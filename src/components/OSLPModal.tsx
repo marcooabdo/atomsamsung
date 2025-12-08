@@ -1,0 +1,2399 @@
+import { useEffect, useState } from 'react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2 } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import { buscarCEP, formatarCEP } from '../lib/cep';
+import type { Database } from '../lib/database.types';
+
+type OS = Database['public']['Tables']['os']['Row'];
+type OSComentario = Database['public']['Tables']['os_comentarios']['Row'];
+type OSAnexo = Database['public']['Tables']['os_anexos']['Row'];
+type OSPeca = Database['public']['Tables']['os_pecas']['Row'];
+
+interface RequisicaoPeca {
+  id: string;
+  os_id: string;
+  cotacao_peca_id: string | null;
+  codigo_peca: string;
+  descricao: string;
+  quantidade_requisitada: number;
+  status: string;
+  peca_estoque_id: string | null;
+  created_at: string;
+}
+
+interface OSLPModalProps {
+  osId: string | null;
+  onClose: () => void;
+  onReload?: () => void;
+  mode?: 'create' | 'view';
+}
+
+type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'anexos' | 'comentarios';
+
+export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalProps) {
+  const { usuario } = useAuth();
+  const [os, setOS] = useState<OS | null>(null);
+  const [pecas, setPecas] = useState<OSPeca[]>([]);
+  const [requisicoes, setRequisicoes] = useState<RequisicaoPeca[]>([]);
+  const [comentarios, setComentarios] = useState<OSComentario[]>([]);
+  const [anexos, setAnexos] = useState<OSAnexo[]>([]);
+  const [checklist, setChecklist] = useState<any[]>([]);
+  const [novoComentario, setNovoComentario] = useState('');
+  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('dados');
+  const [loading, setLoading] = useState(mode === 'view');
+  const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);
+  const [mostrarModalConversao, setMostrarModalConversao] = useState(false);
+  const [motivoConversao, setMotivoConversao] = useState('');
+  const [confirmaConversao, setConfirmaConversao] = useState(false);
+  const [convertendo, setConvertendo] = useState(false);
+
+  // Estados para criação de nova OS
+  const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
+  const [unidadeId, setUnidadeId] = useState('');
+  const [tipoAtendimento, setTipoAtendimento] = useState<'IH' | 'CI'>('CI');
+  const [numeroOSSamsung, setNumeroOSSamsung] = useState('');
+  const [clienteNome, setClienteNome] = useState('');
+  const [clienteCPF, setClienteCPF] = useState('');
+  const [clienteTelefone, setClienteTelefone] = useState('');
+  const [clienteEmail, setClienteEmail] = useState('');
+  const [clienteCEP, setClienteCEP] = useState('');
+  const [clienteLogradouro, setClienteLogradouro] = useState('');
+  const [clienteNumero, setClienteNumero] = useState('');
+  const [clienteComplemento, setClienteComplemento] = useState('');
+  const [clienteBairro, setClienteBairro] = useState('');
+  const [clienteCidade, setClienteCidade] = useState('');
+  const [clienteEstado, setClienteEstado] = useState('');
+  const [buscandoCEP, setBuscandoCEP] = useState(false);
+  const [aparelhoLinha, setAparelhoLinha] = useState('');
+  const [aparelhoModelo, setAparelhoModelo] = useState('');
+  const [aparelhoSerie, setAparelhoSerie] = useState('');
+  const [aparelhoIMEI, setAparelhoIMEI] = useState('');
+  const [defeitoRelatado, setDefeitoRelatado] = useState('');
+  const [observacoesInternas, setObservacoesInternas] = useState('');
+  const [clienteEncontrado, setClienteEncontrado] = useState(false);
+
+  // Estados temporários para modo de criação - requisições
+  const [requisicoesTemporarias, setRequisicoesTemporarias] = useState<Array<{
+    codigo: string;
+    descricao: string;
+    quantidade: number;
+  }>>([]);
+  const [anexosTemporarios, setAnexosTemporarios] = useState<Array<{
+    file: File;
+    nome: string;
+  }>>([]);
+  const [comentariosTemporarios, setComentariosTemporarios] = useState<string[]>([]);
+
+  // Estados para adicionar requisição
+  const [novaPecaCodigo, setNovaPecaCodigo] = useState('');
+  const [novaPecaDescricao, setNovaPecaDescricao] = useState('');
+  const [novaPecaQuantidade, setNovaPecaQuantidade] = useState(1);
+  const [novaPecaValor, setNovaPecaValor] = useState('');
+  const [sugestoesPecas, setSugestoesPecas] = useState<Array<{
+    pn: string;
+    descricao: string;
+    valor_com_impostos: number;
+    valor_corrigido?: number;
+    count: number;
+  }>>([]);
+  const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+
+  useEffect(() => {
+    if (mode === 'create') {
+      loadUnidades();
+      if (usuario?.unidade_id) {
+        setUnidadeId(usuario.unidade_id);
+      }
+    } else if (osId) {
+      loadOS();
+      loadPecas();
+      loadRequisicoes();
+      loadChecklist();
+      loadComentarios();
+      loadAnexos();
+    }
+  }, [osId, mode]);
+
+  // Debounce para buscar sugestões
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (novaPecaCodigo && mode === 'view') {
+        buscarSugestoesPecas(novaPecaCodigo);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [novaPecaCodigo]);
+
+  const loadUnidades = async () => {
+    const { data } = await supabase
+      .from('unidades')
+      .select('id, nome')
+      .eq('ativa', true)
+      .order('nome');
+    setUnidades(data || []);
+  };
+
+  const handleBuscarCEP = async (cep: string) => {
+    if (!cep || cep.replace(/\D/g, '').length !== 8) return;
+
+    setBuscandoCEP(true);
+    try {
+      const endereco = await buscarCEP(cep);
+      if (endereco) {
+        setClienteLogradouro(endereco.logradouro);
+        setClienteBairro(endereco.bairro);
+        setClienteCidade(endereco.localidade);
+        setClienteEstado(endereco.uf);
+        setClienteComplemento(endereco.complemento || '');
+      }
+    } catch (error) {
+      console.error('Erro ao buscar CEP:', error);
+      alert('Erro ao buscar CEP. Verifique o CEP digitado ou preencha manualmente.');
+    } finally {
+      setBuscandoCEP(false);
+    }
+  };
+
+  const buscarCliente = async (cpfCnpj: string) => {
+    if (!cpfCnpj || cpfCnpj.length < 11) {
+      setClienteEncontrado(false);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('cpf_cnpj', cpfCnpj)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data) {
+        setClienteNome(data.nome);
+        setClienteTelefone(data.telefone || '');
+        setClienteEmail(data.email || '');
+        setClienteCEP(data.cep || '');
+        setClienteLogradouro(data.logradouro || '');
+        setClienteNumero(data.numero || '');
+        setClienteComplemento(data.complemento || '');
+        setClienteBairro(data.bairro || '');
+        setClienteCidade(data.cidade || '');
+        setClienteEstado(data.estado || '');
+        setClienteEncontrado(true);
+      } else {
+        setClienteEncontrado(false);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar cliente:', error);
+      setClienteEncontrado(false);
+    }
+  };
+
+  const salvarOuAtualizarCliente = async () => {
+    if (!clienteCPF || !clienteNome) return;
+
+    try {
+      const { data: clienteExistente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('cpf_cnpj', clienteCPF)
+        .maybeSingle();
+
+      const enderecoCompleto = [
+        clienteLogradouro,
+        clienteNumero,
+        clienteComplemento,
+        clienteBairro,
+        clienteCidade,
+        clienteEstado
+      ].filter(Boolean).join(', ');
+
+      if (clienteExistente) {
+        await supabase
+          .from('clientes')
+          .update({
+            nome: clienteNome,
+            telefone: clienteTelefone || null,
+            email: clienteEmail || null,
+            endereco: enderecoCompleto || null,
+            cep: clienteCEP || null,
+            logradouro: clienteLogradouro || null,
+            numero: clienteNumero || null,
+            complemento: clienteComplemento || null,
+            bairro: clienteBairro || null,
+            cidade: clienteCidade || null,
+            estado: clienteEstado || null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', clienteExistente.id);
+      } else {
+        await supabase.from('clientes').insert({
+          cpf_cnpj: clienteCPF,
+          nome: clienteNome,
+          telefone: clienteTelefone || null,
+          email: clienteEmail || null,
+          endereco: enderecoCompleto || null,
+          cep: clienteCEP || null,
+          logradouro: clienteLogradouro || null,
+          numero: clienteNumero || null,
+          complemento: clienteComplemento || null,
+          bairro: clienteBairro || null,
+          cidade: clienteCidade || null,
+          estado: clienteEstado || null
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar/atualizar cliente:', error);
+    }
+  };
+
+  const loadOS = async () => {
+    if (!osId) return;
+    try {
+      const { data, error } = await supabase
+        .from('os')
+        .select(`
+          *,
+          unidade:unidades!os_unidade_id_fkey(nome),
+          cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao)
+        `)
+        .eq('id', osId)
+        .single();
+
+      if (error) throw error;
+      setOS(data);
+    } catch (error) {
+      console.error('Erro ao carregar OS:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadPecas = async () => {
+    if (!osId) return;
+    const [osPecasResult, cotacaoPecasResult] = await Promise.all([
+      supabase
+        .from('os_pecas')
+        .select('*')
+        .eq('os_id', osId)
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('cotacoes_pecas')
+        .select('*')
+        .eq('os_id', osId)
+        .order('created_at', { ascending: true })
+    ]);
+
+    const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
+      id: p.id,
+      os_id: p.os_id,
+      cotacao_peca_id: p.id,
+      codigo: p.pn,
+      pn: p.pn,
+      descricao: p.descricao,
+      quantidade: p.quantidade,
+      valor_unitario: p.valor_base_gspn,
+      valor_total: p.valor_base_gspn * p.quantidade,
+      created_at: p.created_at,
+      updated_at: p.updated_at
+    }));
+
+    setPecas([...(osPecasResult.data || []), ...cotacaoPecas]);
+  };
+
+  const loadRequisicoes = async () => {
+    if (!osId) return;
+    const { data } = await supabase
+      .from('requisicoes_pecas')
+      .select('*')
+      .eq('os_id', osId)
+      .neq('status', 'cancelada')
+      .order('created_at', { ascending: false });
+
+    setRequisicoes(data || []);
+  };
+
+  const buscarSugestoesPecas = async (codigo: string) => {
+    if (!codigo || codigo.length < 2) {
+      setSugestoesPecas([]);
+      setMostrarSugestoes(false);
+      return;
+    }
+
+    try {
+      // Buscar peças do estoque da unidade
+      const { data: pecasEstoque } = await supabase
+        .from('estoque_pecas')
+        .select('pn, descricao, valor_com_impostos')
+        .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+        .ilike('pn', `%${codigo}%`)
+        .limit(10);
+
+      // Agrupar e contar peças iguais
+      const pecasAgrupadas = (pecasEstoque || []).reduce((acc, peca) => {
+        const key = `${peca.pn}-${peca.descricao}`;
+        if (!acc[key]) {
+          acc[key] = {
+            pn: peca.pn,
+            descricao: peca.descricao,
+            valor_com_impostos: peca.valor_com_impostos,
+            count: 0
+          };
+        }
+        acc[key].count++;
+        return acc;
+      }, {} as Record<string, any>);
+
+      // Buscar valor corrigido do último pedido
+      const sugestoesComValor = await Promise.all(
+        Object.values(pecasAgrupadas).map(async (peca: any) => {
+          const { data: pedido } = await supabase
+            .from('estoque_pedidos')
+            .select('valor_estimado')
+            .eq('pn', peca.pn)
+            .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          return {
+            ...peca,
+            valor_corrigido: pedido?.valor_estimado || null
+          };
+        })
+      );
+
+      setSugestoesPecas(sugestoesComValor);
+      setMostrarSugestoes(true);
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error);
+    }
+  };
+
+  const loadChecklist = async () => {
+    if (!osId) return;
+    const { data } = await supabase
+      .from('os_checklist')
+      .select('*, concluido_por:usuarios(nome)')
+      .eq('os_id', osId)
+      .order('ordem', { ascending: true });
+
+    setChecklist(data || []);
+  };
+
+  const loadComentarios = async () => {
+    if (!osId) return;
+    const { data: osData } = await supabase
+      .from('os')
+      .select('cotacao_id')
+      .eq('id', osId)
+      .maybeSingle();
+
+    const [osComentariosResult, cotacaoComentariosResult] = await Promise.all([
+      supabase
+        .from('os_comentarios')
+        .select('*')
+        .eq('os_id', osId)
+        .order('created_at', { ascending: false }),
+      osData?.cotacao_id
+        ? supabase
+            .from('cotacao_comentarios')
+            .select('*')
+            .eq('cotacao_id', osData.cotacao_id)
+            .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null })
+    ]);
+
+    const cotacaoComentarios = (cotacaoComentariosResult.data || []).map(c => ({
+      id: c.id,
+      os_id: c.os_id,
+      usuario_id: c.usuario_id,
+      comentario: c.texto,
+      is_system: c.is_system || false,
+      created_at: c.created_at,
+      updated_at: c.updated_at
+    }));
+
+    const todosComentarios = [...(osComentariosResult.data || []), ...cotacaoComentarios].sort((a, b) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    );
+
+    setComentarios(todosComentarios);
+  };
+
+  const loadAnexos = async () => {
+    if (!osId) return;
+    const { data } = await supabase
+      .from('os_anexos')
+      .select('*, usuario:usuarios(nome)')
+      .eq('os_id', osId)
+      .order('created_at', { ascending: false });
+
+    setAnexos(data || []);
+  };
+
+  const handleCriarOS = async () => {
+    if (!unidadeId || !clienteNome || !defeitoRelatado) {
+      alert('Preencha os campos obrigatórios: Unidade, Nome do Cliente e Defeito Relatado');
+      return;
+    }
+
+    // Validação específica para OS IH: cidade obrigatória
+    if (tipoAtendimento === 'IH' && !clienteCidade?.trim()) {
+      alert('Para OS do tipo IH (In-Home), a cidade do cliente é obrigatória para roteamento.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      await salvarOuAtualizarCliente();
+
+      const enderecoCompleto = [
+        clienteLogradouro,
+        clienteNumero,
+        clienteComplemento,
+        clienteBairro,
+        clienteCidade,
+        clienteEstado
+      ].filter(Boolean).join(', ');
+
+      const { data: novaOS, error: osError } = await supabase
+        .from('os')
+        .insert({
+          unidade_id: unidadeId,
+          tipo_os: 'LP',
+          tipo_atendimento: tipoAtendimento,
+          numero_os_samsung: numeroOSSamsung || null,
+          cliente_nome: clienteNome,
+          cliente_cpf_cnpj: clienteCPF || null,
+          cliente_telefone: clienteTelefone || null,
+          cliente_email: clienteEmail || null,
+          cliente_endereco: enderecoCompleto || null,
+          cliente_cep: clienteCEP || null,
+          cliente_logradouro: clienteLogradouro || null,
+          cliente_numero: clienteNumero || null,
+          cliente_complemento: clienteComplemento || null,
+          cliente_bairro: clienteBairro || null,
+          cliente_cidade: clienteCidade || null,
+          cliente_estado: clienteEstado || null,
+          aparelho_linha: aparelhoLinha || null,
+          aparelho_modelo: aparelhoModelo || null,
+          aparelho_numero_serie: aparelhoSerie || null,
+          aparelho_imei: aparelhoIMEI || null,
+          defeito_relatado: defeitoRelatado,
+          observacoes_internas: observacoesInternas || null,
+          coluna_kanban: 'os_nova',
+          criado_por: usuario?.id
+        })
+        .select()
+        .single();
+
+      if (osError) throw osError;
+
+      if (requisicoesTemporarias.length > 0) {
+        const requisicoesInsert = requisicoesTemporarias.map(req => ({
+          os_id: novaOS.id,
+          codigo_peca: req.codigo,
+          descricao: req.descricao,
+          quantidade_requisitada: req.quantidade,
+          status: 'pendente',
+          requisitado_por: usuario?.id
+        }));
+
+        const { error: requisicoesError } = await supabase
+          .from('requisicoes_pecas')
+          .insert(requisicoesInsert);
+
+        if (requisicoesError) throw requisicoesError;
+      }
+
+      const checklistPadrao = [
+        'Verificar número de série do aparelho',
+        'Conferir IMEI com sistema Samsung',
+        'Testar funcionamento geral do aparelho',
+        'Fotografar defeito relatado',
+        'Embalar aparelho adequadamente'
+      ];
+
+      const checklistInsert = checklistPadrao.map((item, index) => ({
+        os_id: novaOS.id,
+        item: item,
+        ordem: index + 1,
+        concluido: false
+      }));
+
+      const { error: checklistError } = await supabase
+        .from('os_checklist')
+        .insert(checklistInsert);
+
+      if (checklistError) throw checklistError;
+
+      if (anexosTemporarios.length > 0) {
+        for (const anexo of anexosTemporarios) {
+          const fileExt = anexo.file.name.split('.').pop();
+          const fileName = `${Math.random()}.${fileExt}`;
+          const filePath = `${novaOS.id}/${fileName}`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('os-anexos')
+            .upload(filePath, anexo.file);
+
+          if (uploadError) {
+            console.error('Erro ao fazer upload:', uploadError);
+            continue;
+          }
+
+          await supabase.from('os_anexos').insert({
+            os_id: novaOS.id,
+            nome_arquivo: anexo.nome,
+            caminho_arquivo: filePath,
+            tipo_arquivo: anexo.file.type,
+            tamanho: anexo.file.size,
+            usuario_id: usuario?.id
+          });
+        }
+      }
+
+      const comentariosInsert = [
+        {
+          os_id: novaOS.id,
+          usuario_id: usuario?.id,
+          comentario: `OS LP criada por ${usuario?.nome}`,
+          is_system: true
+        }
+      ];
+
+      if (comentariosTemporarios.length > 0) {
+        comentariosInsert.push(...comentariosTemporarios.map(comentario => ({
+          os_id: novaOS.id,
+          usuario_id: usuario?.id,
+          comentario: comentario,
+          is_system: false
+        })));
+      }
+
+      if (requisicoesTemporarias.length > 0) {
+        requisicoesTemporarias.forEach(req => {
+          comentariosInsert.push({
+            os_id: novaOS.id,
+            usuario_id: usuario?.id,
+            comentario: `Peça requisitada por ${usuario?.nome}: ${req.descricao} (${req.codigo})`,
+            is_system: true
+          });
+        });
+      }
+
+      const { error: comentariosError } = await supabase
+        .from('os_comentarios')
+        .insert(comentariosInsert);
+
+      if (comentariosError) throw comentariosError;
+
+      alert('OS LP criada com sucesso!');
+      onReload?.();
+      onClose();
+    } catch (error) {
+      console.error('Erro ao criar OS LP:', error);
+      alert('Erro ao criar OS LP');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRequisitarPeca = async (peca: any) => {
+    try {
+      await supabase.from('requisicoes_pecas').insert({
+        os_id: osId,
+        cotacao_peca_id: peca.cotacao_peca_id,
+        codigo_peca: peca.codigo || peca.pn,
+        descricao: peca.descricao,
+        quantidade_requisitada: peca.quantidade,
+        status: 'pendente',
+        requisitado_por: usuario?.id,
+        numero_os_samsung: os?.numero_os_samsung,
+        unidade_id: os?.unidade_id
+      });
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Peça requisitada por ${usuario?.nome}: ${peca.descricao} (${peca.codigo || peca.pn})`,
+        is_system: true
+      });
+
+      alert('Requisição enviada!');
+      loadRequisicoes();
+      loadComentarios();
+    } catch (error) {
+      console.error('Erro ao requisitar peça:', error);
+      alert('Erro ao requisitar peça');
+    }
+  };
+
+  const handleCancelarRequisicao = async (requisicao: RequisicaoPeca) => {
+    const motivo = prompt('Digite o motivo do cancelamento:');
+    if (!motivo) return;
+
+    try {
+      const { error: updateError } = await supabase
+        .from('requisicoes_pecas')
+        .update({ status: 'cancelada', motivo_cancelamento: motivo })
+        .eq('id', requisicao.id);
+
+      if (updateError) {
+        console.error('Erro ao atualizar requisição:', updateError);
+        throw updateError;
+      }
+
+      const { error: commentError } = await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Requisição cancelada por ${usuario?.nome}: ${requisicao.descricao}\nMotivo: ${motivo}`,
+        is_system: true
+      });
+
+      if (commentError) {
+        console.error('Erro ao inserir comentário:', commentError);
+      }
+
+      alert('Requisição cancelada!');
+      loadRequisicoes();
+      loadComentarios();
+    } catch (error) {
+      console.error('Erro ao cancelar requisição:', error);
+      alert('Erro ao cancelar requisição');
+    }
+  };
+
+  const handlePostarGI = async (requisicao: RequisicaoPeca) => {
+    const confirmacao = confirm(
+      `Confirma a postagem de GI desta peça?\n\n` +
+      `Peça: ${requisicao.descricao}\n` +
+      `Código: ${requisicao.codigo_peca}`
+    );
+    if (!confirmacao) return;
+
+    try {
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'gi_postada',
+          gi_postada_em: new Date().toISOString(),
+          tipo_devolucao: 'usada',
+          motivo_devolucao: 'Peça consumida - GI postada'
+        })
+        .eq('id', requisicao.id);
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `GI postada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})`,
+        is_system: true
+      });
+
+      // Log no histórico da peça
+      if (requisicao.peca_estoque_id) {
+        await supabase.from('estoque_historico').insert({
+          peca_id: requisicao.peca_estoque_id,
+          usuario_id: usuario?.id,
+          acao: 'gi_postada',
+          status_anterior: 'vinculada_tecnico',
+          status_novo: 'vinculada_tecnico',
+          observacao: `GI postada por ${usuario?.nome} - Peça aguardando devolução ao estoque`
+        });
+      }
+
+      alert('GI postada com sucesso!');
+      loadRequisicoes();
+      loadComentarios();
+      onReload?.();
+    } catch (error) {
+      console.error('Erro ao postar GI:', error);
+      alert('Erro ao postar GI');
+    }
+  };
+
+  const handleRemoverPeca = async (requisicao: RequisicaoPeca) => {
+    const motivo = prompt('Motivo da devolução:');
+    if (!motivo) return;
+
+    const tipo = prompt('Tipo de devolução:\n1 = Nova\n2 = Nova com defeito\n3 = Usada');
+    const tipoDevolucao = tipo === '1' ? 'nova' : tipo === '2' ? 'nova_com_defeito' : 'usada';
+
+    try {
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'devolvida',
+          motivo_devolucao: motivo,
+          tipo_devolucao: tipoDevolucao
+        })
+        .eq('id', requisicao.id);
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Peça devolvida por ${usuario?.nome}: ${requisicao.descricao}\nTipo: ${tipoDevolucao}\nMotivo: ${motivo}`,
+        is_system: true
+      });
+
+      alert('Peça devolvida com sucesso!');
+      loadRequisicoes();
+      loadComentarios();
+      onReload?.();
+    } catch (error) {
+      console.error('Erro ao devolver peça:', error);
+      alert('Erro ao devolver peça');
+    }
+  };
+
+  const handleCancelarGI = async (requisicao: RequisicaoPeca) => {
+    const motivo = prompt('Digite o motivo do cancelamento da GI:');
+    if (!motivo || !motivo.trim()) {
+      alert('É necessário informar o motivo do cancelamento');
+      return;
+    }
+
+    const confirmacao = confirm(
+      `Confirma o cancelamento da GI desta peça?\n\n` +
+      `Peça: ${requisicao.descricao}\n` +
+      `Código: ${requisicao.codigo_peca}\n` +
+      `Motivo: ${motivo}\n\n` +
+      `A peça voltará para o status "ATENDIDA" e poderá ser devolvida ou ter a GI postada novamente.`
+    );
+    if (!confirmacao) return;
+
+    try {
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'atendida',
+          gi_postada_em: null
+        })
+        .eq('id', requisicao.id);
+
+      await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `GI cancelada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})\nRequisição ID: ${requisicao.id.slice(0, 8)}\nMotivo: ${motivo}`,
+          is_system: true
+        });
+
+      // Log no histórico da peça
+      if (requisicao.peca_estoque_id) {
+        await supabase.from('estoque_historico').insert({
+          peca_id: requisicao.peca_estoque_id,
+          usuario_id: usuario?.id,
+          acao: 'gi_cancelada',
+          status_anterior: 'vinculada_tecnico',
+          status_novo: 'vinculada_tecnico',
+          observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
+        });
+      }
+
+      await loadRequisicoes();
+      await loadComentarios();
+
+      if (onReload) {
+        onReload();
+      }
+    } catch (error) {
+      console.error('Erro ao cancelar GI:', error);
+      alert('Erro ao cancelar GI');
+    }
+  };
+
+  const handleAdicionarComentario = async () => {
+    if (!novoComentario.trim() || !osId) return;
+
+    try {
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: novoComentario,
+        is_system: false
+      });
+
+      setNovoComentario('');
+      loadComentarios();
+    } catch (error) {
+      console.error('Erro ao adicionar comentário:', error);
+    }
+  };
+
+  const handleToggleChecklist = async (item: any) => {
+    try {
+      await supabase
+        .from('os_checklist')
+        .update({
+          concluido: !item.concluido,
+          concluido_em: !item.concluido ? new Date().toISOString() : null,
+          concluido_por_id: !item.concluido ? usuario?.id : null
+        })
+        .eq('id', item.id);
+
+      loadChecklist();
+    } catch (error) {
+      console.error('Erro ao atualizar checklist:', error);
+    }
+  };
+
+  const handleUploadAnexo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.files?.[0] || !osId) return;
+
+    const file = e.target.files[0];
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Math.random()}.${fileExt}`;
+    const filePath = `${osId}/${fileName}`;
+
+    try {
+      const { error: uploadError } = await supabase.storage
+        .from('os-anexos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      await supabase.from('os_anexos').insert({
+        os_id: osId,
+        nome_arquivo: file.name,
+        caminho_arquivo: filePath,
+        tipo_arquivo: file.type,
+        tamanho: file.size,
+        usuario_id: usuario?.id
+      });
+
+      alert('Anexo enviado com sucesso!');
+      loadAnexos();
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      alert('Erro ao fazer upload do anexo');
+    }
+  };
+
+  const handleConverterOS = async () => {
+    if (!motivoConversao.trim()) {
+      alert('Por favor, informe o motivo da conversão');
+      return;
+    }
+
+    if (!confirmaConversao) {
+      alert('Por favor, confirme que entende as consequências da conversão');
+      return;
+    }
+
+    setConvertendo(true);
+    try {
+      const { error: updateError } = await supabase
+        .from('os')
+        .update({ tipo_os: 'OW' })
+        .eq('id', osId);
+
+      if (updateError) throw updateError;
+
+      const comentariosInsert = [
+        {
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `OS convertida de LP para OW por ${usuario?.nome}`,
+          is_system: true
+        },
+        {
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `Motivo da conversão: ${motivoConversao}`,
+          is_system: true
+        }
+      ];
+
+      const requisicoesCount = requisicoes.length;
+      if (requisicoesCount > 0) {
+        comentariosInsert.push({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `IMPORTANTE: ${requisicoesCount} requisição(ões) de peças foram mantidas`,
+          is_system: true
+        });
+      }
+
+      const { error: comentariosError } = await supabase
+        .from('os_comentarios')
+        .insert(comentariosInsert);
+
+      if (comentariosError) throw comentariosError;
+
+      alert('OS convertida com sucesso para OW!');
+      setMostrarModalConversao(false);
+      setMotivoConversao('');
+      setConfirmaConversao(false);
+      onReload?.();
+      onClose();
+    } catch (error) {
+      console.error('Erro ao converter OS:', error);
+      alert('Erro ao converter OS');
+    } finally {
+      setConvertendo(false);
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const statusConfig: Record<string, { label: string; color: string }> = {
+      pendente: { label: 'PENDENTE', color: '#FFBF00' },
+      atendida: { label: 'ATENDIDA', color: '#00D4FF' },
+      em_uso: { label: 'EM USO', color: '#9D00FF' },
+      gi_postada: { label: 'GI POSTADA', color: '#39FF14' },
+      devolvida: { label: 'DEVOLVIDA', color: '#FF0064' },
+      cancelada: { label: 'CANCELADA', color: '#808080' },
+      reprovada: { label: 'REPROVADA', color: '#FF0064' }
+    };
+
+    const config = statusConfig[status] || { label: status.toUpperCase(), color: '#6B7280' };
+
+    return (
+      <span
+        className="px-2 py-1 rounded text-xs font-bold uppercase"
+        style={{
+          backgroundColor: `${config.color}20`,
+          color: config.color,
+          border: `1px solid ${config.color}60`
+        }}
+      >
+        {config.label}
+      </span>
+    );
+  };
+
+  if (loading && mode === 'view') {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <div className="futuristic-loader"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-[#FFA500]/20">
+          <div>
+            <h2 className="tech-heading text-xl text-[#FFA500] flex items-center gap-2">
+              LP - Garantia
+              {mode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
+            </h2>
+            {os && (
+              <p className="text-sm text-gray-400 mt-1">
+                {os.numero_os_samsung || os.numero_os_interna || 'N/A'}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[#FFA500]/10 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5 text-[#FFA500]" />
+          </button>
+        </div>
+
+        {mode === 'create' ? (
+          <>
+            <div className="flex border-b border-[#FFA500]/20">
+              {[
+                { id: 'dados', label: 'Dados Básicos', icon: User },
+                { id: 'estoque', label: 'Estoque & Peças', icon: Package },
+                { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                { id: 'anexos', label: 'Anexos', icon: Paperclip },
+                { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setAbaAtiva(id as AbaAtiva)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
+                    abaAtiva === id
+                      ? 'bg-[#FFA500]/10 text-[#FFA500] border-b-2 border-[#FFA500]'
+                      : 'text-gray-400 hover:bg-[#FFA500]/5 hover:text-[#FFA500]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                  {id === 'estoque' && requisicoesTemporarias.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
+                      {requisicoesTemporarias.length}
+                    </span>
+                  )}
+                  {id === 'anexos' && anexosTemporarios.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
+                      {anexosTemporarios.length}
+                    </span>
+                  )}
+                  {id === 'comentarios' && comentariosTemporarios.length > 0 && (
+                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
+                      {comentariosTemporarios.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
+              {abaAtiva === 'dados' && (
+                <div className="space-y-6">
+              <div className="premium-card p-6">
+                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                  Informações Básicas
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Unidade *
+                    </label>
+                    <select
+                      value={unidadeId}
+                      onChange={(e) => setUnidadeId(e.target.value)}
+                      className="neon-input w-full"
+                    >
+                      <option value="">Selecione...</option>
+                      {unidades.map(u => (
+                        <option key={u.id} value={u.id}>{u.nome}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Tipo Atendimento
+                    </label>
+                    <select
+                      value={tipoAtendimento}
+                      onChange={(e) => setTipoAtendimento(e.target.value as 'IH' | 'CI')}
+                      className="neon-input w-full"
+                    >
+                      <option value="CI">CI - Carry In</option>
+                      <option value="IH">IH - In Home</option>
+                    </select>
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Número OS Samsung *
+                    </label>
+                    <input
+                      type="text"
+                      value={numeroOSSamsung}
+                      onChange={(e) => setNumeroOSSamsung(e.target.value)}
+                      className="neon-input w-full"
+                      placeholder="Obrigatório para OS Samsung"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="premium-card p-6">
+                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                  Dados do Cliente
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      CPF/CNPJ
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteCPF}
+                      onChange={(e) => setClienteCPF(e.target.value)}
+                      onBlur={() => buscarCliente(clienteCPF)}
+                      className="neon-input w-full"
+                      placeholder="Digite CPF/CNPJ para buscar cliente"
+                    />
+                    {clienteEncontrado && (
+                      <p className="text-xs text-green-400 mt-1">✓ Cliente encontrado na base de dados</p>
+                    )}
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Nome *
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteNome}
+                      onChange={(e) => setClienteNome(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Telefone
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteTelefone}
+                      onChange={(e) => setClienteTelefone(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Email
+                    </label>
+                    <input
+                      type="email"
+                      value={clienteEmail}
+                      onChange={(e) => setClienteEmail(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      CEP
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={clienteCEP}
+                        onChange={(e) => setClienteCEP(e.target.value)}
+                        onBlur={(e) => handleBuscarCEP(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="00000-000"
+                        maxLength={9}
+                      />
+                      {buscandoCEP && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="w-4 h-4 text-[#FFA500] animate-spin" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Estado
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteEstado}
+                      onChange={(e) => setClienteEstado(e.target.value)}
+                      className="neon-input w-full"
+                      placeholder="UF"
+                      maxLength={2}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Logradouro
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteLogradouro}
+                      onChange={(e) => setClienteLogradouro(e.target.value)}
+                      className="neon-input w-full"
+                      placeholder="Rua, Avenida, etc."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Número
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteNumero}
+                      onChange={(e) => setClienteNumero(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Complemento
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteComplemento}
+                      onChange={(e) => setClienteComplemento(e.target.value)}
+                      className="neon-input w-full"
+                      placeholder="Apt, Bloco, etc."
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Bairro
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteBairro}
+                      onChange={(e) => setClienteBairro(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Cidade
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteCidade}
+                      onChange={(e) => setClienteCidade(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="premium-card p-6">
+                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                  Dados do Aparelho
+                </h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Linha
+                    </label>
+                    <input
+                      type="text"
+                      value={aparelhoLinha}
+                      onChange={(e) => setAparelhoLinha(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Modelo
+                    </label>
+                    <input
+                      type="text"
+                      value={aparelhoModelo}
+                      onChange={(e) => setAparelhoModelo(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Número de Série
+                    </label>
+                    <input
+                      type="text"
+                      value={aparelhoSerie}
+                      onChange={(e) => setAparelhoSerie(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      IMEI
+                    </label>
+                    <input
+                      type="text"
+                      value={aparelhoIMEI}
+                      onChange={(e) => setAparelhoIMEI(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Defeito Relatado *
+                    </label>
+                    <textarea
+                      value={defeitoRelatado}
+                      onChange={(e) => setDefeitoRelatado(e.target.value)}
+                      className="neon-input w-full"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Observações Internas
+                    </label>
+                    <textarea
+                      value={observacoesInternas}
+                      onChange={(e) => setObservacoesInternas(e.target.value)}
+                      className="neon-input w-full"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              </div>
+                </div>
+              )}
+
+            {abaAtiva === 'estoque' && (
+              <div className="space-y-6">
+                <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Gestão de Peças e Estoque
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Requisite peças do estoque. O almoxarife receberá e atenderá sua requisição.
+                  </p>
+                </div>
+
+                <div className="premium-card p-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Código/PN
+                      </label>
+                      <input
+                        type="text"
+                        value={novaPecaCodigo}
+                        onChange={(e) => setNovaPecaCodigo(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="Ex: GH82-12345A"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Descrição
+                      </label>
+                      <input
+                        type="text"
+                        value={novaPecaDescricao}
+                        onChange={(e) => setNovaPecaDescricao(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="Ex: Display LCD"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Qtd
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={novaPecaQuantidade}
+                          onChange={(e) => setNovaPecaQuantidade(Number(e.target.value))}
+                          className="neon-input w-20"
+                        />
+                        <button
+                          onClick={() => {
+                            if (!novaPecaCodigo || !novaPecaDescricao) {
+                              alert('Preencha código e descrição');
+                              return;
+                            }
+                            setRequisicoesTemporarias([...requisicoesTemporarias, {
+                              codigo: novaPecaCodigo,
+                              descricao: novaPecaDescricao,
+                              quantidade: novaPecaQuantidade
+                            }]);
+                            setNovaPecaCodigo('');
+                            setNovaPecaDescricao('');
+                            setNovaPecaQuantidade(1);
+                          }}
+                          className="neon-button px-4 py-2 flex-1 text-xs"
+                          style={{
+                            backgroundColor: '#00D4FF20',
+                            borderColor: '#00D4FF',
+                            color: '#00D4FF'
+                          }}
+                        >
+                          REQUISITAR
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  {requisicoesTemporarias.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhuma peça requisitada ainda</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {requisicoesTemporarias.map((req, index) => (
+                        <div key={index} className="premium-card p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="text-sm font-bold text-gray-300">{req.descricao}</p>
+                                <span
+                                  className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                  style={{
+                                    backgroundColor: '#FFBF0020',
+                                    color: '#FFBF00',
+                                    border: '1px solid #FFBF0060'
+                                  }}
+                                >
+                                  PENDENTE
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-500">Código: {req.codigo}</p>
+                              <p className="text-xs text-gray-500 mt-1">Qtd: {req.quantidade}</p>
+                            </div>
+                            <button
+                              onClick={() => {
+                                setRequisicoesTemporarias(requisicoesTemporarias.filter((_, i) => i !== index));
+                              }}
+                              className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                              style={{
+                                backgroundColor: '#FF006410',
+                                borderColor: '#FF0064',
+                                color: '#FF0064'
+                              }}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              REMOVER
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'checklist' && (
+              <div className="space-y-6">
+                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4">
+                  <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider flex items-center gap-2">
+                    <CheckSquare className="w-4 h-4" />
+                    Checklist do Reparo LP
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Itens de verificação para garantir a qualidade do serviço
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  {[
+                    'Verificar número de série do aparelho',
+                    'Conferir IMEI com sistema Samsung',
+                    'Testar funcionamento geral do aparelho',
+                    'Fotografar defeito relatado',
+                    'Embalar aparelho adequadamente'
+                  ].map((item, index) => (
+                    <div key={index} className="premium-card p-4 hover-lift">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-5 h-5 rounded border-2 border-gray-500 flex items-center justify-center">
+                        </div>
+                        <div className="flex-1">
+                          <p className="text-sm text-gray-200">{item}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Será marcado após criação da OS
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'anexos' && (
+              <div className="space-y-6">
+                <div className="premium-card p-6">
+                  <label className="neon-button flex items-center justify-center gap-2 w-full px-4 py-3 cursor-pointer"
+                    style={{
+                      backgroundColor: '#FFA50020',
+                      borderColor: '#FFA500',
+                      color: '#FFA500'
+                    }}>
+                    <Paperclip className="w-4 h-4" />
+                    SELECIONAR ARQUIVO
+                    <input
+                      type="file"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setAnexosTemporarios([...anexosTemporarios, {
+                            file,
+                            nome: file.name
+                          }]);
+                          e.target.value = '';
+                        }
+                      }}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <div>
+                  {anexosTemporarios.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhum arquivo selecionado</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {anexosTemporarios.map((anexo, index) => (
+                        <div key={index} className="premium-card p-4 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm text-gray-300">{anexo.nome}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {(anexo.file.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                          <button
+                            onClick={() => {
+                              setAnexosTemporarios(anexosTemporarios.filter((_, i) => i !== index));
+                            }}
+                            className="neon-button flex items-center gap-2 text-xs px-3 py-1"
+                            style={{
+                              backgroundColor: '#FF006410',
+                              borderColor: '#FF0064',
+                              color: '#FF0064'
+                            }}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'comentarios' && (
+              <div className="space-y-4">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Adicionar comentário..."
+                    value={novoComentario}
+                    onChange={(e) => setNovoComentario(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && novoComentario.trim()) {
+                        setComentariosTemporarios([...comentariosTemporarios, novoComentario.trim()]);
+                        setNovoComentario('');
+                      }
+                    }}
+                    className="neon-input flex-1"
+                  />
+                  <button
+                    onClick={() => {
+                      if (novoComentario.trim()) {
+                        setComentariosTemporarios([...comentariosTemporarios, novoComentario.trim()]);
+                        setNovoComentario('');
+                      }
+                    }}
+                    className="neon-button px-6"
+                  >
+                    Enviar
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {comentariosTemporarios.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhum comentário ainda</p>
+                  ) : (
+                    comentariosTemporarios.map((comentario, index) => (
+                      <div key={index} className="premium-card p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <p className="text-sm text-gray-300 flex-1">{comentario}</p>
+                          <button
+                            onClick={() => {
+                              setComentariosTemporarios(comentariosTemporarios.filter((_, i) => i !== index));
+                            }}
+                            className="text-gray-500 hover:text-red-500 transition-colors ml-2"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          Por {usuario?.nome || 'Você'}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex border-b border-[#FFA500]/20">
+              {[
+                { id: 'dados', label: 'Dados OS/Cliente', icon: User },
+                { id: 'estoque', label: 'Estoque & Peças', icon: Package },
+                { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                { id: 'anexos', label: 'Anexos', icon: Paperclip },
+                { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
+              ].map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setAbaAtiva(id as AbaAtiva)}
+                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
+                    abaAtiva === id
+                      ? 'bg-[#FFA500]/10 text-[#FFA500] border-b-2 border-[#FFA500]'
+                      : 'text-gray-400 hover:bg-[#FFA500]/5 hover:text-[#FFA500]'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
+              {abaAtiva === 'dados' && os && (
+                <div className="space-y-6">
+                  <div className="premium-card p-4 bg-gradient-to-r from-[#FFA500]/10 to-[#00D4FF]/10 border-l-4 border-[#FFA500]">
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <FileText className="w-4 h-4" />
+                      Informações da OS
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      {os.numero_os_samsung && (
+                        <div>
+                          <label className="text-xs text-gray-500 uppercase">Número OS Samsung</label>
+                          <p className="text-sm text-gray-300 mt-1 font-mono font-bold">{os.numero_os_samsung}</p>
+                        </div>
+                      )}
+                      {(os as any).cotacao?.numero_cotacao && (
+                        <div>
+                          <label className="text-xs text-gray-500 uppercase">Número Cotação</label>
+                          <p className="text-sm text-gray-300 mt-1 font-mono font-bold">{(os as any).cotacao.numero_cotacao}</p>
+                        </div>
+                      )}
+                      {(os as any).unidade?.nome && (
+                        <div>
+                          <label className="text-xs text-gray-500 uppercase">Unidade</label>
+                          <p className="text-sm text-gray-300 mt-1 font-semibold uppercase">{(os as any).unidade.nome}</p>
+                        </div>
+                      )}
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Tipo de Atendimento</label>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className="px-3 py-1 rounded text-xs font-bold"
+                            style={{
+                              backgroundColor: os.tipo_atendimento === 'IH' ? '#10b98130' : '#f9731630',
+                              color: os.tipo_atendimento === 'IH' ? '#10b981' : '#f97316',
+                              border: `1px solid ${os.tipo_atendimento === 'IH' ? '#10b981' : '#f97316'}60`
+                            }}
+                          >
+                            {os.tipo_atendimento}
+                          </span>
+                          <span
+                            className="px-3 py-1 rounded text-xs font-bold"
+                            style={{
+                              backgroundColor: os.tipo_os === 'LP' ? '#FFA50030' : '#00D4FF30',
+                              color: os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF',
+                              border: `1px solid ${os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF'}60`
+                            }}
+                          >
+                            {os.tipo_os}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4 flex items-center gap-2">
+                      <User className="w-4 h-4" />
+                      Cliente
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Nome</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.cliente_nome}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">CPF/CNPJ</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.cliente_cpf_cnpj || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Telefone</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Email</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.cliente_email || '-'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-500 uppercase">Endereço</label>
+                        <div className="grid grid-cols-4 gap-2 mt-1">
+                          <div>
+                            <p className="text-xs text-gray-500">CEP</p>
+                            <p className="text-sm text-gray-300">{os.cliente_cep || '-'}</p>
+                          </div>
+                          <div className="col-span-3">
+                            <p className="text-xs text-gray-500">Logradouro</p>
+                            <p className="text-sm text-gray-300">{os.cliente_logradouro || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Número</p>
+                            <p className="text-sm text-gray-300">{os.cliente_numero || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Complemento</p>
+                            <p className="text-sm text-gray-300">{os.cliente_complemento || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Bairro</p>
+                            <p className="text-sm text-gray-300">{os.cliente_bairro || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Cidade</p>
+                            <p className="text-sm text-gray-300">{os.cliente_cidade || '-'}</p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-500">Estado</p>
+                            <p className="text-sm text-gray-300">{os.cliente_estado || '-'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-700 pt-6">
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                      Aparelho
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Linha</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.aparelho_linha || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Modelo</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.aparelho_modelo || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Nº Série</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.aparelho_numero_serie || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">IMEI</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.aparelho_imei || '-'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-500 uppercase">Defeito Relatado</label>
+                        <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.defeito_relatado || '-'}</p>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="text-xs text-gray-500 uppercase">Observações Internas</label>
+                        <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.observacoes_internas || '-'}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="premium-card p-6 border-l-4 border-[#00D4FF]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2 mb-2">
+                          <RefreshCw className="w-4 h-4" />
+                          Converter Tipo de OS
+                        </h3>
+                        <p className="text-xs text-gray-400">
+                          Converta esta OS de LP para OW. Todas as informações, anexos e requisições serão mantidos.
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => setMostrarModalConversao(true)}
+                        className="neon-button px-6 py-3 ml-4"
+                        style={{
+                          backgroundColor: '#00D4FF20',
+                          borderColor: '#00D4FF',
+                          color: '#00D4FF'
+                        }}
+                      >
+                        CONVERTER PARA OW
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {abaAtiva === 'estoque' && (
+                <div className="space-y-6">
+                  <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Adicionar Nova Requisição
+                    </h3>
+                    <p className="text-xs text-gray-400 mt-2">
+                      Requisite peças do estoque. O almoxarife receberá e atenderá sua requisição.
+                    </p>
+                  </div>
+
+                  <div className="premium-card p-4">
+                    <div className="grid grid-cols-4 gap-3">
+                      <div className="relative">
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Código/PN *
+                        </label>
+                        <input
+                          type="text"
+                          value={novaPecaCodigo}
+                          onChange={(e) => {
+                            setNovaPecaCodigo(e.target.value);
+                            setMostrarSugestoes(true);
+                          }}
+                          onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
+                          className="neon-input w-full"
+                          placeholder="Ex: GH82-12345A"
+                        />
+                        {mostrarSugestoes && sugestoesPecas.length > 0 && (
+                          <div className="absolute z-50 mt-1 w-full max-w-md bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                            {sugestoesPecas.map((sugestao, idx) => (
+                              <div
+                                key={idx}
+                                onClick={() => {
+                                  setNovaPecaCodigo(sugestao.pn);
+                                  setNovaPecaDescricao(sugestao.descricao);
+                                  setNovaPecaValor((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
+                                  setMostrarSugestoes(false);
+                                }}
+                                className="p-3 hover:bg-[#00D4FF]/10 cursor-pointer border-b border-gray-800 last:border-0"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="flex-1">
+                                    <p className="text-sm font-bold text-[#00D4FF]">{sugestao.pn}</p>
+                                    <p className="text-xs text-gray-400 mt-1">{sugestao.descricao}</p>
+                                    <div className="flex items-center gap-3 mt-2">
+                                      <span className="text-[10px] text-gray-500">
+                                        GSPN/NF: R$ {sugestao.valor_com_impostos?.toFixed(2) || '0.00'}
+                                      </span>
+                                      {sugestao.valor_corrigido && (
+                                        <span className="text-[10px] text-[#39FF14]">
+                                          Corrigido: R$ {sugestao.valor_corrigido.toFixed(2)}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <span className="text-xs text-gray-600">
+                                    {sugestao.count} em estoque
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Descrição *
+                        </label>
+                        <input
+                          type="text"
+                          value={novaPecaDescricao}
+                          onChange={(e) => setNovaPecaDescricao(e.target.value)}
+                          className="neon-input w-full"
+                          placeholder="Ex: Display LCD"
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Valor (R$)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={novaPecaValor}
+                          onChange={(e) => setNovaPecaValor(e.target.value)}
+                          className="neon-input w-full"
+                          placeholder="0.00"
+                        />
+                        <p className="text-[10px] text-gray-500 mt-1">Valor GSPN/NF</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Qtd *
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="number"
+                            min="1"
+                            value={novaPecaQuantidade}
+                            onChange={(e) => setNovaPecaQuantidade(Number(e.target.value))}
+                            className="neon-input w-20"
+                          />
+                          <button
+                            onClick={async () => {
+                              if (!novaPecaCodigo || !novaPecaDescricao) {
+                                alert('Preencha código e descrição');
+                                return;
+                              }
+
+                              try {
+                                const valorNumerico = novaPecaValor ? parseFloat(novaPecaValor) : null;
+
+                                await supabase.from('requisicoes_pecas').insert({
+                                  os_id: osId,
+                                  codigo_peca: novaPecaCodigo,
+                                  descricao: novaPecaDescricao,
+                                  quantidade_requisitada: novaPecaQuantidade,
+                                  valor_peca: valorNumerico,
+                                  status: 'pendente'
+                                });
+
+                                await supabase.from('os_comentarios').insert({
+                                  os_id: osId,
+                                  usuario_id: usuario?.id,
+                                  comentario: `✚ Requisição adicionada: ${novaPecaDescricao} (${novaPecaCodigo}) - Qtd: ${novaPecaQuantidade}${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
+                                  is_system: true
+                                });
+
+                                setNovaPecaCodigo('');
+                                setNovaPecaDescricao('');
+                                setNovaPecaQuantidade(1);
+                                setNovaPecaValor('');
+                                setSugestoesPecas([]);
+                                loadRequisicoes();
+                                loadComentarios();
+                                alert('Requisição criada com sucesso!');
+                              } catch (error) {
+                                console.error('Erro ao criar requisição:', error);
+                                alert('Erro ao criar requisição');
+                              }
+                            }}
+                            className="neon-button px-4 py-2 flex-1 text-xs"
+                            style={{
+                              backgroundColor: '#00D4FF20',
+                              borderColor: '#00D4FF',
+                              color: '#00D4FF'
+                            }}
+                          >
+                            REQUISITAR
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                      Peças da OS (Valores Sem Markup)
+                    </h3>
+                    {pecas.length === 0 ? (
+                      <p className="text-gray-500 text-sm">Nenhuma peça vinculada a esta OS</p>
+                    ) : (
+                      <div className="space-y-3">
+                        {pecas.map((peca) => {
+                          const requisicao = requisicoes.find(
+                            r => r.cotacao_peca_id === peca.cotacao_peca_id
+                          );
+
+                          return (
+                            <div
+                              key={peca.id}
+                              className="premium-card p-4 border-l-4"
+                              style={{ borderLeftColor: '#FFA500' }}
+                            >
+                              <div className="flex items-start justify-between mb-2">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
+                                    {requisicao && getStatusBadge(requisicao.status)}
+                                  </div>
+                                  <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                  <div className="flex items-center gap-4 mt-2">
+                                    <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                                    <p className="text-xs text-gray-500">
+                                      Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                    </p>
+                                    <p className="text-xs font-bold text-[#FFA500]">
+                                      Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                    </p>
+                                  </div>
+                                  {requisicao && (
+                                    <p className="text-xs text-gray-500 mt-2">
+                                      Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
+                                    </p>
+                                  )}
+                                  {requisicao && (requisicao.status === 'em_uso' && requisicao.motivo_reprovacao) && (
+                                    <div className="mt-3 p-3 rounded-lg" style={{
+                                      backgroundColor: '#FF006410',
+                                      border: '1px solid #FF006460'
+                                    }}>
+                                      <div className="flex items-start gap-2">
+                                        <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
+                                        <div className="flex-1">
+                                          <p className="text-xs font-bold text-[#FF0064] mb-1">DEVOLUÇÃO REJEITADA PELO ESTOQUE:</p>
+                                          <p className="text-xs text-gray-300">{requisicao.motivo_reprovacao}</p>
+                                          <p className="text-xs text-[#FFBF00] mt-2 italic">
+                                            ⚠️ Você pode postar uma nova GI ou devolver a peça novamente
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex gap-2">
+                                  {!requisicao ? (
+                                    <button
+                                      onClick={() => handleRequisitarPeca(peca)}
+                                      className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                    >
+                                      <Send className="w-3 h-3" />
+                                      REQUISITAR
+                                    </button>
+                                  ) : requisicao.status === 'pendente' ? (
+                                    <>
+                                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg border" style={{
+                                        backgroundColor: '#FFBF0010',
+                                        borderColor: '#FFBF00',
+                                        color: '#FFBF00'
+                                      }}>
+                                        <Clock className="w-3 h-3" />
+                                        <span className="text-xs font-bold">AGUARDANDO ESTOQUE</span>
+                                      </div>
+                                      <button
+                                        onClick={() => handleCancelarRequisicao(requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#FF006410',
+                                          borderColor: '#FF0064',
+                                          color: '#FF0064'
+                                        }}
+                                      >
+                                        <X className="w-3 h-3" />
+                                        CANCELAR
+                                      </button>
+                                    </>
+                                  ) : (requisicao.status === 'atendida' || requisicao.status === 'em_uso') ? (
+                                    <>
+                                      <button
+                                        onClick={() => handlePostarGI(requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#39FF1410',
+                                          borderColor: '#39FF14',
+                                          color: '#39FF14'
+                                        }}
+                                      >
+                                        <Send className="w-3 h-3" />
+                                        POSTAR GI
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoverPeca(requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#FF006410',
+                                          borderColor: '#FF0064',
+                                          color: '#FF0064'
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        DEVOLVER
+                                      </button>
+                                    </>
+                                  ) : requisicao.status === 'gi_postada' ? (
+                                    <button
+                                      onClick={() => handleCancelarGI(requisicao)}
+                                      className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                      style={{
+                                        backgroundColor: '#FF006410',
+                                        borderColor: '#FF0064',
+                                        color: '#FF0064'
+                                      }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                      CANCELAR GI
+                                    </button>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {abaAtiva === 'checklist' && (
+                <div>
+                  <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                    Checklist de Verificação
+                  </h3>
+                  {checklist.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Nenhum item de checklist definido</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {checklist.map((item) => (
+                        <div
+                          key={item.id}
+                          className="premium-card p-4 flex items-center justify-between"
+                        >
+                          <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={item.concluido}
+                              onChange={() => handleToggleChecklist(item)}
+                              className="w-5 h-5"
+                            />
+                            <div>
+                              <p className={`text-sm ${item.concluido ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                                {item.item}
+                              </p>
+                              {item.concluido && item.concluido_por && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  Concluído por: {item.concluido_por.nome}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {abaAtiva === 'anexos' && (
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider">
+                      Anexos
+                    </h3>
+                    <label className="neon-button flex items-center gap-2 text-xs px-4 py-2 cursor-pointer">
+                      <Paperclip className="w-3 h-3" />
+                      ADICIONAR
+                      <input
+                        type="file"
+                        onChange={handleUploadAnexo}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                  {anexos.length === 0 ? (
+                    <p className="text-gray-500 text-sm">Nenhum anexo</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {anexos.map((anexo) => (
+                        <div key={anexo.id} className="premium-card p-4">
+                          <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            Enviado por: {anexo.usuario?.nome || 'Desconhecido'}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {abaAtiva === 'comentarios' && (
+                <div>
+                  <div className="mb-4">
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                      Adicionar Comentário
+                    </h3>
+                    <div className="flex gap-2">
+                      <textarea
+                        value={novoComentario}
+                        onChange={(e) => setNovoComentario(e.target.value)}
+                        className="neon-input flex-1"
+                        rows={3}
+                        placeholder="Digite seu comentário..."
+                      />
+                      <button
+                        onClick={handleAdicionarComentario}
+                        className="neon-button px-4"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <label className="flex items-center gap-2 mt-2 text-xs text-gray-400">
+                      <input
+                        type="checkbox"
+                        checked={mostrarComentariosSistema}
+                        onChange={(e) => setMostrarComentariosSistema(e.target.checked)}
+                      />
+                      Mostrar logs do sistema
+                    </label>
+                  </div>
+
+                  <div className="space-y-3">
+                    {comentarios
+                      .filter(c => mostrarComentariosSistema || !c.is_system)
+                      .map((comentario) => (
+                        <div
+                          key={comentario.id}
+                          className={`premium-card p-4 ${
+                            comentario.is_system ? 'border-l-4 border-l-blue-500' : ''
+                          }`}
+                        >
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                              <User className="w-4 h-4 text-gray-500" />
+                              <span className="text-sm text-gray-400">
+                                {comentario.is_system ? 'Sistema' : 'Usuário'}
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-600">
+                              {new Date(comentario.created_at).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                            {comentario.comentario}
+                          </p>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {mode === 'create' && (
+          <div className="p-6 border-t border-[#FFA500]/20">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex gap-4 text-xs text-gray-400">
+                <div className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-[#00D4FF]" />
+                  <span>
+                    {requisicoesTemporarias.length} requisição(ões) • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-4 justify-end">
+              <button
+                onClick={() => {
+                  const temDados = requisicoesTemporarias.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
+                  if (temDados) {
+                    const confirmar = confirm('Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
+                    if (!confirmar) return;
+                  }
+                  onClose();
+                }}
+                className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={handleCriarOS}
+                disabled={loading || !unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado}
+                className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: '#FFA50020',
+                  borderColor: '#FFA500',
+                  color: '#FFA500'
+                }}
+              >
+                {loading ? 'CRIANDO...' : 'SALVAR OS LP'}
+              </button>
+            </div>
+            {(!unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado) && (
+              <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400">
+                <AlertCircle className="w-4 h-4" />
+                <span>Preencha os campos obrigatórios: Unidade, Número OS Samsung, Nome do Cliente e Defeito Relatado</span>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {mostrarModalConversao && os && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="premium-card w-full max-w-2xl border-[#00D4FF]">
+            <div className="p-6 border-b border-[#00D4FF]/20">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
+                  <RefreshCw className="w-6 h-6" />
+                  CONVERTER OS LP → OW
+                </h2>
+                <button
+                  onClick={() => {
+                    setMostrarModalConversao(false);
+                    setMotivoConversao('');
+                    setConfirmaConversao(false);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase mb-3">Informações da OS</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <span className="text-gray-500">Número:</span>
+                    <span className="text-gray-300 ml-2">#{os.numero_sequencial}</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Tipo Atual:</span>
+                    <span className="text-[#FFA500] ml-2 font-bold">LP</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Tipo Destino:</span>
+                    <span className="text-[#00D4FF] ml-2 font-bold">OW</span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Status:</span>
+                    <span className="text-gray-300 ml-2">{os.coluna_kanban}</span>
+                  </div>
+                </div>
+              </div>
+
+              {requisicoes.length > 0 && (
+                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
+                  <h3 className="text-sm font-bold text-yellow-400 uppercase mb-3 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4" />
+                    Avisos Importantes
+                  </h3>
+                  <ul className="space-y-2 text-sm text-gray-300">
+                    <li className="flex items-start gap-2">
+                      <span className="text-yellow-400 mt-1">⚠</span>
+                      <span>Esta OS possui {requisicoes.length} requisição(ões) de peças que serão mantidas</span>
+                    </li>
+                  </ul>
+                </div>
+              )}
+
+              <div>
+                <label className="text-sm font-bold text-gray-300 uppercase mb-2 block">
+                  Motivo da Conversão *
+                </label>
+                <textarea
+                  value={motivoConversao}
+                  onChange={(e) => setMotivoConversao(e.target.value)}
+                  className="neon-input w-full"
+                  rows={4}
+                  placeholder="Informe o motivo da conversão..."
+                />
+              </div>
+
+              <div className="flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="confirmacao-lp"
+                  checked={confirmaConversao}
+                  onChange={(e) => setConfirmaConversao(e.target.checked)}
+                  className="mt-1 w-4 h-4"
+                />
+                <label htmlFor="confirmacao-lp" className="text-sm text-gray-300 cursor-pointer">
+                  Confirmo que entendo as consequências desta conversão e que todas as informações, anexos e requisições serão mantidos
+                </label>
+              </div>
+
+              <div className="flex gap-4 justify-end pt-4 border-t border-gray-700">
+                <button
+                  onClick={() => {
+                    setMostrarModalConversao(false);
+                    setMotivoConversao('');
+                    setConfirmaConversao(false);
+                  }}
+                  className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
+                  disabled={convertendo}
+                >
+                  CANCELAR
+                </button>
+                <button
+                  onClick={handleConverterOS}
+                  disabled={convertendo || !motivoConversao.trim() || !confirmaConversao}
+                  className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: '#00D4FF20',
+                    borderColor: '#00D4FF',
+                    color: '#00D4FF'
+                  }}
+                >
+                  {convertendo ? 'CONVERTENDO...' : 'CONFIRMAR CONVERSÃO'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,364 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
+import { X, Users, Search, Check, Trash2, Shield, UserMinus } from 'lucide-react';
+
+interface Participant {
+  id: string;
+  user_id: string;
+  role: string;
+  nome: string;
+  foto_url: string | null;
+  tipo: string;
+}
+
+interface EditGroupModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  conversationId: string;
+  onUpdate: () => void;
+}
+
+export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: EditGroupModalProps) {
+  const [groupName, setGroupName] = useState('');
+  const [groupDescription, setGroupDescription] = useState('');
+  const [participants, setParticipants] = useState<Participant[]>([]);
+  const [availableUsers, setAvailableUsers] = useState<any[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      loadGroupInfo();
+      loadParticipants();
+      loadAvailableUsers();
+    }
+  }, [isOpen, conversationId]);
+
+  const loadGroupInfo = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_conversations')
+        .select('nome, descricao')
+        .eq('id', conversationId)
+        .single();
+
+      if (error) throw error;
+      setGroupName(data.nome || '');
+      setGroupDescription(data.descricao || '');
+    } catch (err) {
+      console.error('Erro ao carregar informações do grupo:', err);
+    }
+  };
+
+  const loadParticipants = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_participants')
+        .select(`
+          id,
+          user_id,
+          role,
+          usuarios(id, nome, foto_url, tipo)
+        `)
+        .eq('conversation_id', conversationId);
+
+      if (error) throw error;
+
+      const enriched = data.map(p => {
+        const user = Array.isArray(p.usuarios) ? p.usuarios[0] : p.usuarios;
+        return {
+          id: p.id,
+          user_id: p.user_id,
+          role: p.role,
+          nome: user.nome,
+          foto_url: user.foto_url,
+          tipo: user.tipo
+        };
+      });
+
+      setParticipants(enriched);
+    } catch (err) {
+      console.error('Erro ao carregar participantes:', err);
+    }
+  };
+
+  const loadAvailableUsers = async () => {
+    try {
+      const { data: allUsers, error: usersError } = await supabase
+        .from('usuarios')
+        .select('id, nome, foto_url, tipo')
+        .order('nome');
+
+      if (usersError) throw usersError;
+
+      const { data: currentParticipants, error: partError } = await supabase
+        .from('chat_participants')
+        .select('user_id')
+        .eq('conversation_id', conversationId);
+
+      if (partError) throw partError;
+
+      const participantIds = new Set(currentParticipants.map(p => p.user_id));
+      const available = allUsers.filter(u => !participantIds.has(u.id));
+
+      setAvailableUsers(available);
+    } catch (err) {
+      console.error('Erro ao carregar usuários disponíveis:', err);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!groupName.trim()) {
+      alert('O nome do grupo é obrigatório');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const { error } = await supabase
+        .from('chat_conversations')
+        .update({
+          nome: groupName.trim(),
+          descricao: groupDescription.trim() || null
+        })
+        .eq('id', conversationId);
+
+      if (error) throw error;
+
+      onUpdate();
+      onClose();
+    } catch (err) {
+      console.error('Erro ao salvar grupo:', err);
+      alert('Erro ao salvar alterações');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleAddMember = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .insert({
+          conversation_id: conversationId,
+          user_id: userId,
+          role: 'member'
+        });
+
+      if (error) throw error;
+
+      loadParticipants();
+      loadAvailableUsers();
+    } catch (err) {
+      console.error('Erro ao adicionar membro:', err);
+      alert('Erro ao adicionar membro');
+    }
+  };
+
+  const handleRemoveMember = async (participantId: string) => {
+    if (!confirm('Remover este membro do grupo?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .delete()
+        .eq('id', participantId);
+
+      if (error) throw error;
+
+      loadParticipants();
+      loadAvailableUsers();
+    } catch (err) {
+      console.error('Erro ao remover membro:', err);
+      alert('Erro ao remover membro');
+    }
+  };
+
+  const handleToggleAdmin = async (participantId: string, currentRole: string) => {
+    const newRole = currentRole === 'admin' ? 'member' : 'admin';
+
+    try {
+      const { error } = await supabase
+        .from('chat_participants')
+        .update({ role: newRole })
+        .eq('id', participantId);
+
+      if (error) throw error;
+
+      loadParticipants();
+    } catch (err) {
+      console.error('Erro ao alterar permissão:', err);
+      alert('Erro ao alterar permissão');
+    }
+  };
+
+  const filteredAvailable = availableUsers.filter(user =>
+    user.nome.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="premium-card w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+        <div className="flex items-center justify-between p-6 border-b border-[#00D4FF]/20">
+          <div className="flex items-center gap-3">
+            <Users className="w-6 h-6 text-[#00D4FF]" />
+            <h2 className="text-xl font-bold text-[#00D4FF] tech-heading">
+              EDITAR GRUPO
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-all"
+          >
+            <X className="w-5 h-5 text-gray-400" />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-300 mb-2">
+              Nome do Grupo
+            </label>
+            <input
+              type="text"
+              value={groupName}
+              onChange={(e) => setGroupName(e.target.value)}
+              maxLength={50}
+              className="w-full px-4 py-2.5 bg-black/60 border border-[#00D4FF]/20 rounded-lg text-gray-300 focus:outline-none focus:border-[#00D4FF]/50"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-300 mb-2">
+              Descrição
+            </label>
+            <textarea
+              value={groupDescription}
+              onChange={(e) => setGroupDescription(e.target.value)}
+              maxLength={200}
+              rows={3}
+              className="w-full px-4 py-2.5 bg-black/60 border border-[#00D4FF]/20 rounded-lg text-gray-300 resize-none focus:outline-none focus:border-[#00D4FF]/50"
+            />
+          </div>
+
+          <div>
+            <h3 className="text-sm font-semibold text-gray-300 mb-3">
+              Participantes ({participants.length})
+            </h3>
+            <div className="space-y-1 mb-4">
+              {participants.map((participant) => (
+                <div
+                  key={participant.id}
+                  className="flex items-center gap-3 p-3 bg-black/40 rounded-lg border border-gray-800"
+                >
+                  <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
+                    {participant.foto_url ? (
+                      <img src={participant.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
+                    ) : (
+                      <span className="text-[#00D4FF] font-bold">
+                        {participant.nome.charAt(0).toUpperCase()}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <p className="font-semibold text-gray-200">{participant.nome}</p>
+                      {participant.role === 'admin' && (
+                        <span className="px-2 py-0.5 bg-[#39FF14]/20 text-[#39FF14] text-xs font-bold rounded">
+                          ADMIN
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 uppercase">{participant.tipo}</p>
+                  </div>
+
+                  <button
+                    onClick={() => handleToggleAdmin(participant.id, participant.role)}
+                    className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-all"
+                    title={participant.role === 'admin' ? 'Remover admin' : 'Tornar admin'}
+                  >
+                    <Shield className={`w-4 h-4 ${participant.role === 'admin' ? 'text-[#39FF14]' : 'text-gray-500'}`} />
+                  </button>
+
+                  <button
+                    onClick={() => handleRemoveMember(participant.id)}
+                    className="p-2 hover:bg-red-500/10 rounded-lg transition-all"
+                    title="Remover do grupo"
+                  >
+                    <UserMinus className="w-4 h-4 text-red-400" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {availableUsers.length > 0 && (
+            <div>
+              <h3 className="text-sm font-semibold text-gray-300 mb-3">
+                Adicionar Membros
+              </h3>
+
+              <div className="relative mb-3">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar usuários..."
+                  className="w-full pl-10 pr-4 py-2 bg-black/60 border border-[#00D4FF]/20 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/50"
+                />
+              </div>
+
+              <div className="space-y-1 max-h-48 overflow-y-auto cyber-scrollbar">
+                {filteredAvailable.map((user) => (
+                  <button
+                    key={user.id}
+                    onClick={() => handleAddMember(user.id)}
+                    className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#00D4FF]/5 border border-transparent transition-all"
+                  >
+                    <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
+                      {user.foto_url ? (
+                        <img src={user.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
+                      ) : (
+                        <span className="text-[#00D4FF] font-bold">
+                          {user.nome.charAt(0).toUpperCase()}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex-1 text-left">
+                      <p className="font-semibold text-gray-200">{user.nome}</p>
+                      <p className="text-xs text-gray-500 uppercase">{user.tipo}</p>
+                    </div>
+
+                    <Check className="w-5 h-5 text-[#00D4FF]" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 p-6 border-t border-[#00D4FF]/20">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-gray-700 hover:bg-gray-600 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!groupName.trim() || saving}
+            className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-[#00D4FF] text-black hover:bg-[#00D4FF]/80 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {saving ? 'Salvando...' : 'Salvar Alterações'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

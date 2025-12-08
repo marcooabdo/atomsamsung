@@ -1,0 +1,1435 @@
+import { useEffect, useState } from 'react';
+import { supabase } from '../../lib/supabase';
+import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ModalSelecionarID } from './ModalSelecionarID';
+import { ModalPedirPeca } from './ModalPedirPeca';
+import { ModalRegistrarValorGSPN } from './ModalRegistrarValorGSPN';
+import { ModalJustificativaPedido } from './ModalJustificativaPedido';
+import { BadgeTipoOS } from './BadgeTipoOS';
+import { EstoqueDashboard } from './EstoqueDashboard';
+
+interface EstoqueTransferenciasProps {
+  selectedUnidade: string;
+  user: any;
+}
+
+interface RequisicaoAgrupada {
+  os_id: string;
+  numero_os_samsung: string | null;
+  numero_os_interna: string | null;
+  tipo_os: 'LP' | 'OW';
+  requisicoes: any[];
+  totalPecas: number;
+  todasAtendidas: boolean;
+  algunsAtendidas: boolean;
+  valorTotal: number;
+}
+
+export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransferenciasProps) {
+  const [requisicoesAgrupadas, setRequisicoesAgrupadas] = useState<RequisicaoAgrupada[]>([]);
+  const [pedidosAtivos, setPedidosAtivos] = useState<RequisicaoAgrupada[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [osExpandida, setOsExpandida] = useState<string | null>(null);
+  const [osExpandidaPedido, setOsExpandidaPedido] = useState<string | null>(null);
+  const [modalSelecionarID, setModalSelecionarID] = useState<any>(null);
+  const [modalPedirPeca, setModalPedirPeca] = useState<any>(null);
+  const [modalRegistrarValor, setModalRegistrarValor] = useState<any>(null);
+  const [modalJustificativa, setModalJustificativa] = useState<any>(null);
+  const [modalVerPedido, setModalVerPedido] = useState<any>(null);
+
+  useEffect(() => {
+    loadData();
+  }, [selectedUnidade]);
+
+  const loadData = async () => {
+    await loadRequisicoes();
+  };
+
+  const loadRequisicoes = async () => {
+    try {
+      let query = supabase
+        .from('requisicoes_pecas')
+        .select(`
+          *,
+          os:os(numero_os_samsung, numero_os_interna, coluna_kanban, tipo_os),
+          peca_estoque:estoque_pecas(id_numerico, valor_com_impostos, delivery, pn, descricao),
+          reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (selectedUnidade && selectedUnidade !== 'todas') {
+        query = query.eq('unidade_id', selectedUnidade);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      // Para cada requisição, buscar contagem de IDs disponíveis
+      const requisicoesComContagem = await Promise.all(
+        (data || []).map(async (req: any) => {
+          const { count } = await supabase
+            .from('estoque_pecas')
+            .select('*', { count: 'exact', head: true })
+            .eq('pn', req.codigo_peca)
+            .eq('status', 'disponivel')
+            .eq('unidade_id', req.unidade_id);
+
+          return {
+            ...req,
+            ids_disponiveis_count: count || 0
+          };
+        })
+      );
+
+      // Separar pedidos ativos (sempre visíveis) de requisições normais (filtradas por coluna)
+      const colunasValidas = ['orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
+      const agrupado: Record<string, RequisicaoAgrupada> = {};
+      const pedidosAtivosAgrupado: Record<string, RequisicaoAgrupada> = {};
+
+      requisicoesComContagem.forEach((req: any) => {
+        const isPedidoAtivo = req.status === 'pedido_feito';
+        const temIDDisponivel = req.ids_disponiveis_count > 0;
+        const colunaValida = req.os?.coluna_kanban && colunasValidas.includes(req.os.coluna_kanban);
+
+        // Pedidos ativos SEMPRE aparecem na seção de pedidos
+        if (isPedidoAtivo) {
+          if (!pedidosAtivosAgrupado[req.os_id]) {
+            pedidosAtivosAgrupado[req.os_id] = {
+              os_id: req.os_id,
+              numero_os_samsung: req.numero_os_samsung || req.os?.numero_os_samsung || null,
+              numero_os_interna: req.os?.numero_os_interna || null,
+              tipo_os: req.os?.tipo_os || 'OW',
+              requisicoes: [],
+              totalPecas: 0,
+              todasAtendidas: false,
+              algunsAtendidas: false,
+              valorTotal: 0
+            };
+          }
+          pedidosAtivosAgrupado[req.os_id].requisicoes.push(req);
+          pedidosAtivosAgrupado[req.os_id].totalPecas += 1;
+
+          // Se tem ID disponível, TAMBÉM aparece na lista de transferências (mantendo info do pedido)
+          if (temIDDisponivel && colunaValida) {
+            if (!agrupado[req.os_id]) {
+              agrupado[req.os_id] = {
+                os_id: req.os_id,
+                numero_os_samsung: req.numero_os_samsung || req.os?.numero_os_samsung || null,
+                numero_os_interna: req.os?.numero_os_interna || null,
+                tipo_os: req.os?.tipo_os || 'OW',
+                requisicoes: [],
+                totalPecas: 0,
+                todasAtendidas: false,
+                algunsAtendidas: false,
+                valorTotal: 0
+              };
+            }
+            agrupado[req.os_id].requisicoes.push(req);
+            agrupado[req.os_id].totalPecas += 1;
+            agrupado[req.os_id].todasAtendidas = false;
+          }
+          return;
+        }
+
+        // Requisições normais seguem filtro de coluna
+        if (!colunaValida) {
+          return;
+        }
+
+        if (!agrupado[req.os_id]) {
+          agrupado[req.os_id] = {
+            os_id: req.os_id,
+            numero_os_samsung: req.numero_os_samsung || req.os?.numero_os_samsung || null,
+            numero_os_interna: req.os?.numero_os_interna || null,
+            tipo_os: req.os?.tipo_os || 'OW',
+            requisicoes: [],
+            totalPecas: 0,
+            todasAtendidas: true,
+            algunsAtendidas: false,
+            valorTotal: 0
+          };
+        }
+
+        agrupado[req.os_id].requisicoes.push(req);
+        agrupado[req.os_id].totalPecas += 1;
+
+        if (req.status !== 'atendida' && req.status !== 'gi_postada') {
+          agrupado[req.os_id].todasAtendidas = false;
+        }
+
+        if (req.status === 'atendida' || req.status === 'gi_postada') {
+          agrupado[req.os_id].algunsAtendidas = true;
+        }
+
+        if (req.peca_estoque?.valor_com_impostos) {
+          agrupado[req.os_id].valorTotal += Number(req.peca_estoque.valor_com_impostos) * Number(req.quantidade_requisitada);
+        }
+      });
+
+      setRequisicoesAgrupadas(Object.values(agrupado));
+      setPedidosAtivos(Object.values(pedidosAtivosAgrupado));
+    } catch (error) {
+      console.error('Erro ao carregar requisições:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAprovarRequisicao = (requisicao: any) => {
+    setModalSelecionarID(requisicao);
+  };
+
+  const handleReprovarRequisicao = async (requisicao: any) => {
+    const motivo = prompt('Digite o motivo da reprovação da requisição:');
+    if (!motivo || !motivo.trim()) {
+      alert('É necessário informar o motivo da reprovação');
+      return;
+    }
+
+    const confirmacao = confirm(
+      `Confirma a REPROVAÇÃO desta requisição?\n\n` +
+      `Peça: ${requisicao.descricao}\n` +
+      `Código: ${requisicao.codigo_peca}\n` +
+      `Quantidade: ${requisicao.quantidade_requisitada}\n` +
+      `Motivo: ${motivo}\n\n` +
+      `Esta ação NÃO pode ser desfeita.`
+    );
+    if (!confirmacao) return;
+
+    try {
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single();
+
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'reprovada',
+          motivo_reprovacao: motivo,
+          reprovado_em: new Date().toISOString(),
+          reprovado_por: user.id
+        })
+        .eq('id', requisicao.id);
+
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Requisição REPROVADA por ${userData?.nome || 'Estoque'}\nPeça: ${requisicao.descricao} (${requisicao.codigo_peca})\nRequisição ID: ${requisicao.id.slice(0, 8)}\nMotivo: ${motivo}`,
+        is_system: true
+      });
+
+      alert('Requisição reprovada com sucesso!');
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao reprovar requisição:', error);
+      alert('Erro ao reprovar requisição');
+    }
+  };
+
+  const handleConfirmarTransferencia = async (requisicaoId: string, pecaEstoqueId: string) => {
+    try {
+      const requisicao = modalSelecionarID;
+
+      console.log('🔄 Iniciando transferência:', {
+        requisicaoId: requisicao.id,
+        pecaEstoqueId,
+        osId: requisicao.os_id
+      });
+
+      // ⚠️ VALIDAÇÃO CRÍTICA: Verificar se a peça já está vinculada a outra requisição ativa
+      const { data: requisicaoExistente, error: checkError } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, os_id, codigo_peca, descricao, status, os:os(numero_os_samsung, numero_os_interna)')
+        .eq('peca_estoque_id', pecaEstoqueId)
+        .not('status', 'in', '(reprovada,devolvida)')
+        .maybeSingle();
+
+      if (checkError) {
+        console.error('❌ Erro ao verificar requisições existentes:', checkError);
+        throw new Error(`Erro ao verificar disponibilidade da peça: ${checkError.message}`);
+      }
+
+      if (requisicaoExistente && requisicaoExistente.id !== requisicao.id) {
+        const osNumero = requisicaoExistente.os?.numero_os_samsung || requisicaoExistente.os?.numero_os_interna || 'N/A';
+        alert(
+          `❌ ERRO: Esta peça já está vinculada a outra requisição!\n\n` +
+          `OS: ${osNumero}\n` +
+          `Peça: ${requisicaoExistente.descricao}\n` +
+          `Status: ${requisicaoExistente.status.toUpperCase()}\n\n` +
+          `Não é possível vincular a mesma peça física a múltiplas requisições.\n` +
+          `Selecione outro ID disponível.`
+        );
+        return;
+      }
+
+      // Atualizar requisição
+      const { error: reqError, data: reqData } = await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'atendida',
+          peca_estoque_id: pecaEstoqueId,
+          atendido_por: user.id,
+          aprovado_em: new Date().toISOString()
+        })
+        .eq('id', requisicao.id)
+        .select();
+
+      if (reqError) {
+        console.error('❌ Erro ao atualizar requisição:', reqError);
+        throw new Error(`Erro ao atualizar requisição: ${reqError.message}`);
+      }
+
+      console.log('✅ Requisição atualizada:', reqData);
+
+      // Atualizar peça no estoque
+      const { error: pecaError, data: pecaData } = await supabase
+        .from('estoque_pecas')
+        .update({
+          status: 'vinculada_tecnico',
+          os_id: requisicao.os_id,
+          tecnico_id: requisicao.tecnico_id
+        })
+        .eq('id', pecaEstoqueId)
+        .select();
+
+      if (pecaError) {
+        console.error('❌ Erro ao atualizar peça:', pecaError);
+        throw new Error(`Erro ao atualizar peça no estoque: ${pecaError.message}`);
+      }
+
+      console.log('✅ Peça atualizada:', pecaData);
+
+      // Criar log no histórico do estoque
+      const { error: histError } = await supabase.from('estoque_historico').insert({
+        peca_id: pecaEstoqueId,
+        usuario_id: user.id,
+        acao: 'transferencia',
+        status_anterior: 'disponivel',
+        status_novo: 'vinculada_tecnico',
+        origem: 'Estoque Central',
+        destino: `OS ${requisicao.os?.numero_os_samsung || requisicao.os?.numero_os_interna}`,
+        observacao: `ID vinculado à requisição - ${requisicao.descricao}`
+      });
+
+      if (histError) {
+        console.warn('⚠️ Erro ao criar histórico (não crítico):', histError);
+      } else {
+        console.log('✅ Histórico criado');
+      }
+
+      // Buscar nome do usuário
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single();
+
+      // Buscar ID numérico da peça para incluir no comentário
+      const { data: pecaEstoque } = await supabase
+        .from('estoque_pecas')
+        .select('id_numerico')
+        .eq('id', pecaEstoqueId)
+        .single();
+
+      // Log em os_comentarios com nome do usuário e ID da peça
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Requisição APROVADA - Peça vinculada por ${userData?.nome || 'Estoque'}\nPeça: ${requisicao.descricao} (${requisicao.codigo_peca})\nID da Peça: #${pecaEstoque?.id_numerico || 'N/A'}\nRequisição ID: ${requisicao.id.slice(0, 8)}`,
+        is_system: true
+      });
+
+      console.log('🔍 Verificando se todas as peças da OS foram atendidas...');
+
+      // Verificar se todas as peças da OS foram atendidas
+      // Importante: precisamos aguardar um pouco para garantir que a transação foi confirmada
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      const { data: todasRequisicoes, error: reqCheckError } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, status')
+        .eq('os_id', requisicao.os_id);
+
+      if (reqCheckError) {
+        console.error('❌ Erro ao buscar requisições da OS:', reqCheckError);
+        throw reqCheckError;
+      }
+
+      console.log('📋 Requisições da OS:', todasRequisicoes?.map(r => ({ id: r.id.slice(0, 8), status: r.status })));
+
+      const todasAtendidas = todasRequisicoes?.every(r =>
+        r.status === 'atendida' || r.status === 'gi_postada' || r.status === 'devolvida'
+      );
+
+      console.log('✅ Todas atendidas?', todasAtendidas);
+
+      if (todasAtendidas) {
+        console.log('🎯 Todas as peças foram atendidas! Iniciando movimentação...');
+
+        // Buscar dados completos da OS para roteamento
+        const { data: osCompleta, error: osError } = await supabase
+          .from('os')
+          .select('tipo_atendimento, cliente_cidade, unidade_id, coluna_kanban')
+          .eq('id', requisicao.os_id)
+          .single();
+
+        if (osError) {
+          console.error('❌ Erro ao buscar dados da OS:', osError);
+          throw osError;
+        }
+
+        console.log('📊 Dados da OS:', {
+          tipo_atendimento: osCompleta?.tipo_atendimento,
+          cliente_cidade: osCompleta?.cliente_cidade,
+          unidade_id: osCompleta?.unidade_id,
+          coluna_atual: osCompleta?.coluna_kanban
+        });
+
+        let destinoColuna = 'peca_disponivel';
+        let mensagemDestino = 'Peça Disponível';
+
+        // Lógica de roteamento automático APENAS para OS IH
+        if (osCompleta?.tipo_atendimento === 'IH' && osCompleta?.cliente_cidade && osCompleta?.unidade_id) {
+          console.log('🔍 OS é IH, buscando rota para cidade:', osCompleta.cliente_cidade);
+
+          // Buscar rota que contenha a cidade E pertença à mesma unidade da OS
+          const { data: rota, error: rotaError } = await supabase
+            .from('rotas')
+            .select('nome, coluna_kanban')
+            .contains('cidades', [osCompleta.cliente_cidade])
+            .eq('ativa', true)
+            .eq('unidade_id', osCompleta.unidade_id)
+            .maybeSingle();
+
+          if (rotaError) {
+            console.error('❌ Erro ao buscar rota:', rotaError);
+          } else if (rota && rota.coluna_kanban) {
+            console.log('✅ Rota encontrada:', rota);
+            destinoColuna = rota.coluna_kanban;
+            mensagemDestino = rota.nome;
+          } else {
+            console.log('⚠️ Nenhuma rota encontrada para esta cidade');
+          }
+        } else {
+          console.log('ℹ️ OS não é IH ou não tem cidade/unidade - indo para Peça Disponível');
+        }
+
+        console.log(`🚀 Movendo OS de "${osCompleta?.coluna_kanban}" para "${destinoColuna}"`);
+
+        // Mover OS para destino apropriado
+        const { error: updateOsError } = await supabase
+          .from('os')
+          .update({
+            coluna_kanban: destinoColuna,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', requisicao.os_id);
+
+        if (updateOsError) {
+          console.error('❌ Erro ao mover OS:', updateOsError);
+          throw updateOsError;
+        }
+
+        console.log('✅ OS movida com sucesso para:', destinoColuna);
+
+        const mensagemComentario = destinoColuna === 'peca_disponivel'
+          ? `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida para "${mensagemDestino}"`
+          : `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida automaticamente para "${mensagemDestino}"`;
+
+        await supabase.from('os_comentarios').insert({
+          os_id: requisicao.os_id,
+          usuario_id: user.id,
+          comentario: mensagemComentario,
+          is_system: true
+        });
+
+        const mensagemAlerta = destinoColuna === 'peca_disponivel'
+          ? 'Transferência confirmada! Todas as peças foram vinculadas. OS movida para "Peça Disponível".'
+          : `Transferência confirmada! Todas as peças foram vinculadas. OS movida automaticamente para "${mensagemDestino}".`;
+
+        alert(mensagemAlerta);
+      } else {
+        alert('Transferência confirmada com sucesso!');
+      }
+
+      setModalSelecionarID(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao confirmar transferência:', error);
+      alert('Erro ao confirmar transferência');
+    }
+  };
+
+  const handleRegistrarValor = (requisicao: any) => {
+    setModalRegistrarValor(requisicao);
+  };
+
+  const handleConfirmarValor = async (valor: number) => {
+    try {
+      const requisicao = modalRegistrarValor;
+
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          valor_peca: valor
+        })
+        .eq('id', requisicao.id);
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single();
+
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Valor GSPN registrado por ${userData?.nome || 'Estoque'}: ${requisicao.descricao} (${requisicao.codigo_peca}) - R$ ${valor.toFixed(2)}`,
+        is_system: true
+      });
+
+      alert('Valor GSPN registrado com sucesso!');
+      setModalRegistrarValor(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao registrar valor:', error);
+      throw error;
+    }
+  };
+
+  const handlePedirPeca = (requisicao: any) => {
+    setModalPedirPeca(requisicao);
+  };
+
+  const handlePedirPecaComEstoque = (requisicao: any) => {
+    setModalJustificativa(requisicao);
+  };
+
+  const handleVerPedido = (requisicao: any) => {
+    setModalVerPedido(requisicao);
+  };
+
+  const handleRefazerPedido = async (requisicao: any) => {
+    if (!confirm('Deseja refazer este pedido? O status voltará para PENDENTE e a OS será movida de volta no Kanban.')) return;
+
+    try {
+      await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'pendente',
+          numero_pedido_samsung: null,
+          observacoes_pedido: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requisicao.id);
+
+      const { data: osData } = await supabase
+        .from('os')
+        .select('id, coluna_kanban')
+        .eq('id', requisicao.os_id)
+        .maybeSingle();
+
+      const { data: outrasRequisicoes } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, status')
+        .eq('os_id', requisicao.os_id)
+        .neq('id', requisicao.id);
+
+      const temOutrasPecasPedidas = outrasRequisicoes?.some(r => r.status === 'pedido_feito');
+      const temOutrasPendentes = outrasRequisicoes?.some(r => r.status === 'pendente');
+
+      let mensagemMovimentacao = '';
+
+      if (osData) {
+        if (osData.coluna_kanban === 'peca_em_transito') {
+          if (!temOutrasPecasPedidas) {
+            await supabase
+              .from('os')
+              .update({
+                coluna_kanban: 'aguardando_peca',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', requisicao.os_id);
+            mensagemMovimentacao = ' - OS movida de "Peça em Trânsito" para "Aguardando Peça"';
+          }
+        } else if (osData.coluna_kanban === 'aguardando_peca') {
+          if (!temOutrasPecasPedidas && !temOutrasPendentes) {
+            await supabase
+              .from('os')
+              .update({
+                coluna_kanban: 'orcamento_aprovado',
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', requisicao.os_id);
+            mensagemMovimentacao = ' - OS movida para "Orçamento Aprovado"';
+          }
+        }
+      }
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Pedido CANCELADO por ${userData?.nome || 'Estoque'}\nPedido Samsung: ${requisicao.numero_pedido_samsung}\nPeça: ${requisicao.descricao} (${requisicao.codigo_peca})\nRequisição ID: ${requisicao.id.slice(0, 8)}\nStatus voltou para PENDENTE${mensagemMovimentacao}`,
+        is_system: true
+      });
+
+      const alertMsg = `Pedido cancelado! Status voltou para PENDENTE.${mensagemMovimentacao}`;
+      alert(alertMsg);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao refazer pedido:', error);
+      alert('Erro ao refazer pedido');
+    }
+  };
+
+  const handleConfirmarPedidoComJustificativa = async (justificativa: string) => {
+    try {
+      const requisicao = modalJustificativa;
+
+      const valorEstimado = Number(requisicao.valor_peca || 0);
+      if (isNaN(valorEstimado) || valorEstimado <= 0) {
+        throw new Error('Valor estimado inválido');
+      }
+
+      // Atualizar requisição com status pedido_feito e justificativa nas observações
+      const { error: updateError } = await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'pedido_feito',
+          numero_pedido_samsung: `PENDENTE-${Date.now()}`,
+          observacoes_pedido: `JUSTIFICATIVA (${requisicao.ids_disponiveis_count} ID(s) disponível(eis)): ${justificativa}`,
+          valor_peca: valorEstimado,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requisicao.id);
+
+      if (updateError) throw updateError;
+
+      await supabase
+        .from('os')
+        .update({
+          coluna_kanban: 'peca_em_transito',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requisicao.os_id);
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Pedido criado por ${userData?.nome || 'Estoque'} MESMO COM ${requisicao.ids_disponiveis_count} ID(s) DISPONÍVEL(EIS): ${requisicao.descricao} (${requisicao.codigo_peca}) - Valor GSPN: R$ ${valorEstimado.toFixed(2)}\nJUSTIFICATIVA: ${justificativa}\nOS movida para "Peça em Trânsito"`,
+        is_system: true
+      });
+
+      alert('Pedido criado com justificativa registrada! OS movida para "Peça em Trânsito".');
+      setModalJustificativa(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao criar pedido:', error);
+      throw error;
+    }
+  };
+
+  const handleConfirmarPedido = async (requisicaoId: string, dados: any) => {
+    try {
+      const requisicao = modalPedirPeca;
+
+      const valorEstimado = Number(dados.valorEstimado || 0);
+      if (isNaN(valorEstimado) || valorEstimado <= 0) {
+        throw new Error('Valor estimado inválido');
+      }
+
+      // Atualizar requisição com dados do pedido e mudar status para "pedido_feito"
+      const { error: updateError } = await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'pedido_feito',
+          numero_pedido_samsung: dados.numeroPedido,
+          observacoes_pedido: dados.observacoes || null,
+          valor_peca: valorEstimado,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', requisicao.id);
+
+      if (updateError) throw updateError;
+
+      const { data: osData } = await supabase
+        .from('os')
+        .select('id, coluna_kanban')
+        .eq('id', requisicao.os_id)
+        .maybeSingle();
+
+      let colunaDestino = 'peca_em_transito';
+      let mensagemMovimentacao = '';
+
+      if (osData && osData.coluna_kanban !== 'peca_em_transito') {
+        await supabase
+          .from('os')
+          .update({
+            coluna_kanban: 'peca_em_transito',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', requisicao.os_id);
+
+        mensagemMovimentacao = ' - OS movida para "Peça em Trânsito"';
+      }
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      const observacaoTexto = dados.observacoes ? `\nObservações: ${dados.observacoes}` : '';
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Pedido ${dados.numeroPedido} criado por ${userData?.nome || 'Estoque'}: ${requisicao.descricao} (${requisicao.codigo_peca}) - Valor GSPN: R$ ${valorEstimado.toFixed(2)}${observacaoTexto}${mensagemMovimentacao}`,
+        is_system: true
+      });
+
+      alert(`Pedido criado com sucesso!${mensagemMovimentacao ? ' OS movida para "Peça em Trânsito".' : ''}`);
+      setModalPedirPeca(null);
+      await loadData();
+    } catch (error) {
+      console.error('Erro ao criar pedido:', error);
+      throw error;
+    }
+  };
+
+  const getStatusBadge = (status: string) => {
+    const config: Record<string, { label: string; color: string }> = {
+      pendente: { label: 'PENDENTE', color: '#FFBF00' },
+      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' },
+      atendida: { label: 'ATENDIDA', color: '#39FF14' },
+      em_uso: { label: 'EM USO', color: '#00D4FF' },
+      gi_postada: { label: 'GI POSTADA', color: '#9D00FF' },
+      devolvida: { label: 'DEVOLVIDA', color: '#FF0064' },
+      reprovada: { label: 'REPROVADA', color: '#FF0064' }
+    };
+
+    const { label, color } = config[status] || { label: status.toUpperCase(), color: '#6B7280' };
+
+    return (
+      <span
+        className="px-2 py-1 rounded text-xs font-bold uppercase"
+        style={{
+          backgroundColor: `${color}20`,
+          color: color,
+          border: `1px solid ${color}60`
+        }}
+      >
+        {label}
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFBF00]"></div>
+      </div>
+    );
+  }
+
+  const requisicoesComPendentes = requisicoesAgrupadas.filter(g =>
+    g.requisicoes.some(r => r.status === 'pendente' || r.status === 'pedido_feito')
+  );
+
+  const calcularEstatisticas = () => {
+    const todasRequisicoesPendentes = requisicoesComPendentes.flatMap(g =>
+      g.requisicoes.filter(r => r.status === 'pendente')
+    );
+
+    const lpRequisicoes = todasRequisicoesPendentes.filter(r => r.os?.tipo_os === 'LP');
+    const owRequisicoes = todasRequisicoesPendentes.filter(r => r.os?.tipo_os === 'OW');
+
+    const lpSemID = lpRequisicoes.filter(r => r.ids_disponiveis_count === 0).length;
+    const owSemID = owRequisicoes.filter(r => r.ids_disponiveis_count === 0).length;
+
+    const lpSemPreco = lpRequisicoes.filter(r => !r.valor_peca && r.ids_disponiveis_count === 0).length;
+    const owSemPreco = owRequisicoes.filter(r => !r.valor_peca && r.ids_disponiveis_count === 0).length;
+
+    const lpValorTotal = lpRequisicoes
+      .filter(r => r.valor_peca)
+      .reduce((sum, r) => sum + (Number(r.valor_peca) * Number(r.quantidade_requisitada)), 0);
+
+    const owValorTotal = owRequisicoes
+      .filter(r => r.valor_peca)
+      .reduce((sum, r) => sum + (Number(r.valor_peca) * Number(r.quantidade_requisitada)), 0);
+
+    const lpOsIds = new Set(lpRequisicoes.map(r => r.os_id));
+    const owOsIds = new Set(owRequisicoes.map(r => r.os_id));
+
+    const pecasSemPrecoMap: Record<string, any> = {};
+    todasRequisicoesPendentes
+      .filter(r => !r.valor_peca && r.ids_disponiveis_count === 0)
+      .forEach(r => {
+        const key = r.codigo_peca;
+        if (!pecasSemPrecoMap[key]) {
+          pecasSemPrecoMap[key] = {
+            codigo_peca: r.codigo_peca,
+            descricao: r.descricao,
+            count: 0,
+            lpCount: 0,
+            owCount: 0
+          };
+        }
+        pecasSemPrecoMap[key].count++;
+        if (r.os?.tipo_os === 'LP') {
+          pecasSemPrecoMap[key].lpCount++;
+        } else {
+          pecasSemPrecoMap[key].owCount++;
+        }
+      });
+
+    return {
+      lpPendentes: {
+        osCount: lpOsIds.size,
+        pecasCount: lpRequisicoes.length,
+        valorTotal: lpValorTotal,
+        semID: lpSemID,
+        semPreco: lpSemPreco
+      },
+      owPendentes: {
+        osCount: owOsIds.size,
+        pecasCount: owRequisicoes.length,
+        valorTotal: owValorTotal,
+        semID: owSemID,
+        semPreco: owSemPreco
+      },
+      pecasSemPreco: Object.values(pecasSemPrecoMap).sort((a: any, b: any) => b.count - a.count)
+    };
+  };
+
+  const dashboardStats = calcularEstatisticas();
+
+  const handleRegistrarPrecoFromDashboard = (codigoPeca: string, descricao: string) => {
+    const requisicao = requisicoesComPendentes
+      .flatMap(g => g.requisicoes)
+      .find(r => r.codigo_peca === codigoPeca && !r.valor_peca);
+
+    if (requisicao) {
+      handleRegistrarValor(requisicao);
+    }
+  };
+
+  const requisicoesAtendidas = requisicoesAgrupadas.filter(g =>
+    g.todasAtendidas && g.requisicoes.length > 0
+  );
+
+  return (
+    <div className="space-y-6">
+      <EstoqueDashboard
+        stats={dashboardStats}
+        onRegistrarPreco={handleRegistrarPrecoFromDashboard}
+      />
+
+      <div className="bg-[#FFBF00]/10 border border-[#FFBF00]/30 rounded-lg p-6">
+        <h4 className="font-semibold text-[#FFBF00] mb-2">Transferências e Requisições de Peças</h4>
+        <p className="text-sm text-gray-300 mb-4">
+          Aprove requisições, vincule IDs específicos às OSs e acompanhe pedidos em trânsito.
+        </p>
+        <div className="grid grid-cols-3 gap-4 text-center">
+          <div className="bg-[#FFBF00]/10 rounded-lg p-3">
+            <p className="text-2xl font-bold text-[#FFBF00]">{requisicoesComPendentes.length}</p>
+            <p className="text-xs text-gray-400 uppercase">OSs Aguardando</p>
+          </div>
+          <div className="bg-[#39FF14]/10 rounded-lg p-3">
+            <p className="text-2xl font-bold text-[#39FF14]">{requisicoesAtendidas.length}</p>
+            <p className="text-xs text-gray-400 uppercase">OSs Atendidas</p>
+          </div>
+          <div className="bg-[#FF0064]/10 rounded-lg p-3">
+            <p className="text-2xl font-bold text-[#FF0064]">
+              {pedidosAtivos.flatMap(g => g.requisicoes).length}
+            </p>
+            <p className="text-xs text-gray-400 uppercase">Pedidos Ativos</p>
+          </div>
+        </div>
+      </div>
+
+      {/* PEDIDOS ATIVOS - SEMPRE VISÍVEIS */}
+      {pedidosAtivos.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-[#FF0064] mb-4 flex items-center gap-2">
+            <Package className="w-5 h-5" />
+            PEDIDOS ATIVOS ({pedidosAtivos.length} OSs - {pedidosAtivos.flatMap(g => g.requisicoes).length} peças)
+          </h3>
+          <div className="bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg p-4 mb-4">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-5 h-5 text-[#FF0064] flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm text-[#FF0064] font-semibold mb-1">
+                  Pedidos Ativos - Independente da Coluna da OS
+                </p>
+                <p className="text-xs text-gray-300">
+                  Estes pedidos estão ativos independente da posição da OS no Kanban.
+                  Peças com pedido ativo estão BLOQUEADAS nas cotações e não podem ser alteradas.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {pedidosAtivos.map((grupo) => {
+              const colunasValidas = ['orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
+              const osForaFluxo = !colunasValidas.includes(grupo.requisicoes[0]?.os?.coluna_kanban);
+              const colunaNome = grupo.requisicoes[0]?.os?.coluna_kanban || 'desconhecida';
+
+              return (
+                <div key={grupo.os_id} className="premium-card border-[#FF0064]/30">
+                  {osForaFluxo && (
+                    <div className="bg-yellow-500/20 border-b border-yellow-500/30 p-3 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-yellow-400" />
+                      <p className="text-xs text-yellow-300 font-semibold">
+                        ⚠️ ATENÇÃO: OS está em coluna "{colunaNome.replace(/_/g, ' ').toUpperCase()}" - Pedido continua ativo
+                      </p>
+                    </div>
+                  )}
+                  <div
+                    className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                    onClick={() => setOsExpandidaPedido(osExpandidaPedido === grupo.os_id ? null : grupo.os_id)}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        {osExpandidaPedido === grupo.os_id ? (
+                          <ChevronDown className="w-5 h-5 text-[#FF0064]" />
+                        ) : (
+                          <ChevronRight className="w-5 h-5 text-gray-500" />
+                        )}
+                        <Package className="w-5 h-5 text-[#FF0064]" />
+                        <div>
+                          <p className="font-bold text-white">
+                            OS {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
+                          </p>
+                          <p className="text-xs text-gray-400">
+                            {grupo.totalPecas} peça(s) com pedido ativo
+                          </p>
+                        </div>
+                      </div>
+                      <BadgeTipoOS tipo={grupo.tipo_os} />
+                    </div>
+                  </div>
+
+                  {osExpandidaPedido === grupo.os_id && (
+                    <div className="border-t border-gray-800 p-4 space-y-3">
+                      {grupo.requisicoes.map((req: any) => (
+                        <div key={req.id} className="bg-[#FF0064]/5 border border-[#FF0064]/20 rounded-lg p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-2">
+                                <p className="font-bold text-white">{req.descricao}</p>
+                                <span
+                                  className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                  style={{
+                                    backgroundColor: '#FF006420',
+                                    borderColor: '#FF0064',
+                                    color: '#FF0064',
+                                    border: '1px solid'
+                                  }}
+                                >
+                                  🔒 BLOQUEADA
+                                </span>
+                                <span
+                                  className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                  style={{
+                                    backgroundColor: '#FFBF0020',
+                                    borderColor: '#FFBF00',
+                                    color: '#FFBF00',
+                                    border: '1px solid'
+                                  }}
+                                >
+                                  PEDIDO ATIVO
+                                </span>
+                              </div>
+                              <p className="text-xs text-gray-400 mb-2">
+                                PN: <span className="font-mono font-bold">{req.codigo_peca}</span>
+                              </p>
+                              <p className="text-xs text-gray-500 mb-2">
+                                Qtd: {req.quantidade_requisitada} • IDs disponíveis: {req.ids_disponiveis_count || 0}
+                              </p>
+                              {req.valor_peca && (
+                                <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
+                                  <DollarSign className="w-3 h-3 text-[#39FF14]" />
+                                  <span className="text-[#39FF14] font-bold">Valor GSPN: R$ {Number(req.valor_peca).toFixed(2)}</span>
+                                </p>
+                              )}
+                              {req.observacoes_pedido && (
+                                <div className="bg-gray-900/50 rounded-lg p-3 mb-3">
+                                  <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Observações do Pedido:</p>
+                                  <p className="text-sm text-gray-300">{req.observacoes_pedido}</p>
+                                </div>
+                              )}
+                              <p className="text-xs text-gray-500">
+                                Pedido feito em: {new Date(req.updated_at || req.created_at).toLocaleString('pt-BR')}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {req.ids_disponiveis_count > 0 && (
+                              <button
+                                onClick={() => handleAprovarRequisicao(req)}
+                                className="neon-button text-xs px-4 py-2"
+                                style={{
+                                  backgroundColor: '#39FF1420',
+                                  color: '#39FF14',
+                                  borderColor: '#39FF1460'
+                                }}
+                              >
+                                APROVAR
+                              </button>
+                            )}
+                            <button
+                              onClick={() => handleReprovarRequisicao(req)}
+                              className="neon-button text-xs px-4 py-2"
+                              style={{
+                                backgroundColor: '#FF006410',
+                                color: '#FF0064',
+                                borderColor: '#FF006460'
+                              }}
+                            >
+                              REPROVAR
+                            </button>
+                            <button
+                              onClick={() => setModalVerPedido(req)}
+                              className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                              style={{
+                                backgroundColor: '#00D4FF10',
+                                borderColor: '#00D4FF',
+                                color: '#00D4FF'
+                              }}
+                            >
+                              <Package className="w-4 h-4" />
+                              VER DETALHES DO PEDIDO
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* REQUISIÇÕES PENDENTES */}
+      {requisicoesComPendentes.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-[#FFBF00] mb-4 flex items-center gap-2">
+            <Clock className="w-5 h-5" />
+            REQUISIÇÕES PENDENTES ({requisicoesComPendentes.length} OSs)
+          </h3>
+          <div className="space-y-3">
+            {requisicoesComPendentes.map((grupo) => (
+              <div key={grupo.os_id} className="premium-card">
+                <div
+                  className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                  onClick={() => setOsExpandida(osExpandida === grupo.os_id ? null : grupo.os_id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {osExpandida === grupo.os_id ? (
+                        <ChevronDown className="w-5 h-5 text-[#00D4FF]" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-gray-200">
+                            OS: {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
+                          </p>
+                          <BadgeTipoOS tipo={grupo.tipo_os} />
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-gray-500">
+                            {grupo.totalPecas} peça(s)
+                          </span>
+                          {grupo.valorTotal > 0 && (
+                            <span className="text-xs text-[#39FF14] font-bold flex items-center gap-1">
+                              <DollarSign className="w-3 h-3" />
+                              R$ {grupo.valorTotal.toFixed(2)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {grupo.algunsAtendidas && !grupo.todasAtendidas && (
+                        <span className="px-3 py-1 rounded-full text-xs font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                          PARCIAL
+                        </span>
+                      )}
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/30">
+                        {grupo.requisicoes.filter(r => r.status === 'pendente').length} PENDENTE(S)
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {osExpandida === grupo.os_id && (
+                  <div className="border-t border-[#00D4FF]/20 p-4 space-y-3">
+                    {grupo.requisicoes.map((req) => (
+                      <div key={req.id} className="bg-black/30 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-medium text-gray-200">{req.descricao}</p>
+                              {getStatusBadge(req.status)}
+                            </div>
+                            <div className="text-xs text-gray-400 space-y-1">
+                              <p>Código: <span className="font-mono text-gray-300">{req.codigo_peca}</span></p>
+                              <p>Quantidade: <span className="text-[#39FF14]">{req.quantidade_requisitada}</span></p>
+                              {req.peca_estoque && (
+                                <p>
+                                  ID Vinculado: <span className="font-mono text-[#39FF14]">#{req.peca_estoque.id_numerico}</span>
+                                  {req.peca_estoque.delivery && (
+                                    <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{req.peca_estoque.delivery}</span></span>
+                                  )}
+                                  {' - '}R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
+                                </p>
+                              )}
+                              {req.valor_peca && (
+                                <p className="flex items-center gap-1">
+                                  <DollarSign className="w-3 h-3 text-[#39FF14]" />
+                                  <span className="text-[#39FF14] font-bold">Valor GSPN: R$ {Number(req.valor_peca).toFixed(2)}</span>
+                                </p>
+                              )}
+                            </div>
+                            {req.observacoes_pedido && (
+                              <div className="bg-gray-900/50 rounded-lg p-3 mt-3">
+                                <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Observações do Pedido:</p>
+                                <p className="text-sm text-gray-300">{req.observacoes_pedido}</p>
+                              </div>
+                            )}
+                            {req.numero_pedido_samsung && req.numero_pedido_samsung !== 'N/A' && !req.numero_pedido_samsung.startsWith('PENDENTE-') && (
+                              <div className="bg-blue-900/20 rounded-lg p-3 mt-3 border border-blue-500/30">
+                                <p className="text-xs text-blue-400 uppercase font-semibold mb-1">Pedido Samsung:</p>
+                                <p className="text-sm text-gray-300">{req.numero_pedido_samsung}</p>
+                              </div>
+                            )}
+                            {req.status === 'reprovada' && req.motivo_reprovacao && (
+                              <div className="mt-3 p-3 rounded-lg" style={{
+                                backgroundColor: '#FF006410',
+                                border: '1px solid #FF006460'
+                              }}>
+                                <div className="flex items-start gap-2">
+                                  <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
+                                  <div className="flex-1">
+                                    <p className="text-xs font-bold text-[#FF0064] mb-1">MOTIVO DA REPROVAÇÃO:</p>
+                                    <p className="text-xs text-gray-300">{req.motivo_reprovacao}</p>
+                                    {req.reprovado_por_usuario && req.reprovado_em && (
+                                      <p className="text-xs text-gray-500 mt-2">
+                                        Reprovado por {req.reprovado_por_usuario.nome} em{' '}
+                                        {new Date(req.reprovado_em).toLocaleString('pt-BR', {
+                                          day: '2-digit',
+                                          month: '2-digit',
+                                          year: 'numeric',
+                                          hour: '2-digit',
+                                          minute: '2-digit'
+                                        })}
+                                      </p>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                          {req.status === 'pedido_feito' && (
+                            <div className="flex items-center gap-2 ml-3">
+                              <button
+                                onClick={() => handleVerPedido(req)}
+                                className="neon-button text-xs px-4 py-2"
+                                style={{
+                                  backgroundColor: '#00D4FF20',
+                                  color: '#00D4FF',
+                                  borderColor: '#00D4FF60'
+                                }}
+                              >
+                                VER PEDIDO
+                              </button>
+                              <button
+                                onClick={() => handleRefazerPedido(req)}
+                                className="neon-button text-xs px-4 py-2"
+                                style={{
+                                  backgroundColor: '#FFBF0020',
+                                  color: '#FFBF00',
+                                  borderColor: '#FFBF0060'
+                                }}
+                              >
+                                REFAZER PEDIDO
+                              </button>
+                            </div>
+                          )}
+                          {req.status === 'pendente' && (
+                            <div className="flex items-center gap-2 ml-3 flex-wrap">
+                              {req.ids_disponiveis_count > 0 ? (
+                                <>
+                                  <button
+                                    onClick={() => handleAprovarRequisicao(req)}
+                                    className="neon-button text-xs px-4 py-2 font-bold"
+                                    style={{
+                                      backgroundColor: '#39FF1420',
+                                      color: '#39FF14',
+                                      borderColor: '#39FF1460'
+                                    }}
+                                    title={`${req.ids_disponiveis_count} ID(s) disponível(eis) no estoque`}
+                                  >
+                                    <CheckCircle className="w-4 h-4 inline mr-1" />
+                                    APROVAR ({req.ids_disponiveis_count} ID{req.ids_disponiveis_count > 1 ? 's' : ''})
+                                  </button>
+                                  <button
+                                    onClick={() => handleReprovarRequisicao(req)}
+                                    className="neon-button text-xs px-4 py-2"
+                                    style={{
+                                      backgroundColor: '#FF006420',
+                                      color: '#FF0064',
+                                      borderColor: '#FF006460'
+                                    }}
+                                  >
+                                    <XCircle className="w-4 h-4 inline mr-1" />
+                                    REJEITAR
+                                  </button>
+                                  <button
+                                    onClick={() => handleRegistrarValor(req)}
+                                    className="neon-button text-xs px-4 py-2"
+                                    style={{
+                                      backgroundColor: '#FFBF0020',
+                                      color: '#FFBF00',
+                                      borderColor: '#FFBF0060'
+                                    }}
+                                  >
+                                    REGISTRAR VALOR GSPN
+                                  </button>
+                                </>
+                              ) : (
+                                <>
+                                  {req.numero_pedido_samsung && req.numero_pedido_samsung !== 'N/A' && !req.numero_pedido_samsung.startsWith('PENDENTE-') && (
+                                    <button
+                                      onClick={() => handleVerPedido(req)}
+                                      className="neon-button text-xs px-4 py-2"
+                                      style={{
+                                        backgroundColor: '#00D4FF20',
+                                        color: '#00D4FF',
+                                        borderColor: '#00D4FF60'
+                                      }}
+                                    >
+                                      VER PEDIDO
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleRegistrarValor(req)}
+                                    className="neon-button text-xs px-4 py-2"
+                                    style={{
+                                      backgroundColor: '#FFBF0020',
+                                      color: '#FFBF00',
+                                      borderColor: '#FFBF0060'
+                                    }}
+                                  >
+                                    REGISTRAR VALOR GSPN
+                                  </button>
+                                  {req.valor_peca && (
+                                    <button
+                                      onClick={() => handlePedirPeca(req)}
+                                      className="neon-button text-xs px-4 py-2"
+                                      style={{
+                                        backgroundColor: '#00D4FF20',
+                                        color: '#00D4FF',
+                                        borderColor: '#00D4FF60'
+                                      }}
+                                    >
+                                      CRIAR PEDIDO
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => handleReprovarRequisicao(req)}
+                                    className="neon-button text-xs px-4 py-2"
+                                    style={{
+                                      backgroundColor: '#FF006420',
+                                      color: '#FF0064',
+                                      borderColor: '#FF006460'
+                                    }}
+                                  >
+                                    <XCircle className="w-4 h-4 inline mr-1" />
+                                    REJEITAR
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* REQUISIÇÕES ATENDIDAS */}
+      {requisicoesAtendidas.length > 0 && (
+        <div>
+          <h3 className="text-lg font-bold text-[#39FF14] mb-4 flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            REQUISIÇÕES ATENDIDAS ({requisicoesAtendidas.length} OSs)
+          </h3>
+          <div className="space-y-2">
+            {requisicoesAtendidas.slice(0, 5).map((grupo) => (
+              <div key={grupo.os_id} className="premium-card p-3 opacity-60">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="text-sm font-medium text-gray-300">
+                        OS: {grupo.numero_os_samsung || grupo.numero_os_interna}
+                      </p>
+                      <BadgeTipoOS tipo={grupo.tipo_os} />
+                    </div>
+                    <p className="text-xs text-gray-500">{grupo.totalPecas} peça(s) atendida(s)</p>
+                  </div>
+                  {grupo.valorTotal > 0 && (
+                    <p className="text-sm text-[#39FF14] font-bold">
+                      R$ {grupo.valorTotal.toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Modais */}
+      {modalSelecionarID && (
+        <ModalSelecionarID
+          requisicao={modalSelecionarID}
+          onConfirm={(pecaId) => handleConfirmarTransferencia(modalSelecionarID.id, pecaId)}
+          onCancel={() => setModalSelecionarID(null)}
+          onRegistrarValor={() => {
+            handleRegistrarValor(modalSelecionarID);
+            setModalSelecionarID(null);
+          }}
+          onPedirPeca={() => {
+            if (modalSelecionarID.ids_disponiveis_count > 0) {
+              handlePedirPecaComEstoque(modalSelecionarID);
+            } else {
+              handlePedirPeca(modalSelecionarID);
+            }
+            setModalSelecionarID(null);
+          }}
+        />
+      )}
+
+      {modalRegistrarValor && (
+        <ModalRegistrarValorGSPN
+          requisicao={modalRegistrarValor}
+          onConfirm={handleConfirmarValor}
+          onCancel={() => setModalRegistrarValor(null)}
+        />
+      )}
+
+      {modalPedirPeca && (
+        <ModalPedirPeca
+          requisicao={modalPedirPeca}
+          onConfirm={(dados) => handleConfirmarPedido(modalPedirPeca.id, dados)}
+          onCancel={() => setModalPedirPeca(null)}
+        />
+      )}
+
+      {modalJustificativa && (
+        <ModalJustificativaPedido
+          requisicao={modalJustificativa}
+          idsDisponiveis={modalJustificativa.ids_disponiveis_count}
+          onConfirm={handleConfirmarPedidoComJustificativa}
+          onCancel={() => setModalJustificativa(null)}
+        />
+      )}
+
+      {modalVerPedido && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="premium-card max-w-2xl w-full">
+            <div className="border-b border-[#00D4FF]/20 p-6 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
+                  <Package className="w-6 h-6" />
+                  Detalhes do Pedido
+                </h2>
+              </div>
+              <button onClick={() => setModalVerPedido(null)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-[#00D4FF]" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4 space-y-3">
+                <div>
+                  <p className="text-xs text-gray-500 uppercase">Descrição</p>
+                  <p className="text-sm text-gray-200 font-medium">{modalVerPedido.descricao}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Part Number</p>
+                    <p className="text-sm text-gray-200 font-mono">{modalVerPedido.codigo_peca}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Quantidade</p>
+                    <p className="text-sm text-gray-200">{modalVerPedido.quantidade_requisitada}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Valor GSPN</p>
+                    <p className="text-sm text-[#39FF14] font-bold">R$ {Number(modalVerPedido.valor_peca || 0).toFixed(2)}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Número do Pedido</p>
+                    <p className="text-sm text-[#00D4FF] font-mono">{modalVerPedido.numero_pedido_samsung}</p>
+                  </div>
+                </div>
+                {modalVerPedido.observacoes_pedido && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Observações</p>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap">{modalVerPedido.observacoes_pedido}</p>
+                  </div>
+                )}
+                {modalVerPedido.previsao_entrega && (
+                  <div>
+                    <p className="text-xs text-gray-500 uppercase">Previsão de Entrega</p>
+                    <p className="text-sm text-gray-200">{new Date(modalVerPedido.previsao_entrega).toLocaleDateString('pt-BR')}</p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => setModalVerPedido(null)}
+                className="neon-button w-full py-3"
+                style={{
+                  backgroundColor: '#00D4FF20',
+                  color: '#00D4FF',
+                  borderColor: '#00D4FF60'
+                }}
+              >
+                FECHAR
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
