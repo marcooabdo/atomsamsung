@@ -58,9 +58,9 @@ function OtimizadorContent() {
           <div>
             <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 flex items-center gap-3">
               <Zap className="w-10 h-10 text-cyan-400 animate-pulse" />
-              Centro de Comando Operacional
+              Centro de Comando IH
             </h1>
-            <p className="text-gray-400 mt-2">Hub gerencial completo para gestão de atendimentos IH</p>
+            <p className="text-gray-400 mt-2">Hub gerencial completo para gestao de atendimentos</p>
           </div>
 
           <div className="w-64">

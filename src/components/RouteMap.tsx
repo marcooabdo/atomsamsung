@@ -120,24 +120,14 @@ export default function RouteMap({
   }, [map, filteredMarkers, baseLocation]);
 
   const createMarkerIcon = (color: string, ordem?: number) => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="40" height="50" viewBox="0 0 40 50">
-        <path d="M20 0C11.716 0 5 6.716 5 15c0 8.284 15 35 15 35s15-26.716 15-35C35 6.716 28.284 0 20 0z" fill="${color}" stroke="white" stroke-width="2"/>
-        <circle cx="20" cy="15" r="10" fill="white"/>
-        <text x="20" y="21" text-anchor="middle" fill="${color}" font-size="12" font-weight="bold">${ordem || '•'}</text>
-      </svg>
-    `;
-    return 'data:image/svg+xml;base64,' + btoa(svg);
+    const label = ordem !== undefined ? String(ordem) : '';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40"><path d="M16 0C7.164 0 0 7.164 0 16c0 8.837 16 24 16 24s16-15.163 16-24C32 7.164 24.836 0 16 0z" fill="${color}" stroke="#ffffff" stroke-width="2"/><circle cx="16" cy="14" r="8" fill="#ffffff"/>${label ? `<text x="16" y="18" text-anchor="middle" fill="${color}" font-size="10" font-weight="bold" font-family="Arial">${label}</text>` : `<circle cx="16" cy="14" r="3" fill="${color}"/>`}</svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
   };
 
   const createBaseIcon = () => {
-    const svg = `
-      <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="#1e40af" stroke="white" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
-      </svg>
-    `;
-    return 'data:image/svg+xml;base64,' + btoa(svg);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="#1e40af" stroke="#ffffff" stroke-width="2"/><path d="M12 6L6 10v7h4v-4h4v4h4v-7L12 6z" fill="#ffffff"/></svg>`;
+    return 'data:image/svg+xml,' + encodeURIComponent(svg);
   };
 
   return (
@@ -154,10 +144,11 @@ export default function RouteMap({
             position={{ lat: baseLocation.lat, lng: baseLocation.lng }}
             icon={{
               url: createBaseIcon(),
-              scaledSize: new google.maps.Size(48, 48),
-              anchor: new google.maps.Point(24, 24),
+              scaledSize: new google.maps.Size(40, 40),
+              anchor: new google.maps.Point(20, 20),
             }}
             onClick={() => setSelectedMarker('base')}
+            zIndex={1000}
           />
         )}
 
@@ -182,8 +173,8 @@ export default function RouteMap({
               position={{ lat: marker.lat, lng: marker.lng }}
               icon={{
                 url: createMarkerIcon(color, marker.ordem),
-                scaledSize: new google.maps.Size(40, 50),
-                anchor: new google.maps.Point(20, 50),
+                scaledSize: new google.maps.Size(32, 40),
+                anchor: new google.maps.Point(16, 40),
               }}
               onClick={() => {
                 setSelectedMarker(marker.id);

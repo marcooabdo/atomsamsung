@@ -38,6 +38,12 @@ interface Tecnico {
   nome: string;
 }
 
+interface BaseLocation {
+  lat: number;
+  lng: number;
+  nome: string;
+}
+
 export default function MapaInteligente() {
   const { selectedUnidade } = useOtimizador();
   const [osWithCoords, setOsWithCoords] = useState<OSComCoordenadas[]>([]);
@@ -48,6 +54,7 @@ export default function MapaInteligente() {
   const [tecnicos, setTecnicos] = useState<Tecnico[]>([]);
   const [rotas, setRotas] = useState<string[]>([]);
   const [selectedOS, setSelectedOS] = useState<OSComCoordenadas | null>(null);
+  const [baseLocation, setBaseLocation] = useState<BaseLocation | null>(null);
 
   const [filtros, setFiltros] = useState<Filtros>({
     dataInicio: '',
@@ -65,8 +72,34 @@ export default function MapaInteligente() {
       loadOSsComCoordenadas();
       loadTecnicos();
       loadRotas();
+      loadBaseLocation();
     }
   }, [selectedUnidade]);
+
+  const loadBaseLocation = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('unidades')
+        .select('nome, lat_base, lng_base, endereco_completo')
+        .eq('id', selectedUnidade)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (data && data.lat_base && data.lng_base) {
+        setBaseLocation({
+          lat: parseFloat(data.lat_base),
+          lng: parseFloat(data.lng_base),
+          nome: data.nome || 'Base'
+        });
+      } else {
+        setBaseLocation(null);
+      }
+    } catch (error) {
+      console.error('Erro ao carregar localização base:', error);
+      setBaseLocation(null);
+    }
+  };
 
   useEffect(() => {
     aplicarFiltros();
@@ -478,7 +511,7 @@ export default function MapaInteligente() {
               <RouteMap
                 osMarkers={osFiltradas}
                 selectedRota={undefined}
-                baseLocation={undefined}
+                baseLocation={baseLocation || undefined}
               />
             )}
           </div>
