@@ -7,35 +7,80 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-interface SamsungOS {
+interface SamsungServiceOrder {
   SvcOrderNo: string;
-  CustFirstName?: string;
-  CustLastName?: string;
-  CustAddrStreet?: string;
-  CustAddrStreetDetail?: string;
-  CustAddrCity?: string;
-  CustAddrState?: string;
-  CustAddrZIP?: string;
-  CustHomePhone?: string;
-  CustMobilePhone?: string;
-  Model?: string;
-  IMEI?: string;
-  DefectDesc?: string;
-  DefectCode?: string;
-  Symptoms?: string;
-  CustEmail?: string;
-  ProductModel?: string;
-  SerialNo?: string;
-  CreateDate?: string;
-  ReqDate?: string;
-  SvcType?: string;
-  WarrantyStatus?: string;
-  RepairType?: string;
+  AscJobNo: string;
+  ReqDate: string;
+  Model: string;
+  SerialNo: string;
+  IMEI: string;
+  PurchaseDate: string;
+  WarrantyType: string;
+  CustName: string;
+  CustCity: string;
+  ScheduleDate: string;
+  CollectionCenter: string;
+  CollectionCenterName: string;
+  SvcTypeDesc: string;
+  StatusDesc: string;
+  StReasonDesc: string;
+  CollectionRefNo: string;
+  CompleteDate: string;
+  Engineer: string;
+  EngineerName: string;
+  Remark: string;
+  AscCode: string;
+  AscName: string;
+  CustComment: string;
+  CustHomePhone: string;
+  CustOfficePhone: string;
+  CustMobilePhone: string;
+  SvcProduct: string;
+  CustFeedback: string;
+  SvcComment: string;
+  LocalProduct: string;
+  CcAppDate: string;
+  RedoFlag: string;
+  Status: string;
+  ScheduleTime: string;
+  PostingDate: string;
+  DetailType: string;
+  CustZipcode: string;
+  CustFirstName: string;
+  CustLastName: string;
+  CustAddress: string;
+  CustState: string;
+  StReason: string;
+  CompleteTime: string;
+  SvcTAT: string;
+  InboundTrackingNo: string;
+  WarrantyStatus: string;
+  EliteService: string;
+  AppTime: string;
+  WtyType: string;
+  CallReceivedDate: string;
+  CallReceivedTime: string;
+  CustRequestDate: string;
+  CustRequestTime: string;
+  UrgentService: string;
+  RiskGrade: string;
 }
 
 interface SamsungAPIResponse {
-  ServiceOrderList?: SamsungOS[];
-  data?: SamsungOS[];
+  Return: {
+    EsCommonResult: {
+      Code: string;
+      Codedesc: string;
+      Msgid: string;
+      Sac: string;
+      Pac: string;
+    };
+    EvRetCode: string;
+    EvRetMsg: string;
+  };
+  EtSvcInfo: {
+    results: SamsungServiceOrder[];
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -51,7 +96,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Autorização necessária' }),
+        JSON.stringify({ error: 'Autoriza\u00e7\u00e3o necess\u00e1ria' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -61,7 +106,7 @@ Deno.serve(async (req: Request) => {
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Usuário não autenticado' }),
+        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -74,7 +119,7 @@ Deno.serve(async (req: Request) => {
 
     if (!usuario) {
       return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
+        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -90,7 +135,7 @@ Deno.serve(async (req: Request) => {
 
     if (!config) {
       return new Response(
-        JSON.stringify({ error: 'Configuração Samsung não encontrada ou inativa' }),
+        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada ou inativa' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -108,9 +153,9 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincronização:', syncLogError);
+      console.error('Erro ao criar log de sincroniza\u00e7\u00e3o:', syncLogError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincronização' }),
+        JSON.stringify({ error: 'Erro ao iniciar sincroniza\u00e7\u00e3o' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -126,22 +171,43 @@ Deno.serve(async (req: Request) => {
       return `${year}${month}${day}`;
     };
 
+    const generatePac = () => {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      return `${year}${month}${day}${hours}${minutes}${seconds}`;
+    };
+
     const payload = {
-      ASCCode: config.asc_code,
-      FromDate: formatDate(dataInicio),
-      ToDate: formatDate(hoje)
+      IsBasicCond: {
+        AscCode: config.asc_code,
+        ReqDateFrom: formatDate(dataInicio),
+        ReqDateTo: formatDate(hoje)
+      },
+      IvCompany: "",
+      IsCommonHeader: {
+        Company: config.company_code,
+        AscCode: config.asc_code,
+        Country: config.country_code,
+        Lang: config.language_code,
+        Pac: generatePac()
+      }
     };
 
     const apiUrl = 'https://latam.ipaas.samsung.com/latam/gcic/GetSOList/1.0/ImportSet';
-    const samsungToken = config.ambiente_ativo === 'prod' ? config.token_prod : config.token_dev;
 
-    console.log('Consultando API Samsung:', payload);
+    console.log('Consultando API Samsung:', JSON.stringify(payload));
 
     const samsungResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${samsungToken}`
+        'Authorization': `Bearer ${config.token_api}`,
+        'Cookie': 'sap-usercontext=sap-client=100'
       },
       body: JSON.stringify(payload)
     });
@@ -170,8 +236,27 @@ Deno.serve(async (req: Request) => {
     }
 
     const responseData: SamsungAPIResponse = await samsungResponse.json();
-    const osList = responseData.ServiceOrderList || responseData.data || [];
 
+    if (responseData.Return.EvRetCode !== "0") {
+      const errorMsg = `API Samsung retornou erro: ${responseData.Return.EvRetMsg || 'Erro desconhecido'}`;
+      console.error(errorMsg);
+
+      await supabase
+        .from('samsung_sync_logs')
+        .update({
+          status: 'erro',
+          finalizado_em: new Date().toISOString(),
+          mensagem_erro: errorMsg
+        })
+        .eq('id', syncLog.id);
+
+      return new Response(
+        JSON.stringify({ error: errorMsg }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const osList = responseData.EtSvcInfo?.results || [];
     console.log(`Total de OS encontradas: ${osList.length}`);
 
     const { data: existingOS } = await supabase
@@ -192,35 +277,42 @@ Deno.serve(async (req: Request) => {
         continue;
       }
 
-      const clienteNome = `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() || 'Cliente Samsung';
+      const clienteNome = os.CustName?.trim() ||
+                         `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() ||
+                         'Cliente Samsung';
+
+      const telefone = os.CustMobilePhone || os.CustHomePhone || os.CustOfficePhone || '';
+      const imei = os.IMEI || os.SerialNo || '';
+
       const endereco = [
-        os.CustAddrStreet,
-        os.CustAddrStreetDetail,
-        os.CustAddrCity,
-        os.CustAddrState
+        os.CustAddress,
+        os.CustCity,
+        os.CustState
       ].filter(Boolean).join(', ');
 
-      const telefone = os.CustMobilePhone || os.CustHomePhone || '';
+      const tipoReparo = os.SvcTypeDesc === 'In Home' ? 'VISITA TECNICA' :
+                        os.SvcTypeDesc === 'Carry In' ? 'BALCAO' :
+                        os.SvcTypeDesc || 'VISITA TECNICA';
 
       const osData = {
         unidade_id: unidadeId,
         numero_os_samsung: os.SvcOrderNo,
         cliente_nome: clienteNome,
-        cliente_telefone: telefone,
-        cliente_email: os.CustEmail || null,
+        cliente_telefone: telefone || null,
+        cliente_email: null,
         endereco: endereco || null,
-        cep: os.CustAddrZIP || null,
-        cidade: os.CustAddrCity || null,
-        estado: os.CustAddrState || null,
-        modelo_equipamento: os.Model || os.ProductModel || null,
-        imei: os.IMEI || os.SerialNo || null,
-        defeito_reclamado: os.DefectDesc || os.Symptoms || null,
+        cep: os.CustZipcode || null,
+        cidade: os.CustCity || null,
+        estado: os.CustState || null,
+        modelo_equipamento: os.Model || null,
+        imei: imei || null,
+        defeito_reclamado: os.Remark || os.CustComment || os.SvcComment || null,
         coluna_kanban: 'OS NOVA',
         tipo_os: 'SAMSUNG',
-        tipo_reparo: os.RepairType || os.SvcType || 'VISITA TECNICA',
-        status_garantia: os.WarrantyStatus || null,
-        data_abertura_samsung: os.CreateDate || null,
-        data_requisicao_samsung: os.ReqDate || null
+        tipo_reparo: tipoReparo,
+        status_garantia: os.WarrantyType || os.WarrantyStatus || null,
+        data_abertura_samsung: os.ReqDate || null,
+        data_requisicao_samsung: os.CustRequestDate || null
       };
 
       const { error: insertError } = await supabase

@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, CheckCircle, AlertCircle, Clock, RefreshCw } from 'lucide-react';
+import { Download, CheckCircle, AlertCircle, Clock, RefreshCw, Save, Edit, Smartphone } from 'lucide-react';
 
 interface SamsungConfig {
   id: string;
   asc_code: string;
-  ambiente_ativo: 'dev' | 'prod';
+  token_api: string;
   dias_historico: number;
+  company_code: string;
+  country_code: string;
+  language_code: string;
   ativo: boolean;
   ultima_sincronizacao: string | null;
 }
@@ -27,7 +30,19 @@ export function SamsungGSPNTab() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  const [formData, setFormData] = useState({
+    asc_code: '',
+    token_api: '',
+    dias_historico: 7,
+    company_code: 'C820',
+    country_code: 'BR',
+    language_code: 'EN',
+    ativo: true
+  });
 
   useEffect(() => {
     loadData();
@@ -54,7 +69,20 @@ export function SamsungGSPNTab() {
         .eq('unidade_id', usuario.unidade_id)
         .maybeSingle();
 
-      setConfig(configData);
+      if (configData) {
+        setConfig(configData);
+        setFormData({
+          asc_code: configData.asc_code,
+          token_api: configData.token_api,
+          dias_historico: configData.dias_historico,
+          company_code: configData.company_code,
+          country_code: configData.country_code,
+          language_code: configData.language_code,
+          ativo: configData.ativo
+        });
+      } else {
+        setEditing(true);
+      }
 
       const { data: logsData } = await supabase
         .from('samsung_sync_logs')
@@ -68,6 +96,58 @@ export function SamsungGSPNTab() {
       console.error('Erro ao carregar dados Samsung:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSave = async () => {
+    if (!formData.asc_code || !formData.token_api) {
+      setMessage({ type: 'error', text: 'AscCode e Token API são obrigatórios' });
+      return;
+    }
+
+    setSaving(true);
+    setMessage(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('unidade_id')
+        .eq('auth_id', session.user.id)
+        .single();
+
+      if (!usuario) return;
+
+      if (config) {
+        await supabase
+          .from('samsung_api_configs')
+          .update({
+            ...formData,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', config.id);
+      } else {
+        await supabase
+          .from('samsung_api_configs')
+          .insert({
+            ...formData,
+            unidade_id: usuario.unidade_id
+          });
+      }
+
+      setMessage({ type: 'success', text: 'Configuração salva com sucesso!' });
+      setEditing(false);
+      loadData();
+    } catch (error: unknown) {
+      console.error('Erro ao salvar configuração:', error);
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Erro ao salvar configuração'
+      });
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -170,51 +250,30 @@ export function SamsungGSPNTab() {
     );
   }
 
-  if (!config) {
-    return (
-      <div className="text-center py-12">
-        <AlertCircle className="w-16 h-16 text-red-400 mx-auto mb-4" />
-        <h3 className="text-xl font-bold text-white mb-2">Configuração não encontrada</h3>
-        <p className="text-gray-400">
-          A integração com Samsung GSPN não está configurada para esta unidade.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="premium-card">
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h3 className="text-xl font-bold text-white mb-2">Sincronização Samsung GSPN</h3>
-            <p className="text-gray-400">
-              Importe ordens de serviço diretamente da API Samsung GSPN
-            </p>
-          </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-400">ASC Code</div>
-            <div className="text-lg font-bold text-[#00D4FF]">{config.asc_code}</div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <div className="text-sm text-gray-400 mb-1">Ambiente</div>
-            <div className="text-lg font-bold text-white uppercase">
-              {config.ambiente_ativo}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-lg bg-[#1428A0]/20 border-2 border-[#1428A0] flex items-center justify-center">
+              <Smartphone className="w-6 h-6 text-[#1428A0]" />
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-white">Configuração Samsung GSPN</h3>
+              <p className="text-gray-400 text-sm">
+                Configure a integração com a API Samsung para sua unidade
+              </p>
             </div>
           </div>
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <div className="text-sm text-gray-400 mb-1">Dias de histórico</div>
-            <div className="text-lg font-bold text-white">{config.dias_historico} dias</div>
-          </div>
-          <div className="bg-white/5 rounded-lg p-4 border border-white/10">
-            <div className="text-sm text-gray-400 mb-1">Última sincronização</div>
-            <div className="text-sm font-bold text-white">
-              {formatDateTime(config.ultima_sincronizacao)}
-            </div>
-          </div>
+          {config && !editing && (
+            <button
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#00D4FF]/30 text-[#00D4FF] hover:bg-[#00D4FF]/10 transition-colors"
+            >
+              <Edit className="w-4 h-4" />
+              EDITAR
+            </button>
+          )}
         </div>
 
         {message && (
@@ -229,33 +288,180 @@ export function SamsungGSPNTab() {
           </div>
         )}
 
-        <button
-          onClick={handleImport}
-          disabled={importing || !config.ativo}
-          className="neon-button w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {importing ? (
-            <>
-              <RefreshCw className="w-5 h-5 animate-spin" />
-              IMPORTANDO...
-            </>
-          ) : (
-            <>
-              <Download className="w-5 h-5" />
-              IMPORTAR OS DOS ÚLTIMOS {config.dias_historico} DIAS
-            </>
-          )}
-        </button>
+        {editing ? (
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  AscCode <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.asc_code}
+                  onChange={(e) => setFormData({ ...formData, asc_code: e.target.value })}
+                  placeholder="Ex: 5959883"
+                  className="neon-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  Token API <span className="text-red-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={formData.token_api}
+                  onChange={(e) => setFormData({ ...formData, token_api: e.target.value })}
+                  placeholder="Ex: 886c22d6-3c82-338e-9359-45f0dbd53c70"
+                  className="neon-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Dias de Histórico</label>
+                <input
+                  type="number"
+                  value={formData.dias_historico}
+                  onChange={(e) => setFormData({ ...formData, dias_historico: parseInt(e.target.value) })}
+                  min="1"
+                  max="30"
+                  className="neon-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Company Code</label>
+                <input
+                  type="text"
+                  value={formData.company_code}
+                  onChange={(e) => setFormData({ ...formData, company_code: e.target.value })}
+                  className="neon-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Country Code</label>
+                <input
+                  type="text"
+                  value={formData.country_code}
+                  onChange={(e) => setFormData({ ...formData, country_code: e.target.value })}
+                  className="neon-input"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">Language Code</label>
+                <input
+                  type="text"
+                  value={formData.language_code}
+                  onChange={(e) => setFormData({ ...formData, language_code: e.target.value })}
+                  className="neon-input"
+                />
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="ativo"
+                checked={formData.ativo}
+                onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
+                className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#00D4FF]"
+              />
+              <label htmlFor="ativo" className="text-sm text-gray-300">
+                Integração ativa
+              </label>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t border-white/10">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="neon-button flex items-center gap-2 disabled:opacity-50"
+              >
+                {saving ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    SALVANDO...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4" />
+                    SALVAR CONFIGURAÇÃO
+                  </>
+                )}
+              </button>
+              {config && (
+                <button
+                  onClick={() => {
+                    setEditing(false);
+                    setFormData({
+                      asc_code: config.asc_code,
+                      token_api: config.token_api,
+                      dias_historico: config.dias_historico,
+                      company_code: config.company_code,
+                      country_code: config.country_code,
+                      language_code: config.language_code,
+                      ativo: config.ativo
+                    });
+                  }}
+                  className="px-6 py-3 rounded-lg border border-gray-700 text-gray-400 hover:bg-gray-800/60 transition-colors"
+                >
+                  CANCELAR
+                </button>
+              )}
+            </div>
+          </div>
+        ) : config ? (
+          <>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="text-sm text-gray-400 mb-1">AscCode</div>
+                <div className="text-lg font-bold text-[#1428A0]">{config.asc_code}</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="text-sm text-gray-400 mb-1">Dias de histórico</div>
+                <div className="text-lg font-bold text-white">{config.dias_historico} dias</div>
+              </div>
+              <div className="bg-white/5 rounded-lg p-4 border border-white/10">
+                <div className="text-sm text-gray-400 mb-1">Última sincronização</div>
+                <div className="text-sm font-bold text-white">
+                  {formatDateTime(config.ultima_sincronizacao)}
+                </div>
+              </div>
+            </div>
+
+            <button
+              onClick={handleImport}
+              disabled={importing || !config.ativo}
+              className="neon-button w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {importing ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  IMPORTANDO...
+                </>
+              ) : (
+                <>
+                  <Download className="w-5 h-5" />
+                  ATUALIZAR - IMPORTAR OS DOS ÚLTIMOS {config.dias_historico} DIAS
+                </>
+              )}
+            </button>
+          </>
+        ) : (
+          <div className="text-center py-8">
+            <AlertCircle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
+            <p className="text-gray-400 mb-4">Nenhuma configuração encontrada</p>
+            <p className="text-sm text-gray-500">Configure a integração Samsung para começar</p>
+          </div>
+        )}
       </div>
 
-      <div className="premium-card">
-        <h3 className="text-lg font-bold text-white mb-4">Histórico de Sincronizações</h3>
+      {syncLogs.length > 0 && (
+        <div className="premium-card">
+          <h3 className="text-lg font-bold text-white mb-4">Histórico de Sincronizações</h3>
 
-        {syncLogs.length === 0 ? (
-          <div className="text-center py-8 text-gray-400">
-            Nenhuma sincronização realizada ainda
-          </div>
-        ) : (
           <div className="space-y-3">
             {syncLogs.map((log) => (
               <div
@@ -302,8 +508,8 @@ export function SamsungGSPNTab() {
               </div>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
