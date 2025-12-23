@@ -309,6 +309,14 @@ Deno.serve(async (req: Request) => {
       const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
                              os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
 
+      const warrantyStatus = (os.WarrantyStatus || os.WarrantyType || '').toUpperCase();
+      const isInWarranty = warrantyStatus.includes('IN WARRANTY') ||
+                          warrantyStatus.includes('GARANTIA') ||
+                          warrantyStatus === 'IW' ||
+                          warrantyStatus === 'W';
+
+      const tipoOS = isInWarranty ? 'LP' : 'OW';
+
       const osData = {
         unidade_id: unidadeId,
         numero_os_samsung: os.SvcOrderNo,
@@ -323,7 +331,7 @@ Deno.serve(async (req: Request) => {
         aparelho_imei: imei || null,
         defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
         coluna_kanban: 'os_nova',
-        tipo_os: 'SAMSUNG',
+        tipo_os: tipoOS,
         tipo_atendimento: tipoAtendimento,
         tipo_reparo: tipoReparo,
         status_garantia: os.WarrantyType || os.WarrantyStatus || null,
