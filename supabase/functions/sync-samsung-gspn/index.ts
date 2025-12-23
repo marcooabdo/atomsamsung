@@ -127,16 +127,22 @@ Deno.serve(async (req: Request) => {
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const targetUnidadeId = body.unidade_id;
 
-    let unidadeId = usuario.unidade_id;
+    let unidadeId = targetUnidadeId || usuario.unidade_id;
 
-    if (targetUnidadeId && targetUnidadeId !== unidadeId) {
+    if (!unidadeId) {
+      return new Response(
+        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
       if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
         return new Response(
           JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      unidadeId = targetUnidadeId;
     }
 
     const { data: unidade } = await supabase
@@ -370,10 +376,12 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Erro geral:', error);
+    console.error('Stack trace:', error.stack);
     return new Response(
       JSON.stringify({
         error: 'Erro interno do servidor',
-        details: error.message
+        details: error.message,
+        stack: error.stack
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
