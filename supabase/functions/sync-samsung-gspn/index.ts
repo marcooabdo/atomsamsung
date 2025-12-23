@@ -170,13 +170,13 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (syncLogError || !syncLog) {
+ /*    if (syncLogError || !syncLog) {
       console.error('Erro ao criar log de sincronização:', syncLogError);
       return new Response(
         JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
-    }
+    } */
 
     const hoje = new Date();
     const dataInicio = new Date(hoje);
@@ -229,29 +229,27 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify(payload)
     });
-
+    return new Response(
+      JSON.stringify({
+        response: samsungResponse
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    );
+    
     if (!samsungResponse.ok) {
       const errorText = await samsungResponse.text();
       console.error('Erro na API Samsung:', errorText);
 
-      await supabase
+      /* await supabase
         .from('samsung_sync_logs')
         .update({
           status: 'erro',
           finalizado_em: new Date().toISOString(),
           mensagem_erro: `API retornou status ${samsungResponse.status}: ${errorText}`
         })
-        .eq('id', syncLog.id);
+        .eq('id', syncLog.id); */
 
-      return new Response(
-        JSON.stringify({
-          error: 'Erro na API Samsung',
-          details: errorText,
-          status: samsungResponse.status
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+
 
     const responseData: SamsungAPIResponse = await samsungResponse.json();
 
