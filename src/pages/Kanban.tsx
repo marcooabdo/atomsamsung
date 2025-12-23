@@ -861,7 +861,7 @@ export function Kanban() {
                               </span>
                             </div>
 
-                            {mostrarStatusSamsung && os.numero_os_samsung && ((os as any).status_samsung_desc || (os as any).status_samsung_reason) && (
+                            {mostrarStatusSamsung && os.numero_os_samsung && (
                               <div className="mt-1.5 rounded-md p-1.5 space-y-1"
                                 style={{
                                   background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.03) 100%)',
@@ -869,18 +869,14 @@ export function Kanban() {
                                   boxShadow: '0 0 10px rgba(139,92,246,0.1)'
                                 }}
                               >
-                                {(os as any).status_samsung_desc && (
-                                  <div className="text-[9px] space-y-0.5">
-                                    <span className="text-gray-400 block">Status:</span>
-                                    <span className="text-gray-200 font-medium block">{(os as any).status_samsung_desc}</span>
-                                  </div>
-                                )}
-                                {(os as any).status_samsung_reason && (
-                                  <div className="text-[9px] space-y-0.5">
-                                    <span className="text-gray-400 block">Motivo:</span>
-                                    <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason}</span>
-                                  </div>
-                                )}
+                                <div className="text-[9px] space-y-0.5">
+                                  <span className="text-gray-400 block">Status:</span>
+                                  <span className="text-gray-200 font-medium block">{(os as any).status_samsung_desc || '—'}</span>
+                                </div>
+                                <div className="text-[9px] space-y-0.5">
+                                  <span className="text-gray-400 block">Motivo:</span>
+                                  <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason || '—'}</span>
+                                </div>
                               </div>
                             )}
 
