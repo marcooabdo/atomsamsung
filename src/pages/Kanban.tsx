@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -48,6 +48,7 @@ export function Kanban() {
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
+  const [syncingSamsung, setSyncingSamsung] = useState(false);
   const autoScrollInterval = useRef<number | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
@@ -86,6 +87,97 @@ export function Kanban() {
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
     setUnidades(data || []);
+  };
+
+  const syncSamsungGSPN = async () => {
+    setSyncingSamsung(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Sessão não encontrada');
+        return;
+      }
+
+      let unidadesParaSync: string[] = [];
+
+      if (selectedUnidade) {
+        unidadesParaSync = [selectedUnidade];
+      } else {
+        const { data: todasUnidades } = await supabase
+          .from('unidades')
+          .select('id, samsung_asccode, samsung_token')
+          .not('samsung_asccode', 'is', null)
+          .not('samsung_token', 'is', null);
+
+        if (todasUnidades && todasUnidades.length > 0) {
+          unidadesParaSync = todasUnidades.map(u => u.id);
+        }
+      }
+
+      if (unidadesParaSync.length === 0) {
+        alert('Nenhuma unidade com configuração Samsung encontrada');
+        setSyncingSamsung(false);
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-samsung-gspn`;
+
+      let totalCriadas = 0;
+      let totalIgnoradas = 0;
+      let totalEncontradas = 0;
+      const erros: string[] = [];
+
+      for (const unidadeId of unidadesParaSync) {
+        try {
+          const { data: unidadeData } = await supabase
+            .from('unidades')
+            .select('nome, samsung_asccode, samsung_token')
+            .eq('id', unidadeId)
+            .single();
+
+          if (!unidadeData?.samsung_asccode || !unidadeData?.samsung_token) {
+            continue;
+          }
+
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ unidade_id: unidadeId }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            totalCriadas += result.total_criadas || 0;
+            totalIgnoradas += result.total_ignoradas || 0;
+            totalEncontradas += result.total_encontradas || 0;
+          } else {
+            erros.push(`${unidadeData.nome}: ${result.error || 'Erro desconhecido'}`);
+          }
+        } catch (error) {
+          console.error(`Erro ao sincronizar unidade ${unidadeId}:`, error);
+          erros.push(`Erro na unidade: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+        }
+      }
+
+      if (erros.length > 0) {
+        alert(`Sincronização concluída com erros:\n\n${erros.join('\n')}\n\n${totalCriadas} OS criadas de ${totalEncontradas} encontradas`);
+      } else if (totalEncontradas > 0) {
+        alert(`Sincronização Samsung concluída!\n\n${totalCriadas} OS criadas\n${totalIgnoradas} OS já existentes\n${totalEncontradas} OS encontradas`);
+      } else {
+        alert('Nenhuma OS Samsung encontrada no período');
+      }
+
+      await loadKanbanData();
+    } catch (error) {
+      console.error('Erro na sincronização Samsung:', error);
+      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setSyncingSamsung(false);
+    }
   };
 
   const calcularValorPecas = (os: any) => {
@@ -562,8 +654,9 @@ export function Kanban() {
             </button>
 
             <button
-              onClick={loadKanbanData}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+              onClick={syncSamsungGSPN}
+              disabled={syncingSamsung}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,245,255,0.05) 100%)',
                 border: '1px solid #00D4FF',
@@ -571,8 +664,8 @@ export function Kanban() {
                 boxShadow: '0 0 10px rgba(0,212,255,0.2)'
               }}
             >
-              <Activity className="w-3.5 h-3.5" />
-              ATUALIZAR
+              <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
+              {syncingSamsung ? 'SINCRONIZANDO...' : 'ATUALIZAR'}
             </button>
           </div>
         </div>

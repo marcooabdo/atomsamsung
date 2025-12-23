@@ -113,7 +113,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: usuario } = await supabase
       .from('usuarios')
-      .select('unidade_id')
+      .select('unidade_id, tipo')
       .eq('id', user.id)
       .single();
 
@@ -124,7 +124,20 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const unidadeId = usuario.unidade_id;
+    const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const targetUnidadeId = body.unidade_id;
+
+    let unidadeId = usuario.unidade_id;
+
+    if (targetUnidadeId && targetUnidadeId !== unidadeId) {
+      if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
+        return new Response(
+          JSON.stringify({ error: 'Sem permiss\u00e3o para sincronizar outras unidades' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      unidadeId = targetUnidadeId;
+    }
 
     const { data: unidade } = await supabase
       .from('unidades')
