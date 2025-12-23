@@ -1,9 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, Smartphone } from 'lucide-react';
-import { SamsungGSPNTab } from '../components/SamsungGSPNTab';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown } from 'lucide-react';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'samsung';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists';
 
 interface Unidade {
   id: string;
@@ -14,6 +13,8 @@ interface Unidade {
   estado: string | null;
   cep: string | null;
   telefone: string | null;
+  samsung_asccode: string | null;
+  samsung_token: string | null;
   created_at: string;
 }
 
@@ -109,7 +110,7 @@ export function Configuracoes() {
   const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>('');
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>('');
 
-  const [formUnidade, setFormUnidade] = useState({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '' });
+  const [formUnidade, setFormUnidade] = useState({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
@@ -201,7 +202,7 @@ export function Configuracoes() {
       switch (activeTab) {
         case 'unidades':
           const unidade = unidades.find(u => u.id === id);
-          if (unidade) setFormUnidade({ nome: unidade.nome, endereco: unidade.endereco || '', numero: unidade.numero || '', cidade: unidade.cidade || '', estado: unidade.estado || '', cep: unidade.cep || '', telefone: unidade.telefone || '' });
+          if (unidade) setFormUnidade({ nome: unidade.nome, endereco: unidade.endereco || '', numero: unidade.numero || '', cidade: unidade.cidade || '', estado: unidade.estado || '', cep: unidade.cep || '', telefone: unidade.telefone || '', samsung_asccode: unidade.samsung_asccode || '', samsung_token: unidade.samsung_token || '' });
           break;
         case 'usuarios':
           const usuario = usuarios.find(u => u.id === id);
@@ -225,7 +226,7 @@ export function Configuracoes() {
           break;
       }
     } else {
-      setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '' });
+      setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: '', senha: '', ativo: true });
       setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
@@ -269,7 +270,9 @@ export function Configuracoes() {
             cidade: formUnidade.cidade || null,
             estado: formUnidade.estado || null,
             cep: formUnidade.cep || null,
-            telefone: formUnidade.telefone || null
+            telefone: formUnidade.telefone || null,
+            samsung_asccode: formUnidade.samsung_asccode || null,
+            samsung_token: formUnidade.samsung_token || null
           };
           if (editingId) {
             const { error } = await supabase.from('unidades').update(unidadeData).eq('id', editingId);
@@ -520,8 +523,7 @@ export function Configuracoes() {
     { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064' },
     { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD' },
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981' },
-    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' },
-    { id: 'samsung' as Tab, label: 'Samsung GSPN', icon: Smartphone, color: '#1428A0' }
+    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' }
   ];
 
   return (
@@ -580,6 +582,32 @@ export function Configuracoes() {
                     <div>
                       <label className="block text-xs text-gray-400 uppercase mb-2">Telefone</label>
                       <input type="text" value={formUnidade.telefone} onChange={(e) => setFormUnidade({...formUnidade, telefone: e.target.value})} placeholder="(00) 00000-0000" className="neon-input" />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-700 pt-4 mt-4">
+                    <h3 className="text-sm font-semibold text-[#00D4FF] mb-4 uppercase">Integração Samsung GSPN</h3>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">ASC Code</label>
+                        <input
+                          type="text"
+                          value={formUnidade.samsung_asccode}
+                          onChange={(e) => setFormUnidade({...formUnidade, samsung_asccode: e.target.value})}
+                          placeholder="Código ASC Samsung"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Token API</label>
+                        <input
+                          type="password"
+                          value={formUnidade.samsung_token}
+                          onChange={(e) => setFormUnidade({...formUnidade, samsung_token: e.target.value})}
+                          placeholder="Token de integração"
+                          className="neon-input"
+                        />
+                      </div>
                     </div>
                   </div>
                 </>
@@ -1790,8 +1818,6 @@ export function Configuracoes() {
                     )}
                   </div>
                 )}
-
-                {activeTab === 'samsung' && <SamsungGSPNTab />}
               </>
             )}
           </div>

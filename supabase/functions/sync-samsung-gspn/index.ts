@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('unidade_id')
-      .eq('auth_id', user.id)
+      .eq('id', user.id)
       .single();
 
     if (!usuario) {
@@ -126,16 +126,15 @@ Deno.serve(async (req: Request) => {
 
     const unidadeId = usuario.unidade_id;
 
-    const { data: config } = await supabase
-      .from('samsung_api_configs')
-      .select('*')
-      .eq('unidade_id', unidadeId)
-      .eq('ativo', true)
+    const { data: unidade } = await supabase
+      .from('unidades')
+      .select('samsung_asccode, samsung_token')
+      .eq('id', unidadeId)
       .single();
 
-    if (!config) {
+    if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
       return new Response(
-        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada ou inativa' }),
+        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada na unidade' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -144,7 +143,7 @@ Deno.serve(async (req: Request) => {
       .from('samsung_sync_logs')
       .insert({
         unidade_id: unidadeId,
-        config_id: config.id,
+        config_id: null,
         status: 'em_progresso',
         iniciado_em: new Date().toISOString(),
         executado_por: user.id
@@ -162,7 +161,7 @@ Deno.serve(async (req: Request) => {
 
     const hoje = new Date();
     const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - config.dias_historico);
+    dataInicio.setDate(hoje.getDate() - 30);
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
@@ -184,16 +183,16 @@ Deno.serve(async (req: Request) => {
 
     const payload = {
       IsBasicCond: {
-        AscCode: config.asc_code,
+        AscCode: unidade.samsung_asccode,
         ReqDateFrom: formatDate(dataInicio),
         ReqDateTo: formatDate(hoje)
       },
       IvCompany: "",
       IsCommonHeader: {
-        Company: config.company_code,
-        AscCode: config.asc_code,
-        Country: config.country_code,
-        Lang: config.language_code,
+        Company: "9430",
+        AscCode: unidade.samsung_asccode,
+        Country: "BR",
+        Lang: "P",
         Pac: generatePac()
       }
     };
@@ -206,7 +205,7 @@ Deno.serve(async (req: Request) => {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.token_api}`,
+        'Authorization': `Bearer ${unidade.samsung_token}`,
         'Cookie': 'sap-usercontext=sap-client=100'
       },
       body: JSON.stringify(payload)
@@ -345,11 +344,6 @@ Deno.serve(async (req: Request) => {
         }
       })
       .eq('id', syncLog.id);
-
-    await supabase
-      .from('samsung_api_configs')
-      .update({ ultima_sincronizacao: new Date().toISOString() })
-      .eq('id', config.id);
 
     return new Response(
       JSON.stringify({
