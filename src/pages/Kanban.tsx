@@ -48,6 +48,7 @@ export function Kanban() {
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
+  const [mostrarStatusSamsung, setMostrarStatusSamsung] = useState(false);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
   const autoScrollInterval = useRef<number | null>(null);
 
@@ -640,6 +641,22 @@ export function Kanban() {
             </button>
 
             <button
+              onClick={() => setMostrarStatusSamsung(!mostrarStatusSamsung)}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+              style={{
+                background: mostrarStatusSamsung
+                  ? 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)'
+                  : 'rgba(107,114,128,0.1)',
+                border: `1px solid ${mostrarStatusSamsung ? '#8B5CF6' : '#6B7280'}`,
+                color: mostrarStatusSamsung ? '#8B5CF6' : '#6B7280',
+                boxShadow: mostrarStatusSamsung ? '0 0 10px rgba(139,92,246,0.2)' : 'none'
+              }}
+            >
+              {mostrarStatusSamsung ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+              STATUS
+            </button>
+
+            <button
               onClick={() => setCriarOSLP(true)}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
               style={{
@@ -843,6 +860,29 @@ export function Kanban() {
                                 {os.tipo_os}
                               </span>
                             </div>
+
+                            {mostrarStatusSamsung && os.numero_os_samsung && ((os as any).status_samsung_desc || (os as any).status_samsung_reason) && (
+                              <div className="mt-1.5 rounded-md p-1.5 space-y-1"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.03) 100%)',
+                                  border: '1px solid rgba(139,92,246,0.3)',
+                                  boxShadow: '0 0 10px rgba(139,92,246,0.1)'
+                                }}
+                              >
+                                {(os as any).status_samsung_desc && (
+                                  <div className="text-[9px] space-y-0.5">
+                                    <span className="text-gray-400 block">Status:</span>
+                                    <span className="text-gray-200 font-medium block">{(os as any).status_samsung_desc}</span>
+                                  </div>
+                                )}
+                                {(os as any).status_samsung_reason && (
+                                  <div className="text-[9px] space-y-0.5">
+                                    <span className="text-gray-400 block">Motivo:</span>
+                                    <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason}</span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             {(() => {
                               const pecasEmTransito = (os as any).requisicoes?.filter((req: any) =>

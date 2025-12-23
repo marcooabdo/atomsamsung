@@ -331,6 +331,8 @@ Deno.serve(async (req: Request) => {
         tipo_atendimento: tipoAtendimento,
         tipo_reparo: tipoReparo,
         status_garantia: os.WarrantyType || os.WarrantyStatus || null,
+        status_samsung_desc: os.StatusDesc || null,
+        status_samsung_reason: os.StReasonDesc || null,
         data_abertura_samsung: os.ReqDate || null,
         data_requisicao_samsung: os.CustRequestDate || null,
         criado_por: usuario.id
