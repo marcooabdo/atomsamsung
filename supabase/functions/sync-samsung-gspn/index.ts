@@ -170,14 +170,6 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
- /*    if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincronização:', syncLogError);
-      return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    } */
-
     const hoje = new Date();
     const dataInicio = new Date(hoje);
     dataInicio.setDate(hoje.getDate() - 7);
