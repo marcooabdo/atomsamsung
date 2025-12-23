@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
+import { OSAgendamentoTab } from './OSAgendamentoTab';
 import type { Database } from '../lib/database.types';
 
 const COLUNAS_KANBAN = [
@@ -54,7 +55,7 @@ interface OSLPModalProps {
   mode?: 'create' | 'view';
 }
 
-type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'anexos' | 'comentarios';
+type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'anexos' | 'comentarios' | 'agendamento';
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalProps) {
   const { usuario } = useAuth();
@@ -1120,6 +1121,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                 { id: 'dados', label: 'Dados Básicos', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                ...(tipoAtendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
               ].map(({ id, label, icon: Icon }) => (
@@ -1654,6 +1656,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
               </div>
             )}
 
+            {abaAtiva === 'agendamento' && (
+              <div className="space-y-6">
+                <div className="bg-[#FFA500]/10 border border-[#FFA500]/30 rounded-lg p-4">
+                  <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Agendamento
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-2">
+                    Configure o agendamento após criar a OS
+                  </p>
+                </div>
+              </div>
+            )}
+
             {abaAtiva === 'comentarios' && (
               <div className="space-y-4">
                 <div className="flex gap-2">
@@ -1718,6 +1734,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                 { id: 'dados', label: 'Dados OS/Cliente', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                ...(os?.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
               ].map(({ id, label, icon: Icon }) => (
@@ -2257,6 +2274,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                     </div>
                   )}
                 </div>
+              )}
+
+              {abaAtiva === 'agendamento' && os && (
+                <OSAgendamentoTab osId={os.id} onReload={loadOS} />
               )}
 
               {abaAtiva === 'anexos' && (
