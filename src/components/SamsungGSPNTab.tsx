@@ -30,6 +30,7 @@ export function SamsungGSPNTab() {
   const [syncLogs, setSyncLogs] = useState<SyncLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -58,7 +59,7 @@ export function SamsungGSPNTab() {
       const { data: usuario } = await supabase
         .from('usuarios')
         .select('unidade_id')
-        .eq('auth_id', session.user.id)
+        .eq('auth_user_id', session.user.id)
         .single();
 
       if (!usuario) return;
@@ -115,7 +116,7 @@ export function SamsungGSPNTab() {
       const { data: usuario } = await supabase
         .from('usuarios')
         .select('unidade_id')
-        .eq('auth_id', session.user.id)
+        .eq('auth_user_id', session.user.id)
         .single();
 
       if (!usuario) return;
@@ -198,6 +199,68 @@ export function SamsungGSPNTab() {
       });
     } finally {
       setImporting(false);
+    }
+  };
+
+  const handleUpdateStatus = async () => {
+    if (updatingStatus) return;
+
+    setUpdatingStatus(true);
+    setMessage(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        setMessage({ type: 'error', text: 'Sessão não encontrada' });
+        return;
+      }
+
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('unidade_id')
+        .eq('auth_user_id', session.user.id)
+        .single();
+
+      if (!usuario?.unidade_id) {
+        setMessage({ type: 'error', text: 'Usuário sem unidade vinculada' });
+        return;
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/update-samsung-status`;
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ unidade_id: usuario.unidade_id })
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage({
+          type: 'error',
+          text: result.error || 'Erro ao atualizar status Samsung'
+        });
+        return;
+      }
+
+      setMessage({
+        type: 'success',
+        text: `Atualização concluída! ${result.total_atualizadas} OS atualizadas de ${result.total_os_sistema} no sistema.`
+      });
+
+      loadData();
+    } catch (error: unknown) {
+      console.error('Erro na atualização de status:', error);
+      setMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Erro desconhecido ao atualizar status'
+      });
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -445,6 +508,24 @@ export function SamsungGSPNTab() {
                 <>
                   <Download className="w-5 h-5" />
                   ATUALIZAR - IMPORTAR OS DOS ÚLTIMOS {config.dias_historico} DIAS
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={handleUpdateStatus}
+              disabled={updatingStatus || !config.ativo}
+              className="neon-button-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {updatingStatus ? (
+                <>
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                  ATUALIZANDO STATUS...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-5 h-5" />
+                  ATUALIZAR STATUS/MOTIVO DAS OS EXISTENTES
                 </>
               )}
             </button>
