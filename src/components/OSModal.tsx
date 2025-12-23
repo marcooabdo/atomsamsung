@@ -1196,6 +1196,18 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       <p className="text-sm text-gray-300 mt-1 font-semibold uppercase">{(os as any).unidade.nome}</p>
                     </div>
                   )}
+                  {os.numero_os_samsung && (
+                    <>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Status</label>
+                        <p className="text-sm text-gray-300 mt-1 font-medium">{(os as any).status_samsung_desc || '—'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Motivo</label>
+                        <p className="text-sm text-gray-300 mt-1 font-medium">{(os as any).status_samsung_reason || '—'}</p>
+                      </div>
+                    </>
+                  )}
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Tipo de Atendimento</label>
                     <div className="flex items-center gap-2 mt-1">
