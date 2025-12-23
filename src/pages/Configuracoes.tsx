@@ -25,6 +25,7 @@ interface Usuario {
   tipo: 'master' | 'diretoria' | 'gerente' | 'administrador' | 'estoque' | 'tecnico' | 'tecnico_ih' | 'vendedor' | 'atendente';
   unidade_id: string | null;
   ativo: boolean;
+  numero_tecnico: string | null;
   created_at: string;
 }
 
@@ -111,7 +112,7 @@ export function Configuracoes() {
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>('');
 
   const [formUnidade, setFormUnidade] = useState({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
-  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true });
+  const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
@@ -206,7 +207,7 @@ export function Configuracoes() {
           break;
         case 'usuarios':
           const usuario = usuarios.find(u => u.id === id);
-          if (usuario) setFormUsuario({ nome: usuario.nome, email: usuario.email, tipo: usuario.tipo, unidade_id: usuario.unidade_id || '', senha: '', ativo: usuario.ativo });
+          if (usuario) setFormUsuario({ nome: usuario.nome, email: usuario.email, tipo: usuario.tipo, unidade_id: usuario.unidade_id || '', senha: '', ativo: usuario.ativo, numero_tecnico: usuario.numero_tecnico || '' });
           break;
         case 'servicos':
           const servico = servicos.find(s => s.id === id);
@@ -227,7 +228,7 @@ export function Configuracoes() {
       }
     } else {
       setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
-      setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: '', senha: '', ativo: true });
+      setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
       setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
@@ -308,7 +309,8 @@ export function Configuracoes() {
               email: formUsuario.email,
               tipo: formUsuario.tipo,
               unidade_id: formUsuario.unidade_id || null,
-              ativo: formUsuario.ativo
+              ativo: formUsuario.ativo,
+              numero_tecnico: formUsuario.numero_tecnico || null
             };
             if (formUsuario.senha) requestBody.senha = formUsuario.senha;
 
@@ -335,7 +337,8 @@ export function Configuracoes() {
               senha: formUsuario.senha,
               tipo: formUsuario.tipo,
               unidade_id: formUsuario.unidade_id || null,
-              ativo: formUsuario.ativo
+              ativo: formUsuario.ativo,
+              numero_tecnico: formUsuario.numero_tecnico || null
             };
 
             const response = await fetch(apiUrl, {
@@ -650,6 +653,13 @@ export function Configuracoes() {
                       {formUsuario.tipo === 'tecnico_ih' && 'Acesso às OS IH e dados da sua unidade'}
                       {formUsuario.tipo === 'vendedor' && 'Acesso a cotações e vendas da sua unidade'}
                       {formUsuario.tipo === 'atendente' && 'Acesso a atendimento e dados da sua unidade'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Número do Técnico</label>
+                    <input type="text" value={formUsuario.numero_tecnico} onChange={(e) => setFormUsuario({...formUsuario, numero_tecnico: e.target.value})} placeholder="Ex: TEC001, 12345" className="neon-input" />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Número de cadastro/registro do técnico (opcional)
                     </p>
                   </div>
                   <div>

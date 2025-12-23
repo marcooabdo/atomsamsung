@@ -14,6 +14,7 @@ interface CreateUserRequest {
   tipo?: string;
   unidade_id?: string | null;
   ativo?: boolean;
+  numero_tecnico?: string | null;
   user_id?: string;
 }
 
@@ -72,7 +73,7 @@ Deno.serve(async (req: Request) => {
     }
 
     const body: CreateUserRequest = await req.json();
-    const { action, nome, email, senha, tipo, unidade_id, ativo = true, user_id } = body;
+    const { action, nome, email, senha, tipo, unidade_id, ativo = true, numero_tecnico, user_id } = body;
 
     if (action === 'create') {
       if (!nome || !email || !senha || !tipo) {
@@ -103,7 +104,8 @@ Deno.serve(async (req: Request) => {
           email,
           tipo,
           unidade_id: unidade_id || null,
-          ativo
+          ativo,
+          numero_tecnico: numero_tecnico || null
         });
 
       if (profileError) {
@@ -138,7 +140,8 @@ Deno.serve(async (req: Request) => {
         email,
         tipo,
         unidade_id: unidade_id || null,
-        ativo
+        ativo,
+        numero_tecnico: numero_tecnico || null
       };
 
       const { error: profileError } = await supabaseAdmin
