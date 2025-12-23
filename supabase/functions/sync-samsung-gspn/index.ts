@@ -327,6 +327,7 @@ Deno.serve(async (req: Request) => {
         defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
         coluna_kanban: 'os_nova',
         tipo_os: tipoOS,
+        tipo_orcamento: 'normal',
         tipo_atendimento: tipoAtendimento,
         tipo_reparo: tipoReparo,
         status_garantia: os.WarrantyType || os.WarrantyStatus || null,
