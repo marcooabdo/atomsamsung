@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, CheckCircle, AlertCircle, Clock, RefreshCw, Save, Edit, Smartphone } from 'lucide-react';
+import { Download, CheckCircle, AlertCircle, Clock, RefreshCw, Save, Edit, Smartphone, Settings } from 'lucide-react';
 
 interface SamsungConfig {
   id: string;
@@ -453,7 +453,14 @@ export function SamsungGSPNTab() {
           <div className="text-center py-8">
             <AlertCircle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
             <p className="text-gray-400 mb-4">Nenhuma configuração encontrada</p>
-            <p className="text-sm text-gray-500">Preencha os campos acima para configurar a integração Samsung</p>
+            <p className="text-sm text-gray-500 mb-6">Configure a integração Samsung GSPN para começar a sincronizar ordens de serviço</p>
+            <button
+              onClick={() => setEditing(true)}
+              className="neon-button inline-flex items-center gap-2"
+            >
+              <Settings className="w-5 h-5" />
+              ADICIONAR CONFIGURAÇÃO
+            </button>
           </div>
         )}
       </div>
