@@ -453,7 +453,7 @@ export function SamsungGSPNTab() {
           <div className="text-center py-8">
             <AlertCircle className="w-16 h-16 text-yellow-400 mx-auto mb-4" />
             <p className="text-gray-400 mb-4">Nenhuma configuração encontrada</p>
-            <p className="text-sm text-gray-500">Configure a integração Samsung para começar</p>
+            <p className="text-sm text-gray-500">Preencha os campos acima para configurar a integração Samsung</p>
           </div>
         )}
       </div>
