@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -799,6 +799,24 @@ export function Kanban() {
                                 }}>
                                   {os.numero_os_samsung || os.cliente_nome}
                                 </h5>
+                                {os.numero_os_samsung && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(os.numero_os_samsung);
+                                      const btn = e.currentTarget;
+                                      const originalHTML = btn.innerHTML;
+                                      btn.innerHTML = '<span style="color: #39FF14;">✓</span>';
+                                      setTimeout(() => {
+                                        btn.innerHTML = originalHTML;
+                                      }, 1000);
+                                    }}
+                                    className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+                                    title="Copiar número da OS"
+                                  >
+                                    <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                  </button>
+                                )}
                                 {os.tipo_os === 'OW' && os.tipo_orcamento === 'samsung_contigo' && (
                                   <span
                                     className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0"
@@ -861,7 +879,7 @@ export function Kanban() {
                               </span>
                             </div>
 
-                            {mostrarStatusSamsung && os.numero_os_samsung && (os as any).status_samsung_reason && (
+                            {mostrarStatusSamsung && os.numero_os_samsung && ((os as any).status_samsung_desc || (os as any).status_samsung_reason) && (
                               <div className="mt-1.5 rounded-md p-1.5"
                                 style={{
                                   background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.03) 100%)',
@@ -869,9 +887,19 @@ export function Kanban() {
                                   boxShadow: '0 0 10px rgba(139,92,246,0.1)'
                                 }}
                               >
-                                <div className="text-[9px] space-y-0.5">
-                                  <span className="text-gray-400 block">Motivo:</span>
-                                  <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason}</span>
+                                <div className="text-[9px] space-y-1">
+                                  {(os as any).status_samsung_desc && (
+                                    <>
+                                      <span className="text-[#8B5CF6] font-bold block">Status:</span>
+                                      <span className="text-gray-200 font-medium block">{(os as any).status_samsung_desc}</span>
+                                    </>
+                                  )}
+                                  {(os as any).status_samsung_reason && (
+                                    <>
+                                      <span className="text-[#8B5CF6] font-bold block mt-1">Motivo:</span>
+                                      <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason}</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             )}
