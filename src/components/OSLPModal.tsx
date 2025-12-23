@@ -1000,61 +1000,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
     setMovendoOS(true);
     try {
-      // Verificar se há peças bloqueando
-      const { data: requisicoes } = await supabase
-        .from('requisicoes_pecas')
-        .select('id, status, codigo_peca, descricao, numero_pedido_samsung')
-        .eq('os_id', os.id);
-
-      const pecasAtivas = requisicoes?.filter(r =>
-        ['atendida', 'em_uso', 'gi_postada', 'pedido_feito'].includes(r.status)
-      ) || [];
-
-      const colunasPermitidas = [
-        'peca_em_transito',
-        'peca_disponivel',
-        'aguardando_peca',
-        'rota_preta',
-        'rota_vermelha',
-        'rota_azul',
-        'rota_verde',
-        'rota_rosa',
-        'rota_amarela',
-        'rota_laranja',
-        'em_rota_ih',
-        'reparo_concluido',
-        'em_reparo_ci',
-        'aguardando_fechamento',
-        'fechar_os'
-      ];
-
-      if (pecasAtivas.length > 0 && !colunasPermitidas.includes(targetColumn)) {
-        const statusLabels: Record<string, string> = {
-          pedido_feito: '🚚 Pedido Ativo',
-          atendida: '✅ Peça Atendida',
-          em_uso: '🔧 Em Uso',
-          gi_postada: '📦 GI Pendente'
-        };
-
-        const listaPecas = pecasAtivas
-          .map(p => {
-            const statusLabel = statusLabels[p.status] || p.status;
-            return `• ${p.codigo_peca || 'N/A'} - ${statusLabel}${p.numero_pedido_samsung ? ` (Pedido #${p.numero_pedido_samsung})` : ''}`;
-          })
-          .join('\n');
-
-        alert(
-          `⚠️ MOVIMENTAÇÃO BLOQUEADA\n\n` +
-          `Esta OS possui ${pecasAtivas.length} peça(s) em processo ativo:\n\n${listaPecas}\n\n` +
-          `Para desbloquear, finalize o processo das peças ou mova para:\n` +
-          `• Rotas, Em Rota IH, Reparo Concluído, Em Reparo CI\n` +
-          `• Aguardando Peça, Peça em Trânsito, Peça Disponível\n` +
-          `• Aguardando Fechamento, Fechar OS`
-        );
-        setMovendoOS(false);
-        return;
-      }
-
       const { error } = await supabase
         .from('os')
         .update({
