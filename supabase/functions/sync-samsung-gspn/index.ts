@@ -309,13 +309,8 @@ Deno.serve(async (req: Request) => {
       const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
                              os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
 
-      const warrantyStatus = (os.WarrantyStatus || os.WarrantyType || '').toUpperCase();
-      const isInWarranty = warrantyStatus.includes('IN WARRANTY') ||
-                          warrantyStatus.includes('GARANTIA') ||
-                          warrantyStatus === 'IW' ||
-                          warrantyStatus === 'W';
-
-      const tipoOS = isInWarranty ? 'LP' : 'OW';
+      const warrantyType = (os.WarrantyType || 'O').toUpperCase();
+      const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
 
       const osData = {
         unidade_id: unidadeId,
