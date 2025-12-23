@@ -1,9 +1,34 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2 } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import type { Database } from '../lib/database.types';
+
+const COLUNAS_KANBAN = [
+  { id: 'os_nova', label: 'OS Nova' },
+  { id: 'diagnostico', label: 'Diagnóstico' },
+  { id: 'aguardando_cotacao', label: 'Aguardando Cotação' },
+  { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação' },
+  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
+  { id: 'aguardando_peca', label: 'Aguardando Peça' },
+  { id: 'peca_em_transito', label: 'Peça em Trânsito' },
+  { id: 'peca_disponivel', label: 'Peça Disponível' },
+  { id: 'em_reparo_ci', label: 'Em Reparo CI' },
+  { id: 'rota_preta', label: 'Rota Preta' },
+  { id: 'rota_vermelha', label: 'Rota Vermelha' },
+  { id: 'rota_azul', label: 'Rota Azul' },
+  { id: 'rota_verde', label: 'Rota Verde' },
+  { id: 'rota_rosa', label: 'Rota Rosa' },
+  { id: 'rota_amarela', label: 'Rota Amarela' },
+  { id: 'rota_laranja', label: 'Rota Laranja' },
+  { id: 'em_rota_ih', label: 'Em Rota IH' },
+  { id: 'reparo_concluido', label: 'Reparo Concluído' },
+  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
+  { id: 'fechar_os', label: 'Fechar OS' },
+  { id: 'os_fechada', label: 'OS Fechada' },
+  { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados' }
+];
 
 type OS = Database['public']['Tables']['os']['Row'];
 type OSComentario = Database['public']['Tables']['os_comentarios']['Row'];
@@ -47,6 +72,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   const [motivoConversao, setMotivoConversao] = useState('');
   const [confirmaConversao, setConfirmaConversao] = useState(false);
   const [convertendo, setConvertendo] = useState(false);
+  const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
+  const [movendoOS, setMovendoOS] = useState(false);
 
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -968,6 +995,88 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     );
   };
 
+  const moverOS = async (targetColumn: string) => {
+    if (!os || movendoOS) return;
+
+    setMovendoOS(true);
+    try {
+      // Verificar se há peças bloqueando
+      const { data: requisicoes } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, status, codigo_peca, descricao, numero_pedido_samsung')
+        .eq('os_id', os.id);
+
+      const pecasAtivas = requisicoes?.filter(r =>
+        ['atendida', 'em_uso', 'gi_postada', 'pedido_feito'].includes(r.status)
+      ) || [];
+
+      const colunasPermitidas = [
+        'peca_em_transito',
+        'peca_disponivel',
+        'aguardando_peca',
+        'rota_preta',
+        'rota_vermelha',
+        'rota_azul',
+        'rota_verde',
+        'rota_rosa',
+        'rota_amarela',
+        'rota_laranja',
+        'em_rota_ih',
+        'reparo_concluido',
+        'em_reparo_ci',
+        'aguardando_fechamento',
+        'fechar_os'
+      ];
+
+      if (pecasAtivas.length > 0 && !colunasPermitidas.includes(targetColumn)) {
+        const statusLabels: Record<string, string> = {
+          pedido_feito: '🚚 Pedido Ativo',
+          atendida: '✅ Peça Atendida',
+          em_uso: '🔧 Em Uso',
+          gi_postada: '📦 GI Pendente'
+        };
+
+        const listaPecas = pecasAtivas
+          .map(p => {
+            const statusLabel = statusLabels[p.status] || p.status;
+            return `• ${p.codigo_peca || 'N/A'} - ${statusLabel}${p.numero_pedido_samsung ? ` (Pedido #${p.numero_pedido_samsung})` : ''}`;
+          })
+          .join('\n');
+
+        alert(
+          `⚠️ MOVIMENTAÇÃO BLOQUEADA\n\n` +
+          `Esta OS possui ${pecasAtivas.length} peça(s) em processo ativo:\n\n${listaPecas}\n\n` +
+          `Para desbloquear, finalize o processo das peças ou mova para:\n` +
+          `• Rotas, Em Rota IH, Reparo Concluído, Em Reparo CI\n` +
+          `• Aguardando Peça, Peça em Trânsito, Peça Disponível\n` +
+          `• Aguardando Fechamento, Fechar OS`
+        );
+        setMovendoOS(false);
+        return;
+      }
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          coluna_kanban: targetColumn,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', os.id);
+
+      if (error) throw error;
+
+      alert('OS movida com sucesso!');
+      setMostrarMoverPara(false);
+      onReload?.();
+      onClose();
+    } catch (error: any) {
+      console.error('Erro ao mover OS:', error);
+      alert(`Erro ao mover OS: ${error.message}`);
+    } finally {
+      setMovendoOS(false);
+    }
+  };
+
   if (loading && mode === 'view') {
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -975,6 +1084,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       </div>
     );
   }
+
+  const colunaAtual = COLUNAS_KANBAN.find(c => c.id === os?.coluna_kanban);
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
@@ -991,12 +1102,70 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
               </p>
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 hover:bg-[#FFA500]/10 rounded-lg transition-colors"
-          >
-            <X className="w-5 h-5 text-[#FFA500]" />
-          </button>
+          <div className="flex items-center gap-2">
+            {mode === 'view' && os && (
+              <div className="relative">
+                <button
+                  onClick={() => setMostrarMoverPara(!mostrarMoverPara)}
+                  disabled={movendoOS}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255,165,0,0.2) 0%, rgba(255,165,0,0.05) 100%)',
+                    border: '1px solid #FFA500',
+                    color: '#FFA500',
+                    boxShadow: '0 0 10px rgba(255,165,0,0.2)'
+                  }}
+                >
+                  <MoveHorizontal className="w-4 h-4" />
+                  MOVER PARA
+                  <ChevronDown className={`w-4 h-4 transition-transform ${mostrarMoverPara ? 'rotate-180' : ''}`} />
+                </button>
+
+                {mostrarMoverPara && (
+                  <div className="absolute right-0 top-full mt-2 w-72 max-h-96 overflow-y-auto premium-card p-3 z-50 cyber-scrollbar">
+                    <div className="mb-3 pb-2 border-b border-[#FFA500]/20">
+                      <p className="text-xs text-gray-400">Coluna Atual:</p>
+                      <p className="text-sm font-bold text-[#FFA500]">{colunaAtual?.label || 'N/A'}</p>
+                    </div>
+                    <div className="space-y-1">
+                      {COLUNAS_KANBAN.filter(c => c.id !== os.coluna_kanban).map((coluna) => (
+                        <button
+                          key={coluna.id}
+                          onClick={() => {
+                            if (window.confirm(`Mover OS para "${coluna.label}"?`)) {
+                              moverOS(coluna.id);
+                            }
+                          }}
+                          disabled={movendoOS}
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[#FFA500]/10 disabled:opacity-50"
+                          style={{
+                            color: '#fff',
+                            border: '1px solid transparent'
+                          }}
+                          onMouseEnter={(e) => {
+                            e.currentTarget.style.borderColor = '#FFA500';
+                            e.currentTarget.style.boxShadow = '0 0 10px rgba(255,165,0,0.2)';
+                          }}
+                          onMouseLeave={(e) => {
+                            e.currentTarget.style.borderColor = 'transparent';
+                            e.currentTarget.style.boxShadow = 'none';
+                          }}
+                        >
+                          {coluna.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            <button
+              onClick={onClose}
+              className="p-2 hover:bg-[#FFA500]/10 rounded-lg transition-colors"
+            >
+              <X className="w-5 h-5 text-[#FFA500]" />
+            </button>
+          </div>
         </div>
 
         {mode === 'create' ? (
