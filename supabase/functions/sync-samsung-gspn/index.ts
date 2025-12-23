@@ -296,15 +296,12 @@ Deno.serve(async (req: Request) => {
       const telefone = os.CustMobilePhone || os.CustHomePhone || os.CustOfficePhone || '';
       const imei = os.IMEI || os.SerialNo || '';
 
-      const endereco = [
-        os.CustAddress,
-        os.CustCity,
-        os.CustState
-      ].filter(Boolean).join(', ');
-
       const tipoReparo = os.SvcTypeDesc === 'In Home' ? 'VISITA TECNICA' :
                         os.SvcTypeDesc === 'Carry In' ? 'BALCAO' :
                         os.SvcTypeDesc || 'VISITA TECNICA';
+
+      const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
+                             os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
 
       const osData = {
         unidade_id: unidadeId,
@@ -312,19 +309,21 @@ Deno.serve(async (req: Request) => {
         cliente_nome: clienteNome,
         cliente_telefone: telefone || null,
         cliente_email: null,
-        endereco: endereco || null,
-        cep: os.CustZipcode || null,
-        cidade: os.CustCity || null,
-        estado: os.CustState || null,
-        modelo_equipamento: os.Model || null,
-        imei: imei || null,
-        defeito_reclamado: os.Remark || os.CustComment || os.SvcComment || null,
+        cliente_endereco: os.CustAddress || null,
+        cliente_cep: os.CustZipcode || null,
+        cliente_cidade: os.CustCity || null,
+        cliente_estado: os.CustState || null,
+        aparelho_modelo: os.Model || null,
+        aparelho_imei: imei || null,
+        defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
         coluna_kanban: 'os_nova',
         tipo_os: 'SAMSUNG',
+        tipo_atendimento: tipoAtendimento,
         tipo_reparo: tipoReparo,
         status_garantia: os.WarrantyType || os.WarrantyStatus || null,
         data_abertura_samsung: os.ReqDate || null,
-        data_requisicao_samsung: os.CustRequestDate || null
+        data_requisicao_samsung: os.CustRequestDate || null,
+        criado_por: usuario.id
       };
 
       const { error: insertError } = await supabase
