@@ -114,7 +114,7 @@ Deno.serve(async (req: Request) => {
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('id, unidade_id, tipo')
-      .eq('auth_id', user.id)
+      .eq('id', user.id)
       .single();
 
     if (!usuario) {
@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
 
     const hoje = new Date();
     const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - 30);
+    dataInicio.setDate(hoje.getDate() - 7);
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
