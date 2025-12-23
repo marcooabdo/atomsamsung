@@ -221,12 +221,6 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify(payload)
     });
-    return new Response(
-      JSON.stringify({
-        response: samsungResponse
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
     
     if (!samsungResponse.ok) {
       const errorText = await samsungResponse.text();
