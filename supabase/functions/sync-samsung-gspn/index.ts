@@ -83,6 +83,48 @@ interface SamsungAPIResponse {
   };
 }
 
+interface SamsungDetailResponse {
+  Return: {
+    EsHeaderInfo: {
+      AscCode: string;
+      [key: string]: any;
+    };
+    EsBpInfo: {
+      CustAddrStreet2?: string;
+      CustEmail?: string;
+      CustDistrict?: string;
+      CustId?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+}
+
+interface ProcessedOS {
+  numero_os_samsung: string;
+  cliente_numero: string;
+  cliente_email: string;
+  cliente_bairro: string;
+  cliente_complemento: string;
+  cliente_cpf_cnpj: string;
+}
+
+async function runWithConcurrencyLimit<T>(
+  items: T[],
+  limit: number,
+  processItem: (item: T) => Promise<void>
+): Promise<void> {
+  const results: Promise<void>[] = [];
+
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    const batchPromises = batch.map(item => processItem(item).catch(err => {
+      console.error('Erro ao processar item:', err);
+    }));
+    await Promise.all(batchPromises);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -96,7 +138,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Autorização necessária' }),
+        JSON.stringify({ error: 'Autoriza\u00e7\u00e3o necess\u00e1ria' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -106,7 +148,7 @@ Deno.serve(async (req: Request) => {
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Usuário não autenticado' }),
+        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -119,7 +161,7 @@ Deno.serve(async (req: Request) => {
 
     if (!usuario) {
       return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
+        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -131,7 +173,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidadeId) {
       return new Response(
-        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
+        JSON.stringify({ error: 'Unidade n\u00e3o especificada. Usu\u00e1rio master deve informar unidade_id no corpo da requisi\u00e7\u00e3o.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -139,7 +181,7 @@ Deno.serve(async (req: Request) => {
     if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
       if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
         return new Response(
-          JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
+          JSON.stringify({ error: 'Sem permiss\u00e3o para sincronizar outras unidades' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -153,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
       return new Response(
-        JSON.stringify({ error: 'Configuração Samsung não encontrada na unidade' }),
+        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada na unidade' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -171,9 +213,9 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincronização:', syncLogError);
+      console.error('Erro ao criar log de sincroniza\u00e7\u00e3o:', syncLogError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
+        JSON.stringify({ error: 'Erro ao iniciar sincroniza\u00e7\u00e3o', details: syncLogError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -285,16 +327,83 @@ Deno.serve(async (req: Request) => {
 
     const existingNumbers = new Set((existingOS || []).map(os => os.numero_os_samsung));
 
+    const { data: tecnicos } = await supabase
+      .from('usuarios')
+      .select('id, nome, email, numero_tecnico')
+      .eq('unidade_id', unidadeId)
+      .not('numero_tecnico', 'is', null);
+
+    const tecnicoMap = new Map<string, { id: string; nome: string; email: string }>();
+    (tecnicos || []).forEach(t => {
+      if (t.numero_tecnico) {
+        tecnicoMap.set(t.numero_tecnico, { id: t.id, nome: t.nome, email: t.email });
+      }
+    });
+
     let criadas = 0;
     let ignoradas = 0;
     const erros: string[] = [];
+
+    const osToCreate: any[] = [];
+    const detailsMap = new Map<string, ProcessedOS>();
 
     for (const os of osList) {
       if (existingNumbers.has(os.SvcOrderNo)) {
         ignoradas++;
         continue;
       }
+      osToCreate.push(os);
+    }
 
+    console.log(`Processando ${osToCreate.length} OS com detalhes complementares...`);
+
+    await runWithConcurrencyLimit(osToCreate, 3, async (os) => {
+      try {
+        const detailPayload = {
+          IvSvcOrderNo: os.SvcOrderNo,
+          IsCommonHeader: {
+            Company: "C820",
+            AscCode: unidade.samsung_asccode,
+            Country: "BR",
+            Lang: "EN",
+            Pac: generatePac()
+          }
+        };
+
+        const detailResponse = await fetch(
+          'https://latam.ipaas.samsung.com/latam/gcic/GetSOInfoAll/1.0/ImportSet',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${unidade.samsung_token}`
+            },
+            body: JSON.stringify(detailPayload)
+          }
+        );
+
+        if (detailResponse.ok) {
+          const detailData: SamsungDetailResponse = await detailResponse.json();
+
+          if (detailData?.Return?.EsHeaderInfo?.AscCode) {
+            detailsMap.set(os.SvcOrderNo, {
+              numero_os_samsung: os.SvcOrderNo,
+              cliente_numero: detailData.Return.EsBpInfo.CustAddrStreet2 || '',
+              cliente_email: detailData.Return.EsBpInfo.CustEmail || '',
+              cliente_bairro: detailData.Return.EsBpInfo.CustDistrict || '',
+              cliente_complemento: '',
+              cliente_cpf_cnpj: detailData.Return.EsBpInfo.CustId || ''
+            });
+          }
+        }
+      } catch (error) {
+        console.error(`Erro ao buscar detalhes da OS ${os.SvcOrderNo}:`, error);
+      }
+    });
+
+    console.log(`Criando ${osToCreate.length} OS no banco...`);
+
+    for (const os of osToCreate) {
       const clienteNome = os.CustName?.trim() ||
                          `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() ||
                          'Cliente Samsung';
@@ -312,18 +421,28 @@ Deno.serve(async (req: Request) => {
       const warrantyType = (os.WarrantyType || 'O').toUpperCase();
       const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
 
-      const osData = {
+      const details = detailsMap.get(os.SvcOrderNo);
+      const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
+
+      const osData: any = {
         unidade_id: unidadeId,
         numero_os_samsung: os.SvcOrderNo,
         cliente_nome: clienteNome,
         cliente_telefone: telefone || null,
-        cliente_email: null,
+        cliente_email: details?.cliente_email || null,
+        cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null,
         cliente_endereco: os.CustAddress || null,
+        cliente_numero: details?.cliente_numero || null,
+        cliente_complemento: details?.cliente_complemento || null,
+        cliente_bairro: details?.cliente_bairro || null,
         cliente_cep: os.CustZipcode || null,
         cliente_cidade: os.CustCity || null,
         cliente_estado: os.CustState || null,
+        cliente_vip: os.EliteService !== 'N',
+        aparelho_marca: 'Samsung',
         aparelho_modelo: os.Model || null,
         aparelho_imei: imei || null,
+        data_compra: os.PurchaseDate || null,
         defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
         coluna_kanban: 'os_nova',
         tipo_os: tipoOS,
@@ -337,6 +456,10 @@ Deno.serve(async (req: Request) => {
         data_requisicao_samsung: os.CustRequestDate || null,
         criado_por: usuario.id
       };
+
+      if (tecnico) {
+        osData.atribuido_a = tecnico.id;
+      }
 
       const { error: insertError } = await supabase
         .from('os')
