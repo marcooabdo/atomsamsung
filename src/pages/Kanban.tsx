@@ -156,12 +156,19 @@ export function Kanban() {
             totalCriadas += result.total_criadas || 0;
             totalIgnoradas += result.total_ignoradas || 0;
             totalEncontradas += result.total_encontradas || 0;
+          } else if (response.status === 504) {
+            erros.push(`${unidadeData.nome}: Timeout - A API Samsung demorou muito para responder`);
           } else {
             erros.push(`${unidadeData.nome}: ${result.error || 'Erro desconhecido'}`);
           }
         } catch (error) {
           console.error(`Erro ao sincronizar unidade ${unidadeId}:`, error);
-          erros.push(`Erro na unidade: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+          const errorMsg = error instanceof Error ? error.message : 'Erro desconhecido';
+          if (errorMsg.includes('Failed to fetch') || errorMsg.includes('timeout')) {
+            erros.push(`${unidadeData.nome}: Timeout na conexão. Tente novamente.`);
+          } else {
+            erros.push(`${unidadeData.nome}: ${errorMsg}`);
+          }
         }
       }
 
