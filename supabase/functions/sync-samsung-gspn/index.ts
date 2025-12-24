@@ -296,7 +296,7 @@ Deno.serve(async (req: Request) => {
       const osData: any = {
         unidade_id: unidadeId, numero_os_samsung: os.SvcOrderNo, cliente_nome: clienteNome, cliente_telefone: telefone || null, cliente_email: details?.cliente_email || null, cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null, cliente_endereco: os.CustAddress || null, cliente_numero: details?.cliente_numero || null, cliente_complemento: details?.cliente_complemento || null, cliente_bairro: details?.cliente_bairro || null, cliente_cep: os.CustZipcode || null, cliente_cidade: os.CustCity || null, cliente_estado: os.CustState || null, cliente_vip: os.EliteService !== 'N', aparelho_marca: 'Samsung', aparelho_modelo: os.Model || null, aparelho_imei: imei || null, data_compra: os.PurchaseDate || null, defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null, coluna_kanban: 'os_nova', tipo_os: tipoOS, tipo_orcamento: 'normal', tipo_atendimento: tipoAtendimento, tipo_reparo: tipoReparo, status_garantia: os.WarrantyType || os.WarrantyStatus || null, status_samsung_desc: os.StatusDesc || null, status_samsung_reason: os.StReasonDesc || null, data_abertura_samsung: os.ReqDate || null, data_requisicao_samsung: os.CustRequestDate || null, criado_por: usuario.id
       };
-      if (tecnico) { osData.atribuido_a = tecnico.id; }
+      if (tecnico) { osData.tecnico_id = tecnico.id; }
       osDataArray.push(osData);
     }
 
