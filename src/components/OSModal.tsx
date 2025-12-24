@@ -368,13 +368,98 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       // Busca a cotação vinculada e verifica requisições em trânsito
       const { data: osData } = await supabase
         .from('os')
-        .select('cotacao_id, numero_os_samsung')
+        .select(`
+          *,
+          unidade:unidades!os_unidade_id_fkey(id, nome)
+        `)
         .eq('id', osId)
         .maybeSingle();
 
-      if (!osData?.cotacao_id) {
-        alert('Esta OS não possui cotação vinculada');
+      if (!osData) {
+        alert('OS não encontrada');
         return;
+      }
+
+      let cotacaoId = osData.cotacao_id;
+
+      // Se não tem cotação vinculada, cria uma automaticamente
+      if (!cotacaoId) {
+        const { data: novaCotacao, error: cotacaoError } = await supabase
+          .from('cotacoes')
+          .insert({
+            unidade_id: osData.unidade_id,
+            cliente_nome: osData.cliente_nome,
+            cliente_telefone: osData.cliente_telefone,
+            cliente_cpf_cnpj: osData.cliente_cpf_cnpj,
+            cliente_endereco: osData.cliente_endereco,
+            cliente_bairro: osData.cliente_bairro,
+            cliente_cidade: osData.cliente_cidade,
+            cliente_estado: osData.cliente_estado,
+            cliente_cep: osData.cliente_cep,
+            tipo_atendimento: osData.tipo_atendimento,
+            produto_marca: osData.produto_marca,
+            produto_modelo: osData.produto_modelo,
+            defeito_reclamado: osData.defeito_reclamado,
+            status: 'pendente_preenchimento',
+            versao: 1
+          })
+          .select('id')
+          .single();
+
+        if (cotacaoError) {
+          throw new Error(`Erro ao criar cotação: ${cotacaoError.message}`);
+        }
+
+        cotacaoId = novaCotacao.id;
+
+        // Vincula a cotação à OS
+        await supabase
+          .from('os')
+          .update({ cotacao_id: cotacaoId })
+          .eq('id', osId);
+
+        // Copia as peças e serviços da OS para a cotação
+        const { data: pecasOS } = await supabase
+          .from('os_pecas')
+          .select('*')
+          .eq('os_id', osId);
+
+        if (pecasOS && pecasOS.length > 0) {
+          await supabase
+            .from('cotacoes_pecas')
+            .insert(
+              pecasOS.map(peca => ({
+                cotacao_id: cotacaoId,
+                codigo_peca: peca.codigo_peca,
+                descricao: peca.descricao,
+                quantidade: peca.quantidade,
+                valor_unitario: peca.valor_unitario,
+                valor_total: peca.valor_total,
+                valor_base_gspn: peca.valor_base_gspn
+              }))
+            );
+        }
+
+        const { data: servicosOS } = await supabase
+          .from('os_servicos')
+          .select('*')
+          .eq('os_id', osId);
+
+        if (servicosOS && servicosOS.length > 0) {
+          await supabase
+            .from('cotacoes_servicos')
+            .insert(
+              servicosOS.map(servico => ({
+                cotacao_id: cotacaoId,
+                codigo_servico: servico.codigo_servico,
+                descricao: servico.descricao,
+                quantidade: servico.quantidade,
+                valor_unitario: servico.valor_unitario,
+                valor_total: servico.valor_total,
+                observacao: servico.observacao
+              }))
+            );
+        }
       }
 
       // Verifica se há peças em trânsito
@@ -400,40 +485,34 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
       setRefazendoOrcamento(true);
 
-      if (!osData?.cotacao_id) {
-        alert('Esta OS não possui cotação vinculada');
-        setRefazendoOrcamento(false);
-        return;
-      }
-
       // Busca versão atual da cotação
       const { data: cotacaoData } = await supabase
         .from('cotacoes')
         .select('versao')
-        .eq('id', osData.cotacao_id)
+        .eq('id', cotacaoId)
         .maybeSingle();
 
       const versaoAtual = cotacaoData?.versao || 1;
 
       // Adiciona comentário de sistema na cotação
       await supabase.from('cotacao_comentarios').insert({
-        cotacao_id: osData.cotacao_id,
+        cotacao_id: cotacaoId,
         usuario_id: usuario?.id,
-        texto: `OS #${osData.numero_os_samsung} removida do Kanban - Orçamento retornado para ajustes por ${usuario?.nome || 'Usuário'}`,
+        texto: `OS #${osData.numero_os_samsung || 'sem número'} removida do Kanban - Orçamento retornado para ajustes por ${usuario?.nome || 'Usuário'}`,
         is_system: true
       });
 
       // Preserva anexos antes de deletar OS (seta os_id para NULL mas mantém cotacao_id)
       await supabase
         .from('os_anexos')
-        .update({ os_id: null })
+        .update({ os_id: null, cotacao_id: cotacaoId })
         .eq('os_id', osId);
 
       // Garante que todas as requisições desta OS têm cotacao_id definido
       // (importante para manter pedidos ativos quando OS for deletada)
       await supabase
         .from('requisicoes_pecas')
-        .update({ cotacao_id: osData.cotacao_id })
+        .update({ cotacao_id: cotacaoId })
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
@@ -445,7 +524,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           versao: versaoAtual + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', osData.cotacao_id);
+        .eq('id', cotacaoId);
 
       // Deleta a OS - PostgreSQL automaticamente gerencia as foreign keys:
       // - ON DELETE CASCADE: os_pecas, os_checklist, os_comentarios
