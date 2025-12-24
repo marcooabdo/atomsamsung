@@ -388,6 +388,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           .from('cotacoes')
           .insert({
             unidade_id: osData.unidade_id,
+            tipo_os: osData.tipo_os,
+            tipo_atendimento: osData.tipo_atendimento,
             cliente_nome: osData.cliente_nome,
             cliente_telefone: osData.cliente_telefone,
             cliente_cpf_cnpj: osData.cliente_cpf_cnpj,
@@ -396,10 +398,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             cliente_cidade: osData.cliente_cidade,
             cliente_estado: osData.cliente_estado,
             cliente_cep: osData.cliente_cep,
-            tipo_atendimento: osData.tipo_atendimento,
-            produto_marca: osData.produto_marca,
-            produto_modelo: osData.produto_modelo,
-            defeito_reclamado: osData.defeito_reclamado,
+            aparelho_marca: osData.aparelho_marca,
+            aparelho_linha: osData.aparelho_linha,
+            aparelho_modelo: osData.aparelho_modelo,
+            aparelho_numero_serie: osData.aparelho_numero_serie,
+            defeito_relatado: osData.defeito_relatado,
+            criado_por: usuario?.id,
             status: 'pendente_preenchimento',
             versao: 1
           })
@@ -430,12 +434,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             .insert(
               pecasOS.map(peca => ({
                 cotacao_id: cotacaoId,
-                codigo_peca: peca.codigo_peca,
+                pn: peca.codigo_peca,
                 descricao: peca.descricao,
                 quantidade: peca.quantidade,
-                valor_unitario: peca.valor_unitario,
-                valor_total: peca.valor_total,
-                valor_base_gspn: peca.valor_base_gspn
+                valor_base_gspn: peca.valor_base_gspn || 0,
+                valor_final_unitario: peca.valor_unitario || 0,
+                valor_total: peca.valor_total || 0,
+                markup_aplicado: peca.markup_aplicado || 0
               }))
             );
         }
@@ -451,7 +456,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             .insert(
               servicosOS.map(servico => ({
                 cotacao_id: cotacaoId,
-                codigo_servico: servico.codigo_servico,
+                servico_id: servico.servico_id,
                 descricao: servico.descricao,
                 quantidade: servico.quantidade,
                 valor_unitario: servico.valor_unitario,
