@@ -30,6 +30,8 @@ interface OSDetails {
   aparelho_marca: string | null;
   aparelho_modelo: string | null;
   aparelho_nserie: string | null;
+  status_samsung_desc: string | null;
+  status_samsung_reason: string | null;
   agendamento?: {
     data_agendamento: string;
     confirmado_com_cliente: boolean;
@@ -221,6 +223,25 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               {osDetails.tipo_os}
             </span>
           </div>
+
+          {osDetails.numero_os_samsung && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-blue-600" />
+                INFORMAÇÃO DA OS
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <span className="text-gray-600">Status:</span>
+                  <p className="font-medium text-gray-900">{osDetails.status_samsung_desc || '—'}</p>
+                </div>
+                <div>
+                  <span className="text-gray-600">Motivo:</span>
+                  <p className="font-medium text-gray-900">{osDetails.status_samsung_reason || '—'}</p>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
