@@ -109,52 +109,6 @@ interface ProcessedOS {
   cliente_cpf_cnpj: string;
 }
 
-interface SamsungAttachment {
-  Filename: string;
-  Filetype: string;
-  Fileobjkey: string;
-  Description: string;
-  FileSize: string;
-  CreatedDt: string;
-  CreatedTm: string;
-  CreatedBy: string;
-  Docclass: string;
-}
-
-interface SamsungAttachListResponse {
-  EtFileInfo: {
-    results: SamsungAttachment[];
-  };
-}
-
-interface SamsungAttachFileResponse {
-  Return: {
-    EsCommonResult: {
-      Code: string;
-      Codedesc: string;
-      Msgid: string;
-      Sac: string;
-      Pac: string;
-    };
-    EvFileStream: string;
-  };
-}
-
-function mapFileTypeToTipo(filetype: string, filename: string): 'foto' | 'video' | 'documento' {
-  const lowerFiletype = (filetype || '').toLowerCase();
-  const lowerFilename = (filename || '').toLowerCase();
-
-  if (lowerFiletype.includes('image') || lowerFilename.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
-    return 'foto';
-  }
-
-  if (lowerFiletype.includes('video') || lowerFilename.match(/\.(mp4|avi|mov|wmv|flv|webm)$/)) {
-    return 'video';
-  }
-
-  return 'documento';
-}
-
 async function runWithConcurrencyLimit<T>(
   items: T[],
   limit: number,
@@ -168,138 +122,6 @@ async function runWithConcurrencyLimit<T>(
       console.error('Erro ao processar item:', err);
     }));
     await Promise.all(batchPromises);
-  }
-}
-
-async function downloadAndSaveAttachments(
-  osId: string,
-  numeroOSSamsung: string,
-  unidade: { samsung_asccode: string; samsung_token: string },
-  supabase: any,
-  generatePac: () => string,
-  usuarioId: string
-): Promise<void> {
-  try {
-    const listPayload = {
-      IvSvcOrderNo: numeroOSSamsung,
-      IsCommonHeader: {
-        Company: "C820",
-        AscCode: unidade.samsung_asccode,
-        Country: "BR",
-        Lang: "EN",
-        Pac: generatePac()
-      }
-    };
-
-    const listResponse = await fetch(
-      'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachList/1.0/ImportSet',
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${unidade.samsung_token}`,
-          'Cookie': 'sap-usercontext=sap-client=100'
-        },
-        body: JSON.stringify(listPayload)
-      }
-    );
-
-    if (!listResponse.ok) {
-      console.error(`Erro ao listar anexos da OS ${numeroOSSamsung}`);
-      return;
-    }
-
-    const listData: SamsungAttachListResponse = await listResponse.json();
-    const attachments = listData.EtFileInfo?.results || [];
-
-    if (attachments.length === 0) {
-      console.log(`Nenhum anexo encontrado para OS ${numeroOSSamsung}`);
-      return;
-    }
-
-    console.log(`Encontrados ${attachments.length} anexos para OS ${numeroOSSamsung}`);
-
-    for (const attachment of attachments) {
-      try {
-        const filePayload = {
-          IvSvcOrderNo: numeroOSSamsung,
-          IvDocKey: attachment.Fileobjkey,
-          IsCommonHeader: {
-            Company: "C820",
-            AscCode: unidade.samsung_asccode,
-            Country: "BR",
-            Lang: "EN",
-            Pac: generatePac()
-          }
-        };
-
-        const fileResponse = await fetch(
-          'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachFile/1.0/ImportSet',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${unidade.samsung_token}`,
-              'Cookie': 'sap-usercontext=sap-client=100'
-            },
-            body: JSON.stringify(filePayload)
-          }
-        );
-
-        if (!fileResponse.ok) {
-          console.error(`Erro ao baixar anexo ${attachment.Filename}`);
-          continue;
-        }
-
-        const fileData: SamsungAttachFileResponse = await fileResponse.json();
-
-        if (!fileData.Return?.EvFileStream) {
-          console.error(`Stream vazio para anexo ${attachment.Filename}`);
-          continue;
-        }
-
-        const base64Data = fileData.Return.EvFileStream;
-        const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
-
-        const timestamp = Date.now();
-        const fileName = `${osId}/${timestamp}_${attachment.Filename}`;
-
-        const { error: uploadError } = await supabase.storage
-          .from('os_anexos')
-          .upload(fileName, binaryData, {
-            contentType: attachment.Filetype || 'application/octet-stream',
-            upsert: false
-          });
-
-        if (uploadError) {
-          console.error(`Erro ao fazer upload do anexo ${attachment.Filename}:`, uploadError);
-          continue;
-        }
-
-        const { data: urlData } = supabase.storage
-          .from('os_anexos')
-          .getPublicUrl(fileName);
-
-        const tipoAnexo = mapFileTypeToTipo(attachment.Filetype, attachment.Filename);
-
-        await supabase
-          .from('os_anexos')
-          .insert({
-            os_id: osId,
-            nome_arquivo: attachment.Filename,
-            url: urlData.publicUrl,
-            tipo: tipoAnexo,
-            tamanho_bytes: parseInt(attachment.FileSize) || 0,
-            usuario_id: usuarioId
-          });
-
-        console.log(`Anexo ${attachment.Filename} salvo com sucesso`);
-      } catch (error) {
-        console.error(`Erro ao processar anexo ${attachment.Filename}:`, error);
-      }
-    }
-  } catch (error) {
-    console.error(`Erro ao processar anexos da OS ${numeroOSSamsung}:`, error);
   }
 }
 
@@ -524,18 +346,21 @@ Deno.serve(async (req: Request) => {
 
     const osToCreate: any[] = [];
     const detailsMap = new Map<string, ProcessedOS>();
+    const MAX_OS_PER_SYNC = 15;
 
     for (const os of osList) {
       if (existingNumbers.has(os.SvcOrderNo)) {
         ignoradas++;
         continue;
       }
-      osToCreate.push(os);
+      if (osToCreate.length < MAX_OS_PER_SYNC) {
+        osToCreate.push(os);
+      }
     }
 
-    console.log(`Processando ${osToCreate.length} OS com detalhes complementares...`);
+    console.log(`Processando ${osToCreate.length} OS com detalhes complementares (limite: ${MAX_OS_PER_SYNC})...`);
 
-    await runWithConcurrencyLimit(osToCreate, 3, async (os) => {
+    await runWithConcurrencyLimit(osToCreate, 1, async (os) => {
       try {
         const detailPayload = {
           IvSvcOrderNo: os.SvcOrderNo,
@@ -650,17 +475,6 @@ Deno.serve(async (req: Request) => {
         erros.push(`OS ${os.SvcOrderNo}: ${insertError.message}`);
       } else {
         criadas++;
-
-        if (osCreated?.id) {
-          await downloadAndSaveAttachments(
-            osCreated.id,
-            os.SvcOrderNo,
-            unidade,
-            supabase,
-            generatePac,
-            usuario.id
-          );
-        }
       }
     }
 
