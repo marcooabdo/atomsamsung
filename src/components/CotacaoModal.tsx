@@ -1294,8 +1294,8 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         }
       }
 
-      // Salvar pagamentos temporários (para novas cotações)
-      if (!cotacaoId && pagamentosTemporarios.length > 0) {
+      // Salvar pagamentos temporários (sempre que houver)
+      if (pagamentosTemporarios.length > 0) {
         let pagamentosSalvosCount = 0;
         const pagamentosFalhados: string[] = [];
 
