@@ -83,21 +83,55 @@ interface SamsungAPIResponse {
   };
 }
 
+interface SamsungDetailResponse {
+  Return: {
+    EsHeaderInfo: {
+      AscCode: string;
+      [key: string]: any;
+    };
+    EsBpInfo: {
+      CustAddrStreet2?: string;
+      CustEmail?: string;
+      CustDistrict?: string;
+      CustId?: string;
+      [key: string]: any;
+    };
+    [key: string]: any;
+  };
+}
+
+interface ProcessedOS {
+  numero_os_samsung: string;
+  cliente_numero: string;
+  cliente_email: string;
+  cliente_bairro: string;
+  cliente_complemento: string;
+  cliente_cpf_cnpj: string;
+}
+
 const API_TIMEOUT_MS = 30000;
+const DETAIL_API_TIMEOUT_MS = 10000;
+const CONCURRENCY_LIMIT = 10;
 
 async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
   try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal
-    });
+    const response = await fetch(url, { ...options, signal: controller.signal });
     return response;
   } finally {
     clearTimeout(timeoutId);
   }
+}
+
+async function runWithConcurrencyLimit<T, R>(items: T[], limit: number, processItem: (item: T) => Promise<R>): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    const batchResults = await Promise.all(batch.map(item => processItem(item).catch(() => null as R)));
+    results.push(...batchResults);
+  }
+  return results;
 }
 
 Deno.serve(async (req: Request) => {
@@ -112,87 +146,47 @@ Deno.serve(async (req: Request) => {
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Autorização necessária' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Autorizacao necessaria' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabase.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário não autenticado' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Usuario nao autenticado' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: usuario } = await supabase
-      .from('usuarios')
-      .select('id, unidade_id, tipo')
-      .eq('id', user.id)
-      .single();
+    const { data: usuario } = await supabase.from('usuarios').select('id, unidade_id, tipo').eq('id', user.id).single();
 
     if (!usuario) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Usuario nao encontrado' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
     const targetUnidadeId = body.unidade_id;
-
     let unidadeId = targetUnidadeId || usuario.unidade_id;
 
     if (!unidadeId) {
-      return new Response(
-        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Unidade nao especificada' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
       if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
-        return new Response(
-          JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
+        return new Response(JSON.stringify({ error: 'Sem permissao para sincronizar outras unidades' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
-    const { data: unidade } = await supabase
-      .from('unidades')
-      .select('samsung_asccode, samsung_token')
-      .eq('id', unidadeId)
-      .single();
+    const { data: unidade } = await supabase.from('unidades').select('samsung_asccode, samsung_token').eq('id', unidadeId).single();
 
     if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
-      return new Response(
-        JSON.stringify({ error: 'Configuração Samsung não encontrada na unidade' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: 'Configuracao Samsung nao encontrada na unidade' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    const { data: syncLog, error: syncLogError } = await supabase
-      .from('samsung_sync_logs')
-      .insert({
-        unidade_id: unidadeId,
-        config_id: null,
-        status: 'em_andamento',
-        iniciado_em: new Date().toISOString(),
-        executado_por: usuario.id
-      })
-      .select()
-      .single();
+    const { data: syncLog, error: syncLogError } = await supabase.from('samsung_sync_logs').insert({ unidade_id: unidadeId, config_id: null, status: 'em_andamento', iniciado_em: new Date().toISOString(), executado_por: usuario.id }).select().single();
 
     if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincronização:', syncLogError);
-      return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('Erro ao criar log de sincronizacao:', syncLogError);
+      return new Response(JSON.stringify({ error: 'Erro ao iniciar sincronizacao', details: syncLogError?.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const hoje = new Date();
@@ -208,89 +202,37 @@ Deno.serve(async (req: Request) => {
 
     const generatePac = () => {
       const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      return `${year}${month}${day}${hours}${minutes}${seconds}`;
+      return `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`;
     };
 
     const payload = {
-      IsBasicCond: {
-        AscCode: unidade.samsung_asccode,
-        ReqDateFrom: formatDate(dataInicio),
-        ReqDateTo: formatDate(hoje)
-      },
+      IsBasicCond: { AscCode: unidade.samsung_asccode, ReqDateFrom: formatDate(dataInicio), ReqDateTo: formatDate(hoje) },
       IvCompany: "",
-      IsCommonHeader: {
-        Company: "C820",
-        AscCode: unidade.samsung_asccode,
-        Country: "BR",
-        Lang: "EN",
-        Pac: generatePac()
-      }
+      IsCommonHeader: { Company: "C820", AscCode: unidade.samsung_asccode, Country: "BR", Lang: "EN", Pac: generatePac() }
     };
 
     const apiUrl = 'https://latam.ipaas.samsung.com/latam/gcic/GetSOList/1.0/ImportSet';
-
     console.log('Consultando API Samsung:', JSON.stringify(payload));
 
     let samsungResponse: Response;
     try {
       samsungResponse = await fetchWithTimeout(apiUrl, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${unidade.samsung_token}`,
-          'Cookie': 'sap-usercontext=sap-client=100'
-        },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${unidade.samsung_token}`, 'Cookie': 'sap-usercontext=sap-client=100' },
         body: JSON.stringify(payload)
       }, API_TIMEOUT_MS);
     } catch (fetchError) {
-      const errorMsg = fetchError.name === 'AbortError'
-        ? 'Timeout ao conectar com API Samsung (30s)'
-        : `Erro de conexão: ${fetchError.message}`;
-
-      console.error('Erro na requisição Samsung:', errorMsg);
-
-      await supabase
-        .from('samsung_sync_logs')
-        .update({
-          status: 'erro',
-          finalizado_em: new Date().toISOString(),
-          mensagem_erro: errorMsg
-        })
-        .eq('id', syncLog.id);
-
-      return new Response(
-        JSON.stringify({ error: errorMsg }),
-        { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      const errorMsg = fetchError.name === 'AbortError' ? 'Timeout ao conectar com API Samsung (30s)' : `Erro de conexao: ${fetchError.message}`;
+      console.error('Erro na requisicao Samsung:', errorMsg);
+      await supabase.from('samsung_sync_logs').update({ status: 'erro', finalizado_em: new Date().toISOString(), mensagem_erro: errorMsg }).eq('id', syncLog.id);
+      return new Response(JSON.stringify({ error: errorMsg }), { status: 504, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     if (!samsungResponse.ok) {
       const errorText = await samsungResponse.text();
       console.error('Erro na API Samsung:', errorText);
-
-      await supabase
-        .from('samsung_sync_logs')
-        .update({
-          status: 'erro',
-          finalizado_em: new Date().toISOString(),
-          mensagem_erro: `API retornou status ${samsungResponse.status}: ${errorText}`
-        })
-        .eq('id', syncLog.id);
-
-      return new Response(
-        JSON.stringify({
-          error: 'Erro na API Samsung',
-          details: errorText,
-          status: samsungResponse.status
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      await supabase.from('samsung_sync_logs').update({ status: 'erro', finalizado_em: new Date().toISOString(), mensagem_erro: `API retornou status ${samsungResponse.status}: ${errorText}` }).eq('id', syncLog.id);
+      return new Response(JSON.stringify({ error: 'Erro na API Samsung', details: errorText, status: samsungResponse.status }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const responseData: SamsungAPIResponse = await samsungResponse.json();
@@ -298,174 +240,84 @@ Deno.serve(async (req: Request) => {
     if (responseData.Return.EvRetCode !== "0") {
       const errorMsg = `API Samsung retornou erro: ${responseData.Return.EvRetMsg || 'Erro desconhecido'}`;
       console.error(errorMsg);
-
-      await supabase
-        .from('samsung_sync_logs')
-        .update({
-          status: 'erro',
-          finalizado_em: new Date().toISOString(),
-          mensagem_erro: errorMsg
-        })
-        .eq('id', syncLog.id);
-
-      return new Response(
-        JSON.stringify({ error: errorMsg }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      await supabase.from('samsung_sync_logs').update({ status: 'erro', finalizado_em: new Date().toISOString(), mensagem_erro: errorMsg }).eq('id', syncLog.id);
+      return new Response(JSON.stringify({ error: errorMsg }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     const osList = responseData.EtSvcInfo?.results || [];
     console.log(`Total de OS encontradas: ${osList.length}`);
 
-    const { data: existingOS } = await supabase
-      .from('os')
-      .select('numero_os_samsung')
-      .eq('unidade_id', unidadeId)
-      .not('numero_os_samsung', 'is', null);
-
+    const { data: existingOS } = await supabase.from('os').select('numero_os_samsung').eq('unidade_id', unidadeId).not('numero_os_samsung', 'is', null);
     const existingNumbers = new Set((existingOS || []).map(os => os.numero_os_samsung));
 
-    const { data: tecnicos } = await supabase
-      .from('usuarios')
-      .select('id, nome, email, numero_tecnico')
-      .eq('unidade_id', unidadeId)
-      .not('numero_tecnico', 'is', null);
-
+    const { data: tecnicos } = await supabase.from('usuarios').select('id, nome, email, numero_tecnico').eq('unidade_id', unidadeId).not('numero_tecnico', 'is', null);
     const tecnicoMap = new Map<string, { id: string; nome: string; email: string }>();
-    (tecnicos || []).forEach(t => {
-      if (t.numero_tecnico) {
-        tecnicoMap.set(t.numero_tecnico, { id: t.id, nome: t.nome, email: t.email });
-      }
+    (tecnicos || []).forEach(t => { if (t.numero_tecnico) { tecnicoMap.set(t.numero_tecnico, { id: t.id, nome: t.nome, email: t.email }); } });
+
+    const osToCreate: SamsungServiceOrder[] = [];
+    let ignoradas = 0;
+    for (const os of osList) {
+      if (existingNumbers.has(os.SvcOrderNo)) { ignoradas++; continue; }
+      osToCreate.push(os);
+    }
+
+    console.log(`Buscando detalhes de ${osToCreate.length} OS...`);
+    const detailsMap = new Map<string, ProcessedOS>();
+
+    await runWithConcurrencyLimit(osToCreate, CONCURRENCY_LIMIT, async (os) => {
+      try {
+        const detailPayload = { IvSvcOrderNo: os.SvcOrderNo, IsCommonHeader: { Company: "C820", AscCode: unidade.samsung_asccode, Country: "BR", Lang: "EN", Pac: generatePac() } };
+        const detailResponse = await fetchWithTimeout('https://latam.ipaas.samsung.com/latam/gcic/GetSOInfoAll/1.0/ImportSet', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${unidade.samsung_token}` }, body: JSON.stringify(detailPayload) }, DETAIL_API_TIMEOUT_MS);
+        if (detailResponse.ok) {
+          const detailData: SamsungDetailResponse = await detailResponse.json();
+          if (detailData?.Return?.EsHeaderInfo?.AscCode) {
+            detailsMap.set(os.SvcOrderNo, { numero_os_samsung: os.SvcOrderNo, cliente_numero: detailData.Return.EsBpInfo?.CustAddrStreet2 || '', cliente_email: detailData.Return.EsBpInfo?.CustEmail || '', cliente_bairro: detailData.Return.EsBpInfo?.CustDistrict || '', cliente_complemento: '', cliente_cpf_cnpj: detailData.Return.EsBpInfo?.CustId || '' });
+          }
+        }
+      } catch (error) { console.error(`Erro ao buscar detalhes da OS ${os.SvcOrderNo}:`, error); }
+      return null;
     });
 
-    const osToCreate: any[] = [];
-    let ignoradas = 0;
+    console.log(`Detalhes obtidos: ${detailsMap.size}/${osToCreate.length}`);
+    console.log(`Criando ${osToCreate.length} OS no banco (batch insert)...`);
 
-    for (const os of osList) {
-      if (existingNumbers.has(os.SvcOrderNo)) {
-        ignoradas++;
-        continue;
-      }
-
-      const clienteNome = os.CustName?.trim() ||
-                         `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() ||
-                         'Cliente Samsung';
-
+    const osDataArray: any[] = [];
+    for (const os of osToCreate) {
+      const clienteNome = os.CustName?.trim() || `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() || 'Cliente Samsung';
       const telefone = os.CustMobilePhone || os.CustHomePhone || os.CustOfficePhone || '';
       const imei = os.IMEI || os.SerialNo || '';
-
-      const tipoReparo = os.SvcTypeDesc === 'In Home' ? 'VISITA TECNICA' :
-                        os.SvcTypeDesc === 'Carry In' ? 'BALCAO' :
-                        os.SvcTypeDesc || 'VISITA TECNICA';
-
-      const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
-                             os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
-
+      const tipoReparo = os.SvcTypeDesc === 'In Home' ? 'VISITA TECNICA' : os.SvcTypeDesc === 'Carry In' ? 'BALCAO' : os.SvcTypeDesc || 'VISITA TECNICA';
+      const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' : os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
       const warrantyType = (os.WarrantyType || 'O').toUpperCase();
       const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
-
+      const details = detailsMap.get(os.SvcOrderNo);
       const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
 
       const osData: any = {
-        unidade_id: unidadeId,
-        numero_os_samsung: os.SvcOrderNo,
-        cliente_nome: clienteNome,
-        cliente_telefone: telefone || null,
-        cliente_endereco: os.CustAddress || null,
-        cliente_cep: os.CustZipcode || null,
-        cliente_cidade: os.CustCity || null,
-        cliente_estado: os.CustState || null,
-        cliente_vip: os.EliteService !== 'N',
-        aparelho_marca: 'Samsung',
-        aparelho_modelo: os.Model || null,
-        aparelho_imei: imei || null,
-        data_compra: os.PurchaseDate || null,
-        defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
-        coluna_kanban: 'os_nova',
-        tipo_os: tipoOS,
-        tipo_orcamento: 'normal',
-        tipo_atendimento: tipoAtendimento,
-        tipo_reparo: tipoReparo,
-        status_garantia: os.WarrantyType || os.WarrantyStatus || null,
-        status_samsung_desc: os.StatusDesc || null,
-        status_samsung_reason: os.StReasonDesc || null,
-        data_abertura_samsung: os.ReqDate || null,
-        data_requisicao_samsung: os.CustRequestDate || null,
-        criado_por: usuario.id
+        unidade_id: unidadeId, numero_os_samsung: os.SvcOrderNo, cliente_nome: clienteNome, cliente_telefone: telefone || null, cliente_email: details?.cliente_email || null, cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null, cliente_endereco: os.CustAddress || null, cliente_numero: details?.cliente_numero || null, cliente_complemento: details?.cliente_complemento || null, cliente_bairro: details?.cliente_bairro || null, cliente_cep: os.CustZipcode || null, cliente_cidade: os.CustCity || null, cliente_estado: os.CustState || null, cliente_vip: os.EliteService !== 'N', aparelho_marca: 'Samsung', aparelho_modelo: os.Model || null, aparelho_imei: imei || null, data_compra: os.PurchaseDate || null, defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null, coluna_kanban: 'os_nova', tipo_os: tipoOS, tipo_orcamento: 'normal', tipo_atendimento: tipoAtendimento, tipo_reparo: tipoReparo, status_garantia: os.WarrantyType || os.WarrantyStatus || null, status_samsung_desc: os.StatusDesc || null, status_samsung_reason: os.StReasonDesc || null, data_abertura_samsung: os.ReqDate || null, data_requisicao_samsung: os.CustRequestDate || null, criado_por: usuario.id
       };
-
-      if (tecnico) {
-        osData.atribuido_a = tecnico.id;
-      }
-
-      osToCreate.push(osData);
+      if (tecnico) { osData.atribuido_a = tecnico.id; }
+      osDataArray.push(osData);
     }
-
-    console.log(`Criando ${osToCreate.length} OS no banco (batch insert)...`);
 
     let criadas = 0;
     const erros: string[] = [];
-
-    if (osToCreate.length > 0) {
+    if (osDataArray.length > 0) {
       const BATCH_SIZE = 50;
-
-      for (let i = 0; i < osToCreate.length; i += BATCH_SIZE) {
-        const batch = osToCreate.slice(i, i + BATCH_SIZE);
-
-        const { data: inserted, error: insertError } = await supabase
-          .from('os')
-          .insert(batch)
-          .select('id');
-
-        if (insertError) {
-          console.error(`Erro ao criar batch de OS:`, insertError);
-          erros.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`);
-        } else {
-          criadas += inserted?.length || 0;
-        }
+      for (let i = 0; i < osDataArray.length; i += BATCH_SIZE) {
+        const batch = osDataArray.slice(i, i + BATCH_SIZE);
+        const { data: inserted, error: insertError } = await supabase.from('os').insert(batch).select('id');
+        if (insertError) { console.error('Erro ao criar batch de OS:', insertError); erros.push(`Batch ${Math.floor(i / BATCH_SIZE) + 1}: ${insertError.message}`); }
+        else { criadas += inserted?.length || 0; }
       }
     }
 
-    await supabase
-      .from('samsung_sync_logs')
-      .update({
-        status: erros.length > 0 ? 'parcial' : 'sucesso',
-        finalizado_em: new Date().toISOString(),
-        total_os_encontradas: osList.length,
-        total_os_criadas: criadas,
-        total_os_ignoradas: ignoradas,
-        mensagem_erro: erros.length > 0 ? erros.join('\n') : null,
-        detalhes: {
-          periodo: {
-            de: formatDate(dataInicio),
-            ate: formatDate(hoje)
-          },
-          erros: erros
-        }
-      })
-      .eq('id', syncLog.id);
+    await supabase.from('samsung_sync_logs').update({ status: erros.length > 0 ? 'parcial' : 'sucesso', finalizado_em: new Date().toISOString(), total_os_encontradas: osList.length, total_os_criadas: criadas, total_os_ignoradas: ignoradas, mensagem_erro: erros.length > 0 ? erros.join('; ') : null, detalhes: { periodo: { de: formatDate(dataInicio), ate: formatDate(hoje) }, detalhes_obtidos: detailsMap.size, erros: erros } }).eq('id', syncLog.id);
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        total_encontradas: osList.length,
-        total_criadas: criadas,
-        total_ignoradas: ignoradas,
-        erros: erros.length > 0 ? erros : undefined
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ success: true, total_encontradas: osList.length, total_criadas: criadas, total_ignoradas: ignoradas, detalhes_obtidos: detailsMap.size, erros: erros.length > 0 ? erros : undefined }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
     console.error('Erro geral:', error);
-    console.error('Stack trace:', error.stack);
-    return new Response(
-      JSON.stringify({
-        error: 'Erro interno do servidor',
-        details: error.message,
-        stack: error.stack
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: 'Erro interno do servidor', details: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
