@@ -140,6 +140,21 @@ interface SamsungAttachFileResponse {
   };
 }
 
+function mapFileTypeToTipo(filetype: string, filename: string): 'foto' | 'video' | 'documento' {
+  const lowerFiletype = (filetype || '').toLowerCase();
+  const lowerFilename = (filename || '').toLowerCase();
+
+  if (lowerFiletype.includes('image') || lowerFilename.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/)) {
+    return 'foto';
+  }
+
+  if (lowerFiletype.includes('video') || lowerFilename.match(/\.(mp4|avi|mov|wmv|flv|webm)$/)) {
+    return 'video';
+  }
+
+  return 'documento';
+}
+
 async function runWithConcurrencyLimit<T>(
   items: T[],
   limit: number,
@@ -161,7 +176,8 @@ async function downloadAndSaveAttachments(
   numeroOSSamsung: string,
   unidade: { samsung_asccode: string; samsung_token: string },
   supabase: any,
-  generatePac: () => string
+  generatePac: () => string,
+  usuarioId: string
 ): Promise<void> {
   try {
     const listPayload = {
@@ -264,14 +280,17 @@ async function downloadAndSaveAttachments(
           .from('os_anexos')
           .getPublicUrl(fileName);
 
+        const tipoAnexo = mapFileTypeToTipo(attachment.Filetype, attachment.Filename);
+
         await supabase
           .from('os_anexos')
           .insert({
             os_id: osId,
             nome_arquivo: attachment.Filename,
             url: urlData.publicUrl,
-            tipo: attachment.Filetype || 'application/octet-stream',
-            tamanho: parseInt(attachment.FileSize) || 0
+            tipo: tipoAnexo,
+            tamanho_bytes: parseInt(attachment.FileSize) || 0,
+            usuario_id: usuarioId
           });
 
         console.log(`Anexo ${attachment.Filename} salvo com sucesso`);
@@ -638,7 +657,8 @@ Deno.serve(async (req: Request) => {
             os.SvcOrderNo,
             unidade,
             supabase,
-            generatePac
+            generatePac,
+            usuario.id
           );
         }
       }
