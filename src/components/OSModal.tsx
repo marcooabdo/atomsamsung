@@ -2027,23 +2027,23 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       </span>
                     </div>
                   </div>
-
-                  {/* Botão Refazer Orçamento */}
-                  <div className="premium-card p-6 bg-[#FFBF00]/5 border border-[#FFBF00]/20">
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Ajustes Necessários?</p>
-                    <button
-                      onClick={handleRefazerOrcamento}
-                      disabled={refazendoOrcamento}
-                      className="w-full neon-button bg-[#FFBF00]/10 hover:bg-[#FFBF00]/20 border border-[#FFBF00]/30 text-[#FFBF00] py-3 px-6 rounded-lg font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {refazendoOrcamento ? '⏳ Processando...' : '🔄 Refazer Orçamento'}
-                    </button>
-                    <p className="text-xs text-gray-500 mt-3 text-center">
-                      Move a OS de volta para Cotações para editar peças, serviços ou valores
-                    </p>
-                  </div>
                 </div>
               )}
+
+              {/* Botão Refazer Orçamento - sempre visível para OS do tipo OW */}
+              <div className="premium-card p-6 bg-[#FFBF00]/5 border border-[#FFBF00]/20">
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Ajustes Necessários?</p>
+                <button
+                  onClick={handleRefazerOrcamento}
+                  disabled={refazendoOrcamento}
+                  className="w-full neon-button bg-[#FFBF00]/10 hover:bg-[#FFBF00]/20 border border-[#FFBF00]/30 text-[#FFBF00] py-3 px-6 rounded-lg font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {refazendoOrcamento ? '⏳ Processando...' : '🔄 Refazer Orçamento'}
+                </button>
+                <p className="text-xs text-gray-500 mt-3 text-center">
+                  Move a OS de volta para Cotações para editar peças, serviços ou valores
+                </p>
+              </div>
             </div>
           )}
 
