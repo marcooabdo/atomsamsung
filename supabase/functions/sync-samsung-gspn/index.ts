@@ -83,48 +83,6 @@ interface SamsungAPIResponse {
   };
 }
 
-interface SamsungDetailResponse {
-  Return: {
-    EsHeaderInfo: {
-      AscCode: string;
-      [key: string]: any;
-    };
-    EsBpInfo: {
-      CustAddrStreet2?: string;
-      CustEmail?: string;
-      CustDistrict?: string;
-      CustId?: string;
-      [key: string]: any;
-    };
-    [key: string]: any;
-  };
-}
-
-interface ProcessedOS {
-  numero_os_samsung: string;
-  cliente_numero: string;
-  cliente_email: string;
-  cliente_bairro: string;
-  cliente_complemento: string;
-  cliente_cpf_cnpj: string;
-}
-
-async function runWithConcurrencyLimit<T>(
-  items: T[],
-  limit: number,
-  processItem: (item: T) => Promise<void>
-): Promise<void> {
-  const results: Promise<void>[] = [];
-
-  for (let i = 0; i < items.length; i += limit) {
-    const batch = items.slice(i, i + limit);
-    const batchPromises = batch.map(item => processItem(item).catch(err => {
-      console.error('Erro ao processar item:', err);
-    }));
-    await Promise.all(batchPromises);
-  }
-}
-
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -344,9 +302,8 @@ Deno.serve(async (req: Request) => {
     let ignoradas = 0;
     const erros: string[] = [];
 
-    const osToCreate: any[] = [];
-    const detailsMap = new Map<string, ProcessedOS>();
-    const MAX_OS_PER_SYNC = 15;
+    const osToCreate: SamsungServiceOrder[] = [];
+    const MAX_OS_PER_SYNC = 10;
 
     for (const os of osList) {
       if (existingNumbers.has(os.SvcOrderNo)) {
@@ -358,53 +315,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    console.log(`Processando ${osToCreate.length} OS com detalhes complementares (limite: ${MAX_OS_PER_SYNC})...`);
-
-    await runWithConcurrencyLimit(osToCreate, 1, async (os) => {
-      try {
-        const detailPayload = {
-          IvSvcOrderNo: os.SvcOrderNo,
-          IsCommonHeader: {
-            Company: "C820",
-            AscCode: unidade.samsung_asccode,
-            Country: "BR",
-            Lang: "EN",
-            Pac: generatePac()
-          }
-        };
-
-        const detailResponse = await fetch(
-          'https://latam.ipaas.samsung.com/latam/gcic/GetSOInfoAll/1.0/ImportSet',
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${unidade.samsung_token}`
-            },
-            body: JSON.stringify(detailPayload)
-          }
-        );
-
-        if (detailResponse.ok) {
-          const detailData: SamsungDetailResponse = await detailResponse.json();
-
-          if (detailData?.Return?.EsHeaderInfo?.AscCode) {
-            detailsMap.set(os.SvcOrderNo, {
-              numero_os_samsung: os.SvcOrderNo,
-              cliente_numero: detailData.Return.EsBpInfo.CustAddrStreet2 || '',
-              cliente_email: detailData.Return.EsBpInfo.CustEmail || '',
-              cliente_bairro: detailData.Return.EsBpInfo.CustDistrict || '',
-              cliente_complemento: '',
-              cliente_cpf_cnpj: detailData.Return.EsBpInfo.CustId || ''
-            });
-          }
-        }
-      } catch (error) {
-        console.error(`Erro ao buscar detalhes da OS ${os.SvcOrderNo}:`, error);
-      }
-    });
-
-    console.log(`Criando ${osToCreate.length} OS no banco...`);
+    console.log(`Criando ${osToCreate.length} OS no banco (limite: ${MAX_OS_PER_SYNC})...`);
 
     for (const os of osToCreate) {
       const clienteNome = os.CustName?.trim() ||
@@ -424,7 +335,6 @@ Deno.serve(async (req: Request) => {
       const warrantyType = (os.WarrantyType || 'O').toUpperCase();
       const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
 
-      const details = detailsMap.get(os.SvcOrderNo);
       const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
 
       const osData: any = {
@@ -432,12 +342,12 @@ Deno.serve(async (req: Request) => {
         numero_os_samsung: os.SvcOrderNo,
         cliente_nome: clienteNome,
         cliente_telefone: telefone || null,
-        cliente_email: details?.cliente_email || null,
-        cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null,
+        cliente_email: null,
+        cliente_cpf_cnpj: null,
         cliente_endereco: os.CustAddress || null,
-        cliente_numero: details?.cliente_numero || null,
-        cliente_complemento: details?.cliente_complemento || null,
-        cliente_bairro: details?.cliente_bairro || null,
+        cliente_numero: null,
+        cliente_complemento: null,
+        cliente_bairro: null,
         cliente_cep: os.CustZipcode || null,
         cliente_cidade: os.CustCity || null,
         cliente_estado: os.CustState || null,
