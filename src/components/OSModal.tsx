@@ -381,6 +381,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       }
 
       let cotacaoId = osData.cotacao_id;
+      const cotacaoJaExistia = !!cotacaoId;
 
       // Se não tem cotação vinculada, cria uma automaticamente
       if (!cotacaoId) {
@@ -500,10 +501,14 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       const versaoAtual = cotacaoData?.versao || 1;
 
       // Adiciona comentário de sistema na cotação
+      const textoComentario = cotacaoJaExistia
+        ? `OS #${osData.numero_os_samsung || 'sem número'} removida do Kanban - Orçamento retornado para ajustes por ${usuario?.nome || 'Usuário'}`
+        : `Cotação criada automaticamente a partir da OS #${osData.numero_os_samsung || 'sem número'} movida do Kanban por ${usuario?.nome || 'Usuário'}`;
+
       await supabase.from('cotacao_comentarios').insert({
         cotacao_id: cotacaoId,
         usuario_id: usuario?.id,
-        texto: `OS #${osData.numero_os_samsung || 'sem número'} removida do Kanban - Orçamento retornado para ajustes por ${usuario?.nome || 'Usuário'}`,
+        texto: textoComentario,
         is_system: true
       });
 
@@ -521,12 +526,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
-      // Atualiza o status da cotação para pendente_preenchimento e incrementa versão
+      // Atualiza o status da cotação para pendente_preenchimento
+      // Só incrementa versão se a cotação já existia antes (é um refazer de verdade)
       await supabase
         .from('cotacoes')
         .update({
           status: 'pendente_preenchimento',
-          versao: versaoAtual + 1,
+          versao: cotacaoJaExistia ? versaoAtual + 1 : 1,
           updated_at: new Date().toISOString()
         })
         .eq('id', cotacaoId);
