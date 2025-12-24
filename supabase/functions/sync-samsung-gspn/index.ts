@@ -109,6 +109,37 @@ interface ProcessedOS {
   cliente_cpf_cnpj: string;
 }
 
+interface SamsungAttachment {
+  Filename: string;
+  Filetype: string;
+  Fileobjkey: string;
+  Description: string;
+  FileSize: string;
+  CreatedDt: string;
+  CreatedTm: string;
+  CreatedBy: string;
+  Docclass: string;
+}
+
+interface SamsungAttachListResponse {
+  EtFileInfo: {
+    results: SamsungAttachment[];
+  };
+}
+
+interface SamsungAttachFileResponse {
+  Return: {
+    EsCommonResult: {
+      Code: string;
+      Codedesc: string;
+      Msgid: string;
+      Sac: string;
+      Pac: string;
+    };
+    EvFileStream: string;
+  };
+}
+
 async function runWithConcurrencyLimit<T>(
   items: T[],
   limit: number,
@@ -125,6 +156,134 @@ async function runWithConcurrencyLimit<T>(
   }
 }
 
+async function downloadAndSaveAttachments(
+  osId: string,
+  numeroOSSamsung: string,
+  unidade: { samsung_asccode: string; samsung_token: string },
+  supabase: any,
+  generatePac: () => string
+): Promise<void> {
+  try {
+    const listPayload = {
+      IvSvcOrderNo: numeroOSSamsung,
+      IsCommonHeader: {
+        Company: "C820",
+        AscCode: unidade.samsung_asccode,
+        Country: "BR",
+        Lang: "EN",
+        Pac: generatePac()
+      }
+    };
+
+    const listResponse = await fetch(
+      'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachList/1.0/ImportSet',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${unidade.samsung_token}`,
+          'Cookie': 'sap-usercontext=sap-client=100'
+        },
+        body: JSON.stringify(listPayload)
+      }
+    );
+
+    if (!listResponse.ok) {
+      console.error(`Erro ao listar anexos da OS ${numeroOSSamsung}`);
+      return;
+    }
+
+    const listData: SamsungAttachListResponse = await listResponse.json();
+    const attachments = listData.EtFileInfo?.results || [];
+
+    if (attachments.length === 0) {
+      console.log(`Nenhum anexo encontrado para OS ${numeroOSSamsung}`);
+      return;
+    }
+
+    console.log(`Encontrados ${attachments.length} anexos para OS ${numeroOSSamsung}`);
+
+    for (const attachment of attachments) {
+      try {
+        const filePayload = {
+          IvSvcOrderNo: numeroOSSamsung,
+          IvDocKey: attachment.Fileobjkey,
+          IsCommonHeader: {
+            Company: "C820",
+            AscCode: unidade.samsung_asccode,
+            Country: "BR",
+            Lang: "EN",
+            Pac: generatePac()
+          }
+        };
+
+        const fileResponse = await fetch(
+          'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachFile/1.0/ImportSet',
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${unidade.samsung_token}`,
+              'Cookie': 'sap-usercontext=sap-client=100'
+            },
+            body: JSON.stringify(filePayload)
+          }
+        );
+
+        if (!fileResponse.ok) {
+          console.error(`Erro ao baixar anexo ${attachment.Filename}`);
+          continue;
+        }
+
+        const fileData: SamsungAttachFileResponse = await fileResponse.json();
+
+        if (!fileData.Return?.EvFileStream) {
+          console.error(`Stream vazio para anexo ${attachment.Filename}`);
+          continue;
+        }
+
+        const base64Data = fileData.Return.EvFileStream;
+        const binaryData = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+        const timestamp = Date.now();
+        const fileName = `${osId}/${timestamp}_${attachment.Filename}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('os_anexos')
+          .upload(fileName, binaryData, {
+            contentType: attachment.Filetype || 'application/octet-stream',
+            upsert: false
+          });
+
+        if (uploadError) {
+          console.error(`Erro ao fazer upload do anexo ${attachment.Filename}:`, uploadError);
+          continue;
+        }
+
+        const { data: urlData } = supabase.storage
+          .from('os_anexos')
+          .getPublicUrl(fileName);
+
+        await supabase
+          .from('os_anexos')
+          .insert({
+            os_id: osId,
+            nome_arquivo: attachment.Filename,
+            url: urlData.publicUrl,
+            tipo: attachment.Filetype || 'application/octet-stream',
+            tamanho: parseInt(attachment.FileSize) || 0
+          });
+
+        console.log(`Anexo ${attachment.Filename} salvo com sucesso`);
+      } catch (error) {
+        console.error(`Erro ao processar anexo ${attachment.Filename}:`, error);
+      }
+    }
+  } catch (error) {
+    console.error(`Erro ao processar anexos da OS ${numeroOSSamsung}:`, error);
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -138,7 +297,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Autoriza\u00e7\u00e3o necess\u00e1ria' }),
+        JSON.stringify({ error: 'Autorização necessária' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -148,7 +307,7 @@ Deno.serve(async (req: Request) => {
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o autenticado' }),
+        JSON.stringify({ error: 'Usuário não autenticado' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -161,7 +320,7 @@ Deno.serve(async (req: Request) => {
 
     if (!usuario) {
       return new Response(
-        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o encontrado' }),
+        JSON.stringify({ error: 'Usuário não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -173,7 +332,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidadeId) {
       return new Response(
-        JSON.stringify({ error: 'Unidade n\u00e3o especificada. Usu\u00e1rio master deve informar unidade_id no corpo da requisi\u00e7\u00e3o.' }),
+        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -181,7 +340,7 @@ Deno.serve(async (req: Request) => {
     if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
       if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
         return new Response(
-          JSON.stringify({ error: 'Sem permiss\u00e3o para sincronizar outras unidades' }),
+          JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -195,7 +354,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
       return new Response(
-        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada na unidade' }),
+        JSON.stringify({ error: 'Configuração Samsung não encontrada na unidade' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -213,9 +372,9 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincroniza\u00e7\u00e3o:', syncLogError);
+      console.error('Erro ao criar log de sincronização:', syncLogError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincroniza\u00e7\u00e3o', details: syncLogError?.message }),
+        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -271,7 +430,7 @@ Deno.serve(async (req: Request) => {
       },
       body: JSON.stringify(payload)
     });
-    
+
     if (!samsungResponse.ok) {
       const errorText = await samsungResponse.text();
       console.error('Erro na API Samsung:', errorText);
@@ -461,15 +620,27 @@ Deno.serve(async (req: Request) => {
         osData.atribuido_a = tecnico.id;
       }
 
-      const { error: insertError } = await supabase
+      const { data: osCreated, error: insertError } = await supabase
         .from('os')
-        .insert(osData);
+        .insert(osData)
+        .select('id')
+        .single();
 
       if (insertError) {
         console.error(`Erro ao criar OS ${os.SvcOrderNo}:`, insertError);
         erros.push(`OS ${os.SvcOrderNo}: ${insertError.message}`);
       } else {
         criadas++;
+
+        if (osCreated?.id) {
+          await downloadAndSaveAttachments(
+            osCreated.id,
+            os.SvcOrderNo,
+            unidade,
+            supabase,
+            generatePac
+          );
+        }
       }
     }
 
