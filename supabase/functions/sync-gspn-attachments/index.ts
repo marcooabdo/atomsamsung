@@ -381,7 +381,7 @@ Deno.serve(async (req: Request) => {
           .from('os-anexos')
           .upload(fileName, fileBytes, {
             contentType: mimeType,
-            upsert: false
+            upsert: true
           });
 
         if (uploadError) {
