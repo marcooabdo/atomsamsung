@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, Cloud } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DevolucaoModal } from './DevolucaoModal';
@@ -87,6 +87,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
+  const [syncingGspnAnexos, setSyncingGspnAnexos] = useState(false);
 
   useEffect(() => {
     loadOS();
@@ -301,6 +302,59 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     if (error) console.error('Erro ao carregar anexos:', error);
 
     setAnexos(data || []);
+  };
+
+  const syncGspnAnexos = async () => {
+    if (!os?.numero_os_samsung) {
+      alert('Esta OS não possui número Samsung vinculado');
+      return;
+    }
+
+    setSyncingGspnAnexos(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        alert('Sessão expirada. Faça login novamente.');
+        return;
+      }
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-gspn-attachments`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ os_id: osId }),
+        }
+      );
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Erro ao sincronizar anexos');
+      }
+
+      if (result.total_sincronizados > 0) {
+        alert(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!`);
+        loadAnexos();
+        loadComentarios();
+      } else if (result.total_gspn === 0) {
+        alert('Nenhum anexo encontrado no GSPN para esta OS.');
+      } else {
+        alert('Todos os anexos já estão sincronizados.');
+      }
+
+      if (result.erros && result.erros.length > 0) {
+        console.error('Erros na sincronização:', result.erros);
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar anexos do GSPN:', error);
+      alert(error instanceof Error ? error.message : 'Erro ao sincronizar anexos do GSPN');
+    } finally {
+      setSyncingGspnAnexos(false);
+    }
   };
 
   const loadPagamento = async () => {
@@ -2150,75 +2204,117 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
           {abaAtiva === 'anexos' && (
             <div className="space-y-4">
-              <label className="neon-button flex items-center justify-center gap-2 px-4 py-3 cursor-pointer">
-                <Paperclip className="w-4 h-4" />
-                ADICIONAR ANEXO
-                <input
-                  type="file"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
+              <div className="flex gap-3">
+                <label className="neon-button flex-1 flex items-center justify-center gap-2 px-4 py-3 cursor-pointer">
+                  <Paperclip className="w-4 h-4" />
+                  ADICIONAR ANEXO
+                  <input
+                    type="file"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
 
-                    if (file.size > 10 * 1024 * 1024) {
-                      alert('Arquivo muito grande! Máximo 10MB');
-                      return;
-                    }
+                      if (file.size > 10 * 1024 * 1024) {
+                        alert('Arquivo muito grande! Maximo 10MB');
+                        return;
+                      }
 
-                    try {
-                      const fileName = `${osId}/${Date.now()}_${file.name}`;
+                      try {
+                        const fileName = `${osId}/${Date.now()}_${file.name}`;
 
-                      const { error: uploadError } = await supabase.storage
-                        .from('os-anexos')
-                        .upload(fileName, file);
+                        const { error: uploadError } = await supabase.storage
+                          .from('os-anexos')
+                          .upload(fileName, file);
 
-                      if (uploadError) throw uploadError;
+                        if (uploadError) throw uploadError;
 
-                      const { data: { publicUrl } } = supabase.storage
-                        .from('os-anexos')
-                        .getPublicUrl(fileName);
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('os-anexos')
+                          .getPublicUrl(fileName);
 
-                      await supabase.from('os_anexos').insert({
-                        os_id: osId,
-                        nome_arquivo: file.name,
-                        url: publicUrl,
-                        tamanho_bytes: file.size,
-                        tipo_arquivo: file.type
-                      });
+                        await supabase.from('os_anexos').insert({
+                          os_id: osId,
+                          nome_arquivo: file.name,
+                          url: publicUrl,
+                          tamanho_bytes: file.size,
+                          tipo_arquivo: file.type
+                        });
 
-                      await supabase.from('os_comentarios').insert({
-                        os_id: osId,
-                        usuario_id: usuario?.id,
-                        comentario: `📎 Anexo adicionado: ${file.name}`,
-                        is_system: true
-                      });
+                        await supabase.from('os_comentarios').insert({
+                          os_id: osId,
+                          usuario_id: usuario?.id,
+                          comentario: `Anexo adicionado: ${file.name}`,
+                          is_system: true
+                        });
 
-                      loadAnexos();
-                      loadComentarios();
-                      alert('Anexo adicionado com sucesso!');
-                    } catch (error) {
-                      console.error('Erro ao fazer upload:', error);
-                      alert('Erro ao adicionar anexo');
-                    }
+                        loadAnexos();
+                        loadComentarios();
+                        alert('Anexo adicionado com sucesso!');
+                      } catch (error) {
+                        console.error('Erro ao fazer upload:', error);
+                        alert('Erro ao adicionar anexo');
+                      }
 
-                    e.target.value = '';
-                  }}
-                />
-              </label>
+                      e.target.value = '';
+                    }}
+                  />
+                </label>
+
+                {os.numero_os_samsung && (
+                  <button
+                    onClick={syncGspnAnexos}
+                    disabled={syncingGspnAnexos}
+                    className="neon-button flex items-center justify-center gap-2 px-4 py-3"
+                    style={{
+                      backgroundColor: syncingGspnAnexos ? '#1a1a2e' : '#00D4FF10',
+                      borderColor: '#00D4FF',
+                      color: '#00D4FF',
+                      opacity: syncingGspnAnexos ? 0.7 : 1,
+                    }}
+                  >
+                    {syncingGspnAnexos ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        SINCRONIZANDO...
+                      </>
+                    ) : (
+                      <>
+                        <Download className="w-4 h-4" />
+                        SYNC GSPN
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
 
               <div className="space-y-3">
                 {anexos.length === 0 ? (
                   <p className="text-center text-gray-500 py-8">Nenhum anexo</p>
                 ) : (
-                  anexos.map((anexo) => (
+                  anexos.map((anexo: any) => (
                     <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <Paperclip className="w-4 h-4 text-[#00D4FF]" />
+                        {anexo.origem === 'gspn_sync' ? (
+                          <Cloud className="w-4 h-4 text-[#00D4FF]" />
+                        ) : (
+                          <Paperclip className="w-4 h-4 text-[#00D4FF]" />
+                        )}
                         <div>
-                          <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                          <p className="text-xs text-gray-500">
-                            {(anexo.tamanho_bytes / 1024).toFixed(2)} KB
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
+                            {anexo.origem === 'gspn_sync' && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00D4FF]/20 text-[#00D4FF] font-medium">
+                                GSPN
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                            <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
+                            {anexo.gspn_description && (
+                              <span>- {anexo.gspn_description}</span>
+                            )}
+                          </div>
                         </div>
                       </div>
                       <div className="flex gap-2">
