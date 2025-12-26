@@ -222,7 +222,7 @@ Deno.serve(async (req: Request) => {
 
     const hoje = new Date();
     const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - 7);
+    dataInicio.setDate(hoje.getDate() - 3);
 
     const formatDate = (date: Date) => {
       const year = date.getFullYear();
