@@ -688,11 +688,11 @@ export function Kanban() {
         </div>
 
         <div
-          className="flex-1 overflow-x-auto overflow-y-hidden cyber-scrollbar"
+          className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden cyber-scrollbar"
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
         >
-          <div className="flex gap-3 h-full pb-3" style={{ minWidth: 'max-content' }}>
+          <div className="flex gap-3 h-full pb-3" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
             {COLUNAS_KANBAN.map((coluna) => {
               const ColumnIcon = coluna.icon;
               const isOver = dragOverColumn === coluna.id;
@@ -700,7 +700,7 @@ export function Kanban() {
               return (
                 <div
                   key={coluna.id}
-                  className={`flex-shrink-0 w-72 h-full rounded-xl transition-all duration-300 ${
+                  className={`flex-shrink-0 w-72 h-full max-h-full rounded-xl transition-all duration-300 overflow-hidden ${
                     isOver ? 'scale-[1.02]' : ''
                   }`}
                   style={{
@@ -714,7 +714,7 @@ export function Kanban() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, coluna.id)}
                 >
-                  <div className="flex flex-col h-full p-3">
+                  <div className="flex flex-col h-full min-h-0 p-3">
                     <div className="flex items-center justify-between mb-3 pb-2 border-b"
                       style={{
                         borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
@@ -757,7 +757,7 @@ export function Kanban() {
                       </div>
                     </div>
 
-                    <div className="flex-1 overflow-y-auto space-y-2 cyber-scrollbar pr-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 cyber-scrollbar pr-1">
                       {filteredData[coluna.id]?.map((os) => (
                         <div
                           key={os.id}
