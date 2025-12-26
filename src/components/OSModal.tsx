@@ -2261,31 +2261,31 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   />
                 </label>
 
-                {os.numero_os_samsung && (
-                  <button
-                    onClick={syncGspnAnexos}
-                    disabled={syncingGspnAnexos}
-                    className="neon-button flex items-center justify-center gap-2 px-4 py-3"
-                    style={{
-                      backgroundColor: syncingGspnAnexos ? '#1a1a2e' : '#00D4FF10',
-                      borderColor: '#00D4FF',
-                      color: '#00D4FF',
-                      opacity: syncingGspnAnexos ? 0.7 : 1,
-                    }}
-                  >
-                    {syncingGspnAnexos ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin" />
-                        SINCRONIZANDO...
-                      </>
-                    ) : (
-                      <>
-                        <Download className="w-4 h-4" />
-                        SYNC GSPN
-                      </>
-                    )}
-                  </button>
-                )}
+                <button
+                  onClick={syncGspnAnexos}
+                  disabled={syncingGspnAnexos || !os.numero_os_samsung}
+                  title={!os.numero_os_samsung ? 'Esta OS nao possui numero Samsung vinculado' : 'Sincronizar anexos do GSPN'}
+                  className="neon-button flex items-center justify-center gap-2 px-4 py-3"
+                  style={{
+                    backgroundColor: syncingGspnAnexos ? '#1a1a2e' : '#00D4FF10',
+                    borderColor: '#00D4FF',
+                    color: '#00D4FF',
+                    opacity: (syncingGspnAnexos || !os.numero_os_samsung) ? 0.5 : 1,
+                    cursor: !os.numero_os_samsung ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  {syncingGspnAnexos ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                      SINCRONIZANDO...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      SYNC GSPN
+                    </>
+                  )}
+                </button>
               </div>
 
               <div className="space-y-3">
