@@ -336,18 +336,26 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         throw new Error(result.error || 'Erro ao sincronizar anexos');
       }
 
+      console.log('Resultado da sincronizacao GSPN:', result);
+
       if (result.total_sincronizados > 0) {
         alert(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!`);
         loadAnexos();
         loadComentarios();
       } else if (result.total_gspn === 0) {
-        alert('Nenhum anexo encontrado no GSPN para esta OS.');
+        if (result.debug) {
+          console.log('Debug info:', result.debug);
+          alert(`Nenhum anexo encontrado no GSPN.\n\nChaves na resposta: ${result.debug.response_keys?.join(', ') || 'N/A'}\n\nPreview: ${result.debug.response_preview?.substring(0, 200) || 'N/A'}`);
+        } else {
+          alert('Nenhum anexo encontrado no GSPN para esta OS.');
+        }
       } else {
-        alert('Todos os anexos já estão sincronizados.');
+        alert(`Todos os ${result.total_gspn} anexos ja estao sincronizados.`);
       }
 
       if (result.erros && result.erros.length > 0) {
-        console.error('Erros na sincronização:', result.erros);
+        console.error('Erros na sincronizacao:', result.erros);
+        alert(`Alguns anexos tiveram erro:\n${result.erros.join('\n')}`);
       }
     } catch (error) {
       console.error('Erro ao sincronizar anexos do GSPN:', error);

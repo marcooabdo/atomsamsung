@@ -19,18 +19,6 @@ interface AttachmentInfo {
   Docclass: string;
 }
 
-interface AttachmentListResponse {
-  EtFileInfo: {
-    results: AttachmentInfo[];
-  };
-  Return?: {
-    EsCommonResult?: {
-      Code: string;
-      Codedesc: string;
-    };
-  };
-}
-
 interface AttachmentFileResponse {
   Return: {
     EsCommonResult: {
@@ -101,6 +89,56 @@ function getMimeType(filename: string): string {
     'avi': 'video/x-msvideo',
   };
   return mimeTypes[ext || ''] || 'application/octet-stream';
+}
+
+function extractAttachments(data: any): AttachmentInfo[] {
+  if (!data) return [];
+
+  if (data.EtFileInfo?.results && Array.isArray(data.EtFileInfo.results)) {
+    return data.EtFileInfo.results;
+  }
+
+  if (data.EtFileInfo && Array.isArray(data.EtFileInfo)) {
+    return data.EtFileInfo;
+  }
+
+  if (data.ET_FILE_INFO?.results && Array.isArray(data.ET_FILE_INFO.results)) {
+    return data.ET_FILE_INFO.results;
+  }
+
+  if (data.ET_FILE_INFO && Array.isArray(data.ET_FILE_INFO)) {
+    return data.ET_FILE_INFO;
+  }
+
+  if (data.results && Array.isArray(data.results)) {
+    return data.results;
+  }
+
+  if (data.d?.results && Array.isArray(data.d.results)) {
+    return data.d.results;
+  }
+
+  if (Array.isArray(data)) {
+    return data;
+  }
+
+  return [];
+}
+
+function normalizeAttachment(att: any): AttachmentInfo | null {
+  if (!att) return null;
+
+  return {
+    Filename: att.Filename || att.FILENAME || att.filename || att.FileName || '',
+    Filetype: att.Filetype || att.FILETYPE || att.filetype || att.FileType || '',
+    Fileobjkey: att.Fileobjkey || att.FILEOBJKEY || att.fileobjkey || att.FileObjKey || att.DocKey || '',
+    Description: att.Description || att.DESCRIPTION || att.description || '',
+    FileSize: String(att.FileSize || att.FILESIZE || att.filesize || att.Filesize || '0'),
+    CreatedDt: att.CreatedDt || att.CREATEDDT || att.createddt || att.CreateDate || '',
+    CreatedTm: att.CreatedTm || att.CREATEDTM || att.createdtm || att.CreateTime || '',
+    CreatedBy: att.CreatedBy || att.CREATEDBY || att.createdby || '',
+    Docclass: att.Docclass || att.DOCCLASS || att.docclass || '',
+  };
 }
 
 Deno.serve(async (req: Request) => {
@@ -195,7 +233,8 @@ Deno.serve(async (req: Request) => {
 
     const existingKeys = new Set((existingAnexos || []).map(a => a.gspn_fileobjkey));
 
-    console.log(`Buscando anexos da OS Samsung ${os.numero_os_samsung}...`);
+    console.log(`[SYNC] Iniciando sync de anexos para OS Samsung ${os.numero_os_samsung}`);
+    console.log(`[SYNC] ASC Code: ${unidade.samsung_asccode}`);
 
     const listPayload = {
       IvSvcOrderNo: os.numero_os_samsung,
@@ -207,6 +246,8 @@ Deno.serve(async (req: Request) => {
         Pac: generatePac()
       }
     };
+
+    console.log(`[SYNC] Payload da requisicao:`, JSON.stringify(listPayload));
 
     const listResponse = await fetch(
       'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachList/1.0/ImportSet',
@@ -220,22 +261,76 @@ Deno.serve(async (req: Request) => {
       }
     );
 
+    console.log(`[SYNC] Status da resposta: ${listResponse.status}`);
+
+    const responseText = await listResponse.text();
+    console.log(`[SYNC] Resposta completa (primeiros 2000 chars): ${responseText.substring(0, 2000)}`);
+
     if (!listResponse.ok) {
-      const errorText = await listResponse.text();
-      console.error('Erro ao buscar lista de anexos:', errorText);
+      console.error('[SYNC] Erro na requisicao:', responseText);
       return new Response(
-        JSON.stringify({ error: 'Erro ao buscar anexos do GSPN', details: errorText }),
+        JSON.stringify({
+          error: 'Erro ao buscar anexos do GSPN',
+          status: listResponse.status,
+          details: responseText.substring(0, 500)
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const listData: AttachmentListResponse = await listResponse.json();
-    const attachments = listData.EtFileInfo?.results || [];
+    let listData: any;
+    try {
+      listData = JSON.parse(responseText);
+    } catch (parseError) {
+      console.error('[SYNC] Erro ao fazer parse da resposta:', parseError);
+      return new Response(
+        JSON.stringify({
+          error: 'Resposta invalida do GSPN',
+          details: responseText.substring(0, 500)
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-    console.log(`Total de anexos encontrados no GSPN: ${attachments.length}`);
+    console.log(`[SYNC] Estrutura da resposta:`, JSON.stringify(Object.keys(listData)));
+
+    if (listData.Return?.EsCommonResult) {
+      console.log(`[SYNC] EsCommonResult:`, JSON.stringify(listData.Return.EsCommonResult));
+    }
+
+    const rawAttachments = extractAttachments(listData);
+    console.log(`[SYNC] Anexos brutos extraidos: ${rawAttachments.length}`);
+
+    if (rawAttachments.length > 0) {
+      console.log(`[SYNC] Primeiro anexo bruto:`, JSON.stringify(rawAttachments[0]));
+    }
+
+    const attachments = rawAttachments
+      .map(normalizeAttachment)
+      .filter((a): a is AttachmentInfo => a !== null && !!a.Fileobjkey);
+
+    console.log(`[SYNC] Anexos normalizados: ${attachments.length}`);
+
+    if (attachments.length === 0) {
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Nenhum anexo encontrado no GSPN para esta OS',
+          total_gspn: 0,
+          total_sincronizados: 0,
+          total_ja_existentes: existingKeys.size,
+          debug: {
+            response_keys: Object.keys(listData),
+            raw_attachments_count: rawAttachments.length,
+            response_preview: JSON.stringify(listData).substring(0, 500)
+          }
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     const newAttachments = attachments.filter(a => !existingKeys.has(a.Fileobjkey));
-    console.log(`Novos anexos a sincronizar: ${newAttachments.length}`);
+    console.log(`[SYNC] Novos anexos a sincronizar: ${newAttachments.length}`);
 
     if (newAttachments.length === 0) {
       return new Response(
@@ -255,7 +350,7 @@ Deno.serve(async (req: Request) => {
 
     for (const attachment of newAttachments) {
       try {
-        console.log(`Baixando anexo: ${attachment.Filename} (${attachment.Fileobjkey})`);
+        console.log(`[SYNC] Baixando anexo: ${attachment.Filename} (${attachment.Fileobjkey})`);
 
         const filePayload = {
           IvSvcOrderNo: os.numero_os_samsung,
@@ -282,6 +377,8 @@ Deno.serve(async (req: Request) => {
         );
 
         if (!fileResponse.ok) {
+          const errText = await fileResponse.text();
+          console.error(`[SYNC] Erro ao baixar ${attachment.Filename}:`, errText);
           erros.push(`Erro ao baixar ${attachment.Filename}: HTTP ${fileResponse.status}`);
           continue;
         }
@@ -289,6 +386,7 @@ Deno.serve(async (req: Request) => {
         const fileData: AttachmentFileResponse = await fileResponse.json();
 
         if (!fileData.Return?.EvFileStream) {
+          console.error(`[SYNC] Arquivo vazio: ${attachment.Filename}`, JSON.stringify(fileData));
           erros.push(`Arquivo vazio: ${attachment.Filename}`);
           continue;
         }
@@ -305,7 +403,7 @@ Deno.serve(async (req: Request) => {
           });
 
         if (uploadError) {
-          console.error(`Erro ao fazer upload de ${attachment.Filename}:`, uploadError);
+          console.error(`[SYNC] Erro ao fazer upload de ${attachment.Filename}:`, uploadError);
           erros.push(`Erro ao salvar ${attachment.Filename}: ${uploadError.message}`);
           continue;
         }
@@ -333,16 +431,16 @@ Deno.serve(async (req: Request) => {
           });
 
         if (insertError) {
-          console.error(`Erro ao registrar anexo ${attachment.Filename}:`, insertError);
+          console.error(`[SYNC] Erro ao registrar anexo ${attachment.Filename}:`, insertError);
           erros.push(`Erro ao registrar ${attachment.Filename}: ${insertError.message}`);
           continue;
         }
 
         sincronizados++;
-        console.log(`Anexo sincronizado: ${attachment.Filename}`);
+        console.log(`[SYNC] Anexo sincronizado: ${attachment.Filename}`);
 
       } catch (error) {
-        console.error(`Erro ao processar anexo ${attachment.Filename}:`, error);
+        console.error(`[SYNC] Erro ao processar anexo ${attachment.Filename}:`, error);
         erros.push(`Erro ao processar ${attachment.Filename}: ${error.message}`);
       }
     }
@@ -368,7 +466,7 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('Erro geral:', error);
+    console.error('[SYNC] Erro geral:', error);
     return new Response(
       JSON.stringify({
         error: 'Erro interno do servidor',
