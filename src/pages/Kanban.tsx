@@ -592,15 +592,15 @@ export function Kanban() {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col gap-3">
+    <div className="h-[calc(100vh-100px)] flex flex-col gap-3 overflow-hidden">
       <UnitFilter
         unidades={unidades}
         selectedUnidade={selectedUnidade}
         onUnidadeChange={handleUnidadeChange}
       />
 
-      <div className="premium-card p-3 flex-1 flex flex-col">
-        <div className="flex items-center justify-between gap-4 mb-3">
+      <div className="premium-card p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{
               background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,245,255,0.05) 100%)',
@@ -715,7 +715,7 @@ export function Kanban() {
                   onDrop={(e) => handleDrop(e, coluna.id)}
                 >
                   <div className="flex flex-col h-full min-h-0 p-3">
-                    <div className="flex items-center justify-between mb-3 pb-2 border-b"
+                    <div className="flex items-center justify-between mb-3 pb-2 border-b flex-shrink-0"
                       style={{
                         borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
                         background: `linear-gradient(90deg, ${coluna.color}10 0%, transparent 100%)`
