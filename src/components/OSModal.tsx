@@ -339,16 +339,21 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       console.log('Resultado da sincronizacao GSPN:', result);
 
       if (result.total_sincronizados > 0) {
-        alert(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!`);
         loadAnexos();
         loadComentarios();
-      } else if (result.total_gspn === 0) {
-        if (result.debug) {
-          console.log('Debug info:', result.debug);
-          alert(`Nenhum anexo encontrado no GSPN.\n\nChaves na resposta: ${result.debug.response_keys?.join(', ') || 'N/A'}\n\nPreview: ${result.debug.response_preview?.substring(0, 200) || 'N/A'}`);
+
+        if (result.pendentes > 0) {
+          const continuar = confirm(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!\n\nRestam ${result.pendentes} anexo(s) pendentes.\n\nDeseja continuar sincronizando?`);
+          if (continuar) {
+            setSyncingGspnAnexos(false);
+            setTimeout(() => syncGspnAnexos(), 100);
+            return;
+          }
         } else {
-          alert('Nenhum anexo encontrado no GSPN para esta OS.');
+          alert(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!`);
         }
+      } else if (result.total_gspn === 0) {
+        alert('Nenhum anexo encontrado no GSPN para esta OS.');
       } else {
         alert(`Todos os ${result.total_gspn} anexos ja estao sincronizados.`);
       }

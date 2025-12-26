@@ -7,6 +7,8 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const MAX_FILES_PER_CALL = 3;
+
 interface AttachmentInfo {
   Filename: string;
   Filetype: string;
@@ -234,7 +236,6 @@ Deno.serve(async (req: Request) => {
     const existingKeys = new Set((existingAnexos || []).map(a => a.gspn_fileobjkey));
 
     console.log(`[SYNC] Iniciando sync de anexos para OS Samsung ${os.numero_os_samsung}`);
-    console.log(`[SYNC] ASC Code: ${unidade.samsung_asccode}`);
 
     const listPayload = {
       IvSvcOrderNo: os.numero_os_samsung,
@@ -246,8 +247,6 @@ Deno.serve(async (req: Request) => {
         Pac: generatePac()
       }
     };
-
-    console.log(`[SYNC] Payload da requisicao:`, JSON.stringify(listPayload));
 
     const listResponse = await fetch(
       'https://latam.ipaas.samsung.com/latam/gcic/GetSOAttachList/1.0/ImportSet',
@@ -261,23 +260,20 @@ Deno.serve(async (req: Request) => {
       }
     );
 
-    console.log(`[SYNC] Status da resposta: ${listResponse.status}`);
-
-    const responseText = await listResponse.text();
-    console.log(`[SYNC] Resposta completa (primeiros 2000 chars): ${responseText.substring(0, 2000)}`);
-
     if (!listResponse.ok) {
-      console.error('[SYNC] Erro na requisicao:', responseText);
+      const errText = await listResponse.text();
+      console.error('[SYNC] Erro na requisicao:', errText);
       return new Response(
         JSON.stringify({
           error: 'Erro ao buscar anexos do GSPN',
           status: listResponse.status,
-          details: responseText.substring(0, 500)
+          details: errText.substring(0, 500)
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const responseText = await listResponse.text();
     let listData: any;
     try {
       listData = JSON.parse(responseText);
@@ -292,24 +288,10 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`[SYNC] Estrutura da resposta:`, JSON.stringify(Object.keys(listData)));
-
-    if (listData.Return?.EsCommonResult) {
-      console.log(`[SYNC] EsCommonResult:`, JSON.stringify(listData.Return.EsCommonResult));
-    }
-
     const rawAttachments = extractAttachments(listData);
-    console.log(`[SYNC] Anexos brutos extraidos: ${rawAttachments.length}`);
-
-    if (rawAttachments.length > 0) {
-      console.log(`[SYNC] Primeiro anexo bruto:`, JSON.stringify(rawAttachments[0]));
-    }
-
     const attachments = rawAttachments
       .map(normalizeAttachment)
       .filter((a): a is AttachmentInfo => a !== null && !!a.Fileobjkey);
-
-    console.log(`[SYNC] Anexos normalizados: ${attachments.length}`);
 
     if (attachments.length === 0) {
       return new Response(
@@ -319,11 +301,7 @@ Deno.serve(async (req: Request) => {
           total_gspn: 0,
           total_sincronizados: 0,
           total_ja_existentes: existingKeys.size,
-          debug: {
-            response_keys: Object.keys(listData),
-            raw_attachments_count: rawAttachments.length,
-            response_preview: JSON.stringify(listData).substring(0, 500)
-          }
+          pendentes: 0
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -339,18 +317,22 @@ Deno.serve(async (req: Request) => {
           message: 'Todos os anexos ja estao sincronizados',
           total_gspn: attachments.length,
           total_sincronizados: 0,
-          total_ja_existentes: attachments.length
+          total_ja_existentes: attachments.length,
+          pendentes: 0
         }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
+    const toProcess = newAttachments.slice(0, MAX_FILES_PER_CALL);
+    const pendentes = newAttachments.length - toProcess.length;
+
     let sincronizados = 0;
     const erros: string[] = [];
 
-    for (const attachment of newAttachments) {
+    for (const attachment of toProcess) {
       try {
-        console.log(`[SYNC] Baixando anexo: ${attachment.Filename} (${attachment.Fileobjkey})`);
+        console.log(`[SYNC] Baixando anexo: ${attachment.Filename}`);
 
         const filePayload = {
           IvSvcOrderNo: os.numero_os_samsung,
@@ -386,7 +368,7 @@ Deno.serve(async (req: Request) => {
         const fileData: AttachmentFileResponse = await fileResponse.json();
 
         if (!fileData.Return?.EvFileStream) {
-          console.error(`[SYNC] Arquivo vazio: ${attachment.Filename}`, JSON.stringify(fileData));
+          console.error(`[SYNC] Arquivo vazio: ${attachment.Filename}`);
           erros.push(`Arquivo vazio: ${attachment.Filename}`);
           continue;
         }
@@ -460,7 +442,9 @@ Deno.serve(async (req: Request) => {
         total_gspn: attachments.length,
         total_sincronizados: sincronizados,
         total_ja_existentes: existingKeys.size,
-        erros: erros.length > 0 ? erros : undefined
+        pendentes: pendentes,
+        erros: erros.length > 0 ? erros : undefined,
+        message: pendentes > 0 ? `Sincronizados ${sincronizados} anexos. Restam ${pendentes} pendentes - clique novamente para continuar.` : undefined
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
