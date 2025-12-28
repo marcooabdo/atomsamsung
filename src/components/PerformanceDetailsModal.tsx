@@ -294,9 +294,13 @@ export function PerformanceDetailsModal({
                     </span>
                   </td>
                   <td className="p-4 text-right">
-                    <span className="text-sm font-bold text-[#10B981]">
-                      R$ {os.valor_total.toFixed(2)}
-                    </span>
+                    {os.valor_total > 0 ? (
+                      <span className="text-sm font-bold text-[#10B981]">
+                        R$ {os.valor_total.toFixed(2)}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-500">-</span>
+                    )}
                   </td>
                 </tr>
               ))}

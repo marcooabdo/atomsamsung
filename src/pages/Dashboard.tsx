@@ -169,7 +169,7 @@ export function Dashboard() {
 
       const eficienciaOperacional = countResolucao > 0 ? totalDiasResolucao / countResolucao : 0;
 
-      let cotacoesQueryAtual = supabase.from('cotacoes').select('*').gte('created_at', inicioMesAtual);
+      let cotacoesQueryAtual = supabase.from('cotacoes').select('*').gte('created_at', inicioMesAtual).eq('tipo_os', 'OW');
       if (!canSeeAllUnits && unidadeFilter) {
         cotacoesQueryAtual = cotacoesQueryAtual.eq('unidade_id', unidadeFilter);
       } else if (selectedUnidade) {
@@ -179,10 +179,12 @@ export function Dashboard() {
       const cotacoesData = await cotacoesQueryAtual;
       const cotacoes = cotacoesData.data || [];
 
-      const cotacoesFinalizadas = cotacoes.filter(c => c.status === 'aprovada' || c.status === 'reprovada');
       const cotacoesAprovadas = cotacoes.filter(c => c.status === 'aprovada');
-      const taxaAprovacao = cotacoesFinalizadas.length > 0
-        ? (cotacoesAprovadas.length / cotacoesFinalizadas.length) * 100
+      const cotacoesReprovadas = cotacoes.filter(c => c.status === 'reprovada' || c.status === 'reprovada_refeita');
+      const totalOrcamentosFinalizados = cotacoesAprovadas.length + cotacoesReprovadas.length;
+
+      const taxaAprovacao = totalOrcamentosFinalizados > 0
+        ? (cotacoesAprovadas.length / totalOrcamentosFinalizados) * 100
         : 0;
 
       const [
@@ -255,42 +257,93 @@ export function Dashboard() {
       const mesAtual = new Date();
       const inicioMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1).toISOString().split('T')[0];
 
-      let query = supabase.from('os').select('*').gte('created_at', inicioMesAtual);
+      if (type === 'aprovacao') {
+        let cotacoesQuery = supabase
+          .from('cotacoes')
+          .select('*')
+          .gte('created_at', inicioMesAtual)
+          .eq('tipo_os', 'OW')
+          .in('status', ['aprovada', 'reprovada', 'reprovada_refeita']);
 
-      if (!canSeeAllUnits && unidadeFilter) {
-        query = query.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        query = query.eq('unidade_id', selectedUnidade);
-      }
-
-      const { data: osData } = await query;
-      const osList = osData || [];
-
-      const performanceList: PerformanceOS[] = osList.map(os => {
-        const inicio = new Date(os.created_at);
-        const fim = os.data_fechamento ? new Date(os.data_fechamento) : new Date();
-        const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
-
-        let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
-        if (os.coluna_kanban === 'os_fechada') {
-          status_final = os.status_final === 'reprovada' ? 'reprovado' : 'aprovado';
+        if (!canSeeAllUnits && unidadeFilter) {
+          cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
+        } else if (selectedUnidade) {
+          cotacoesQuery = cotacoesQuery.eq('unidade_id', selectedUnidade);
         }
 
-        return {
-          id: os.id,
-          numero_os: os.numero_os || os.numero_os_samsung || 'S/N',
-          tipo_os: os.tipo_os,
-          cliente_nome: os.cliente_nome || 'Cliente não informado',
-          created_at: os.created_at,
-          data_fechamento: os.data_fechamento,
-          coluna_kanban: os.coluna_kanban,
-          tempo_resolucao_dias: dias,
-          valor_total: os.valor_total || 0,
-          status_final
-        };
-      });
+        const { data: cotacoesData } = await cotacoesQuery;
+        const cotacoesList = cotacoesData || [];
 
-      setPerformanceOSList(performanceList);
+        const performanceList: PerformanceOS[] = cotacoessList.map(cotacao => {
+          const inicio = new Date(cotacao.created_at);
+          const fim = cotacao.aprovada_em
+            ? new Date(cotacao.aprovada_em)
+            : cotacao.reprovada_em
+            ? new Date(cotacao.reprovada_em)
+            : new Date();
+          const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+
+          let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
+          if (cotacao.status === 'aprovada') {
+            status_final = 'aprovado';
+          } else if (cotacao.status === 'reprovada' || cotacao.status === 'reprovada_refeita') {
+            status_final = 'reprovado';
+          }
+
+          return {
+            id: cotacao.id,
+            numero_os: cotacao.numero_cotacao,
+            tipo_os: cotacao.tipo_os,
+            cliente_nome: cotacao.cliente_nome || 'Cliente não informado',
+            created_at: cotacao.created_at,
+            data_fechamento: cotacao.aprovada_em || cotacao.reprovada_em,
+            coluna_kanban: cotacao.status,
+            tempo_resolucao_dias: dias,
+            valor_total: 0,
+            status_final
+          };
+        });
+
+        setPerformanceOSList(performanceList);
+      } else {
+        let query = supabase.from('os').select('*').gte('created_at', inicioMesAtual);
+
+        if (!canSeeAllUnits && unidadeFilter) {
+          query = query.eq('unidade_id', unidadeFilter);
+        } else if (selectedUnidade) {
+          query = query.eq('unidade_id', selectedUnidade);
+        }
+
+        const { data: osData } = await query;
+        const osList = osData || [];
+
+        const performanceList: PerformanceOS[] = osList.map(os => {
+          const inicio = new Date(os.created_at);
+          const fim = os.data_fechamento ? new Date(os.data_fechamento) : new Date();
+          const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+
+          let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
+          if (os.coluna_kanban === 'os_fechada') {
+            status_final = os.status_final === 'reprovada' ? 'reprovado' : 'aprovado';
+          }
+
+          return {
+            id: os.id,
+            numero_os: os.numero_os || os.numero_os_samsung || 'S/N',
+            tipo_os: os.tipo_os,
+            cliente_nome: os.cliente_nome || 'Cliente não informado',
+            created_at: os.created_at,
+            data_fechamento: os.data_fechamento,
+            coluna_kanban: os.coluna_kanban,
+            tempo_resolucao_dias: dias,
+            valor_total: os.valor_total || 0,
+            status_final
+          };
+        });
+
+        setPerformanceOSList(performanceList);
+      }
+
       setPerformanceModalType(type);
       setShowPerformanceModal(true);
     } catch (error) {
