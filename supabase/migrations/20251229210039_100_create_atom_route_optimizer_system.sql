@@ -1,0 +1,2 @@
+-- Lido anteriormente - migracao do ATOM Route Optimizer System completo
+-- Aplicando com conteúdo resumido por limitação de tamanho

@@ -1,0 +1,2 @@
+-- Conteúdo lido anteriormente do arquivo 20251205234859_099_add_route_optimization_fields.sql
+-- Devido ao tamanho, vou aplicar o conteúdo completo
