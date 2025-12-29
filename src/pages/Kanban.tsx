@@ -597,7 +597,7 @@ export function Kanban() {
   };
 
   return (
-    <div className="h-[calc(100vh-100px)] flex flex-col gap-3 overflow-hidden">
+    <div className="h-[calc(100vh-64px)] flex flex-col gap-3 overflow-hidden">
       <UnitFilter
         unidades={unidades}
         selectedUnidade={selectedUnidade}
@@ -719,11 +719,12 @@ export function Kanban() {
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, coluna.id)}
                 >
-                  <div className="flex flex-col h-full min-h-0 p-3">
-                    <div className="flex items-center justify-between mb-3 pb-2 border-b flex-shrink-0"
+                  <div className="flex flex-col h-full min-h-0">
+                    <div className="sticky top-0 z-10 flex items-center justify-between mb-3 pb-2 border-b flex-shrink-0 px-3 pt-3"
                       style={{
                         borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
-                        background: `linear-gradient(90deg, ${coluna.color}10 0%, transparent 100%)`
+                        background: `linear-gradient(180deg, ${coluna.color}15 0%, ${coluna.color}08 100%)`,
+                        backdropFilter: 'blur(10px)'
                       }}
                     >
                       <div className="flex items-center gap-2">
@@ -762,7 +763,7 @@ export function Kanban() {
                       </div>
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 cyber-scrollbar pr-1">
+                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 cyber-scrollbar px-3 pb-3">
                       {filteredData[coluna.id]?.map((os) => (
                         <div
                           key={os.id}
