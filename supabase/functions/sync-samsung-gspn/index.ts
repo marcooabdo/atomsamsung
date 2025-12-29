@@ -138,7 +138,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
       return new Response(
-        JSON.stringify({ error: 'Autoriza\u00e7\u00e3o necess\u00e1ria' }),
+        JSON.stringify({ error: 'Autorização necessária' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -148,7 +148,7 @@ Deno.serve(async (req: Request) => {
 
     if (authError || !user) {
       return new Response(
-        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o autenticado' }),
+        JSON.stringify({ error: 'Usuário não autenticado', details: authError?.message }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -161,7 +161,7 @@ Deno.serve(async (req: Request) => {
 
     if (!usuario) {
       return new Response(
-        JSON.stringify({ error: 'Usu\u00e1rio n\u00e3o encontrado' }),
+        JSON.stringify({ error: 'Usuário não encontrado' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -173,7 +173,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidadeId) {
       return new Response(
-        JSON.stringify({ error: 'Unidade n\u00e3o especificada. Usu\u00e1rio master deve informar unidade_id no corpo da requisi\u00e7\u00e3o.' }),
+        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -181,7 +181,7 @@ Deno.serve(async (req: Request) => {
     if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
       if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
         return new Response(
-          JSON.stringify({ error: 'Sem permiss\u00e3o para sincronizar outras unidades' }),
+          JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
@@ -195,7 +195,7 @@ Deno.serve(async (req: Request) => {
 
     if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
       return new Response(
-        JSON.stringify({ error: 'Configura\u00e7\u00e3o Samsung n\u00e3o encontrada na unidade' }),
+        JSON.stringify({ error: 'Configuração Samsung não encontrada na unidade' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -213,9 +213,9 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincroniza\u00e7\u00e3o:', syncLogError);
+      console.error('Erro ao criar log de sincronização:', syncLogError);
       return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincroniza\u00e7\u00e3o', details: syncLogError?.message }),
+        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
