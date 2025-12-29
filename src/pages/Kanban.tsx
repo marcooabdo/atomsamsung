@@ -64,7 +64,9 @@ export function Kanban() {
   }, []);
 
   useEffect(() => {
-    if (usuario && usuario.unidade_id && !selectedUnidade) {
+    // Só define a unidade padrão se o usuário não for master/diretoria
+    const canSelectAllUnits = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+    if (usuario && usuario.unidade_id && !selectedUnidade && !canSelectAllUnits) {
       console.log('🏢 Setando unidade inicial do usuário:', usuario.unidade_id);
       setSelectedUnidade(usuario.unidade_id);
     }
@@ -234,17 +236,20 @@ export function Kanban() {
           tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome)
         `);
 
+      // Verificar se o usuário pode ver todas as unidades
+      const canSelectAllUnits = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+
       // Se o usuário selecionou uma unidade específica no filtro, use essa
       if (selectedUnidade) {
         console.log('🔍 Filtrando por unidade selecionada:', selectedUnidade);
         query = query.eq('unidade_id', selectedUnidade);
       }
-      // Se não selecionou, mas o usuário tem uma unidade fixa, use a dele
-      else if (usuario?.unidade_id) {
+      // Se não selecionou e não pode ver todas, usa a unidade do usuário
+      else if (!canSelectAllUnits && usuario?.unidade_id) {
         console.log('🔍 Filtrando por unidade do usuário:', usuario.unidade_id);
         query = query.eq('unidade_id', usuario.unidade_id);
       }
-      // Se for master/diretoria sem unidade e sem filtro, mostra todas
+      // Se pode ver todas e não selecionou, mostra todas
       else {
         console.log('🔍 Mostrando todas as unidades (usuário master/diretoria)');
       }
