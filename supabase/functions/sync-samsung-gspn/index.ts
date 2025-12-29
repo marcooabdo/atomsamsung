@@ -205,7 +205,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         unidade_id: unidadeId,
         config_id: null,
-        status: 'em_andamento',
+        status: 'em_progresso',
         iniciado_em: new Date().toISOString(),
         executado_por: usuario.id
       })
@@ -476,7 +476,7 @@ Deno.serve(async (req: Request) => {
     await supabase
       .from('samsung_sync_logs')
       .update({
-        status: erros.length > 0 ? 'parcial' : 'sucesso',
+        status: erros.length > 0 ? 'concluido_com_erros' : 'concluido',
         finalizado_em: new Date().toISOString(),
         total_os_encontradas: osList.length,
         total_os_criadas: criadas,
