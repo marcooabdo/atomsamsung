@@ -28,7 +28,6 @@ Deno.serve(async (req: Request) => {
     const email = 'marcoabdo@groupglobal.com.br';
     const password = 'Samsung@2024';
 
-    // Criar usuário no Auth
     const { data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
@@ -42,14 +41,12 @@ Deno.serve(async (req: Request) => {
       throw authError;
     }
 
-    // Buscar unidade
     const { data: unidade } = await supabase
       .from('unidades')
       .select('id')
       .limit(1)
       .single();
 
-    // Criar perfil na tabela usuarios
     const { error: profileError } = await supabase
       .from('usuarios')
       .insert({
