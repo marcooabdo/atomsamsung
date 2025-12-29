@@ -559,9 +559,15 @@ export type Database = {
           saldo_restante: number
           status_pagamento: 'pendente' | 'parcial' | 'pago'
           tipo_orcamento: 'normal' | 'acessorios' | 'samsung_contigo' | null
+          tempo_medio_atendimento: number | null
+          cliente_vip: boolean
+          data_compra: string | null
           status_garantia: string | null
+          status_samsung_desc: string | null
+          status_samsung_reason: string | null
           data_abertura_samsung: string | null
           data_requisicao_samsung: string | null
+          tipo_reparo: string | null
           criado_por: string
           created_at: string
           updated_at: string
@@ -610,9 +616,15 @@ export type Database = {
           saldo_restante?: number
           status_pagamento?: 'pendente' | 'parcial' | 'pago'
           tipo_orcamento?: 'normal' | 'acessorios' | 'samsung_contigo' | null
+          tempo_medio_atendimento?: number | null
+          cliente_vip?: boolean
+          data_compra?: string | null
           status_garantia?: string | null
+          status_samsung_desc?: string | null
+          status_samsung_reason?: string | null
           data_abertura_samsung?: string | null
           data_requisicao_samsung?: string | null
+          tipo_reparo?: string | null
           criado_por: string
           created_at?: string
           updated_at?: string
@@ -661,9 +673,15 @@ export type Database = {
           saldo_restante?: number
           status_pagamento?: 'pendente' | 'parcial' | 'pago'
           tipo_orcamento?: 'normal' | 'acessorios' | 'samsung_contigo' | null
+          tempo_medio_atendimento?: number | null
+          cliente_vip?: boolean
+          data_compra?: string | null
           status_garantia?: string | null
+          status_samsung_desc?: string | null
+          status_samsung_reason?: string | null
           data_abertura_samsung?: string | null
           data_requisicao_samsung?: string | null
+          tipo_reparo?: string | null
           criado_por?: string
           created_at?: string
           updated_at?: string
