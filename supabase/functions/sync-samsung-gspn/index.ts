@@ -66,7 +66,7 @@ interface SamsungOS {
   RiskGrade: string;
 }
 
-interface SamsungResponse {
+interface SamsungListResponse {
   Return: {
     EsCommonResult: {
       Code: string;
@@ -83,8 +83,22 @@ interface SamsungResponse {
   };
 }
 
-interface DetailResponse {
+interface SamsungDetailResponse {
   Return: {
+    EsBpInfo: {
+      CustEmail: string;
+      CustFirstName: string;
+      CustLastName: string;
+      CustAddrStreet1: string;
+      CustAddrStreet2: string;
+      CustDistrict: string;
+      CustCity: string;
+      CustState: string;
+      CustZipcode: string;
+      CustMobilePhone: string;
+      CustHomePhone: string;
+      CustOfficePhone: string;
+    };
     EsCommonResult: {
       Code: string;
       Codedesc: string;
@@ -95,21 +109,25 @@ interface DetailResponse {
     EvRetCode: string;
     EvRetMsg: string;
   };
-  EtHeader: {
-    SvcOrderNo: string;
-    [key: string]: any;
-  };
-  EtCust: {
-    Email: string;
-    TaxNo: string;
-    [key: string]: any;
-  };
-  EtAddr: {
-    HouseNo: string;
-    Complement: string;
-    Neighborhood: string;
-    [key: string]: any;
-  };
+}
+
+function formatDateForAPI(dateStr: string): string {
+  const date = new Date(dateStr);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}${month}${day}`;
+}
+
+function getCurrentPac(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
 }
 
 Deno.serve(async (req: Request) => {
@@ -165,7 +183,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: unidade, error: unidadeError } = await supabase
       .from('unidades')
-      .select('samsung_asc_code, samsung_api_url, samsung_api_username, samsung_api_password')
+      .select('samsung_asccode, samsung_token')
       .eq('id', unidadeId)
       .single();
 
@@ -173,8 +191,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Unit not found or missing Samsung configuration');
     }
 
-    if (!unidade.samsung_asc_code || !unidade.samsung_api_url || 
-        !unidade.samsung_api_username || !unidade.samsung_api_password) {
+    if (!unidade.samsung_asccode || !unidade.samsung_token) {
       throw new Error('Samsung API configuration incomplete for this unit');
     }
 
@@ -205,37 +222,45 @@ Deno.serve(async (req: Request) => {
     const logId = syncLog.data.id;
 
     try {
-      const listUrl = `${unidade.samsung_api_url}/odata/v4/OrderList`;
-      const body = {
-        AscCode: unidade.samsung_asc_code,
-        SvcOrderNo: '',
-        CustName: '',
-        AscJobNo: '',
-        Model: '',
-        SerialNo: '',
-        Imei: '',
-        SchDateFr: dataInicio,
-        SchDateTo: dataFim,
-        Status: ''
+      const baseUrl = 'https://latam.ipaas.samsung.com/latam/gcic';
+      const listUrl = `${baseUrl}/GetSOList/1.0/ImportSet`;
+
+      const pac = getCurrentPac();
+      const reqDateFrom = formatDateForAPI(dataInicio);
+      const reqDateTo = formatDateForAPI(dataFim);
+
+      const listBody = {
+        IsBasicCond: {
+          AscCode: unidade.samsung_asccode,
+          ReqDateFrom: reqDateFrom,
+          ReqDateTo: reqDateTo
+        },
+        IvCompany: '',
+        IsCommonHeader: {
+          Company: 'C820',
+          AscCode: unidade.samsung_asccode,
+          Country: 'BR',
+          Lang: 'EN',
+          Pac: pac
+        }
       };
 
-      const credentials = btoa(`${unidade.samsung_api_username}:${unidade.samsung_api_password}`);
-      
       const listResponse = await fetch(listUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Basic ${credentials}`,
+          'Authorization': `Bearer ${unidade.samsung_token}`,
+          'Cookie': 'sap-usercontext=sap-client=100',
         },
-        body: JSON.stringify(body),
+        body: JSON.stringify(listBody),
       });
 
       if (!listResponse.ok) {
         throw new Error(`Samsung API error: ${listResponse.status} ${listResponse.statusText}`);
       }
 
-      const data: SamsungResponse = await listResponse.json();
-      
+      const data: SamsungListResponse = await listResponse.json();
+
       if (data.Return.EvRetCode !== '0') {
         throw new Error(`Samsung API returned error: ${data.Return.EvRetMsg}`);
       }
@@ -313,20 +338,28 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const detailUrl = `${unidade.samsung_api_url}/odata/v4/OrderDetail`;
-      
+      const detailUrl = `${baseUrl}/GetSOInfoAll/1.0/ImportSet`;
+
       const detailPromises = osToCreate.map(async (os) => {
         try {
+          const detailPac = getCurrentPac();
           const detailBody = {
-            AscCode: unidade.samsung_asc_code,
-            SvcOrderNo: os.SvcOrderNo
+            IvSvcOrderNo: os.SvcOrderNo,
+            IsCommonHeader: {
+              Company: 'C820',
+              AscCode: unidade.samsung_asccode,
+              Country: 'BR',
+              Lang: 'EN',
+              Pac: detailPac
+            }
           };
 
           const detailResponse = await fetch(detailUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Basic ${credentials}`,
+              'Authorization': `Bearer ${unidade.samsung_token}`,
+              'Cookie': 'sap-usercontext=sap-client=100',
             },
             body: JSON.stringify(detailBody),
           });
@@ -335,19 +368,21 @@ Deno.serve(async (req: Request) => {
             return null;
           }
 
-          const detailData: DetailResponse = await detailResponse.json();
-          
+          const detailData: SamsungDetailResponse = await detailResponse.json();
+
           if (detailData.Return.EvRetCode !== '0') {
             return null;
           }
 
           return {
             svcOrderNo: os.SvcOrderNo,
-            cliente_email: detailData.EtCust?.Email || null,
-            cliente_cpf_cnpj: detailData.EtCust?.TaxNo || null,
-            cliente_numero: detailData.EtAddr?.HouseNo || null,
-            cliente_complemento: detailData.EtAddr?.Complement || null,
-            cliente_bairro: detailData.EtAddr?.Neighborhood || null
+            cliente_email: detailData.Return.EsBpInfo?.CustEmail || null,
+            cliente_endereco: detailData.Return.EsBpInfo?.CustAddrStreet1 || null,
+            cliente_numero: detailData.Return.EsBpInfo?.CustAddrStreet2 || null,
+            cliente_bairro: detailData.Return.EsBpInfo?.CustDistrict || null,
+            cliente_cidade: detailData.Return.EsBpInfo?.CustCity || null,
+            cliente_estado: detailData.Return.EsBpInfo?.CustState || null,
+            cliente_cep: detailData.Return.EsBpInfo?.CustZipcode || null
           };
         } catch (error) {
           console.error(`Error fetching details for ${os.SvcOrderNo}:`, error);
@@ -400,7 +435,7 @@ Deno.serve(async (req: Request) => {
             if (imei.length < 15) imei = null;
           }
 
-          const tipoReparo = os.WarrantyType === 'I' ? 'garantia' : 
+          const tipoReparo = os.WarrantyType === 'I' ? 'garantia' :
                             os.WarrantyType === 'O' ? 'fora_garantia' : 'fora_garantia';
 
           const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
@@ -419,14 +454,12 @@ Deno.serve(async (req: Request) => {
             cliente_nome: clienteNome,
             cliente_telefone: telefone || null,
             cliente_email: details?.cliente_email || null,
-            cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null,
-            cliente_endereco: os.CustAddress || null,
+            cliente_endereco: details?.cliente_endereco || os.CustAddress || null,
             cliente_numero: details?.cliente_numero || null,
-            cliente_complemento: details?.cliente_complemento || null,
             cliente_bairro: details?.cliente_bairro || null,
-            cliente_cep: os.CustZipcode || null,
-            cliente_cidade: os.CustCity || null,
-            cliente_estado: os.CustState || null,
+            cliente_cep: details?.cliente_cep || os.CustZipcode || null,
+            cliente_cidade: details?.cliente_cidade || os.CustCity || null,
+            cliente_estado: details?.cliente_estado || os.CustState || null,
             cliente_vip: os.EliteService !== 'N',
             aparelho_marca: 'Samsung',
             aparelho_modelo: os.Model || null,
