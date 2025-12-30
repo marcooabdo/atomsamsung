@@ -142,21 +142,28 @@ export function Kanban() {
             continue;
           }
 
+          const dataFim = new Date().toISOString().split('T')[0];
+          const dataInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
           const response = await fetch(apiUrl, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${session.access_token}`,
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ unidade_id: unidadeId }),
+            body: JSON.stringify({
+              unidadeId: unidadeId,
+              dataInicio,
+              dataFim
+            }),
           });
 
           const result = await response.json();
 
           if (response.ok) {
-            totalCriadas += result.total_criadas || 0;
-            totalIgnoradas += result.total_ignoradas || 0;
-            totalEncontradas += result.total_encontradas || 0;
+            totalCriadas += result.totalCriadas || 0;
+            totalIgnoradas += result.totalIgnoradas || 0;
+            totalEncontradas += result.totalEncontradas || 0;
           } else {
             erros.push(`${unidadeData.nome}: ${result.error || 'Erro desconhecido'}`);
           }
