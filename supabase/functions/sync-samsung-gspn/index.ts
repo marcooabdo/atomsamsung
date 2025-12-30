@@ -443,7 +443,7 @@ Deno.serve(async (req: Request) => {
 
           const warrantyType = (os.WarrantyType || 'O').toUpperCase();
           const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
-          const tipoOrcamento = tipoOS === 'LP' ? null : 'normal';
+          const tipoOrcamento = 'normal';
 
           const details = detailsMap.get(os.SvcOrderNo);
           const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
