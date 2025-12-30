@@ -199,7 +199,7 @@ Deno.serve(async (req: Request) => {
       .from('samsung_sync_logs')
       .insert({
         unidade_id: unidadeId,
-        status: 'em_andamento',
+        status: 'em_progresso',
         iniciado_em: new Date().toISOString(),
         executado_por: usuario.id,
         total_os_encontradas: 0,
@@ -215,8 +215,9 @@ Deno.serve(async (req: Request) => {
       .select()
       .single();
 
-    if (!syncLog.data) {
-      throw new Error('Failed to create sync log');
+    if (syncLog.error || !syncLog.data) {
+      console.error('Error creating sync log:', syncLog.error);
+      throw new Error(`Failed to create sync log: ${syncLog.error?.message || 'Unknown error'}`);
     }
 
     const logId = syncLog.data.id;
