@@ -168,7 +168,7 @@ Deno.serve(async (req: Request) => {
     const { data: usuario, error: usuarioError } = await supabase
       .from('usuarios')
       .select('id, unidade_id, nome')
-      .eq('auth_id', user.id)
+      .eq('id', user.id)
       .single();
 
     if (usuarioError || !usuario) {
