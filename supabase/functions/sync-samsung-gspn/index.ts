@@ -1,13 +1,13 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import 'jsr:@supabase/functions-js/edge-runtime.d.ts';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
-interface SamsungServiceOrder {
+interface SamsungOS {
   SvcOrderNo: string;
   AscJobNo: string;
   ReqDate: string;
@@ -66,7 +66,7 @@ interface SamsungServiceOrder {
   RiskGrade: string;
 }
 
-interface SamsungAPIResponse {
+interface SamsungResponse {
   Return: {
     EsCommonResult: {
       Code: string;
@@ -79,440 +79,438 @@ interface SamsungAPIResponse {
     EvRetMsg: string;
   };
   EtSvcInfo: {
-    results: SamsungServiceOrder[];
+    results: SamsungOS[];
   };
 }
 
-interface SamsungDetailResponse {
+interface DetailResponse {
   Return: {
-    EsHeaderInfo: {
-      AscCode: string;
-      [key: string]: any;
+    EsCommonResult: {
+      Code: string;
+      Codedesc: string;
+      Msgid: string;
+      Sac: string;
+      Pac: string;
     };
-    EsBpInfo: {
-      CustAddrStreet2?: string;
-      CustEmail?: string;
-      CustDistrict?: string;
-      CustId?: string;
-      [key: string]: any;
-    };
+    EvRetCode: string;
+    EvRetMsg: string;
+  };
+  EtHeader: {
+    SvcOrderNo: string;
+    [key: string]: any;
+  };
+  EtCust: {
+    Email: string;
+    TaxNo: string;
+    [key: string]: any;
+  };
+  EtAddr: {
+    HouseNo: string;
+    Complement: string;
+    Neighborhood: string;
     [key: string]: any;
   };
 }
 
-interface ProcessedOS {
-  numero_os_samsung: string;
-  cliente_numero: string;
-  cliente_email: string;
-  cliente_bairro: string;
-  cliente_complemento: string;
-  cliente_cpf_cnpj: string;
-}
-
-async function runWithConcurrencyLimit<T>(
-  items: T[],
-  limit: number,
-  processItem: (item: T) => Promise<void>
-): Promise<void> {
-  const results: Promise<void>[] = [];
-
-  for (let i = 0; i < items.length; i += limit) {
-    const batch = items.slice(i, i + limit);
-    const batchPromises = batch.map(item => processItem(item).catch(err => {
-      console.error('Erro ao processar item:', err);
-    }));
-    await Promise.all(batchPromises);
-  }
-}
-
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 200, headers: corsHeaders });
+  if (req.method === 'OPTIONS') {
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
 
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Autorização necessária' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      throw new Error('No authorization header');
     }
 
     const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-
-    if (authError || !user) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário não autenticado', details: authError?.message }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      throw new Error('Unauthorized');
     }
 
-    const { data: usuario } = await supabase
+    const { data: usuario, error: usuarioError } = await supabase
       .from('usuarios')
-      .select('id, unidade_id, tipo')
-      .eq('id', user.id)
+      .select('id, unidade_id, nome')
+      .eq('auth_id', user.id)
       .single();
 
-    if (!usuario) {
-      return new Response(
-        JSON.stringify({ error: 'Usuário não encontrado' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (usuarioError || !usuario) {
+      throw new Error('User not found in database');
     }
 
-    const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
-    const targetUnidadeId = body.unidade_id;
+    const { unidadeId, dataInicio, dataFim } = await req.json();
 
-    let unidadeId = targetUnidadeId || usuario.unidade_id;
-
-    if (!unidadeId) {
-      return new Response(
-        JSON.stringify({ error: 'Unidade não especificada. Usuário master deve informar unidade_id no corpo da requisição.' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!unidadeId || !dataInicio || !dataFim) {
+      throw new Error('Missing required parameters');
     }
 
-    if (targetUnidadeId && targetUnidadeId !== usuario.unidade_id && usuario.unidade_id !== null) {
-      if (usuario.tipo !== 'master' && usuario.tipo !== 'diretoria') {
-        return new Response(
-          JSON.stringify({ error: 'Sem permissão para sincronizar outras unidades' }),
-          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-    }
-
-    const { data: unidade } = await supabase
+    const { data: unidade, error: unidadeError } = await supabase
       .from('unidades')
-      .select('samsung_asccode, samsung_token')
+      .select('samsung_asc_code, samsung_api_url, samsung_api_username, samsung_api_password')
       .eq('id', unidadeId)
       .single();
 
-    if (!unidade || !unidade.samsung_asccode || !unidade.samsung_token) {
-      return new Response(
-        JSON.stringify({ error: 'Configuração Samsung não encontrada na unidade' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (unidadeError || !unidade) {
+      throw new Error('Unit not found or missing Samsung configuration');
     }
 
-    const { data: syncLog, error: syncLogError } = await supabase
+    if (!unidade.samsung_asc_code || !unidade.samsung_api_url || 
+        !unidade.samsung_api_username || !unidade.samsung_api_password) {
+      throw new Error('Samsung API configuration incomplete for this unit');
+    }
+
+    const syncLog = await supabase
       .from('samsung_sync_logs')
       .insert({
         unidade_id: unidadeId,
-        config_id: null,
-        status: 'em_progresso',
+        status: 'em_andamento',
         iniciado_em: new Date().toISOString(),
-        executado_por: usuario.id
+        executado_por: usuario.id,
+        total_os_encontradas: 0,
+        total_os_criadas: 0,
+        total_os_ignoradas: 0,
+        detalhes: {
+          periodo: {
+            de: dataInicio,
+            ate: dataFim
+          }
+        }
       })
       .select()
       .single();
 
-    if (syncLogError || !syncLog) {
-      console.error('Erro ao criar log de sincronização:', syncLogError);
-      return new Response(
-        JSON.stringify({ error: 'Erro ao iniciar sincronização', details: syncLogError?.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!syncLog.data) {
+      throw new Error('Failed to create sync log');
     }
 
-    const hoje = new Date();
-    const dataInicio = new Date(hoje);
-    dataInicio.setDate(hoje.getDate() - 3);
+    const logId = syncLog.data.id;
 
-    const formatDate = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(date.getMonth() + 1).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-      return `${year}${month}${day}`;
-    };
+    try {
+      const listUrl = `${unidade.samsung_api_url}/odata/v4/OrderList`;
+      const body = {
+        AscCode: unidade.samsung_asc_code,
+        SvcOrderNo: '',
+        CustName: '',
+        AscJobNo: '',
+        Model: '',
+        SerialNo: '',
+        Imei: '',
+        SchDateFr: dataInicio,
+        SchDateTo: dataFim,
+        Status: ''
+      };
 
-    const generatePac = () => {
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
-      return `${year}${month}${day}${hours}${minutes}${seconds}`;
-    };
+      const credentials = btoa(`${unidade.samsung_api_username}:${unidade.samsung_api_password}`);
+      
+      const listResponse = await fetch(listUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${credentials}`,
+        },
+        body: JSON.stringify(body),
+      });
 
-    const payload = {
-      IsBasicCond: {
-        AscCode: unidade.samsung_asccode,
-        ReqDateFrom: formatDate(dataInicio),
-        ReqDateTo: formatDate(hoje)
-      },
-      IvCompany: "",
-      IsCommonHeader: {
-        Company: "C820",
-        AscCode: unidade.samsung_asccode,
-        Country: "BR",
-        Lang: "EN",
-        Pac: generatePac()
+      if (!listResponse.ok) {
+        throw new Error(`Samsung API error: ${listResponse.status} ${listResponse.statusText}`);
       }
-    };
 
-    const apiUrl = 'https://latam.ipaas.samsung.com/latam/gcic/GetSOList/1.0/ImportSet';
+      const data: SamsungResponse = await listResponse.json();
+      
+      if (data.Return.EvRetCode !== '0') {
+        throw new Error(`Samsung API returned error: ${data.Return.EvRetMsg}`);
+      }
 
-    console.log('Consultando API Samsung:', JSON.stringify(payload));
-
-    const samsungResponse = await fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${unidade.samsung_token}`,
-        'Cookie': 'sap-usercontext=sap-client=100'
-      },
-      body: JSON.stringify(payload)
-    });
-    
-    if (!samsungResponse.ok) {
-      const errorText = await samsungResponse.text();
-      console.error('Erro na API Samsung:', errorText);
+      const osList = data.EtSvcInfo.results;
+      const totalEncontradas = osList.length;
 
       await supabase
         .from('samsung_sync_logs')
-        .update({
-          status: 'erro',
-          finalizado_em: new Date().toISOString(),
-          mensagem_erro: `API retornou status ${samsungResponse.status}: ${errorText}`
-        })
-        .eq('id', syncLog.id);
+        .update({ total_os_encontradas: totalEncontradas })
+        .eq('id', logId);
 
-      return new Response(
-        JSON.stringify({
-          error: 'Erro na API Samsung',
-          details: errorText,
-          status: samsungResponse.status
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+      if (totalEncontradas === 0) {
+        await supabase
+          .from('samsung_sync_logs')
+          .update({
+            status: 'concluido',
+            finalizado_em: new Date().toISOString(),
+            total_os_encontradas: 0,
+            total_os_criadas: 0,
+            total_os_ignoradas: 0
+          })
+          .eq('id', logId);
 
-    const responseData: SamsungAPIResponse = await samsungResponse.json();
-
-    if (responseData.Return.EvRetCode !== "0") {
-      const errorMsg = `API Samsung retornou erro: ${responseData.Return.EvRetMsg || 'Erro desconhecido'}`;
-      console.error(errorMsg);
-
-      await supabase
-        .from('samsung_sync_logs')
-        .update({
-          status: 'erro',
-          finalizado_em: new Date().toISOString(),
-          mensagem_erro: errorMsg
-        })
-        .eq('id', syncLog.id);
-
-      return new Response(
-        JSON.stringify({ error: errorMsg }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const osList = responseData.EtSvcInfo?.results || [];
-    console.log(`Total de OS encontradas: ${osList.length}`);
-
-    const { data: existingOS } = await supabase
-      .from('os')
-      .select('numero_os_samsung')
-      .eq('unidade_id', unidadeId)
-      .not('numero_os_samsung', 'is', null);
-
-    const existingNumbers = new Set((existingOS || []).map(os => os.numero_os_samsung));
-
-    const { data: tecnicos } = await supabase
-      .from('usuarios')
-      .select('id, nome, email, numero_tecnico')
-      .eq('unidade_id', unidadeId)
-      .not('numero_tecnico', 'is', null);
-
-    const tecnicoMap = new Map<string, { id: string; nome: string; email: string }>();
-    (tecnicos || []).forEach(t => {
-      if (t.numero_tecnico) {
-        tecnicoMap.set(t.numero_tecnico, { id: t.id, nome: t.nome, email: t.email });
-      }
-    });
-
-    let criadas = 0;
-    let ignoradas = 0;
-    const erros: string[] = [];
-
-    const osToCreate: any[] = [];
-    const detailsMap = new Map<string, ProcessedOS>();
-
-    for (const os of osList) {
-      if (existingNumbers.has(os.SvcOrderNo)) {
-        ignoradas++;
-        continue;
-      }
-      osToCreate.push(os);
-    }
-
-    console.log(`Processando ${osToCreate.length} OS com detalhes complementares...`);
-
-    await runWithConcurrencyLimit(osToCreate, 3, async (os) => {
-      try {
-        const detailPayload = {
-          IvSvcOrderNo: os.SvcOrderNo,
-          IsCommonHeader: {
-            Company: "C820",
-            AscCode: unidade.samsung_asccode,
-            Country: "BR",
-            Lang: "EN",
-            Pac: generatePac()
-          }
-        };
-
-        const detailResponse = await fetch(
-          'https://latam.ipaas.samsung.com/latam/gcic/GetSOInfoAll/1.0/ImportSet',
+        return new Response(
+          JSON.stringify({
+            success: true,
+            totalEncontradas: 0,
+            totalCriadas: 0,
+            totalIgnoradas: 0
+          }),
           {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const existingOSNumbers = await supabase
+        .from('os')
+        .select('numero_os_samsung')
+        .eq('unidade_id', unidadeId)
+        .in('numero_os_samsung', osList.map(os => os.SvcOrderNo));
+
+      const existingNumbers = new Set(
+        (existingOSNumbers.data || []).map(os => os.numero_os_samsung)
+      );
+
+      const osToCreate = osList.filter(os => !existingNumbers.has(os.SvcOrderNo));
+      const totalIgnoradas = osList.length - osToCreate.length;
+
+      await supabase
+        .from('samsung_sync_logs')
+        .update({ total_os_ignoradas: totalIgnoradas })
+        .eq('id', logId);
+
+      if (osToCreate.length === 0) {
+        await supabase
+          .from('samsung_sync_logs')
+          .update({
+            status: 'concluido',
+            finalizado_em: new Date().toISOString()
+          })
+          .eq('id', logId);
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            totalEncontradas,
+            totalCriadas: 0,
+            totalIgnoradas
+          }),
+          {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
+      const detailUrl = `${unidade.samsung_api_url}/odata/v4/OrderDetail`;
+      
+      const detailPromises = osToCreate.map(async (os) => {
+        try {
+          const detailBody = {
+            AscCode: unidade.samsung_asc_code,
+            SvcOrderNo: os.SvcOrderNo
+          };
+
+          const detailResponse = await fetch(detailUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${unidade.samsung_token}`
+              'Authorization': `Basic ${credentials}`,
             },
-            body: JSON.stringify(detailPayload)
-          }
-        );
+            body: JSON.stringify(detailBody),
+          });
 
-        if (detailResponse.ok) {
-          const detailData: SamsungDetailResponse = await detailResponse.json();
-
-          if (detailData?.Return?.EsHeaderInfo?.AscCode) {
-            detailsMap.set(os.SvcOrderNo, {
-              numero_os_samsung: os.SvcOrderNo,
-              cliente_numero: detailData.Return.EsBpInfo.CustAddrStreet2 || '',
-              cliente_email: detailData.Return.EsBpInfo.CustEmail || '',
-              cliente_bairro: detailData.Return.EsBpInfo.CustDistrict || '',
-              cliente_complemento: '',
-              cliente_cpf_cnpj: detailData.Return.EsBpInfo.CustId || ''
-            });
+          if (!detailResponse.ok) {
+            return null;
           }
+
+          const detailData: DetailResponse = await detailResponse.json();
+          
+          if (detailData.Return.EvRetCode !== '0') {
+            return null;
+          }
+
+          return {
+            svcOrderNo: os.SvcOrderNo,
+            cliente_email: detailData.EtCust?.Email || null,
+            cliente_cpf_cnpj: detailData.EtCust?.TaxNo || null,
+            cliente_numero: detailData.EtAddr?.HouseNo || null,
+            cliente_complemento: detailData.EtAddr?.Complement || null,
+            cliente_bairro: detailData.EtAddr?.Neighborhood || null
+          };
+        } catch (error) {
+          console.error(`Error fetching details for ${os.SvcOrderNo}:`, error);
+          return null;
         }
-      } catch (error) {
-        console.error(`Erro ao buscar detalhes da OS ${os.SvcOrderNo}:`, error);
+      });
+
+      const detailsResults = await Promise.all(detailPromises);
+      const detailsMap = new Map(
+        detailsResults
+          .filter(d => d !== null)
+          .map(d => [d!.svcOrderNo, d])
+      );
+
+      const { data: tecnicos } = await supabase
+        .from('usuarios')
+        .select('id, numero_tecnico')
+        .eq('unidade_id', unidadeId)
+        .not('numero_tecnico', 'is', null);
+
+      const tecnicoMap = new Map(
+        (tecnicos || []).map(t => [t.numero_tecnico, t])
+      );
+
+      const errors: string[] = [];
+      let criadas = 0;
+
+      for (const os of osToCreate) {
+        try {
+          let clienteNome = '';
+          if (os.CustFirstName || os.CustLastName) {
+            clienteNome = `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim();
+          } else if (os.CustName) {
+            clienteNome = os.CustName;
+          }
+
+          if (!clienteNome) {
+            clienteNome = 'Cliente Samsung';
+          }
+
+          let telefone = os.CustMobilePhone || os.CustHomePhone || os.CustOfficePhone || null;
+          if (telefone) {
+            telefone = telefone.replace(/\D/g, '');
+            if (telefone.length < 10) telefone = null;
+          }
+
+          let imei = os.IMEI || os.SerialNo || null;
+          if (imei) {
+            imei = imei.replace(/\D/g, '');
+            if (imei.length < 15) imei = null;
+          }
+
+          const tipoReparo = os.WarrantyType === 'I' ? 'garantia' : 
+                            os.WarrantyType === 'O' ? 'fora_garantia' : 'fora_garantia';
+
+          const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
+                                 os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
+
+          const warrantyType = (os.WarrantyType || 'O').toUpperCase();
+          const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
+          const tipoOrcamento = tipoOS === 'LP' ? null : 'normal';
+
+          const details = detailsMap.get(os.SvcOrderNo);
+          const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
+
+          const osData: any = {
+            unidade_id: unidadeId,
+            numero_os_samsung: os.SvcOrderNo,
+            cliente_nome: clienteNome,
+            cliente_telefone: telefone || null,
+            cliente_email: details?.cliente_email || null,
+            cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null,
+            cliente_endereco: os.CustAddress || null,
+            cliente_numero: details?.cliente_numero || null,
+            cliente_complemento: details?.cliente_complemento || null,
+            cliente_bairro: details?.cliente_bairro || null,
+            cliente_cep: os.CustZipcode || null,
+            cliente_cidade: os.CustCity || null,
+            cliente_estado: os.CustState || null,
+            cliente_vip: os.EliteService !== 'N',
+            aparelho_marca: 'Samsung',
+            aparelho_modelo: os.Model || null,
+            aparelho_imei: imei || null,
+            data_compra: os.PurchaseDate || null,
+            defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
+            coluna_kanban: 'os_nova',
+            tipo_os: tipoOS,
+            tipo_orcamento: tipoOrcamento,
+            tipo_atendimento: tipoAtendimento,
+            tipo_reparo: tipoReparo,
+            status_garantia: os.WarrantyType || os.WarrantyStatus || null,
+            status_samsung_desc: os.StatusDesc || null,
+            status_samsung_reason: os.StReasonDesc || null,
+            data_abertura_samsung: os.ReqDate || null,
+            data_requisicao_samsung: os.CustRequestDate || null,
+            criado_por: usuario.id
+          };
+
+          if (tecnico) {
+            osData.atribuido_a = tecnico.id;
+          }
+
+          const { error: insertError } = await supabase
+            .from('os')
+            .insert(osData);
+
+          if (insertError) {
+            console.error(`Erro ao criar OS ${os.SvcOrderNo}:`, insertError);
+            errors.push(`OS ${os.SvcOrderNo}: ${insertError.message}`);
+          } else {
+            criadas++;
+          }
+        } catch (error: any) {
+          console.error(`Error processing OS ${os.SvcOrderNo}:`, error);
+          errors.push(`OS ${os.SvcOrderNo}: ${error.message}`);
+        }
       }
-    });
 
-    console.log(`Criando ${osToCreate.length} OS no banco...`);
+      const finalStatus = errors.length > 0 ? 'concluido_com_erros' : 'concluido';
+      const mensagemErro = errors.length > 0 ? errors.join('\n') : null;
 
-    for (const os of osToCreate) {
-      const clienteNome = os.CustName?.trim() ||
-                         `${os.CustFirstName || ''} ${os.CustLastName || ''}`.trim() ||
-                         'Cliente Samsung';
+      await supabase
+        .from('samsung_sync_logs')
+        .update({
+          status: finalStatus,
+          finalizado_em: new Date().toISOString(),
+          total_os_criadas: criadas,
+          mensagem_erro: mensagemErro,
+          detalhes: {
+            periodo: {
+              de: dataInicio,
+              ate: dataFim
+            },
+            erros: errors
+          }
+        })
+        .eq('id', logId);
 
-      const telefone = os.CustMobilePhone || os.CustHomePhone || os.CustOfficePhone || '';
-      const imei = os.IMEI || os.SerialNo || '';
+      return new Response(
+        JSON.stringify({
+          success: true,
+          totalEncontradas,
+          totalCriadas: criadas,
+          totalIgnoradas,
+          errors: errors.length > 0 ? errors : undefined
+        }),
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
 
-      const tipoReparo = os.SvcTypeDesc === 'In Home' ? 'VISITA TECNICA' :
-                        os.SvcTypeDesc === 'Carry In' ? 'BALCAO' :
-                        os.SvcTypeDesc || 'VISITA TECNICA';
+    } catch (error: any) {
+      await supabase
+        .from('samsung_sync_logs')
+        .update({
+          status: 'erro',
+          finalizado_em: new Date().toISOString(),
+          mensagem_erro: error.message
+        })
+        .eq('id', logId);
 
-      const tipoAtendimento = os.SvcTypeDesc === 'In Home' ? 'IH' :
-                             os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
-
-      const warrantyType = (os.WarrantyType || 'O').toUpperCase();
-      const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
-
-      const details = detailsMap.get(os.SvcOrderNo);
-      const tecnico = os.Engineer ? tecnicoMap.get(os.Engineer) : null;
-
-      const osData: any = {
-        unidade_id: unidadeId,
-        numero_os_samsung: os.SvcOrderNo,
-        cliente_nome: clienteNome,
-        cliente_telefone: telefone || null,
-        cliente_email: details?.cliente_email || null,
-        cliente_cpf_cnpj: details?.cliente_cpf_cnpj || null,
-        cliente_endereco: os.CustAddress || null,
-        cliente_numero: details?.cliente_numero || null,
-        cliente_complemento: details?.cliente_complemento || null,
-        cliente_bairro: details?.cliente_bairro || null,
-        cliente_cep: os.CustZipcode || null,
-        cliente_cidade: os.CustCity || null,
-        cliente_estado: os.CustState || null,
-        cliente_vip: os.EliteService !== 'N',
-        aparelho_marca: 'Samsung',
-        aparelho_modelo: os.Model || null,
-        aparelho_imei: imei || null,
-        data_compra: os.PurchaseDate || null,
-        defeito_relatado: os.Remark || os.CustComment || os.SvcComment || null,
-        coluna_kanban: 'os_nova',
-        tipo_os: tipoOS,
-        tipo_orcamento: 'normal',
-        tipo_atendimento: tipoAtendimento,
-        tipo_reparo: tipoReparo,
-        status_garantia: os.WarrantyType || os.WarrantyStatus || null,
-        status_samsung_desc: os.StatusDesc || null,
-        status_samsung_reason: os.StReasonDesc || null,
-        data_abertura_samsung: os.ReqDate || null,
-        data_requisicao_samsung: os.CustRequestDate || null,
-        criado_por: usuario.id
-      };
-
-      if (tecnico) {
-        osData.atribuido_a = tecnico.id;
-      }
-
-      const { error: insertError } = await supabase
-        .from('os')
-        .insert(osData);
-
-      if (insertError) {
-        console.error(`Erro ao criar OS ${os.SvcOrderNo}:`, insertError);
-        erros.push(`OS ${os.SvcOrderNo}: ${insertError.message}`);
-      } else {
-        criadas++;
-      }
+      throw error;
     }
 
-    await supabase
-      .from('samsung_sync_logs')
-      .update({
-        status: erros.length > 0 ? 'concluido_com_erros' : 'concluido',
-        finalizado_em: new Date().toISOString(),
-        total_os_encontradas: osList.length,
-        total_os_criadas: criadas,
-        total_os_ignoradas: ignoradas,
-        mensagem_erro: erros.length > 0 ? erros.join('\n') : null,
-        detalhes: {
-          periodo: {
-            de: formatDate(dataInicio),
-            ate: formatDate(hoje)
-          },
-          erros: erros
-        }
-      })
-      .eq('id', syncLog.id);
-
+  } catch (error: any) {
+    console.error('Error:', error);
     return new Response(
-      JSON.stringify({
-        success: true,
-        total_encontradas: osList.length,
-        total_criadas: criadas,
-        total_ignoradas: ignoradas,
-        erros: erros.length > 0 ? erros : undefined
-      }),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-
-  } catch (error) {
-    console.error('Erro geral:', error);
-    console.error('Stack trace:', error.stack);
-    return new Response(
-      JSON.stringify({
-        error: 'Erro interno do servidor',
-        details: error.message,
-        stack: error.stack
-      }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
     );
   }
 });
