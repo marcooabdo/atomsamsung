@@ -24,11 +24,11 @@ export function Login() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0D] cyber-grid flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-radial from-[#00D4FF]/10 via-transparent to-transparent opacity-30" />
+    <div className="min-h-screen cyber-grid flex items-center justify-center p-4 relative overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+      <div className="absolute inset-0 opacity-30" style={{ background: 'radial-gradient(circle at center, var(--border-accent), transparent, transparent)' }} />
 
-      <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-[#00D4FF]/5 rounded-full blur-3xl animate-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-[#1428F0]/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }} />
+      <div className="absolute top-1/4 left-1/4 w-96 h-96 rounded-full blur-3xl animate-pulse" style={{ background: 'var(--border-primary)' }} />
+      <div className="absolute bottom-1/4 right-1/4 w-96 h-96 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s', background: 'var(--border-primary)' }} />
 
       <div className="w-full max-w-md relative z-10 scale-in">
         <div className="glass-modal p-10">
@@ -41,10 +41,10 @@ export function Login() {
             </div>
           </div>
 
-          <h1 className="tech-heading text-4xl text-center text-[#00D4FF] mb-2 neon-text-blue">
+          <h1 className="tech-heading text-4xl text-center mb-2 neon-text-blue" style={{ color: 'var(--text-accent)' }}>
             SAMSUNG
           </h1>
-          <p className="text-center text-gray-400 mb-8 text-sm tracking-widest uppercase font-medium">
+          <p className="text-center mb-8 text-sm tracking-widest uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>
             Sistema Operacional Corporativo
           </p>
 
@@ -52,7 +52,7 @@ export function Login() {
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-xs font-semibold text-[#00D4FF] mb-3 uppercase tracking-widest flex items-center gap-2">
+              <label htmlFor="email" className="block text-xs font-semibold mb-3 uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--text-accent)' }}>
                 <Mail className="w-4 h-4" />
                 E-mail Corporativo
               </label>
@@ -68,7 +68,7 @@ export function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-xs font-semibold text-[#00D4FF] mb-3 uppercase tracking-widest flex items-center gap-2">
+              <label htmlFor="password" className="block text-xs font-semibold mb-3 uppercase tracking-widest flex items-center gap-2" style={{ color: 'var(--text-accent)' }}>
                 <Lock className="w-4 h-4" />
                 Senha de Acesso
               </label>
@@ -112,20 +112,20 @@ export function Login() {
 
           <div className="flex items-center justify-center gap-2 mt-6">
             <div className="w-2 h-2 rounded-full bg-[#39FF14] pulse-neon" />
-            <p className="text-xs text-gray-500 uppercase tracking-widest font-medium">
+            <p className="text-xs uppercase tracking-widest font-medium" style={{ color: 'var(--text-secondary)' }}>
               Sistema Online
             </p>
           </div>
         </div>
 
-        <p className="text-center text-gray-600 text-xs mt-8 uppercase tracking-widest font-medium">
+        <p className="text-center text-xs mt-8 uppercase tracking-widest font-medium" style={{ color: 'var(--text-secondary)' }}>
           Acesso Restrito • Usuários Autorizados
         </p>
 
         <div className="mt-6 p-4 premium-card text-center">
-          <p className="text-xs text-gray-400 mb-2">Credenciais Padrão:</p>
-          <p className="text-xs text-[#00D4FF] font-mono">marcoabdo@groupglobal.com.br</p>
-          <p className="text-xs text-gray-500 mt-1">Senha: Samsung@2024</p>
+          <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Credenciais Padrão:</p>
+          <p className="text-xs font-mono" style={{ color: 'var(--text-accent)' }}>marcoabdo@groupglobal.com.br</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Senha: Samsung@2024</p>
         </div>
       </div>
     </div>

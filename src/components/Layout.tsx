@@ -1,6 +1,7 @@
 import { ReactNode, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import {
   LayoutDashboard,
   FileText,
@@ -13,7 +14,9 @@ import {
   Menu,
   X,
   ClipboardList,
-  Zap
+  Zap,
+  Sun,
+  Moon
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -34,6 +37,7 @@ const menuItems = [
 
 export function Layout({ children }: LayoutProps) {
   const { usuario, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
@@ -46,16 +50,18 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen bg-[#0A0A0D] cyber-grid">
+    <div className="min-h-screen cyber-grid" style={{ background: 'var(--bg-primary)' }}>
       <aside
-        className={`fixed top-0 left-0 h-full bg-gradient-to-b from-black to-[#0A0A0D] border-r border-[#00D4FF]/15 transition-all duration-300 z-30 backdrop-blur-xl flex flex-col ${
+        className={`fixed top-0 left-0 h-full border-r transition-all duration-300 z-30 backdrop-blur-xl flex flex-col ${
           sidebarOpen ? 'w-72' : 'w-20'
         }`}
         style={{
-          boxShadow: '0 0 20px rgba(0, 212, 255, 0.05), inset 0 0 20px rgba(0, 212, 255, 0.02)'
+          background: 'linear-gradient(180deg, var(--bg-secondary), var(--bg-primary))',
+          borderColor: 'var(--border-primary)',
+          boxShadow: '0 0 20px var(--border-primary), inset 0 0 20px var(--border-primary)'
         }}
       >
-        <div className="flex items-center justify-between p-6 border-b border-[#00D4FF]/15 flex-shrink-0">
+        <div className="flex items-center justify-between p-6 border-b flex-shrink-0" style={{ borderColor: 'var(--border-primary)' }}>
           {sidebarOpen && (
             <div className="flex items-center gap-3 slide-in">
               <img
@@ -68,12 +74,15 @@ export function Layout({ children }: LayoutProps) {
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
-            className="p-2 hover:bg-[#00D4FF]/5 rounded-lg transition-all duration-300"
+            className="p-2 rounded-lg transition-all duration-300"
+            style={{ background: 'var(--bg-hover)' }}
+            onMouseEnter={(e) => e.currentTarget.style.background = 'var(--bg-hover)'}
+            onMouseLeave={(e) => e.currentTarget.style.background = 'transparent'}
           >
             {sidebarOpen ? (
-              <X className="w-5 h-5 text-[#00D4FF]" />
+              <X className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
             ) : (
-              <Menu className="w-5 h-5 text-[#00D4FF]" />
+              <Menu className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
             )}
           </button>
         </div>
@@ -87,13 +96,24 @@ export function Layout({ children }: LayoutProps) {
               <Link
                 key={item.id}
                 to={item.path}
-                className={`group relative w-full flex items-center gap-4 px-5 py-4 rounded-lg transition-all duration-300 ${
-                  isActive
-                    ? 'bg-[#00D4FF]/10 text-[#00D4FF] border border-[#00D4FF]/20'
-                    : 'hover:bg-[#00D4FF]/5 text-gray-400 hover:text-[#00D4FF] border border-transparent'
-                }`}
+                className={`group relative w-full flex items-center gap-4 px-5 py-4 rounded-lg transition-all duration-300 border`}
                 style={{
-                  animationDelay: `${index * 50}ms`
+                  animationDelay: `${index * 50}ms`,
+                  background: isActive ? 'var(--bg-hover)' : 'transparent',
+                  color: isActive ? 'var(--text-accent)' : 'var(--text-secondary)',
+                  borderColor: isActive ? 'var(--border-primary)' : 'transparent'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.color = 'var(--text-accent)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'var(--text-secondary)';
+                  }
                 }}
                 title={!sidebarOpen ? item.label : ''}
               >
@@ -111,8 +131,11 @@ export function Layout({ children }: LayoutProps) {
                 )}
                 {isActive && (
                   <div
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-gradient-to-b from-transparent via-[#00D4FF] to-transparent"
-                    style={{ boxShadow: '0 0 4px rgba(0, 212, 255, 0.4)' }}
+                    className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8"
+                    style={{
+                      background: 'linear-gradient(180deg, transparent, var(--text-accent), transparent)',
+                      boxShadow: '0 0 4px var(--border-accent)'
+                    }}
                   />
                 )}
               </Link>
@@ -120,11 +143,11 @@ export function Layout({ children }: LayoutProps) {
           })}
         </nav>
 
-        <div className="flex-shrink-0 p-5 border-t border-[#00D4FF]/15 bg-gradient-to-t from-black/60 to-transparent">
+        <div className="flex-shrink-0 p-5 border-t" style={{ borderColor: 'var(--border-primary)', background: 'linear-gradient(180deg, transparent, var(--bg-secondary))' }}>
           {sidebarOpen && usuario && (
             <div className="mb-3 p-3 premium-card slide-in">
-              <p className="text-xs font-semibold text-[#00D4FF] truncate tracking-wide break-words">{usuario.nome}</p>
-              <p className="text-[10px] text-gray-400 uppercase tracking-wider mt-1 font-medium">{usuario.tipo}</p>
+              <p className="text-xs font-semibold truncate tracking-wide break-words" style={{ color: 'var(--text-accent)' }}>{usuario.nome}</p>
+              <p className="text-[10px] uppercase tracking-wider mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>{usuario.tipo}</p>
               {usuario.unidade_id && (
                 <div className="flex items-center gap-1 mt-1.5">
                   <div className="w-1.5 h-1.5 rounded-full bg-[#10b981]" style={{ boxShadow: '0 0 4px rgba(16, 185, 129, 0.4)' }} />
@@ -134,17 +157,49 @@ export function Layout({ children }: LayoutProps) {
             </div>
           )}
 
-          <button
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-lg bg-black/60 border border-red-500/25 hover:border-red-500/50 hover:bg-red-500/10 transition-all duration-300 text-red-400 hover:text-red-300 group"
-            title={!sidebarOpen ? 'Sair' : ''}
-            style={{
-              boxShadow: '0 0 8px rgba(255, 0, 100, 0.1)'
-            }}
-          >
-            <LogOut className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
-            {sidebarOpen && <span className="font-medium text-xs tracking-wider">SAIR</span>}
-          </button>
+          <div className={`flex gap-2 ${sidebarOpen ? 'flex-row' : 'flex-col'}`}>
+            <button
+              onClick={toggleTheme}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all duration-300 group"
+              title={!sidebarOpen ? (theme === 'dark' ? 'Modo Claro' : 'Modo Escuro') : ''}
+              style={{
+                background: 'var(--bg-secondary)',
+                borderColor: 'var(--border-primary)',
+                color: 'var(--text-accent)',
+                boxShadow: '0 0 8px var(--border-primary)',
+                flex: sidebarOpen ? 1 : 'none'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-accent)';
+                e.currentTarget.style.background = 'var(--bg-hover)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor = 'var(--border-primary)';
+                e.currentTarget.style.background = 'var(--bg-secondary)';
+              }}
+            >
+              {theme === 'dark' ? (
+                <Sun className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
+              ) : (
+                <Moon className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
+              )}
+              {sidebarOpen && <span className="font-medium text-xs tracking-wider">{theme === 'dark' ? 'CLARO' : 'ESCURO'}</span>}
+            </button>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-red-500/25 hover:border-red-500/50 hover:bg-red-500/10 transition-all duration-300 text-red-400 hover:text-red-300 group"
+              title={!sidebarOpen ? 'Sair' : ''}
+              style={{
+                background: 'var(--bg-secondary)',
+                boxShadow: '0 0 8px rgba(255, 0, 100, 0.1)',
+                flex: sidebarOpen ? 1 : 'none'
+              }}
+            >
+              <LogOut className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
+              {sidebarOpen && <span className="font-medium text-xs tracking-wider">SAIR</span>}
+            </button>
+          </div>
         </div>
       </aside>
 
