@@ -226,47 +226,82 @@ Deno.serve(async (req: Request) => {
       const baseUrl = 'https://latam.ipaas.samsung.com/latam/gcic';
       const listUrl = `${baseUrl}/GetSOList/1.0/ImportSet`;
 
-      const pac = getCurrentPac();
-      const reqDateFrom = formatDateForAPI(dataInicio);
-      const reqDateTo = formatDateForAPI(dataFim);
+      const startDate = new Date(dataInicio);
+      const endDate = new Date(dataFim);
+      const daysDiff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
 
-      const listBody = {
-        IsBasicCond: {
-          AscCode: unidade.samsung_asccode,
-          ReqDateFrom: reqDateFrom,
-          ReqDateTo: reqDateTo
-        },
-        IvCompany: '',
-        IsCommonHeader: {
-          Company: 'C820',
-          AscCode: unidade.samsung_asccode,
-          Country: 'BR',
-          Lang: 'EN',
-          Pac: pac
+      const dateRanges: Array<{ from: string; to: string }> = [];
+
+      if (daysDiff <= 7) {
+        dateRanges.push({ from: dataInicio, to: dataFim });
+      } else {
+        let currentDate = new Date(startDate);
+        while (currentDate <= endDate) {
+          const rangeEnd = new Date(currentDate);
+          rangeEnd.setDate(rangeEnd.getDate() + 6);
+
+          if (rangeEnd > endDate) {
+            rangeEnd.setTime(endDate.getTime());
+          }
+
+          dateRanges.push({
+            from: currentDate.toISOString().split('T')[0],
+            to: rangeEnd.toISOString().split('T')[0]
+          });
+
+          currentDate.setDate(currentDate.getDate() + 7);
         }
-      };
-
-      const listResponse = await fetch(listUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${unidade.samsung_token}`,
-          'Cookie': 'sap-usercontext=sap-client=100',
-        },
-        body: JSON.stringify(listBody),
-      });
-
-      if (!listResponse.ok) {
-        throw new Error(`Samsung API error: ${listResponse.status} ${listResponse.statusText}`);
       }
 
-      const data: SamsungListResponse = await listResponse.json();
+      const allOsList: SamsungOS[] = [];
 
-      if (data.Return.EvRetCode !== '0') {
-        throw new Error(`Samsung API returned error: ${data.Return.EvRetMsg}`);
+      for (const range of dateRanges) {
+        const pac = getCurrentPac();
+        const reqDateFrom = formatDateForAPI(range.from);
+        const reqDateTo = formatDateForAPI(range.to);
+
+        const listBody = {
+          IsBasicCond: {
+            AscCode: unidade.samsung_asccode,
+            ReqDateFrom: reqDateFrom,
+            ReqDateTo: reqDateTo
+          },
+          IvCompany: '',
+          IsCommonHeader: {
+            Company: 'C820',
+            AscCode: unidade.samsung_asccode,
+            Country: 'BR',
+            Lang: 'EN',
+            Pac: pac
+          }
+        };
+
+        const listResponse = await fetch(listUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${unidade.samsung_token}`,
+            'Cookie': 'sap-usercontext=sap-client=100',
+          },
+          body: JSON.stringify(listBody),
+        });
+
+        if (!listResponse.ok) {
+          throw new Error(`Samsung API error: ${listResponse.status} ${listResponse.statusText}`);
+        }
+
+        const data: SamsungListResponse = await listResponse.json();
+
+        if (data.Return.EvRetCode !== '0') {
+          throw new Error(`Samsung API returned error: ${data.Return.EvRetMsg}`);
+        }
+
+        if (data.EtSvcInfo?.results) {
+          allOsList.push(...data.EtSvcInfo.results);
+        }
       }
 
-      const osList = data.EtSvcInfo.results;
+      const osList = allOsList;
       const totalEncontradas = osList.length;
 
       await supabase
