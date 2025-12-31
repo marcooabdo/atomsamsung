@@ -33,7 +33,9 @@ const COLUNAS_KANBAN = [
 ];
 
 type OS = Database['public']['Tables']['os']['Row'];
-type OSComentario = Database['public']['Tables']['os_comentarios']['Row'];
+type OSComentario = Database['public']['Tables']['os_comentarios']['Row'] & {
+  usuario?: { nome: string } | null;
+};
 type OSAnexo = Database['public']['Tables']['os_anexos']['Row'];
 type OSPeca = Database['public']['Tables']['os_pecas']['Row'];
 
@@ -243,17 +245,17 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       .eq('id', osId)
       .maybeSingle();
 
-    // Busca comentários tanto de os_comentarios quanto de cotacao_comentarios
+    // Busca comentários tanto de os_comentarios quanto de cotacao_comentarios com nome do usuário
     const [osComentariosResult, cotacaoComentariosResult] = await Promise.all([
       supabase
         .from('os_comentarios')
-        .select('*')
+        .select('*, usuario:usuarios(nome)')
         .eq('os_id', osId)
         .order('created_at', { ascending: false }),
       osData?.cotacao_id
         ? supabase
             .from('cotacao_comentarios')
-            .select('*')
+            .select('*, usuario:usuarios(nome)')
             .eq('cotacao_id', osData.cotacao_id)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null })
@@ -270,7 +272,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       comentario: c.texto,
       is_system: c.is_system || false,
       created_at: c.created_at,
-      updated_at: c.updated_at
+      updated_at: c.updated_at,
+      usuario: c.usuario
     }));
 
     const todosComentarios = [...(osComentariosResult.data || []), ...cotacaoComentarios].sort((a, b) =>
@@ -2444,8 +2447,14 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         key={comentario.id}
                         className={`premium-card p-4 ${comentario.is_system ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : ''}`}
                       >
-                        {comentario.is_system && (
-                          <p className="text-xs text-blue-400 font-bold mb-1">🤖 SISTEMA</p>
+                        {comentario.is_system ? (
+                          <p className="text-xs text-blue-400 font-bold mb-1">
+                            🤖 SISTEMA {comentario.usuario?.nome && `- ${comentario.usuario.nome}`}
+                          </p>
+                        ) : (
+                          <p className="text-xs text-gray-400 font-bold mb-1">
+                            👤 {comentario.usuario?.nome || 'Usuário'}
+                          </p>
                         )}
                         <p className="text-sm text-gray-300">{comentario.comentario}</p>
                         <p className="text-xs text-gray-500 mt-2">
