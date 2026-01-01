@@ -70,22 +70,26 @@ export function OSAgendamentoTab({
 
   const loadTecnicos = async () => {
     try {
-      let query = supabase
+      const { data: tecnicosUnidade, error: error1 } = await supabase
         .from('usuarios')
         .select('id, nome')
-        .eq('ativo', true)
-        .order('nome');
+        .eq('tipo', 'tecnico')
+        .eq('unidade_id', unidadeId)
+        .eq('ativo', true);
 
-      if (tipoAtendimento === 'IH') {
-        query = query.in('tipo', ['tecnico_ih', 'tecnico']);
-      } else {
-        query = query.eq('tipo', 'tecnico').eq('unidade_id', unidadeId);
-      }
+      const { data: tecnicosIH, error: error2 } = await supabase
+        .from('usuarios')
+        .select('id, nome')
+        .eq('tipo', 'tecnico_ih')
+        .eq('ativo', true);
 
-      const { data, error } = await query;
+      if (error1) throw error1;
+      if (error2) throw error2;
 
-      if (error) throw error;
-      setTecnicos(data || []);
+      const todosTecnicos = [...(tecnicosUnidade || []), ...(tecnicosIH || [])];
+      todosTecnicos.sort((a, b) => a.nome.localeCompare(b.nome));
+
+      setTecnicos(todosTecnicos);
     } catch (error) {
       console.error('Erro ao carregar técnicos:', error);
     }
