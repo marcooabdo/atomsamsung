@@ -2078,14 +2078,22 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                               try {
                                 const valorNumerico = novaPecaValor ? parseFloat(novaPecaValor) : null;
 
-                                await supabase.from('requisicoes_pecas').insert({
+                                const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
                                   os_id: osId,
                                   codigo_peca: novaPecaCodigo,
                                   descricao: novaPecaDescricao,
                                   quantidade_requisitada: novaPecaQuantidade,
                                   valor_peca: valorNumerico,
-                                  status: 'pendente'
+                                  status: 'pendente',
+                                  requisitado_por: usuario?.id,
+                                  unidade_id: os?.unidade_id || usuario?.unidade_id,
+                                  numero_os_samsung: os?.numero_os_samsung
                                 });
+
+                                if (insertError) {
+                                  console.error('Erro ao inserir requisição:', insertError);
+                                  throw insertError;
+                                }
 
                                 await supabase.from('os_comentarios').insert({
                                   os_id: osId,
@@ -2099,12 +2107,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 setNovaPecaQuantidade(1);
                                 setNovaPecaValor('');
                                 setSugestoesPecas([]);
-                                loadRequisicoes();
-                                loadComentarios();
+                                await loadRequisicoes();
+                                await loadComentarios();
                                 alert('Requisição criada com sucesso!');
-                              } catch (error) {
+                              } catch (error: any) {
                                 console.error('Erro ao criar requisição:', error);
-                                alert('Erro ao criar requisição');
+                                alert(`Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`);
                               }
                             }}
                             className="neon-button px-4 py-2 flex-1 text-xs"
