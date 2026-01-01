@@ -634,7 +634,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
   const handleRequisitarPeca = async (peca: any) => {
     try {
-      await supabase.from('requisicoes_pecas').insert({
+      const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
         os_id: osId,
         cotacao_peca_id: peca.cotacao_peca_id,
         codigo_peca: peca.codigo || peca.pn,
@@ -646,16 +646,43 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         unidade_id: os?.unidade_id
       });
 
-      await supabase.from('os_comentarios').insert({
-        os_id: osId,
-        usuario_id: usuario?.id,
-        comentario: `Peça requisitada por ${usuario?.nome}: ${peca.descricao} (${peca.codigo || peca.pn})`,
-        is_system: true
-      });
+      if (insertError) throw insertError;
 
-      alert('Requisição enviada!');
+      // Mover OS para "Aguardando Peça" se não estiver lá ainda
+      const colunasQueNaoPrecisamMover = ['aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
+      if (os?.coluna_kanban && !colunasQueNaoPrecisamMover.includes(os.coluna_kanban)) {
+        const { error: updateError } = await supabase
+          .from('os')
+          .update({
+            coluna_kanban: 'aguardando_peca',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', osId);
+
+        if (updateError) {
+          console.error('Erro ao mover OS:', updateError);
+        }
+
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `OS movida para "Aguardando Peça" - requisição criada por ${usuario?.nome}`,
+          is_system: true
+        });
+      } else {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `Peça requisitada por ${usuario?.nome}: ${peca.descricao} (${peca.codigo || peca.pn})`,
+          is_system: true
+        });
+      }
+
+      alert('Requisição enviada! OS movida para "Aguardando Peça".');
       loadRequisicoes();
       loadComentarios();
+      loadOS();
+      onReload?.();
     } catch (error) {
       console.error('Erro ao requisitar peça:', error);
       alert('Erro ao requisitar peça');
