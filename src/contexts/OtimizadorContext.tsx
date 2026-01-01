@@ -30,6 +30,7 @@ interface OtimizadorContextData {
   agendamentosData: any[];
   tecnicosData: any[];
   unidades: Unidade[];
+  isMaster: boolean;
   loadOSData: () => Promise<void>;
   loadAgendamentosData: () => Promise<void>;
   loadTecnicosData: () => Promise<void>;
@@ -38,7 +39,7 @@ interface OtimizadorContextData {
 const OtimizadorContext = createContext<OtimizadorContextData>({} as OtimizadorContextData);
 
 export function OtimizadorProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth();
+  const { user, usuario } = useAuth();
   const [activeTab, setActiveTab] = useState<OtimizadorTab>('dashboard');
   const [selectedUnidade, setSelectedUnidade] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -48,15 +49,21 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
   const [tecnicosData, setTecnicosData] = useState<any[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
 
+  const isMaster = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+
   useEffect(() => {
     loadUnidades();
   }, []);
 
   useEffect(() => {
-    if (user?.unidade_id) {
-      setSelectedUnidade(user.unidade_id);
+    if (usuario) {
+      if (isMaster) {
+        setSelectedUnidade(null);
+      } else if (usuario.unidade_id) {
+        setSelectedUnidade(usuario.unidade_id);
+      }
     }
-  }, [user]);
+  }, [usuario, isMaster]);
 
   const loadUnidades = async () => {
     try {
@@ -74,27 +81,32 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
-    if (selectedUnidade) {
+    if (isMaster || selectedUnidade) {
       loadOSData();
       loadAgendamentosData();
       loadTecnicosData();
     }
-  }, [selectedUnidade, refreshKey]);
+  }, [selectedUnidade, refreshKey, isMaster]);
 
   const loadOSData = async () => {
-    if (!selectedUnidade) return;
+    if (!isMaster && !selectedUnidade) return;
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('os')
         .select(`
           *,
           cliente:clientes(nome, telefone, email),
           tecnico:usuarios!os_tecnico_id_fkey(nome)
         `)
-        .eq('unidade_id', selectedUnidade)
         .order('created_at', { ascending: false });
+
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         setOsData(data);
@@ -107,10 +119,10 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
   };
 
   const loadAgendamentosData = async () => {
-    if (!selectedUnidade) return;
+    if (!isMaster && !selectedUnidade) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('agendamentos')
         .select(`
           *,
@@ -122,8 +134,13 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
           ),
           tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)
         `)
-        .eq('unidade_id', selectedUnidade)
         .order('data_agendamento', { ascending: true });
+
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         setAgendamentosData(data);
@@ -134,16 +151,21 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
   };
 
   const loadTecnicosData = async () => {
-    if (!selectedUnidade) return;
+    if (!isMaster && !selectedUnidade) return;
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('usuarios')
         .select('*')
-        .eq('unidade_id', selectedUnidade)
         .in('tipo', ['tecnico', 'tecnico_ih'])
         .eq('ativo', true)
         .order('nome');
+
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      }
+
+      const { data, error } = await query;
 
       if (!error && data) {
         setTecnicosData(data);
@@ -157,13 +179,17 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
     setRefreshKey(prev => prev + 1);
   };
 
+  const handleSetSelectedUnidade = (unidade: string | null) => {
+    setSelectedUnidade(unidade === '' ? null : unidade);
+  };
+
   return (
     <OtimizadorContext.Provider
       value={{
         activeTab,
         setActiveTab,
         selectedUnidade,
-        setSelectedUnidade,
+        setSelectedUnidade: handleSetSelectedUnidade,
         refreshKey,
         refresh,
         loading,
@@ -171,6 +197,7 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         agendamentosData,
         tecnicosData,
         unidades,
+        isMaster,
         loadOSData,
         loadAgendamentosData,
         loadTecnicosData

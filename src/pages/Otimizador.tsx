@@ -24,7 +24,9 @@ const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }
 ];
 
 function OtimizadorContent() {
-  const { activeTab, setActiveTab, selectedUnidade, setSelectedUnidade, unidades } = useOtimizador();
+  const { activeTab, setActiveTab, selectedUnidade, setSelectedUnidade, unidades, isMaster } = useOtimizador();
+
+  const canProceed = isMaster || selectedUnidade;
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -72,7 +74,7 @@ function OtimizadorContent() {
           </div>
         </div>
 
-        {!selectedUnidade ? (
+        {!canProceed ? (
           <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-8 text-center">
             <p className="text-yellow-400 text-lg">Selecione uma unidade para começar</p>
           </div>
