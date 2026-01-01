@@ -25,7 +25,9 @@ async function reverseGeocode(lat: number, lng: number): Promise<string> {
 
 interface Peca {
   id: string;
-  peca_id: string;
+  peca_estoque_id: string;
+  codigo_peca: string;
+  descricao: string;
   quantidade: number;
   status: string;
   estoque_pecas: {
@@ -33,7 +35,7 @@ interface Peca {
     descricao: string;
     id_peca: string;
     delivery: number;
-  };
+  } | null;
 }
 
 interface ChecklistItem {
@@ -206,10 +208,12 @@ export function ExecucaoOS() {
       .from('requisicoes_pecas')
       .select(`
         id,
-        peca_id,
-        quantidade,
+        peca_estoque_id,
+        codigo_peca,
+        descricao,
+        quantidade_requisitada,
         status,
-        estoque_pecas:peca_id (
+        estoque_pecas:peca_estoque_id (
           sku,
           descricao,
           id_peca,
@@ -220,7 +224,11 @@ export function ExecucaoOS() {
       .in('status', ['atendida', 'em_uso', 'gi_postada', 'devolvida']);
 
     if (data) {
-      setPecas(data as unknown as Peca[]);
+      const pecasFormatted = data.map(p => ({
+        ...p,
+        quantidade: p.quantidade_requisitada
+      }));
+      setPecas(pecasFormatted as unknown as Peca[]);
     }
   };
 
@@ -837,9 +845,11 @@ export function ExecucaoOS() {
                   pecas.map(peca => (
                     <div key={peca.id} className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
                       <div>
-                        <p className="text-white font-medium">{peca.estoque_pecas.descricao}</p>
-                        <p className="text-gray-400 text-sm">SKU: {peca.estoque_pecas.sku}</p>
-                        <p className="text-gray-400 text-sm">ID: {peca.estoque_pecas.id_peca} | Delivery: {peca.estoque_pecas.delivery} dias</p>
+                        <p className="text-white font-medium">{peca.estoque_pecas?.descricao || peca.descricao}</p>
+                        <p className="text-gray-400 text-sm">SKU: {peca.estoque_pecas?.sku || peca.codigo_peca}</p>
+                        {peca.estoque_pecas && (
+                          <p className="text-gray-400 text-sm">ID: {peca.estoque_pecas.id_peca} | Delivery: {peca.estoque_pecas.delivery} dias</p>
+                        )}
                         <p className="text-gray-400 text-sm">Quantidade: {peca.quantidade}</p>
                         <div className="mt-2">
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
