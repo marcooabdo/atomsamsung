@@ -33,7 +33,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (usuario?.tipo === 'tecnico' && !window.location.pathname.startsWith('/mobile')) {
+  if (usuario?.tipo === 'tecnico_ih' && !window.location.pathname.startsWith('/mobile')) {
     return <Navigate to="/mobile/agenda" replace />;
   }
 
@@ -55,7 +55,7 @@ function MobileProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/login" replace />;
   }
 
-  if (usuario?.tipo !== 'tecnico') {
+  if (usuario?.tipo !== 'tecnico_ih') {
     return <Navigate to="/" replace />;
   }
 

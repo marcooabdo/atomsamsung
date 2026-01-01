@@ -33,7 +33,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
           </div>
           <div>
             <p className="text-white font-medium text-sm">{usuario?.nome}</p>
-            <p className="text-gray-400 text-xs">Técnico de Campo</p>
+            <p className="text-gray-400 text-xs">Tecnico IH</p>
           </div>
         </div>
         <button
