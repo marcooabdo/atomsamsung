@@ -2122,46 +2122,56 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
-                      Peças da OS (Valores Sem Markup)
+                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">
+                      Requisições de Peças
                     </h3>
-                    {pecas.length === 0 ? (
-                      <p className="text-gray-500 text-sm">Nenhuma peça vinculada a esta OS</p>
+                    {requisicoes.length === 0 ? (
+                      <p className="text-gray-500 text-sm">Nenhuma requisição criada ainda</p>
                     ) : (
                       <div className="space-y-3">
-                        {pecas.map((peca) => {
-                          const requisicao = requisicoes.find(
-                            r => r.cotacao_peca_id === peca.cotacao_peca_id
-                          );
+                        {requisicoes.map((requisicao) => {
+                          const peca = pecas.find(p => p.cotacao_peca_id === requisicao.cotacao_peca_id);
 
                           return (
                             <div
-                              key={peca.id}
+                              key={requisicao.id}
                               className="premium-card p-4 border-l-4"
-                              style={{ borderLeftColor: '#FFA500' }}
+                              style={{ borderLeftColor: '#00D4FF' }}
                             >
                               <div className="flex items-start justify-between mb-2">
                                 <div className="flex-1">
                                   <div className="flex items-center gap-2 mb-2">
-                                    <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
-                                    {requisicao && getStatusBadge(requisicao.status)}
+                                    <p className="text-sm font-bold text-gray-300">{requisicao.descricao || 'Sem descrição'}</p>
+                                    {getStatusBadge(requisicao.status)}
                                   </div>
-                                  <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                  <p className="text-xs text-gray-500 mt-1">Código: {requisicao.codigo_peca || 'N/A'}</p>
                                   <div className="flex items-center gap-4 mt-2">
-                                    <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
-                                    <p className="text-xs text-gray-500">
-                                      Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                    </p>
-                                    <p className="text-xs font-bold text-[#FFA500]">
-                                      Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
-                                    </p>
+                                    <p className="text-xs text-gray-500">Qtd: {requisicao.quantidade_requisitada}</p>
+                                    {requisicao.valor_peca && (
+                                      <>
+                                        <p className="text-xs text-gray-500">
+                                          Unit: R$ {Number(requisicao.valor_peca).toFixed(2)}
+                                        </p>
+                                        <p className="text-xs font-bold text-[#00D4FF]">
+                                          Total: R$ {(Number(requisicao.valor_peca) * requisicao.quantidade_requisitada).toFixed(2)}
+                                        </p>
+                                      </>
+                                    )}
+                                    {peca && (
+                                      <>
+                                        <p className="text-xs text-gray-500">
+                                          Unit GSPN: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                        </p>
+                                        <p className="text-xs font-bold text-[#FFA500]">
+                                          Total GSPN: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                        </p>
+                                      </>
+                                    )}
                                   </div>
-                                  {requisicao && (
-                                    <p className="text-xs text-gray-500 mt-2">
-                                      Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
-                                    </p>
-                                  )}
-                                  {requisicao && (requisicao.status === 'em_uso' && requisicao.motivo_reprovacao) && (
+                                  <p className="text-xs text-gray-500 mt-2">
+                                    Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
+                                  </p>
+                                  {(requisicao.status === 'em_uso' && requisicao.motivo_reprovacao) && (
                                     <div className="mt-3 p-3 rounded-lg" style={{
                                       backgroundColor: '#FF006410',
                                       border: '1px solid #FF006460'
@@ -2181,15 +2191,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 </div>
 
                                 <div className="flex gap-2">
-                                  {!requisicao ? (
-                                    <button
-                                      onClick={() => handleRequisitarPeca(peca)}
-                                      className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                    >
-                                      <Send className="w-3 h-3" />
-                                      REQUISITAR
-                                    </button>
-                                  ) : requisicao.status === 'pendente' ? (
+                                  {requisicao.status === 'pendente' ? (
                                     <>
                                       <div className="flex items-center gap-2 px-4 py-2 rounded-lg border" style={{
                                         backgroundColor: '#FFBF0010',
@@ -2261,6 +2263,49 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                       </div>
                     )}
                   </div>
+
+                  {pecas.length > 0 && (
+                    <div className="mt-6">
+                      <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                        Peças da Cotação (Disponíveis para Requisitar)
+                      </h3>
+                      <div className="space-y-3">
+                        {pecas.filter(peca => !requisicoes.find(r => r.cotacao_peca_id === peca.cotacao_peca_id)).map((peca) => (
+                          <div
+                            key={peca.id}
+                            className="premium-card p-4 border-l-4"
+                            style={{ borderLeftColor: '#FFA500' }}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                <div className="flex items-center gap-4 mt-2">
+                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                                  <p className="text-xs text-gray-500">
+                                    Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                  </p>
+                                  <p className="text-xs font-bold text-[#FFA500]">
+                                    Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <button
+                                onClick={() => handleRequisitarPeca(peca)}
+                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                              >
+                                <Send className="w-3 h-3" />
+                                REQUISITAR
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
