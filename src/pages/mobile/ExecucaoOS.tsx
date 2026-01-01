@@ -140,7 +140,7 @@ export function ExecucaoOS() {
 
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_reclamado, coluna_kanban, tecnico_agendado_id')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_relatado, coluna_kanban, tecnico_agendado_id')
       .eq('id', osId)
       .maybeSingle();
 
@@ -182,7 +182,7 @@ export function ExecucaoOS() {
         cliente_nome: data.cliente_nome,
         endereco_completo: `${data.cliente_endereco}, ${data.cliente_bairro || ''}, ${data.cliente_cidade}`.trim(),
         tipo_servico: data.tipo_atendimento === 'IH' ? `IH - ${data.tipo_reparo || ''}` : data.tipo_atendimento || '',
-        descricao_problema: data.defeito_reclamado || ''
+        descricao_problema: data.defeito_relatado || ''
       }
     };
 

@@ -16,7 +16,7 @@ interface OSDetailsModalProps {
     cliente_cep: string | null;
     aparelho_marca: string | null;
     aparelho_modelo: string | null;
-    defeito_reclamado: string | null;
+    defeito_relatado: string | null;
     observacoes: string | null;
     latitude: number | null;
     longitude: number | null;
@@ -112,10 +112,10 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
             </div>
           </div>
 
-          {os.defeito_reclamado && (
+          {os.defeito_relatado && (
             <div className="bg-gray-800 rounded-xl p-4">
-              <h3 className="text-white font-bold mb-2">Defeito Reclamado</h3>
-              <p className="text-gray-300">{os.defeito_reclamado}</p>
+              <h3 className="text-white font-bold mb-2">Defeito Relatado</h3>
+              <p className="text-gray-300">{os.defeito_relatado}</p>
             </div>
           )}
 

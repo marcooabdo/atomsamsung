@@ -14,7 +14,7 @@ interface OSDetails {
   tipo_atendimento: 'IH' | 'CI';
   tipo_os: 'LP' | 'OW';
   rota: string;
-  defeito_reclamado: string | null;
+  defeito_relatado: string | null;
   observacoes_internas: string | null;
   coluna_kanban: string;
   cliente_nome: string;
@@ -317,11 +317,11 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 </div>
               </div>
 
-              {osDetails.defeito_reclamado && (
+              {osDetails.defeito_relatado && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Defeito Reclamado</h3>
+                  <h3 className="font-semibold text-gray-900 mb-2">Defeito Relatado</h3>
                   <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
-                    {osDetails.defeito_reclamado}
+                    {osDetails.defeito_relatado}
                   </p>
                 </div>
               )}

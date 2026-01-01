@@ -24,7 +24,7 @@ interface AgendamentoOS {
   confirmado_com_cliente: boolean;
   aparelho_marca: string | null;
   aparelho_modelo: string | null;
-  defeito_reclamado: string | null;
+  defeito_relatado: string | null;
   observacoes: string | null;
   latitude: number | null;
   longitude: number | null;
@@ -72,7 +72,7 @@ export function AgendaMobile() {
         confirmado_com_cliente: item.confirmado_com_cliente,
         aparelho_marca: item.aparelho_marca,
         aparelho_modelo: item.aparelho_modelo,
-        defeito_reclamado: item.defeito_relatado,
+        defeito_relatado: item.defeito_relatado,
         observacoes: item.os_observacoes,
         latitude: item.latitude,
         longitude: item.longitude
