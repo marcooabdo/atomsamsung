@@ -106,15 +106,19 @@ export function ExecucaoOS() {
     if (!usuario) return false;
 
     const { data } = await supabase
-      .from('os')
-      .select('id, coluna_kanban')
-      .eq('tecnico_agendado_id', usuario.id)
-      .in('coluna_kanban', ['em_reparo_ci', 'em_rota_ih'])
-      .neq('id', osId || '')
-      .limit(1)
-      .maybeSingle();
+      .from('agendamentos')
+      .select('os_id, os:os_id(coluna_kanban)')
+      .eq('tecnico_id', usuario.id)
+      .neq('os_id', osId || '')
+      .limit(10);
 
-    return !!data;
+    if (data) {
+      const activeOS = data.find((a: any) =>
+        a.os?.coluna_kanban === 'em_reparo_ci' || a.os?.coluna_kanban === 'em_rota_ih'
+      );
+      return !!activeOS;
+    }
+    return false;
   };
 
   const loadAgendamento = async () => {
@@ -122,6 +126,17 @@ export function ExecucaoOS() {
 
     const activeOSExists = await checkForActiveOS();
     setHasActiveOS(activeOSExists);
+
+    const { data: agendamentoData, error: agendamentoError } = await supabase
+      .from('agendamentos')
+      .select('id, tecnico_id, checkin_realizado, checkout_realizado, checkin_hora, checkout_hora, checkin_latitude, checkin_longitude')
+      .eq('os_id', osId)
+      .eq('tecnico_id', usuario.id)
+      .maybeSingle();
+
+    if (agendamentoError) {
+      console.error('Erro ao carregar agendamento:', agendamentoError);
+    }
 
     const { data, error } = await supabase
       .from('os')
@@ -141,21 +156,27 @@ export function ExecucaoOS() {
       return;
     }
 
-    if (data.tecnico_agendado_id !== usuario.id) {
+    const isAuthorized = agendamentoData?.tecnico_id === usuario.id || data.tecnico_agendado_id === usuario.id;
+
+    if (!isAuthorized) {
       console.error('Técnico não autorizado para esta OS');
       setLoading(false);
       return;
     }
 
-    const mockAgendamento = {
-      id: data.id,
+    const checkinRealizado = agendamentoData?.checkin_realizado ||
+      data.coluna_kanban === 'em_reparo_ci' ||
+      data.coluna_kanban === 'em_rota_ih';
+
+    const agendamentoObj = {
+      id: agendamentoData?.id || data.id,
       os_id: data.id,
-      checkin_realizado: data.coluna_kanban === 'em_reparo_ci' || data.coluna_kanban === 'em_rota_ih',
-      checkout_realizado: false,
-      checkin_hora: null,
-      checkout_hora: null,
-      checkin_latitude: null,
-      checkin_longitude: null,
+      checkin_realizado: checkinRealizado,
+      checkout_realizado: agendamentoData?.checkout_realizado || false,
+      checkin_hora: agendamentoData?.checkin_hora || null,
+      checkout_hora: agendamentoData?.checkout_hora || null,
+      checkin_latitude: agendamentoData?.checkin_latitude || null,
+      checkin_longitude: agendamentoData?.checkin_longitude || null,
       os: {
         numero_os: data.numero_os_samsung || data.numero_os_interna || 'S/N',
         cliente_nome: data.cliente_nome,
@@ -165,9 +186,9 @@ export function ExecucaoOS() {
       }
     };
 
-    setAgendamento(mockAgendamento as unknown as AgendamentoDetalhes);
+    setAgendamento(agendamentoObj as unknown as AgendamentoDetalhes);
 
-    if (mockAgendamento.checkin_realizado) {
+    if (checkinRealizado) {
       setCurrentStep('checklist');
     }
 
