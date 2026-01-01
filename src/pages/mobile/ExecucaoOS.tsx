@@ -31,10 +31,9 @@ interface Peca {
   quantidade: number;
   status: string;
   estoque_pecas: {
-    sku: string;
+    id_unico: string;
+    pn: string;
     descricao: string;
-    id_peca: string;
-    delivery: number;
   } | null;
 }
 
@@ -214,10 +213,9 @@ export function ExecucaoOS() {
         quantidade_requisitada,
         status,
         estoque_pecas:peca_estoque_id (
-          sku,
-          descricao,
-          id_peca,
-          delivery
+          id_unico,
+          pn,
+          descricao
         )
       `)
       .eq('os_id', osId)
@@ -846,9 +844,9 @@ export function ExecucaoOS() {
                     <div key={peca.id} className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
                       <div>
                         <p className="text-white font-medium">{peca.estoque_pecas?.descricao || peca.descricao}</p>
-                        <p className="text-gray-400 text-sm">SKU: {peca.estoque_pecas?.sku || peca.codigo_peca}</p>
+                        <p className="text-gray-400 text-sm">PN: {peca.estoque_pecas?.pn || peca.codigo_peca}</p>
                         {peca.estoque_pecas && (
-                          <p className="text-gray-400 text-sm">ID: {peca.estoque_pecas.id_peca} | Delivery: {peca.estoque_pecas.delivery} dias</p>
+                          <p className="text-gray-400 text-sm">ID Único: {peca.estoque_pecas.id_unico}</p>
                         )}
                         <p className="text-gray-400 text-sm">Quantidade: {peca.quantidade}</p>
                         <div className="mt-2">
