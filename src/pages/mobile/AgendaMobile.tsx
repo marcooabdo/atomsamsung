@@ -1,26 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Phone, Navigation, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { MapPin, Clock, Phone, Navigation, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon, Map } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
 interface AgendamentoOS {
   id: string;
-  os_id: string;
+  numero_os: string;
+  tipo_servico: string;
+  cliente_nome: string;
+  cliente_telefone: string;
+  endereco_completo: string;
+  cliente_endereco: string;
+  cliente_bairro: string;
+  cliente_cidade: string;
+  latitude: number | null;
+  longitude: number | null;
+  status_kanban: string;
   data_agendamento: string;
-  periodo: string;
-  checkin_realizado: boolean;
-  checkout_realizado: boolean;
-  os: {
-    numero_os: string;
-    tipo_servico: string;
-    cliente_nome: string;
-    cliente_telefone: string;
-    endereco_completo: string;
-    latitude: number;
-    longitude: number;
-    status_kanban: string;
-  };
+  periodo_agendamento: string;
+  confirmado_com_cliente: boolean;
 }
 
 export function AgendaMobile() {
@@ -29,37 +28,23 @@ export function AgendaMobile() {
   const [agendamentos, setAgendamentos] = useState<AgendamentoOS[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0]);
+  const [mostrarMapa, setMostrarMapa] = useState(false);
 
   const loadAgendamentos = async () => {
     if (!usuario) return;
 
     setLoading(true);
-    const { data } = await supabase
-      .from('agendamentos')
-      .select(`
-        id,
-        os_id,
-        data_agendamento,
-        periodo,
-        checkin_realizado,
-        checkout_realizado,
-        os:os_id (
-          numero_os,
-          tipo_servico,
-          cliente_nome,
-          cliente_telefone,
-          endereco_completo,
-          latitude,
-          longitude,
-          status_kanban
-        )
-      `)
-      .eq('tecnico_id', usuario.id)
+    const { data, error } = await supabase
+      .from('os')
+      .select('id, numero_os, tipo_servico, cliente_nome, cliente_telefone, endereco_completo, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, status_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+      .eq('tecnico_agendado_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
-      .order('periodo', { ascending: true });
+      .order('periodo_agendamento', { ascending: true });
 
-    if (data) {
-      setAgendamentos(data as unknown as AgendamentoOS[]);
+    if (error) {
+      console.error('Erro ao carregar agendamentos:', error);
+    } else if (data) {
+      setAgendamentos(data as AgendamentoOS[]);
     }
     setLoading(false);
   };
@@ -68,23 +53,23 @@ export function AgendaMobile() {
     loadAgendamentos();
   }, [usuario, dataFiltro]);
 
-  const getStatusBadge = (agendamento: AgendamentoOS) => {
-    if (agendamento.checkout_realizado) {
-      return { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' };
-    }
-    if (agendamento.checkin_realizado) {
-      return { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' };
-    }
-    return { label: 'Pendente', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+  const getStatusBadge = (os: AgendamentoOS) => {
+    const statusMap: Record<string, { label: string; color: string }> = {
+      'concluido': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+      'em-execucao': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'agendado': { label: 'Agendado', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' },
+      'aguardando-peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' }
+    };
+    return statusMap[os.status_kanban] || { label: 'Pendente', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
   };
 
   const getPeriodoLabel = (periodo: string) => {
     const periodos: Record<string, string> = {
-      manha: 'Manhã (08:00 - 12:00)',
-      tarde: 'Tarde (13:00 - 18:00)',
-      noite: 'Noite (18:00 - 21:00)'
+      'manha': 'Manhã (08:00 - 12:00)',
+      'tarde': 'Tarde (13:00 - 18:00)',
+      'noite': 'Noite (18:00 - 21:00)'
     };
-    return periodos[periodo] || periodo;
+    return periodos[periodo?.toLowerCase()] || periodo || 'Não especificado';
   };
 
   const openNavigation = (lat: number, lng: number, endereco: string) => {
@@ -105,13 +90,21 @@ export function AgendaMobile() {
           <h1 className="text-2xl font-bold text-white">Agenda do Dia</h1>
           <p className="text-gray-400 text-sm">{agendamentos.length} OS agendadas</p>
         </div>
-        <button
-          onClick={loadAgendamentos}
-          disabled={loading}
-          className="p-3 bg-cyan-500/20 border border-cyan-500/50 rounded-xl text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-        >
-          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setMostrarMapa(!mostrarMapa)}
+            className="p-3 bg-blue-500/20 border border-blue-500/50 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors"
+          >
+            <Map className="w-5 h-5" />
+          </button>
+          <button
+            onClick={loadAgendamentos}
+            disabled={loading}
+            className="p-3 bg-cyan-500/20 border border-cyan-500/50 rounded-xl text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+          >
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+          </button>
+        </div>
       </div>
 
       <div className="relative">
@@ -124,6 +117,18 @@ export function AgendaMobile() {
         />
       </div>
 
+      {mostrarMapa && agendamentos.length > 0 && (
+        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
+          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
+            <Map className="w-5 h-5 text-blue-400" />
+            Rota do Dia
+          </h3>
+          <div className="bg-gray-800 rounded-lg h-[400px] relative overflow-hidden">
+            <MapaRotaTecnico agendamentos={agendamentos} />
+          </div>
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
@@ -135,18 +140,20 @@ export function AgendaMobile() {
         </div>
       ) : (
         <div className="space-y-3">
-          {agendamentos.map(agendamento => {
-            const status = getStatusBadge(agendamento);
-            const os = agendamento.os;
+          {agendamentos.map((os, index) => {
+            const status = getStatusBadge(os);
 
             return (
               <div
-                key={agendamento.id}
+                key={os.id}
                 className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
+                      <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded text-blue-400 text-xs font-bold">
+                        #{index + 1}
+                      </span>
                       <span className="text-white font-bold text-lg">OS #{os.numero_os}</span>
                       <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${status.color}`}>
                         {status.label}
@@ -159,14 +166,14 @@ export function AgendaMobile() {
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                    <span className="text-gray-300 text-sm">{getPeriodoLabel(agendamento.periodo)}</span>
+                    <span className="text-gray-300 text-sm">{getPeriodoLabel(os.periodo_agendamento)}</span>
                   </div>
 
                   <div className="flex items-start gap-2">
                     <MapPin className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-medium text-sm">{os.cliente_nome}</p>
-                      <p className="text-gray-400 text-sm">{os.endereco_completo || 'Endereço não cadastrado'}</p>
+                      <p className="text-gray-400 text-sm">{os.endereco_completo || os.cliente_endereco || 'Endereço não cadastrado'}</p>
                     </div>
                   </div>
 
@@ -184,12 +191,12 @@ export function AgendaMobile() {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  {!agendamento.checkout_realizado && (
+                  {os.status_kanban !== 'concluido' && (
                     <button
-                      onClick={() => navigate(`/mobile/execucao/${agendamento.id}`)}
+                      onClick={() => navigate(`/mobile/execucao/${os.id}`)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
                     >
-                      {agendamento.checkin_realizado ? (
+                      {os.status_kanban === 'em-execucao' ? (
                         <>
                           <CheckCircle className="w-5 h-5" />
                           Continuar
@@ -205,7 +212,7 @@ export function AgendaMobile() {
 
                   {os.latitude && os.longitude && (
                     <button
-                      onClick={() => openNavigation(os.latitude, os.longitude, os.endereco_completo)}
+                      onClick={() => openNavigation(os.latitude, os.longitude, os.endereco_completo || os.cliente_endereco)}
                       className="px-4 py-3 bg-green-500/20 border border-green-500/50 text-green-400 font-medium rounded-xl hover:bg-green-500/30 transition-all"
                     >
                       <Navigation className="w-5 h-5" />
@@ -217,6 +224,74 @@ export function AgendaMobile() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function MapaRotaTecnico({ agendamentos }: { agendamentos: AgendamentoOS[] }) {
+  const validAgendamentos = agendamentos.filter(a => a.latitude && a.longitude);
+
+  if (validAgendamentos.length === 0) {
+    return (
+      <div className="h-full flex items-center justify-center text-gray-400">
+        <div className="text-center">
+          <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
+          <p>Nenhuma OS com localização cadastrada</p>
+        </div>
+      </div>
+    );
+  }
+
+  const bounds = validAgendamentos.reduce((acc, os) => {
+    const lat = os.latitude!;
+    const lng = os.longitude!;
+    return {
+      minLat: Math.min(acc.minLat, lat),
+      maxLat: Math.max(acc.maxLat, lat),
+      minLng: Math.min(acc.minLng, lng),
+      maxLng: Math.max(acc.maxLng, lng)
+    };
+  }, {
+    minLat: validAgendamentos[0].latitude!,
+    maxLat: validAgendamentos[0].latitude!,
+    minLng: validAgendamentos[0].longitude!,
+    maxLng: validAgendamentos[0].longitude!
+  });
+
+  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
+  const centerLng = (bounds.minLng + bounds.maxLng) / 2;
+
+  const googleMapsUrl = `https://www.google.com/maps/dir/${validAgendamentos.map(a => `${a.latitude},${a.longitude}`).join('/')}/`;
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-1 bg-gray-700 rounded-t-lg overflow-hidden">
+        <iframe
+          src={`https://www.google.com/maps/embed/v1/directions?key=&origin=${validAgendamentos[0].latitude},${validAgendamentos[0].longitude}&destination=${validAgendamentos[validAgendamentos.length - 1].latitude},${validAgendamentos[validAgendamentos.length - 1].longitude}${validAgendamentos.length > 2 ? '&waypoints=' + validAgendamentos.slice(1, -1).map(a => `${a.latitude},${a.longitude}`).join('|') : ''}`}
+          width="100%"
+          height="100%"
+          style={{ border: 0 }}
+          allowFullScreen
+          loading="lazy"
+          referrerPolicy="no-referrer-when-downgrade"
+          className="w-full h-full"
+        />
+      </div>
+      <div className="bg-gray-800 p-3 rounded-b-lg flex items-center justify-between">
+        <div className="text-sm">
+          <p className="text-gray-400">Total de paradas</p>
+          <p className="text-white font-bold">{validAgendamentos.length} locais</p>
+        </div>
+        <a
+          href={googleMapsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="px-4 py-2 bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2"
+        >
+          <Navigation className="w-4 h-4" />
+          Abrir no Maps
+        </a>
+      </div>
     </div>
   );
 }
