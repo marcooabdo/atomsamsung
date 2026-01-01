@@ -3,6 +3,7 @@ import { useAuth, AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import { Login } from './pages/Login';
 import { Layout } from './components/Layout';
+import { MobileLayout } from './components/MobileLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Cotacoes } from './pages/Cotacoes';
 import { Kanban } from './pages/Kanban';
@@ -13,9 +14,12 @@ import { OFS } from './pages/OFS';
 import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
 import { Skywalker } from './pages/Skywalker';
+import { AgendaMobile } from './pages/mobile/AgendaMobile';
+import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
+import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, usuario } = useAuth();
 
   if (loading) {
     return (
@@ -27,6 +31,32 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (usuario?.role === 'tecnico' && !window.location.pathname.startsWith('/mobile')) {
+    return <Navigate to="/mobile/agenda" replace />;
+  }
+
+  return <>{children}</>;
+}
+
+function MobileProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { user, loading, usuario } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
+        <div className="w-12 h-12 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (usuario?.role !== 'tecnico') {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -47,6 +77,37 @@ function AppContent() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+
+        <Route
+          path="/mobile/agenda"
+          element={
+            <MobileProtectedRoute>
+              <MobileLayout>
+                <AgendaMobile />
+              </MobileLayout>
+            </MobileProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mobile/execucao/:agendamentoId"
+          element={
+            <MobileProtectedRoute>
+              <ExecucaoOS />
+            </MobileProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mobile/desempenho"
+          element={
+            <MobileProtectedRoute>
+              <MobileLayout>
+                <DesempenhoMobile />
+              </MobileLayout>
+            </MobileProtectedRoute>
+          }
+        />
 
         <Route
           path="/"

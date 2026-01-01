@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, Cloud } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, Cloud, FileDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DevolucaoModal } from './DevolucaoModal';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
+import { gerarRelatorioOS } from '../lib/relatorioOS';
 import type { Database } from '../lib/database.types';
 
 const COLUNAS_KANBAN = [
@@ -1352,6 +1353,21 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => gerarRelatorioOS(osId)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-green-500/20"
+              style={{
+                background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
+                border: '1px solid #22c55e',
+                color: '#22c55e',
+                boxShadow: '0 0 10px rgba(34,197,94,0.2)'
+              }}
+              title="Exportar Relatório PDF"
+            >
+              <FileDown className="w-4 h-4" />
+              PDF
+            </button>
+
             <div className="relative">
               <button
                 onClick={() => setMostrarMoverPara(!mostrarMoverPara)}
