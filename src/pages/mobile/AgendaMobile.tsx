@@ -44,16 +44,40 @@ export function AgendaMobile() {
 
     setLoading(true);
     const { data, error } = await supabase
-      .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, tipo_os, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, cliente_cep, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente, aparelho_marca, aparelho_modelo, defeito_reclamado, observacoes, latitude, longitude')
-      .eq('tecnico_agendado_id', usuario.id)
+      .from('v_agendamentos_com_status_visual')
+      .select('os_id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, tipo_os, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, cliente_cep, coluna_kanban, data_agendamento, confirmado_com_cliente, aparelho_marca, aparelho_modelo, defeito_relatado, os_observacoes, latitude, longitude, horario_inicio, horario_fim')
+      .eq('tecnico_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
-      .order('periodo_agendamento', { ascending: true });
+      .order('horario_inicio', { ascending: true });
 
     if (error) {
       console.error('Erro ao carregar agendamentos:', error);
     } else if (data) {
-      setAgendamentos(data as AgendamentoOS[]);
+      const mappedData = data.map(item => ({
+        id: item.os_id,
+        numero_os_interna: item.numero_os_interna,
+        numero_os_samsung: item.numero_os_samsung,
+        tipo_atendimento: item.tipo_atendimento,
+        tipo_reparo: item.tipo_reparo,
+        tipo_os: item.tipo_os,
+        cliente_nome: item.cliente_nome,
+        cliente_telefone: item.cliente_telefone,
+        cliente_endereco: item.cliente_endereco,
+        cliente_bairro: item.cliente_bairro,
+        cliente_cidade: item.cliente_cidade,
+        cliente_cep: item.cliente_cep,
+        coluna_kanban: item.coluna_kanban,
+        data_agendamento: item.data_agendamento,
+        periodo_agendamento: item.horario_inicio < '12:00' ? 'manha' : 'tarde',
+        confirmado_com_cliente: item.confirmado_com_cliente,
+        aparelho_marca: item.aparelho_marca,
+        aparelho_modelo: item.aparelho_modelo,
+        defeito_reclamado: item.defeito_relatado,
+        observacoes: item.os_observacoes,
+        latitude: item.latitude,
+        longitude: item.longitude
+      }));
+      setAgendamentos(mappedData as AgendamentoOS[]);
     }
     setLoading(false);
   };

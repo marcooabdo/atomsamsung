@@ -211,39 +211,6 @@ export function OSAgendamentoTab({
 
   return (
     <div className="space-y-6">
-      {agendamento && (
-        <div className="premium-card p-4 bg-[#00D4FF10] border border-[#00D4FF30]">
-          <div className="flex items-center gap-2 mb-3">
-            <CheckCircle className="w-5 h-5 text-[#39FF14]" />
-            <h4 className="text-[#39FF14] font-bold">Agendamento Ativo</h4>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-sm">
-            <div>
-              <span className="text-gray-400">Data:</span>
-              <p className="text-white font-semibold">
-                {new Date(agendamento.data_agendamento).toLocaleDateString('pt-BR')}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-400">Técnico:</span>
-              <p className="text-white font-semibold">{agendamento.tecnico?.nome}</p>
-            </div>
-            <div>
-              <span className="text-gray-400">Status:</span>
-              <p className="text-white font-semibold capitalize">
-                {agendamento.status.replace('_', ' ')}
-              </p>
-            </div>
-            <div>
-              <span className="text-gray-400">Confirmado:</span>
-              <p className={`font-semibold ${agendamento.confirmado_com_cliente ? 'text-[#39FF14]' : 'text-[#FFBF00]'}`}>
-                {agendamento.confirmado_com_cliente ? 'Sim' : 'Não'}
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-[#00D4FF] mb-2">
