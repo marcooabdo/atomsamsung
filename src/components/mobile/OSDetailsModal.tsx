@@ -1,4 +1,4 @@
-import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation } from 'lucide-react';
+import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle } from 'lucide-react';
 
 interface OSDetailsModalProps {
   os: {
@@ -20,6 +20,7 @@ interface OSDetailsModalProps {
     observacoes: string | null;
     latitude: number | null;
     longitude: number | null;
+    coluna_kanban: string;
   };
   onClose: () => void;
   onStart: () => void;
@@ -28,20 +29,14 @@ interface OSDetailsModalProps {
 export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
   const enderecoCompleto = `${os.cliente_endereco}, ${os.cliente_bairro || ''}, ${os.cliente_cidade}${os.cliente_cep ? ` - CEP: ${os.cliente_cep}` : ''}`.trim();
 
+  const estaEmAndamento = os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih';
+
   const openMaps = () => {
-    if (os.latitude && os.longitude) {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${os.latitude},${os.longitude}`, '_blank');
-    } else {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoCompleto)}`, '_blank');
-    }
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoCompleto)}`, '_blank');
   };
 
   const openWaze = () => {
-    if (os.latitude && os.longitude) {
-      window.open(`https://waze.com/ul?ll=${os.latitude},${os.longitude}&navigate=yes`, '_blank');
-    } else {
-      window.open(`https://waze.com/ul?q=${encodeURIComponent(enderecoCompleto)}`, '_blank');
-    }
+    window.open(`https://waze.com/ul?q=${encodeURIComponent(enderecoCompleto)}`, '_blank');
   };
 
   const openWhatsApp = () => {
@@ -175,8 +170,17 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
             onClick={onStart}
             className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
           >
-            <PlayCircle className="w-6 h-6" />
-            Iniciar Atendimento
+            {estaEmAndamento ? (
+              <>
+                <CheckCircle className="w-6 h-6" />
+                Continuar Atendimento
+              </>
+            ) : (
+              <>
+                <PlayCircle className="w-6 h-6" />
+                Iniciar Atendimento
+              </>
+            )}
           </button>
         </div>
       </div>

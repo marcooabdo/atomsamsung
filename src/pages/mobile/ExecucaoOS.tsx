@@ -221,14 +221,37 @@ export function ExecucaoOS() {
   };
 
   const loadChecklist = async (osId: string) => {
-    const checklistItems: ChecklistItem[] = [
-      { id: '1', item: 'Verificar equipamento', concluido: false, observacao: '' },
-      { id: '2', item: 'Testar funcionalidades', concluido: false, observacao: '' },
-      { id: '3', item: 'Limpar equipamento', concluido: false, observacao: '' },
-      { id: '4', item: 'Instalar peças necessárias', concluido: false, observacao: '' },
-      { id: '5', item: 'Testar após reparo', concluido: false, observacao: '' }
-    ];
-    setChecklist(checklistItems);
+    if (!usuario) return;
+
+    const { data: osData } = await supabase
+      .from('os')
+      .select('tipo_atendimento, unidade_id')
+      .eq('id', osId)
+      .maybeSingle();
+
+    if (!osData) return;
+
+    const { data: template } = await supabase
+      .from('checklist_templates')
+      .select('itens')
+      .eq('tipo_servico', osData.tipo_atendimento)
+      .eq('ativo', true)
+      .or(`unidade_id.is.null,unidade_id.eq.${osData.unidade_id}`)
+      .order('unidade_id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (template && template.itens && Array.isArray(template.itens) && template.itens.length > 0) {
+      const checklistItems: ChecklistItem[] = template.itens.map((item: any, index: number) => ({
+        id: String(index + 1),
+        item: item.texto || item.item || '',
+        concluido: false,
+        observacao: ''
+      }));
+      setChecklist(checklistItems);
+    } else {
+      setChecklist([]);
+    }
   };
 
   const loadComentarios = async (osId: string) => {
@@ -309,27 +332,23 @@ export function ExecucaoOS() {
   const handleSaveChecklist = async () => {
     if (!agendamento) return;
 
-    const allChecked = checklist.every(item => item.concluido);
-    if (!allChecked) {
-      alert('Por favor, complete todos os itens do checklist antes de continuar.');
-      return;
+    let comentario = '';
+
+    if (checklist.length > 0) {
+      const checklistText = checklist
+        .map(item => `[${item.concluido ? 'X' : ' '}] ${item.item}${item.observacao ? ` - ${item.observacao}` : ''}`)
+        .join('\n');
+      comentario = `CHECKLIST DE SERVIÇO:\n${checklistText}\n\n`;
     }
 
-    if (!defeitoEncontrado.trim() || !diagnostico.trim() || !acaoRealizada.trim()) {
-      alert('Por favor, preencha os campos: Defeito Encontrado, Diagnóstico e Ação Realizada.');
-      return;
-    }
-
-    const checklistText = checklist
-      .map(item => `[${item.concluido ? 'X' : ' '}] ${item.item}${item.observacao ? ` - ${item.observacao}` : ''}`)
-      .join('\n');
+    comentario += `DEFEITO ENCONTRADO:\n${defeitoEncontrado || 'Não informado'}\n\nDIAGNÓSTICO:\n${diagnostico || 'Não informado'}\n\nAÇÃO REALIZADA:\n${acaoRealizada || 'Não informado'}`;
 
     await supabase
       .from('os_comentarios')
       .insert({
         os_id: agendamento.os_id,
         usuario_id: usuario?.id,
-        comentario: `CHECKLIST DE SERVIÇO:\n${checklistText}\n\nDEFEITO ENCONTRADO:\n${defeitoEncontrado}\n\nDIAGNÓSTICO:\n${diagnostico}\n\nAÇÃO REALIZADA:\n${acaoRealizada}`,
+        comentario,
         is_system: false
       });
 
@@ -341,6 +360,20 @@ export function ExecucaoOS() {
       .eq('id', agendamento.os_id);
 
     setCurrentStep('pecas');
+  };
+
+  const isChecklistValid = () => {
+    const checklistCompleto = checklist.length === 0 || checklist.every(item => item.concluido);
+    const camposObrigatorios = defeitoEncontrado.trim() && diagnostico.trim() && acaoRealizada.trim();
+    return checklistCompleto && camposObrigatorios;
+  };
+
+  const isEncerramentoValid = () => {
+    return !!assinaturaTecnico && !!assinaturaCliente;
+  };
+
+  const canCheckout = () => {
+    return agendamento?.checkin_realizado && isChecklistValid() && isEncerramentoValid();
   };
 
   const handlePecaAction = async (pecaId: string, action: 'gi' | 'devolucao_nova' | 'devolucao_defeito') => {
@@ -433,8 +466,19 @@ export function ExecucaoOS() {
   };
 
   const handleCheckout = async () => {
-    if (!agendamento || !assinaturaTecnico || !assinaturaCliente) {
-      alert('Por favor, complete as assinaturas antes de fazer check-out.');
+    if (!canCheckout()) {
+      if (!agendamento?.checkin_realizado) {
+        alert('É necessário fazer check-in primeiro.');
+        return;
+      }
+      if (!isChecklistValid()) {
+        alert('Complete todos os campos obrigatórios: Defeito Encontrado, Diagnóstico e Ação Realizada' + (checklist.length > 0 ? ', e todos os itens do checklist.' : '.'));
+        return;
+      }
+      if (!isEncerramentoValid()) {
+        alert('Complete as assinaturas do técnico e do cliente antes de fazer check-out.');
+        return;
+      }
       return;
     }
 
@@ -556,30 +600,42 @@ export function ExecucaoOS() {
           {steps.map((step, index) => {
             const Icon = step.icon;
             const isActive = step.key === currentStep;
-            const isPast = steps.findIndex(s => s.key === currentStep) > index;
-            const isCompleted = (step.key === 'checkin' && agendamento.checkin_realizado) ||
-                              (step.key === 'checkout' && agendamento.checkout_realizado);
+            const isCompleted =
+              (step.key === 'checkin' && agendamento.checkin_realizado) ||
+              (step.key === 'checklist' && isChecklistValid()) ||
+              (step.key === 'encerramento' && isEncerramentoValid()) ||
+              (step.key === 'checkout' && agendamento.checkout_realizado);
+
+            const canNavigate =
+              agendamento.checkin_realizado ||
+              step.key === 'checkin';
 
             return (
               <div key={step.key} className="flex items-center flex-shrink-0">
-                <div className={`flex flex-col items-center gap-1 px-3 ${isActive ? 'opacity-100' : 'opacity-50'}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 ${
-                    isCompleted || isPast
+                <button
+                  onClick={() => canNavigate && setCurrentStep(step.key)}
+                  disabled={!canNavigate}
+                  className={`flex flex-col items-center gap-1 px-3 ${
+                    canNavigate ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                  } ${isActive ? 'opacity-100' : 'opacity-70'}`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                    isCompleted
                       ? 'bg-green-500/20 border-green-500 text-green-400'
                       : isActive
                       ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400'
                       : 'bg-gray-800 border-gray-700 text-gray-500'
                   }`}>
-                    <Icon className="w-5 h-5" />
+                    {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
                   </div>
                   <span className={`text-xs font-medium ${
-                    isActive ? 'text-cyan-400' : 'text-gray-500'
+                    isCompleted ? 'text-green-400' : isActive ? 'text-cyan-400' : 'text-gray-500'
                   }`}>
                     {step.label}
                   </span>
-                </div>
+                </button>
                 {index < steps.length - 1 && (
-                  <div className={`w-8 h-0.5 ${isPast ? 'bg-green-500' : 'bg-gray-700'}`} />
+                  <div className={`w-8 h-0.5 ${isCompleted ? 'bg-green-500' : 'bg-gray-700'}`} />
                 )}
               </div>
             );
