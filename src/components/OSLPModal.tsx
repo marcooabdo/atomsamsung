@@ -525,11 +525,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       if (requisicoesTemporarias.length > 0) {
         const requisicoesInsert = requisicoesTemporarias.map(req => ({
           os_id: novaOS.id,
+          cotacao_id: null,
           codigo_peca: req.codigo,
           descricao: req.descricao,
           quantidade_requisitada: req.quantidade,
           status: 'pendente',
-          requisitado_por: usuario?.id
+          requisitado_por: usuario?.id,
+          unidade_id: unidadeId
         }));
 
         const { error: requisicoesError } = await supabase
@@ -636,6 +638,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     try {
       const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
         os_id: osId,
+        cotacao_id: os?.cotacao_id || null,
         cotacao_peca_id: peca.cotacao_peca_id,
         codigo_peca: peca.codigo || peca.pn,
         descricao: peca.descricao,
