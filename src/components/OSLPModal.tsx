@@ -2277,7 +2277,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
               )}
 
               {abaAtiva === 'agendamento' && os && (
-                <OSAgendamentoTab osId={os.id} onReload={loadOS} />
+                <OSAgendamentoTab
+                  osId={os.id}
+                  unidadeId={os.unidade_id}
+                  tipoAtendimento={os.tipo_atendimento || 'CI'}
+                  dataAgendamento={os.data_agendamento}
+                  tecnicoAgendadoId={os.tecnico_agendado_id}
+                  confirmadoComCliente={os.confirmado_com_cliente}
+                  periodoAgendamento={os.periodo_agendamento}
+                  tipoReparo={os.tipo_reparo}
+                  colunaKanban={os.coluna_kanban}
+                  onSave={loadOS}
+                />
               )}
 
               {abaAtiva === 'anexos' && (
