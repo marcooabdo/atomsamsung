@@ -60,13 +60,18 @@ export function OSAgendamentoTab({
     try {
       const tipoTecnico = tipoAtendimento === 'IH' ? 'tecnico_ih' : 'tecnico';
 
-      const { data, error } = await supabase
+      let query = supabase
         .from('usuarios')
         .select('id, nome')
-        .eq('unidade_id', unidadeId)
         .eq('tipo', tipoTecnico)
         .eq('ativo', true)
         .order('nome');
+
+      if (tipoAtendimento !== 'IH') {
+        query = query.eq('unidade_id', unidadeId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       setTecnicos(data || []);
