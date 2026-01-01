@@ -42,7 +42,7 @@ export function OSAgendamentoTab({
   const [tecnicos, setTecnicos] = useState<Array<{ id: string; nome: string }>>([]);
   const [formData, setFormData] = useState({
     data_agendamento: dataAgendamento || '',
-    tecnico_agendado_id: tecnicoAgendadoId || '',
+    tecnico_agendado_id: '',
     confirmado_com_cliente: confirmadoComCliente || false,
     periodo_agendamento: periodoAgendamento || '',
     tipo_reparo: tipoReparo || ''
@@ -56,19 +56,30 @@ export function OSAgendamentoTab({
     loadAgendamento();
   }, [osId, tipoAtendimento]);
 
+  useEffect(() => {
+    if (agendamento) {
+      setFormData({
+        data_agendamento: agendamento.data_agendamento || '',
+        tecnico_agendado_id: agendamento.tecnico_id || '',
+        confirmado_com_cliente: agendamento.confirmado_com_cliente || false,
+        periodo_agendamento: agendamento.periodo_agendamento || '',
+        tipo_reparo: agendamento.tipo_reparo || ''
+      });
+    }
+  }, [agendamento]);
+
   const loadTecnicos = async () => {
     try {
-      const tipoTecnico = tipoAtendimento === 'IH' ? 'tecnico_ih' : 'tecnico';
-
       let query = supabase
         .from('usuarios')
         .select('id, nome')
-        .eq('tipo', tipoTecnico)
         .eq('ativo', true)
         .order('nome');
 
-      if (tipoAtendimento !== 'IH') {
-        query = query.eq('unidade_id', unidadeId);
+      if (tipoAtendimento === 'IH') {
+        query = query.in('tipo', ['tecnico_ih', 'tecnico']);
+      } else {
+        query = query.eq('tipo', 'tecnico').eq('unidade_id', unidadeId);
       }
 
       const { data, error } = await query;
@@ -86,7 +97,7 @@ export function OSAgendamentoTab({
         .from('agendamentos')
         .select('*, tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)')
         .eq('os_id', osId)
-        .in('status', ['pendente_confirmacao', 'confirmado', 'em_andamento'])
+        .in('status', ['confirmado', 'em_andamento'])
         .maybeSingle();
 
       if (error) throw error;
