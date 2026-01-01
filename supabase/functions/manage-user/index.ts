@@ -32,41 +32,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
 
     if (!authHeader) {
-      throw new Error('Token de autentica\u00e7\u00e3o n\u00e3o fornecido');
-    }
-
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      },
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
-
-    const { data: { user: requestingUser }, error: authError } = await supabaseClient.auth.getUser();
-
-    if (authError || !requestingUser) {
-      console.error('Erro de autentica\u00e7\u00e3o:', authError);
-      throw new Error('N\u00e3o autenticado ou token inv\u00e1lido');
-    }
-
-    const { data: requestingUsuario, error: usuarioError } = await supabaseClient
-      .from('usuarios')
-      .select('tipo')
-      .eq('id', requestingUser.id)
-      .single();
-
-    if (usuarioError || !requestingUsuario) {
-      console.error('Erro ao buscar usu\u00e1rio:', usuarioError);
-      throw new Error('Usu\u00e1rio n\u00e3o encontrado');
-    }
-
-    if (!['master', 'gerente', 'diretoria'].includes(requestingUsuario.tipo)) {
-      throw new Error('Sem permiss\u00e3o para gerenciar usu\u00e1rios');
+      throw new Error('Token de autenticacao nao fornecido');
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -76,15 +42,38 @@ Deno.serve(async (req: Request) => {
       }
     });
 
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+    if (authError || !requestingUser) {
+      console.error('Erro de autenticacao:', authError);
+      throw new Error('Nao autenticado ou token invalido');
+    }
+
+    const { data: requestingUsuario, error: usuarioError } = await supabaseAdmin
+      .from('usuarios')
+      .select('tipo')
+      .eq('id', requestingUser.id)
+      .single();
+
+    if (usuarioError || !requestingUsuario) {
+      console.error('Erro ao buscar usuario:', usuarioError);
+      throw new Error('Usuario nao encontrado');
+    }
+
+    if (!['master', 'gerente', 'diretoria'].includes(requestingUsuario.tipo)) {
+      throw new Error('Sem permissao para gerenciar usuarios');
+    }
+
     const body: CreateUserRequest = await req.json();
     const { action, nome, email, senha, tipo, unidade_id, ativo = true, numero_tecnico, user_id } = body;
 
     if (action === 'create') {
       if (!nome || !email || !senha || !tipo) {
-        throw new Error('Nome, email, senha e tipo s\u00e3o obrigat\u00f3rios');
+        throw new Error('Nome, email, senha e tipo sao obrigatorios');
       }
 
-      const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
+      const { data: authData, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
         email,
         password: senha,
         email_confirm: true,
@@ -93,11 +82,11 @@ Deno.serve(async (req: Request) => {
         }
       });
 
-      if (authError) {
-        if (authError.message.includes('already registered')) {
-          throw new Error('Este email j\u00e1 est\u00e1 em uso');
+      if (createAuthError) {
+        if (createAuthError.message.includes('already registered')) {
+          throw new Error('Este email ja esta em uso');
         }
-        throw authError;
+        throw createAuthError;
       }
 
       const { error: profileError } = await supabaseAdmin
@@ -120,7 +109,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Usu\u00e1rio criado com sucesso!',
+          message: 'Usuario criado com sucesso!',
           user: {
             id: authData.user.id,
             email,
@@ -136,7 +125,7 @@ Deno.serve(async (req: Request) => {
       );
     } else if (action === 'update') {
       if (!user_id) {
-        throw new Error('ID do usu\u00e1rio \u00e9 obrigat\u00f3rio para atualiza\u00e7\u00e3o');
+        throw new Error('ID do usuario e obrigatorio para atualizacao');
       }
 
       const updateData: any = {
@@ -174,7 +163,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Usu\u00e1rio atualizado com sucesso!'
+          message: 'Usuario atualizado com sucesso!'
         }),
         {
           headers: {
@@ -185,7 +174,7 @@ Deno.serve(async (req: Request) => {
       );
     } else if (action === 'reset-password') {
       if (!user_id || !senha) {
-        throw new Error('ID do usu\u00e1rio e nova senha s\u00e3o obrigat\u00f3rios');
+        throw new Error('ID do usuario e nova senha sao obrigatorios');
       }
 
       const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -209,11 +198,11 @@ Deno.serve(async (req: Request) => {
       );
     } else if (action === 'delete') {
       if (!user_id) {
-        throw new Error('ID do usu\u00e1rio \u00e9 obrigat\u00f3rio para exclus\u00e3o');
+        throw new Error('ID do usuario e obrigatorio para exclusao');
       }
 
       if (user_id === requestingUser.id) {
-        throw new Error('Voc\u00ea n\u00e3o pode excluir seu pr\u00f3prio usu\u00e1rio');
+        throw new Error('Voce nao pode excluir seu proprio usuario');
       }
 
       const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
@@ -235,7 +224,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Usu\u00e1rio exclu\u00eddo com sucesso!'
+          message: 'Usuario excluido com sucesso!'
         }),
         {
           headers: {
@@ -245,14 +234,14 @@ Deno.serve(async (req: Request) => {
         }
       );
     } else {
-      throw new Error('A\u00e7\u00e3o inv\u00e1lida');
+      throw new Error('Acao invalida');
     }
   } catch (error) {
-    console.error('Erro ao gerenciar usu\u00e1rio:', error);
+    console.error('Erro ao gerenciar usuario:', error);
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro ao gerenciar usu\u00e1rio'
+        error: error.message || 'Erro ao gerenciar usuario'
       }),
       {
         status: 400,
