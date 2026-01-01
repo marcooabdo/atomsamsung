@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Phone, Navigation, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon, Map } from 'lucide-react';
+import { MapPin, Clock, Phone, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -15,8 +15,6 @@ interface AgendamentoOS {
   cliente_endereco: string;
   cliente_bairro: string;
   cliente_cidade: string;
-  latitude: number | null;
-  longitude: number | null;
   coluna_kanban: string;
   data_agendamento: string;
   periodo_agendamento: string;
@@ -29,7 +27,6 @@ export function AgendaMobile() {
   const [agendamentos, setAgendamentos] = useState<AgendamentoOS[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0]);
-  const [mostrarMapa, setMostrarMapa] = useState(false);
 
   const loadAgendamentos = async () => {
     if (!usuario) return;
@@ -37,7 +34,7 @@ export function AgendaMobile() {
     setLoading(true);
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
       .eq('tecnico_agendado_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
       .order('periodo_agendamento', { ascending: true });
@@ -83,17 +80,6 @@ export function AgendaMobile() {
     return periodos[periodo?.toLowerCase()] || periodo || 'Não especificado';
   };
 
-  const openNavigation = (lat: number, lng: number, endereco: string) => {
-    const wazeUrl = `https://www.waze.com/ul?ll=${lat},${lng}&navigate=yes`;
-    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
-
-    if (confirm('Abrir navegação no Waze?')) {
-      window.open(wazeUrl, '_blank');
-    } else {
-      window.open(googleMapsUrl, '_blank');
-    }
-  };
-
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -101,21 +87,13 @@ export function AgendaMobile() {
           <h1 className="text-2xl font-bold text-white">Agenda do Dia</h1>
           <p className="text-gray-400 text-sm">{agendamentos.length} OS agendadas</p>
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMostrarMapa(!mostrarMapa)}
-            className="p-3 bg-blue-500/20 border border-blue-500/50 rounded-xl text-blue-400 hover:bg-blue-500/30 transition-colors"
-          >
-            <Map className="w-5 h-5" />
-          </button>
-          <button
-            onClick={loadAgendamentos}
-            disabled={loading}
-            className="p-3 bg-cyan-500/20 border border-cyan-500/50 rounded-xl text-cyan-400 hover:bg-cyan-500/30 transition-colors"
-          >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-        </div>
+        <button
+          onClick={loadAgendamentos}
+          disabled={loading}
+          className="p-3 bg-cyan-500/20 border border-cyan-500/50 rounded-xl text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+        >
+          <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+        </button>
       </div>
 
       <div className="relative">
@@ -127,18 +105,6 @@ export function AgendaMobile() {
           className="w-full pl-11 pr-4 py-3 bg-gray-900 border border-gray-700 rounded-xl text-white focus:outline-none focus:border-cyan-500"
         />
       </div>
-
-      {mostrarMapa && agendamentos.length > 0 && (
-        <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-          <h3 className="text-white font-bold mb-3 flex items-center gap-2">
-            <Map className="w-5 h-5 text-blue-400" />
-            Rota do Dia
-          </h3>
-          <div className="bg-gray-800 rounded-lg h-[400px] relative overflow-hidden">
-            <MapaRotaTecnico agendamentos={agendamentos} />
-          </div>
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-12">
@@ -227,88 +193,12 @@ export function AgendaMobile() {
                     </button>
                   )}
 
-                  {os.latitude && os.longitude && (
-                    <button
-                      onClick={() => openNavigation(os.latitude, os.longitude, os.cliente_endereco)}
-                      className="px-4 py-3 bg-green-500/20 border border-green-500/50 text-green-400 font-medium rounded-xl hover:bg-green-500/30 transition-all"
-                    >
-                      <Navigation className="w-5 h-5" />
-                    </button>
-                  )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
-    </div>
-  );
-}
-
-function MapaRotaTecnico({ agendamentos }: { agendamentos: AgendamentoOS[] }) {
-  const validAgendamentos = agendamentos.filter(a => a.latitude && a.longitude);
-
-  if (validAgendamentos.length === 0) {
-    return (
-      <div className="h-full flex items-center justify-center text-gray-400">
-        <div className="text-center">
-          <MapPin className="w-12 h-12 mx-auto mb-2 opacity-50" />
-          <p>Nenhuma OS com localização cadastrada</p>
-        </div>
-      </div>
-    );
-  }
-
-  const bounds = validAgendamentos.reduce((acc, os) => {
-    const lat = os.latitude!;
-    const lng = os.longitude!;
-    return {
-      minLat: Math.min(acc.minLat, lat),
-      maxLat: Math.max(acc.maxLat, lat),
-      minLng: Math.min(acc.minLng, lng),
-      maxLng: Math.max(acc.maxLng, lng)
-    };
-  }, {
-    minLat: validAgendamentos[0].latitude!,
-    maxLat: validAgendamentos[0].latitude!,
-    minLng: validAgendamentos[0].longitude!,
-    maxLng: validAgendamentos[0].longitude!
-  });
-
-  const centerLat = (bounds.minLat + bounds.maxLat) / 2;
-  const centerLng = (bounds.minLng + bounds.maxLng) / 2;
-
-  const googleMapsUrl = `https://www.google.com/maps/dir/${validAgendamentos.map(a => `${a.latitude},${a.longitude}`).join('/')}/`;
-
-  return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 bg-gray-700 rounded-t-lg overflow-hidden">
-        <iframe
-          src={`https://www.google.com/maps/embed/v1/directions?key=&origin=${validAgendamentos[0].latitude},${validAgendamentos[0].longitude}&destination=${validAgendamentos[validAgendamentos.length - 1].latitude},${validAgendamentos[validAgendamentos.length - 1].longitude}${validAgendamentos.length > 2 ? '&waypoints=' + validAgendamentos.slice(1, -1).map(a => `${a.latitude},${a.longitude}`).join('|') : ''}`}
-          width="100%"
-          height="100%"
-          style={{ border: 0 }}
-          allowFullScreen
-          loading="lazy"
-          referrerPolicy="no-referrer-when-downgrade"
-          className="w-full h-full"
-        />
-      </div>
-      <div className="bg-gray-800 p-3 rounded-b-lg flex items-center justify-between">
-        <div className="text-sm">
-          <p className="text-gray-400">Total de paradas</p>
-          <p className="text-white font-bold">{validAgendamentos.length} locais</p>
-        </div>
-        <a
-          href={googleMapsUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="px-4 py-2 bg-green-500/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-500/30 transition-all flex items-center gap-2"
-        >
-          <Navigation className="w-4 h-4" />
-          Abrir no Maps
-        </a>
-      </div>
     </div>
   );
 }
