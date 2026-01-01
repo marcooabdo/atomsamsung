@@ -6,8 +6,10 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface AgendamentoOS {
   id: string;
-  numero_os: string;
-  tipo_servico: string;
+  numero_os_interna: string | null;
+  numero_os_samsung: string | null;
+  tipo_atendimento: string;
+  tipo_reparo: string | null;
   cliente_nome: string;
   cliente_telefone: string;
   endereco_completo: string;
@@ -16,7 +18,7 @@ interface AgendamentoOS {
   cliente_cidade: string;
   latitude: number | null;
   longitude: number | null;
-  status_kanban: string;
+  coluna_kanban: string;
   data_agendamento: string;
   periodo_agendamento: string;
   confirmado_com_cliente: boolean;
@@ -36,7 +38,7 @@ export function AgendaMobile() {
     setLoading(true);
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os, tipo_servico, cliente_nome, cliente_telefone, endereco_completo, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, status_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, endereco_completo, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
       .eq('tecnico_agendado_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
       .order('periodo_agendamento', { ascending: true });
@@ -55,12 +57,22 @@ export function AgendaMobile() {
 
   const getStatusBadge = (os: AgendamentoOS) => {
     const statusMap: Record<string, { label: string; color: string }> = {
-      'concluido': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-      'em-execucao': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'agendado': { label: 'Agendado', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' },
-      'aguardando-peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' }
+      'os_fechada': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+      'reparo_concluido': { label: 'Reparo Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+      'em_reparo_ci': { label: 'Em Reparo', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'em_rota_ih': { label: 'Em Rota', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'rota_preta': { label: 'Rota Preta', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' },
+      'rota_vermelha': { label: 'Rota Vermelha', color: 'bg-red-500/20 text-red-400 border-red-500/50' },
+      'rota_azul': { label: 'Rota Azul', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_verde': { label: 'Rota Verde', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+      'rota_rosa': { label: 'Rota Rosa', color: 'bg-pink-500/20 text-pink-400 border-pink-500/50' },
+      'rota_amarela': { label: 'Rota Amarela', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'rota_laranja': { label: 'Rota Laranja', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
+      'aguardando_peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
+      'peca_disponivel': { label: 'Peça Disponível', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' },
+      'os_nova': { label: 'OS Nova', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' }
     };
-    return statusMap[os.status_kanban] || { label: 'Pendente', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+    return statusMap[os.coluna_kanban] || { label: 'Agendado', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' };
   };
 
   const getPeriodoLabel = (periodo: string) => {
@@ -154,12 +166,18 @@ export function AgendaMobile() {
                       <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded text-blue-400 text-xs font-bold">
                         #{index + 1}
                       </span>
-                      <span className="text-white font-bold text-lg">OS #{os.numero_os}</span>
+                      <span className="text-white font-bold text-lg">
+                        OS #{os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+                      </span>
                       <span className={`px-2 py-1 rounded-lg text-xs font-medium border ${status.color}`}>
                         {status.label}
                       </span>
                     </div>
-                    <p className="text-gray-400 text-sm">{os.tipo_servico || 'Serviço não especificado'}</p>
+                    <p className="text-gray-400 text-sm">
+                      {os.tipo_atendimento === 'IH'
+                        ? `IH - ${os.tipo_reparo || 'Reparo não especificado'}`
+                        : os.tipo_atendimento || 'Serviço não especificado'}
+                    </p>
                   </div>
                 </div>
 
@@ -191,12 +209,12 @@ export function AgendaMobile() {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  {os.status_kanban !== 'concluido' && (
+                  {os.coluna_kanban !== 'os_fechada' && os.coluna_kanban !== 'reparo_concluido' && (
                     <button
                       onClick={() => navigate(`/mobile/execucao/${os.id}`)}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
                     >
-                      {os.status_kanban === 'em-execucao' ? (
+                      {os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih' ? (
                         <>
                           <CheckCircle className="w-5 h-5" />
                           Continuar
