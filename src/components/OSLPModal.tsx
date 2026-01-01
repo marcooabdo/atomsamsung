@@ -2076,10 +2076,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                               }
 
                               try {
+                                if (!os?.cotacao_id) {
+                                  alert('Esta OS não possui cotação vinculada. Não é possível criar requisições manuais.');
+                                  return;
+                                }
+
                                 const valorNumerico = novaPecaValor ? parseFloat(novaPecaValor) : null;
 
                                 const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
                                   os_id: osId,
+                                  cotacao_id: os.cotacao_id,
                                   codigo_peca: novaPecaCodigo,
                                   descricao: novaPecaDescricao,
                                   quantidade_requisitada: novaPecaQuantidade,
