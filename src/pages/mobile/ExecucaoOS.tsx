@@ -31,6 +31,8 @@ interface Peca {
   estoque_pecas: {
     sku: string;
     descricao: string;
+    id_peca: string;
+    delivery: number;
   };
 }
 
@@ -209,11 +211,13 @@ export function ExecucaoOS() {
         status,
         estoque_pecas:peca_id (
           sku,
-          descricao
+          descricao,
+          id_peca,
+          delivery
         )
       `)
       .eq('os_id', osId)
-      .eq('status', 'atendida');
+      .in('status', ['atendida', 'em_uso', 'gi_postada', 'devolvida']);
 
     if (data) {
       setPecas(data as unknown as Peca[]);
@@ -834,83 +838,112 @@ export function ExecucaoOS() {
                     <div key={peca.id} className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3">
                       <div>
                         <p className="text-white font-medium">{peca.estoque_pecas.descricao}</p>
-                        <p className="text-gray-400 text-sm">SKU: {peca.estoque_pecas.sku} | Qtd: {peca.quantidade}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <p className="text-gray-400 text-sm font-medium">Selecione a ação:</p>
-                        <div className="grid grid-cols-1 gap-2">
-                          <button
-                            onClick={() => handlePecaAction(peca.id, 'gi')}
-                            className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                              selectedPecaActions[peca.id] === 'gi'
-                                ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
-                                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-green-500/50'
-                            }`}
-                          >
-                            ✓ Confirmar Uso (Postar GI)
-                          </button>
-                          <button
-                            onClick={() => handlePecaAction(peca.id, 'devolucao_nova')}
-                            className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                              selectedPecaActions[peca.id] === 'devolucao_nova'
-                                ? 'bg-blue-500/20 border-2 border-blue-500 text-blue-400'
-                                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-blue-500/50'
-                            }`}
-                          >
-                            ↩ Devolução - Peça Nova
-                          </button>
-                          <button
-                            onClick={() => handlePecaAction(peca.id, 'devolucao_defeito')}
-                            className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
-                              selectedPecaActions[peca.id] === 'devolucao_defeito'
-                                ? 'bg-red-500/20 border-2 border-red-500 text-red-400'
-                                : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-red-500/50'
-                            }`}
-                          >
-                            ⚠ Devolução - Defeito (RMA)
-                          </button>
+                        <p className="text-gray-400 text-sm">SKU: {peca.estoque_pecas.sku}</p>
+                        <p className="text-gray-400 text-sm">ID: {peca.estoque_pecas.id_peca} | Delivery: {peca.estoque_pecas.delivery} dias</p>
+                        <p className="text-gray-400 text-sm">Quantidade: {peca.quantidade}</p>
+                        <div className="mt-2">
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                            peca.status === 'atendida' ? 'bg-green-500/20 text-green-400' :
+                            peca.status === 'gi_postada' ? 'bg-blue-500/20 text-blue-400' :
+                            peca.status === 'devolvida' ? 'bg-orange-500/20 text-orange-400' :
+                            'bg-gray-500/20 text-gray-400'
+                          }`}>
+                            {peca.status === 'atendida' ? 'Atendida' :
+                             peca.status === 'gi_postada' ? 'GI Postado' :
+                             peca.status === 'devolvida' ? 'Devolvida' :
+                             peca.status === 'em_uso' ? 'Em Uso' : peca.status}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-2 pt-2">
-                        <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
-                          <Camera className="w-5 h-5 text-cyan-400" />
-                          <span className="text-xs text-gray-400">Foto Peça Nova</span>
-                          {pecaPhotos[peca.id]?.nova && <CheckCircle className="w-4 h-4 text-green-400" />}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'nova', e.target.files[0])}
-                            className="hidden"
-                          />
-                        </label>
+                      {peca.status === 'atendida' && (
+                        <div className="space-y-2">
+                          <p className="text-gray-400 text-sm font-medium">Selecione a ação:</p>
+                          <div className="grid grid-cols-1 gap-2">
+                            <button
+                              onClick={() => handlePecaAction(peca.id, 'gi')}
+                              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                                selectedPecaActions[peca.id] === 'gi'
+                                  ? 'bg-green-500/20 border-2 border-green-500 text-green-400'
+                                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-green-500/50'
+                              }`}
+                            >
+                              ✓ Confirmar Uso (Postar GI)
+                            </button>
+                            <button
+                              onClick={() => handlePecaAction(peca.id, 'devolucao_nova')}
+                              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                                selectedPecaActions[peca.id] === 'devolucao_nova'
+                                  ? 'bg-blue-500/20 border-2 border-blue-500 text-blue-400'
+                                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-blue-500/50'
+                              }`}
+                            >
+                              ↩ Devolução - Peça Nova
+                            </button>
+                            <button
+                              onClick={() => handlePecaAction(peca.id, 'devolucao_defeito')}
+                              className={`px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+                                selectedPecaActions[peca.id] === 'devolucao_defeito'
+                                  ? 'bg-red-500/20 border-2 border-red-500 text-red-400'
+                                  : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-red-500/50'
+                              }`}
+                            >
+                              ⚠ Devolução - Defeito (RMA)
+                            </button>
+                          </div>
+                        </div>
+                      )}
 
-                        <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
-                          <Camera className="w-5 h-5 text-cyan-400" />
-                          <span className="text-xs text-gray-400">Foto Peça Velha</span>
-                          {pecaPhotos[peca.id]?.velha && <CheckCircle className="w-4 h-4 text-green-400" />}
-                          <input
-                            type="file"
-                            accept="image/*"
-                            capture="environment"
-                            onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'velha', e.target.files[0])}
-                            className="hidden"
-                          />
-                        </label>
-                      </div>
+                      {peca.status !== 'atendida' && (
+                        <div className="p-3 bg-gray-800/50 rounded-lg">
+                          <p className="text-gray-400 text-sm">
+                            {peca.status === 'gi_postada' && '✓ GI já postado - Peça consumida'}
+                            {peca.status === 'devolvida' && '↩ Peça já devolvida ao estoque'}
+                            {peca.status === 'em_uso' && '⚙ Peça em uso'}
+                          </p>
+                        </div>
+                      )}
+
+                      {peca.status === 'atendida' && (
+                        <div className="grid grid-cols-2 gap-2 pt-2">
+                          <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
+                            <Camera className="w-5 h-5 text-cyan-400" />
+                            <span className="text-xs text-gray-400">Foto Peça Nova</span>
+                            {pecaPhotos[peca.id]?.nova && <CheckCircle className="w-4 h-4 text-green-400" />}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'nova', e.target.files[0])}
+                              className="hidden"
+                            />
+                          </label>
+
+                          <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
+                            <Camera className="w-5 h-5 text-cyan-400" />
+                            <span className="text-xs text-gray-400">Foto Peça Velha</span>
+                            {pecaPhotos[peca.id]?.velha && <CheckCircle className="w-4 h-4 text-green-400" />}
+                            <input
+                              type="file"
+                              accept="image/*"
+                              capture="environment"
+                              onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'velha', e.target.files[0])}
+                              className="hidden"
+                            />
+                          </label>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
 
                 <button
                   onClick={handleSavePecas}
-                  disabled={pecas.length > 0 && Object.keys(selectedPecaActions).length !== pecas.length}
+                  disabled={pecas.filter(p => p.status === 'atendida').length > 0 && Object.keys(selectedPecaActions).length !== pecas.filter(p => p.status === 'atendida').length}
                   className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <Send className="w-5 h-5" />
-                  {pecas.length === 0 ? 'Continuar' : 'Salvar Ações e Continuar'}
+                  {pecas.length === 0 ? 'Continuar' : pecas.filter(p => p.status === 'atendida').length > 0 ? 'Salvar Ações e Continuar' : 'Continuar'}
                 </button>
               </div>
             )}
