@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Rocket, Trophy, Star, ShoppingCart, Settings } from 'lucide-react';
+import { Rocket, Trophy, Star, ShoppingCart, Settings, TrendingUp } from 'lucide-react';
 import { SkywalkerProvider } from '../contexts/SkywalkerContext';
-import { RankingGlobal } from '../components/skywalker/RankingGlobal';
+import { DashboardUnificado } from '../components/skywalker/DashboardUnificado';
 import { PipelineGoogleCultura } from '../components/skywalker/PipelineGoogleCultura';
 import { InputVendas } from '../components/skywalker/InputVendas';
-import { RegrasJogo } from '../components/skywalker/RegrasJogo';
+import { ConfiguradorRegras } from '../components/skywalker/ConfiguradorRegras';
+import { MetricasAutomaticas } from '../components/skywalker/MetricasAutomaticas';
 
-type TabKey = 'ranking' | 'pipeline' | 'vendas' | 'regras';
+type TabKey = 'dashboard' | 'metricas' | 'pipeline' | 'vendas' | 'config';
 
 interface Tab {
   key: TabKey;
@@ -17,14 +18,20 @@ interface Tab {
 
 const tabs: Tab[] = [
   {
-    key: 'ranking',
-    label: 'Ranking Global',
+    key: 'dashboard',
+    label: 'Dashboard',
     icon: <Trophy className="w-5 h-5" />,
-    component: <RankingGlobal />
+    component: <DashboardUnificado />
+  },
+  {
+    key: 'metricas',
+    label: 'Metricas Automaticas',
+    icon: <TrendingUp className="w-5 h-5" />,
+    component: <MetricasAutomaticas />
   },
   {
     key: 'pipeline',
-    label: 'Pipeline Google & Cultura',
+    label: 'Reviews & Cultura',
     icon: <Star className="w-5 h-5" />,
     component: <PipelineGoogleCultura />
   },
@@ -35,15 +42,15 @@ const tabs: Tab[] = [
     component: <InputVendas />
   },
   {
-    key: 'regras',
-    label: 'Regras do Jogo',
+    key: 'config',
+    label: 'Configuracoes',
     icon: <Settings className="w-5 h-5" />,
-    component: <RegrasJogo />
+    component: <ConfiguradorRegras />
   }
 ];
 
 function SkywalkerContent() {
-  const [activeTab, setActiveTab] = useState<TabKey>('ranking');
+  const [activeTab, setActiveTab] = useState<TabKey>('dashboard');
 
   const currentTab = tabs.find(t => t.key === activeTab);
 
@@ -61,7 +68,7 @@ function SkywalkerContent() {
             <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-cyan-300">
               SKYWALKER
             </h1>
-            <p className="text-gray-400 text-sm">Sistema de Gamificacao de Carreira</p>
+            <p className="text-gray-400 text-sm">Sistema de Gamificacao de Performance</p>
           </div>
         </div>
 

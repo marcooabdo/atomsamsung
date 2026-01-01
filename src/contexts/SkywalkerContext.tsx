@@ -199,6 +199,9 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
       vendas: estrelasVendas,
       reviews: estrelasReviews,
       cultura: estrelasCultura,
+      os_finalizadas: 0,
+      agendamentos: 0,
+      pecas: 0,
       total: estrelasVendas + estrelasReviews + estrelasCultura
     };
   }, [vendas, reviews, culturas, getRegra]);
