@@ -16,8 +16,7 @@ import {
   ClipboardList,
   Zap,
   Sun,
-  Moon,
-  Rocket
+  Moon
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -33,7 +32,6 @@ const menuItems = [
   { id: 'chat', label: 'QG de Comunicação', icon: MessageSquare, path: '/chat' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
   { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
-  { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
   { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes' },
 ];
 
