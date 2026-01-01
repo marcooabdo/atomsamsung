@@ -42,13 +42,14 @@ export function OSAgendamentoTab({
   const [tecnicos, setTecnicos] = useState<Array<{ id: string; nome: string }>>([]);
   const [formData, setFormData] = useState({
     data_agendamento: dataAgendamento || '',
-    tecnico_agendado_id: '',
+    tecnico_agendado_id: tecnicoAgendadoId || '',
     confirmado_com_cliente: confirmadoComCliente || false,
     periodo_agendamento: periodoAgendamento || '',
     tipo_reparo: tipoReparo || ''
   });
   const [salvando, setSalvando] = useState(false);
   const [erro, setErro] = useState('');
+  const [sucesso, setSucesso] = useState('');
   const [agendamento, setAgendamento] = useState<any>(null);
 
   useEffect(() => {
@@ -57,16 +58,14 @@ export function OSAgendamentoTab({
   }, [osId, tipoAtendimento]);
 
   useEffect(() => {
-    if (agendamento) {
-      setFormData({
-        data_agendamento: agendamento.data_agendamento || '',
-        tecnico_agendado_id: agendamento.tecnico_id || '',
-        confirmado_com_cliente: agendamento.confirmado_com_cliente || false,
-        periodo_agendamento: agendamento.periodo_agendamento || '',
-        tipo_reparo: agendamento.tipo_reparo || ''
-      });
-    }
-  }, [agendamento]);
+    setFormData({
+      data_agendamento: dataAgendamento || '',
+      tecnico_agendado_id: tecnicoAgendadoId || '',
+      confirmado_com_cliente: confirmadoComCliente || false,
+      periodo_agendamento: periodoAgendamento || '',
+      tipo_reparo: tipoReparo || ''
+    });
+  }, [dataAgendamento, tecnicoAgendadoId, confirmadoComCliente, periodoAgendamento, tipoReparo]);
 
   const loadTecnicos = async () => {
     try {
@@ -109,21 +108,25 @@ export function OSAgendamentoTab({
 
   const handleSave = async () => {
     setErro('');
+    setSucesso('');
     setSalvando(true);
 
     try {
       if (!formData.data_agendamento) {
         setErro('Data do agendamento é obrigatória');
+        setSalvando(false);
         return;
       }
 
       if (!formData.tecnico_agendado_id) {
         setErro('Tecnico designado e obrigatorio');
+        setSalvando(false);
         return;
       }
 
       if (tipoAtendimento === 'IH' && !formData.tipo_reparo) {
         setErro('Tipo de Reparo e obrigatorio para atendimentos IH');
+        setSalvando(false);
         return;
       }
 
@@ -140,6 +143,12 @@ export function OSAgendamentoTab({
         .eq('id', osId);
 
       if (error) throw error;
+
+      setSucesso('Agendamento salvo com sucesso!');
+
+      setTimeout(() => {
+        setSucesso('');
+      }, 3000);
 
       onSave();
     } catch (error: any) {
@@ -291,6 +300,15 @@ export function OSAgendamentoTab({
         {erro && (
           <div className="premium-card p-3 bg-[#FF006410] border border-[#FF006430]">
             <p className="text-[#FF0064] text-sm">{erro}</p>
+          </div>
+        )}
+
+        {sucesso && (
+          <div className="premium-card p-3 bg-[#39FF1410] border border-[#39FF1430]">
+            <p className="text-[#39FF14] text-sm flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              {sucesso}
+            </p>
           </div>
         )}
 
