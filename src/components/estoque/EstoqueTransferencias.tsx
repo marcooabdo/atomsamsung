@@ -81,15 +81,13 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         })
       );
 
-      // Separar pedidos ativos (sempre visíveis) de requisições normais (filtradas por coluna)
-      const colunasValidas = ['orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
+      // Separar pedidos ativos de requisições normais
       const agrupado: Record<string, RequisicaoAgrupada> = {};
       const pedidosAtivosAgrupado: Record<string, RequisicaoAgrupada> = {};
 
       requisicoesComContagem.forEach((req: any) => {
         const isPedidoAtivo = req.status === 'pedido_feito';
         const temIDDisponivel = req.ids_disponiveis_count > 0;
-        const colunaValida = req.os?.coluna_kanban && colunasValidas.includes(req.os.coluna_kanban);
 
         // Pedidos ativos SEMPRE aparecem na seção de pedidos
         if (isPedidoAtivo) {
@@ -110,7 +108,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           pedidosAtivosAgrupado[req.os_id].totalPecas += 1;
 
           // Se tem ID disponível, TAMBÉM aparece na lista de transferências (mantendo info do pedido)
-          if (temIDDisponivel && colunaValida) {
+          if (temIDDisponivel) {
             if (!agrupado[req.os_id]) {
               agrupado[req.os_id] = {
                 os_id: req.os_id,
@@ -131,11 +129,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           return;
         }
 
-        // Requisições normais seguem filtro de coluna
-        if (!colunaValida) {
-          return;
-        }
-
+        // Todas as requisições não-pedido aparecem
         if (!agrupado[req.os_id]) {
           agrupado[req.os_id] = {
             os_id: req.os_id,
@@ -884,20 +878,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           </div>
           <div className="space-y-3">
             {pedidosAtivos.map((grupo) => {
-              const colunasValidas = ['orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
-              const osForaFluxo = !colunasValidas.includes(grupo.requisicoes[0]?.os?.coluna_kanban);
-              const colunaNome = grupo.requisicoes[0]?.os?.coluna_kanban || 'desconhecida';
-
               return (
                 <div key={grupo.os_id} className="premium-card border-[#FF0064]/30">
-                  {osForaFluxo && (
-                    <div className="bg-yellow-500/20 border-b border-yellow-500/30 p-3 flex items-center gap-2">
-                      <AlertCircle className="w-4 h-4 text-yellow-400" />
-                      <p className="text-xs text-yellow-300 font-semibold">
-                        ⚠️ ATENÇÃO: OS está em coluna "{colunaNome.replace(/_/g, ' ').toUpperCase()}" - Pedido continua ativo
-                      </p>
-                    </div>
-                  )}
                   <div
                     className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
                     onClick={() => setOsExpandidaPedido(osExpandidaPedido === grupo.os_id ? null : grupo.os_id)}
