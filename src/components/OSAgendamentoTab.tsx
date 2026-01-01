@@ -66,7 +66,35 @@ export function OSAgendamentoTab({
       periodo_agendamento: periodoAgendamento || '',
       tipo_reparo: tipoReparo || ''
     });
+
+    if (dataAgendamento && tecnicoAgendadoId) {
+      carregarResumoExistente();
+    }
   }, [dataAgendamento, tecnicoAgendadoId, confirmadoComCliente, periodoAgendamento, tipoReparo]);
+
+  const carregarResumoExistente = async () => {
+    if (!dataAgendamento || !tecnicoAgendadoId) return;
+
+    try {
+      const { data: tecnicoData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', tecnicoAgendadoId)
+        .single();
+
+      if (tecnicoData) {
+        setDadosSalvos({
+          data: dataAgendamento,
+          tecnico: tecnicoData.nome,
+          periodo: periodoAgendamento || 'Não especificado',
+          confirmado: confirmadoComCliente || false,
+          tipo_reparo: tipoAtendimento === 'IH' ? (tipoReparo || 'N/A') : null
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao carregar resumo:', error);
+    }
+  };
 
   const loadTecnicos = async () => {
     try {
