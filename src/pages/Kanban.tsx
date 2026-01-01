@@ -229,7 +229,14 @@ export function Kanban() {
             valor_peca,
             numero_pedido_samsung,
             created_at,
-            peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(delivery)
+            peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(
+              delivery,
+              pn,
+              estoque_etiquetas(
+                id_sequencial,
+                delivery
+              )
+            )
           ),
           unidade:unidades!os_unidade_id_fkey(nome),
           tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome)
@@ -1147,10 +1154,19 @@ export function Kanban() {
                                     >
                                       PEDIDO ATIVO
                                     </span>
-                                    <p className="text-[10px] text-gray-300 font-medium truncate">{req.descricao}</p>
-                                    {req.codigo_peca && (
-                                      <p className="text-[9px] text-gray-500 font-mono truncate">{req.codigo_peca}</p>
-                                    )}
+                                    <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
+                                    <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
+                                        <>
+                                          <span className="text-[8px] text-cyan-400">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
+                                          <span className="text-gray-600">•</span>
+                                        </>
+                                      )}
+                                      {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
+                                        <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
                               </div>

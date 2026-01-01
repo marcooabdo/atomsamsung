@@ -53,9 +53,13 @@ interface OSDetails {
   }>;
   pecas?: Array<{
     codigo_peca: string;
-    nome_peca: string;
+    descricao: string;
+    pn: string;
     quantidade: number;
     valor_unitario: number;
+    status: string;
+    id_sequencial?: string;
+    delivery?: string;
   }>;
   anexos?: Array<{
     id: string;
@@ -116,25 +120,34 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         .from('requisicoes_pecas')
         .select(`
           codigo_peca,
-          nome_peca,
-          quantidade_solicitada,
-          estoque_pecas (
-            valor_gspn
+          descricao,
+          quantidade_requisitada,
+          status,
+          estoque_pecas:peca_estoque_id (
+            valor_gspn,
+            pn,
+            estoque_etiquetas (
+              id_sequencial,
+              delivery
+            )
           )
         `)
-        .eq('os_id', osId)
-        .eq('status', 'aprovada');
+        .eq('os_id', osId);
 
       const { data: anexos } = await supabase
         .from('os_anexos')
         .select('id, descricao, arquivo_url')
         .eq('os_id', osId);
 
-      const pecasFormatted = pecas?.map(p => ({
+      const pecasFormatted = pecas?.map((p: any) => ({
         codigo_peca: p.codigo_peca,
-        nome_peca: p.nome_peca,
-        quantidade: p.quantidade_solicitada,
-        valor_unitario: p.estoque_pecas?.valor_gspn || 0
+        descricao: p.descricao,
+        pn: p.estoque_pecas?.pn || p.codigo_peca,
+        quantidade: p.quantidade_requisitada || 1,
+        valor_unitario: p.estoque_pecas?.valor_gspn || 0,
+        status: p.status,
+        id_sequencial: p.estoque_pecas?.estoque_etiquetas?.[0]?.id_sequencial,
+        delivery: p.estoque_pecas?.estoque_etiquetas?.[0]?.delivery
       })) || [];
 
       const osFormatted: OSDetails = {
@@ -463,19 +476,48 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 {osDetails.pecas.map((peca, index) => (
                   <div
                     key={index}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                    className="p-3 bg-gray-50 rounded-lg space-y-2"
                   >
-                    <div>
-                      <p className="font-medium text-gray-900">{peca.nome_peca}</p>
-                      <p className="text-sm text-gray-600">Código: {peca.codigo_peca}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-medium text-gray-900">
-                        {peca.quantidade}x R$ {peca.valor_unitario.toFixed(2)}
-                      </p>
-                      <p className="text-sm text-gray-600">
-                        Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
-                      </p>
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <p className="font-bold text-gray-900 text-lg">{peca.pn}</p>
+                        <p className="text-sm text-gray-700 mt-1">{peca.descricao}</p>
+                        <div className="flex items-center gap-3 mt-2">
+                          {peca.id_sequencial && (
+                            <>
+                              <span className="text-xs text-cyan-600 font-medium">ID: {peca.id_sequencial}</span>
+                              <span className="text-gray-400">•</span>
+                            </>
+                          )}
+                          {peca.delivery && (
+                            <>
+                              <span className="text-xs text-orange-600 font-medium">Delivery: {peca.delivery}</span>
+                              <span className="text-gray-400">•</span>
+                            </>
+                          )}
+                          <span className="text-xs text-gray-600">Código: {peca.codigo_peca}</span>
+                          <span className="text-gray-400">•</span>
+                          <span className="text-xs text-gray-600">Qtd: {peca.quantidade}</span>
+                        </div>
+                        <div className="mt-2">
+                          <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
+                            peca.status === 'atendida' ? 'bg-green-100 text-green-700' :
+                            peca.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                            peca.status === 'gi_postada' ? 'bg-blue-100 text-blue-700' :
+                            'bg-gray-100 text-gray-700'
+                          }`}>
+                            {peca.status}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium text-gray-900">
+                          R$ {peca.valor_unitario.toFixed(2)}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
+                        </p>
+                      </div>
                     </div>
                   </div>
                 ))}
