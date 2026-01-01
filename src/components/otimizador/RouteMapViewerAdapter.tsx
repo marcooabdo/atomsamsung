@@ -5,8 +5,8 @@ import type { OS } from '../../lib/routeKanbanSync';
 interface LegacyRouteMapViewerProps {
   rota: any;
   unidadeConfig: {
-    lat_base: number | null;
-    lng_base: number | null;
+    latitude: number | null;
+    longitude: number | null;
     endereco_base: string | null;
   };
 }
@@ -17,8 +17,8 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
   console.log('UnidadeConfig:', unidadeConfig);
   console.log('OS incluidas:', rota?.os_incluidas);
 
-  if (!unidadeConfig?.lat_base || !unidadeConfig?.lng_base) {
-    console.warn('Base não configurada - lat_base ou lng_base ausentes');
+  if (!unidadeConfig?.latitude || !unidadeConfig?.longitude) {
+    console.warn('Base não configurada - latitude ou longitude ausentes');
     return (
       <div className="w-full h-[600px] flex items-center justify-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
         <div className="text-center p-8">
@@ -46,8 +46,8 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
   }
 
   const baseCoordinates: Coordinates = {
-    lat: unidadeConfig.lat_base,
-    lng: unidadeConfig.lng_base
+    lat: unidadeConfig.latitude,
+    lng: unidadeConfig.longitude
   };
 
   console.log('Base coordinates:', baseCoordinates);

@@ -66,19 +66,19 @@ export function IntegratedRouteOptimizer({
       const { data: unidade, error } = await import('../../lib/supabase').then(m =>
         m.supabase
           .from('unidades')
-          .select('lat_base, lng_base, endereco_completo, endereco')
+          .select('latitude, longitude, endereco')
           .eq('id', unidadeId)
           .single()
       );
 
       if (error) throw error;
 
-      if (unidade.lat_base && unidade.lng_base) {
+      if (unidade.latitude && unidade.longitude) {
         setBaseCoordinates({
-          lat: Number(unidade.lat_base),
-          lng: Number(unidade.lng_base)
+          lat: Number(unidade.latitude),
+          lng: Number(unidade.longitude)
         });
-        setBaseAddress(unidade.endereco_completo || unidade.endereco || '');
+        setBaseAddress(unidade.endereco || '');
       } else {
         setError('Coordenadas da base não configuradas. Configure no menu Configurações.');
       }

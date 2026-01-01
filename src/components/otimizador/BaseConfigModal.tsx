@@ -33,16 +33,16 @@ export function BaseConfigModal({
     try {
       const { data, error } = await supabase
         .from('unidades')
-        .select('endereco_completo, endereco, lat_base, lng_base')
+        .select('endereco, latitude, longitude')
         .eq('id', unidadeId)
         .single();
 
       if (error) throw error;
 
       if (data) {
-        setAddress(data.endereco_completo || data.endereco || '');
-        setLat(data.lat_base ? String(data.lat_base) : '');
-        setLng(data.lng_base ? String(data.lng_base) : '');
+        setAddress(data.endereco || '');
+        setLat(data.latitude ? String(data.latitude) : '');
+        setLng(data.longitude ? String(data.longitude) : '');
       }
     } catch (err) {
       console.error('Erro ao carregar configuração:', err);
@@ -102,9 +102,9 @@ export function BaseConfigModal({
       const { error } = await supabase
         .from('unidades')
         .update({
-          lat_base: latNum,
-          lng_base: lngNum,
-          endereco_completo: address.trim() || null
+          latitude: latNum,
+          longitude: lngNum,
+          endereco: address.trim() || null
         })
         .eq('id', unidadeId);
 

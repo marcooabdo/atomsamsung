@@ -57,8 +57,8 @@ interface Tecnico {
 }
 
 interface UnidadeConfig {
-  lat_base: number | null;
-  lng_base: number | null;
+  latitude: number | null;
+  longitude: number | null;
   endereco_base: string | null;
   tempo_medio_ih: number;
   horario_inicio: string;
@@ -159,7 +159,7 @@ export default function MotorOtimizacao() {
   const loadUnidadeConfig = async () => {
     const { data: unidade } = await supabase
       .from('unidades')
-      .select('lat_base, lng_base, endereco_base, endereco, cidade, estado')
+      .select('latitude, longitude, endereco, cidade, estado')
       .eq('id', selectedUnidade)
       .single();
 
@@ -170,11 +170,11 @@ export default function MotorOtimizacao() {
       .single();
 
     if (unidade && config) {
-      let latBase = unidade.lat_base;
-      let lngBase = unidade.lng_base;
-      let enderecoBase = unidade.endereco_base || unidade.endereco;
+      let latitude = unidade.latitude;
+      let longitude = unidade.longitude;
+      let enderecoBase = unidade.endereco;
 
-      if ((!latBase || !lngBase) && enderecoBase) {
+      if ((!latitude || !longitude) && enderecoBase) {
         setGeocodificando(true);
         try {
           const fullAddress = `${enderecoBase}, ${unidade.cidade}, ${unidade.estado}, Brasil`;
@@ -183,18 +183,18 @@ export default function MotorOtimizacao() {
           const geocoded = await geocodeAddress(fullAddress);
 
           if (geocoded) {
-            latBase = geocoded.lat;
-            lngBase = geocoded.lng;
+            latitude = geocoded.lat;
+            longitude = geocoded.lng;
 
             await supabase
               .from('unidades')
               .update({
-                lat_base: latBase,
-                lng_base: lngBase,
+                latitude: latitude,
+                longitude: longitude,
               })
               .eq('id', selectedUnidade);
 
-            console.log('Coordenadas da unidade salvas com sucesso:', { lat: latBase, lng: lngBase });
+            console.log('Coordenadas da unidade salvas com sucesso:', { latitude, longitude });
           }
         } catch (error) {
           console.error('Erro ao geocodificar endereço da unidade:', error);
@@ -204,8 +204,8 @@ export default function MotorOtimizacao() {
       }
 
       setUnidadeConfig({
-        lat_base: latBase,
-        lng_base: lngBase,
+        latitude: latitude,
+        longitude: longitude,
         endereco_base: enderecoBase,
         tempo_medio_ih: config.tempo_medio_ih,
         horario_inicio: config.horario_inicio,
@@ -226,8 +226,8 @@ export default function MotorOtimizacao() {
       return false;
     }
 
-    if (!unidadeConfig?.lat_base || !unidadeConfig?.lng_base) {
-      alert('Unidade não possui coordenadas base cadastradas. Configure em Configurações > Unidade');
+    if (!unidadeConfig?.latitude || !unidadeConfig?.longitude) {
+      alert('Unidade não possui coordenadas cadastradas. Configure em Configurações > Unidade');
       return false;
     }
 
@@ -710,7 +710,7 @@ export default function MotorOtimizacao() {
         </div>
       )}
 
-      {!geocodificando && (!unidadeConfig?.lat_base || !unidadeConfig?.lng_base) && (
+      {!geocodificando && (!unidadeConfig?.latitude || !unidadeConfig?.longitude) && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-6">
           <div className="flex items-center gap-3">
             <AlertCircle className="w-6 h-6 text-yellow-400" />
@@ -725,7 +725,7 @@ export default function MotorOtimizacao() {
         </div>
       )}
 
-      {!geocodificando && unidadeConfig?.lat_base && unidadeConfig?.lng_base && (
+      {!geocodificando && unidadeConfig?.latitude && unidadeConfig?.longitude && (
         <>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
@@ -802,7 +802,7 @@ export default function MotorOtimizacao() {
                     <p className="text-gray-400 text-xs mb-1">Base da Unidade</p>
                     <p className="text-white text-sm">{unidadeConfig.endereco_base || 'Endereço não cadastrado'}</p>
                     <p className="text-gray-400 text-xs mt-1">
-                      Lat: {unidadeConfig.lat_base?.toFixed(6)} / Lng: {unidadeConfig.lng_base?.toFixed(6)}
+                      Lat: {unidadeConfig.latitude?.toFixed(6)} / Lng: {unidadeConfig.longitude?.toFixed(6)}
                     </p>
                   </div>
                 </div>

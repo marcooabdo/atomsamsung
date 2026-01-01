@@ -80,16 +80,16 @@ export default function MapaInteligente() {
     try {
       const { data, error } = await supabase
         .from('unidades')
-        .select('nome, lat_base, lng_base, endereco_completo')
+        .select('nome, latitude, longitude, endereco')
         .eq('id', selectedUnidade)
         .maybeSingle();
 
       if (error) throw error;
 
-      if (data && data.lat_base && data.lng_base) {
+      if (data && data.latitude && data.longitude) {
         setBaseLocation({
-          lat: parseFloat(data.lat_base),
-          lng: parseFloat(data.lng_base),
+          lat: parseFloat(data.latitude),
+          lng: parseFloat(data.longitude),
           nome: data.nome || 'Base'
         });
       } else {

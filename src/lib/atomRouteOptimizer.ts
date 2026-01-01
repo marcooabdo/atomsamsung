@@ -123,17 +123,17 @@ export async function otimizarRotaInteligente(
 ): Promise<ResultadoOtimizacao> {
   const { data: unidade } = await supabase
     .from('unidades')
-    .select('lat_base, lng_base, endereco')
+    .select('latitude, longitude, endereco')
     .eq('id', unidadeId)
     .single();
 
-  if (!unidade || !unidade.lat_base || !unidade.lng_base) {
+  if (!unidade || !unidade.latitude || !unidade.longitude) {
     throw new Error('Unidade sem coordenadas cadastradas');
   }
 
   const pontoBase = {
-    lat: unidade.lat_base,
-    lng: unidade.lng_base,
+    lat: unidade.latitude,
+    lng: unidade.longitude,
     endereco: unidade.endereco || 'Unidade'
   };
 
