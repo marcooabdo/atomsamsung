@@ -2076,24 +2076,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                               }
 
                               try {
-                                if (!os?.cotacao_id) {
-                                  alert('Esta OS não possui cotação vinculada. Não é possível criar requisições manuais.');
-                                  return;
-                                }
-
                                 const valorNumerico = novaPecaValor ? parseFloat(novaPecaValor) : null;
 
-                                const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
-                                  os_id: osId,
-                                  cotacao_id: os.cotacao_id,
-                                  codigo_peca: novaPecaCodigo,
-                                  descricao: novaPecaDescricao,
-                                  quantidade_requisitada: novaPecaQuantidade,
-                                  valor_peca: valorNumerico,
-                                  status: 'pendente',
-                                  requisitado_por: usuario?.id,
-                                  unidade_id: os?.unidade_id || usuario?.unidade_id,
-                                  numero_os_samsung: os?.numero_os_samsung
+                                const { data: requisicaoId, error: insertError } = await supabase.rpc('inserir_requisicao_peca', {
+                                  p_os_id: osId,
+                                  p_cotacao_peca_id: null,
+                                  p_codigo_peca: novaPecaCodigo,
+                                  p_descricao: novaPecaDescricao,
+                                  p_quantidade_requisitada: novaPecaQuantidade,
+                                  p_valor_peca: valorNumerico,
+                                  p_numero_os_samsung: os?.numero_os_samsung || null
                                 });
 
                                 if (insertError) {
