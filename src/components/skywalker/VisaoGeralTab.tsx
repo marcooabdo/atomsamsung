@@ -398,122 +398,128 @@ export function VisaoGeralTab() {
                 key={prof.id}
                 onClick={() => setSelectedProfissional(prof)}
                 className={`
-                  relative overflow-hidden cursor-pointer
-                  bg-gradient-to-br ${nivelStyle.bg}
-                  rounded-2xl p-5 border-2 ${nivelStyle.border}
-                  shadow-lg ${nivelStyle.glow}
+                  relative overflow-hidden cursor-pointer group
+                  bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90
+                  backdrop-blur-sm
+                  rounded-2xl p-4 border-3
                   transition-all duration-300
-                  hover:scale-[1.02] hover:shadow-xl
-                  ${atingiuMeta ? 'ring-2 ring-green-500/50' : ''}
+                  hover:scale-[1.02]
+                  ${atingiuMeta ? 'ring-2 ring-green-500/50 ring-offset-2 ring-offset-gray-950' : ''}
                 `}
+                style={{
+                  borderWidth: '3px',
+                  borderStyle: 'solid',
+                  borderColor: prof.nivel?.cor || '#6B7280',
+                  boxShadow: `0 0 30px ${prof.nivel?.cor || '#6B7280'}40, 0 0 60px ${prof.nivel?.cor || '#6B7280'}20, inset 0 0 20px rgba(0,0,0,0.3)`,
+                }}
               >
+                <div
+                  className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity"
+                  style={{
+                    background: `radial-gradient(circle at 50% 0%, ${prof.nivel?.cor || '#6B7280'}40, transparent 70%)`
+                  }}
+                />
+
                 {atingiuMeta && (
-                  <div className="absolute top-0 right-0">
-                    <div className="bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-bl-xl flex items-center gap-1">
+                  <div className="absolute top-0 right-0 z-10">
+                    <div className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg flex items-center gap-1">
                       <CheckCircle className="w-3 h-3" />
-                      Meta OK
+                      Meta
                     </div>
                   </div>
                 )}
 
                 {ranking <= 3 && (
-                  <div className="absolute top-3 left-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                      ranking === 1 ? 'bg-yellow-500 shadow-lg shadow-yellow-500/50' :
-                      ranking === 2 ? 'bg-gray-400 shadow-lg shadow-gray-400/50' :
-                      'bg-orange-600 shadow-lg shadow-orange-600/50'
+                  <div className="absolute -top-2 -left-2 z-10">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 border-gray-950 ${
+                      ranking === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-[0_0_20px_rgba(234,179,8,0.6)]' :
+                      ranking === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500 shadow-[0_0_20px_rgba(148,163,184,0.6)]' :
+                      'bg-gradient-to-br from-orange-500 to-orange-700 shadow-[0_0_20px_rgba(249,115,22,0.6)]'
                     }`}>
-                      {ranking === 1 ? <Crown className="w-4 h-4 text-black" /> :
-                       ranking === 2 ? <Medal className="w-4 h-4 text-black" /> :
-                       <Award className="w-4 h-4 text-white" />}
+                      {ranking === 1 ? <Crown className="w-5 h-5 text-black drop-shadow-lg" /> :
+                       ranking === 2 ? <Medal className="w-5 h-5 text-black drop-shadow-lg" /> :
+                       <Award className="w-5 h-5 text-white drop-shadow-lg" />}
                     </div>
                   </div>
                 )}
 
-                <div className="flex items-start justify-between mb-4">
-                  <div className={ranking <= 3 ? 'ml-10' : ''}>
-                    <h4 className="text-white font-bold text-lg">{prof.usuario?.nome || 'Sem nome'}</h4>
-                    <p className="text-gray-400 text-sm">{prof.unidade?.nome}</p>
-                  </div>
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-bold"
-                    style={{
-                      backgroundColor: (prof.nivel?.cor || '#6B7280') + '30',
-                      color: prof.nivel?.cor || '#6B7280',
-                      border: `1px solid ${prof.nivel?.cor || '#6B7280'}50`
-                    }}
-                  >
-                    <NivelIcon className="w-4 h-4" />
-                    {prof.nivel?.nome || 'Starter'}
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-center gap-2 mb-4">
-                  <div className="flex items-center gap-1">
-                    {[...Array(Math.min(prof.estrelas_mes, 12))].map((_, i) => (
-                      <Star
-                        key={i}
-                        className="w-5 h-5 text-yellow-400 fill-current drop-shadow-lg"
-                        style={{
-                          filter: 'drop-shadow(0 0 4px rgba(250, 204, 21, 0.5))',
-                          animation: `pulse 2s ease-in-out ${i * 0.1}s infinite`
-                        }}
-                      />
-                    ))}
-                    {[...Array(Math.max(0, metaEstrelas - prof.estrelas_mes))].map((_, i) => (
-                      <Star key={`empty-${i}`} className="w-5 h-5 text-gray-600" />
-                    ))}
-                  </div>
-                </div>
-
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-gray-400 text-sm">Progresso do Mes</span>
-                    <span className="text-white text-sm font-bold">
-                      {prof.estrelas_mes}/{metaEstrelas}
-                    </span>
-                  </div>
-                  <div className="h-3 bg-gray-900/50 rounded-full overflow-hidden border border-gray-700">
+                <div className="relative">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className={`flex-1 min-w-0 ${ranking <= 3 ? 'ml-8' : ''}`}>
+                      <h4 className="text-white font-bold text-base truncate">{prof.usuario?.nome || 'Sem nome'}</h4>
+                      <p className="text-gray-400 text-xs truncate">{prof.unidade?.nome}</p>
+                    </div>
                     <div
-                      className={`h-full transition-all duration-500 ${
-                        atingiuMeta
-                          ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                          : 'bg-gradient-to-r from-yellow-400 to-amber-500'
-                      }`}
-                      style={{ width: `${progresso}%` }}
+                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold flex-shrink-0 ml-2"
+                      style={{
+                        backgroundColor: (prof.nivel?.cor || '#6B7280') + '25',
+                        color: prof.nivel?.cor || '#6B7280',
+                        border: `1.5px solid ${prof.nivel?.cor || '#6B7280'}60`
+                      }}
+                    >
+                      <NivelIcon className="w-3 h-3" />
+                      {prof.nivel?.nome || 'Starter'}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-center mb-3">
+                    <div className="text-3xl font-black text-white drop-shadow-lg">
+                      {prof.estrelas_mes}
+                      <span className="text-gray-500 text-lg font-normal">/{metaEstrelas}</span>
+                    </div>
+                    <Star className="w-6 h-6 text-yellow-400 fill-current ml-2"
+                      style={{ filter: 'drop-shadow(0 0 6px rgba(250, 204, 21, 0.7))' }}
                     />
                   </div>
-                </div>
 
-                <div className="flex items-center justify-between text-sm border-t border-gray-700/50 pt-3">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    prof.time === 'front_office'
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
-                  }`}>
-                    {prof.time === 'front_office' ? 'Front Office' : 'Inside Sales'}
-                  </span>
+                  <div className="mb-3">
+                    <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-gray-700/50">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          atingiuMeta
+                            ? 'bg-gradient-to-r from-green-400 to-emerald-500'
+                            : 'bg-gradient-to-r from-yellow-400 to-amber-500'
+                        }`}
+                        style={{
+                          width: `${progresso}%`,
+                          boxShadow: atingiuMeta
+                            ? '0 0 10px rgba(34, 197, 94, 0.5)'
+                            : '0 0 10px rgba(251, 191, 36, 0.5)'
+                        }}
+                      />
+                    </div>
+                  </div>
 
-                  {!atingiuMeta && faltamEstrelas > 0 && (
-                    <span className="text-orange-400 text-xs flex items-center gap-1">
-                      <Zap className="w-3 h-3" />
-                      Faltam {faltamEstrelas}
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0 ${
+                      prof.time === 'front_office'
+                        ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                        : 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
+                    }`}>
+                      {prof.time === 'front_office' ? 'Front' : 'Inside'}
                     </span>
-                  )}
 
-                  {atingiuMeta && proximoNivel && (
-                    <span className="text-green-400 text-xs flex items-center gap-1">
-                      <TrendingUp className="w-3 h-3" />
-                      Proximo: {proximoNivel.nome}
-                    </span>
-                  )}
-                </div>
+                    {!atingiuMeta && faltamEstrelas > 0 && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-orange-500/15 text-orange-400 border border-orange-500/30 flex items-center gap-1 flex-shrink-0">
+                        <Zap className="w-2.5 h-2.5" />
+                        -{faltamEstrelas}
+                      </span>
+                    )}
 
-                <div className="flex items-center justify-center mt-3 pt-3 border-t border-gray-700/50">
-                  <span className="text-gray-500 text-xs flex items-center gap-1">
-                    <ChevronRight className="w-4 h-4" />
-                    Clique para ver detalhes
-                  </span>
+                    {atingiuMeta && proximoNivel && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/30 flex items-center gap-1 flex-shrink-0">
+                        <TrendingUp className="w-2.5 h-2.5" />
+                        {proximoNivel.nome}
+                      </span>
+                    )}
+
+                    {prof.meses_consecutivos_validos > 0 && (
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1 flex-shrink-0">
+                        <Flame className="w-2.5 h-2.5" />
+                        {prof.meses_consecutivos_validos}x
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
             );
