@@ -2,11 +2,26 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, MapPin, CheckCircle, Clock, Package, Camera, FileText,
-  AlertCircle, Send, ChevronDown, ChevronUp, Edit3
+  AlertCircle, Send, ChevronDown, ChevronUp, Edit3, Navigation
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AssinaturaCanvas } from '../../components/mobile/AssinaturaCanvas';
+
+async function reverseGeocode(lat: number, lng: number): Promise<string> {
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&addressdetails=1`
+    );
+    const data = await response.json();
+    if (data.display_name) {
+      return data.display_name;
+    }
+    return `${lat}, ${lng}`;
+  } catch {
+    return `${lat}, ${lng}`;
+  }
+}
 
 interface Peca {
   id: string;
@@ -214,6 +229,9 @@ export function ExecucaoOS() {
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       const { latitude, longitude } = position.coords;
+      const checkinTime = new Date();
+
+      const enderecoTecnico = await reverseGeocode(latitude, longitude);
 
       await supabase
         .from('os')
@@ -223,11 +241,22 @@ export function ExecucaoOS() {
         .eq('id', agendamento.os_id);
 
       await supabase
+        .from('agendamentos')
+        .update({
+          checkin_realizado: true,
+          checkin_hora: checkinTime.toISOString(),
+          checkin_latitude: latitude,
+          checkin_longitude: longitude
+        })
+        .eq('os_id', agendamento.os_id)
+        .eq('tecnico_id', usuario?.id);
+
+      await supabase
         .from('os_comentarios')
         .insert({
           os_id: agendamento.os_id,
           usuario_id: usuario?.id,
-          comentario: `Check-in realizado em ${new Date().toLocaleString('pt-BR')} - Coordenadas: ${latitude}, ${longitude}`,
+          comentario: `CHECK-IN REALIZADO\nData/Hora: ${checkinTime.toLocaleString('pt-BR')}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
           is_system: true
         });
 
@@ -370,49 +399,75 @@ export function ExecucaoOS() {
       return;
     }
 
-    const tecnicoBlob = await fetch(assinaturaTecnico).then(r => r.blob());
-    const clienteBlob = await fetch(assinaturaCliente).then(r => r.blob());
+    if (!navigator.geolocation) {
+      alert('Geolocalização não disponível no seu dispositivo.');
+      return;
+    }
 
-    const tecnicoPath = `assinaturas/${agendamento.os_id}_tecnico_${Date.now()}.png`;
-    const clientePath = `assinaturas/${agendamento.os_id}_cliente_${Date.now()}.png`;
+    navigator.geolocation.getCurrentPosition(async (position) => {
+      const { latitude, longitude } = position.coords;
+      const checkoutTime = new Date();
 
-    await supabase.storage.from('os-anexos').upload(tecnicoPath, tecnicoBlob);
-    await supabase.storage.from('os-anexos').upload(clientePath, clienteBlob);
+      const enderecoTecnico = await reverseGeocode(latitude, longitude);
 
-    await supabase.from('os_anexos').insert([
-      {
-        os_id: agendamento.os_id,
-        usuario_id: usuario?.id,
-        tipo: 'assinatura_tecnico',
-        nome_arquivo: 'Assinatura Técnico',
-        caminho_storage: tecnicoPath
-      },
-      {
-        os_id: agendamento.os_id,
-        usuario_id: usuario?.id,
-        tipo: 'assinatura_cliente',
-        nome_arquivo: 'Assinatura Cliente',
-        caminho_storage: clientePath
-      }
-    ]);
+      const tecnicoBlob = await fetch(assinaturaTecnico).then(r => r.blob());
+      const clienteBlob = await fetch(assinaturaCliente).then(r => r.blob());
 
-    await supabase
-      .from('agendamentos')
-      .update({
-        checkout_realizado: true,
-        checkout_hora: new Date().toISOString()
-      })
-      .eq('id', agendamento.id);
+      const tecnicoPath = `assinaturas/${agendamento.os_id}_tecnico_${Date.now()}.png`;
+      const clientePath = `assinaturas/${agendamento.os_id}_cliente_${Date.now()}.png`;
 
-    const novoStatus = resultado === 'sucesso' ? 'finalizado' :
-                       resultado === 'improdutiva' ? 'aguardando_pecas' : 'em_reparo';
+      await supabase.storage.from('os-anexos').upload(tecnicoPath, tecnicoBlob);
+      await supabase.storage.from('os-anexos').upload(clientePath, clienteBlob);
 
-    await supabase
-      .from('os')
-      .update({ status_kanban: novoStatus })
-      .eq('id', agendamento.os_id);
+      await supabase.from('os_anexos').insert([
+        {
+          os_id: agendamento.os_id,
+          usuario_id: usuario?.id,
+          tipo: 'assinatura_tecnico',
+          nome_arquivo: 'Assinatura Técnico',
+          caminho_storage: tecnicoPath
+        },
+        {
+          os_id: agendamento.os_id,
+          usuario_id: usuario?.id,
+          tipo: 'assinatura_cliente',
+          nome_arquivo: 'Assinatura Cliente',
+          caminho_storage: clientePath
+        }
+      ]);
 
-    navigate('/mobile/agenda');
+      await supabase
+        .from('agendamentos')
+        .update({
+          checkout_realizado: true,
+          checkout_hora: checkoutTime.toISOString(),
+          checkout_latitude: latitude,
+          checkout_longitude: longitude
+        })
+        .eq('os_id', agendamento.os_id)
+        .eq('tecnico_id', usuario?.id);
+
+      await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: agendamento.os_id,
+          usuario_id: usuario?.id,
+          comentario: `CHECK-OUT REALIZADO\nData/Hora: ${checkoutTime.toLocaleString('pt-BR')}\nResultado: ${resultado === 'sucesso' ? 'Reparo com Sucesso' : resultado === 'improdutiva' ? 'Improdutiva/Revisita' : 'Peça com Defeito'}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
+          is_system: true
+        });
+
+      const novoStatus = resultado === 'sucesso' ? 'reparo_concluido' :
+                         resultado === 'improdutiva' ? 'aguardando_peca' : 'aguardando_peca';
+
+      await supabase
+        .from('os')
+        .update({ coluna_kanban: novoStatus })
+        .eq('id', agendamento.os_id);
+
+      navigate('/mobile/agenda');
+    }, (error) => {
+      alert('Não foi possível obter sua localização. Ative o GPS e tente novamente.');
+    });
   };
 
   const toggleSection = (section: string) => {
@@ -509,13 +564,36 @@ export function ExecucaoOS() {
 
               <div className="space-y-3 mb-6">
                 <div className="p-3 bg-gray-800 rounded-lg">
-                  <p className="text-gray-400 text-sm mb-1">Endereço</p>
+                  <p className="text-gray-400 text-sm mb-1">Endereco do Cliente</p>
                   <p className="text-white">{agendamento.os.endereco_completo}</p>
                 </div>
                 <div className="p-3 bg-gray-800 rounded-lg">
-                  <p className="text-gray-400 text-sm mb-1">Tipo de Serviço</p>
+                  <p className="text-gray-400 text-sm mb-1">Tipo de Servico</p>
                   <p className="text-white">{agendamento.os.tipo_servico}</p>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 mb-4">
+                <button
+                  onClick={() => {
+                    const endereco = encodeURIComponent(agendamento.os.endereco_completo);
+                    window.open(`https://waze.com/ul?q=${endereco}`, '_blank');
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-cyan-500/20 border border-cyan-500/50 rounded-xl text-cyan-400 font-medium hover:bg-cyan-500/30 transition-all"
+                >
+                  <Navigation className="w-5 h-5" />
+                  Waze
+                </button>
+                <button
+                  onClick={() => {
+                    const endereco = encodeURIComponent(agendamento.os.endereco_completo);
+                    window.open(`https://www.google.com/maps/search/?api=1&query=${endereco}`, '_blank');
+                  }}
+                  className="flex items-center justify-center gap-2 px-4 py-3 bg-blue-500/20 border border-blue-500/50 rounded-xl text-blue-400 font-medium hover:bg-blue-500/30 transition-all"
+                >
+                  <MapPin className="w-5 h-5" />
+                  Maps
+                </button>
               </div>
 
               <button
@@ -529,7 +607,7 @@ export function ExecucaoOS() {
 
             <div className="p-4 bg-cyan-500/10 border border-cyan-500/30 rounded-xl">
               <p className="text-cyan-400 text-sm">
-                O check-in irá capturar sua localização atual e hora de chegada.
+                O check-in ira capturar sua localizacao atual e hora de chegada.
               </p>
             </div>
           </div>
