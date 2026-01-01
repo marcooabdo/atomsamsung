@@ -15,7 +15,9 @@ import {
   Users,
   Activity,
   Zap,
-  Settings
+  Settings,
+  Calendar,
+  Filter
 } from 'lucide-react';
 
 interface DashboardStats {
@@ -23,10 +25,10 @@ interface DashboardStats {
   osAbertas: number;
   cotacoesPendentes: number;
   cotacoesAprovadas: number;
-  pecasEstoque: number;
-  agendamentosHoje: number;
-  receitaMesLP: number;
-  receitaMesOW: number;
+  pecasDisponiveis: number;
+  agendamentos: number;
+  receitaLP: number;
+  receitaOW: number;
   osAtrasadas: number;
   eficienciaOperacional: number;
   taxaAprovacao: number;
@@ -34,14 +36,6 @@ interface DashboardStats {
   metaReceitaOW?: number;
   metaEficiencia?: number;
   metaTaxaAprovacao?: number;
-  trendOSAbertas: number;
-  trendCotacoesPendentes: number;
-  trendCotacoesAprovadas: number;
-  trendPecasEstoque: number;
-  trendAgendamentos: number;
-  trendReceitaLP: number;
-  trendReceitaOW: number;
-  trendOSAtrasadas: number;
 }
 
 interface PerformanceOS {
@@ -64,21 +58,13 @@ export function Dashboard() {
     osAbertas: 0,
     cotacoesPendentes: 0,
     cotacoesAprovadas: 0,
-    pecasEstoque: 0,
-    agendamentosHoje: 0,
-    receitaMesLP: 0,
-    receitaMesOW: 0,
+    pecasDisponiveis: 0,
+    agendamentos: 0,
+    receitaLP: 0,
+    receitaOW: 0,
     osAtrasadas: 0,
     eficienciaOperacional: 0,
     taxaAprovacao: 0,
-    trendOSAbertas: 0,
-    trendCotacoesPendentes: 0,
-    trendCotacoesAprovadas: 0,
-    trendPecasEstoque: 0,
-    trendAgendamentos: 0,
-    trendReceitaLP: 0,
-    trendReceitaOW: 0,
-    trendOSAtrasadas: 0,
   });
   const [loading, setLoading] = useState(true);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
@@ -87,6 +73,11 @@ export function Dashboard() {
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceModalType, setPerformanceModalType] = useState<'eficiencia' | 'aprovacao'>('eficiencia');
   const [performanceOSList, setPerformanceOSList] = useState<PerformanceOS[]>([]);
+
+  const today = new Date();
+  const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  const [dataInicio, setDataInicio] = useState(firstDayOfMonth.toISOString().split('T')[0]);
+  const [dataFim, setDataFim] = useState(today.toISOString().split('T')[0]);
 
   useEffect(() => {
     loadUnidades();
@@ -99,7 +90,7 @@ export function Dashboard() {
       }
       loadDashboardData();
     }
-  }, [user, selectedUnidade]);
+  }, [user, selectedUnidade, dataInicio, dataFim]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
@@ -108,58 +99,34 @@ export function Dashboard() {
 
   const loadDashboardData = async () => {
     try {
+      setLoading(true);
       const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
       const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
 
-      const buildQuery = (table: string) => {
-        let query = supabase.from(table).select('*', { count: 'exact', head: true });
-        if (!canSeeAllUnits && unidadeFilter) {
-          query = query.eq('unidade_id', unidadeFilter);
-        } else if (selectedUnidade) {
-          query = query.eq('unidade_id', selectedUnidade);
-        }
-        return query;
-      };
-
-      const hoje = new Date().toISOString().split('T')[0];
-      const mesAtual = new Date();
-      const mesAnterior = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1);
-      const inicioMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1).toISOString().split('T')[0];
-      const inicioMesAnterior = new Date(mesAnterior.getFullYear(), mesAnterior.getMonth(), 1).toISOString().split('T')[0];
-      const fimMesAnterior = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 0).toISOString().split('T')[0];
-
-      let osQueryAtual = supabase.from('os').select('*').gte('created_at', inicioMesAtual);
-      let osQueryAnterior = supabase.from('os').select('*').gte('created_at', inicioMesAnterior).lte('created_at', fimMesAnterior);
+      let osQuery = supabase
+        .from('os')
+        .select('*')
+        .gte('created_at', `${dataInicio}T00:00:00`)
+        .lte('created_at', `${dataFim}T23:59:59`);
 
       if (!canSeeAllUnits && unidadeFilter) {
-        osQueryAtual = osQueryAtual.eq('unidade_id', unidadeFilter);
-        osQueryAnterior = osQueryAnterior.eq('unidade_id', unidadeFilter);
+        osQuery = osQuery.eq('unidade_id', unidadeFilter);
       } else if (selectedUnidade) {
-        osQueryAtual = osQueryAtual.eq('unidade_id', selectedUnidade);
-        osQueryAnterior = osQueryAnterior.eq('unidade_id', selectedUnidade);
+        osQuery = osQuery.eq('unidade_id', selectedUnidade);
       }
 
-      const [osAtualData, osAnteriorData] = await Promise.all([
-        osQueryAtual,
-        osQueryAnterior
-      ]);
+      const { data: osData } = await osQuery;
+      const osList = osData || [];
 
-      const osAtual = osAtualData.data || [];
-      const osAnterior = osAnteriorData.data || [];
+      const osAbertas = osList.filter(os => os.coluna_kanban !== 'os_fechada').length;
+      const receitaLP = osList.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
+      const receitaOW = osList.filter(os => os.tipo_os === 'OW').reduce((sum, os) => sum + (os.valor_total || 0), 0);
 
-      const osAbertasAtual = osAtual.filter(os => os.coluna_kanban !== 'os_fechada').length;
-      const osAbertasAnterior = osAnterior.filter(os => os.coluna_kanban !== 'os_fechada').length;
-
-      const receitaLPAtual = osAtual.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
-      const receitaOWAtual = osAtual.filter(os => os.tipo_os === 'OW').reduce((sum, os) => sum + (os.valor_total || 0), 0);
-      const receitaLPAnterior = osAnterior.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
-      const receitaOWAnterior = osAnterior.filter(os => os.tipo_os === 'OW').reduce((sum, os) => sum + (os.valor_total || 0), 0);
-
-      const osFechadasAtual = osAtual.filter(os => os.coluna_kanban === 'os_fechada');
+      const osFechadas = osList.filter(os => os.coluna_kanban === 'os_fechada');
       let totalDiasResolucao = 0;
       let countResolucao = 0;
 
-      osFechadasAtual.forEach(os => {
+      osFechadas.forEach(os => {
         const inicio = new Date(os.created_at);
         const fim = os.data_fechamento ? new Date(os.data_fechamento) : new Date();
         const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
@@ -169,15 +136,21 @@ export function Dashboard() {
 
       const eficienciaOperacional = countResolucao > 0 ? totalDiasResolucao / countResolucao : 0;
 
-      let cotacoesQueryAtual = supabase.from('cotacoes').select('*').gte('created_at', inicioMesAtual).eq('tipo_os', 'OW');
+      let cotacoesQuery = supabase
+        .from('cotacoes')
+        .select('*')
+        .gte('created_at', `${dataInicio}T00:00:00`)
+        .lte('created_at', `${dataFim}T23:59:59`)
+        .eq('tipo_os', 'OW');
+
       if (!canSeeAllUnits && unidadeFilter) {
-        cotacoesQueryAtual = cotacoesQueryAtual.eq('unidade_id', unidadeFilter);
+        cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
       } else if (selectedUnidade) {
-        cotacoesQueryAtual = cotacoesQueryAtual.eq('unidade_id', selectedUnidade);
+        cotacoesQuery = cotacoesQuery.eq('unidade_id', selectedUnidade);
       }
 
-      const cotacoesData = await cotacoesQueryAtual;
-      const cotacoes = cotacoesData.data || [];
+      const { data: cotacoesData } = await cotacoesQuery;
+      const cotacoes = cotacoesData || [];
 
       const cotacoesAprovadas = cotacoes.filter(c => c.status === 'aprovada');
       const cotacoesReprovadas = cotacoes.filter(c => c.status === 'reprovada' || c.status === 'reprovada_refeita');
@@ -187,45 +160,92 @@ export function Dashboard() {
         ? (cotacoesAprovadas.length / totalOrcamentosFinalizados) * 100
         : 0;
 
+      let cotacoesPendentesQuery = supabase
+        .from('cotacoes')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${dataInicio}T00:00:00`)
+        .lte('created_at', `${dataFim}T23:59:59`)
+        .in('status', ['pendente_preenchimento', 'enviada']);
+
+      if (!canSeeAllUnits && unidadeFilter) {
+        cotacoesPendentesQuery = cotacoesPendentesQuery.eq('unidade_id', unidadeFilter);
+      } else if (selectedUnidade) {
+        cotacoesPendentesQuery = cotacoesPendentesQuery.eq('unidade_id', selectedUnidade);
+      }
+
+      let cotacoesAprovadasQuery = supabase
+        .from('cotacoes')
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${dataInicio}T00:00:00`)
+        .lte('created_at', `${dataFim}T23:59:59`)
+        .eq('status', 'aprovada');
+
+      if (!canSeeAllUnits && unidadeFilter) {
+        cotacoesAprovadasQuery = cotacoesAprovadasQuery.eq('unidade_id', unidadeFilter);
+      } else if (selectedUnidade) {
+        cotacoesAprovadasQuery = cotacoesAprovadasQuery.eq('unidade_id', selectedUnidade);
+      }
+
+      let pecasQuery = supabase
+        .from('estoque_pecas')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'disponivel');
+
+      if (!canSeeAllUnits && unidadeFilter) {
+        pecasQuery = pecasQuery.eq('unidade_id', unidadeFilter);
+      } else if (selectedUnidade) {
+        pecasQuery = pecasQuery.eq('unidade_id', selectedUnidade);
+      }
+
+      let agendamentosQuery = supabase
+        .from('os')
+        .select('*', { count: 'exact', head: true })
+        .gte('data_agendamento', dataInicio)
+        .lte('data_agendamento', dataFim)
+        .neq('coluna_kanban', 'os_fechada')
+        .not('data_agendamento', 'is', null);
+
+      if (!canSeeAllUnits && unidadeFilter) {
+        agendamentosQuery = agendamentosQuery.eq('unidade_id', unidadeFilter);
+      } else if (selectedUnidade) {
+        agendamentosQuery = agendamentosQuery.eq('unidade_id', selectedUnidade);
+      }
+
+      const mesAtual = new Date();
+      let metasQuery = { data: null as any };
+      if (unidadeFilter) {
+        metasQuery = await supabase
+          .from('metas_performance')
+          .select('*')
+          .eq('unidade_id', unidadeFilter)
+          .eq('ano', mesAtual.getFullYear())
+          .eq('mes', mesAtual.getMonth() + 1)
+          .maybeSingle();
+      }
+
       const [
         cotacoesPendentesResult,
         cotacoesAprovadasResult,
         pecasResult,
-        agendamentosResult,
-        metasResult
+        agendamentosResult
       ] = await Promise.all([
-        buildQuery('cotacoes').in('status', ['pendente_preenchimento', 'enviada']),
-        buildQuery('cotacoes').eq('status', 'aprovada'),
-        buildQuery('estoque_pecas').eq('status', 'disponivel'),
-        buildQuery('os').eq('data_agendamento', hoje).neq('coluna_kanban', 'os_fechada'),
-        (async () => {
-          if (!unidadeFilter) return { data: null };
-          return await supabase
-            .from('metas_performance')
-            .select('*')
-            .eq('unidade_id', unidadeFilter)
-            .eq('ano', mesAtual.getFullYear())
-            .eq('mes', mesAtual.getMonth() + 1)
-            .maybeSingle();
-        })()
+        cotacoesPendentesQuery,
+        cotacoesAprovadasQuery,
+        pecasQuery,
+        agendamentosQuery
       ]);
 
-      const metas = metasResult.data;
-
-      const calcularTrend = (atual: number, anterior: number) => {
-        if (anterior === 0) return 0;
-        return ((atual - anterior) / anterior) * 100;
-      };
+      const metas = metasQuery.data;
 
       setStats({
-        totalOS: osAtual.length,
-        osAbertas: osAbertasAtual,
+        totalOS: osList.length,
+        osAbertas,
         cotacoesPendentes: cotacoesPendentesResult.count || 0,
         cotacoesAprovadas: cotacoesAprovadasResult.count || 0,
-        pecasEstoque: pecasResult.count || 0,
-        agendamentosHoje: agendamentosResult.count || 0,
-        receitaMesLP: receitaLPAtual,
-        receitaMesOW: receitaOWAtual,
+        pecasDisponiveis: pecasResult.count || 0,
+        agendamentos: agendamentosResult.count || 0,
+        receitaLP,
+        receitaOW,
         osAtrasadas: 0,
         eficienciaOperacional,
         taxaAprovacao,
@@ -233,14 +253,6 @@ export function Dashboard() {
         metaReceitaOW: metas ? Number(metas.meta_receita_ow) : undefined,
         metaEficiencia: metas ? Number(metas.meta_eficiencia_operacional) : undefined,
         metaTaxaAprovacao: metas ? Number(metas.meta_taxa_aprovacao) : undefined,
-        trendOSAbertas: calcularTrend(osAbertasAtual, osAbertasAnterior),
-        trendCotacoesPendentes: 0,
-        trendCotacoesAprovadas: 0,
-        trendPecasEstoque: 0,
-        trendAgendamentos: 0,
-        trendReceitaLP: calcularTrend(receitaLPAtual, receitaLPAnterior),
-        trendReceitaOW: calcularTrend(receitaOWAtual, receitaOWAnterior),
-        trendOSAtrasadas: 0,
       });
     } catch (error) {
       console.error('Erro ao carregar dados do dashboard:', error);
@@ -254,14 +266,12 @@ export function Dashboard() {
       const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
       const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
 
-      const mesAtual = new Date();
-      const inicioMesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1).toISOString().split('T')[0];
-
       if (type === 'aprovacao') {
         let cotacoesQuery = supabase
           .from('cotacoes')
           .select('*')
-          .gte('created_at', inicioMesAtual)
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`)
           .eq('tipo_os', 'OW')
           .in('status', ['aprovada', 'reprovada', 'reprovada_refeita']);
 
@@ -274,7 +284,7 @@ export function Dashboard() {
         const { data: cotacoesData } = await cotacoesQuery;
         const cotacoesList = cotacoesData || [];
 
-        const performanceList: PerformanceOS[] = cotacoessList.map(cotacao => {
+        const performanceList: PerformanceOS[] = cotacoesList.map(cotacao => {
           const inicio = new Date(cotacao.created_at);
           const fim = cotacao.aprovada_em
             ? new Date(cotacao.aprovada_em)
@@ -294,7 +304,7 @@ export function Dashboard() {
             id: cotacao.id,
             numero_os: cotacao.numero_cotacao,
             tipo_os: cotacao.tipo_os,
-            cliente_nome: cotacao.cliente_nome || 'Cliente não informado',
+            cliente_nome: cotacao.cliente_nome || 'Cliente nao informado',
             created_at: cotacao.created_at,
             data_fechamento: cotacao.aprovada_em || cotacao.reprovada_em,
             coluna_kanban: cotacao.status,
@@ -306,7 +316,11 @@ export function Dashboard() {
 
         setPerformanceOSList(performanceList);
       } else {
-        let query = supabase.from('os').select('*').gte('created_at', inicioMesAtual);
+        let query = supabase
+          .from('os')
+          .select('*')
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`);
 
         if (!canSeeAllUnits && unidadeFilter) {
           query = query.eq('unidade_id', unidadeFilter);
@@ -331,7 +345,7 @@ export function Dashboard() {
             id: os.id,
             numero_os: os.numero_os || os.numero_os_samsung || 'S/N',
             tipo_os: os.tipo_os,
-            cliente_nome: os.cliente_nome || 'Cliente não informado',
+            cliente_nome: os.cliente_nome || 'Cliente nao informado',
             created_at: os.created_at,
             data_fechamento: os.data_fechamento,
             coluna_kanban: os.coluna_kanban,
@@ -351,25 +365,26 @@ export function Dashboard() {
     }
   };
 
-  const formatTrend = (value: number) => {
-    if (value === 0) return '0%';
-    const sign = value > 0 ? '+' : '';
-    return `${sign}${value.toFixed(1)}%`;
-  };
-
   const formatCurrency = (value: number) => {
     return `R$ ${value.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
+  const formatDateLabel = () => {
+    const inicio = new Date(dataInicio);
+    const fim = new Date(dataFim);
+    const formatOptions: Intl.DateTimeFormatOptions = { day: '2-digit', month: '2-digit', year: 'numeric' };
+    return `${inicio.toLocaleDateString('pt-BR', formatOptions)} - ${fim.toLocaleDateString('pt-BR', formatOptions)}`;
+  };
+
   const statCards = [
-    { title: 'OS Abertas', value: stats.osAbertas, icon: FileText, color: '#0EA5E9', trend: formatTrend(stats.trendOSAbertas), hasGoal: false },
-    { title: 'Cotações Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', trend: formatTrend(stats.trendCotacoesPendentes), hasGoal: false },
-    { title: 'Cotações Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', trend: formatTrend(stats.trendCotacoesAprovadas), hasGoal: false },
-    { title: 'Peças Disponíveis', value: stats.pecasEstoque, icon: Package, color: '#06B6D4', trend: formatTrend(stats.trendPecasEstoque), hasGoal: false },
-    { title: 'Agendamentos Hoje', value: stats.agendamentosHoje, icon: Users, color: '#0EA5E9', trend: formatTrend(stats.trendAgendamentos), hasGoal: false },
-    { title: 'Receita do Mês LP', value: formatCurrency(stats.receitaMesLP), icon: DollarSign, color: '#A855F7', trend: formatTrend(stats.trendReceitaLP), hasGoal: true, goal: stats.metaReceitaLP, onClick: () => setShowGoalsModal(true) },
-    { title: 'Receita do Mês OW', value: formatCurrency(stats.receitaMesOW), icon: DollarSign, color: '#0EA5E9', trend: formatTrend(stats.trendReceitaOW), hasGoal: true, goal: stats.metaReceitaOW, onClick: () => setShowGoalsModal(true) },
-    { title: 'OS com Alerta', value: stats.osAtrasadas, icon: AlertCircle, color: '#EF4444', trend: formatTrend(stats.trendOSAtrasadas), hasGoal: false }
+    { title: 'OS Abertas', value: stats.osAbertas, icon: FileText, color: '#0EA5E9', hasGoal: false },
+    { title: 'Cotacoes Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
+    { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
+    { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
+    { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
+    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#A855F7', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => setShowGoalsModal(true) },
+    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => setShowGoalsModal(true) },
+    { title: 'OS com Alerta', value: stats.osAtrasadas, icon: AlertCircle, color: '#EF4444', hasGoal: false }
   ];
 
   if (loading) {
@@ -388,11 +403,43 @@ export function Dashboard() {
         onUnidadeChange={setSelectedUnidade}
       />
 
+      <div className="flex items-center gap-4 p-4 rounded-xl" style={{
+        background: 'linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,0,0,0.4) 100%)',
+        border: '1px solid rgba(0,212,255,0.3)'
+      }}>
+        <div className="flex items-center gap-2">
+          <Filter className="w-5 h-5 text-cyan-400" />
+          <span className="text-gray-400 text-sm font-medium">Periodo:</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(e) => setDataInicio(e.target.value)}
+              className="px-3 py-2 bg-gray-800/80 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+          <span className="text-gray-500">ate</span>
+          <div className="flex items-center gap-2">
+            <Calendar className="w-4 h-4 text-gray-500" />
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(e) => setDataFim(e.target.value)}
+              className="px-3 py-2 bg-gray-800/80 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
+            />
+          </div>
+        </div>
+        <div className="ml-auto px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+          <span className="text-cyan-400 text-sm font-medium">{formatDateLabel()}</span>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
-          const isPositive = stat.trend.startsWith('+');
-          const isNeutral = stat.trend === '0%';
 
           const calculateProgress = () => {
             if (!stat.hasGoal || !stat.goal) {
@@ -443,44 +490,27 @@ export function Dashboard() {
                     style={{ color: stat.color }}
                   />
                 </div>
-                <div className="flex items-center gap-1">
-                  <div
-                    className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-md"
+                {stat.hasGoal && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setShowGoalsModal(true);
+                    }}
+                    className="p-1 rounded transition-all duration-200"
                     style={{
-                      background: isNeutral
-                        ? 'linear-gradient(135deg, rgba(107,114,128,0.2) 0%, rgba(107,114,128,0.08) 100%)'
-                        : isPositive
-                        ? 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.08) 100%)'
-                        : 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0.08) 100%)',
-                      color: isNeutral ? '#6B7280' : isPositive ? '#10B981' : '#EF4444',
-                      border: `1px solid ${isNeutral ? 'rgba(107,114,128,0.3)' : isPositive ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
-                      boxShadow: `0 0 6px ${isNeutral ? 'rgba(107,114,128,0.1)' : isPositive ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)'}`
+                      background: 'rgba(255,255,255,0.05)',
+                      border: '1px solid rgba(255,255,255,0.1)'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
                     }}
                   >
-                    {stat.trend}
-                  </div>
-                  {stat.hasGoal && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setShowGoalsModal(true);
-                      }}
-                      className="p-1 rounded transition-all duration-200"
-                      style={{
-                        background: 'rgba(255,255,255,0.05)',
-                        border: '1px solid rgba(255,255,255,0.1)'
-                      }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
-                      }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
-                      }}
-                    >
-                      <Settings className="w-3 h-3 text-gray-400" />
-                    </button>
-                  )}
-                </div>
+                    <Settings className="w-3 h-3 text-gray-400" />
+                  </button>
+                )}
               </div>
 
               <h4 className="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-widest">
@@ -556,7 +586,7 @@ export function Dashboard() {
             >
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#0EA5E9]" style={{ boxShadow: '0 0 4px rgba(14,165,233,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">OS em Análise</span>
+                <span className="text-xs font-medium text-gray-300">OS em Analise</span>
               </div>
               <span className="text-sm font-bold text-[#0EA5E9]">
                 {Math.floor(stats.osAbertas * 0.3)}
@@ -572,7 +602,7 @@ export function Dashboard() {
             >
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#F59E0B]" style={{ boxShadow: '0 0 4px rgba(245,158,11,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">Aguardando Peças</span>
+                <span className="text-xs font-medium text-gray-300">Aguardando Pecas</span>
               </div>
               <span className="text-sm font-bold text-[#F59E0B]">
                 {Math.floor(stats.osAbertas * 0.4)}
@@ -658,7 +688,7 @@ export function Dashboard() {
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Taxa de Aprovação</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Taxa de Aprovacao</span>
                 <span className="text-xs text-[#10B981] font-bold">{stats.taxaAprovacao.toFixed(1)}%</span>
               </div>
               <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
@@ -685,7 +715,7 @@ export function Dashboard() {
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Eficiência Operacional</span>
+                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Eficiencia Operacional</span>
                 <span className="text-xs text-[#0EA5E9] font-bold">{stats.eficienciaOperacional.toFixed(1)} dias</span>
               </div>
               <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
@@ -709,7 +739,7 @@ export function Dashboard() {
         isOpen={showPerformanceModal}
         onClose={() => setShowPerformanceModal(false)}
         metric={performanceModalType}
-        title={performanceModalType === 'eficiencia' ? 'Eficiência Operacional' : 'Taxa de Aprovação'}
+        title={performanceModalType === 'eficiencia' ? 'Eficiencia Operacional' : 'Taxa de Aprovacao'}
         osList={performanceOSList}
         targetValue={performanceModalType === 'eficiencia' ? stats.metaEficiencia : stats.metaTaxaAprovacao}
         currentValue={performanceModalType === 'eficiencia' ? stats.eficienciaOperacional : stats.taxaAprovacao}

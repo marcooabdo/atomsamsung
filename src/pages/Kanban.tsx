@@ -43,7 +43,7 @@ export function Kanban() {
   const [draggedCard, setDraggedCard] = useState<OS | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
-  const [selectedUnidade, setSelectedUnidade] = useState('');
+  const [selectedUnidade, setSelectedUnidade] = useState('1b9ff2d1-474e-4783-aa39-80c89a6a48cf');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
@@ -63,15 +63,7 @@ export function Kanban() {
     loadUnidades();
   }, []);
 
-  useEffect(() => {
-    // Só define a unidade padrão se o usuário não for master/diretoria
-    const canSelectAllUnits = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
-    if (usuario && usuario.unidade_id && !selectedUnidade && !canSelectAllUnits) {
-      console.log('🏢 Setando unidade inicial do usuário:', usuario.unidade_id);
-      setSelectedUnidade(usuario.unidade_id);
-    }
-  }, [usuario]);
-
+  
   useEffect(() => {
     console.log('🔄 Recarregando Kanban - selectedUnidade:', selectedUnidade || 'NENHUMA');
     if (usuario) {
