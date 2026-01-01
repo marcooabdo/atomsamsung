@@ -12,7 +12,6 @@ interface AgendamentoOS {
   tipo_reparo: string | null;
   cliente_nome: string;
   cliente_telefone: string;
-  endereco_completo: string;
   cliente_endereco: string;
   cliente_bairro: string;
   cliente_cidade: string;
@@ -38,7 +37,7 @@ export function AgendaMobile() {
     setLoading(true);
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, endereco_completo, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, latitude, longitude, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
       .eq('tecnico_agendado_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
       .order('periodo_agendamento', { ascending: true });
@@ -191,7 +190,7 @@ export function AgendaMobile() {
                     <MapPin className="w-4 h-4 text-cyan-400 flex-shrink-0 mt-0.5" />
                     <div className="flex-1 min-w-0">
                       <p className="text-white font-medium text-sm">{os.cliente_nome}</p>
-                      <p className="text-gray-400 text-sm">{os.endereco_completo || os.cliente_endereco || 'Endereço não cadastrado'}</p>
+                      <p className="text-gray-400 text-sm">{os.cliente_endereco || 'Endereço não cadastrado'}</p>
                     </div>
                   </div>
 
@@ -230,7 +229,7 @@ export function AgendaMobile() {
 
                   {os.latitude && os.longitude && (
                     <button
-                      onClick={() => openNavigation(os.latitude, os.longitude, os.endereco_completo || os.cliente_endereco)}
+                      onClick={() => openNavigation(os.latitude, os.longitude, os.cliente_endereco)}
                       className="px-4 py-3 bg-green-500/20 border border-green-500/50 text-green-400 font-medium rounded-xl hover:bg-green-500/30 transition-all"
                     >
                       <Navigation className="w-5 h-5" />
