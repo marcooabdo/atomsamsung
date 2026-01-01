@@ -112,52 +112,68 @@ export function ExecucaoOS() {
       .in('coluna_kanban', ['em_reparo_ci', 'em_rota_ih'])
       .neq('id', osId || '')
       .limit(1)
-      .single();
+      .maybeSingle();
 
     return !!data;
   };
 
   const loadAgendamento = async () => {
-    if (!osId) return;
+    if (!osId || !usuario) return;
 
     const activeOSExists = await checkForActiveOS();
     setHasActiveOS(activeOSExists);
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_reclamado, coluna_kanban')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_reclamado, coluna_kanban, tecnico_agendado_id')
       .eq('id', osId)
-      .single();
+      .maybeSingle();
 
-    if (data) {
-      const mockAgendamento = {
-        id: data.id,
-        os_id: data.id,
-        checkin_realizado: data.coluna_kanban === 'em_reparo_ci' || data.coluna_kanban === 'em_rota_ih',
-        checkout_realizado: false,
-        checkin_hora: null,
-        checkout_hora: null,
-        checkin_latitude: null,
-        checkin_longitude: null,
-        os: {
-          numero_os: data.numero_os_samsung || data.numero_os_interna || 'S/N',
-          cliente_nome: data.cliente_nome,
-          endereco_completo: `${data.cliente_endereco}, ${data.cliente_bairro || ''}, ${data.cliente_cidade}`.trim(),
-          tipo_servico: data.tipo_atendimento === 'IH' ? `IH - ${data.tipo_reparo || ''}` : data.tipo_atendimento || '',
-          descricao_problema: data.defeito_reclamado || ''
-        }
-      };
-
-      setAgendamento(mockAgendamento as unknown as AgendamentoDetalhes);
-
-      if (mockAgendamento.checkin_realizado) {
-        setCurrentStep('checklist');
-      }
-
-      await loadPecas(data.id);
-      await loadChecklist(data.id);
-      await loadComentarios(data.id);
+    if (error) {
+      console.error('Erro ao carregar OS:', error);
+      setLoading(false);
+      return;
     }
+
+    if (!data) {
+      console.error('OS não encontrada ou sem permissão');
+      setLoading(false);
+      return;
+    }
+
+    if (data.tecnico_agendado_id !== usuario.id) {
+      console.error('Técnico não autorizado para esta OS');
+      setLoading(false);
+      return;
+    }
+
+    const mockAgendamento = {
+      id: data.id,
+      os_id: data.id,
+      checkin_realizado: data.coluna_kanban === 'em_reparo_ci' || data.coluna_kanban === 'em_rota_ih',
+      checkout_realizado: false,
+      checkin_hora: null,
+      checkout_hora: null,
+      checkin_latitude: null,
+      checkin_longitude: null,
+      os: {
+        numero_os: data.numero_os_samsung || data.numero_os_interna || 'S/N',
+        cliente_nome: data.cliente_nome,
+        endereco_completo: `${data.cliente_endereco}, ${data.cliente_bairro || ''}, ${data.cliente_cidade}`.trim(),
+        tipo_servico: data.tipo_atendimento === 'IH' ? `IH - ${data.tipo_reparo || ''}` : data.tipo_atendimento || '',
+        descricao_problema: data.defeito_reclamado || ''
+      }
+    };
+
+    setAgendamento(mockAgendamento as unknown as AgendamentoDetalhes);
+
+    if (mockAgendamento.checkin_realizado) {
+      setCurrentStep('checklist');
+    }
+
+    await loadPecas(data.id);
+    await loadChecklist(data.id);
+    await loadComentarios(data.id);
 
     setLoading(false);
   };
@@ -202,7 +218,7 @@ export function ExecucaoOS() {
       .eq('is_system', false)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (data && data.comentario) {
       const defeitoMatch = data.comentario.match(/DEFEITO ENCONTRADO:\n(.*?)\n\n/s);
@@ -216,8 +232,10 @@ export function ExecucaoOS() {
   };
 
   useEffect(() => {
-    loadAgendamento();
-  }, [osId]);
+    if (usuario && osId) {
+      loadAgendamento();
+    }
+  }, [osId, usuario]);
 
   const handleCheckin = async () => {
     if (!agendamento || !navigator.geolocation) return;
