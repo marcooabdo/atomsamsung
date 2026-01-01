@@ -643,6 +643,52 @@ export function ExecucaoOS() {
             <p className="text-gray-400 text-sm">{agendamento.os.cliente_nome}</p>
           </div>
         </div>
+
+        <div className="flex overflow-x-auto hide-scrollbar px-4 pb-3">
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            const isActive = step.key === currentStep;
+            const isCompleted =
+              (step.key === 'checkin' && agendamento.checkin_realizado) ||
+              (step.key === 'checklist' && isChecklistValid()) ||
+              (step.key === 'encerramento' && isEncerramentoValid()) ||
+              (step.key === 'checkout' && agendamento.checkout_realizado);
+
+            const canNavigate =
+              agendamento.checkin_realizado ||
+              step.key === 'checkin';
+
+            return (
+              <div key={step.key} className="flex items-center flex-shrink-0">
+                <button
+                  onClick={() => canNavigate && setCurrentStep(step.key)}
+                  disabled={!canNavigate}
+                  className={`flex flex-col items-center gap-1 px-3 ${
+                    canNavigate ? 'cursor-pointer' : 'cursor-not-allowed opacity-50'
+                  } ${isActive ? 'opacity-100' : 'opacity-70'}`}
+                >
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${
+                    isCompleted
+                      ? 'bg-green-500/20 border-green-500 text-green-400'
+                      : isActive
+                      ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400'
+                      : 'bg-gray-800 border-gray-700 text-gray-500'
+                  }`}>
+                    {isCompleted ? <CheckCircle className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+                  </div>
+                  <span className={`text-xs font-medium ${
+                    isCompleted ? 'text-green-400' : isActive ? 'text-cyan-400' : 'text-gray-500'
+                  }`}>
+                    {step.label}
+                  </span>
+                </button>
+                {index < steps.length - 1 && (
+                  <div className={`w-8 h-0.5 ${isCompleted ? 'bg-green-500' : 'bg-gray-700'}`} />
+                )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="p-4 space-y-4">
