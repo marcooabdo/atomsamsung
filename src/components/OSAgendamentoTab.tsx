@@ -51,6 +51,7 @@ export function OSAgendamentoTab({
   const [erro, setErro] = useState('');
   const [sucesso, setSucesso] = useState('');
   const [agendamento, setAgendamento] = useState<any>(null);
+  const [dadosSalvos, setDadosSalvos] = useState<any>(null);
 
   useEffect(() => {
     loadTecnicos();
@@ -130,25 +131,46 @@ export function OSAgendamentoTab({
         return;
       }
 
-      const { error } = await supabase
+      console.log('Dados do formulário antes de salvar:', formData);
+      console.log('Tipo de atendimento:', tipoAtendimento);
+
+      const updateData = {
+        data_agendamento: formData.data_agendamento,
+        tecnico_agendado_id: formData.tecnico_agendado_id,
+        confirmado_com_cliente: formData.confirmado_com_cliente,
+        periodo_agendamento: formData.periodo_agendamento || null,
+        tipo_reparo: tipoAtendimento === 'IH' ? (formData.tipo_reparo || null) : null,
+        updated_at: new Date().toISOString()
+      };
+
+      console.log('Salvando agendamento:', updateData);
+
+      const { data: updatedData, error } = await supabase
         .from('os')
-        .update({
-          data_agendamento: formData.data_agendamento,
-          tecnico_agendado_id: formData.tecnico_agendado_id,
-          confirmado_com_cliente: formData.confirmado_com_cliente,
-          periodo_agendamento: formData.periodo_agendamento || null,
-          tipo_reparo: tipoAtendimento === 'IH' ? (formData.tipo_reparo || null) : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', osId);
+        .update(updateData)
+        .eq('id', osId)
+        .select('data_agendamento, tecnico_agendado_id, confirmado_com_cliente, periodo_agendamento, tipo_reparo')
+        .single();
 
       if (error) throw error;
+
+      console.log('Dados salvos no banco:', updatedData);
+
+      const tecnicoSelecionado = tecnicos.find(t => t.id === updatedData.tecnico_agendado_id);
+
+      setDadosSalvos({
+        data: updatedData.data_agendamento,
+        tecnico: tecnicoSelecionado?.nome || 'N/A',
+        periodo: updatedData.periodo_agendamento || 'Não especificado',
+        confirmado: updatedData.confirmado_com_cliente,
+        tipo_reparo: tipoAtendimento === 'IH' ? (updatedData.tipo_reparo || 'N/A') : null
+      });
 
       setSucesso('Agendamento salvo com sucesso!');
 
       setTimeout(() => {
         setSucesso('');
-      }, 3000);
+      }, 5000);
 
       onSave();
     } catch (error: any) {
@@ -309,6 +331,49 @@ export function OSAgendamentoTab({
               <CheckCircle className="w-4 h-4" />
               {sucesso}
             </p>
+          </div>
+        )}
+
+        {dadosSalvos && (
+          <div className="premium-card p-4 bg-[#00D4FF10] border border-[#00D4FF30]">
+            <div className="flex items-center gap-2 mb-3">
+              <CheckCircle className="w-5 h-5 text-[#00D4FF]" />
+              <h4 className="text-[#00D4FF] font-bold">Resumo do Agendamento</h4>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <span className="text-gray-400 block mb-1">Data:</span>
+                <p className="text-white font-semibold">
+                  {new Date(dadosSalvos.data + 'T00:00:00').toLocaleDateString('pt-BR')}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-400 block mb-1">Período:</span>
+                <p className="text-white font-semibold capitalize">
+                  {dadosSalvos.periodo}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-400 block mb-1">Técnico:</span>
+                <p className="text-white font-semibold">
+                  {dadosSalvos.tecnico}
+                </p>
+              </div>
+              <div>
+                <span className="text-gray-400 block mb-1">Confirmado:</span>
+                <p className={`font-semibold ${dadosSalvos.confirmado ? 'text-[#39FF14]' : 'text-[#FFBF00]'}`}>
+                  {dadosSalvos.confirmado ? 'Sim' : 'Não'}
+                </p>
+              </div>
+              {dadosSalvos.tipo_reparo && (
+                <div className="col-span-2">
+                  <span className="text-gray-400 block mb-1">Tipo de Reparo:</span>
+                  <p className="text-white font-semibold">
+                    {dadosSalvos.tipo_reparo}
+                  </p>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
