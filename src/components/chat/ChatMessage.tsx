@@ -32,6 +32,21 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const getUserColor = (name: string) => {
+    const colors = [
+      '#00D4FF', // Cyan
+      '#39FF14', // Green
+      '#FF6B35', // Orange
+      '#FFD700', // Gold
+      '#FF1493', // Pink
+      '#8A2BE2', // Purple
+      '#00FA9A', // Spring Green
+      '#FF69B4', // Hot Pink
+    ];
+    const hash = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return bytes + ' B';
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
@@ -69,14 +84,15 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
     if (message.message_type === 'document' && message.file_url) {
       return (
-        <div className="flex items-center gap-3 p-3 bg-black/40 rounded-lg border border-gray-700">
-          <FileText className="w-8 h-8 text-[#00D4FF] flex-shrink-0" />
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-blue-900/40 to-blue-800/30 rounded-lg border border-blue-500/40"
+             style={{ boxShadow: '0 0 15px rgba(59, 130, 246, 0.2)' }}>
+          <FileText className="w-8 h-8 text-blue-400 flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px rgba(59, 130, 246, 0.6))' }} />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-300 truncate">
+            <p className="text-sm font-medium text-blue-200 truncate">
               {message.file_name}
             </p>
             {message.file_size && (
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-blue-300/60">
                 {formatFileSize(message.file_size)}
               </p>
             )}
@@ -84,9 +100,9 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
           <a
             href={message.file_url}
             download
-            className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-all"
+            className="p-2 hover:bg-blue-500/20 rounded-lg transition-all"
           >
-            <Download className="w-5 h-5 text-[#00D4FF]" />
+            <Download className="w-5 h-5 text-blue-400" />
           </a>
         </div>
       );
@@ -94,8 +110,9 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
     if (message.message_type === 'audio' && message.file_url) {
       return (
-        <div className="flex items-center gap-3 p-3 bg-black/40 rounded-lg border border-gray-700">
-          <Mic className="w-6 h-6 text-[#00D4FF] flex-shrink-0" />
+        <div className="flex items-center gap-3 p-3 bg-gradient-to-r from-purple-900/40 to-purple-800/30 rounded-lg border border-purple-500/40"
+             style={{ boxShadow: '0 0 15px rgba(168, 85, 247, 0.2)' }}>
+          <Mic className="w-6 h-6 text-purple-400 flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px rgba(168, 85, 247, 0.6))' }} />
           <audio src={message.file_url} controls className="flex-1" />
         </div>
       );
@@ -111,11 +128,20 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
   return (
     <div className={`flex gap-2 ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
       {!isOwnMessage && !isGrouped && conversationType === 'group' && (
-        <div className="w-8 h-8 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0 mt-auto mb-1">
+        <div
+          className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-auto mb-1"
+          style={{
+            backgroundColor: `${getUserColor(message.sender_name)}20`,
+            border: `2px solid ${getUserColor(message.sender_name)}60`
+          }}
+        >
           {message.sender_photo ? (
             <img src={message.sender_photo} alt="" className="w-full h-full rounded-full object-cover" />
           ) : (
-            <span className="text-[#00D4FF] text-sm font-bold">
+            <span
+              className="text-sm font-bold"
+              style={{ color: getUserColor(message.sender_name) }}
+            >
               {message.sender_name.charAt(0).toUpperCase()}
             </span>
           )}
@@ -128,7 +154,13 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
 
       <div className={`max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'} flex flex-col gap-1`}>
         {showSenderName && (
-          <span className="text-xs text-[#00D4FF] font-semibold px-2">
+          <span
+            className="text-xs font-bold px-2"
+            style={{
+              color: getUserColor(message.sender_name),
+              textShadow: `0 0 10px ${getUserColor(message.sender_name)}60`
+            }}
+          >
             {message.sender_name}
           </span>
         )}
@@ -136,12 +168,14 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
         <div
           className={`rounded-lg px-3 py-2 ${
             isOwnMessage
-              ? 'bg-[#00D4FF]/20 border border-[#00D4FF]/30'
-              : 'bg-gray-800/80 border border-gray-700'
+              ? 'bg-gradient-to-br from-[#00D4FF]/25 to-[#00D4FF]/15 border border-[#00D4FF]/40'
+              : 'bg-gradient-to-br from-gray-800/90 to-gray-800/70 border border-gray-600/50'
           }`}
           style={isOwnMessage ? {
-            boxShadow: '0 0 20px rgba(0, 212, 255, 0.15)'
-          } : {}}
+            boxShadow: '0 0 25px rgba(0, 212, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
+          } : {
+            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
+          }}
         >
           {renderContent()}
 

@@ -281,24 +281,10 @@ export function ExecucaoOS() {
   };
 
   const loadComentarios = async (osId: string) => {
-    const { data } = await supabase
-      .from('os_comentarios')
-      .select('comentario')
-      .eq('os_id', osId)
-      .eq('is_system', false)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (data && data.comentario) {
-      const defeitoMatch = data.comentario.match(/DEFEITO ENCONTRADO:\n(.*?)\n\n/s);
-      const diagnosticoMatch = data.comentario.match(/DIAGNÓSTICO:\n(.*?)\n\n/s);
-      const acaoMatch = data.comentario.match(/AÇÃO REALIZADA:\n(.*)/s);
-
-      if (defeitoMatch) setDefeitoEncontrado(defeitoMatch[1]);
-      if (diagnosticoMatch) setDiagnostico(diagnosticoMatch[1]);
-      if (acaoMatch) setAcaoRealizada(acaoMatch[1]);
-    }
+    // Campos sempre começam vazios para o técnico preencher
+    setDefeitoEncontrado('');
+    setDiagnostico('');
+    setAcaoRealizada('');
   };
 
   useEffect(() => {
