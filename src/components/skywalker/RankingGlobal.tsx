@@ -17,7 +17,7 @@ export function RankingGlobal() {
         const cultura = culturas.find(c => c.colaborador_id === colab.id);
 
         const travadoPorCultura = estrelas.reviews === 0 || estrelas.cultura === 0;
-        const metaNivel = getRegra(`meta_estrelas_${colab.nivel}`);
+        const metaNivel = getRegra(`meta_estrelas_${colab.nivel_atual}`);
         const progresso = metaNivel > 0 ? Math.min((estrelas.total / metaNivel) * 100, 100) : 0;
 
         return {
@@ -30,7 +30,7 @@ export function RankingGlobal() {
           progresso
         };
       })
-      .filter(c => filterNivel === 'all' || c.nivel === filterNivel)
+      .filter(c => filterNivel === 'all' || c.nivel_atual === filterNivel)
       .sort((a, b) => b.estrelas.total - a.estrelas.total);
   }, [colaboradores, vendas, reviews, culturas, calcularEstrelas, filterNivel, getRegra]);
 
@@ -106,7 +106,7 @@ export function RankingGlobal() {
             </thead>
             <tbody className="divide-y divide-gray-800">
               {ranking.map((colab, index) => {
-                const nivelConfig = NIVEIS_CONFIG[colab.nivel as Nivel];
+                const nivelConfig = NIVEIS_CONFIG[colab.nivel_atual as Nivel];
                 const isTop3 = index < 3;
 
                 return (

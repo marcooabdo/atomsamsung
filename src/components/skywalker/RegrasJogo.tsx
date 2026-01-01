@@ -197,7 +197,7 @@ export function RegrasJogo() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {colaboradores.map(colab => {
-            const nivelConfig = NIVEIS_CONFIG[colab.nivel];
+            const nivelConfig = NIVEIS_CONFIG[colab.nivel_atual];
             return (
               <div key={colab.id} className="p-3 bg-gray-800/50 border border-gray-700 rounded-lg flex items-center gap-3">
                 <div className="w-10 h-10 rounded-full bg-gray-700 flex items-center justify-center">

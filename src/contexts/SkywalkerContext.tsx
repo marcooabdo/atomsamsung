@@ -7,7 +7,7 @@ export interface Colaborador {
   usuario_id: string;
   unidade_id: string;
   perfil: 'front_office' | 'inside_sales';
-  nivel: 'starter' | 'avancado' | 'elite' | 'lider_global';
+  nivel_atual: 'starter' | 'avancado' | 'elite' | 'lider_global';
   meses_consecutivos: number;
   ativo: boolean;
   usuario?: {
