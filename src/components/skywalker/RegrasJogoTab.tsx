@@ -36,6 +36,14 @@ interface RegraPromocao {
   ordem: number;
 }
 
+interface NovaRegraPromocao {
+  tipo: 'promocao' | 'rebaixamento';
+  nome: string;
+  descricao: string;
+  condicao: string;
+  obrigatorio: boolean;
+}
+
 interface Bonificacao {
   id: string;
   nome: string;
@@ -62,6 +70,9 @@ export function RegrasJogoTab() {
   const [showNovoPilar, setShowNovoPilar] = useState(false);
   const [editingPilar, setEditingPilar] = useState<Pilar | null>(null);
   const [showNovaBonificacao, setShowNovaBonificacao] = useState(false);
+  const [showNovaRegraPromocao, setShowNovaRegraPromocao] = useState(false);
+  const [editingRegraPromocao, setEditingRegraPromocao] = useState<RegraPromocao | null>(null);
+  const [tipoRegraPromocao, setTipoRegraPromocao] = useState<'promocao' | 'rebaixamento'>('promocao');
 
   const [novoPilar, setNovoPilar] = useState({
     nome: '',
@@ -89,6 +100,14 @@ export function RegrasJogoTab() {
     condicao: 'meta_atingida',
     condicao_valor: null as number | null,
     time_aplicavel: ['front_office', 'inside_sales']
+  });
+
+  const [novaRegraPromocao, setNovaRegraPromocao] = useState<NovaRegraPromocao>({
+    tipo: 'promocao',
+    nome: '',
+    descricao: '',
+    condicao: '',
+    obrigatorio: false
   });
 
   useEffect(() => {
@@ -214,6 +233,55 @@ export function RegrasJogoTab() {
 
   const handleToggleRegraPromocao = async (id: string, ativo: boolean) => {
     await supabase.from('skywalker_regras_promocao').update({ ativo }).eq('id', id);
+    loadData();
+  };
+
+  const handleSaveRegraPromocao = async () => {
+    if (!novaRegraPromocao.nome.trim() || !novaRegraPromocao.condicao.trim()) return;
+
+    const ordem = regrasPromocao.filter(r => r.tipo === novaRegraPromocao.tipo).length + 1;
+    const { error } = await supabase.from('skywalker_regras_promocao').insert({
+      ...novaRegraPromocao,
+      ordem,
+      ativo: true
+    });
+
+    if (!error) {
+      setShowNovaRegraPromocao(false);
+      setNovaRegraPromocao({
+        tipo: 'promocao',
+        nome: '',
+        descricao: '',
+        condicao: '',
+        obrigatorio: false
+      });
+      loadData();
+    }
+  };
+
+  const handleUpdateRegraPromocao = async () => {
+    if (!editingRegraPromocao) return;
+
+    const { error } = await supabase
+      .from('skywalker_regras_promocao')
+      .update({
+        nome: editingRegraPromocao.nome,
+        descricao: editingRegraPromocao.descricao,
+        condicao: editingRegraPromocao.condicao,
+        obrigatorio: editingRegraPromocao.obrigatorio,
+        ativo: editingRegraPromocao.ativo
+      })
+      .eq('id', editingRegraPromocao.id);
+
+    if (!error) {
+      setEditingRegraPromocao(null);
+      loadData();
+    }
+  };
+
+  const handleDeleteRegraPromocao = async (id: string) => {
+    if (!confirm('Excluir esta regra?')) return;
+    await supabase.from('skywalker_regras_promocao').delete().eq('id', id);
     loadData();
   };
 
@@ -680,66 +748,326 @@ export function RegrasJogoTab() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-green-500/30">
-          <h3 className="text-lg font-bold text-green-400 mb-4 flex items-center gap-2">
-            <ChevronUp className="w-5 h-5" />
-            Regras de Promocao
-          </h3>
-          <div className="space-y-3">
+        <div className="bg-gray-800/50 rounded-xl border border-green-500/30 overflow-hidden">
+          <div className="p-4 flex items-center justify-between bg-green-500/10">
+            <h3 className="text-lg font-bold text-green-400 flex items-center gap-2">
+              <ChevronUp className="w-5 h-5" />
+              Regras de Promocao
+            </h3>
+            <button
+              onClick={() => {
+                setTipoRegraPromocao('promocao');
+                setNovaRegraPromocao({ ...novaRegraPromocao, tipo: 'promocao' });
+                setShowNovaRegraPromocao(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-green-600/20 text-green-400 rounded text-sm hover:bg-green-600/30"
+            >
+              <Plus className="w-4 h-4" />
+              Nova
+            </button>
+          </div>
+          <div className="p-4 space-y-2">
             {regrasPromocao.filter(r => r.tipo === 'promocao').map((regra) => (
-              <label
-                key={regra.id}
-                className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg cursor-pointer hover:bg-gray-900"
-              >
-                <input
-                  type="checkbox"
-                  checked={regra.ativo}
-                  onChange={(e) => handleToggleRegraPromocao(regra.id, e.target.checked)}
-                  className="w-4 h-4 accent-green-500"
-                />
-                <div className="flex-1">
-                  <span className={`text-sm ${regra.ativo ? 'text-gray-300' : 'text-gray-500'}`}>
-                    {regra.nome}
-                  </span>
-                  {regra.obrigatorio && (
-                    <span className="ml-2 text-xs text-yellow-400">(Obrigatorio)</span>
-                  )}
-                </div>
-              </label>
+              <div key={regra.id}>
+                {editingRegraPromocao?.id === regra.id ? (
+                  <div className="bg-gray-900/50 rounded-lg p-3 border border-green-500/50 space-y-2">
+                    <input
+                      type="text"
+                      value={editingRegraPromocao.nome}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, nome: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Nome da regra"
+                    />
+                    <textarea
+                      value={editingRegraPromocao.descricao || ''}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, descricao: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Descricao"
+                      rows={2}
+                    />
+                    <input
+                      type="text"
+                      value={editingRegraPromocao.condicao}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, condicao: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Codigo da condicao"
+                    />
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingRegraPromocao.obrigatorio}
+                          onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, obrigatorio: e.target.checked })}
+                          className="w-4 h-4 accent-green-500"
+                        />
+                        <span className="text-gray-300 text-sm">Obrigatorio</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingRegraPromocao.ativo}
+                          onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, ativo: e.target.checked })}
+                          className="w-4 h-4 accent-green-500"
+                        />
+                        <span className="text-gray-300 text-sm">Ativo</span>
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingRegraPromocao(null)}
+                        className="flex-1 px-3 py-1.5 bg-gray-700 text-white rounded text-sm"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleUpdateRegraPromocao}
+                        className="flex-1 px-3 py-1.5 bg-green-600 text-white rounded text-sm"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg hover:bg-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={regra.ativo}
+                      onChange={(e) => handleToggleRegraPromocao(regra.id, e.target.checked)}
+                      className="w-4 h-4 accent-green-500"
+                    />
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium ${regra.ativo ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {regra.nome}
+                      </span>
+                      {regra.descricao && (
+                        <p className="text-xs text-gray-500 mt-0.5">{regra.descricao}</p>
+                      )}
+                      {regra.obrigatorio && (
+                        <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                          Obrigatorio
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditingRegraPromocao(regra)}
+                        className="p-1.5 text-gray-400 hover:text-green-400"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRegraPromocao(regra.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
+            {regrasPromocao.filter(r => r.tipo === 'promocao').length === 0 && (
+              <p className="text-gray-500 text-sm text-center py-4">Nenhuma regra configurada</p>
+            )}
           </div>
         </div>
 
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-red-500/30">
-          <h3 className="text-lg font-bold text-red-400 mb-4 flex items-center gap-2">
-            <ChevronDown className="w-5 h-5" />
-            Regras de Rebaixamento
-          </h3>
-          <div className="space-y-3">
+        <div className="bg-gray-800/50 rounded-xl border border-red-500/30 overflow-hidden">
+          <div className="p-4 flex items-center justify-between bg-red-500/10">
+            <h3 className="text-lg font-bold text-red-400 flex items-center gap-2">
+              <ChevronDown className="w-5 h-5" />
+              Regras de Rebaixamento
+            </h3>
+            <button
+              onClick={() => {
+                setTipoRegraPromocao('rebaixamento');
+                setNovaRegraPromocao({ ...novaRegraPromocao, tipo: 'rebaixamento' });
+                setShowNovaRegraPromocao(true);
+              }}
+              className="flex items-center gap-1 px-3 py-1.5 bg-red-600/20 text-red-400 rounded text-sm hover:bg-red-600/30"
+            >
+              <Plus className="w-4 h-4" />
+              Nova
+            </button>
+          </div>
+          <div className="p-4 space-y-2">
             {regrasPromocao.filter(r => r.tipo === 'rebaixamento').map((regra) => (
-              <label
-                key={regra.id}
-                className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg cursor-pointer hover:bg-gray-900"
-              >
-                <input
-                  type="checkbox"
-                  checked={regra.ativo}
-                  onChange={(e) => handleToggleRegraPromocao(regra.id, e.target.checked)}
-                  className="w-4 h-4 accent-red-500"
-                />
-                <div className="flex-1">
-                  <span className={`text-sm ${regra.ativo ? 'text-gray-300' : 'text-gray-500'}`}>
-                    {regra.nome}
-                  </span>
-                  {regra.obrigatorio && (
-                    <span className="ml-2 text-xs text-yellow-400">(Obrigatorio)</span>
-                  )}
-                </div>
-              </label>
+              <div key={regra.id}>
+                {editingRegraPromocao?.id === regra.id ? (
+                  <div className="bg-gray-900/50 rounded-lg p-3 border border-red-500/50 space-y-2">
+                    <input
+                      type="text"
+                      value={editingRegraPromocao.nome}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, nome: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Nome da regra"
+                    />
+                    <textarea
+                      value={editingRegraPromocao.descricao || ''}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, descricao: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Descricao"
+                      rows={2}
+                    />
+                    <input
+                      type="text"
+                      value={editingRegraPromocao.condicao}
+                      onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, condicao: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white text-sm"
+                      placeholder="Codigo da condicao"
+                    />
+                    <div className="flex items-center justify-between">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingRegraPromocao.obrigatorio}
+                          onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, obrigatorio: e.target.checked })}
+                          className="w-4 h-4 accent-red-500"
+                        />
+                        <span className="text-gray-300 text-sm">Obrigatorio</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editingRegraPromocao.ativo}
+                          onChange={(e) => setEditingRegraPromocao({ ...editingRegraPromocao, ativo: e.target.checked })}
+                          className="w-4 h-4 accent-red-500"
+                        />
+                        <span className="text-gray-300 text-sm">Ativo</span>
+                      </label>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => setEditingRegraPromocao(null)}
+                        className="flex-1 px-3 py-1.5 bg-gray-700 text-white rounded text-sm"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleUpdateRegraPromocao}
+                        className="flex-1 px-3 py-1.5 bg-red-600 text-white rounded text-sm"
+                      >
+                        Salvar
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-3 p-3 bg-gray-900/50 rounded-lg hover:bg-gray-900">
+                    <input
+                      type="checkbox"
+                      checked={regra.ativo}
+                      onChange={(e) => handleToggleRegraPromocao(regra.id, e.target.checked)}
+                      className="w-4 h-4 accent-red-500"
+                    />
+                    <div className="flex-1">
+                      <span className={`text-sm font-medium ${regra.ativo ? 'text-gray-300' : 'text-gray-500'}`}>
+                        {regra.nome}
+                      </span>
+                      {regra.descricao && (
+                        <p className="text-xs text-gray-500 mt-0.5">{regra.descricao}</p>
+                      )}
+                      {regra.obrigatorio && (
+                        <span className="inline-block mt-1 text-xs px-2 py-0.5 bg-yellow-500/20 text-yellow-400 rounded">
+                          Obrigatorio
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => setEditingRegraPromocao(regra)}
+                        className="p-1.5 text-gray-400 hover:text-red-400"
+                      >
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRegraPromocao(regra.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-400"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
             ))}
+            {regrasPromocao.filter(r => r.tipo === 'rebaixamento').length === 0 && (
+              <p className="text-gray-500 text-sm text-center py-4">Nenhuma regra configurada</p>
+            )}
           </div>
         </div>
       </div>
+
+      {showNovaRegraPromocao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
+          <div className="bg-gray-900 border border-cyan-500/50 rounded-xl p-6 w-full max-w-2xl">
+            <h4 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+              <Plus className="w-5 h-5" />
+              Criar Nova Regra de {tipoRegraPromocao === 'promocao' ? 'Promocao' : 'Rebaixamento'}
+            </h4>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Nome da Regra *</label>
+                <input
+                  type="text"
+                  value={novaRegraPromocao.nome}
+                  onChange={(e) => setNovaRegraPromocao({ ...novaRegraPromocao, nome: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Ex: Atingir meta mensal"
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Descricao</label>
+                <textarea
+                  value={novaRegraPromocao.descricao}
+                  onChange={(e) => setNovaRegraPromocao({ ...novaRegraPromocao, descricao: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                  placeholder="Descreva em detalhes a condicao para aplicacao desta regra"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Codigo da Condicao *</label>
+                <input
+                  type="text"
+                  value={novaRegraPromocao.condicao}
+                  onChange={(e) => setNovaRegraPromocao({ ...novaRegraPromocao, condicao: e.target.value })}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-lg px-4 py-2 text-white font-mono text-sm"
+                  placeholder="Ex: meta_atingida, estrelas_minimas, meses_consecutivos"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Codigo usado no sistema para verificar a condicao
+                </p>
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={novaRegraPromocao.obrigatorio}
+                  onChange={(e) => setNovaRegraPromocao({ ...novaRegraPromocao, obrigatorio: e.target.checked })}
+                  className={`w-4 h-4 ${tipoRegraPromocao === 'promocao' ? 'accent-green-500' : 'accent-red-500'}`}
+                />
+                <span className="text-gray-300">Regra obrigatoria</span>
+              </label>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setShowNovaRegraPromocao(false)}
+                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveRegraPromocao}
+                className={`flex items-center gap-2 px-4 py-2 ${
+                  tipoRegraPromocao === 'promocao' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
+                } text-white rounded-lg`}
+              >
+                <Save className="w-4 h-4" />
+                Salvar Regra
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
