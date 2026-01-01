@@ -884,7 +884,7 @@ export function ExecucaoOS() {
                                 <>
                                   <span className="text-cyan-400 text-xs">ID: {etiqueta.id_sequencial}</span>
                                   <span className="text-gray-500">•</span>
-                                  <span className="text-orange-400 text-xs">Delivery: {etiqueta.delivery} dias</span>
+                                  <span className="text-orange-400 text-xs">Delivery: {etiqueta.delivery}</span>
                                 </>
                               )}
                               <span className="text-gray-500">•</span>

@@ -1171,6 +1171,46 @@ export function Kanban() {
                                 </div>
                               </div>
                             ))}
+                            {(os as any).requisicoes?.filter((r: any) => ['atendida', 'em_uso', 'gi_postada'].includes(r.status)).map((req: any) => (
+                              <div
+                                key={req.id}
+                                className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
+                                style={{
+                                  borderColor: 'rgba(57,255,20,0.3)',
+                                  background: 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)',
+                                  boxShadow: '0 0 10px rgba(57,255,20,0.1)'
+                                }}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <Package className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #39FF14)' }} />
+                                  <div className="flex-1 min-w-0">
+                                    <span
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
+                                      style={{
+                                        background: 'linear-gradient(135deg, rgba(57,255,20,0.3) 0%, rgba(57,255,20,0.15) 100%)',
+                                        color: '#39FF14',
+                                        border: '1px solid rgba(57,255,20,0.5)'
+                                      }}
+                                    >
+                                      {req.status === 'atendida' ? 'COM TÉCNICO' : req.status === 'em_uso' ? 'EM USO' : 'GI PENDENTE'}
+                                    </span>
+                                    <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
+                                    <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
+                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                      {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
+                                        <>
+                                          <span className="text-[8px] text-cyan-400">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
+                                          <span className="text-gray-600">•</span>
+                                        </>
+                                      )}
+                                      {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
+                                        <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       ))}
