@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Phone, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon } from 'lucide-react';
+import { MapPin, Clock, Phone, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon, Package, Navigation } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { OSDetailsModal } from '../../components/mobile/OSDetailsModal';
 
 interface AgendamentoOS {
   id: string;
@@ -10,15 +11,23 @@ interface AgendamentoOS {
   numero_os_samsung: string | null;
   tipo_atendimento: string;
   tipo_reparo: string | null;
+  tipo_os: string | null;
   cliente_nome: string;
   cliente_telefone: string;
   cliente_endereco: string;
-  cliente_bairro: string;
+  cliente_bairro: string | null;
   cliente_cidade: string;
+  cliente_cep: string | null;
   coluna_kanban: string;
   data_agendamento: string;
   periodo_agendamento: string;
   confirmado_com_cliente: boolean;
+  aparelho_marca: string | null;
+  aparelho_modelo: string | null;
+  defeito_reclamado: string | null;
+  observacoes: string | null;
+  latitude: number | null;
+  longitude: number | null;
 }
 
 export function AgendaMobile() {
@@ -27,6 +36,8 @@ export function AgendaMobile() {
   const [agendamentos, setAgendamentos] = useState<AgendamentoOS[]>([]);
   const [loading, setLoading] = useState(true);
   const [dataFiltro, setDataFiltro] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedOS, setSelectedOS] = useState<AgendamentoOS | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const loadAgendamentos = async () => {
     if (!usuario) return;
@@ -34,7 +45,7 @@ export function AgendaMobile() {
     setLoading(true);
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+      .select('id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, tipo_os, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, cliente_cep, coluna_kanban, data_agendamento, periodo_agendamento, confirmado_com_cliente, aparelho_marca, aparelho_modelo, defeito_reclamado, observacoes, latitude, longitude')
       .eq('tecnico_agendado_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
       .order('periodo_agendamento', { ascending: true });
@@ -55,20 +66,30 @@ export function AgendaMobile() {
     const statusMap: Record<string, { label: string; color: string }> = {
       'os_fechada': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
       'reparo_concluido': { label: 'Reparo Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-      'em_reparo_ci': { label: 'Em Reparo', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'em_rota_ih': { label: 'Em Rota', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'rota_preta': { label: 'Rota Preta', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' },
-      'rota_vermelha': { label: 'Rota Vermelha', color: 'bg-red-500/20 text-red-400 border-red-500/50' },
-      'rota_azul': { label: 'Rota Azul', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_verde': { label: 'Rota Verde', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-      'rota_rosa': { label: 'Rota Rosa', color: 'bg-pink-500/20 text-pink-400 border-pink-500/50' },
-      'rota_amarela': { label: 'Rota Amarela', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'rota_laranja': { label: 'Rota Laranja', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
+      'em_reparo_ci': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'em_rota_ih': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
+      'rota_preta': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_vermelha': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_azul': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_verde': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_rosa': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_amarela': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'rota_laranja': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
       'aguardando_peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
-      'peca_disponivel': { label: 'Peça Disponível', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' },
-      'os_nova': { label: 'OS Nova', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' }
+      'peca_disponivel': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
+      'os_nova': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' }
     };
-    return statusMap[os.coluna_kanban] || { label: 'Agendado', color: 'bg-cyan-500/20 text-cyan-400 border-cyan-500/50' };
+    return statusMap[os.coluna_kanban] || { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
+  };
+
+  const getCardBorderColor = (os: AgendamentoOS) => {
+    if (os.coluna_kanban === 'os_fechada' || os.coluna_kanban === 'reparo_concluido') {
+      return 'border-green-500/50';
+    }
+    if (os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih') {
+      return 'border-yellow-500/50';
+    }
+    return 'border-blue-500/50';
   };
 
   const getPeriodoLabel = (periodo: string) => {
@@ -119,16 +140,17 @@ export function AgendaMobile() {
         <div className="space-y-3">
           {agendamentos.map((os, index) => {
             const status = getStatusBadge(os);
+            const borderColor = getCardBorderColor(os);
 
             return (
               <div
                 key={os.id}
-                className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-3"
+                className={`bg-gray-900 border-2 ${borderColor} rounded-xl p-4 space-y-3`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="px-2 py-1 bg-blue-500/20 border border-blue-500/50 rounded text-blue-400 text-xs font-bold">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <span className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-gray-300 text-xs font-bold">
                         #{index + 1}
                       </span>
                       <span className="text-white font-bold text-lg">
@@ -138,11 +160,19 @@ export function AgendaMobile() {
                         {status.label}
                       </span>
                     </div>
-                    <p className="text-gray-400 text-sm">
+                    <p className="text-gray-400 text-sm mb-1">
                       {os.tipo_atendimento === 'IH'
                         ? `IH - ${os.tipo_reparo || 'Reparo não especificado'}`
                         : os.tipo_atendimento || 'Serviço não especificado'}
                     </p>
+                    {(os.aparelho_marca || os.aparelho_modelo) && (
+                      <div className="flex items-center gap-2 mt-2">
+                        <Package className="w-4 h-4 text-cyan-400 flex-shrink-0" />
+                        <p className="text-white text-sm font-medium">
+                          {os.aparelho_marca || ''} {os.aparelho_modelo || ''}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -164,7 +194,9 @@ export function AgendaMobile() {
                     <div className="flex items-center gap-2">
                       <Phone className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                       <a
-                        href={`tel:${os.cliente_telefone}`}
+                        href={`https://wa.me/55${os.cliente_telefone.replace(/\D/g, '')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         className="text-cyan-400 text-sm hover:underline"
                       >
                         {os.cliente_telefone}
@@ -176,7 +208,10 @@ export function AgendaMobile() {
                 <div className="flex gap-2 pt-2">
                   {os.coluna_kanban !== 'os_fechada' && os.coluna_kanban !== 'reparo_concluido' && (
                     <button
-                      onClick={() => navigate(`/mobile/execucao/${os.id}`)}
+                      onClick={() => {
+                        setSelectedOS(os);
+                        setShowDetailsModal(true);
+                      }}
                       className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
                     >
                       {os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih' ? (
@@ -187,7 +222,7 @@ export function AgendaMobile() {
                       ) : (
                         <>
                           <PlayCircle className="w-5 h-5" />
-                          Iniciar
+                          Ver Detalhes
                         </>
                       )}
                     </button>
@@ -198,6 +233,20 @@ export function AgendaMobile() {
             );
           })}
         </div>
+      )}
+
+      {showDetailsModal && selectedOS && (
+        <OSDetailsModal
+          os={selectedOS}
+          onClose={() => {
+            setShowDetailsModal(false);
+            setSelectedOS(null);
+          }}
+          onStart={() => {
+            setShowDetailsModal(false);
+            navigate(`/mobile/execucao/${selectedOS.id}`);
+          }}
+        />
       )}
     </div>
   );

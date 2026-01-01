@@ -47,18 +47,23 @@ interface AgendamentoDetalhes {
 type Step = 'checkin' | 'checklist' | 'pecas' | 'evidencias' | 'encerramento' | 'checkout';
 
 export function ExecucaoOS() {
-  const { agendamentoId } = useParams();
+  const { agendamentoId: osId } = useParams();
   const navigate = useNavigate();
   const { usuario } = useAuth();
 
   const [agendamento, setAgendamento] = useState<AgendamentoDetalhes | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>('checkin');
   const [loading, setLoading] = useState(true);
+  const [hasActiveOS, setHasActiveOS] = useState(false);
 
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
-  const [comentarios, setComentarios] = useState('');
+  const [defeitoEncontrado, setDefeitoEncontrado] = useState('');
+  const [diagnostico, setDiagnostico] = useState('');
+  const [acaoRealizada, setAcaoRealizada] = useState('');
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [selectedPecaActions, setSelectedPecaActions] = useState<Record<string, 'gi' | 'devolucao_nova' | 'devolucao_defeito'>>({});
+  const [pecaPhotos, setPecaPhotos] = useState<Record<string, { nova: string | null; velha: string | null }>>({});
+  const [uploadedEvidencias, setUploadedEvidencias] = useState<string[]>([]);
 
   const [resultado, setResultado] = useState<'sucesso' | 'peca_defeito' | 'improdutiva'>('sucesso');
   const [showAssinaturaTecnico, setShowAssinaturaTecnico] = useState(false);
@@ -82,41 +87,61 @@ export function ExecucaoOS() {
     { key: 'checkout', label: 'Check-out', icon: Clock }
   ];
 
-  const loadAgendamento = async () => {
-    if (!agendamentoId) return;
+  const checkForActiveOS = async () => {
+    if (!usuario) return false;
 
     const { data } = await supabase
-      .from('agendamentos')
-      .select(`
-        id,
-        os_id,
-        checkin_realizado,
-        checkout_realizado,
-        checkin_hora,
-        checkout_hora,
-        checkin_latitude,
-        checkin_longitude,
-        os:os_id (
-          numero_os,
-          cliente_nome,
-          endereco_completo,
-          tipo_servico,
-          descricao_problema
-        )
-      `)
-      .eq('id', agendamentoId)
+      .from('os')
+      .select('id, coluna_kanban')
+      .eq('tecnico_agendado_id', usuario.id)
+      .in('coluna_kanban', ['em_reparo_ci', 'em_rota_ih'])
+      .neq('id', osId || '')
+      .limit(1)
+      .single();
+
+    return !!data;
+  };
+
+  const loadAgendamento = async () => {
+    if (!osId) return;
+
+    const activeOSExists = await checkForActiveOS();
+    setHasActiveOS(activeOSExists);
+
+    const { data } = await supabase
+      .from('os')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_reclamado, coluna_kanban')
+      .eq('id', osId)
       .single();
 
     if (data) {
-      setAgendamento(data as unknown as AgendamentoDetalhes);
+      const mockAgendamento = {
+        id: data.id,
+        os_id: data.id,
+        checkin_realizado: data.coluna_kanban === 'em_reparo_ci' || data.coluna_kanban === 'em_rota_ih',
+        checkout_realizado: false,
+        checkin_hora: null,
+        checkout_hora: null,
+        checkin_latitude: null,
+        checkin_longitude: null,
+        os: {
+          numero_os: data.numero_os_samsung || data.numero_os_interna || 'S/N',
+          cliente_nome: data.cliente_nome,
+          endereco_completo: `${data.cliente_endereco}, ${data.cliente_bairro || ''}, ${data.cliente_cidade}`.trim(),
+          tipo_servico: data.tipo_atendimento === 'IH' ? `IH - ${data.tipo_reparo || ''}` : data.tipo_atendimento || '',
+          descricao_problema: data.defeito_reclamado || ''
+        }
+      };
 
-      if (data.checkin_realizado) {
+      setAgendamento(mockAgendamento as unknown as AgendamentoDetalhes);
+
+      if (mockAgendamento.checkin_realizado) {
         setCurrentStep('checklist');
       }
 
-      await loadPecas(data.os_id);
-      await loadChecklist(data.os_id);
-      await loadComentarios(data.os_id);
+      await loadPecas(data.id);
+      await loadChecklist(data.id);
+      await loadComentarios(data.id);
     }
 
     setLoading(false);
@@ -159,34 +184,52 @@ export function ExecucaoOS() {
       .from('os_comentarios')
       .select('comentario')
       .eq('os_id', osId)
+      .eq('is_system', false)
       .order('created_at', { ascending: false })
       .limit(1)
       .single();
 
-    if (data) {
-      setComentarios(data.comentario);
+    if (data && data.comentario) {
+      const defeitoMatch = data.comentario.match(/DEFEITO ENCONTRADO:\n(.*?)\n\n/s);
+      const diagnosticoMatch = data.comentario.match(/DIAGNÓSTICO:\n(.*?)\n\n/s);
+      const acaoMatch = data.comentario.match(/AÇÃO REALIZADA:\n(.*)/s);
+
+      if (defeitoMatch) setDefeitoEncontrado(defeitoMatch[1]);
+      if (diagnosticoMatch) setDiagnostico(diagnosticoMatch[1]);
+      if (acaoMatch) setAcaoRealizada(acaoMatch[1]);
     }
   };
 
   useEffect(() => {
     loadAgendamento();
-  }, [agendamentoId]);
+  }, [osId]);
 
   const handleCheckin = async () => {
     if (!agendamento || !navigator.geolocation) return;
+
+    if (hasActiveOS) {
+      alert('Você tem um atendimento em andamento. Finalize o check-out antes de iniciar outro.');
+      return;
+    }
 
     navigator.geolocation.getCurrentPosition(async (position) => {
       const { latitude, longitude } = position.coords;
 
       await supabase
-        .from('agendamentos')
+        .from('os')
         .update({
-          checkin_realizado: true,
-          checkin_hora: new Date().toISOString(),
-          checkin_latitude: latitude,
-          checkin_longitude: longitude
+          coluna_kanban: 'em_rota_ih'
         })
-        .eq('id', agendamento.id);
+        .eq('id', agendamento.os_id);
+
+      await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: agendamento.os_id,
+          usuario_id: usuario?.id,
+          comentario: `Check-in realizado em ${new Date().toLocaleString('pt-BR')} - Coordenadas: ${latitude}, ${longitude}`,
+          is_system: true
+        });
 
       setCurrentStep('checklist');
       loadAgendamento();
@@ -198,6 +241,17 @@ export function ExecucaoOS() {
   const handleSaveChecklist = async () => {
     if (!agendamento) return;
 
+    const allChecked = checklist.every(item => item.concluido);
+    if (!allChecked) {
+      alert('Por favor, complete todos os itens do checklist antes de continuar.');
+      return;
+    }
+
+    if (!defeitoEncontrado.trim() || !diagnostico.trim() || !acaoRealizada.trim()) {
+      alert('Por favor, preencha os campos: Defeito Encontrado, Diagnóstico e Ação Realizada.');
+      return;
+    }
+
     const checklistText = checklist
       .map(item => `[${item.concluido ? 'X' : ' '}] ${item.item}${item.observacao ? ` - ${item.observacao}` : ''}`)
       .join('\n');
@@ -207,9 +261,16 @@ export function ExecucaoOS() {
       .insert({
         os_id: agendamento.os_id,
         usuario_id: usuario?.id,
-        comentario: `CHECKLIST DE SERVIÇO:\n${checklistText}\n\nOBSERVAÇÕES:\n${comentarios}`,
+        comentario: `CHECKLIST DE SERVIÇO:\n${checklistText}\n\nDEFEITO ENCONTRADO:\n${defeitoEncontrado}\n\nDIAGNÓSTICO:\n${diagnostico}\n\nAÇÃO REALIZADA:\n${acaoRealizada}`,
         is_system: false
       });
+
+    await supabase
+      .from('os')
+      .update({
+        coluna_kanban: 'em_reparo_ci'
+      })
+      .eq('id', agendamento.os_id);
 
     setCurrentStep('pecas');
   };
@@ -241,12 +302,46 @@ export function ExecucaoOS() {
     setCurrentStep('evidencias');
   };
 
+  const handleUploadPecaPhoto = async (pecaId: string, tipo: 'nova' | 'velha', file: File) => {
+    if (!agendamento) return;
+
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${agendamento.os_id}_peca_${pecaId}_${tipo}_${Date.now()}.${fileExt}`;
+    const filePath = `os-anexos/${fileName}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('os-anexos')
+      .upload(filePath, file);
+
+    if (!uploadError) {
+      await supabase
+        .from('os_anexos')
+        .insert({
+          os_id: agendamento.os_id,
+          usuario_id: usuario?.id,
+          tipo: `peca_${tipo}`,
+          nome_arquivo: file.name,
+          caminho_storage: filePath
+        });
+
+      setPecaPhotos(prev => ({
+        ...prev,
+        [pecaId]: {
+          ...prev[pecaId],
+          [tipo]: filePath
+        }
+      }));
+
+      alert(`Foto da peça ${tipo} anexada com sucesso!`);
+    }
+  };
+
   const handleUploadEvidencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!agendamento || !e.target.files?.[0]) return;
 
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
-    const fileName = `${agendamento.os_id}_${Date.now()}.${fileExt}`;
+    const fileName = `${agendamento.os_id}_evidencia_${Date.now()}.${fileExt}`;
     const filePath = `os-anexos/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -264,6 +359,7 @@ export function ExecucaoOS() {
           caminho_storage: filePath
         });
 
+      setUploadedEvidencias(prev => [...prev, filePath]);
       alert('Evidência anexada com sucesso!');
     }
   };
@@ -487,17 +583,45 @@ export function ExecucaoOS() {
                   </div>
                 ))}
 
-                <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-                  <label className="block text-white font-medium mb-2">
-                    Comentários Gerais
-                  </label>
-                  <textarea
-                    value={comentarios}
-                    onChange={(e) => setComentarios(e.target.value)}
-                    placeholder="Descreva o resultado da visita, problemas encontrados, etc."
-                    rows={4}
-                    className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 resize-none"
-                  />
+                <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-4">
+                  <div>
+                    <label className="block text-white font-medium mb-2">
+                      Defeito Encontrado <span className="text-red-400">*</span>
+                    </label>
+                    <textarea
+                      value={defeitoEncontrado}
+                      onChange={(e) => setDefeitoEncontrado(e.target.value)}
+                      placeholder="Descreva o defeito encontrado no equipamento"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-medium mb-2">
+                      Diagnóstico <span className="text-red-400">*</span>
+                    </label>
+                    <textarea
+                      value={diagnostico}
+                      onChange={(e) => setDiagnostico(e.target.value)}
+                      placeholder="Descreva o diagnóstico técnico do problema"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 resize-none"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-white font-medium mb-2">
+                      Ação Realizada <span className="text-red-400">*</span>
+                    </label>
+                    <textarea
+                      value={acaoRealizada}
+                      onChange={(e) => setAcaoRealizada(e.target.value)}
+                      placeholder="Descreva o que foi feito no atendimento"
+                      rows={3}
+                      className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500 resize-none"
+                    />
+                  </div>
                 </div>
 
                 <button
@@ -575,6 +699,34 @@ export function ExecucaoOS() {
                           </button>
                         </div>
                       </div>
+
+                      <div className="grid grid-cols-2 gap-2 pt-2">
+                        <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
+                          <Camera className="w-5 h-5 text-cyan-400" />
+                          <span className="text-xs text-gray-400">Foto Peça Nova</span>
+                          {pecaPhotos[peca.id]?.nova && <CheckCircle className="w-4 h-4 text-green-400" />}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'nova', e.target.files[0])}
+                            className="hidden"
+                          />
+                        </label>
+
+                        <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
+                          <Camera className="w-5 h-5 text-cyan-400" />
+                          <span className="text-xs text-gray-400">Foto Peça Velha</span>
+                          {pecaPhotos[peca.id]?.velha && <CheckCircle className="w-4 h-4 text-green-400" />}
+                          <input
+                            type="file"
+                            accept="image/*"
+                            capture="environment"
+                            onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'velha', e.target.files[0])}
+                            className="hidden"
+                          />
+                        </label>
+                      </div>
                     </div>
                   ))
                 )}
@@ -610,17 +762,18 @@ export function ExecucaoOS() {
                 <div className="bg-gray-900 border border-gray-700 rounded-xl p-4">
                   <label className="flex flex-col items-center gap-3 cursor-pointer">
                     <Camera className="w-12 h-12 text-cyan-400" />
-                    <span className="text-white font-medium">Anexar Fotos ou Arquivos</span>
+                    <span className="text-white font-medium">
+                      Anexar Fotos do Reparo <span className="text-red-400">*</span>
+                    </span>
                     <span className="text-gray-400 text-sm text-center">
-                      Tire fotos do equipamento antes e depois do reparo
+                      Tire fotos do equipamento antes e depois do reparo (obrigatório)
                     </span>
                     <input
                       type="file"
-                      accept="image/*,application/pdf"
+                      accept="image/*"
                       capture="environment"
                       onChange={handleUploadEvidencia}
                       className="hidden"
-                      multiple
                     />
                     <div className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium">
                       Escolher Arquivo
@@ -628,9 +781,30 @@ export function ExecucaoOS() {
                   </label>
                 </div>
 
+                {uploadedEvidencias.length > 0 && (
+                  <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CheckCircle className="w-5 h-5 text-green-400" />
+                      <span className="text-green-400 font-medium">
+                        {uploadedEvidencias.length} foto(s) anexada(s)
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-sm">
+                      Você pode adicionar mais fotos se necessário
+                    </p>
+                  </div>
+                )}
+
                 <button
-                  onClick={() => setCurrentStep('encerramento')}
-                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
+                  onClick={() => {
+                    if (uploadedEvidencias.length === 0) {
+                      alert('Por favor, anexe pelo menos uma foto do reparo antes de continuar.');
+                      return;
+                    }
+                    setCurrentStep('encerramento');
+                  }}
+                  disabled={uploadedEvidencias.length === 0}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <Send className="w-5 h-5" />
                   Continuar
