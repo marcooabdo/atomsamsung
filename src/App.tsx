@@ -12,6 +12,7 @@ import { Financeiro } from './pages/Financeiro';
 import { OFS } from './pages/OFS';
 import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
+import { Skywalker } from './pages/Skywalker';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -141,6 +142,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <Configuracoes />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/skywalker"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Skywalker />
               </Layout>
             </ProtectedRoute>
           }
