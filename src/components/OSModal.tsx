@@ -2261,14 +2261,10 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                         if (uploadError) throw uploadError;
 
-                        const { data: { publicUrl } } = supabase.storage
-                          .from('os-anexos')
-                          .getPublicUrl(fileName);
-
                         await supabase.from('os_anexos').insert({
                           os_id: osId,
                           nome_arquivo: file.name,
-                          url: publicUrl,
+                          url: fileName,
                           tamanho_bytes: file.size,
                           tipo_arquivo: file.type
                         });
@@ -2351,7 +2347,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       </div>
                       <div className="flex gap-2">
                         <a
-                          href={supabase.storage.from('os-anexos').getPublicUrl(anexo.url).data.publicUrl}
+                          href={supabase.storage.from('os-anexos').getPublicUrl(anexo.url.replace(/^os-anexos\//, '')).data.publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="neon-button text-xs px-4 py-2"

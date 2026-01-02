@@ -538,7 +538,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 {osDetails.anexos.map((anexo) => {
                   const { data: publicUrl } = supabase.storage
                     .from('os-anexos')
-                    .getPublicUrl(anexo.url);
+                    .getPublicUrl(anexo.url.replace(/^os-anexos\//, ''));
 
                   return (
                     <a
