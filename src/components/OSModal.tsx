@@ -2351,7 +2351,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       </div>
                       <div className="flex gap-2">
                         <a
-                          href={anexo.url}
+                          href={supabase.storage.from('os-anexos').getPublicUrl(anexo.url).data.publicUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="neon-button text-xs px-4 py-2"
