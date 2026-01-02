@@ -63,8 +63,11 @@ interface OSDetails {
   }>;
   anexos?: Array<{
     id: string;
-    descricao: string | null;
-    arquivo_url: string;
+    nome_arquivo: string;
+    url: string;
+    tipo: string;
+    tamanho_bytes: number;
+    created_at: string;
   }>;
 }
 
@@ -136,7 +139,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
       const { data: anexos } = await supabase
         .from('os_anexos')
-        .select('id, descricao, arquivo_url')
+        .select('id, nome_arquivo, url, tipo, tamanho_bytes, created_at')
         .eq('os_id', osId);
 
       const pecasFormatted = pecas?.map((p: any) => ({
@@ -532,20 +535,26 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 Anexos
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {osDetails.anexos.map((anexo) => (
-                  <a
-                    key={anexo.id}
-                    href={anexo.arquivo_url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                  >
-                    <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <p className="text-sm text-gray-700 text-center truncate">
-                      {anexo.descricao || 'Anexo'}
-                    </p>
-                  </a>
-                ))}
+                {osDetails.anexos.map((anexo) => {
+                  const { data: publicUrl } = supabase.storage
+                    .from('os-anexos')
+                    .getPublicUrl(anexo.url);
+
+                  return (
+                    <a
+                      key={anexo.id}
+                      href={publicUrl.publicUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-700 text-center truncate">
+                        {anexo.nome_arquivo}
+                      </p>
+                    </a>
+                  );
+                })}
               </div>
             </div>
           )}
