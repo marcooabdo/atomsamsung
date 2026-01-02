@@ -434,9 +434,7 @@ export function ExecucaoOS() {
           usuario_id: usuario?.id,
           tipo: `peca_${tipo}`,
           nome_arquivo: file.name,
-          url: filePath,
-          tamanho_bytes: file.size,
-          tipo_arquivo: file.type
+          caminho_storage: filePath
         });
 
       setPecaPhotos(prev => ({
@@ -543,17 +541,15 @@ export function ExecucaoOS() {
           os_id: agendamento.os_id,
           usuario_id: usuario?.id,
           tipo: 'assinatura_tecnico',
-          nome_arquivo: 'Assinatura Técnico.png',
-          url: tecnicoPath,
-          tipo_arquivo: 'image/png'
+          nome_arquivo: 'Assinatura Técnico',
+          caminho_storage: tecnicoPath
         },
         {
           os_id: agendamento.os_id,
           usuario_id: usuario?.id,
           tipo: 'assinatura_cliente',
-          nome_arquivo: 'Assinatura Cliente.png',
-          url: clientePath,
-          tipo_arquivo: 'image/png'
+          nome_arquivo: 'Assinatura Cliente',
+          caminho_storage: clientePath
         }
       ]);
 
