@@ -85,98 +85,53 @@ export function Kanban() {
   };
 
   const syncSamsungGSPN = async () => {
+    if (!selectedUnidade) {
+      alert('Selecione uma unidade para atualizar');
+      return;
+    }
+
     setSyncingSamsung(true);
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Sessão não encontrada');
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('nome, samsung_asccode, samsung_token')
+        .eq('id', selectedUnidade)
+        .single();
+
+      if (!unidadeData) {
+        alert('Unidade não encontrada');
         return;
       }
 
-      let unidadesParaSync: string[] = [];
-
-      if (selectedUnidade) {
-        unidadesParaSync = [selectedUnidade];
-      } else {
-        const { data: todasUnidades } = await supabase
-          .from('unidades')
-          .select('id, samsung_asccode, samsung_token')
-          .not('samsung_asccode', 'is', null)
-          .not('samsung_token', 'is', null);
-
-        if (todasUnidades && todasUnidades.length > 0) {
-          unidadesParaSync = todasUnidades.map(u => u.id);
-        }
-      }
-
-      if (unidadesParaSync.length === 0) {
-        alert('Nenhuma unidade com configuração Samsung encontrada');
-        setSyncingSamsung(false);
+      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
+        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
         return;
       }
 
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-samsung-gspn`;
+      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ascCode: unidadeData.samsung_asccode,
+          tokenApi: unidadeData.samsung_token,
+          filial: unidadeData.nome.toLowerCase(),
+          unidade_id: selectedUnidade
+        }),
+      });
 
-      let totalCriadas = 0;
-      let totalIgnoradas = 0;
-      let totalEncontradas = 0;
-      const erros: string[] = [];
+      const result = await response.json();
 
-      for (const unidadeId of unidadesParaSync) {
-        try {
-          const { data: unidadeData } = await supabase
-            .from('unidades')
-            .select('nome, samsung_asccode, samsung_token')
-            .eq('id', unidadeId)
-            .single();
-
-          if (!unidadeData?.samsung_asccode || !unidadeData?.samsung_token) {
-            continue;
-          }
-
-          const dataFim = new Date().toISOString().split('T')[0];
-          const dataInicio = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
-
-          const response = await fetch(apiUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              unidadeId: unidadeId,
-              dataInicio,
-              dataFim
-            }),
-          });
-
-          const result = await response.json();
-
-          if (response.ok) {
-            totalCriadas += result.totalCriadas || 0;
-            totalIgnoradas += result.totalIgnoradas || 0;
-            totalEncontradas += result.totalEncontradas || 0;
-          } else {
-            erros.push(`${unidadeData.nome}: ${result.error || 'Erro desconhecido'}`);
-          }
-        } catch (error) {
-          console.error(`Erro ao sincronizar unidade ${unidadeId}:`, error);
-          erros.push(`Erro na unidade: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-        }
-      }
-
-      if (erros.length > 0) {
-        alert(`Sincronização concluída com erros:\n\n${erros.join('\n')}\n\n${totalCriadas} OS criadas de ${totalEncontradas} encontradas`);
-      } else if (totalEncontradas > 0) {
-        alert(`Sincronização Samsung concluída!\n\n${totalCriadas} OS criadas\n${totalIgnoradas} OS já existentes\n${totalEncontradas} OS encontradas`);
+      if (response.ok && result.status === 'success') {
+        alert(`Atualização concluída com sucesso!\n\n${result.message}\nFilial: ${result.filial}`);
+        await loadKanbanData();
       } else {
-        alert('Nenhuma OS Samsung encontrada no período');
+        alert(`Erro na atualização: ${result.message || 'Erro desconhecido'}`);
       }
-
-      await loadKanbanData();
     } catch (error) {
-      console.error('Erro na sincronização Samsung:', error);
-      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      console.error('Erro ao atualizar OS:', error);
+      alert(`Erro ao atualizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingSamsung(false);
     }
@@ -683,7 +638,7 @@ export function Kanban() {
 
             <button
               onClick={syncSamsungGSPN}
-              disabled={syncingSamsung}
+              disabled={syncingSamsung || !selectedUnidade}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,245,255,0.05) 100%)',
@@ -691,6 +646,7 @@ export function Kanban() {
                 color: '#00D4FF',
                 boxShadow: '0 0 10px rgba(0,212,255,0.2)'
               }}
+              title={!selectedUnidade ? 'Selecione uma unidade para atualizar' : 'Atualizar OS da Samsung'}
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
               {syncingSamsung ? 'SINCRONIZANDO...' : 'ATUALIZAR'}
