@@ -1,6 +1,7 @@
 import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { AnexoPreviewModal } from './AnexoPreviewModal';
 
 interface OSDetailsModalProps {
   osId: string;
@@ -84,6 +85,7 @@ const ROTA_COLORS: Record<string, string> = {
 export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [osDetails, setOsDetails] = useState<OSDetails | null>(null);
   const [loading, setLoading] = useState(true);
+  const [anexoPreview, setAnexoPreview] = useState<any>(null);
 
   useEffect(() => {
     loadOSDetails();
@@ -541,18 +543,16 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                     .getPublicUrl(anexo.url);
 
                   return (
-                    <a
+                    <button
                       key={anexo.id}
-                      href={publicUrl.publicUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={() => setAnexoPreview({ ...anexo, url: publicUrl.publicUrl })}
                       className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
                       <p className="text-sm text-gray-700 text-center truncate">
                         {anexo.nome_arquivo}
                       </p>
-                    </a>
+                    </button>
                   );
                 })}
               </div>
@@ -560,6 +560,13 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           )}
         </div>
       </div>
+
+      {anexoPreview && (
+        <AnexoPreviewModal
+          anexo={anexoPreview}
+          onClose={() => setAnexoPreview(null)}
+        />
+      )}
     </div>
   );
 }
