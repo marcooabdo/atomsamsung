@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { DevolucaoModal } from './DevolucaoModal';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
+import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import type { Database } from '../lib/database.types';
 
@@ -73,6 +74,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [requisicoes, setRequisicoes] = useState<RequisicaoPeca[]>([]);
   const [comentarios, setComentarios] = useState<OSComentario[]>([]);
   const [anexos, setAnexos] = useState<OSAnexo[]>([]);
+  const [anexoPreview, setAnexoPreview] = useState<OSAnexo | null>(null);
   const [pagamento, setPagamento] = useState<any>(null);
   const [checklist, setChecklist] = useState<any[]>([]);
   const [novoComentario, setNovoComentario] = useState('');
@@ -2350,14 +2352,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         </div>
                       </div>
                       <div className="flex gap-2">
-                        <a
-                          href={anexo.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
+                        <button
+                          onClick={() => setAnexoPreview(anexo)}
                           className="neon-button text-xs px-4 py-2"
                         >
                           Abrir
-                        </a>
+                        </button>
                         <button
                           onClick={async () => {
                             if (!confirm('Deseja realmente excluir este anexo?')) return;
@@ -2607,6 +2607,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {anexoPreview && (
+        <AnexoPreviewModal
+          anexo={anexoPreview}
+          onClose={() => setAnexoPreview(null)}
+        />
       )}
 
       {mostrarModalDevolucao && requisicaoSelecionada && (
