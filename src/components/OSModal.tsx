@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, Cloud, FileDown } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { DevolucaoModal } from './DevolucaoModal';
@@ -92,7 +92,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
-  const [syncingGspnAnexos, setSyncingGspnAnexos] = useState(false);
 
   useEffect(() => {
     loadOS();
@@ -308,72 +307,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     if (error) console.error('Erro ao carregar anexos:', error);
 
     setAnexos(data || []);
-  };
-
-  const syncGspnAnexos = async () => {
-    if (!os?.numero_os_samsung) {
-      alert('Esta OS não possui número Samsung vinculado');
-      return;
-    }
-
-    setSyncingGspnAnexos(true);
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        alert('Sessão expirada. Faça login novamente.');
-        return;
-      }
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-gspn-attachments`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ os_id: osId }),
-        }
-      );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.error || 'Erro ao sincronizar anexos');
-      }
-
-      console.log('Resultado da sincronizacao GSPN:', result);
-
-      if (result.total_sincronizados > 0) {
-        loadAnexos();
-        loadComentarios();
-
-        if (result.pendentes > 0) {
-          const continuar = confirm(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!\n\nRestam ${result.pendentes} anexo(s) pendentes.\n\nDeseja continuar sincronizando?`);
-          if (continuar) {
-            setSyncingGspnAnexos(false);
-            setTimeout(() => syncGspnAnexos(), 100);
-            return;
-          }
-        } else {
-          alert(`Sincronizados ${result.total_sincronizados} anexo(s) do GSPN!`);
-        }
-      } else if (result.total_gspn === 0) {
-        alert('Nenhum anexo encontrado no GSPN para esta OS.');
-      } else {
-        alert(`Todos os ${result.total_gspn} anexos ja estao sincronizados.`);
-      }
-
-      if (result.erros && result.erros.length > 0) {
-        console.error('Erros na sincronizacao:', result.erros);
-        alert(`Alguns anexos tiveram erro:\n${result.erros.join('\n')}`);
-      }
-    } catch (error) {
-      console.error('Erro ao sincronizar anexos do GSPN:', error);
-      alert(error instanceof Error ? error.message : 'Erro ao sincronizar anexos do GSPN');
-    } finally {
-      setSyncingGspnAnexos(false);
-    }
   };
 
   const loadPagamento = async () => {
@@ -2295,31 +2228,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   />
                 </label>
 
-                <button
-                  onClick={syncGspnAnexos}
-                  disabled={syncingGspnAnexos || !os.numero_os_samsung}
-                  title={!os.numero_os_samsung ? 'Esta OS nao possui numero Samsung vinculado' : 'Sincronizar anexos do GSPN'}
-                  className="neon-button flex items-center justify-center gap-2 px-4 py-3"
-                  style={{
-                    backgroundColor: syncingGspnAnexos ? '#1a1a2e' : '#00D4FF10',
-                    borderColor: '#00D4FF',
-                    color: '#00D4FF',
-                    opacity: (syncingGspnAnexos || !os.numero_os_samsung) ? 0.5 : 1,
-                    cursor: !os.numero_os_samsung ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {syncingGspnAnexos ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      SINCRONIZANDO...
-                    </>
-                  ) : (
-                    <>
-                      <Download className="w-4 h-4" />
-                      SYNC GSPN
-                    </>
-                  )}
-                </button>
               </div>
 
               <div className="space-y-3">
@@ -2329,25 +2237,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   anexos.map((anexo: any) => (
                     <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {anexo.origem === 'gspn_sync' ? (
-                          <Cloud className="w-4 h-4 text-[#00D4FF]" />
-                        ) : (
-                          <Paperclip className="w-4 h-4 text-[#00D4FF]" />
-                        )}
+                        <Paperclip className="w-4 h-4 text-[#00D4FF]" />
                         <div>
                           <div className="flex items-center gap-2">
                             <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                            {anexo.origem === 'gspn_sync' && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#00D4FF]/20 text-[#00D4FF] font-medium">
-                                GSPN
-                              </span>
-                            )}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-gray-500">
                             <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
-                            {anexo.gspn_description && (
-                              <span>- {anexo.gspn_description}</span>
-                            )}
                           </div>
                         </div>
                       </div>
