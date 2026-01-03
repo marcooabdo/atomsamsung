@@ -1,4 +1,5 @@
 import { X, Download } from 'lucide-react';
+import { encodeStoragePath } from '../lib/storageUtils';
 
 interface AnexoPreviewModalProps {
   anexo: {
@@ -10,6 +11,8 @@ interface AnexoPreviewModalProps {
 }
 
 export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
+  const encodedUrl = anexo.url.includes('://') ? anexo.url : encodeStoragePath(anexo.url);
+
   const getFileExtension = (filename: string) => {
     return filename.split('.').pop()?.toLowerCase() || '';
   };
@@ -28,7 +31,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
 
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = anexo.url;
+    link.href = encodedUrl;
     link.download = anexo.nome_arquivo;
     link.target = '_blank';
     document.body.appendChild(link);
@@ -108,7 +111,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
         >
           {isImage(anexo.nome_arquivo) ? (
             <img
-              src={anexo.url}
+              src={encodedUrl}
               alt={anexo.nome_arquivo}
               className="max-w-full max-h-full object-contain"
               style={{
@@ -117,7 +120,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
             />
           ) : isPDF(anexo.nome_arquivo) ? (
             <iframe
-              src={anexo.url}
+              src={encodedUrl}
               className="w-full h-full"
               style={{
                 minHeight: '600px',
@@ -125,7 +128,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
                 borderRadius: '8px'
               }}
               title={anexo.nome_arquivo}
-            />
+              />
           ) : null}
         </div>
       </div>
