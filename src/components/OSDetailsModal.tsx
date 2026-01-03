@@ -2,7 +2,7 @@ import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalL
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
-import { getEncodedPublicUrl } from '../lib/storageUtils';
+import { getStoragePublicUrl } from '../lib/storageUtils';
 
 interface OSDetailsModalProps {
   osId: string;
@@ -539,12 +539,12 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {osDetails.anexos.map((anexo) => {
-                  const encodedUrl = getEncodedPublicUrl('os-anexos', anexo.url, supabase);
+                  const publicUrl = getStoragePublicUrl(anexo.url);
 
                   return (
                     <button
                       key={anexo.id}
-                      onClick={() => setAnexoPreview({ ...anexo, url: encodedUrl })}
+                      onClick={() => setAnexoPreview({ ...anexo, url: publicUrl })}
                       className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                     >
                       <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />

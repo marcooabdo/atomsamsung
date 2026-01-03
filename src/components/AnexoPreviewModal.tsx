@@ -1,5 +1,5 @@
 import { X, Download } from 'lucide-react';
-import { encodeStoragePath } from '../lib/storageUtils';
+import { getStoragePublicUrl } from '../lib/storageUtils';
 
 interface AnexoPreviewModalProps {
   anexo: {
@@ -11,7 +11,7 @@ interface AnexoPreviewModalProps {
 }
 
 export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
-  const encodedUrl = anexo.url.includes('://') ? anexo.url : encodeStoragePath(anexo.url);
+  const publicUrl = anexo.url.includes('://') ? anexo.url : getStoragePublicUrl(anexo.url);
 
   const getFileExtension = (filename: string) => {
     return filename.split('.').pop()?.toLowerCase() || '';
@@ -31,7 +31,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
 
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = encodedUrl;
+    link.href = publicUrl;
     link.download = anexo.nome_arquivo;
     link.target = '_blank';
     document.body.appendChild(link);
@@ -111,7 +111,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
         >
           {isImage(anexo.nome_arquivo) ? (
             <img
-              src={encodedUrl}
+              src={publicUrl}
               alt={anexo.nome_arquivo}
               className="max-w-full max-h-full object-contain"
               style={{
@@ -120,7 +120,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
             />
           ) : isPDF(anexo.nome_arquivo) ? (
             <iframe
-              src={encodedUrl}
+              src={publicUrl}
               className="w-full h-full"
               style={{
                 minHeight: '600px',
@@ -128,7 +128,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
                 borderRadius: '8px'
               }}
               title={anexo.nome_arquivo}
-              />
+            />
           ) : null}
         </div>
       </div>
