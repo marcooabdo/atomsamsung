@@ -42,10 +42,10 @@ export function Login() {
           </div>
 
           <h1 className="tech-heading text-4xl text-center mb-2 neon-text-blue" style={{ color: 'var(--text-accent)' }}>
-            SAMSUNG
+            ATOM
           </h1>
           <p className="text-center mb-8 text-sm tracking-widest uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>
-            Sistema Operacional Corporativo
+            Sistema Operacional Corporativo Samsung
           </p>
 
           <div className="neon-divider mb-8" />
