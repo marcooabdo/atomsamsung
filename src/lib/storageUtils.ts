@@ -1,26 +1,18 @@
-import { supabase } from './supabase';
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 
 export function encodeStoragePath(path: string): string {
   return path.split('/').map(part => encodeURIComponent(part)).join('/');
 }
 
 export function getStoragePublicUrl(pathFromDb: string): string {
-  const parts = pathFromDb.split('/');
-  const bucketName = parts[0];
-  const filePath = parts.slice(1).join('/');
-
-  const encodedPath = encodeStoragePath(filePath);
-  const { data } = supabase.storage.from(bucketName).getPublicUrl(encodedPath);
-  return data.publicUrl;
+  const encodedPath = encodeStoragePath(pathFromDb);
+  return `${supabaseUrl}/storage/v1/object/public/${encodedPath}`;
 }
 
-export function getEncodedPublicUrl(bucketName: string, path: string, supabaseClient: any): string {
-  let cleanPath = path;
-  if (path.startsWith(`${bucketName}/`)) {
-    cleanPath = path.substring(bucketName.length + 1);
+export function getEncodedPublicUrl(bucketName: string, path: string): string {
+  let fullPath = path;
+  if (!path.startsWith(`${bucketName}/`)) {
+    fullPath = `${bucketName}/${path}`;
   }
-
-  const encodedPath = encodeStoragePath(cleanPath);
-  const { data } = supabaseClient.storage.from(bucketName).getPublicUrl(encodedPath);
-  return data.publicUrl;
+  return getStoragePublicUrl(fullPath);
 }
