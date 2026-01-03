@@ -32,13 +32,8 @@ export function Login() {
 
       <div className="w-full max-w-md relative z-10 scale-in">
         <div className="glass-modal p-10">
-          <div className="flex justify-center mb-8">
-            <div className="relative">
-              <div className="absolute inset-0 bg-gradient-to-r from-[#00D4FF] to-[#1428F0] rounded-2xl blur-xl opacity-50 pulse-neon" />
-              <div className="relative h-32 bg-gradient-to-br from-[#00D4FF] to-[#1428F0] rounded-2xl flex items-center justify-center border-2 border-[#00D4FF]/50 overflow-hidden px-6">
-                <img src="/gemini_generated_image_nghqponghqponghq.jpeg" alt="ATOM Logo" className="h-full w-auto object-contain" style={{ filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.8))' }} />
-              </div>
-            </div>
+          <div className="flex justify-center mb-4">
+            <img src="/gemini_generated_image_hjxu69hjxu69hjxu copy.jpeg" alt="ATOM Logo" className="h-28 w-auto object-contain rounded-lg" style={{ filter: 'drop-shadow(0 0 20px rgba(0, 212, 255, 0.4))' }} />
           </div>
 
           <h1 className="tech-heading text-4xl text-center mb-2 neon-text-blue" style={{ color: 'var(--text-accent)' }}>
