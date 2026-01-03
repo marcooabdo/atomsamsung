@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Zap, Lock, Mail, AlertTriangle } from 'lucide-react';
+import { Lock, Mail, AlertTriangle } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -35,8 +35,8 @@ export function Login() {
           <div className="flex justify-center mb-8">
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-[#00D4FF] to-[#1428F0] rounded-2xl blur-xl opacity-50 pulse-neon" />
-              <div className="relative w-20 h-20 bg-gradient-to-br from-[#00D4FF] to-[#1428F0] rounded-2xl flex items-center justify-center border-2 border-[#00D4FF]/50">
-                <Zap className="w-10 h-10 text-white" style={{ filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.8))' }} />
+              <div className="relative w-32 h-32 bg-gradient-to-br from-[#00D4FF] to-[#1428F0] rounded-2xl flex items-center justify-center border-2 border-[#00D4FF]/50 overflow-hidden">
+                <img src="/gemini_generated_image_nghqponghqponghq.jpeg" alt="ATOM Logo" className="w-full h-full object-cover" style={{ filter: 'drop-shadow(0 0 10px rgba(255, 255, 255, 0.8))' }} />
               </div>
             </div>
           </div>
