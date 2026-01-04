@@ -5,7 +5,7 @@ import { Activity, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react
 interface Job {
   id: string;
   unidade_id: string;
-  os_ids: string[] | null;
+  os_id: string | null;
   modulo: string;
   status: string;
   is_running: boolean;
@@ -172,15 +172,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
               <p className="text-xs text-gray-400">
                 Tempo: <span className="font-medium text-gray-300">{getTimeElapsed()}</span>
               </p>
-
-              {currentJob.os_ids && currentJob.os_ids.length > 0 && (
-                <>
-                  <span className="text-xs text-gray-500">•</span>
-                  <p className="text-xs text-gray-400">
-                    OS: <span className="font-medium text-gray-300">{currentJob.os_ids.length}</span>
-                  </p>
-                </>
-              )}
             </div>
 
             {currentJob.error_message && (
