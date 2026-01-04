@@ -663,12 +663,12 @@ export function Kanban() {
                 hasJobRunning
                   ? 'Aguarde a sincronização em andamento'
                   : !selectedUnidade
-                  ? 'Selecione uma unidade para atualizar'
-                  : 'Atualizar OS da Samsung'
+                  ? 'Selecione uma unidade para sincronizar'
+                  : 'Sincronizar novas OS da Samsung'
               }
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
-              {syncingSamsung ? 'SINCRONIZANDO...' : 'ATUALIZAR'}
+              {syncingSamsung ? 'SINCRONIZANDO...' : 'SYNC NOVAS OS'}
             </button>
           </div>
         </div>
