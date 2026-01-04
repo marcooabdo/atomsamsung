@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { Activity, CheckCircle, XCircle, Clock, AlertCircle } from 'lucide-react';
+import { Activity, CheckCircle, XCircle, Clock } from 'lucide-react';
 
 interface Job {
   id: string;
@@ -157,13 +157,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
                 Tempo: <span className="font-medium text-gray-300">{getTimeElapsed()}</span>
               </p>
             </div>
-
-            {currentJob.error_message && (
-              <div className="flex items-start gap-2 mt-2 p-2 rounded-lg bg-red-500/10 border border-red-500/30">
-                <AlertCircle className="w-3 h-3 text-red-400 mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-red-300">{currentJob.error_message}</p>
-              </div>
-            )}
           </div>
         </div>
 
