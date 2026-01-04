@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
+import { JobStatusCard } from '../components/JobStatusCard';
 import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
@@ -50,6 +51,7 @@ export function Kanban() {
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
   const [mostrarStatusSamsung, setMostrarStatusSamsung] = useState(false);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
+  const [hasJobRunning, setHasJobRunning] = useState(false);
   const autoScrollInterval = useRef<number | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
@@ -90,6 +92,11 @@ export function Kanban() {
       return;
     }
 
+    if (hasJobRunning) {
+      alert('Já existe uma sincronização em andamento. Aguarde a conclusão.');
+      return;
+    }
+
     setSyncingSamsung(true);
     try {
       const { data: unidadeData } = await supabase
@@ -124,7 +131,6 @@ export function Kanban() {
       const result = await response.json();
 
       if (response.ok && result.status === 'success') {
-        alert(`Atualização concluída com sucesso!\n\n${result.message}\nFilial: ${result.filial}`);
         await loadKanbanData();
       } else {
         alert(`Erro na atualização: ${result.message || 'Erro desconhecido'}`);
@@ -565,6 +571,13 @@ export function Kanban() {
         onUnidadeChange={handleUnidadeChange}
       />
 
+      {selectedUnidade && (
+        <JobStatusCard
+          unidadeId={selectedUnidade}
+          onJobRunningChange={setHasJobRunning}
+        />
+      )}
+
       <div className="premium-card p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">
           <div className="flex items-center gap-3">
@@ -638,7 +651,7 @@ export function Kanban() {
 
             <button
               onClick={syncSamsungGSPN}
-              disabled={syncingSamsung || !selectedUnidade}
+              disabled={syncingSamsung || !selectedUnidade || hasJobRunning}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,245,255,0.05) 100%)',
@@ -646,7 +659,13 @@ export function Kanban() {
                 color: '#00D4FF',
                 boxShadow: '0 0 10px rgba(0,212,255,0.2)'
               }}
-              title={!selectedUnidade ? 'Selecione uma unidade para atualizar' : 'Atualizar OS da Samsung'}
+              title={
+                hasJobRunning
+                  ? 'Aguarde a sincronização em andamento'
+                  : !selectedUnidade
+                  ? 'Selecione uma unidade para atualizar'
+                  : 'Atualizar OS da Samsung'
+              }
             >
               <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
               {syncingSamsung ? 'SINCRONIZANDO...' : 'ATUALIZAR'}
