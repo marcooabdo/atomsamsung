@@ -43,23 +43,10 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       )
       .subscribe();
 
-    const interval = setInterval(() => {
-      if (currentJob && !currentJob.is_running && currentJob.finished_at) {
-        const finishedTime = new Date(currentJob.finished_at).getTime();
-        const now = Date.now();
-        const thirtyMinutes = 30 * 60 * 1000;
-
-        if (now - finishedTime > thirtyMinutes) {
-          setCurrentJob(null);
-        }
-      }
-    }, 60000);
-
     return () => {
       channel.unsubscribe();
-      clearInterval(interval);
     };
-  }, [unidadeId, currentJob]);
+  }, [unidadeId]);
 
   useEffect(() => {
     if (onJobRunningChange) {
@@ -68,13 +55,10 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
   }, [currentJob?.is_running, onJobRunningChange]);
 
   const loadCurrentJob = async () => {
-    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000).toISOString();
-
     const { data, error } = await supabase
       .from('jobs')
       .select('*')
       .eq('unidade_id', unidadeId)
-      .or(`is_running.eq.true,finished_at.gte.${thirtyMinutesAgo}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -183,14 +167,14 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
           </div>
         </div>
 
-        {!currentJob.is_running && currentJob.finished_at && (
+        {!currentJob.is_running && (
           <div className="text-right">
-            <p className="text-[10px] text-gray-500">Concluído em</p>
+            <p className="text-[10px] text-gray-500">Finalizado em</p>
             <p className="text-xs text-gray-400 font-medium">
-              {new Date(currentJob.finished_at).toLocaleTimeString('pt-BR', {
+              {currentJob.finished_at ? new Date(currentJob.finished_at).toLocaleTimeString('pt-BR', {
                 hour: '2-digit',
                 minute: '2-digit'
-              })}
+              }) : '-'}
             </p>
           </div>
         )}
