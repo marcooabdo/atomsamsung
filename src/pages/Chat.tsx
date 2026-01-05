@@ -45,7 +45,7 @@ export function Chat() {
 
   return (
     <>
-      <div className="h-[calc(100vh-8rem)] flex flex-col -mx-8 -my-6 bg-[#0a1015]">
+      <div className="h-[calc(100vh-48px)] flex flex-col bg-[#0a1015] -m-6 overflow-hidden">
         <div className="flex items-center justify-between px-6 py-3 border-b border-[#1a3a4a]/50 bg-[#0d1419]">
           <div className="flex gap-1">
             <button

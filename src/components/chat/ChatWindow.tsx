@@ -28,32 +28,46 @@ interface ConversationInfo {
 export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) {
   const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
+    setError(null);
     loadConversationInfo();
     markMessagesAsRead();
   }, [conversationId]);
 
   const loadConversationInfo = async () => {
     try {
-      const { data: conv, error } = await supabase
+      const { data: conv, error: convError } = await supabase
         .from('chat_conversations')
         .select('*')
         .eq('id', conversationId)
-        .single();
+        .maybeSingle();
 
-      if (error) throw error;
+      if (convError) {
+        console.error('Erro ao buscar conversa:', convError);
+        setError('Erro ao carregar conversa');
+        setLoading(false);
+        return;
+      }
+
+      if (!conv) {
+        setError('Conversa nao encontrada');
+        setLoading(false);
+        return;
+      }
 
       const { data: participant } = await supabase
         .from('chat_participants')
         .select('role')
         .eq('conversation_id', conversationId)
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
 
       let enrichedConv: ConversationInfo = {
         ...conv,
-        user_role: participant?.role
+        user_role: participant?.role || 'member'
       };
 
       if (conv.tipo === 'direct') {
@@ -62,23 +76,17 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
           .select('user_id, usuarios(id, nome)')
           .eq('conversation_id', conversationId)
           .neq('user_id', userId)
-          .single();
+          .maybeSingle();
 
         if (otherParticipant && otherParticipant.usuarios) {
           const otherUser = Array.isArray(otherParticipant.usuarios)
             ? otherParticipant.usuarios[0]
             : otherParticipant.usuarios;
 
-          const { data: presence } = await supabase
-            .from('user_presence')
-            .select('status, last_seen_at')
-            .eq('user_id', otherUser.id)
-            .maybeSingle();
-
           enrichedConv.other_user = {
             ...otherUser,
-            status: presence?.status || 'offline',
-            last_seen_at: presence?.last_seen_at
+            status: 'offline',
+            last_seen_at: undefined
           };
         }
       } else {
@@ -91,9 +99,10 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       }
 
       setConversationInfo(enrichedConv);
+      setLoading(false);
     } catch (err) {
       console.error('Erro ao carregar informações da conversa:', err);
-    } finally {
+      setError('Erro ao carregar conversa');
       setLoading(false);
     }
   };
@@ -109,10 +118,30 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
     }
   };
 
-  if (loading || !conversationInfo) {
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-full w-full bg-[#0a1015]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D4FF]"></div>
+      </div>
+    );
+  }
+
+  if (error || !conversationInfo) {
+    return (
+      <div className="flex items-center justify-center h-full w-full bg-[#0a1015]">
+        <div className="text-center">
+          <p className="text-gray-400 mb-4">{error || 'Conversa nao encontrada'}</p>
+          <button
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              loadConversationInfo();
+            }}
+            className="px-4 py-2 bg-[#00D4FF]/20 text-[#00D4FF] rounded-lg hover:bg-[#00D4FF]/30 transition-all"
+          >
+            Tentar novamente
+          </button>
+        </div>
       </div>
     );
   }
