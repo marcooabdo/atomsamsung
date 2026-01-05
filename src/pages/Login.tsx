@@ -116,12 +116,6 @@ export function Login() {
         <p className="text-center text-xs mt-8 uppercase tracking-widest font-medium" style={{ color: 'var(--text-secondary)' }}>
           Acesso Restrito • Usuários Autorizados
         </p>
-
-        <div className="mt-6 p-4 premium-card text-center">
-          <p className="text-xs mb-2" style={{ color: 'var(--text-secondary)' }}>Credenciais Padrão:</p>
-          <p className="text-xs font-mono" style={{ color: 'var(--text-accent)' }}>marcoabdo@groupglobal.com.br</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>Senha: Samsung@2024</p>
-        </div>
       </div>
     </div>
   );
