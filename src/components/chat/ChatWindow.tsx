@@ -15,11 +15,9 @@ interface ConversationInfo {
   tipo: string;
   nome: string | null;
   descricao: string | null;
-  foto_url: string | null;
   other_user?: {
     id: string;
     nome: string;
-    foto_url: string | null;
     status?: string;
     last_seen_at?: string;
   };
@@ -61,7 +59,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       if (conv.tipo === 'direct') {
         const { data: otherParticipant } = await supabase
           .from('chat_participants')
-          .select('user_id, usuarios(id, nome, foto_url)')
+          .select('user_id, usuarios(id, nome)')
           .eq('conversation_id', conversationId)
           .neq('user_id', userId)
           .single();
@@ -75,11 +73,11 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
             .from('user_presence')
             .select('status, last_seen_at')
             .eq('user_id', otherUser.id)
-            .single();
+            .maybeSingle();
 
           enrichedConv.other_user = {
             ...otherUser,
-            status: presence?.status,
+            status: presence?.status || 'offline',
             last_seen_at: presence?.last_seen_at
           };
         }

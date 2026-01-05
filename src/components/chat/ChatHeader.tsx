@@ -7,11 +7,9 @@ interface ConversationInfo {
   tipo: string;
   nome: string | null;
   descricao: string | null;
-  foto_url: string | null;
   other_user?: {
     id: string;
     nome: string;
-    foto_url: string | null;
     status?: string;
     last_seen_at?: string;
   };
@@ -31,10 +29,6 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
   const displayName = conversation.tipo === 'direct' && conversation.other_user
     ? conversation.other_user.nome
     : conversation.nome;
-
-  const displayPhoto = conversation.tipo === 'direct' && conversation.other_user
-    ? conversation.other_user.foto_url
-    : conversation.foto_url;
 
   const getStatusText = () => {
     if (conversation.tipo === 'group') {
@@ -80,9 +74,7 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
         )}
 
         <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden flex-shrink-0">
-          {displayPhoto ? (
-            <img src={displayPhoto} alt="" className="w-full h-full object-cover" />
-          ) : conversation.tipo === 'group' ? (
+          {conversation.tipo === 'group' ? (
             <Users className="w-5 h-5 text-[#00D4FF]" />
           ) : (
             <div className="text-[#00D4FF] font-bold">

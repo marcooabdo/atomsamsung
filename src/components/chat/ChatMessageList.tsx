@@ -17,7 +17,6 @@ interface Message {
   edited_at: string | null;
   deleted_at: string | null;
   sender_name: string;
-  sender_photo: string | null;
   read_by?: string[];
 }
 
@@ -64,7 +63,7 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
         .from('chat_messages')
         .select(`
           *,
-          usuarios!chat_messages_sender_id_fkey(nome, foto_url)
+          usuarios!chat_messages_sender_id_fkey(nome)
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: false })
@@ -91,15 +90,13 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
             return {
               ...msg,
               sender_name: sender?.nome || 'Usuário',
-              sender_photo: sender?.foto_url,
               read_by: reads?.map(r => r.user_id) || []
             };
           }
 
           return {
             ...msg,
-            sender_name: sender?.nome || 'Usuário',
-            sender_photo: sender?.foto_url
+            sender_name: sender?.nome || 'Usuário'
           };
         })
       );
@@ -137,14 +134,13 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
         async (payload) => {
           const { data: sender } = await supabase
             .from('usuarios')
-            .select('nome, foto_url')
+            .select('nome')
             .eq('id', payload.new.sender_id)
-            .single();
+            .maybeSingle();
 
           const newMessage = {
             ...payload.new,
-            sender_name: sender?.nome || 'Usuário',
-            sender_photo: sender?.foto_url
+            sender_name: sender?.nome || 'Usuário'
           };
 
           setMessages(prev => [...prev, newMessage as Message]);

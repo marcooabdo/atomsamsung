@@ -24,14 +24,11 @@ export function Chat() {
 
   return (
     <>
-      <div className="h-[calc(100vh-6rem)] flex gap-4">
+      <div className="fixed top-16 left-0 right-0 bottom-0 flex">
         <div
           className={`${
             isMobile && selectedConversationId ? 'hidden' : 'flex'
-          } flex-col w-full md:w-[380px] bg-black/40 border border-[#00D4FF]/20 rounded-lg overflow-hidden`}
-          style={{
-            boxShadow: '0 0 40px rgba(0, 212, 255, 0.1)'
-          }}
+          } flex-col w-full md:w-[400px] bg-black/95 border-r border-[#00D4FF]/20`}
         >
           <ChatConversationList
             userId={usuario.id}
@@ -44,10 +41,7 @@ export function Chat() {
         <div
           className={`${
             isMobile && !selectedConversationId ? 'hidden' : 'flex'
-          } flex-1 bg-black/40 border border-[#00D4FF]/20 rounded-lg overflow-hidden`}
-          style={{
-            boxShadow: '0 0 40px rgba(0, 212, 255, 0.1)'
-          }}
+          } flex-1 bg-black/95`}
         >
           {selectedConversationId ? (
             <ChatWindow
