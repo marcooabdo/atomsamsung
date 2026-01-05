@@ -1,14 +1,17 @@
 import { useState, useRef, KeyboardEvent } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Send, Paperclip, Smile, Image, FileText, Mic, X } from 'lucide-react';
+import { Send, Paperclip, Image, FileText, X } from 'lucide-react';
+import { Message } from './ChatMessageList';
 
 interface ChatInputProps {
   conversationId: string;
   userId: string;
+  userName?: string;
   onMessageSent?: () => void;
+  onMessageAdded?: (message: Message) => void;
 }
 
-export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputProps) {
+export function ChatInput({ conversationId, userId, onMessageSent, onMessageAdded }: ChatInputProps) {
   const [message, setMessage] = useState('');
   const [sending, setSending] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -19,16 +22,20 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
   const handleSendMessage = async () => {
     if (!message.trim() || sending) return;
 
+    const messageContent = message.trim();
     setSending(true);
+
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('chat_messages')
         .insert({
           conversation_id: conversationId,
           sender_id: userId,
-          content: message.trim(),
+          content: messageContent,
           message_type: 'text'
-        });
+        })
+        .select()
+        .single();
 
       if (error) throw error;
 
@@ -36,6 +43,20 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
       if (textareaRef.current) {
         textareaRef.current.style.height = 'auto';
       }
+
+      if (data && onMessageAdded) {
+        const { data: userData } = await supabase
+          .from('usuarios')
+          .select('nome')
+          .eq('id', userId)
+          .maybeSingle();
+
+        onMessageAdded({
+          ...data,
+          sender_name: userData?.nome || 'Voce'
+        } as Message);
+      }
+
       onMessageSent?.();
     } catch (err) {
       console.error('Erro ao enviar mensagem:', err);
@@ -82,7 +103,7 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
         .from('chat-files')
         .getPublicUrl(filePath);
 
-      const { error: messageError } = await supabase
+      const { data: messageData, error: messageError } = await supabase
         .from('chat_messages')
         .insert({
           conversation_id: conversationId,
@@ -92,9 +113,24 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
           file_url: publicUrl,
           file_name: file.name,
           file_size: file.size
-        });
+        })
+        .select()
+        .single();
 
       if (messageError) throw messageError;
+
+      if (messageData && onMessageAdded) {
+        const { data: userData } = await supabase
+          .from('usuarios')
+          .select('nome')
+          .eq('id', userId)
+          .maybeSingle();
+
+        onMessageAdded({
+          ...messageData,
+          sender_name: userData?.nome || 'Voce'
+        } as Message);
+      }
 
       onMessageSent?.();
     } catch (err) {

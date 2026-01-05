@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChatHeader } from './ChatHeader';
-import { ChatMessageList } from './ChatMessageList';
+import { ChatMessageList, ChatMessageListRef, Message } from './ChatMessageList';
 import { ChatInput } from './ChatInput';
 
 interface ChatWindowProps {
@@ -29,6 +29,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
   const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const messageListRef = useRef<ChatMessageListRef>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -155,6 +156,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       />
 
       <ChatMessageList
+        ref={messageListRef}
         conversationId={conversationId}
         userId={userId}
         conversationType={conversationInfo.tipo}
@@ -164,6 +166,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         conversationId={conversationId}
         userId={userId}
         onMessageSent={markMessagesAsRead}
+        onMessageAdded={(msg) => messageListRef.current?.addMessage(msg)}
       />
     </div>
   );

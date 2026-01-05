@@ -1,9 +1,9 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChatMessage } from './ChatMessage';
 import { Loader } from 'lucide-react';
 
-interface Message {
+export interface Message {
   id: string;
   conversation_id: string;
   sender_id: string;
@@ -26,7 +26,11 @@ interface ChatMessageListProps {
   conversationType: string;
 }
 
-export function ChatMessageList({ conversationId, userId, conversationType }: ChatMessageListProps) {
+export interface ChatMessageListRef {
+  addMessage: (message: Message) => void;
+}
+
+export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType }, ref) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -50,6 +54,18 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
       setIsInitialLoad(false);
     }
   }, [messages, isInitialLoad]);
+
+  useImperativeHandle(ref, () => ({
+    addMessage: (message: Message) => {
+      setMessages(prev => {
+        if (prev.some(m => m.id === message.id)) {
+          return prev;
+        }
+        return [...prev, message];
+      });
+      setTimeout(() => scrollToBottom(), 100);
+    }
+  }));
 
   const loadMessages = async (before?: string) => {
     try {
@@ -258,4 +274,4 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
       )}
     </div>
   );
-}
+});
