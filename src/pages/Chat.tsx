@@ -24,7 +24,7 @@ export function Chat() {
 
   return (
     <>
-      <div className="fixed top-16 left-0 right-0 bottom-0 flex">
+      <div className="h-[calc(100vh-8rem)] flex gap-0 -mx-8 -my-6">
         <div
           className={`${
             isMobile && selectedConversationId ? 'hidden' : 'flex'

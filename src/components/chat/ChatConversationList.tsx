@@ -45,6 +45,7 @@ export function ChatConversationList({
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
+  const [creatingConversation, setCreatingConversation] = useState(false);
 
   useEffect(() => {
     loadConversations();
@@ -155,18 +156,37 @@ export function ChatConversationList({
   };
 
   const handleStartDirectConversation = async (otherUserId: string) => {
+    if (creatingConversation) return;
+
+    setCreatingConversation(true);
     try {
+      console.log('Criando conversa com usuário:', otherUserId);
+
       const { data, error } = await supabase.rpc('create_direct_conversation', {
         user1_id: userId,
         user2_id: otherUserId
       });
 
-      if (error) throw error;
+      console.log('Resposta da criação:', { data, error });
+
+      if (error) {
+        console.error('Erro RPC:', error);
+        throw error;
+      }
+
+      if (!data) {
+        throw new Error('Nenhum ID de conversa retornado');
+      }
+
+      console.log('Conversa criada com sucesso, ID:', data);
+      await loadConversations();
       onSelectConversation(data);
       setActiveTab('conversations');
-    } catch (err) {
+    } catch (err: any) {
       console.error('Erro ao criar conversa:', err);
-      alert('Erro ao iniciar conversa');
+      alert(`Erro ao iniciar conversa: ${err.message || 'Erro desconhecido'}`);
+    } finally {
+      setCreatingConversation(false);
     }
   };
 
@@ -345,11 +365,18 @@ export function ChatConversationList({
             </div>
           ) : (
             <div className="p-2">
+              {creatingConversation && (
+                <div className="flex items-center justify-center p-4 bg-[#00D4FF]/10 rounded-lg mb-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00D4FF] mr-3"></div>
+                  <span className="text-sm text-[#00D4FF]">Iniciando conversa...</span>
+                </div>
+              )}
               {filteredUsers.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => handleStartDirectConversation(user.id)}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg transition-all mb-1 hover:bg-[#00D4FF]/5 border border-transparent hover:border-[#00D4FF]/30"
+                  disabled={creatingConversation}
+                  className="w-full flex items-start gap-3 p-3 rounded-lg transition-all mb-1 hover:bg-[#00D4FF]/5 border border-transparent hover:border-[#00D4FF]/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="relative flex-shrink-0">
                     <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
