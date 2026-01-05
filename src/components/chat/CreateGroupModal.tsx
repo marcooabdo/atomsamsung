@@ -5,7 +5,6 @@ import { X, Users, Search, Check } from 'lucide-react';
 interface User {
   id: string;
   nome: string;
-  foto_url: string | null;
   tipo: string;
 }
 
@@ -34,7 +33,8 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, foto_url, tipo')
+        .select('id, nome, tipo')
+        .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
 
@@ -201,13 +201,9 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
                     }`}
                   >
                     <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
-                      {user.foto_url ? (
-                        <img src={user.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <span className="text-[#00D4FF] font-bold">
-                          {user.nome.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <span className="text-[#00D4FF] font-bold">
+                        {user.nome.charAt(0).toUpperCase()}
+                      </span>
                     </div>
 
                     <div className="flex-1 text-left">

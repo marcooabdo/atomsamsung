@@ -7,7 +7,6 @@ interface Participant {
   user_id: string;
   role: string;
   nome: string;
-  foto_url: string | null;
   tipo: string;
 }
 
@@ -58,7 +57,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
           id,
           user_id,
           role,
-          usuarios(id, nome, foto_url, tipo)
+          usuarios(id, nome, tipo)
         `)
         .eq('conversation_id', conversationId);
 
@@ -71,7 +70,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
           user_id: p.user_id,
           role: p.role,
           nome: user.nome,
-          foto_url: user.foto_url,
           tipo: user.tipo
         };
       });
@@ -86,7 +84,8 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     try {
       const { data: allUsers, error: usersError } = await supabase
         .from('usuarios')
-        .select('id, nome, foto_url, tipo')
+        .select('id, nome, tipo')
+        .eq('ativo', true)
         .order('nome');
 
       if (usersError) throw usersError;
@@ -254,13 +253,9 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
                   className="flex items-center gap-3 p-3 bg-black/40 rounded-lg border border-gray-800"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
-                    {participant.foto_url ? (
-                      <img src={participant.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
-                    ) : (
-                      <span className="text-[#00D4FF] font-bold">
-                        {participant.nome.charAt(0).toUpperCase()}
-                      </span>
-                    )}
+                    <span className="text-[#00D4FF] font-bold">
+                      {participant.nome.charAt(0).toUpperCase()}
+                    </span>
                   </div>
 
                   <div className="flex-1">
@@ -320,13 +315,9 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
                     className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-[#00D4FF]/5 border border-transparent transition-all"
                   >
                     <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center flex-shrink-0">
-                      {user.foto_url ? (
-                        <img src={user.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <span className="text-[#00D4FF] font-bold">
-                          {user.nome.charAt(0).toUpperCase()}
-                        </span>
-                      )}
+                      <span className="text-[#00D4FF] font-bold">
+                        {user.nome.charAt(0).toUpperCase()}
+                      </span>
                     </div>
 
                     <div className="flex-1 text-left">

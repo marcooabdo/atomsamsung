@@ -6,7 +6,6 @@ interface Conversation {
   id: string;
   tipo: string;
   nome: string | null;
-  foto_url: string | null;
   unread_count: number;
   last_message: {
     content: string;
@@ -17,14 +16,12 @@ interface Conversation {
   other_user?: {
     id: string;
     nome: string;
-    foto_url: string | null;
   };
 }
 
 interface User {
   id: string;
   nome: string;
-  foto_url: string | null;
   tipo: string;
   ativo: boolean;
 }
@@ -104,7 +101,7 @@ export function ChatConversationList({
           if (conv.tipo === 'direct') {
             const { data: participants } = await supabase
               .from('chat_participants')
-              .select('user_id, usuarios(id, nome, foto_url)')
+              .select('user_id, usuarios(id, nome)')
               .eq('conversation_id', conv.id)
               .neq('user_id', userId)
               .single();
@@ -138,7 +135,7 @@ export function ChatConversationList({
       console.log('Carregando usuários... userId atual:', userId);
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, foto_url, tipo, ativo')
+        .select('id, nome, tipo, ativo')
         .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
@@ -286,10 +283,6 @@ export function ChatConversationList({
                   ? conv.other_user.nome
                   : conv.nome;
 
-                const displayPhoto = conv.tipo === 'direct' && conv.other_user
-                  ? conv.other_user.foto_url
-                  : conv.foto_url;
-
                 return (
                   <button
                     key={conv.id}
@@ -302,9 +295,7 @@ export function ChatConversationList({
                   >
                     <div className="relative flex-shrink-0">
                       <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
-                        {displayPhoto ? (
-                          <img src={displayPhoto} alt="" className="w-full h-full object-cover" />
-                        ) : conv.tipo === 'group' ? (
+                        {conv.tipo === 'group' ? (
                           <Users className="w-6 h-6 text-[#00D4FF]" />
                         ) : (
                           <div className="text-[#00D4FF] font-bold text-lg">
@@ -362,13 +353,9 @@ export function ChatConversationList({
                 >
                   <div className="relative flex-shrink-0">
                     <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
-                      {user.foto_url ? (
-                        <img src={user.foto_url} alt="" className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="text-[#00D4FF] font-bold text-lg">
-                          {user.nome.charAt(0).toUpperCase()}
-                        </div>
-                      )}
+                      <div className="text-[#00D4FF] font-bold text-lg">
+                        {user.nome.charAt(0).toUpperCase()}
+                      </div>
                     </div>
                   </div>
 
