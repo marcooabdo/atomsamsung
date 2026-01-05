@@ -24,7 +24,7 @@ interface LayoutProps {
   children: ReactNode;
 }
 
-const menuItems = [
+const allMenuItems = [
   { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'cotacoes', label: 'Nexus de Cotações', icon: FileText, path: '/cotacoes' },
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
@@ -34,7 +34,7 @@ const menuItems = [
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
   { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
   { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
-  { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes' },
+  { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes', onlyFor: ['master', 'diretoria', 'gerente'] },
 ];
 
 export function Layout({ children }: LayoutProps) {
@@ -42,6 +42,11 @@ export function Layout({ children }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const menuItems = allMenuItems.filter(item => {
+    if (!item.onlyFor) return true;
+    return usuario && item.onlyFor.includes(usuario.tipo);
+  });
 
   const handleSignOut = async () => {
     try {

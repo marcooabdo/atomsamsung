@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown } from 'lucide-react';
 
 type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists';
@@ -92,6 +93,7 @@ interface ChecklistTemplate {
 }
 
 export function Configuracoes() {
+  const { usuario: usuarioLogado } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('unidades');
   const [loading, setLoading] = useState(true);
 
@@ -519,15 +521,20 @@ export function Configuracoes() {
     }
   };
 
-  const tabs = [
+  const allTabs = [
     { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: '#00D4FF' },
-    { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14' },
+    { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14', onlyFor: ['master', 'diretoria', 'gerente'] },
     { id: 'servicos' as Tab, label: 'Serviços', icon: Wrench, color: '#FFBF00' },
     { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064' },
     { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD' },
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981' },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' }
   ];
+
+  const tabs = allTabs.filter(tab => {
+    if (!tab.onlyFor) return true;
+    return usuarioLogado && tab.onlyFor.includes(usuarioLogado.tipo);
+  });
 
   return (
     <>
@@ -633,8 +640,8 @@ export function Configuracoes() {
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Usuário *</label>
                     <select value={formUsuario.tipo} onChange={(e) => setFormUsuario({...formUsuario, tipo: e.target.value as any})} className="neon-input">
-                      <option value="master">Master</option>
-                      <option value="diretoria">Diretoria</option>
+                      {usuarioLogado?.tipo !== 'gerente' && <option value="master">Master</option>}
+                      {usuarioLogado?.tipo !== 'gerente' && <option value="diretoria">Diretoria</option>}
                       <option value="gerente">Gerente</option>
                       <option value="administrador">Administrador</option>
                       <option value="estoque">Estoque</option>
