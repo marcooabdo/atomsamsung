@@ -63,33 +63,33 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
 
   return (
     <>
-      <div className="flex items-center gap-3 p-4 border-b border-[#00D4FF]/20 bg-black/40">
+      <div className="flex items-center gap-3 px-4 py-3 border-b border-[#1a3a4a]/50 bg-[#0d1419]">
         {onBack && (
           <button
             onClick={onBack}
-            className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-all md:hidden"
+            className="p-2 hover:bg-[#1a3a4a]/50 rounded-lg transition-all md:hidden"
           >
             <ArrowLeft className="w-5 h-5 text-[#00D4FF]" />
           </button>
         )}
 
-        <div className="w-10 h-10 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden flex-shrink-0">
+        <div className="w-11 h-11 rounded-full bg-[#1a3a4a] flex items-center justify-center overflow-hidden flex-shrink-0">
           {conversation.tipo === 'group' ? (
             <Users className="w-5 h-5 text-[#00D4FF]" />
           ) : (
-            <div className="text-[#00D4FF] font-bold">
+            <span className="text-[#00D4FF] font-semibold text-lg">
               {displayName?.charAt(0).toUpperCase()}
-            </div>
+            </span>
           )}
         </div>
 
         <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-gray-200 truncate">
+          <h2 className="font-semibold text-white truncate">
             {displayName}
           </h2>
-          <p className="text-xs text-gray-400 flex items-center gap-1">
+          <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
             {conversation.tipo === 'direct' && conversation.other_user?.status === 'online' && (
-              <span className="w-2 h-2 bg-[#39FF14] rounded-full pulse-neon"></span>
+              <span className="w-2 h-2 bg-[#00D4FF] rounded-full"></span>
             )}
             {getStatusText()}
           </p>
@@ -98,7 +98,7 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
         {canEditGroup && (
           <button
             onClick={() => setShowEditModal(true)}
-            className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-all"
+            className="p-2 hover:bg-[#1a3a4a]/50 rounded-lg transition-all"
             title="Configurações do grupo"
           >
             <Settings className="w-5 h-5 text-gray-400 hover:text-[#00D4FF]" />

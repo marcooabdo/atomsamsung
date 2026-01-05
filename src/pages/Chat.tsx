@@ -4,7 +4,7 @@ import { ChatConversationList } from '../components/chat/ChatConversationList';
 import { ChatWindow } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
 import { supabase } from '../lib/supabase';
-import { Map, MessageCircle } from 'lucide-react';
+import { Building2, MessageCircle } from 'lucide-react';
 
 export function Chat() {
   const { usuario } = useAuth();
@@ -12,7 +12,6 @@ export function Chat() {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
-  const [activeTab, setActiveTab] = useState<'campus' | 'chat'>('chat');
 
   useEffect(() => {
     const checkMobile = () => {
@@ -33,9 +32,9 @@ export function Chat() {
   const loadOnlineCount = async () => {
     try {
       const { count } = await supabase
-        .from('user_presence')
+        .from('usuarios')
         .select('*', { count: 'exact', head: true })
-        .eq('status', 'online');
+        .eq('ativo', true);
       setOnlineCount(count || 0);
     } catch (err) {
       console.error('Erro ao carregar contagem de usuários online:', err);
@@ -46,93 +45,71 @@ export function Chat() {
 
   return (
     <>
-      <div className="h-[calc(100vh-8rem)] flex flex-col gap-0 -mx-8 -my-6">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#00D4FF]/20 bg-black/40 backdrop-blur-sm">
-          <div className="flex gap-2">
+      <div className="h-[calc(100vh-8rem)] flex flex-col -mx-8 -my-6 bg-[#0a1015]">
+        <div className="flex items-center justify-between px-6 py-3 border-b border-[#1a3a4a]/50 bg-[#0d1419]">
+          <div className="flex gap-1">
             <button
-              onClick={() => setActiveTab('campus')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'campus'
-                  ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/50'
-                  : 'text-gray-400 hover:text-[#00D4FF] hover:bg-[#00D4FF]/10'
-              }`}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-gray-400 hover:text-white hover:bg-[#1a3a4a]/30 transition-all"
             >
-              <Map className="w-4 h-4" />
-              <span className="font-medium">Campus</span>
+              <Building2 className="w-4 h-4" />
+              <span className="font-medium text-sm">Campus</span>
             </button>
             <button
-              onClick={() => setActiveTab('chat')}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                activeTab === 'chat'
-                  ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/50'
-                  : 'text-gray-400 hover:text-[#00D4FF] hover:bg-[#00D4FF]/10'
-              }`}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0d2832] text-[#00D4FF] border border-[#00D4FF]/30 transition-all"
             >
               <MessageCircle className="w-4 h-4" />
-              <span className="font-medium">Chat</span>
+              <span className="font-medium text-sm">Chat</span>
             </button>
           </div>
-          <div className="flex items-center gap-2">
-            <div className="w-2 h-2 bg-[#39FF14] rounded-full animate-pulse"></div>
-            <span className="text-sm text-gray-400">
-              <span className="text-[#39FF14] font-semibold">{onlineCount}</span> online
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
+            <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
+            <span className="text-sm text-[#00D4FF] font-medium">
+              {onlineCount} online
             </span>
           </div>
         </div>
 
-        <div className="flex-1 flex gap-0 overflow-hidden">
-        <div
-          className={`${
-            isMobile && selectedConversationId ? 'hidden' : 'flex'
-          } flex-col w-full md:w-[400px] bg-black/95 border-r border-[#00D4FF]/20`}
-        >
-          <ChatConversationList
-            userId={usuario.id}
-            selectedConversationId={selectedConversationId}
-            onSelectConversation={setSelectedConversationId}
-            onCreateGroup={() => setShowCreateGroupModal(true)}
-          />
-        </div>
-
-        <div
-          className={`${
-            isMobile && !selectedConversationId ? 'hidden' : 'flex'
-          } flex-1 bg-black/95`}
-        >
-          {selectedConversationId ? (
-            <ChatWindow
-              conversationId={selectedConversationId}
+        <div className="flex-1 flex overflow-hidden">
+          <div
+            className={`${
+              isMobile && selectedConversationId ? 'hidden' : 'flex'
+            } flex-col w-full md:w-[380px] lg:w-[420px] bg-[#0d1419] border-r border-[#1a3a4a]/50`}
+          >
+            <ChatConversationList
               userId={usuario.id}
-              onBack={isMobile ? () => setSelectedConversationId(null) : undefined}
+              selectedConversationId={selectedConversationId}
+              onSelectConversation={setSelectedConversationId}
+              onCreateGroup={() => setShowCreateGroupModal(true)}
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center p-8">
-              <div className="text-center max-w-md">
-                <div className="w-32 h-32 mx-auto mb-6 rounded-full bg-[#00D4FF]/10 flex items-center justify-center">
-                  <svg
-                    className="w-16 h-16 text-[#00D4FF]/50"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"
-                    />
-                  </svg>
+          </div>
+
+          <div
+            className={`${
+              isMobile && !selectedConversationId ? 'hidden' : 'flex'
+            } flex-1 bg-[#0a1015]`}
+          >
+            {selectedConversationId ? (
+              <ChatWindow
+                conversationId={selectedConversationId}
+                userId={usuario.id}
+                onBack={isMobile ? () => setSelectedConversationId(null) : undefined}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-28 h-28 mx-auto mb-6 rounded-full bg-[#0d2832] border border-[#00D4FF]/20 flex items-center justify-center">
+                    <MessageCircle className="w-14 h-14 text-[#00D4FF]/60" strokeWidth={1.5} />
+                  </div>
+                  <h3 className="text-xl font-semibold text-white mb-2">
+                    Selecione uma conversa
+                  </h3>
+                  <p className="text-sm text-gray-500">
+                    Escolha uma conversa na lista ao lado ou inicie uma nova
+                  </p>
                 </div>
-                <h3 className="text-xl font-semibold text-gray-400 mb-2">
-                  Selecione uma conversa
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Escolha uma conversa na lista ou inicie uma nova
-                </p>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Users, MessageSquare, UserCircle2 } from 'lucide-react';
+import { Search, Users, MessageSquare, AtSign } from 'lucide-react';
 
 interface Conversation {
   id: string;
@@ -133,7 +133,6 @@ export function ChatConversationList({
   const loadUsers = async () => {
     setLoadingUsers(true);
     try {
-      console.log('Carregando usuários... userId atual:', userId);
       const { data, error } = await supabase
         .from('usuarios')
         .select('id, nome, tipo, ativo')
@@ -141,12 +140,7 @@ export function ChatConversationList({
         .neq('id', userId)
         .order('nome');
 
-      if (error) {
-        console.error('Erro na query de usuários:', error);
-        throw error;
-      }
-
-      console.log('Usuários carregados:', data);
+      if (error) throw error;
       setUsers(data || []);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
@@ -160,25 +154,14 @@ export function ChatConversationList({
 
     setCreatingConversation(true);
     try {
-      console.log('Criando conversa com usuário:', otherUserId);
-
       const { data, error } = await supabase.rpc('create_direct_conversation', {
         user1_id: userId,
         user2_id: otherUserId
       });
 
-      console.log('Resposta da criação:', { data, error });
+      if (error) throw error;
+      if (!data) throw new Error('Nenhum ID de conversa retornado');
 
-      if (error) {
-        console.error('Erro RPC:', error);
-        throw error;
-      }
-
-      if (!data) {
-        throw new Error('Nenhum ID de conversa retornado');
-      }
-
-      console.log('Conversa criada com sucesso, ID:', data);
       await loadConversations();
       onSelectConversation(data);
       setActiveTab('conversations');
@@ -206,15 +189,9 @@ export function ChatConversationList({
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return 'agora';
-    if (minutes < 60) return `${minutes}min`;
     if (hours < 24) return `${hours}h`;
-    if (days === 1) return 'ontem';
-    if (days < 7) return `${days}d`;
     return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
   };
 
@@ -222,33 +199,31 @@ export function ChatConversationList({
     if (!conv.last_message) return 'Sem mensagens';
 
     const { content, message_type, sender_name } = conv.last_message;
-    const prefix = conv.tipo === 'group' ? `${sender_name}: ` : '';
+    const prefix = conv.tipo === 'group' ? `${sender_name.split(' ')[0]}: ` : '';
 
-    if (message_type === 'image') return `${prefix}📷 Foto`;
-    if (message_type === 'document') return `${prefix}📎 Documento`;
-    if (message_type === 'audio') return `${prefix}🎤 Áudio`;
+    if (message_type === 'image') return `${prefix}Foto`;
+    if (message_type === 'document') return `${prefix}Documento`;
+    if (message_type === 'audio') return `${prefix}Audio`;
 
-    return `${prefix}${content}`;
+    const maxLength = 30;
+    const text = `${prefix}${content}`;
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
   };
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-[#00D4FF]/20">
-        <h2 className="text-3xl font-bold text-[#00D4FF] mb-4 tracking-[0.3em]" style={{
-          textShadow: '0 0 20px rgba(0, 212, 255, 0.5)',
-          fontFamily: 'monospace',
-          letterSpacing: '0.3em'
-        }}>
+    <div className="flex flex-col h-full bg-[#0d1419]">
+      <div className="p-5">
+        <h2 className="text-2xl font-bold text-[#00D4FF] mb-5 tracking-[0.2em]">
           CHAT
         </h2>
 
         <div className="flex gap-2 mb-4">
           <button
             onClick={() => setActiveTab('conversations')}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'conversations'
-                ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/50'
-                : 'bg-black/40 text-gray-400 border border-gray-700 hover:border-[#00D4FF]/30'
+                ? 'bg-[#0d2832] text-[#00D4FF] border border-[#00D4FF]/40'
+                : 'bg-[#151f26] text-gray-400 border border-[#1a3a4a]/50 hover:border-[#00D4FF]/30'
             }`}
           >
             <MessageSquare className="w-4 h-4" />
@@ -256,13 +231,13 @@ export function ChatConversationList({
           </button>
           <button
             onClick={() => setActiveTab('contacts')}
-            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+            className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
               activeTab === 'contacts'
-                ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/50'
-                : 'bg-black/40 text-gray-400 border border-gray-700 hover:border-[#00D4FF]/30'
+                ? 'bg-[#0d2832] text-[#00D4FF] border border-[#00D4FF]/40'
+                : 'bg-[#151f26] text-gray-400 border border-[#1a3a4a]/50 hover:border-[#00D4FF]/30'
             }`}
           >
-            <UserCircle2 className="w-4 h-4" />
+            <AtSign className="w-4 h-4" />
             Contatos
           </button>
         </div>
@@ -274,14 +249,14 @@ export function ChatConversationList({
             placeholder={activeTab === 'conversations' ? 'Buscar conversas...' : 'Buscar contatos...'}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-black/60 border border-[#00D4FF]/20 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/50"
+            className="w-full pl-10 pr-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/40"
           />
         </div>
 
         {activeTab === 'conversations' && (
           <button
             onClick={onCreateGroup}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-[#00D4FF]/10 hover:bg-[#00D4FF]/20 border border-[#00D4FF]/30 rounded-lg text-[#00D4FF] font-semibold text-sm transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#0d2832] hover:bg-[#0d2832]/80 border border-[#00D4FF]/30 rounded-lg text-[#00D4FF] font-medium text-sm transition-all"
           >
             <Users className="w-4 h-4" />
             Novo Grupo
@@ -289,7 +264,7 @@ export function ChatConversationList({
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto cyber-scrollbar">
+      <div className="flex-1 overflow-y-auto">
         {activeTab === 'conversations' ? (
           loading ? (
             <div className="flex items-center justify-center h-32">
@@ -301,7 +276,7 @@ export function ChatConversationList({
               <p className="text-sm">Nenhuma conversa ainda</p>
             </div>
           ) : (
-            <div className="p-2">
+            <div className="px-3">
               {filteredConversations.map((conv) => {
                 const displayName = conv.tipo === 'direct' && conv.other_user
                   ? conv.other_user.nome
@@ -311,42 +286,41 @@ export function ChatConversationList({
                   <button
                     key={conv.id}
                     onClick={() => onSelectConversation(conv.id)}
-                    className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all mb-1 ${
+                    className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 ${
                       selectedConversationId === conv.id
-                        ? 'bg-[#00D4FF]/15 border-l-4 border-l-[#00D4FF]'
-                        : 'hover:bg-[#00D4FF]/5 border-l-4 border-l-transparent'
+                        ? 'bg-[#00D4FF]/10'
+                        : 'hover:bg-[#1a3a4a]/30'
                     }`}
                   >
-                    <div className="relative flex-shrink-0">
-                      <div className="w-14 h-14 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
+                    <div className="flex-shrink-0">
+                      <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
                         {conv.tipo === 'group' ? (
-                          <Users className="w-6 h-6 text-[#00D4FF]" />
+                          <Users className="w-5 h-5 text-[#00D4FF]" />
                         ) : (
-                          <div className="text-[#00D4FF] font-bold text-lg">
+                          <span className="text-[#00D4FF] font-semibold text-lg">
                             {displayName?.charAt(0).toUpperCase()}
-                          </div>
+                          </span>
                         )}
                       </div>
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <h3 className="font-semibold text-gray-100 truncate text-base">
+                      <div className="flex items-center justify-between">
+                        <h3 className="font-semibold text-white truncate">
                           {displayName}
                         </h3>
                         {conv.last_message && (
-                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2 font-medium">
+                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
                             {formatTime(conv.last_message.created_at)}
                           </span>
                         )}
                       </div>
-
-                      <div className="flex items-center justify-between gap-2 mt-1">
-                        <p className="text-sm text-gray-400 truncate flex-1">
+                      <div className="flex items-center justify-between mt-1">
+                        <p className="text-sm text-gray-400 truncate pr-2">
                           {getMessagePreview(conv)}
                         </p>
                         {conv.unread_count > 0 && (
-                          <span className="ml-2 flex-shrink-0 min-w-[22px] h-5 px-1.5 bg-[#39FF14] text-black text-xs font-bold rounded-full flex items-center justify-center">
+                          <span className="flex-shrink-0 min-w-[20px] h-5 px-1.5 bg-[#00D4FF] text-black text-xs font-bold rounded-full flex items-center justify-center">
                             {conv.unread_count}
                           </span>
                         )}
@@ -364,15 +338,15 @@ export function ChatConversationList({
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-500">
-              <UserCircle2 className="w-12 h-12 mb-2 opacity-50" />
+              <AtSign className="w-12 h-12 mb-2 opacity-50" />
               <p className="text-sm">Nenhum contato encontrado</p>
             </div>
           ) : (
-            <div className="p-2">
+            <div className="px-3">
               {creatingConversation && (
-                <div className="flex items-center justify-center p-4 bg-[#00D4FF]/10 rounded-lg mb-2">
-                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00D4FF] mr-3"></div>
-                  <span className="text-sm text-[#00D4FF]">Iniciando conversa...</span>
+                <div className="flex items-center justify-center p-4 bg-[#00D4FF]/10 rounded-lg mb-2 border border-[#00D4FF]/30">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#00D4FF] mr-3"></div>
+                  <span className="text-sm text-[#00D4FF]">Abrindo conversa...</span>
                 </div>
               )}
               {filteredUsers.map((user) => (
@@ -380,21 +354,21 @@ export function ChatConversationList({
                   key={user.id}
                   onClick={() => handleStartDirectConversation(user.id)}
                   disabled={creatingConversation}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg transition-all mb-1 hover:bg-[#00D4FF]/5 border-l-4 border-l-transparent hover:border-l-[#00D4FF]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 hover:bg-[#1a3a4a]/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <div className="relative flex-shrink-0">
-                    <div className="w-14 h-14 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
-                      <div className="text-[#00D4FF] font-bold text-xl">
+                  <div className="flex-shrink-0">
+                    <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
+                      <span className="text-[#00D4FF] font-semibold text-lg">
                         {user.nome.charAt(0).toUpperCase()}
-                      </div>
+                      </span>
                     </div>
                   </div>
 
                   <div className="flex-1 min-w-0 text-left">
-                    <h3 className="font-semibold text-gray-100 truncate text-base">
+                    <h3 className="font-semibold text-white truncate">
                       {user.nome}
                     </h3>
-                    <p className="text-xs text-gray-500 uppercase truncate mt-0.5">
+                    <p className="text-xs text-gray-500 uppercase mt-0.5">
                       {user.tipo}
                     </p>
                   </div>

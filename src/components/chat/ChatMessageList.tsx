@@ -206,7 +206,7 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
 
   if (loading) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-[#0a1015]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D4FF]"></div>
       </div>
     );
@@ -216,11 +216,7 @@ export function ChatMessageList({ conversationId, userId, conversationType }: Ch
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      className="flex-1 overflow-y-auto cyber-scrollbar p-4 bg-[url('/grid.svg')] bg-repeat"
-      style={{
-        backgroundSize: '30px 30px',
-        backgroundImage: 'radial-gradient(circle, #00D4FF08 1px, transparent 1px)'
-      }}
+      className="flex-1 overflow-y-auto p-4 bg-[#0a1015]"
     >
       {loadingMore && (
         <div className="flex justify-center py-4">

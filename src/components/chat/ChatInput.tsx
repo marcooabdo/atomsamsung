@@ -130,7 +130,7 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
   };
 
   return (
-    <div className="p-4 border-t border-[#00D4FF]/20 bg-black/40">
+    <div className="px-4 py-3 border-t border-[#1a3a4a]/50 bg-[#0d1419]">
       {uploading && (
         <div className="mb-3 px-4 py-2 bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg">
           <div className="flex items-center gap-3">
@@ -140,12 +140,12 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
         </div>
       )}
 
-      <div className="flex items-end gap-2">
+      <div className="flex items-end gap-3">
         <div className="relative">
           <button
             onClick={() => setShowAttachMenu(!showAttachMenu)}
             disabled={uploading}
-            className="p-2.5 hover:bg-[#00D4FF]/10 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            className="p-2.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
             title="Anexar arquivo"
           >
             {showAttachMenu ? (
@@ -156,10 +156,10 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
           </button>
 
           {showAttachMenu && (
-            <div className="absolute bottom-full left-0 mb-2 bg-black/95 border border-[#00D4FF]/30 rounded-lg overflow-hidden shadow-xl">
+            <div className="absolute bottom-full left-0 mb-2 bg-[#151f26] border border-[#1a3a4a] rounded-lg overflow-hidden shadow-xl min-w-[180px]">
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[#00D4FF]/10 transition-all text-left w-full"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full"
               >
                 <Image className="w-5 h-5 text-[#00D4FF]" />
                 <div>
@@ -183,7 +183,7 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
                   input.onchange = (e: any) => handleDocumentSelect(e);
                   input.click();
                 }}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[#00D4FF]/10 transition-all text-left w-full border-t border-gray-800"
+                className="flex items-center gap-3 px-4 py-3 hover:bg-[#1a3a4a]/50 transition-all text-left w-full border-t border-[#1a3a4a]"
               >
                 <FileText className="w-5 h-5 text-[#00D4FF]" />
                 <div>
@@ -204,7 +204,7 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
             placeholder="Digite uma mensagem..."
             disabled={sending || uploading}
             rows={1}
-            className="w-full px-4 py-2.5 bg-black/60 border border-[#00D4FF]/20 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/50 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full px-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/40 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ maxHeight: '120px' }}
           />
         </div>
@@ -212,19 +212,12 @@ export function ChatInput({ conversationId, userId, onMessageSent }: ChatInputPr
         <button
           onClick={handleSendMessage}
           disabled={!message.trim() || sending || uploading}
-          className="p-2.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          className="p-2.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-xl transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           title="Enviar mensagem"
-          style={{
-            boxShadow: message.trim() ? '0 0 20px rgba(0, 212, 255, 0.4)' : 'none'
-          }}
         >
           <Send className="w-5 h-5 text-black" />
         </button>
       </div>
-
-      <p className="text-xs text-gray-500 mt-2 text-center">
-        Pressione Enter para enviar, Shift+Enter para quebrar linha
-      </p>
     </div>
   );
 }

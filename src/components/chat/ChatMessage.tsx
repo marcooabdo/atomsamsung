@@ -119,7 +119,7 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
     }
 
     return (
-      <p className="text-sm text-gray-300 whitespace-pre-wrap break-words">
+      <p className="text-sm text-gray-100 whitespace-pre-wrap break-words">
         {message.content}
       </p>
     );
@@ -166,16 +166,11 @@ export function ChatMessage({ message, isOwnMessage, showSenderName, isGrouped, 
         )}
 
         <div
-          className={`rounded-lg px-3 py-2 ${
+          className={`rounded-2xl px-3 py-2 ${
             isOwnMessage
-              ? 'bg-gradient-to-br from-[#00D4FF]/25 to-[#00D4FF]/15 border border-[#00D4FF]/40'
-              : 'bg-gradient-to-br from-gray-800/90 to-gray-800/70 border border-gray-600/50'
+              ? 'bg-[#0d2832] rounded-br-sm'
+              : 'bg-[#1a2832] rounded-bl-sm'
           }`}
-          style={isOwnMessage ? {
-            boxShadow: '0 0 25px rgba(0, 212, 255, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)'
-          } : {
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.05)'
-          }}
         >
           {renderContent()}
 

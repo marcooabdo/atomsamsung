@@ -111,14 +111,14 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
 
   if (loading || !conversationInfo) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div className="flex items-center justify-center h-full w-full bg-[#0a1015]">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D4FF]"></div>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full w-full bg-[#0a1015]">
       <ChatHeader
         conversation={conversationInfo}
         onBack={onBack}
