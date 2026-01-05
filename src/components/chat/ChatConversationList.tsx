@@ -234,7 +234,11 @@ export function ChatConversationList({
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-[#00D4FF]/20">
-        <h2 className="text-xl font-bold text-[#00D4FF] mb-4 tech-heading">
+        <h2 className="text-3xl font-bold text-[#00D4FF] mb-4 tracking-[0.3em]" style={{
+          textShadow: '0 0 20px rgba(0, 212, 255, 0.5)',
+          fontFamily: 'monospace',
+          letterSpacing: '0.3em'
+        }}>
           CHAT
         </h2>
 
@@ -307,14 +311,14 @@ export function ChatConversationList({
                   <button
                     key={conv.id}
                     onClick={() => onSelectConversation(conv.id)}
-                    className={`w-full flex items-start gap-3 p-3 rounded-lg transition-all mb-1 ${
+                    className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all mb-1 ${
                       selectedConversationId === conv.id
-                        ? 'bg-[#00D4FF]/15 border border-[#00D4FF]/50'
-                        : 'hover:bg-[#00D4FF]/5 border border-transparent'
+                        ? 'bg-[#00D4FF]/15 border-l-4 border-l-[#00D4FF]'
+                        : 'hover:bg-[#00D4FF]/5 border-l-4 border-l-transparent'
                     }`}
                   >
                     <div className="relative flex-shrink-0">
-                      <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
+                      <div className="w-14 h-14 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
                         {conv.tipo === 'group' ? (
                           <Users className="w-6 h-6 text-[#00D4FF]" />
                         ) : (
@@ -326,23 +330,23 @@ export function ChatConversationList({
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
-                      <div className="flex items-center justify-between mb-1">
-                        <h3 className="font-semibold text-gray-200 truncate">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <h3 className="font-semibold text-gray-100 truncate text-base">
                           {displayName}
                         </h3>
                         {conv.last_message && (
-                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
+                          <span className="text-xs text-gray-500 flex-shrink-0 ml-2 font-medium">
                             {formatTime(conv.last_message.created_at)}
                           </span>
                         )}
                       </div>
 
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-2 mt-1">
                         <p className="text-sm text-gray-400 truncate flex-1">
                           {getMessagePreview(conv)}
                         </p>
                         {conv.unread_count > 0 && (
-                          <span className="ml-2 flex-shrink-0 px-2 py-0.5 bg-[#39FF14] text-black text-xs font-bold rounded-full pulse-neon">
+                          <span className="ml-2 flex-shrink-0 min-w-[22px] h-5 px-1.5 bg-[#39FF14] text-black text-xs font-bold rounded-full flex items-center justify-center">
                             {conv.unread_count}
                           </span>
                         )}
@@ -376,21 +380,21 @@ export function ChatConversationList({
                   key={user.id}
                   onClick={() => handleStartDirectConversation(user.id)}
                   disabled={creatingConversation}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg transition-all mb-1 hover:bg-[#00D4FF]/5 border border-transparent hover:border-[#00D4FF]/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full flex items-center gap-3 p-3 rounded-lg transition-all mb-1 hover:bg-[#00D4FF]/5 border-l-4 border-l-transparent hover:border-l-[#00D4FF]/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="relative flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
-                      <div className="text-[#00D4FF] font-bold text-lg">
+                    <div className="w-14 h-14 rounded-full bg-[#00D4FF]/20 flex items-center justify-center overflow-hidden">
+                      <div className="text-[#00D4FF] font-bold text-xl">
                         {user.nome.charAt(0).toUpperCase()}
                       </div>
                     </div>
                   </div>
 
                   <div className="flex-1 min-w-0 text-left">
-                    <h3 className="font-semibold text-gray-200 truncate">
+                    <h3 className="font-semibold text-gray-100 truncate text-base">
                       {user.nome}
                     </h3>
-                    <p className="text-xs text-gray-500 uppercase truncate">
+                    <p className="text-xs text-gray-500 uppercase truncate mt-0.5">
                       {user.tipo}
                     </p>
                   </div>
