@@ -472,7 +472,36 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
       if (response.ok && result.status === 'success') {
         await loadOS();
-        await loadCurrentJob();
+
+        // Começa polling imediato para pegar o job
+        const startPolling = async () => {
+          let attempts = 0;
+          const maxAttempts = 20; // 10 segundos
+
+          while (attempts < maxAttempts) {
+            await loadCurrentJob();
+
+            // Verifica se o job foi encontrado
+            const { data: jobCheck } = await supabase
+              .from('jobs')
+              .select('*')
+              .eq('os_id', osId)
+              .eq('modulo', 'pipeline_operacional')
+              .order('created_at', { ascending: false })
+              .limit(1)
+              .maybeSingle();
+
+            if (jobCheck) {
+              setCurrentJob(jobCheck);
+              break;
+            }
+
+            attempts++;
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        };
+
+        startPolling();
         if (onReload) onReload();
       } else {
         alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
