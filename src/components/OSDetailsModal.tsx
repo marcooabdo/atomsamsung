@@ -1,4 +1,4 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
@@ -7,6 +7,19 @@ import { getStoragePublicUrl } from '../lib/storageUtils';
 interface OSDetailsModalProps {
   osId: string;
   onClose: () => void;
+}
+
+interface Job {
+  id: string;
+  unidade_id: string;
+  os_id: string | null;
+  modulo: string;
+  status: string;
+  is_running: boolean;
+  created_at: string;
+  finished_at: string | null;
+  error_message: string | null;
+  metadata: Record<string, any>;
 }
 
 interface OSDetails {
@@ -34,6 +47,7 @@ interface OSDetails {
   aparelho_nserie: string | null;
   status_samsung_desc: string | null;
   status_samsung_reason: string | null;
+  unidade_id: string;
   agendamento?: {
     data_agendamento: string;
     confirmado_com_cliente: boolean;
@@ -87,10 +101,113 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [osDetails, setOsDetails] = useState<OSDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [anexoPreview, setAnexoPreview] = useState<any>(null);
+  const [syncingGSPN, setSyncingGSPN] = useState(false);
+  const [currentJob, setCurrentJob] = useState<Job | null>(null);
 
   useEffect(() => {
     loadOSDetails();
+    loadCurrentJob();
   }, [osId]);
+
+  useEffect(() => {
+    if (!osDetails?.unidade_id) return;
+
+    const channel = supabase
+      .channel('jobs-changes-os')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'jobs',
+          filter: `os_id=eq.${osId}`
+        },
+        () => {
+          loadCurrentJob();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [osId, osDetails?.unidade_id]);
+
+  async function loadCurrentJob() {
+    const { data, error } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('os_id', osId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error loading job:', error);
+      return;
+    }
+
+    setCurrentJob(data);
+  }
+
+  async function syncGSPN() {
+    if (!osDetails?.numero_os_samsung) {
+      alert('Esta OS não possui número Samsung para sincronizar');
+      return;
+    }
+
+    if (currentJob?.is_running) {
+      alert('Já existe uma sincronização em andamento para esta OS');
+      return;
+    }
+
+    setSyncingGSPN(true);
+    try {
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('nome, samsung_asccode, samsung_token')
+        .eq('id', osDetails.unidade_id)
+        .single();
+
+      if (!unidadeData) {
+        alert('Unidade não encontrada');
+        return;
+      }
+
+      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
+        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
+        return;
+      }
+
+      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/one', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ascCode: unidadeData.samsung_asccode,
+          tokenApi: unidadeData.samsung_token,
+          filial: unidadeData.nome.toLowerCase(),
+          unidade_id: osDetails.unidade_id,
+          numero_os: osDetails.numero_os_samsung
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        await loadOSDetails();
+        await loadCurrentJob();
+      } else {
+        alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar GSPN:', error);
+      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setSyncingGSPN(false);
+    }
+  }
 
   async function loadOSDetails() {
     setLoading(true);
@@ -212,15 +329,66 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
   const enderecoCompleto = `${osDetails.cliente_logradouro}, ${osDetails.cliente_numero}${osDetails.cliente_complemento ? `, ${osDetails.cliente_complemento}` : ''}, ${osDetails.cliente_bairro}, ${osDetails.cliente_cidade} - ${osDetails.cliente_estado}, CEP: ${osDetails.cliente_cep}`;
 
+  const getJobStatusIcon = () => {
+    if (!currentJob) return null;
+    if (currentJob.is_running) {
+      return <Activity className="w-4 h-4 text-blue-500 animate-pulse" />;
+    }
+    if (currentJob.status === 'concluido') {
+      return <CheckCircle className="w-4 h-4 text-green-500" />;
+    }
+    if (currentJob.status === 'erro') {
+      return <XCircle className="w-4 h-4 text-red-500" />;
+    }
+    return <Clock className="w-4 h-4 text-yellow-500" />;
+  };
+
+  const getJobStatusColor = () => {
+    if (!currentJob) return '#9CA3AF';
+    if (currentJob.is_running) return '#3B82F6';
+    if (currentJob.status === 'concluido') return '#10B981';
+    if (currentJob.status === 'erro') return '#EF4444';
+    return '#F59E0B';
+  };
+
+  const getJobTimeElapsed = () => {
+    if (!currentJob) return '-';
+    const start = new Date(currentJob.created_at).getTime();
+    const end = currentJob.finished_at
+      ? new Date(currentJob.finished_at).getTime()
+      : Date.now();
+    const seconds = Math.floor((end - start) / 1000);
+
+    if (seconds < 60) return `${seconds}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
       <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
-          <div>
-            <h2 className="text-2xl font-bold text-gray-900">OS {osDetails.numero_os_interna}</h2>
-            {osDetails.numero_os_samsung && (
-              <p className="text-sm text-gray-600 mt-1">Samsung: {osDetails.numero_os_samsung}</p>
-            )}
+          <div className="flex-1">
+            <div className="flex items-center gap-4">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">OS {osDetails.numero_os_interna}</h2>
+                {osDetails.numero_os_samsung && (
+                  <p className="text-sm text-gray-600 mt-1">Samsung: {osDetails.numero_os_samsung}</p>
+                )}
+              </div>
+              {osDetails.numero_os_samsung && (
+                <button
+                  onClick={syncGSPN}
+                  disabled={syncingGSPN || currentJob?.is_running}
+                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
+                  {syncingGSPN || currentJob?.is_running ? 'Sincronizando...' : 'Atualizar GSPN'}
+                </button>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
@@ -229,6 +397,68 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
             <X className="w-6 h-6 text-gray-600" />
           </button>
         </div>
+
+        {currentJob && (
+          <div className="px-6 pt-4">
+            <div
+              className="p-3 rounded-lg border"
+              style={{
+                background: `linear-gradient(135deg, ${getJobStatusColor()}15 0%, ${getJobStatusColor()}05 100%)`,
+                borderColor: `${getJobStatusColor()}40`
+              }}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: `${getJobStatusColor()}20`,
+                      border: `1px solid ${getJobStatusColor()}40`
+                    }}
+                  >
+                    {getJobStatusIcon()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-gray-900">
+                        {currentJob.is_running ? 'Sincronizando' : 'Última Sincronização'}
+                      </h3>
+                      {currentJob.is_running && (
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className="text-xs text-gray-600">
+                        Status: <span className="font-medium" style={{ color: getJobStatusColor() }}>
+                          {currentJob.is_running ? 'Em execução' : currentJob.status}
+                        </span>
+                      </p>
+                      <span className="text-xs text-gray-400">•</span>
+                      <p className="text-xs text-gray-600">
+                        Tempo: <span className="font-medium text-gray-700">{getJobTimeElapsed()}</span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {!currentJob.is_running && (
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500">Finalizado em</p>
+                    <p className="text-xs text-gray-600 font-medium">
+                      {currentJob.finished_at ? new Date(currentJob.finished_at).toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : '-'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         <div className="p-6 space-y-6">
           <div className="flex gap-2 flex-wrap">
