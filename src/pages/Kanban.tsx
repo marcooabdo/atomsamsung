@@ -65,9 +65,8 @@ export function Kanban() {
     loadUnidades();
   }, []);
 
-  
+
   useEffect(() => {
-    console.log('🔄 Recarregando Kanban - selectedUnidade:', selectedUnidade || 'NENHUMA');
     if (usuario) {
       loadKanbanData();
     }
@@ -136,7 +135,6 @@ export function Kanban() {
         alert(`Erro na atualização: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
-      console.error('Erro ao atualizar OS:', error);
       alert(`Erro ao atualizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingSamsung(false);
@@ -208,44 +206,23 @@ export function Kanban() {
 
       // Se o usuário selecionou uma unidade específica no filtro, use essa
       if (selectedUnidade) {
-        console.log('🔍 Filtrando por unidade selecionada:', selectedUnidade);
         query = query.eq('unidade_id', selectedUnidade);
       }
       // Se não selecionou e não pode ver todas, usa a unidade do usuário
       else if (!canSelectAllUnits && usuario?.unidade_id) {
-        console.log('🔍 Filtrando por unidade do usuário:', usuario.unidade_id);
         query = query.eq('unidade_id', usuario.unidade_id);
       }
-      // Se pode ver todas e não selecionou, mostra todas
-      else {
-        console.log('🔍 Mostrando todas as unidades (usuário master/diretoria)');
-      }
-
       const { data, error } = await query.order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      console.log('📦 Total de OSs carregadas:', data?.length || 0);
-
-      // Debug: Mostrar unidades das OSs carregadas
-      if (data && data.length > 0) {
-        const unidadesUnicas = [...new Set(data.map(os => os.unidade?.nome || 'Sem unidade'))];
-        console.log('🏢 Unidades presentes nas OSs:', unidadesUnicas.join(', '));
-        data.forEach(os => {
-          console.log(`  - OS ${os.numero_os_interna || os.numero_os_samsung || os.id.slice(0,8)}: ${os.unidade?.nome || 'Sem unidade'}`);
-        });
-      }
 
       const grouped = COLUNAS_KANBAN.reduce((acc, coluna) => {
         acc[coluna.id] = (data || []).filter(os => os.coluna_kanban === coluna.id);
         return acc;
       }, {} as Record<string, OS[]>);
 
-      console.log('📋 OS agrupadas por coluna:', Object.entries(grouped).map(([col, oss]) => `${col}: ${oss.length}`).join(', '));
-
       setOsData(grouped);
     } catch (error) {
-      console.error('Erro ao carregar dados do Kanban:', error);
     } finally {
       setLoading(false);
     }
@@ -328,7 +305,6 @@ export function Kanban() {
 
       // Se já tem agendamento com coordenadas, não precisa criar novo
       if (agendamentoExistente?.lat && agendamentoExistente?.lng) {
-        console.log('Agendamento já existe com coordenadas:', agendamentoExistente);
         return;
       }
 
@@ -342,13 +318,10 @@ export function Kanban() {
       // Montar endereço completo
       const enderecoCompleto = `${os.cliente_endereco || ''}, ${os.cliente_bairro || ''}, ${os.cliente_cidade || ''}, ${os.cliente_estado || 'SP'}, Brasil`.trim();
 
-      console.log('Geocodificando endereço:', enderecoCompleto);
-
       // Geocodificar endereço
       const coords = await geocodeAddress(enderecoCompleto);
 
       if (!coords) {
-        console.warn('Não foi possível geocodificar o endereço:', enderecoCompleto);
         // Criar agendamento sem coordenadas
         if (!agendamentoExistente) {
           await supabase
@@ -365,8 +338,6 @@ export function Kanban() {
         }
         return;
       }
-
-      console.log('Coordenadas obtidas:', coords);
 
       // Criar ou atualizar agendamento com coordenadas
       if (agendamentoExistente) {
@@ -392,10 +363,7 @@ export function Kanban() {
             lng: coords.lng
           });
       }
-
-      console.log('Agendamento criado/atualizado com sucesso para OS:', os.numero_os_samsung || os.numero_os_interna);
     } catch (error) {
-      console.error('Erro ao criar agendamento:', error);
     }
   };
 
@@ -509,16 +477,8 @@ export function Kanban() {
         .select();
 
       if (error) {
-        console.error('Erro detalhado ao atualizar OS:', {
-          error,
-          osId: draggedCard.id,
-          fromColumn: draggedCard.coluna_kanban,
-          toColumn: targetColumn
-        });
         throw error;
       }
-
-      console.log('OS movida com sucesso:', data);
 
       // Se moveu para uma rota, criar agendamento com geocodificação
       const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
@@ -533,9 +493,8 @@ export function Kanban() {
         return newData;
       });
     } catch (error: any) {
-      console.error('Erro ao mover card:', error);
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
-      alert(`❌ Erro ao mover OS:\n\n${errorMessage}\n\nVerifique o console para mais detalhes.`);
+      alert(`❌ Erro ao mover OS:\n\n${errorMessage}`);
     } finally {
       setDraggedCard(null);
     }
@@ -559,7 +518,6 @@ export function Kanban() {
   }
 
   const handleUnidadeChange = (unidadeId: string) => {
-    console.log('🎯 Usuário mudou filtro de unidade para:', unidadeId || 'TODAS');
     setSelectedUnidade(unidadeId);
   };
 

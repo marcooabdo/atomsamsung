@@ -33,7 +33,6 @@ export async function buscarCEP(cep: string): Promise<EnderecoViaCEP | null> {
 
     return data;
   } catch (error) {
-    console.error('Erro ao buscar CEP:', error);
     throw error;
   }
 }

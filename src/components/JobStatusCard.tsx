@@ -38,7 +38,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
           filter: `unidade_id=eq.${unidadeId}`
         },
         (payload) => {
-          console.log('Job change:', payload);
           loadCurrentJob();
         }
       )
@@ -46,7 +45,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
 
     // Polling contínuo de 5 em 5 segundos (para pegar novos jobs e atualizações)
     const interval = setInterval(() => {
-      console.log('🔄 Polling job status...');
       loadCurrentJob();
     }, 5000);
 
@@ -101,7 +99,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       .maybeSingle();
 
     if (error) {
-      console.error('Error loading job:', error);
       return;
     }
 
