@@ -44,22 +44,17 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       )
       .subscribe();
 
-    return () => {
-      channel.unsubscribe();
-    };
-  }, [unidadeId]);
-
-  // Polling de 5 em 5 segundos quando tem job running
-  useEffect(() => {
-    if (!currentJob?.is_running) return;
-
+    // Polling contínuo de 5 em 5 segundos (para pegar novos jobs e atualizações)
     const interval = setInterval(() => {
       console.log('🔄 Polling job status...');
       loadCurrentJob();
     }, 5000);
 
-    return () => clearInterval(interval);
-  }, [currentJob?.is_running]);
+    return () => {
+      channel.unsubscribe();
+      clearInterval(interval);
+    };
+  }, [unidadeId]);
 
   useEffect(() => {
     if (onJobRunningChange) {
