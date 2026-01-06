@@ -40,7 +40,6 @@ export function LabelGenerator({ labels, onClose }: LabelGeneratorProps) {
             margin: 5
           });
         } catch (error) {
-          console.error('Erro ao gerar código de barras:', error);
         }
       }
     });

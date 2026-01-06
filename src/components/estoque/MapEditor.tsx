@@ -71,7 +71,6 @@ export function MapEditor({ sala, estantes, onEstanteClick, onRefresh }: MapEdit
       await onRefresh();
       alert('✅ Alterações salvas com sucesso!');
     } catch (error) {
-      console.error('Erro ao salvar:', error);
       alert('❌ Erro ao salvar alterações');
     } finally {
       setSaving(false);
@@ -102,7 +101,6 @@ export function MapEditor({ sala, estantes, onEstanteClick, onRefresh }: MapEdit
       await onRefresh();
       alert('✅ Estante deletada com sucesso!');
     } catch (error) {
-      console.error('Erro ao deletar:', error);
       alert('❌ Erro ao deletar estante');
     }
   };

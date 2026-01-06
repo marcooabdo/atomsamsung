@@ -144,7 +144,6 @@ export function Cotacoes() {
 
       setCotacoes(cotacoesValidas);
     } catch (error) {
-      console.error('Erro ao carregar cotações:', error);
     } finally {
       setLoading(false);
     }
@@ -193,7 +192,6 @@ export function Cotacoes() {
         .single();
 
       if (fetchError) {
-        console.error('Erro ao buscar cotação:', fetchError);
         alert(`Erro ao buscar cotação: ${fetchError.message}`);
         return;
       }
@@ -230,7 +228,6 @@ export function Cotacoes() {
           .maybeSingle();
 
         if (checkError) {
-          console.error('Erro ao verificar número Samsung:', checkError);
           alert(`Erro ao verificar número Samsung: ${checkError.message}`);
           return;
         }
@@ -308,7 +305,6 @@ export function Cotacoes() {
         .single();
 
       if (osError) {
-        console.error('Erro ao criar OS:', osError);
         alert(`Erro ao criar OS: ${osError.message}\n\nDetalhes: ${osError.details || 'Nenhum detalhe disponível'}`);
         return;
       }
@@ -321,10 +317,7 @@ export function Cotacoes() {
         .select();
 
       if (pecasError) {
-        console.error('Erro ao vincular peças à OS:', pecasError);
         alert(`Aviso: Erro ao vincular peças - ${pecasError.message}`);
-      } else {
-        console.log(`✅ ${pecasVinculadas?.length || 0} peças vinculadas à OS ${os.id}`);
       }
 
       // Vincula serviços à OS (mantém cotacao_id para preservar histórico)
@@ -335,26 +328,16 @@ export function Cotacoes() {
         .select();
 
       if (servicosError) {
-        console.error('Erro ao vincular serviços à OS:', servicosError);
         alert(`Aviso: Erro ao vincular serviços - ${servicosError.message}`);
-      } else {
-        console.log(`✅ ${servicosVinculados?.length || 0} serviços vinculados à OS ${os.id}`);
       }
 
       // Vincula requisições de peças à OS (mantém cotacao_id para preservar histórico)
       // IMPORTANTE: Apenas vincula os_id, PRESERVA o status original de cada requisição
-      console.log(`🔗 Iniciando vinculação de requisições da cotação ${id} para OS ${os.id}`);
-
-      // Primeiro, busca TODAS as requisições da cotação para log
+      // Primeiro, busca TODAS as requisições da cotação
       const { data: todasRequisicoes } = await supabase
         .from('requisicoes_pecas')
         .select('id, codigo_peca, status, os_id')
         .eq('cotacao_id', id);
-
-      console.log(`📋 Total de requisições da cotação: ${todasRequisicoes?.length || 0}`);
-      todasRequisicoes?.forEach(req => {
-        console.log(`  📦 ${req.codigo_peca} - Status: ${req.status} - OS atual: ${req.os_id?.slice(0, 8) || 'null'}`);
-      });
 
       // Agora vincula apenas as que não têm os_id
       const { data: requisicoesVinculadas, error: requisicoesError } = await supabase
@@ -365,19 +348,7 @@ export function Cotacoes() {
         .select('id, codigo_peca, status');
 
       if (requisicoesError) {
-        console.error('❌ ERRO ao vincular requisições:', requisicoesError);
         alert(`⚠️ ATENÇÃO: Erro ao vincular requisições de peças!\n\nAs requisições não foram vinculadas à OS.\n\nErro: ${requisicoesError.message}`);
-      } else {
-        console.log(`✅ ${requisicoesVinculadas?.length || 0} requisições vinculadas com sucesso à OS ${os.id.slice(0, 8)}`);
-        requisicoesVinculadas?.forEach(req => {
-          console.log(`  ✅ Requisição ${req.id.slice(0, 8)}: ${req.codigo_peca} - Status: ${req.status}`);
-        });
-
-        // Verifica se há requisições que não foram vinculadas (já tinham os_id)
-        const requisicoesPuladas = (todasRequisicoes?.length || 0) - (requisicoesVinculadas?.length || 0);
-        if (requisicoesPuladas > 0) {
-          console.log(`ℹ️ ${requisicoesPuladas} requisições já tinham os_id e não foram atualizadas`);
-        }
       }
 
       // Vincula anexos à OS (mantém cotacao_id para preservar histórico)
@@ -387,16 +358,12 @@ export function Cotacoes() {
         .eq('cotacao_id', id)
         .is('os_id', null);
 
-      if (anexosError) console.warn('Aviso ao vincular anexos:', anexosError);
-
       // Vincula pagamentos à OS (mantém cotacao_id para preservar histórico)
       const { error: pagamentosError } = await supabase
         .from('pagamentos')
         .update({ os_id: os.id })
         .eq('cotacao_id', id)
         .is('os_id', null);
-
-      if (pagamentosError) console.warn('Aviso ao vincular pagamentos:', pagamentosError);
 
       // Adiciona comentário de sistema na cotação
       await supabase
@@ -434,7 +401,6 @@ export function Cotacoes() {
       loadCotacoes();
       alert('Cotação aprovada! OS criada no Kanban com comentários e anexos.');
     } catch (error: any) {
-      console.error('Erro ao aprovar cotação:', error);
       alert(`Erro ao aprovar cotação: ${error.message || error}`);
     }
   };
@@ -558,7 +524,6 @@ export function Cotacoes() {
         'O tecnico ira analisar o aparelho e adicionar as pecas.'
       );
     } catch (error: any) {
-      console.error('Erro ao enviar para diagnostico:', error);
       alert(`Erro ao enviar para diagnostico: ${error.message || 'Erro desconhecido'}`);
     }
   };
@@ -783,7 +748,6 @@ export function Cotacoes() {
       loadCotacoes();
       alert('Cotação rejeitada! OS criada no Kanban com comentários e anexos.');
     } catch (error) {
-      console.error('Erro ao rejeitar cotação:', error);
       alert('Erro ao rejeitar cotação');
     }
   };
@@ -803,7 +767,6 @@ export function Cotacoes() {
       setShowWhatsAppModal(true);
       setTextoCopied(false);
     } catch (error) {
-      console.error('Erro ao preparar envio:', error);
       alert('Erro ao preparar envio');
     }
   };
@@ -831,7 +794,6 @@ export function Cotacoes() {
       loadCotacoes();
       alert('Cotacao marcada como enviada!');
     } catch (error) {
-      console.error('Erro ao enviar cotacao:', error);
       alert('Erro ao enviar cotacao');
     }
   };

@@ -149,7 +149,6 @@ export default function RomaneioView() {
 
       setRomaneios(Object.values(agrupadoPorTecnico));
     } catch (error) {
-      console.error('Erro ao carregar dados do romaneio:', error);
     } finally {
       setLoadingData(false);
     }

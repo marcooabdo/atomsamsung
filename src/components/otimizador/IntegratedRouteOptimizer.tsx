@@ -83,7 +83,6 @@ export function IntegratedRouteOptimizer({
         setError('Coordenadas da base não configuradas. Configure no menu Configurações.');
       }
     } catch (err) {
-      console.error('Erro ao carregar coordenadas da base:', err);
       setError('Erro ao carregar informações da unidade.');
     }
   };
@@ -136,7 +135,6 @@ export function IntegratedRouteOptimizer({
         config
       );
     } catch (err) {
-      console.error('Erro ao otimizar rota:', err);
       setError('Erro ao calcular rota otimizada. Tente novamente.');
     } finally {
       setIsCalculating(false);
@@ -162,7 +160,6 @@ export function IntegratedRouteOptimizer({
         config
       );
     } catch (err) {
-      console.error('Erro ao recalcular rota:', err);
     } finally {
       setIsCalculating(false);
     }

@@ -65,7 +65,6 @@ export default function ConfiguracaoOtimizador() {
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar configurações:', error);
     }
   };
 
@@ -90,7 +89,6 @@ export default function ConfiguracaoOtimizador() {
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error('Erro ao salvar configurações:', error);
       alert('Erro ao salvar configurações. Tente novamente.');
     } finally {
       setSaving(false);

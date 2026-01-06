@@ -24,7 +24,6 @@ export function ModalJustificativaPedido({ requisicao, idsDisponiveis, onConfirm
     try {
       await onConfirm(justificativa.trim());
     } catch (error) {
-      console.error('Erro ao criar pedido:', error);
       alert('Erro ao criar pedido');
     } finally {
       setLoading(false);

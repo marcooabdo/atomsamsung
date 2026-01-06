@@ -45,7 +45,6 @@ export function BaseConfigModal({
         setLng(data.longitude ? String(data.longitude) : '');
       }
     } catch (err) {
-      console.error('Erro ao carregar configuração:', err);
     }
   };
 
@@ -69,7 +68,6 @@ export function BaseConfigModal({
         setError('Não foi possível encontrar o endereço. Tente outro formato.');
       }
     } catch (err) {
-      console.error('Erro ao geocodificar:', err);
       setError('Erro ao buscar coordenadas. Tente novamente.');
     } finally {
       setIsGeocoding(false);
@@ -113,7 +111,6 @@ export function BaseConfigModal({
       onSave();
       onClose();
     } catch (err) {
-      console.error('Erro ao salvar configuração:', err);
       setError('Erro ao salvar configuração. Tente novamente.');
     } finally {
       setIsSaving(false);

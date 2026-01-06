@@ -180,12 +180,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
   }, [isOpen, unidadeId, tipoOrcamento]);
 
   useEffect(() => {
-    console.log('🔍 [CotacaoModal] Estado do modal de adicionar pagamento:');
-    console.log('   - showAddPaymentModal:', showAddPaymentModal);
-    console.log('   - cotacaoId:', cotacaoId);
-    console.log('   - osData:', osData);
-    console.log('   - Condição para renderizar:', showAddPaymentModal && (!cotacaoId || (cotacaoId && !osData)));
-    console.log('   - Total de pagamentos temporários:', pagamentosTemporarios.length);
   }, [showAddPaymentModal, cotacaoId, osData, pagamentosTemporarios]);
 
   const loadUnidades = async () => {
@@ -314,22 +308,15 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       setPecas(pecasCarregadas);
       setPecasOriginais(JSON.parse(JSON.stringify(pecasCarregadas))); // Deep clone
 
-      console.log('🔍 DEBUG - Peças carregadas:', pecasCarregadas.map(p => ({ id: p.id, pn: p.pn, descricao: p.descricao })));
-
       // Carrega requisições de peças em trânsito
       // Busca TODAS as OS relacionadas à cotação usando busca separada para confiabilidade
       const osIds: string[] = [];
-
-      console.log('🔍 DEBUG - Cotação ID:', id);
-      console.log('🔍 DEBUG - Numero OS Samsung:', cotacao.numero_os_samsung);
 
       // 1. Buscar OS vinculada diretamente por cotacao_id
       const { data: osVinculada } = await supabase
         .from('os')
         .select('id')
         .eq('cotacao_id', id);
-
-      console.log('🔍 DEBUG - OS por cotacao_id:', osVinculada);
 
       if (osVinculada) {
         osIds.push(...osVinculada.map(o => o.id));
@@ -342,8 +329,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
           .select('id')
           .eq('numero_os_samsung', cotacao.numero_os_samsung);
 
-        console.log('🔍 DEBUG - OS por numero_os_samsung:', osPorNumero);
-
         if (osPorNumero) {
           osPorNumero.forEach(os => {
             if (!osIds.includes(os.id)) {
@@ -353,8 +338,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         }
       }
 
-      console.log('🔍 DEBUG - Total OS IDs encontrados:', osIds);
-
       // 3. Buscar requisições vinculadas à cotação
       // Buscar APENAS requisições que realmente bloqueiam (não pendentes, reprovadas ou canceladas)
       // IMPORTANTE: Requisições "pendente" não bloqueiam, pois ainda não foram atendidas
@@ -363,8 +346,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         .select('cotacao_peca_id, codigo_peca, descricao, numero_pedido_samsung, status')
         .eq('cotacao_id', id)
         .not('status', 'in', '(pendente,reprovada,cancelada)');
-
-      console.log('🔍 DEBUG - Requisições bloqueadas por status ativo:', requisicoesData);
 
       const pecasBloqueadasPorRequisicao: string[] = [];
       const pecasInfoCompleto: Array<{cotacao_peca_id: string; pn: string; motivo: 'requisicao' | 'estoque'; status: string; numero_pedido?: string}> = [];
@@ -386,9 +367,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
           }
         });
       }
-
-      console.log('Total pecas bloqueadas por requisicao:', pecasBloqueadasPorRequisicao);
-      console.log('Info completa de bloqueio:', pecasInfoCompleto);
 
       setPecasEmTransito(pecasBloqueadasPorRequisicao);
       setPecasBloqueadasInfo(pecasInfoCompleto);
@@ -461,14 +439,11 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         .order('created_at', { ascending: false });
 
       if (pagamentosError) {
-        console.error('Erro ao carregar pagamentos:', pagamentosError);
       } else {
         setPagamentosTemporarios(pagamentosData || []);
-        console.log('✅ Pagamentos carregados:', pagamentosData?.length || 0);
       }
 
     } catch (error) {
-      console.error('Erro ao carregar cotação:', error);
       alert('Erro ao carregar dados da cotação');
     } finally {
       setLoading(false);
@@ -523,7 +498,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         setClienteEstado(data.uf || '');
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
     }
   };
 
@@ -551,7 +525,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         setClienteEstado(data.estado || '');
       }
     } catch (error) {
-      console.error('Erro ao buscar cliente:', error);
     }
   };
 
@@ -634,7 +607,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         setPnSugestoes(sugestoesUnicas);
       }
     } catch (error) {
-      console.error('Erro ao buscar sugestões de PN:', error);
     }
   };
 
@@ -764,7 +736,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
             .upload(fileName, file);
 
           if (uploadError) {
-            console.error('Erro no upload:', uploadError);
             alert(`Erro ao fazer upload de ${file.name}: ${uploadError.message}`);
             continue;
           }
@@ -782,7 +753,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
             });
 
           if (dbError) {
-            console.error('Erro ao salvar no banco:', dbError);
             alert(`Erro ao salvar referência de ${file.name}: ${dbError.message}`);
           }
         }
@@ -791,7 +761,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         await loadCotacaoData(cotacaoId);
         alert('Anexos salvos com sucesso!');
       } catch (error) {
-        console.error('Erro ao adicionar anexos:', error);
         alert('Erro ao adicionar anexos');
       } finally {
         setLoading(false);
@@ -824,7 +793,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Erro ao baixar anexo:', error);
       alert('Erro ao baixar arquivo');
     }
   };
@@ -858,7 +826,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         setNovoComentario('');
         alert('Comentário adicionado com sucesso!');
       } catch (error) {
-        console.error('Erro ao adicionar comentário:', error);
         alert('Erro ao adicionar comentário');
       }
     } else {
@@ -1249,7 +1216,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
           .insert(comentariosData);
 
         if (comentariosError) {
-          console.error('Erro ao salvar comentários:', comentariosError);
         }
       }
 
@@ -1284,7 +1250,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
 
             anexosSalvosCount++;
           } catch (error) {
-            console.error(`Erro ao enviar anexo ${file.name}:`, error);
             anexosFalhados.push(file.name);
           }
         }
@@ -1344,7 +1309,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
 
             pagamentosSalvosCount++;
           } catch (error) {
-            console.error(`Erro ao salvar pagamento:`, error);
             pagamentosFalhados.push(`Pagamento ${pagamento.forma_pagamento}`);
           }
         }
@@ -1357,7 +1321,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       onSave();
       handleClose();
     } catch (error) {
-      console.error('Erro ao salvar cotação:', error);
       alert('Erro ao salvar cotação');
     } finally {
       setLoading(false);
@@ -1595,7 +1558,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       onSave();
       handleClose();
     } catch (error: any) {
-      console.error('Erro ao enviar para diagnostico:', error);
       alert(`Erro ao enviar para diagnostico: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
@@ -1681,7 +1643,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       setPagamentosTemporarios(prev => prev.filter((_, i) => i !== index));
       alert('✅ Pagamento excluído com sucesso!');
     } catch (error: any) {
-      console.error('Erro ao excluir pagamento:', error);
       alert(`❌ Erro ao excluir pagamento: ${error.message || 'Erro desconhecido'}`);
     }
   };
@@ -1703,7 +1664,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
   };
 
   const handleAddPaymentTemporario = async (paymentData: any) => {
-    console.log('🟢 [CotacaoModal] Pagamento recebido:', paymentData);
 
     if (!unidadeId) {
       alert('❌ Selecione uma unidade antes de adicionar pagamentos!');
@@ -1781,7 +1741,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         alert('✅ Pagamento adicionado! Será salvo quando você salvar a cotação.');
       }
     } catch (error: any) {
-      console.error('Erro ao processar pagamento:', error);
       alert(`❌ Erro ao processar pagamento: ${error.message || 'Erro desconhecido'}`);
     }
   };
@@ -3204,31 +3163,23 @@ function AddPaymentModalSimplified({ valorTotal, clienteNome, onClose, onSave }:
   };
 
   const handleSubmit = () => {
-    console.log('🔵 [AddPaymentModal] handleSubmit chamado');
-    console.log('🔵 [AddPaymentModal] Valor digitado:', valor);
-    console.log('🔵 [AddPaymentModal] Comprovante:', comprovanteFile);
-    console.log('🔵 [AddPaymentModal] Forma pagamento:', formaPagamento);
 
     const valorNum = parseFloat(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) {
-      console.log('❌ [AddPaymentModal] Validação falhou: valor inválido');
       alert('❌ Digite um valor válido maior que zero');
       return;
     }
 
     if (!comprovanteFile) {
-      console.log('❌ [AddPaymentModal] Validação falhou: comprovante ausente');
       alert('❌ Comprovante é obrigatório');
       return;
     }
 
     if (isCartao && !nsu.trim()) {
-      console.log('❌ [AddPaymentModal] Validação falhou: NSU ausente para cartão');
       alert('❌ NSU é obrigatório para pagamentos com cartão');
       return;
     }
 
-    console.log('✅ [AddPaymentModal] Validações passaram');
 
     const paymentData = {
       forma_pagamento: formaPagamento,
@@ -3248,12 +3199,9 @@ function AddPaymentModalSimplified({ valorTotal, clienteNome, onClose, onSave }:
       data_lancamento: new Date().toISOString()
     };
 
-    console.log('🔵 [AddPaymentModal] paymentData criado:', paymentData);
-    console.log('🔵 [AddPaymentModal] Chamando onSave...');
 
     onSave(paymentData);
 
-    console.log('✅ [AddPaymentModal] onSave chamado com sucesso');
   };
 
   return (

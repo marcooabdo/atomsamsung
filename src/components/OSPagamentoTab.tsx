@@ -42,7 +42,6 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       if (error) throw error;
       setPagamentos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar pagamentos:', error);
     } finally {
       setLoading(false);
     }

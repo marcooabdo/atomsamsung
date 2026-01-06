@@ -130,7 +130,6 @@ class RouteOptimizerService {
         }
       };
     } catch (error) {
-      console.error('Erro ao otimizar rota:', error);
       return this.createFallbackRoute(baseCoordinates, validOSs, config);
     }
   }
@@ -281,7 +280,6 @@ class RouteOptimizerService {
         return data.id;
       }
     } catch (error) {
-      console.error('Erro ao salvar sessão:', error);
       return null;
     }
   }
@@ -314,7 +312,6 @@ class RouteOptimizerService {
         lastCalculatedAt: data.last_calculated_at
       };
     } catch (error) {
-      console.error('Erro ao carregar sessão:', error);
       return null;
     }
   }
@@ -329,7 +326,6 @@ class RouteOptimizerService {
       if (error) throw error;
       return true;
     } catch (error) {
-      console.error('Erro ao deletar sessão:', error);
       return false;
     }
   }

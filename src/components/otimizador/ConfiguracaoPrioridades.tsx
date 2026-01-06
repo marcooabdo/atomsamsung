@@ -68,7 +68,6 @@ export default function ConfiguracaoPrioridades() {
       if (error) throw error;
       setRegras(data || []);
     } catch (error) {
-      console.error('Erro ao carregar regras:', error);
       alert('Erro ao carregar regras de prioridade');
     } finally {
       setLoading(false);
@@ -107,7 +106,6 @@ export default function ConfiguracaoPrioridades() {
       await loadRegras();
       cancelEdit();
     } catch (error) {
-      console.error('Erro ao salvar regra:', error);
       alert('Erro ao salvar regra de prioridade');
     }
   };
@@ -124,7 +122,6 @@ export default function ConfiguracaoPrioridades() {
       if (error) throw error;
       await loadRegras();
     } catch (error) {
-      console.error('Erro ao excluir regra:', error);
       alert('Erro ao excluir regra de prioridade');
     }
   };
@@ -161,7 +158,6 @@ export default function ConfiguracaoPrioridades() {
       await Promise.all(updates);
       await loadRegras();
     } catch (error) {
-      console.error('Erro ao atualizar ordem:', error);
     }
   };
 
@@ -175,7 +171,6 @@ export default function ConfiguracaoPrioridades() {
       if (error) throw error;
       await loadRegras();
     } catch (error) {
-      console.error('Erro ao atualizar regra:', error);
     }
   };
 

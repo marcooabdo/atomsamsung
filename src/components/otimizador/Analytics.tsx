@@ -161,7 +161,6 @@ export default function Analytics() {
         topTecnicos,
       });
     } catch (error) {
-      console.error('Erro ao carregar analytics:', error);
     } finally {
       setLoadingAnalytics(false);
     }

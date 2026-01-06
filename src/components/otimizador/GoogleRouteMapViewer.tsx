@@ -101,7 +101,6 @@ export function GoogleRouteMapViewer({
         const path = google.maps.geometry.encoding.decodePath(polyline);
         setDecodedPath(path.map(p => ({ lat: p.lat(), lng: p.lng() })));
       } catch (error) {
-        console.error('Erro ao decodificar polyline:', error);
       }
     }
   }, [polyline, isLoaded]);

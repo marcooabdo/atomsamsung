@@ -76,7 +76,6 @@ export default function DashboardExecutivo() {
         gisPendentes: 0
       });
     } catch (error) {
-      console.error('Error loading KPIs:', error);
     }
   };
 
@@ -147,7 +146,6 @@ export default function DashboardExecutivo() {
       setChartOsPorTecnico(chartDataTecnicos);
       setChartOsPorTipo(chartDataTipos);
     } catch (error) {
-      console.error('Error loading chart data:', error);
     } finally {
       setLoadingCharts(false);
     }

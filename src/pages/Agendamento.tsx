@@ -123,7 +123,6 @@ export function Agendamento() {
       ).length;
       setCheckoutsPendentes(checkoutsPendentesCount);
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
     } finally {
       setLoading(false);
     }

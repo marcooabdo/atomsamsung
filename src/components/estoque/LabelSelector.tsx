@@ -54,7 +54,6 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
             localizacao = pecaData.localizacao;
           }
         } catch (err) {
-          console.warn('Erro ao buscar localização:', err);
         }
 
         for (let i = 0; i < item.quantidade; i++) {
@@ -68,7 +67,6 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
             const { data } = await supabase.rpc('gerar_codigo_barras');
             codigoBarras = data || '';
           } catch (err) {
-            console.warn('Erro ao gerar código de barras, usando fallback:', err);
           }
 
           // Fallback se função falhar
@@ -96,7 +94,6 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
       }
 
       if (labelsToGenerate.length > 0) {
-        console.log('Tentando inserir etiquetas:', labelsToGenerate.length);
 
         const { data, error } = await supabase
           .from('estoque_etiquetas')
@@ -104,12 +101,10 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
           .select();
 
         if (error) {
-          console.error('Erro ao salvar etiquetas:', error);
           alert(`Erro ao salvar etiquetas: ${error.message}`);
           throw error;
         }
 
-        console.log('Etiquetas salvas com sucesso:', data?.length);
 
         // Atualizar contador de impressões
         if (data && data.length > 0) {
@@ -127,7 +122,6 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
         alert('Nenhuma etiqueta para gerar');
       }
     } catch (error: any) {
-      console.error('Erro ao gerar etiquetas:', error);
       alert(`Erro ao gerar etiquetas: ${error?.message || 'Erro desconhecido'}`);
     } finally {
       setGenerating(false);

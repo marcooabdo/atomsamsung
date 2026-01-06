@@ -12,13 +12,8 @@ interface LegacyRouteMapViewerProps {
 }
 
 export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRouteMapViewerProps) {
-  console.log('=== RouteMapViewerAdapter Debug ===');
-  console.log('Rota recebida:', rota);
-  console.log('UnidadeConfig:', unidadeConfig);
-  console.log('OS incluidas:', rota?.os_incluidas);
 
   if (!unidadeConfig?.latitude || !unidadeConfig?.longitude) {
-    console.warn('Base não configurada - latitude ou longitude ausentes');
     return (
       <div className="w-full h-[600px] flex items-center justify-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
         <div className="text-center p-8">
@@ -32,7 +27,6 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
   }
 
   if (!rota || !rota.os_incluidas || rota.os_incluidas.length === 0) {
-    console.warn('Rota vazia ou sem OSs incluídas');
     return (
       <div className="w-full h-[600px] flex items-center justify-center bg-slate-50 rounded-lg border-2 border-dashed border-slate-300">
         <div className="text-center p-8">
@@ -50,7 +44,6 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
     lng: unidadeConfig.longitude
   };
 
-  console.log('Base coordinates:', baseCoordinates);
 
   const osData: OS[] = rota.os_incluidas.map((os: any, index: number) => {
     const coords = os.coordenadas || { lat: os.lat, lng: os.lng };
@@ -60,23 +53,6 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
 
     const endereco_completo = os.endereco ||
       `${os.cliente_logradouro || ''}, ${os.cliente_numero || ''} - ${os.cliente_bairro || ''}`.trim();
-
-    console.log(`OS ${index + 1} (ordem: ${os.ordem_visita}):`, {
-      id: os.os_id || os.id,
-      numero_os: os.numero_os,
-      cliente_nome: os.cliente_nome,
-      cliente_cidade: os.cliente_cidade,
-      coords_originais: coords,
-      coords_convertidos: { lat, lng },
-      endereco: endereco_completo,
-      tipo_lat_convertido: typeof lat,
-      tipo_lng_convertido: typeof lng,
-      lat_valido: !isNaN(lat) && lat !== null && lat !== undefined,
-      lng_valido: !isNaN(lng) && lng !== null && lng !== undefined,
-      ordem_visita: os.ordem_visita,
-      prioridade: os.prioridade,
-      tipo_atendimento: os.tipo_atendimento
-    });
 
     return {
       id: os.os_id || os.id,
@@ -94,8 +70,6 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
     };
   });
 
-  console.log('osData final para o mapa:', osData);
-  console.log('Quantidade de OSs:', osData.length);
 
   return (
     <div className="w-full h-[600px] rounded-lg overflow-hidden border-2 border-slate-300 shadow-lg">
@@ -104,7 +78,6 @@ export default function RouteMapViewerAdapter({ rota, unidadeConfig }: LegacyRou
         osData={osData}
         polyline={rota.polyline}
         selectedOS={null}
-        onOSClick={(os) => console.log('OS clicada:', os)}
         showCompleted={true}
       />
     </div>

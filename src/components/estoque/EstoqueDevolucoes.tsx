@@ -134,7 +134,6 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
 
       setDevolucoesAprovadas(devolucoesEnriquecidas);
     } catch (error) {
-      console.error('Erro ao carregar devoluções:', error);
     } finally {
       setLoading(false);
     }
@@ -214,7 +213,6 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       alert('Devolução aprovada com sucesso!');
       loadDevolucoes();
     } catch (error) {
-      console.error('Erro ao aprovar devolução:', error);
       alert('Erro ao aprovar devolução');
     }
   };
@@ -280,7 +278,6 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       alert('Devolução reprovada. Técnico foi notificado.');
       loadDevolucoes();
     } catch (error) {
-      console.error('Erro ao reprovar devolução:', error);
       alert('Erro ao reprovar devolução');
     }
   };

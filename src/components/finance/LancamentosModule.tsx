@@ -99,7 +99,6 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
       if (error) throw error;
       setPagamentos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar pagamentos:', error);
     } finally {
       setLoading(false);
     }

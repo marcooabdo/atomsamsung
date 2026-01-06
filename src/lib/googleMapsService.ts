@@ -45,7 +45,6 @@ class GoogleMapsService {
   constructor() {
     this.apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
     if (!this.apiKey) {
-      console.warn('Google Maps API key not configured. Please add VITE_GOOGLE_MAPS_API_KEY to .env file');
     }
   }
 
@@ -169,7 +168,6 @@ class GoogleMapsService {
 
       return result;
     } catch (error) {
-      console.error('Distance Matrix API error, falling back to Euclidean:', error);
       return this.calculateEuclideanDistanceMatrix(origins, destinations);
     }
   }
@@ -305,7 +303,6 @@ class GoogleMapsService {
 
       return result;
     } catch (error) {
-      console.error('Directions API error, falling back:', error);
       return this.calculateFallbackRoute(waypoints, startPoint, endPoint);
     }
   }
@@ -386,7 +383,6 @@ class GoogleMapsService {
       this.setCache(cacheKey, result);
       return result;
     } catch (error) {
-      console.error('Geocoding error:', error);
       return null;
     }
   }

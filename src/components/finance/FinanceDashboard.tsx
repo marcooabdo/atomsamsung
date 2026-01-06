@@ -172,7 +172,6 @@ export default function FinanceDashboard({ unidadeId, dataInicio, dataFim }: Das
           .sort((a, b) => b.total - a.total)
       });
     } catch (error) {
-      console.error('Erro ao carregar dashboard:', error);
     } finally {
       setLoading(false);
     }

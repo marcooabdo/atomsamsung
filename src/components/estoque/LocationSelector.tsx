@@ -76,7 +76,6 @@ export function LocationSelector({ partNumber, currentUnidadeId, onSelect, onClo
         setAllLocations(locations);
       }
     } catch (error) {
-      console.error('Erro ao buscar sugestões:', error);
     } finally {
       setLoading(false);
     }

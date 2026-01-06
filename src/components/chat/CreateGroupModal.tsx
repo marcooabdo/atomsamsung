@@ -41,7 +41,6 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
       if (error) throw error;
       setUsers(data || []);
     } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
     }
   };
 
@@ -94,7 +93,6 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
       onGroupCreated(conversation.id);
       handleClose();
     } catch (err) {
-      console.error('Erro ao criar grupo:', err);
       alert('Erro ao criar grupo');
     } finally {
       setCreating(false);

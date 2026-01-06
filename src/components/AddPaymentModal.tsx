@@ -200,7 +200,6 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao registrar pagamento:', error);
       alert(`❌ Erro ao registrar pagamento: ${error.message}`);
     } finally {
       setLoading(false);

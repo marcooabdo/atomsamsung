@@ -97,7 +97,6 @@ export function MapaEstoque() {
         setSelectedSala(data[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar salas:', error);
     }
   };
 
@@ -112,7 +111,6 @@ export function MapaEstoque() {
       if (error) throw error;
       setEstantes(data || []);
     } catch (error) {
-      console.error('Erro ao carregar estantes:', error);
     }
   };
 
@@ -137,7 +135,6 @@ export function MapaEstoque() {
 
       setBins(binsWithCount);
     } catch (error) {
-      console.error('Erro ao carregar bins:', error);
     }
   };
 
@@ -182,7 +179,6 @@ export function MapaEstoque() {
         alert('❌ Peça não encontrada ou não possui localização atribuída');
       }
     } catch (error) {
-      console.error('Erro ao buscar peça:', error);
       alert('Erro ao buscar peça');
     }
   };
@@ -529,7 +525,6 @@ function ConfigView({
       setShowNewSalaModal(false);
       onRefresh();
     } catch (error) {
-      console.error('Erro ao criar sala:', error);
       alert('Erro ao criar sala');
     } finally {
       setCreating(false);
@@ -577,7 +572,6 @@ function ConfigView({
       setShowNewEstanteModal(false);
       onRefresh();
     } catch (error) {
-      console.error('Erro ao criar estante:', error);
       alert('Erro ao criar estante');
     } finally {
       setCreating(false);

@@ -69,7 +69,6 @@ export function RouteDashboard({ tecnicoId, unidadeId, periodo = '30dias' }: Rou
 
       setDailyMetrics(dailyData || []);
     } catch (error) {
-      console.error('Erro ao carregar métricas:', error);
     } finally {
       setLoading(false);
     }

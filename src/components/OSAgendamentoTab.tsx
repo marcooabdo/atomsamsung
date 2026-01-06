@@ -92,7 +92,6 @@ export function OSAgendamentoTab({
         });
       }
     } catch (error) {
-      console.error('Erro ao carregar resumo:', error);
     }
   };
 
@@ -115,7 +114,6 @@ export function OSAgendamentoTab({
       if (error) throw error;
       setTecnicos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar técnicos:', error);
     }
   };
 
@@ -131,7 +129,6 @@ export function OSAgendamentoTab({
       if (error) throw error;
       setAgendamento(data);
     } catch (error) {
-      console.error('Erro ao carregar agendamento:', error);
     }
   };
 
@@ -159,8 +156,6 @@ export function OSAgendamentoTab({
         return;
       }
 
-      console.log('Dados do formulário antes de salvar:', formData);
-      console.log('Tipo de atendimento:', tipoAtendimento);
 
       const updateData = {
         data_agendamento: formData.data_agendamento,
@@ -171,7 +166,6 @@ export function OSAgendamentoTab({
         updated_at: new Date().toISOString()
       };
 
-      console.log('Salvando agendamento:', updateData);
 
       const { data: updatedData, error } = await supabase
         .from('os')
@@ -182,7 +176,6 @@ export function OSAgendamentoTab({
 
       if (error) throw error;
 
-      console.log('Dados salvos no banco:', updatedData);
 
       const tecnicoSelecionado = tecnicos.find(t => t.id === updatedData.tecnico_agendado_id);
 
@@ -202,7 +195,6 @@ export function OSAgendamentoTab({
 
       onSave();
     } catch (error: any) {
-      console.error('Erro ao salvar agendamento:', error);
       setErro(error.message || 'Erro ao salvar agendamento');
     } finally {
       setSalvando(false);

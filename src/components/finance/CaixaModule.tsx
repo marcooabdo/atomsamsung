@@ -102,7 +102,6 @@ export default function CaixaModule({ unidadeId }: CaixaModuleProps) {
 
       setPagamentosDia(pagamentos || []);
     } catch (error) {
-      console.error('Erro ao carregar caixa:', error);
     } finally {
       setLoading(false);
     }
@@ -129,7 +128,6 @@ export default function CaixaModule({ unidadeId }: CaixaModuleProps) {
       setObsAbertura('');
       loadCaixaDia();
     } catch (error) {
-      console.error('Erro ao abrir caixa:', error);
     }
   };
 
@@ -168,7 +166,6 @@ export default function CaixaModule({ unidadeId }: CaixaModuleProps) {
       setObsFechamento('');
       loadCaixaDia();
     } catch (error) {
-      console.error('Erro ao fechar caixa:', error);
     }
   };
 

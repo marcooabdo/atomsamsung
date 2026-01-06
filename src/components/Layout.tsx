@@ -52,7 +52,6 @@ export function Layout({ children }: LayoutProps) {
     try {
       await signOut();
     } catch (error) {
-      console.error('Erro ao sair:', error);
     }
   };
 

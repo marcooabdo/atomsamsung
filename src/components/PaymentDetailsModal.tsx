@@ -28,7 +28,6 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
 
       setUsuario(data);
     } catch (error) {
-      console.error('Erro ao carregar usuário:', error);
     }
   };
 
@@ -63,7 +62,6 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Erro ao fazer download:', error);
       alert('Erro ao fazer download do comprovante');
     } finally {
       setLoading(false);

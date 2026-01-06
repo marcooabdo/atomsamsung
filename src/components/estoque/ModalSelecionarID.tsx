@@ -46,7 +46,6 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
       if (error) throw error;
       setPecasDisponiveis(data || []);
     } catch (error) {
-      console.error('Erro ao carregar peças:', error);
     } finally {
       setLoading(false);
     }
@@ -92,7 +91,6 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
       setScanningQR(false);
       setQrInput('');
     } catch (error) {
-      console.error('Erro ao buscar peça por QR:', error);
       alert('Erro ao buscar peça');
     }
   };

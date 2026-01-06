@@ -74,7 +74,6 @@ async function getFromGeocodingCache(endereco: string): Promise<GeocodingResult 
       quality: data.qualidade
     };
   } catch (error) {
-    console.error('Cache lookup error:', error);
     return null;
   }
 }
@@ -97,7 +96,6 @@ async function saveToGeocodingCache(
       qualidade: result.quality || 'media'
     });
   } catch (error) {
-    console.error('Error saving to geocoding cache:', error);
   }
 }
 
@@ -134,7 +132,6 @@ export async function geocodeFromCEPAndNumber(
 
     return result;
   } catch (error) {
-    console.error('CEP + Number geocoding error:', error);
     return null;
   }
 }
@@ -174,7 +171,6 @@ export async function geocodeAddress(address: string): Promise<GeocodingResult |
 
     return null;
   } catch (error) {
-    console.error('Geocoding error:', error);
     return null;
   }
 }
@@ -198,7 +194,6 @@ export async function geocodeCEP(cep: string): Promise<Coordinates | null> {
 
     return null;
   } catch (error) {
-    console.error('CEP geocoding error:', error);
     return null;
   }
 }
@@ -221,7 +216,6 @@ async function getDistanceFromCache(
       .maybeSingle();
 
     if (error) {
-      console.error('Cache lookup error:', error);
       return null;
     }
 
@@ -235,7 +229,6 @@ async function getDistanceFromCache(
 
     return null;
   } catch (error) {
-    console.error('Cache error:', error);
     return null;
   }
 }
@@ -260,7 +253,6 @@ async function saveDistanceToCache(
       fonte: source
     });
   } catch (error) {
-    console.error('Error saving to cache:', error);
   }
 }
 
@@ -308,7 +300,6 @@ async function getDistanceFromOpenRoute(
 
     return null;
   } catch (error) {
-    console.error('OpenRouteService error:', error);
     return null;
   }
 }
@@ -394,7 +385,6 @@ export async function updateOSCoordinates(osId: string, cep?: string, endereco?:
         .eq('id', osId);
 
       if (error) {
-        console.error('Error updating OS coordinates:', error);
         return false;
       }
 
@@ -403,7 +393,6 @@ export async function updateOSCoordinates(osId: string, cep?: string, endereco?:
 
     return false;
   } catch (error) {
-    console.error('Error updating OS coordinates:', error);
     return false;
   }
 }
@@ -437,7 +426,6 @@ export async function updateAgendamentoCoordinates(
         .eq('id', agendamentoId);
 
       if (error) {
-        console.error('Error updating agendamento coordinates:', error);
         return false;
       }
 
@@ -446,7 +434,6 @@ export async function updateAgendamentoCoordinates(
 
     return false;
   } catch (error) {
-    console.error('Error updating agendamento coordinates:', error);
     return false;
   }
 }
@@ -482,7 +469,6 @@ export async function geocodeBatch(
         success: coords !== null
       });
     } catch (error) {
-      console.error(`Error geocoding item ${item.id}:`, error);
       results.push({
         id: item.id,
         coords: null,

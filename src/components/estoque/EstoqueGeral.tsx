@@ -49,17 +49,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
       const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
 
-      console.log('🔍 DEBUG EstoqueGeral loadPecas:', {
-        user_tipo: user?.tipo,
-        user_unidade_id: user?.unidade_id,
-        selectedUnidade,
-        selectedUnidade_is_empty_string: selectedUnidade === '',
-        unidadeFilter,
-        canSeeAllUnits,
-        statusFilter,
-        showArquivadas
-      });
-
       let query = supabase
         .from('estoque_pecas')
         .select(`
@@ -82,15 +71,12 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       if (canSeeAllUnits) {
         // Master/Diretoria: filtrar SOMENTE se selectedUnidade for UUID válido
         if (selectedUnidade && selectedUnidade !== '' && selectedUnidade !== 'all') {
-          console.log('✅ Master filtrando por unidade:', selectedUnidade);
           query = query.eq('unidade_id', selectedUnidade);
         } else {
-          console.log('✅ Master vendo TODAS as unidades (sem filtro)');
           // NÃO aplicar filtro - ver tudo
         }
       } else if (unidadeFilter) {
         // Usuário normal: filtrar pela sua unidade
-        console.log('✅ Usuário normal filtrando por sua unidade:', unidadeFilter);
         query = query.eq('unidade_id', unidadeFilter);
       }
 
@@ -106,16 +92,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       if (error) throw error;
 
-      console.log('📦 Peças carregadas do banco:', {
-        total: data?.length || 0,
-        unidadeFilter,
-        canSeeAllUnits,
-        selectedUnidade,
-        statusFilter,
-        showArquivadas,
-        error: error ? error.message : null
-      });
-
       const enrichedPecas = (data || []).map((peca: any) => ({
         ...peca,
         nf_data_emissao: peca.estoque_nfs?.data_emissao,
@@ -129,9 +105,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       });
 
       setPecas(enrichedPecas);
-      console.log('✅ Peças processadas:', enrichedPecas.length);
     } catch (error) {
-      console.error('Erro ao carregar peças:', error);
     } finally {
       setLoading(false);
     }
@@ -165,7 +139,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       if (error) throw error;
       setHistoricoData(data || []);
     } catch (error) {
-      console.error('Erro ao carregar histórico:', error);
       setHistoricoData([]);
     } finally {
       setLoadingHistorico(false);
@@ -690,7 +663,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
               await loadPecas();
               alert('✅ Localização atualizada com sucesso!');
             } catch (error) {
-              console.error('Erro ao atualizar localização:', error);
               alert('❌ Erro ao atualizar localização');
             }
           }}

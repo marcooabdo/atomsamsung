@@ -65,7 +65,6 @@ class RouteKanbanSyncService {
 
       return routesWithCount;
     } catch (error) {
-      console.error('Erro ao buscar colunas de rota:', error);
       return [];
     }
   }
@@ -87,7 +86,6 @@ class RouteKanbanSyncService {
 
       return (data || []).filter(os => os.lat !== null && os.lng !== null) as OS[];
     } catch (error) {
-      console.error('Erro ao buscar OSs das rotas:', error);
       return [];
     }
   }
@@ -107,7 +105,6 @@ class RouteKanbanSyncService {
 
       return true;
     } catch (error) {
-      console.error('Erro ao marcar OS como concluída:', error);
       return false;
     }
   }
@@ -127,7 +124,6 @@ class RouteKanbanSyncService {
 
       return true;
     } catch (error) {
-      console.error('Erro ao desfazer conclusão da OS:', error);
       return false;
     }
   }
@@ -144,7 +140,6 @@ class RouteKanbanSyncService {
       await Promise.all(updates);
       return true;
     } catch (error) {
-      console.error('Erro ao atualizar sequência de OSs:', error);
       return false;
     }
   }
@@ -170,7 +165,6 @@ class RouteKanbanSyncService {
 
       const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
       if (!apiKey) {
-        console.warn('Google Maps API key não configurada');
         return null;
       }
 
@@ -196,7 +190,6 @@ class RouteKanbanSyncService {
 
       return null;
     } catch (error) {
-      console.error('Erro ao geocodificar endereço da OS:', error);
       return null;
     }
   }

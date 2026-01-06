@@ -163,7 +163,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       setRequisicoesAgrupadas(Object.values(agrupado));
       setPedidosAtivos(Object.values(pedidosAtivosAgrupado));
     } catch (error) {
-      console.error('Erro ao carregar requisições:', error);
     } finally {
       setLoading(false);
     }
@@ -217,7 +216,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       alert('Requisição reprovada com sucesso!');
       await loadData();
     } catch (error) {
-      console.error('Erro ao reprovar requisição:', error);
       alert('Erro ao reprovar requisição');
     }
   };
@@ -225,12 +223,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const handleConfirmarTransferencia = async (requisicaoId: string, pecaEstoqueId: string) => {
     try {
       const requisicao = modalSelecionarID;
-
-      console.log('🔄 Iniciando transferência:', {
-        requisicaoId: requisicao.id,
-        pecaEstoqueId,
-        osId: requisicao.os_id
-      });
 
       // ⚠️ VALIDAÇÃO CRÍTICA: Verificar se a peça já está vinculada a outra requisição ativa
       const { data: requisicaoExistente, error: checkError } = await supabase
@@ -241,7 +233,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .maybeSingle();
 
       if (checkError) {
-        console.error('❌ Erro ao verificar requisições existentes:', checkError);
         throw new Error(`Erro ao verificar disponibilidade da peça: ${checkError.message}`);
       }
 
@@ -271,11 +262,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .select();
 
       if (reqError) {
-        console.error('❌ Erro ao atualizar requisição:', reqError);
         throw new Error(`Erro ao atualizar requisição: ${reqError.message}`);
       }
 
-      console.log('✅ Requisição atualizada:', reqData);
 
       // Atualizar peça no estoque
       const { error: pecaError, data: pecaData } = await supabase
@@ -289,11 +278,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .select();
 
       if (pecaError) {
-        console.error('❌ Erro ao atualizar peça:', pecaError);
         throw new Error(`Erro ao atualizar peça no estoque: ${pecaError.message}`);
       }
 
-      console.log('✅ Peça atualizada:', pecaData);
 
       // Criar log no histórico do estoque
       const { error: histError } = await supabase.from('estoque_historico').insert({
@@ -308,9 +295,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       });
 
       if (histError) {
-        console.warn('⚠️ Erro ao criar histórico (não crítico):', histError);
       } else {
-        console.log('✅ Histórico criado');
       }
 
       // Buscar nome do usuário
@@ -335,7 +320,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      console.log('🔍 Verificando se todas as peças da OS foram atendidas...');
 
       // Verificar se todas as peças da OS foram atendidas
       // Importante: precisamos aguardar um pouco para garantir que a transação foi confirmada
@@ -347,20 +331,16 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .eq('os_id', requisicao.os_id);
 
       if (reqCheckError) {
-        console.error('❌ Erro ao buscar requisições da OS:', reqCheckError);
         throw reqCheckError;
       }
 
-      console.log('📋 Requisições da OS:', todasRequisicoes?.map(r => ({ id: r.id.slice(0, 8), status: r.status })));
 
       const todasAtendidas = todasRequisicoes?.every(r =>
         r.status === 'atendida' || r.status === 'gi_postada' || r.status === 'devolvida'
       );
 
-      console.log('✅ Todas atendidas?', todasAtendidas);
 
       if (todasAtendidas) {
-        console.log('🎯 Todas as peças foram atendidas! Iniciando movimentação...');
 
         // Buscar dados completos da OS para roteamento
         const { data: osCompleta, error: osError } = await supabase
@@ -370,23 +350,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           .single();
 
         if (osError) {
-          console.error('❌ Erro ao buscar dados da OS:', osError);
           throw osError;
         }
-
-        console.log('📊 Dados da OS:', {
-          tipo_atendimento: osCompleta?.tipo_atendimento,
-          cliente_cidade: osCompleta?.cliente_cidade,
-          unidade_id: osCompleta?.unidade_id,
-          coluna_atual: osCompleta?.coluna_kanban
-        });
 
         let destinoColuna = 'peca_disponivel';
         let mensagemDestino = 'Peça Disponível';
 
         // Lógica de roteamento automático APENAS para OS IH
         if (osCompleta?.tipo_atendimento === 'IH' && osCompleta?.cliente_cidade && osCompleta?.unidade_id) {
-          console.log('🔍 OS é IH, buscando rota para cidade:', osCompleta.cliente_cidade);
 
           // Buscar rota que contenha a cidade E pertença à mesma unidade da OS
           const { data: rota, error: rotaError } = await supabase
@@ -398,19 +369,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             .maybeSingle();
 
           if (rotaError) {
-            console.error('❌ Erro ao buscar rota:', rotaError);
           } else if (rota && rota.coluna_kanban) {
-            console.log('✅ Rota encontrada:', rota);
             destinoColuna = rota.coluna_kanban;
             mensagemDestino = rota.nome;
           } else {
-            console.log('⚠️ Nenhuma rota encontrada para esta cidade');
           }
         } else {
-          console.log('ℹ️ OS não é IH ou não tem cidade/unidade - indo para Peça Disponível');
         }
 
-        console.log(`🚀 Movendo OS de "${osCompleta?.coluna_kanban}" para "${destinoColuna}"`);
 
         // Mover OS para destino apropriado
         const { error: updateOsError } = await supabase
@@ -422,11 +388,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           .eq('id', requisicao.os_id);
 
         if (updateOsError) {
-          console.error('❌ Erro ao mover OS:', updateOsError);
           throw updateOsError;
         }
 
-        console.log('✅ OS movida com sucesso para:', destinoColuna);
 
         const mensagemComentario = destinoColuna === 'peca_disponivel'
           ? `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida para "${mensagemDestino}"`
@@ -451,7 +415,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       setModalSelecionarID(null);
       await loadData();
     } catch (error) {
-      console.error('Erro ao confirmar transferência:', error);
       alert('Erro ao confirmar transferência');
     }
   };
@@ -488,7 +451,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       setModalRegistrarValor(null);
       await loadData();
     } catch (error) {
-      console.error('Erro ao registrar valor:', error);
       throw error;
     }
   };
@@ -579,7 +541,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       alert(alertMsg);
       await loadData();
     } catch (error) {
-      console.error('Erro ao refazer pedido:', error);
       alert('Erro ao refazer pedido');
     }
   };
@@ -632,7 +593,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       setModalJustificativa(null);
       await loadData();
     } catch (error) {
-      console.error('Erro ao criar pedido:', error);
       throw error;
     }
   };
@@ -699,7 +659,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       setModalPedirPeca(null);
       await loadData();
     } catch (error) {
-      console.error('Erro ao criar pedido:', error);
       throw error;
     }
   };

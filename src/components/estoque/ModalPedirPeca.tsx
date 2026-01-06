@@ -43,7 +43,6 @@ export function ModalPedirPeca({ requisicao, onConfirm, onCancel }: ModalPedirPe
         observacoes
       });
     } catch (error) {
-      console.error('Erro ao criar pedido:', error);
       alert('Erro ao criar pedido');
     } finally {
       setLoading(false);

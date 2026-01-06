@@ -69,7 +69,6 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
       if (pecasError) throw pecasError;
       setPecas(pecasData || []);
     } catch (error) {
-      console.error('Erro ao carregar detalhes da NF:', error);
     } finally {
       setLoading(false);
     }
@@ -103,7 +102,6 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
         alert(data.error || 'Erro ao consultar DANFE');
       }
     } catch (error) {
-      console.error('Erro ao consultar DANFE:', error);
       alert('Erro ao consultar DANFE');
     } finally {
       setDownloadingPDF(false);

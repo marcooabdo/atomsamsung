@@ -74,7 +74,6 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
         });
       }
     } catch (error) {
-      console.error('Error loading goals:', error);
     }
   };
 
@@ -112,7 +111,6 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
       if (onSaved) onSaved();
       onClose();
     } catch (error) {
-      console.error('Error saving goals:', error);
       alert('Erro ao salvar metas. Verifique os dados e tente novamente.');
     } finally {
       setSaving(false);

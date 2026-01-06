@@ -94,7 +94,6 @@ export function SamsungGSPNTab() {
 
       setSyncLogs(logsData || []);
     } catch (error) {
-      console.error('Erro ao carregar dados Samsung:', error);
     } finally {
       setLoading(false);
     }
@@ -142,7 +141,6 @@ export function SamsungGSPNTab() {
       setEditing(false);
       loadData();
     } catch (error: unknown) {
-      console.error('Erro ao salvar configuração:', error);
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'Erro ao salvar configuração'
@@ -192,7 +190,6 @@ export function SamsungGSPNTab() {
 
       loadData();
     } catch (error: unknown) {
-      console.error('Erro na importação:', error);
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'Erro desconhecido ao importar OS'
@@ -254,7 +251,6 @@ export function SamsungGSPNTab() {
 
       loadData();
     } catch (error: unknown) {
-      console.error('Erro na atualização de status:', error);
       setMessage({
         type: 'error',
         text: error instanceof Error ? error.message : 'Erro desconhecido ao atualizar status'

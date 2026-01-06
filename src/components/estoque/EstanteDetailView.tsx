@@ -44,7 +44,6 @@ export function EstanteDetailView({ estante, onClose }: EstanteDetailViewProps) 
       if (error) throw error;
       setBins(data || []);
     } catch (error) {
-      console.error('Erro ao carregar bins:', error);
     } finally {
       setLoading(false);
     }

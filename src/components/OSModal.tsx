@@ -196,7 +196,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       if (error) throw error;
       setOS(data);
     } catch (error) {
-      console.error('Erro ao carregar OS:', error);
     } finally {
       setLoading(false);
     }
@@ -256,7 +255,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const loadRequisicoes = async () => {
-    console.log('🔄 Carregando requisições para OS:', osId);
 
     // Busca cotacao_id da OS para incluir requisições da cotação original
     const { data: osData } = await supabase
@@ -265,7 +263,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       .eq('id', osId)
       .maybeSingle();
 
-    console.log('📋 OS cotacao_id:', osData?.cotacao_id || 'nenhuma');
 
     // Busca requisições vinculadas à OS ou à cotação original
     let query = supabase
@@ -287,17 +284,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('❌ Erro ao carregar requisições:', error);
       return;
     }
 
-    console.log('📋 DEBUG OSModal - Requisições carregadas:', data?.length || 0, new Date().toLocaleTimeString());
     data?.forEach(req => {
-      console.log(`  📦 ${req.codigo_peca} - Status: ${req.status} - ID: ${req.id.slice(0, 8)} - OS ID: ${req.os_id?.slice(0, 8) || 'null'} - Cotacao ID: ${req.cotacao_id?.slice(0, 8) || 'null'} - Created: ${new Date(req.created_at).toLocaleTimeString()}`);
     });
 
     setRequisicoes(data || []);
-    console.log('✅ State de requisições atualizado');
   };
 
   const loadChecklist = async () => {
@@ -334,8 +327,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         : Promise.resolve({ data: [], error: null })
     ]);
 
-    console.log('OS Comentarios:', osComentariosResult.data);
-    console.log('Cotacao Comentarios:', cotacaoComentariosResult.data);
 
     // Converte cotacao_comentarios para o formato de os_comentarios
     const cotacaoComentarios = (cotacaoComentariosResult.data || []).map(c => ({
@@ -353,7 +344,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
     );
 
-    console.log('Todos Comentarios:', todosComentarios);
     setComentarios(todosComentarios);
   };
 
@@ -365,7 +355,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       .eq('id', osId)
       .maybeSingle();
 
-    console.log('OS Data (cotacao_id):', osData);
 
     // Busca anexos vinculados à OS ou à cotação original
     const { data, error } = await supabase
@@ -374,8 +363,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       .or(`os_id.eq.${osId}${osData?.cotacao_id ? `,cotacao_id.eq.${osData.cotacao_id}` : ''}`)
       .order('created_at', { ascending: false });
 
-    console.log('Anexos carregados:', data);
-    if (error) console.error('Erro ao carregar anexos:', error);
 
     setAnexos(data || []);
   };
@@ -535,7 +522,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar GSPN:', error);
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingGSPN(false);
@@ -744,7 +730,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       onClose();
       onReload();
     } catch (error) {
-      console.error('Erro ao refazer orçamento:', error);
       alert(`❌ Erro ao mover orçamento: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setRefazendoOrcamento(false);
     }
@@ -765,7 +750,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       setNovoComentario('');
       loadComentarios();
     } catch (error) {
-      console.error('Erro ao adicionar comentário:', error);
     }
   };
 
@@ -800,7 +784,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         return;
       }
 
-      console.log('✨ DEBUG - Criando nova requisição para peça:', peca.codigo || peca.pn);
 
       await supabase
         .from('requisicoes_pecas')
@@ -848,7 +831,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       await loadOS();
       onReload?.();
     } catch (error) {
-      console.error('Erro ao requisitar peça:', error);
       alert('Erro ao criar requisição de peça');
     }
   };
@@ -866,7 +848,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     }
 
     setCriandoRequisicao(true);
-    console.log('🔄 Criando nova requisição para peça:', peca.codigo || peca.pn);
 
     try {
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida)
@@ -894,7 +875,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         return;
       }
 
-      console.log('✅ Nenhuma requisição ativa encontrada, criando nova...');
 
       const { data: novaRequisicao, error: insertError } = await supabase
         .from('requisicoes_pecas')
@@ -913,7 +893,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .single();
 
       if (insertError) throw insertError;
-      console.log('✅ Nova requisição criada:', novaRequisicao?.id);
 
       // Mover OS para "Aguardando Peça" se não estiver lá ainda
       if (os?.coluna_kanban !== 'aguardando_peca') {
@@ -936,16 +915,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       // Aguarda um breve momento para garantir que o banco processou tudo
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      console.log('🔄 Recarregando requisições...');
       await loadRequisicoes();
       await loadOS();
 
-      console.log('✅ Requisições recarregadas com sucesso');
       alert('Nova requisição criada com sucesso!');
 
       onReload?.();
     } catch (error) {
-      console.error('❌ Erro ao criar nova requisição:', error);
       alert('Erro ao criar nova requisição');
     } finally {
       setCriandoRequisicao(false);
@@ -1010,7 +986,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         );
       }, 100);
     } catch (error: any) {
-      console.error('Erro ao finalizar analise:', error);
       alert(`Erro ao finalizar analise: ${error.message || 'Erro desconhecido'}`);
       setFinalizandoAnalise(false);
     }
@@ -1055,7 +1030,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       await loadRequisicoes();
       onReload?.();
     } catch (error) {
-      console.error('Erro ao postar GI:', error);
       alert('Erro ao postar GI');
     }
   };
@@ -1096,7 +1070,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
       alert('Checklist criado com sucesso!');
     } catch (error) {
-      console.error('Erro ao criar checklist:', error);
       alert('Erro ao criar checklist');
     }
   };
@@ -1125,7 +1098,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         });
       }
     } catch (error) {
-      console.error('Erro ao atualizar checklist:', error);
       alert('Erro ao atualizar checklist');
     }
   };
@@ -1141,8 +1113,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     if (!confirmacao) return;
 
     try {
-      console.log('🗑️ Deletando requisição:', requisicao.id);
-      console.log('📋 Dados da requisição:', requisicao);
 
       // Deletar requisição
       const { data: deletedData, error: deleteError } = await supabase
@@ -1151,10 +1121,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('id', requisicao.id)
         .select();
 
-      console.log('🔍 Resultado do delete:', { deletedData, deleteError });
 
       if (deleteError) {
-        console.error('❌ Erro ao deletar:', deleteError);
         throw deleteError;
       }
 
@@ -1165,18 +1133,15 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('id', requisicao.id)
         .maybeSingle();
 
-      console.log('🔍 Verificação após delete:', { verificacao, verifError });
 
       if (verificacao) {
         throw new Error('A requisição ainda existe no banco após tentativa de deleção!');
       }
 
-      console.log('✅ Requisição deletada com sucesso do banco');
 
       // Atualiza o estado local imediatamente
       setRequisicoes(prev => {
         const filtered = prev.filter(r => r.id !== requisicao.id);
-        console.log('📊 Requisições antes:', prev.length, 'depois:', filtered.length);
         return filtered;
       });
 
@@ -1192,16 +1157,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Recarrega dados do servidor para garantir sincronização
-      console.log('🔄 Recarregando requisições...');
       await loadRequisicoes();
       await loadComentarios();
 
-      console.log('✅ Dados recarregados');
 
       alert('Requisição cancelada com sucesso!');
       onReload?.();
     } catch (error) {
-      console.error('❌ Erro ao cancelar requisição:', error);
       alert(`Erro ao cancelar requisição: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
@@ -1239,7 +1201,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       setMostrarModalDevolucao(false);
       setRequisicaoSelecionada(null);
     } catch (error) {
-      console.error('Erro ao solicitar devolução:', error);
       alert('Erro ao solicitar devolução');
       throw error;
     }
@@ -1302,7 +1263,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         onReload();
       }
     } catch (error) {
-      console.error('Erro ao cancelar GI:', error);
       alert('Erro ao cancelar GI');
     }
   };
@@ -1374,7 +1334,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       onReload?.();
       onClose();
     } catch (error) {
-      console.error('Erro ao converter OS:', error);
       alert('Erro ao converter OS');
     } finally {
       setConvertendo(false);
@@ -1401,7 +1360,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       onReload?.();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao mover OS:', error);
       alert(`Erro ao mover OS: ${error.message}`);
     } finally {
       setMovendoOS(false);
@@ -2523,7 +2481,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         loadComentarios();
                         alert('Anexo adicionado com sucesso!');
                       } catch (error) {
-                        console.error('Erro ao fazer upload:', error);
                         alert('Erro ao adicionar anexo');
                       }
 
@@ -2581,7 +2538,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               loadComentarios();
                               alert('Anexo excluído com sucesso!');
                             } catch (error) {
-                              console.error('Erro ao excluir anexo:', error);
                               alert('Erro ao excluir anexo');
                             }
                           }}

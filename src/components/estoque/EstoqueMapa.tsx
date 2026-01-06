@@ -107,7 +107,6 @@ export function EstoqueMapa({ selectedUnidade }: EstoqueMapaProps) {
         setSelectedSala(data[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar salas:', error);
     }
   };
 
@@ -122,7 +121,6 @@ export function EstoqueMapa({ selectedUnidade }: EstoqueMapaProps) {
       if (error) throw error;
       setEstantes(data || []);
     } catch (error) {
-      console.error('Erro ao carregar estantes:', error);
     }
   };
 
@@ -147,7 +145,6 @@ export function EstoqueMapa({ selectedUnidade }: EstoqueMapaProps) {
 
       setBins(binsWithCount);
     } catch (error) {
-      console.error('Erro ao carregar bins:', error);
     }
   };
 
@@ -192,7 +189,6 @@ export function EstoqueMapa({ selectedUnidade }: EstoqueMapaProps) {
         alert('❌ Peça não encontrada ou não possui localização atribuída');
       }
     } catch (error) {
-      console.error('Erro ao buscar peça:', error);
       alert('Erro ao buscar peça');
     }
   };
@@ -589,7 +585,6 @@ function ConfigView({
       setShowNewSalaModal(false);
       onRefresh();
     } catch (error) {
-      console.error('Erro ao criar sala:', error);
       alert('Erro ao criar sala');
     } finally {
       setCreating(false);
@@ -641,7 +636,6 @@ function ConfigView({
       await onRefresh();
       alert(`✅ Estante criada com sucesso!\n${binsToCreate.length} bins configuradas.`);
     } catch (error) {
-      console.error('Erro ao criar estante:', error);
       alert('Erro ao criar estante');
     } finally {
       setCreating(false);
@@ -667,7 +661,6 @@ function ConfigView({
       await onRefresh();
       alert('✅ Sala atualizada com sucesso!');
     } catch (error) {
-      console.error('Erro ao editar sala:', error);
       alert('Erro ao editar sala');
     } finally {
       setCreating(false);
@@ -693,7 +686,6 @@ function ConfigView({
       await onRefresh();
       alert('✅ Estante atualizada com sucesso!');
     } catch (error) {
-      console.error('Erro ao editar estante:', error);
       alert('Erro ao editar estante');
     } finally {
       setCreating(false);
@@ -1132,7 +1124,6 @@ function ModalNovaSala({ currentUnidadeId, onClose, onSuccess }: ModalNovaSalaPr
       alert("✅ Sala criada com sucesso!");
       onSuccess();
     } catch (error) {
-      console.error("Erro ao criar sala:", error);
       alert("Erro ao criar sala");
     } finally {
       setCreating(false);

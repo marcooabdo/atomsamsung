@@ -75,7 +75,6 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
         setEndereco(data.display_name);
       }
     } catch (error) {
-      console.error('Erro ao buscar endereço:', error);
     }
   };
 
@@ -152,7 +151,6 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao fazer check-in:', error);
       alert(`Erro ao fazer check-in: ${error.message}`);
     } finally {
       setLoading(false);

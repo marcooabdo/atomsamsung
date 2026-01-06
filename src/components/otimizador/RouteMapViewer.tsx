@@ -102,7 +102,6 @@ export function RouteMapViewer({
         const path = google.maps.geometry.encoding.decodePath(polyline);
         setDecodedPath(path.map(p => ({ lat: p.lat(), lng: p.lng() })));
       } catch (error) {
-        console.error('Erro ao decodificar polyline:', error);
       }
     }
   }, [polyline, isLoaded]);
@@ -113,7 +112,6 @@ export function RouteMapViewer({
 
       const generatePolyline = async () => {
         try {
-          console.log('Gerando polyline com DirectionsService...');
           const directionsService = new google.maps.DirectionsService();
 
           const waypoints = osData
@@ -125,7 +123,6 @@ export function RouteMapViewer({
             }));
 
           if (waypoints.length === 0) {
-            console.warn('Nenhum waypoint válido para gerar polyline');
             return;
           }
 
@@ -146,14 +143,11 @@ export function RouteMapViewer({
                   lng: p.lng()
                 }));
                 setDecodedPath(path);
-                console.log('Polyline gerada com sucesso:', path.length, 'pontos');
               }
             } else {
-              console.error('Erro ao gerar polyline:', status);
             }
           });
         } catch (error) {
-          console.error('Erro ao gerar polyline:', error);
         } finally {
           setGeneratingPolyline(false);
         }
@@ -192,31 +186,6 @@ export function RouteMapViewer({
 
   const visibleOSs = showCompleted ? osData : osData.filter(os => !os.concluida);
 
-  console.log('=== RouteMapViewer Render ===');
-  console.log('Total OSs:', osData.length);
-  console.log('OSs visíveis:', visibleOSs.length);
-  console.log('Base coordinates:', baseCoordinates);
-  console.log('Decoded path length:', decodedPath.length);
-  console.log('Generating polyline:', generatingPolyline);
-
-  console.log('\n=== Verificando cada OS ===');
-  visibleOSs.forEach((os, idx) => {
-    console.log(`OS ${idx + 1}:`, {
-      id: os.id,
-      numero_os: os.numero_os,
-      lat: os.lat,
-      lng: os.lng,
-      has_lat_lng: !!(os.lat && os.lng),
-      tipo_lat: typeof os.lat,
-      tipo_lng: typeof os.lng
-    });
-  });
-
-  console.log('\n=== Marcador Base ===');
-  console.log('Position:', baseCoordinates);
-  console.log('Base lat tipo:', typeof baseCoordinates.lat);
-  console.log('Base lng tipo:', typeof baseCoordinates.lng);
-
   return (
     <div className="w-full h-full relative">
       <GoogleMap
@@ -236,14 +205,8 @@ export function RouteMapViewer({
 
         {visibleOSs.map((os, index) => {
           if (!os.lat || !os.lng) {
-            console.warn(`OS ${index + 1} sem coordenadas:`, os.numero_os);
             return null;
           }
-
-          console.log(`Renderizando marcador ${index + 1}:`, {
-            numero_os: os.numero_os,
-            position: { lat: os.lat, lng: os.lng }
-          });
 
           return (
             <Marker

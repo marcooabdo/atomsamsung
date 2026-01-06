@@ -129,7 +129,6 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         }
       }
     } catch (err) {
-      console.error('Erro ao carregar mensagens:', err);
     } finally {
       setLoading(false);
       setLoadingMore(false);

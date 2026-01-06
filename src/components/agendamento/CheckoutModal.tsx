@@ -54,7 +54,6 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
       if (error) throw error;
       setTemPecas((data?.length || 0) > 0);
     } catch (error) {
-      console.error('Erro ao verificar peças:', error);
     }
   };
 
@@ -83,7 +82,6 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
         })));
       }
     } catch (error) {
-      console.error('Erro ao carregar checklist:', error);
     } finally {
       setLoadingChecklist(false);
     }
@@ -136,7 +134,6 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
         setEndereco(data.display_name);
       }
     } catch (error) {
-      console.error('Erro ao buscar endereço:', error);
     }
   };
 
@@ -336,7 +333,6 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao fazer checkout:', error);
       alert(`Erro ao fazer checkout: ${error.message}`);
     } finally {
       setLoading(false);

@@ -64,11 +64,9 @@ export class KanbanSyncService {
   }
 
   private async handleAnexoChange(payload: any) {
-    console.log('Anexo changed:', payload);
   }
 
   private async handleOSChange(payload: any) {
-    console.log('OS changed:', payload);
   }
 
   async syncFotoToKanban(anexoId: string, osId: string): Promise<boolean> {
@@ -101,7 +99,6 @@ export class KanbanSyncService {
 
       return true;
     } catch (error) {
-      console.error('Error syncing foto to Kanban:', error);
       return false;
     }
   }
@@ -131,7 +128,6 @@ export class KanbanSyncService {
 
       return true;
     } catch (error) {
-      console.error('Error syncing status change:', error);
       return false;
     }
   }
@@ -149,7 +145,6 @@ export class KanbanSyncService {
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching sync logs:', error);
       return [];
     }
   }
@@ -167,7 +162,6 @@ export class KanbanSyncService {
 
       return data || [];
     } catch (error) {
-      console.error('Error fetching sync queue:', error);
       return [];
     }
   }
@@ -184,7 +178,6 @@ export class KanbanSyncService {
 
       return !error;
     } catch (error) {
-      console.error('Error retrying sync:', error);
       return false;
     }
   }

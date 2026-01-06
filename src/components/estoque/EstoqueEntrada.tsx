@@ -86,7 +86,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       if (error) throw error;
       setNfs(data || []);
     } catch (err) {
-      console.error('Erro ao carregar NFs:', err);
     }
   };
 
@@ -203,7 +202,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         alert(data.error || 'Erro ao consultar DANFE');
       }
     } catch (error) {
-      console.error('Erro ao consultar DANFE:', error);
       alert('Erro ao consultar DANFE');
     } finally {
       setDownloadingNFId(null);
@@ -243,7 +241,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const qtdPecas = pecas?.length || 0;
 
       if (qtdPecas > 0) {
-        console.log(`🗑️ Excluindo NF ${nf.numero_nf} e ${qtdPecas} peças`, pecas.map(p => `ID #${p.id_numerico}`));
       }
 
       const { error: deleteNFError } = await supabase
@@ -252,7 +249,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         .eq('id', nf.id);
 
       if (deleteNFError) {
-        console.error('Erro ao excluir NF:', deleteNFError);
         throw new Error(`Erro ao excluir NF: ${deleteNFError.message}`);
       }
 
@@ -265,7 +261,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       await loadNFs();
     } catch (error) {
-      console.error('Erro ao excluir NF:', error);
       alert(`❌ Erro ao excluir NF: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
@@ -354,14 +349,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setShowPreviewModal(false);
 
     try {
-      console.log('📄 Iniciando importação de NF:', {
-        numero_nf: previewData.numeroNF,
-        fornecedor: previewData.fornecedor,
-        total_produtos: previewData.produtos.length,
-        unidade_id: unidadeId,
-        usuario_id: usuario?.id
-      });
-
       const { data: nfRecord, error: nfError } = await supabase
         .from('estoque_nfs')
         .insert({
@@ -380,14 +367,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         .single();
 
       if (nfError) {
-        console.error('❌ Erro ao inserir NF:', nfError);
         throw new Error(`Erro ao criar registro da NF: ${nfError.message}`);
       }
-
-      console.log('✅ NF criada com sucesso:', {
-        nf_id: nfRecord.id,
-        numero_nf: nfRecord.numero_nf
-      });
 
       const pecasToInsert = [];
       let contador = 0;
@@ -410,27 +391,14 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         }
       }
 
-      console.log('📦 Inserindo peças no estoque:', {
-        total_pecas: pecasToInsert.length,
-        nf_id: nfRecord.id,
-        unidade_id: unidadeId,
-        primeira_peca: pecasToInsert[0]
-      });
-
       const { data: pecasInseridas, error: pecasError } = await supabase
         .from('estoque_pecas')
         .insert(pecasToInsert)
         .select();
 
       if (pecasError) {
-        console.error('❌ Erro ao inserir peças:', pecasError);
         throw new Error(`Erro ao inserir peças no estoque: ${pecasError.message}`);
       }
-
-      console.log('✅ Peças inseridas com sucesso:', {
-        total_inserido: pecasInseridas?.length || 0,
-        esperado: pecasToInsert.length
-      });
 
       // Registrar histórico para cada peça inserida
       if (pecasInseridas && pecasInseridas.length > 0) {
@@ -468,11 +436,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const requisicoesComPedido = requisicoesEncontradas.filter(r => r.status === 'pedido_feito');
 
         if (requisicoesComPedido.length > 0) {
-          console.log('📦 Peças chegaram para requisições com pedido feito:', {
-            quantidade: requisicoesComPedido.length,
-            observacao: 'Status permanece como "pedido_feito" até aprovação de ID específico'
-          });
-
           // Registrar comentários nas OS afetadas
           for (const req of requisicoesComPedido) {
             if (req.os_id) {
@@ -504,14 +467,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         mensagemRequisicoes += '\n\nVá para a aba "Transferências" para selecionar os IDs das peças.';
       }
 
-      console.log('✅ NF processada completamente:', {
-        nf_id: nfRecord.id,
-        numero_nf: previewData.numeroNF,
-        fornecedor: previewData.fornecedor,
-        total_pecas: pecasToInsert.length,
-        valor_total: previewData.valorTotal
-      });
-
       alert(
         `✅ NF ${previewData.numeroNF} importada com sucesso!\n\n` +
         `📦 ${pecasToInsert.length} peças adicionadas ao estoque\n` +
@@ -532,7 +487,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       loadNFs();
     } catch (error: any) {
-      console.error('❌ ERRO ao processar XML:', error);
       const errorMessage = error.message || 'Erro desconhecido ao processar arquivo XML';
       setError(`Falha na importação: ${errorMessage}`);
       alert(`❌ Erro ao importar NF ${previewData.numeroNF}:\n\n${errorMessage}\n\nVerifique o console para mais detalhes.`);

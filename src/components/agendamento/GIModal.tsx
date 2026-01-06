@@ -82,7 +82,6 @@ export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GI
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao postar GI:', error);
       alert(`Erro ao postar GI: ${error.message}`);
     } finally {
       setLoading(false);

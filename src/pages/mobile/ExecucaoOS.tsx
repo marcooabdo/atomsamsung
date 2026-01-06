@@ -150,7 +150,6 @@ export function ExecucaoOS() {
       .maybeSingle();
 
     if (agendamentoError) {
-      console.error('Erro ao carregar agendamento:', agendamentoError);
     }
 
     const { data, error } = await supabase
@@ -160,13 +159,11 @@ export function ExecucaoOS() {
       .maybeSingle();
 
     if (error) {
-      console.error('Erro ao carregar OS:', error);
       setLoading(false);
       return;
     }
 
     if (!data) {
-      console.error('OS não encontrada ou sem permissão');
       setLoading(false);
       return;
     }
@@ -174,7 +171,6 @@ export function ExecucaoOS() {
     const isAuthorized = agendamentoData?.tecnico_id === usuario.id || data.tecnico_agendado_id === usuario.id;
 
     if (!isAuthorized) {
-      console.error('Técnico não autorizado para esta OS');
       setLoading(false);
       return;
     }

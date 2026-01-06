@@ -37,7 +37,6 @@ export function Chat() {
         .eq('ativo', true);
       setOnlineCount(count || 0);
     } catch (err) {
-      console.error('Erro ao carregar contagem de usuários online:', err);
     }
   };
 

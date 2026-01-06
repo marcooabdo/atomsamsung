@@ -123,7 +123,6 @@ export default function ConsumoPecasModule({ unidadeId, dataInicio, dataFim }: C
 
       setPecas(filteredData);
     } catch (error) {
-      console.error('Erro ao carregar pecas:', error);
     } finally {
       setLoading(false);
     }

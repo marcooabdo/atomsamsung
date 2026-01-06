@@ -59,7 +59,6 @@ export function ChatInput({ conversationId, userId, onMessageSent, onMessageAdde
 
       onMessageSent?.();
     } catch (err) {
-      console.error('Erro ao enviar mensagem:', err);
       alert('Erro ao enviar mensagem');
     } finally {
       setSending(false);
@@ -134,7 +133,6 @@ export function ChatInput({ conversationId, userId, onMessageSent, onMessageAdde
 
       onMessageSent?.();
     } catch (err) {
-      console.error('Erro ao enviar arquivo:', err);
       alert('Erro ao enviar arquivo');
     } finally {
       setUploading(false);

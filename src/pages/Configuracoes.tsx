@@ -136,7 +136,6 @@ export function Configuracoes() {
             .select('*')
             .order('nome');
           if (unidadesError) {
-            console.error('Erro ao carregar unidades:', unidadesError);
             alert(`Erro ao carregar unidades: ${unidadesError.message}`);
           }
           setUnidades(unidadesData || []);
@@ -147,7 +146,6 @@ export function Configuracoes() {
             .select('*')
             .order('nome');
           if (usuariosError) {
-            console.error('Erro ao carregar usuários:', usuariosError);
             alert(`Erro ao carregar usuários: ${usuariosError.message}`);
           }
           setUsuarios(usuariosData || []);
@@ -186,14 +184,12 @@ export function Configuracoes() {
             .select('*')
             .order('nome');
           if (checklistsError) {
-            console.error('Erro ao carregar checklists:', checklistsError);
             alert(`Erro ao carregar checklists: ${checklistsError.message}`);
           }
           setChecklists(checklistsData || []);
           break;
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
     } finally {
       setLoading(false);
     }
@@ -257,7 +253,6 @@ export function Configuracoes() {
         });
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
     }
   };
 
@@ -449,7 +444,6 @@ export function Configuracoes() {
       setShowModal(false);
       loadData();
     } catch (error: any) {
-      console.error('Erro ao salvar:', error);
       alert(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
     }
   };
@@ -462,7 +456,6 @@ export function Configuracoes() {
       if (error) throw error;
       loadData();
     } catch (error) {
-      console.error('Erro ao excluir:', error);
       alert('Erro ao excluir item');
     }
   };
@@ -505,7 +498,6 @@ export function Configuracoes() {
       alert('Usuário excluído com sucesso!');
       loadData();
     } catch (error: any) {
-      console.error('Erro ao excluir usuário:', error);
       alert(`Erro ao excluir usuário: ${error.message || 'Erro desconhecido'}`);
     }
   };
@@ -516,7 +508,6 @@ export function Configuracoes() {
       setEditingTaxa(null);
       loadData();
     } catch (error) {
-      console.error('Erro ao salvar taxa:', error);
       alert('Erro ao salvar taxa');
     }
   };

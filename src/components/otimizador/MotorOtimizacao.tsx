@@ -105,7 +105,6 @@ export default function MotorOtimizacao() {
     try {
       await Promise.all([loadRouteOptions(), loadTecnicos(), loadUnidadeConfig()]);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
     } finally {
       setLoadingData(false);
     }
@@ -178,7 +177,6 @@ export default function MotorOtimizacao() {
         setGeocodificando(true);
         try {
           const fullAddress = `${enderecoBase}, ${unidade.cidade}, ${unidade.estado}, Brasil`;
-          console.log('Geocodificando endereço da unidade:', fullAddress);
 
           const geocoded = await geocodeAddress(fullAddress);
 
@@ -194,10 +192,8 @@ export default function MotorOtimizacao() {
               })
               .eq('id', selectedUnidade);
 
-            console.log('Coordenadas da unidade salvas com sucesso:', { latitude, longitude });
           }
         } catch (error) {
-          console.error('Erro ao geocodificar endereço da unidade:', error);
         } finally {
           setGeocodificando(false);
         }
@@ -314,7 +310,6 @@ export default function MotorOtimizacao() {
       setOsExcluidas(osExcluidasTemp);
       return true;
     } catch (error) {
-      console.error('Erro ao carregar OSs:', error);
       alert('Erro ao carregar OSs para otimização');
       return false;
     } finally {
@@ -374,13 +369,10 @@ export default function MotorOtimizacao() {
               .eq('id', os.id);
 
             geocodificadas++;
-            console.log(`Geocodificado: ${os.numero_os_samsung || os.numero_os_interna} - ${os.cliente_nome}`);
           } else {
             falhas++;
-            console.warn(`Falha ao geocodificar: ${os.numero_os_samsung || os.numero_os_interna}`);
           }
         } catch (error) {
-          console.error(`Erro ao geocodificar OS ${os.id}:`, error);
           falhas++;
         }
       }
@@ -391,7 +383,6 @@ export default function MotorOtimizacao() {
         await loadOsParaOtimizar();
       }
     } catch (error) {
-      console.error('Erro ao geocodificar OSs:', error);
       alert('Erro ao geocodificar OSs. Veja o console para detalhes.');
     } finally {
       setGeocodificando(false);
@@ -421,7 +412,6 @@ export default function MotorOtimizacao() {
       setIsRotaModificada(false);
       alert(`Otimização concluída! ${resultado.os_incluidas.length} OSs na rota otimizada.`);
     } catch (error: any) {
-      console.error('Erro ao otimizar:', error);
       alert(error.message || 'Erro ao otimizar rota');
     } finally {
       setOtimizando(false);
@@ -474,9 +464,7 @@ export default function MotorOtimizacao() {
           });
 
         if (saveError) {
-          console.error('Erro ao salvar rota otimizada:', saveError);
         } else {
-          console.log('Rota otimizada salva com sucesso na tabela rotas_otimizadas');
         }
 
         alert('Rota aplicada com sucesso! As OSs foram atualizadas com a ordem de visita.');
@@ -486,7 +474,6 @@ export default function MotorOtimizacao() {
         alert('Erro ao aplicar rota');
       }
     } catch (error) {
-      console.error('Erro ao aplicar rota:', error);
       alert('Erro ao aplicar rota otimizada');
     } finally {
       setAplicando(false);
@@ -529,7 +516,6 @@ export default function MotorOtimizacao() {
       });
       setIsRotaModificada(true);
     } catch (error) {
-      console.error('Erro ao recalcular rota:', error);
       alert('Erro ao recalcular rota');
     } finally {
       setRecalculando(false);
@@ -575,7 +561,6 @@ export default function MotorOtimizacao() {
       });
       setIsRotaModificada(true);
     } catch (error) {
-      console.error('Erro ao remover OS:', error);
       alert('Erro ao remover OS da rota');
     } finally {
       setRecalculando(false);

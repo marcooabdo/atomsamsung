@@ -86,7 +86,6 @@ export function AgendamentoLista({
         handlePrint();
       }, 100);
     } catch (error) {
-      console.error('Erro ao carregar dados para PDF:', error);
       alert('Erro ao gerar PDF');
     }
   };

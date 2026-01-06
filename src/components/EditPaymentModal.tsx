@@ -200,7 +200,6 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao atualizar pagamento:', error);
       alert(`❌ Erro ao atualizar pagamento: ${error.message}`);
     } finally {
       setLoading(false);

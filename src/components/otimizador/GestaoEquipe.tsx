@@ -82,7 +82,6 @@ export default function GestaoEquipe() {
 
       setTecnicos(tecnicosComStats);
     } catch (error) {
-      console.error('Erro ao carregar técnicos:', error);
     } finally {
       setLoadingTecnicos(false);
     }

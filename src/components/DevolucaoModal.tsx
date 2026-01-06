@@ -34,7 +34,6 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS 
       setTipo('nova');
       onClose();
     } catch (error) {
-      console.error('Erro ao solicitar devolução:', error);
     } finally {
       setLoading(false);
     }

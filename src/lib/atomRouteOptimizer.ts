@@ -4,7 +4,6 @@ async function gerarPolylineGoogleMaps(
   pontoBase: { lat: number; lng: number },
   osIncluidas: OSIncluida[]
 ): Promise<string | undefined> {
-  console.log('Polyline será gerada pelo componente de mapa usando DirectionsService do SDK');
   return undefined;
 }
 
@@ -572,7 +571,6 @@ export async function aplicarOtimizacao(otimizacaoId: string): Promise<boolean> 
 
     return true;
   } catch (error) {
-    console.error('Erro ao aplicar otimização:', error);
     return false;
   }
 }

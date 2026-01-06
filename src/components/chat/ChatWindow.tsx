@@ -47,7 +47,6 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         .maybeSingle();
 
       if (convError) {
-        console.error('Erro ao buscar conversa:', convError);
         setError('Erro ao carregar conversa');
         setLoading(false);
         return;
@@ -102,7 +101,6 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       setConversationInfo(enrichedConv);
       setLoading(false);
     } catch (err) {
-      console.error('Erro ao carregar informações da conversa:', err);
       setError('Erro ao carregar conversa');
       setLoading(false);
     }
@@ -115,7 +113,6 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         p_user_id: userId
       });
     } catch (err) {
-      console.error('Erro ao marcar mensagens como lidas:', err);
     }
   };
 

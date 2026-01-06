@@ -124,7 +124,6 @@ export function ChatConversationList({
 
       setConversations(enrichedConversations);
     } catch (err) {
-      console.error('Erro ao carregar conversas:', err);
     } finally {
       setLoading(false);
     }
@@ -143,7 +142,6 @@ export function ChatConversationList({
       if (error) throw error;
       setUsers(data || []);
     } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
     } finally {
       setLoadingUsers(false);
     }
@@ -166,7 +164,6 @@ export function ChatConversationList({
       onSelectConversation(data);
       setActiveTab('conversations');
     } catch (err: any) {
-      console.error('Erro ao criar conversa:', err);
       alert(`Erro ao iniciar conversa: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setCreatingConversation(false);

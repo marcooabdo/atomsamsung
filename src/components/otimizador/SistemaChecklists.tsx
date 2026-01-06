@@ -75,7 +75,6 @@ export default function SistemaChecklists() {
 
       setTemplates(templatesComStats);
     } catch (error) {
-      console.error('Erro ao carregar templates:', error);
     } finally {
       setLoadingTemplates(false);
     }

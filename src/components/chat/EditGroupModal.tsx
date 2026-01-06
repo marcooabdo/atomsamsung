@@ -45,7 +45,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
       setGroupName(data.nome || '');
       setGroupDescription(data.descricao || '');
     } catch (err) {
-      console.error('Erro ao carregar informações do grupo:', err);
     }
   };
 
@@ -76,7 +75,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
 
       setParticipants(enriched);
     } catch (err) {
-      console.error('Erro ao carregar participantes:', err);
     }
   };
 
@@ -102,7 +100,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
 
       setAvailableUsers(available);
     } catch (err) {
-      console.error('Erro ao carregar usuários disponíveis:', err);
     }
   };
 
@@ -127,7 +124,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
       onUpdate();
       onClose();
     } catch (err) {
-      console.error('Erro ao salvar grupo:', err);
       alert('Erro ao salvar alterações');
     } finally {
       setSaving(false);
@@ -149,7 +145,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
       loadParticipants();
       loadAvailableUsers();
     } catch (err) {
-      console.error('Erro ao adicionar membro:', err);
       alert('Erro ao adicionar membro');
     }
   };
@@ -168,7 +163,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
       loadParticipants();
       loadAvailableUsers();
     } catch (err) {
-      console.error('Erro ao remover membro:', err);
       alert('Erro ao remover membro');
     }
   };
@@ -186,7 +180,6 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
 
       loadParticipants();
     } catch (err) {
-      console.error('Erro ao alterar permissão:', err);
       alert('Erro ao alterar permissão');
     }
   };

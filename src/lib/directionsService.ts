@@ -4,7 +4,6 @@ export async function gerarPolylineComDirectionsService(
 ): Promise<string | undefined> {
   try {
     if (!window.google?.maps || osIncluidas.length === 0) {
-      console.warn('Google Maps não carregado ou sem OSs para gerar polyline');
       return undefined;
     }
 
@@ -16,7 +15,6 @@ export async function gerarPolylineComDirectionsService(
     }));
 
     if (waypoints.length > 25) {
-      console.warn('Limitando waypoints para 25 (máximo permitido pela API)');
       waypoints.splice(25);
     }
 
@@ -34,13 +32,11 @@ export async function gerarPolylineComDirectionsService(
           const polyline = result.routes[0]?.overview_polyline;
           resolve(polyline);
         } else {
-          console.error('Erro ao gerar polyline:', status);
           resolve(undefined);
         }
       });
     });
   } catch (error) {
-    console.error('Erro ao gerar polyline:', error);
     return undefined;
   }
 }
@@ -75,13 +71,11 @@ export async function calcularDistanciaRealComGoogleMaps(
             resolve(null);
           }
         } else {
-          console.error('Erro no Distance Matrix:', status);
           resolve(null);
         }
       });
     });
   } catch (error) {
-    console.error('Erro ao calcular distância:', error);
     return null;
   }
 }

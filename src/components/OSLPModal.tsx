@@ -187,7 +187,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
   useEffect(() => {
     if (mode === 'view' && osId) {
-      console.log('[OSLPModal] useEffect: loading job for osId:', osId);
       loadCurrentJob();
 
       const channel = supabase
@@ -198,11 +197,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
           table: 'jobs',
           filter: `os_id=eq.${osId}`
         }, (payload) => {
-          console.log('[OSLPModal] Realtime event received:', payload);
           loadCurrentJob();
         })
         .subscribe((status) => {
-          console.log('[OSLPModal] Realtime subscription status:', status);
         });
 
       return () => {
@@ -233,11 +230,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
   const loadCurrentJob = async () => {
     if (!osId) {
-      console.log('[OSLPModal] loadCurrentJob: osId is null');
       return;
     }
 
-    console.log('[OSLPModal] loadCurrentJob: fetching job for osId:', osId);
 
     const { data, error } = await supabase
       .from('jobs')
@@ -249,11 +244,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       .maybeSingle();
 
     if (error) {
-      console.error('[OSLPModal] loadCurrentJob error:', error);
       return;
     }
 
-    console.log('[OSLPModal] loadCurrentJob result:', data);
 
     if (data) {
       setCurrentJob(data);
@@ -313,7 +306,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         alert(`Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`);
         setSyncingGSPN(false);
       } else {
-        console.log('[OSLPModal] syncGSPN: webhook called successfully, waiting for job creation...');
         setSyncingGSPN(false);
 
         let attempts = 0;
@@ -321,7 +313,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
         const checkJob = async () => {
           attempts++;
-          console.log(`[OSLPModal] syncGSPN: checking for job (attempt ${attempts}/${maxAttempts}) with osId:`, osId);
 
           const { data: job, error } = await supabase
             .from('jobs')
@@ -333,26 +324,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
             .maybeSingle();
 
           if (error) {
-            console.error('[OSLPModal] syncGSPN: error fetching job:', error);
           }
 
-          console.log('[OSLPModal] syncGSPN: query result:', job);
 
           if (job) {
-            console.log('[OSLPModal] syncGSPN: job found!', job);
             setCurrentJob(job);
           } else if (attempts < maxAttempts) {
-            console.log('[OSLPModal] syncGSPN: job not found yet, will retry...');
             setTimeout(checkJob, 2000);
           } else {
-            console.log('[OSLPModal] syncGSPN: max attempts reached, no job found for osId:', osId);
           }
         };
 
         setTimeout(checkJob, 2000);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar GSPN:', error);
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
       setSyncingGSPN(false);
     }
@@ -381,7 +366,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         setClienteComplemento(endereco.complemento || '');
       }
     } catch (error) {
-      console.error('Erro ao buscar CEP:', error);
       alert('Erro ao buscar CEP. Verifique o CEP digitado ou preencha manualmente.');
     } finally {
       setBuscandoCEP(false);
@@ -419,7 +403,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         setClienteEncontrado(false);
       }
     } catch (error) {
-      console.error('Erro ao buscar cliente:', error);
       setClienteEncontrado(false);
     }
   };
@@ -478,7 +461,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         });
       }
     } catch (error) {
-      console.error('Erro ao salvar/atualizar cliente:', error);
     }
   };
 
@@ -498,7 +480,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       if (error) throw error;
       setOS(data);
     } catch (error) {
-      console.error('Erro ao carregar OS:', error);
     } finally {
       setLoading(false);
     }
@@ -601,7 +582,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       setSugestoesPecas(sugestoesComValor);
       setMostrarSugestoes(true);
     } catch (error) {
-      console.error('Erro ao buscar sugestões:', error);
     }
   };
 
@@ -777,7 +757,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
             .upload(filePath, anexo.file);
 
           if (uploadError) {
-            console.error('Erro ao fazer upload:', uploadError);
             continue;
           }
 
@@ -831,7 +810,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       onReload?.();
       onClose();
     } catch (error) {
-      console.error('Erro ao criar OS LP:', error);
       alert('Erro ao criar OS LP');
     } finally {
       setLoading(false);
@@ -867,7 +845,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
           .eq('id', osId);
 
         if (updateError) {
-          console.error('Erro ao mover OS:', updateError);
         }
 
         await supabase.from('os_comentarios').insert({
@@ -891,7 +868,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       loadOS();
       onReload?.();
     } catch (error) {
-      console.error('Erro ao requisitar peça:', error);
       alert('Erro ao requisitar peça');
     }
   };
@@ -907,7 +883,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         .eq('id', requisicao.id);
 
       if (updateError) {
-        console.error('Erro ao atualizar requisição:', updateError);
         throw updateError;
       }
 
@@ -919,14 +894,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       });
 
       if (commentError) {
-        console.error('Erro ao inserir comentário:', commentError);
       }
 
       alert('Requisição cancelada!');
       loadRequisicoes();
       loadComentarios();
     } catch (error) {
-      console.error('Erro ao cancelar requisição:', error);
       alert('Erro ao cancelar requisição');
     }
   };
@@ -974,7 +947,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       loadComentarios();
       onReload?.();
     } catch (error) {
-      console.error('Erro ao postar GI:', error);
       alert('Erro ao postar GI');
     }
   };
@@ -1008,7 +980,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       loadComentarios();
       onReload?.();
     } catch (error) {
-      console.error('Erro ao devolver peça:', error);
       alert('Erro ao devolver peça');
     }
   };
@@ -1066,7 +1037,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         onReload();
       }
     } catch (error) {
-      console.error('Erro ao cancelar GI:', error);
       alert('Erro ao cancelar GI');
     }
   };
@@ -1085,7 +1055,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       setNovoComentario('');
       loadComentarios();
     } catch (error) {
-      console.error('Erro ao adicionar comentário:', error);
     }
   };
 
@@ -1102,7 +1071,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
       loadChecklist();
     } catch (error) {
-      console.error('Erro ao atualizar checklist:', error);
     }
   };
 
@@ -1133,7 +1101,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       alert('Anexo enviado com sucesso!');
       loadAnexos();
     } catch (error) {
-      console.error('Erro ao fazer upload:', error);
       alert('Erro ao fazer upload do anexo');
     }
   };
@@ -1196,7 +1163,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       onReload?.();
       onClose();
     } catch (error) {
-      console.error('Erro ao converter OS:', error);
       alert('Erro ao converter OS');
     } finally {
       setConvertendo(false);
@@ -1250,7 +1216,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       onReload?.();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao mover OS:', error);
       alert(`Erro ao mover OS: ${error.message}`);
     } finally {
       setMovendoOS(false);
@@ -2427,7 +2392,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 });
 
                                 if (insertError) {
-                                  console.error('Erro ao inserir requisição:', insertError);
                                   throw insertError;
                                 }
 
@@ -2447,7 +2411,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 await loadComentarios();
                                 alert('Requisição criada com sucesso!');
                               } catch (error: any) {
-                                console.error('Erro ao criar requisição:', error);
                                 alert(`Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`);
                               }
                             }}

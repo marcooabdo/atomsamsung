@@ -24,7 +24,6 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
     try {
       await onConfirm(valor);
     } catch (error) {
-      console.error('Erro ao registrar valor:', error);
       alert('Erro ao registrar valor');
     } finally {
       setLoading(false);

@@ -70,7 +70,6 @@ export default function ControlePecas() {
 
       setRequisicoes(data || []);
     } catch (error) {
-      console.error('Erro ao carregar requisições:', error);
     } finally {
       setLoadingRequisicoes(false);
     }
@@ -111,7 +110,6 @@ export default function ControlePecas() {
 
       setPecasMaisRequisitadas(topPecas);
     } catch (error) {
-      console.error('Erro ao carregar peças mais requisitadas:', error);
     }
   };
 

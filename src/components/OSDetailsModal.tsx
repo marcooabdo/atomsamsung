@@ -143,7 +143,6 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       .maybeSingle();
 
     if (error) {
-      console.error('Error loading job:', error);
       return;
     }
 
@@ -202,7 +201,6 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
-      console.error('Erro ao sincronizar GSPN:', error);
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingGSPN(false);
@@ -295,7 +293,6 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
       setOsDetails(osFormatted);
     } catch (error) {
-      console.error('Error loading OS details:', error);
     } finally {
       setLoading(false);
     }

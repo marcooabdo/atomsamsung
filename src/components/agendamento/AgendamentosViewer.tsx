@@ -67,7 +67,6 @@ export function AgendamentosViewer({
       const { data } = await query;
       setTecnicos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar técnicos:', error);
     }
   };
 
@@ -97,7 +96,6 @@ export function AgendamentosViewer({
 
       setAgendamentos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
     } finally {
       setLoading(false);
     }

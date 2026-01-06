@@ -83,7 +83,6 @@ export default function PendenciasSamsungModule({ unidadeId, dataInicio, dataFim
       if (error) throw error;
       setPendencias(data || []);
     } catch (error) {
-      console.error('Erro ao carregar pendencias:', error);
     } finally {
       setLoading(false);
     }
@@ -102,7 +101,6 @@ export default function PendenciasSamsungModule({ unidadeId, dataInicio, dataFim
       if (error) throw error;
       loadPendencias();
     } catch (error) {
-      console.error('Erro ao quitar pendencia:', error);
     }
   };
 

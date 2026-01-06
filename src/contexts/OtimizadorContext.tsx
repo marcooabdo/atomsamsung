@@ -76,7 +76,6 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         setUnidades(data);
       }
     } catch (error) {
-      console.error('Error loading unidades:', error);
     }
   };
 
@@ -112,7 +111,6 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         setOsData(data);
       }
     } catch (error) {
-      console.error('Error loading OS data:', error);
     } finally {
       setLoading(false);
     }
@@ -146,7 +144,6 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         setAgendamentosData(data);
       }
     } catch (error) {
-      console.error('Error loading agendamentos:', error);
     }
   };
 
@@ -171,7 +168,6 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         setTecnicosData(data);
       }
     } catch (error) {
-      console.error('Error loading tecnicos:', error);
     }
   };
 

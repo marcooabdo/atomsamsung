@@ -255,7 +255,6 @@ export function Dashboard() {
         metaTaxaAprovacao: metas ? Number(metas.meta_taxa_aprovacao) : undefined,
       });
     } catch (error) {
-      console.error('Erro ao carregar dados do dashboard:', error);
     } finally {
       setLoading(false);
     }
@@ -361,7 +360,6 @@ export function Dashboard() {
       setPerformanceModalType(type);
       setShowPerformanceModal(true);
     } catch (error) {
-      console.error('Error loading performance details:', error);
     }
   };
 

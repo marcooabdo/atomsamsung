@@ -148,7 +148,6 @@ async function optimizeRouteForTechnician(
   osToOptimize: OSForOptimization[]
 ): Promise<OptimizedRoute | null> {
   if (!technician.endereco_base_lat || !technician.endereco_base_lng) {
-    console.warn(`Technician ${technician.nome} does not have base coordinates configured`);
     return null;
   }
 
@@ -158,7 +157,6 @@ async function optimizeRouteForTechnician(
 
   const validOS = osToOptimize.filter(os => os.lat && os.lng);
   if (validOS.length === 0) {
-    console.warn('No OS with valid coordinates for optimization');
     return null;
   }
 
@@ -407,7 +405,6 @@ export async function applyOptimization(
 
     return true;
   } catch (error) {
-    console.error('Error applying optimization:', error);
     return false;
   }
 }

@@ -162,7 +162,6 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      console.error('Erro ao calcular estrelas:', error);
     }
   }, []);
 
@@ -172,7 +171,6 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      console.error('Erro ao recalcular estrelas:', error);
     }
   }, []);
 
@@ -182,7 +180,6 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     });
 
     if (error) {
-      console.error('Erro ao verificar elegibilidade:', error);
       return null;
     }
 

@@ -96,7 +96,6 @@ export default function MapaInteligente() {
         setBaseLocation(null);
       }
     } catch (error) {
-      console.error('Erro ao carregar localização base:', error);
       setBaseLocation(null);
     }
   };
@@ -163,7 +162,6 @@ export default function MapaInteligente() {
       setOsWithCoords(formatted);
       setTotalSemCoords(semCoords || 0);
     } catch (error) {
-      console.error('Erro ao carregar OSs com coordenadas:', error);
     } finally {
       setLoading(false);
     }
@@ -181,7 +179,6 @@ export default function MapaInteligente() {
       if (error) throw error;
       setTecnicos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar técnicos:', error);
     }
   };
 
@@ -196,7 +193,6 @@ export default function MapaInteligente() {
       if (error) throw error;
       setRotas(data?.map((r: any) => r.nome) || []);
     } catch (error) {
-      console.error('Erro ao carregar rotas:', error);
     }
   };
 

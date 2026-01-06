@@ -93,7 +93,6 @@ export default function AgendaOperacional() {
       if (error) throw error;
       setTecnicos(data || []);
     } catch (error) {
-      console.error('Erro ao carregar técnicos:', error);
     }
   };
 
@@ -109,7 +108,6 @@ export default function AgendaOperacional() {
       if (error) throw error;
       setRotas(data || []);
     } catch (error) {
-      console.error('Erro ao carregar rotas:', error);
     }
   };
 
@@ -196,7 +194,6 @@ export default function AgendaOperacional() {
 
       setAgendamentos(agendamentosComDetalhes);
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
     } finally {
       setLoadingData(false);
     }
