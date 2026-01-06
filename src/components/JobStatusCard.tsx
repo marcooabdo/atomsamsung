@@ -62,7 +62,7 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
     if (currentJob.is_running) {
       // Calcula quantos segundos já passaram desde o início
       const start = new Date(currentJob.created_at).getTime();
-      const initialElapsed = Math.floor((Date.now() - start) / 1000);
+      const initialElapsed = Math.max(0, Math.floor((Date.now() - start) / 1000));
       setElapsedSeconds(initialElapsed);
 
       // Inicia contador progressivo
@@ -76,7 +76,7 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       if (currentJob.finished_at) {
         const start = new Date(currentJob.created_at).getTime();
         const end = new Date(currentJob.finished_at).getTime();
-        const seconds = Math.floor((end - start) / 1000);
+        const seconds = Math.max(0, Math.floor((end - start) / 1000));
         setElapsedSeconds(seconds);
       }
     }
@@ -87,6 +87,8 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       .from('jobs')
       .select('*')
       .eq('unidade_id', unidadeId)
+      .eq('modulo', 'pipeline_operacional')
+      .is('os_id', null)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();

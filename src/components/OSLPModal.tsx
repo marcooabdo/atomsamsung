@@ -138,7 +138,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     if (currentJob.is_running) {
       // Calcula quantos segundos já passaram desde o início
       const start = new Date(currentJob.created_at).getTime();
-      const initialElapsed = Math.floor((Date.now() - start) / 1000);
+      const initialElapsed = Math.max(0, Math.floor((Date.now() - start) / 1000));
       setElapsedSeconds(initialElapsed);
 
       // Inicia contador progressivo
@@ -152,7 +152,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       if (currentJob.finished_at) {
         const start = new Date(currentJob.created_at).getTime();
         const end = new Date(currentJob.finished_at).getTime();
-        const seconds = Math.floor((end - start) / 1000);
+        const seconds = Math.max(0, Math.floor((end - start) / 1000));
         setElapsedSeconds(seconds);
       }
     }
