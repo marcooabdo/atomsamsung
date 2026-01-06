@@ -1582,7 +1582,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       <span className="text-xs text-gray-600">•</span>
                       <p className="text-xs text-gray-400">
                         Tempo: <span className="font-medium text-gray-300">
-                          {Math.floor((new Date(currentJob.finished_at || new Date()).getTime() - new Date(currentJob.created_at).getTime()) / 1000)}s
+                          {Math.floor(((currentJob.finished_at ? new Date(currentJob.finished_at).getTime() : Date.now()) - new Date(currentJob.created_at).getTime()) / 1000)}s
                         </span>
                       </p>
                     </div>
