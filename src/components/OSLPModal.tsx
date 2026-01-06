@@ -242,11 +242,37 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       if (!response.ok) {
         const result = await response.json();
         alert(`Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`);
+        setSyncingGSPN(false);
+      } else {
+        let attempts = 0;
+        const maxAttempts = 20;
+        const startTime = new Date().toISOString();
+
+        const pollJob = setInterval(async () => {
+          attempts++;
+
+          const { data: job } = await supabase
+            .from('jobs')
+            .select('*')
+            .eq('os_id', osId)
+            .eq('modulo', 'pipeline_operacional')
+            .gte('created_at', startTime)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (job || attempts >= maxAttempts) {
+            clearInterval(pollJob);
+            if (job) {
+              setCurrentJob(job);
+            }
+            setSyncingGSPN(false);
+          }
+        }, 2000);
       }
     } catch (error) {
       console.error('Erro ao sincronizar GSPN:', error);
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
-    } finally {
       setSyncingGSPN(false);
     }
   };
@@ -1261,16 +1287,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         </div>
 
         {mode === 'view' && currentJob && (
-          <div className="px-6 pt-4">
+          <div className="px-6 pt-4 pb-4">
             <div
               className="p-3 rounded-lg border"
               style={{
                 background: currentJob.is_running
                   ? 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)'
-                  : currentJob.status === 'completed'
+                  : currentJob.status === 'Concluido'
                   ? 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%)'
                   : 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'
+                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'
               }}
             >
               <div className="flex items-center justify-between gap-4">
@@ -1278,13 +1304,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                   <div
                     className="p-2 rounded-lg"
                     style={{
-                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'completed' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'}`
+                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'Concluido' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'}`
                     }}
                   >
                     {currentJob.is_running ? (
                       <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                    ) : currentJob.status === 'completed' ? (
+                    ) : currentJob.status === 'Concluido' ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
                     ) : (
                       <XCircle className="w-4 h-4 text-red-500" />
@@ -1305,8 +1331,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                       <p className="text-xs text-gray-400">
-                        Status: <span className="font-medium" style={{ color: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444' }}>
-                          {currentJob.is_running ? 'Em execução' : currentJob.status === 'completed' ? 'Concluído' : 'Erro'}
+                        Status: <span className="font-medium" style={{ color: currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444' }}>
+                          {currentJob.is_running ? 'Em execução' : currentJob.status === 'Concluido' ? 'Concluído' : 'Erro'}
                         </span>
                       </p>
                       <span className="text-xs text-gray-600">•</span>
