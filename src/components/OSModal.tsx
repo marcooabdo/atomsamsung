@@ -94,6 +94,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [movendoOS, setMovendoOS] = useState(false);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
+  const [, setTimeUpdate] = useState(0);
 
   useEffect(() => {
     loadOS();
@@ -141,6 +142,16 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       return () => clearInterval(interval);
     }
   }, [currentJob?.is_running, osId]);
+
+  useEffect(() => {
+    if (currentJob?.is_running) {
+      const timer = setInterval(() => {
+        setTimeUpdate(prev => prev + 1);
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentJob?.is_running]);
 
   const loadOS = async () => {
     try {
@@ -1497,10 +1508,10 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
               style={{
                 background: currentJob.is_running
                   ? 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)'
-                  : currentJob.status === 'completed'
+                  : currentJob.status === 'Concluido'
                   ? 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%)'
                   : 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'
+                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'
               }}
             >
               <div className="flex items-center justify-between gap-4">
@@ -1508,13 +1519,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   <div
                     className="p-2 rounded-lg"
                     style={{
-                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'completed' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'}`
+                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'Concluido' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'}`
                     }}
                   >
                     {currentJob.is_running ? (
                       <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
-                    ) : currentJob.status === 'completed' ? (
+                    ) : currentJob.status === 'Concluido' ? (
                       <CheckCircle className="w-4 h-4 text-green-500" />
                     ) : (
                       <XCircle className="w-4 h-4 text-red-500" />
@@ -1535,8 +1546,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     </div>
                     <div className="flex items-center gap-3 mt-1">
                       <p className="text-xs text-gray-400">
-                        Status: <span className="font-medium" style={{ color: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444' }}>
-                          {currentJob.is_running ? 'Em execução' : currentJob.status === 'completed' ? 'Concluído' : 'Erro'}
+                        Status: <span className="font-medium" style={{ color: currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444' }}>
+                          {currentJob.is_running ? 'Em execução' : currentJob.status === 'Concluido' ? 'Concluído' : 'Erro'}
                         </span>
                       </p>
                       <span className="text-xs text-gray-600">•</span>
