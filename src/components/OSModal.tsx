@@ -132,6 +132,16 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     };
   }, [osId]);
 
+  useEffect(() => {
+    if (currentJob?.is_running) {
+      const interval = setInterval(() => {
+        loadCurrentJob();
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentJob?.is_running, osId]);
+
   const loadOS = async () => {
     try {
       const { data, error } = await supabase
@@ -1481,7 +1491,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         </div>
 
         {currentJob && (
-          <div className="px-6 pt-4">
+          <div className="px-6 pt-4 pb-4">
             <div
               className="p-3 rounded-lg border"
               style={{
