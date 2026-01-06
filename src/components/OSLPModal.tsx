@@ -200,9 +200,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   }, [currentJob?.is_running]);
 
   const loadCurrentJob = async () => {
-    if (!osId) return;
+    if (!osId) {
+      console.log('[OSLPModal] loadCurrentJob: osId is null');
+      return;
+    }
 
-    const { data } = await supabase
+    console.log('[OSLPModal] loadCurrentJob: fetching job for osId:', osId);
+
+    const { data, error } = await supabase
       .from('jobs')
       .select('*')
       .eq('os_id', osId)
@@ -211,7 +216,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       .limit(1)
       .maybeSingle();
 
-    setCurrentJob(data);
+    if (error) {
+      console.error('[OSLPModal] loadCurrentJob error:', error);
+      return;
+    }
+
+    console.log('[OSLPModal] loadCurrentJob result:', data);
+
+    if (data) {
+      setCurrentJob(data);
+    } else {
+      setCurrentJob(null);
+    }
   };
 
   const syncGSPN = async () => {
@@ -265,31 +281,36 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         alert(`Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`);
         setSyncingGSPN(false);
       } else {
-        let attempts = 0;
-        const maxAttempts = 20;
-        const startTime = new Date().toISOString();
+        console.log('[OSLPModal] syncGSPN: webhook called successfully, waiting for job creation...');
+        setSyncingGSPN(false);
 
-        const pollJob = setInterval(async () => {
+        let attempts = 0;
+        const maxAttempts = 10;
+
+        const checkJob = async () => {
           attempts++;
+          console.log(`[OSLPModal] syncGSPN: checking for job (attempt ${attempts}/${maxAttempts})`);
 
           const { data: job } = await supabase
             .from('jobs')
             .select('*')
             .eq('os_id', osId)
             .eq('modulo', 'pipeline_operacional')
-            .gte('created_at', startTime)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (job || attempts >= maxAttempts) {
-            clearInterval(pollJob);
-            if (job) {
-              setCurrentJob(job);
-            }
-            setSyncingGSPN(false);
+          if (job) {
+            console.log('[OSLPModal] syncGSPN: job found!', job);
+            setCurrentJob(job);
+          } else if (attempts < maxAttempts) {
+            setTimeout(checkJob, 2000);
+          } else {
+            console.log('[OSLPModal] syncGSPN: max attempts reached, no job found');
           }
-        }, 2000);
+        };
+
+        setTimeout(checkJob, 2000);
       }
     } catch (error) {
       console.error('Erro ao sincronizar GSPN:', error);
@@ -1359,12 +1380,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                       <span className="text-xs text-gray-600">•</span>
                       <p className="text-xs text-gray-400">
                         Tempo: <span className="font-medium text-gray-300">
-                          {currentJob.is_running
-                            ? `${Math.floor((Date.now() - new Date(currentJob.created_at).getTime()) / 1000)}s`
-                            : currentJob.finished_at
-                            ? `${Math.floor((new Date(currentJob.finished_at).getTime() - new Date(currentJob.created_at).getTime()) / 1000)}s`
-                            : '0s'
-                          }
+                          {(() => {
+                            let seconds = 0;
+                            if (currentJob.is_running) {
+                              seconds = Math.floor((Date.now() - new Date(currentJob.created_at).getTime()) / 1000);
+                            } else if (currentJob.finished_at) {
+                              const finishedTime = new Date(currentJob.finished_at).getTime();
+                              const createdTime = new Date(currentJob.created_at).getTime();
+                              seconds = Math.floor((finishedTime - createdTime) / 1000);
+                              console.log('[OSLPModal] Time calculation:', {
+                                finished_at: currentJob.finished_at,
+                                created_at: currentJob.created_at,
+                                finishedTime,
+                                createdTime,
+                                diff: finishedTime - createdTime,
+                                seconds
+                              });
+                            }
+                            return `${Math.max(0, seconds)}s`;
+                          })()}
                         </span>
                       </p>
                     </div>
