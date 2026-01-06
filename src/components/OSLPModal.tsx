@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -126,6 +126,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     count: number;
   }>>([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [syncingGSPN, setSyncingGSPN] = useState(false);
+  const [currentJob, setCurrentJob] = useState<any>(null);
 
   useEffect(() => {
     if (mode === 'create') {
@@ -153,6 +155,103 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
     return () => clearTimeout(timer);
   }, [novaPecaCodigo]);
+
+  useEffect(() => {
+    if (mode === 'view' && osId) {
+      loadCurrentJob();
+
+      const channel = supabase
+        .channel('jobs-changes-lp')
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'jobs',
+          filter: `os_id=eq.${osId}`
+        }, () => {
+          loadCurrentJob();
+        })
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    }
+  }, [osId, mode]);
+
+  const loadCurrentJob = async () => {
+    if (!osId) return;
+
+    const { data } = await supabase
+      .from('jobs')
+      .select('*')
+      .eq('os_id', osId)
+      .eq('modulo', 'sync_gspn')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    setCurrentJob(data);
+  };
+
+  const syncGSPN = async () => {
+    if (!os?.numero_os_samsung) {
+      alert('Esta OS não possui número Samsung para sincronizar');
+      return;
+    }
+
+    if (currentJob?.is_running) {
+      alert('Já existe uma sincronização em andamento para esta OS');
+      return;
+    }
+
+    setSyncingGSPN(true);
+    try {
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('nome, samsung_asccode, samsung_token')
+        .eq('id', os.unidade_id)
+        .single();
+
+      if (!unidadeData) {
+        alert('Unidade não encontrada');
+        return;
+      }
+
+      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
+        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
+        return;
+      }
+
+      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/one', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ascCode: unidadeData.samsung_asccode,
+          tokenApi: unidadeData.samsung_token,
+          filial: unidadeData.nome.toLowerCase(),
+          unidade_id: os.unidade_id,
+          numero_os: os.numero_os_samsung
+        }),
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.status === 'success') {
+        await loadOS();
+        await loadCurrentJob();
+        if (onReload) onReload();
+      } else {
+        alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
+      }
+    } catch (error) {
+      console.error('Erro ao sincronizar GSPN:', error);
+      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } finally {
+      setSyncingGSPN(false);
+    }
+  };
 
   const loadUnidades = async () => {
     const { data } = await supabase
@@ -1135,6 +1234,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                 )}
               </div>
             )}
+
+            {mode === 'view' && os?.numero_os_samsung && (
+              <button
+                onClick={syncGSPN}
+                disabled={syncingGSPN || currentJob?.is_running}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)',
+                  border: '1px solid #8B5CF6',
+                  color: '#8B5CF6',
+                  boxShadow: '0 0 10px rgba(139,92,246,0.2)'
+                }}
+                title="Sincronizar dados com Samsung GSPN"
+              >
+                <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
+                SYNC GSPN
+              </button>
+            )}
+
             <button
               onClick={onClose}
               className="p-2 hover:bg-[#FFA500]/10 rounded-lg transition-colors"
@@ -1143,6 +1261,80 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
             </button>
           </div>
         </div>
+
+        {mode === 'view' && currentJob && (
+          <div className="px-6 pt-4">
+            <div
+              className="p-3 rounded-lg border"
+              style={{
+                background: currentJob.is_running
+                  ? 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)'
+                  : currentJob.status === 'completed'
+                  ? 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%)'
+                  : 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
+                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'
+              }}
+            >
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div
+                    className="p-2 rounded-lg"
+                    style={{
+                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'completed' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
+                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444'}`
+                    }}
+                  >
+                    {currentJob.is_running ? (
+                      <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                    ) : currentJob.status === 'completed' ? (
+                      <CheckCircle className="w-4 h-4 text-green-500" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-red-500" />
+                    )}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-white">
+                        {currentJob.is_running ? 'Sincronizando GSPN' : 'Última Sincronização GSPN'}
+                      </h3>
+                      {currentJob.is_running && (
+                        <div className="flex gap-1">
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '0ms' }}></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '200ms' }}></div>
+                          <div className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '400ms' }}></div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-1">
+                      <p className="text-xs text-gray-400">
+                        Status: <span className="font-medium" style={{ color: currentJob.is_running ? '#3B82F6' : currentJob.status === 'completed' ? '#22C55E' : '#EF4444' }}>
+                          {currentJob.is_running ? 'Em execução' : currentJob.status === 'completed' ? 'Concluído' : 'Erro'}
+                        </span>
+                      </p>
+                      <span className="text-xs text-gray-600">•</span>
+                      <p className="text-xs text-gray-400">
+                        Tempo: <span className="font-medium text-gray-300">
+                          {Math.floor((new Date(currentJob.finished_at || new Date()).getTime() - new Date(currentJob.created_at).getTime()) / 1000)}s
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+                {!currentJob.is_running && currentJob.finished_at && (
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500">Finalizado em</p>
+                    <p className="text-xs text-gray-400 font-medium">
+                      {new Date(currentJob.finished_at).toLocaleTimeString('pt-BR', {
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {mode === 'create' ? (
           <>
