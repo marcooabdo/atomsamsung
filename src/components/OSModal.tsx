@@ -396,7 +396,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       .from('jobs')
       .select('*')
       .eq('os_id', osId)
-      .eq('modulo', 'sync_gspn')
+      .eq('modulo', 'pipeline_operacional')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
