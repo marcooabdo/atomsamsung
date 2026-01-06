@@ -205,7 +205,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     }
 
     setSyncingGSPN(true);
-    let jobId: string | null = null;
 
     try {
       const { data: unidadeData } = await supabase
@@ -226,28 +225,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         return;
       }
 
-      const { data: jobData, error: jobError } = await supabase
-        .from('jobs')
-        .insert({
-          os_id: osId,
-          modulo: 'pipeline_operacional',
-          status: 'Processando',
-          is_running: true,
-          created_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (jobError || !jobData) {
-        console.error('Erro ao criar job:', jobError);
-        alert('Erro ao iniciar sincronização');
-        setSyncingGSPN(false);
-        return;
-      }
-
-      jobId = jobData.id;
-      await loadCurrentJob();
-
       const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/one', {
         method: 'POST',
         headers: {
@@ -258,55 +235,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
           tokenApi: unidadeData.samsung_token,
           filial: unidadeData.nome.toLowerCase(),
           unidade_id: os.unidade_id,
-          numero_os: os.numero_os_samsung,
-          job_id: jobData.id
+          numero_os: os.numero_os_samsung
         }),
       });
 
-      const result = await response.json();
-
-      if (response.ok && result.status === 'success') {
-        await supabase
-          .from('jobs')
-          .update({
-            status: 'Concluido',
-            is_running: false,
-            finished_at: new Date().toISOString()
-          })
-          .eq('id', jobData.id);
-
-        await loadOS();
-        await loadCurrentJob();
-        if (onReload) onReload();
-      } else {
-        await supabase
-          .from('jobs')
-          .update({
-            status: 'Erro',
-            is_running: false,
-            finished_at: new Date().toISOString()
-          })
-          .eq('id', jobData.id);
-
-        await loadCurrentJob();
-        alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
+      if (!response.ok) {
+        const result = await response.json();
+        alert(`Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
       console.error('Erro ao sincronizar GSPN:', error);
-
-      if (jobId) {
-        await supabase
-          .from('jobs')
-          .update({
-            status: 'Erro',
-            is_running: false,
-            finished_at: new Date().toISOString()
-          })
-          .eq('id', jobId);
-
-        await loadCurrentJob();
-      }
-
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingGSPN(false);
