@@ -128,6 +128,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
+  const [, setTimeUpdate] = useState(0);
 
   useEffect(() => {
     if (mode === 'create') {
@@ -177,6 +178,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       };
     }
   }, [osId, mode]);
+
+  useEffect(() => {
+    if (currentJob?.is_running) {
+      const interval = setInterval(() => {
+        loadCurrentJob();
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentJob?.is_running, osId]);
+
+  useEffect(() => {
+    if (currentJob?.is_running) {
+      const timer = setInterval(() => {
+        setTimeUpdate(prev => prev + 1);
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [currentJob?.is_running]);
 
   const loadCurrentJob = async () => {
     if (!osId) return;
@@ -1338,7 +1359,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                       <span className="text-xs text-gray-600">•</span>
                       <p className="text-xs text-gray-400">
                         Tempo: <span className="font-medium text-gray-300">
-                          {Math.floor((new Date(currentJob.finished_at || new Date()).getTime() - new Date(currentJob.created_at).getTime()) / 1000)}s
+                          {currentJob.is_running
+                            ? `${Math.floor((Date.now() - new Date(currentJob.created_at).getTime()) / 1000)}s`
+                            : currentJob.finished_at
+                            ? `${Math.floor((new Date(currentJob.finished_at).getTime() - new Date(currentJob.created_at).getTime()) / 1000)}s`
+                            : '0s'
+                          }
                         </span>
                       </p>
                     </div>
