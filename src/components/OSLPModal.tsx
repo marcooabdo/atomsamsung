@@ -159,6 +159,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
   useEffect(() => {
     if (mode === 'view' && osId) {
+      console.log('[OSLPModal] useEffect: loading job for osId:', osId);
       loadCurrentJob();
 
       const channel = supabase
@@ -168,10 +169,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
           schema: 'public',
           table: 'jobs',
           filter: `os_id=eq.${osId}`
-        }, () => {
+        }, (payload) => {
+          console.log('[OSLPModal] Realtime event received:', payload);
           loadCurrentJob();
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('[OSLPModal] Realtime subscription status:', status);
+        });
 
       return () => {
         supabase.removeChannel(channel);
@@ -289,9 +293,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
         const checkJob = async () => {
           attempts++;
-          console.log(`[OSLPModal] syncGSPN: checking for job (attempt ${attempts}/${maxAttempts})`);
+          console.log(`[OSLPModal] syncGSPN: checking for job (attempt ${attempts}/${maxAttempts}) with osId:`, osId);
 
-          const { data: job } = await supabase
+          const { data: job, error } = await supabase
             .from('jobs')
             .select('*')
             .eq('os_id', osId)
@@ -300,13 +304,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
             .limit(1)
             .maybeSingle();
 
+          if (error) {
+            console.error('[OSLPModal] syncGSPN: error fetching job:', error);
+          }
+
+          console.log('[OSLPModal] syncGSPN: query result:', job);
+
           if (job) {
             console.log('[OSLPModal] syncGSPN: job found!', job);
             setCurrentJob(job);
           } else if (attempts < maxAttempts) {
+            console.log('[OSLPModal] syncGSPN: job not found yet, will retry...');
             setTimeout(checkJob, 2000);
           } else {
-            console.log('[OSLPModal] syncGSPN: max attempts reached, no job found');
+            console.log('[OSLPModal] syncGSPN: max attempts reached, no job found for osId:', osId);
           }
         };
 
