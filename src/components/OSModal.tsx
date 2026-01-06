@@ -94,7 +94,35 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [movendoOS, setMovendoOS] = useState(false);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
+
+  // Timer progressivo enquanto o job está rodando
+  useEffect(() => {
+    if (!currentJob) return;
+
+    if (currentJob.is_running) {
+      // Calcula quantos segundos já passaram desde o início
+      const start = new Date(currentJob.created_at).getTime();
+      const initialElapsed = Math.floor((Date.now() - start) / 1000);
+      setElapsedSeconds(initialElapsed);
+
+      // Inicia contador progressivo
+      const interval = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      // Job finalizado, usa tempo real do banco
+      if (currentJob.finished_at) {
+        const start = new Date(currentJob.created_at).getTime();
+        const end = new Date(currentJob.finished_at).getTime();
+        const seconds = Math.floor((end - start) / 1000);
+        setElapsedSeconds(seconds);
+      }
+    }
+  }, [currentJob?.is_running, currentJob?.created_at, currentJob?.finished_at]);
 
   useEffect(() => {
     loadOS();
@@ -1534,28 +1562,61 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           <div className="px-6 pt-4 pb-4">
             <div
               className="p-3 rounded-lg border"
-              style={{
-                background: currentJob.is_running
-                  ? 'linear-gradient(135deg, rgba(59,130,246,0.15) 0%, rgba(59,130,246,0.05) 100%)'
-                  : currentJob.status === 'Concluido'
-                  ? 'linear-gradient(135deg, rgba(34,197,94,0.15) 0%, rgba(34,197,94,0.05) 100%)'
-                  : 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(239,68,68,0.05) 100%)',
-                borderColor: currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'
-              }}
+              style={(() => {
+                let color = '#3B82F6'; // Azul - rodando
+
+                if (!currentJob.is_running && currentJob.finished_at) {
+                  // Cores baseadas no tempo desde a última sincronização
+                  const timeSinceFinished = Date.now() - new Date(currentJob.finished_at).getTime();
+                  const minutesSince = timeSinceFinished / (1000 * 60);
+
+                  if (minutesSince <= 30) color = '#10B981'; // Verde - até 30 min
+                  else if (minutesSince <= 60) color = '#F59E0B'; // Amarelo - até 1h
+                  else if (minutesSince <= 90) color = '#FB923C'; // Laranja - até 1h30
+                  else color = '#EF4444'; // Vermelho - mais de 1h30
+                } else if (currentJob.status === 'Erro') {
+                  color = '#EF4444';
+                }
+
+                return {
+                  background: `linear-gradient(135deg, ${color}25 0%, ${color}08 100%)`,
+                  borderColor: color
+                };
+              })()}
             >
               <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                   <div
                     className="p-2 rounded-lg"
-                    style={{
-                      background: currentJob.is_running ? 'rgba(59,130,246,0.2)' : currentJob.status === 'Concluido' ? 'rgba(34,197,94,0.2)' : 'rgba(239,68,68,0.2)',
-                      border: `1px solid ${currentJob.is_running ? '#3B82F6' : currentJob.status === 'Concluido' ? '#22C55E' : '#EF4444'}`
-                    }}
+                    style={(() => {
+                      let color = '#3B82F6';
+                      if (!currentJob.is_running && currentJob.finished_at) {
+                        const timeSinceFinished = Date.now() - new Date(currentJob.finished_at).getTime();
+                        const minutesSince = timeSinceFinished / (1000 * 60);
+                        if (minutesSince <= 30) color = '#10B981';
+                        else if (minutesSince <= 60) color = '#F59E0B';
+                        else if (minutesSince <= 90) color = '#FB923C';
+                        else color = '#EF4444';
+                      } else if (currentJob.status === 'Erro') {
+                        color = '#EF4444';
+                      }
+                      return {
+                        background: `${color}33`,
+                        border: `1px solid ${color}`
+                      };
+                    })()}
                   >
                     {currentJob.is_running ? (
-                      <RefreshCw className="w-4 h-4 text-blue-500 animate-spin" />
+                      <RefreshCw className="w-4 h-4 animate-spin" style={{ color: '#3B82F6' }} />
                     ) : currentJob.status === 'Concluido' ? (
-                      <CheckCircle className="w-4 h-4 text-green-500" />
+                      <CheckCircle className="w-4 h-4" style={(() => {
+                        const timeSinceFinished = Date.now() - new Date(currentJob.finished_at).getTime();
+                        const minutesSince = timeSinceFinished / (1000 * 60);
+                        if (minutesSince <= 30) return { color: '#10B981' };
+                        if (minutesSince <= 60) return { color: '#F59E0B' };
+                        if (minutesSince <= 90) return { color: '#FB923C' };
+                        return { color: '#EF4444' };
+                      })()} />
                     ) : (
                       <XCircle className="w-4 h-4 text-red-500" />
                     )}
@@ -1582,14 +1643,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       <span className="text-xs text-gray-600">•</span>
                       <p className="text-xs text-gray-400">
                         Tempo: <span className="font-medium text-gray-300">
-                          {(() => {
-                            const createdTimestamp = new Date(currentJob.created_at).getTime();
-                            const finishedTimestamp = currentJob.finished_at
-                              ? new Date(currentJob.finished_at).getTime()
-                              : Date.now();
-                            const segundos = Math.max(0, Math.floor((finishedTimestamp - createdTimestamp) / 1000));
-                            return segundos;
-                          })()}s
+                          {elapsedSeconds < 60
+                            ? `${elapsedSeconds}s`
+                            : elapsedSeconds < 3600
+                            ? `${Math.floor(elapsedSeconds / 60)}m ${elapsedSeconds % 60}s`
+                            : `${Math.floor(elapsedSeconds / 3600)}h ${Math.floor((elapsedSeconds % 3600) / 60)}m`
+                          }
                         </span>
                       </p>
                     </div>

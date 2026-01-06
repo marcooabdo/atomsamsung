@@ -22,6 +22,7 @@ interface JobStatusCardProps {
 
 export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardProps) {
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
   useEffect(() => {
     loadCurrentJob();
@@ -53,6 +54,33 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       onJobRunningChange(currentJob?.is_running || false);
     }
   }, [currentJob?.is_running, onJobRunningChange]);
+
+  // Timer progressivo enquanto o job está rodando
+  useEffect(() => {
+    if (!currentJob) return;
+
+    if (currentJob.is_running) {
+      // Calcula quantos segundos já passaram desde o início
+      const start = new Date(currentJob.created_at).getTime();
+      const initialElapsed = Math.floor((Date.now() - start) / 1000);
+      setElapsedSeconds(initialElapsed);
+
+      // Inicia contador progressivo
+      const interval = setInterval(() => {
+        setElapsedSeconds(prev => prev + 1);
+      }, 1000);
+
+      return () => clearInterval(interval);
+    } else {
+      // Job finalizado, usa tempo real do banco
+      if (currentJob.finished_at) {
+        const start = new Date(currentJob.created_at).getTime();
+        const end = new Date(currentJob.finished_at).getTime();
+        const seconds = Math.floor((end - start) / 1000);
+        setElapsedSeconds(seconds);
+      }
+    }
+  }, [currentJob?.is_running, currentJob?.created_at, currentJob?.finished_at]);
 
   const loadCurrentJob = async () => {
     const { data, error } = await supabase
@@ -90,21 +118,26 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
 
   const getStatusColor = () => {
     if (currentJob.is_running) return '#00D4FF';
-    if (currentJob.status === 'concluido') return '#10B981';
+
+    // Se o job terminou, usa cor baseada no tempo desde a última sincronização
+    if (currentJob.finished_at) {
+      const timeSinceFinished = Date.now() - new Date(currentJob.finished_at).getTime();
+      const minutesSince = timeSinceFinished / (1000 * 60);
+
+      if (minutesSince <= 30) return '#10B981'; // Verde - até 30 min
+      if (minutesSince <= 60) return '#F59E0B'; // Amarelo - até 1h
+      if (minutesSince <= 90) return '#FB923C'; // Laranja - até 1h30
+      return '#EF4444'; // Vermelho - mais de 1h30
+    }
+
     if (currentJob.status === 'erro') return '#EF4444';
     return '#F59E0B';
   };
 
   const getTimeElapsed = () => {
-    const start = new Date(currentJob.created_at).getTime();
-    const end = currentJob.finished_at
-      ? new Date(currentJob.finished_at).getTime()
-      : Date.now();
-    const seconds = Math.floor((end - start) / 1000);
-
-    if (seconds < 60) return `${seconds}s`;
-    const minutes = Math.floor(seconds / 60);
-    if (minutes < 60) return `${minutes}m`;
+    if (elapsedSeconds < 60) return `${elapsedSeconds}s`;
+    const minutes = Math.floor(elapsedSeconds / 60);
+    if (minutes < 60) return `${minutes}m ${elapsedSeconds % 60}s`;
     const hours = Math.floor(minutes / 60);
     return `${hours}h ${minutes % 60}m`;
   };
