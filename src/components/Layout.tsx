@@ -88,6 +88,13 @@ export function Layout({ children }: LayoutProps) {
 
     fetchUnreadConversations();
 
+    const handleMessagesRead = () => {
+      console.log('[Layout] Evento chat:messages-read recebido, atualizando badge...');
+      setTimeout(fetchUnreadConversations, 200);
+    };
+
+    window.addEventListener('chat:messages-read', handleMessagesRead);
+
     const messagesSubscription = supabase
       .channel('layout-messages')
       .on('postgres_changes',
@@ -98,15 +105,16 @@ export function Layout({ children }: LayoutProps) {
         }
       )
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_participants' },
+        { event: 'UPDATE', schema: 'public', table: 'chat_participants' },
         () => {
           console.log('Participante atualizado, atualizando badge...');
-          fetchUnreadConversations();
+          setTimeout(fetchUnreadConversations, 300);
         }
       )
       .subscribe();
 
     return () => {
+      window.removeEventListener('chat:messages-read', handleMessagesRead);
       messagesSubscription.unsubscribe();
     };
   }, [usuario?.id]);

@@ -192,6 +192,10 @@ export function ChatConversationList({
 
     onSelectConversation(conversationId);
 
+    window.dispatchEvent(new CustomEvent('chat:messages-read', {
+      detail: { conversationId, userId }
+    }));
+
     await supabase.rpc('mark_messages_as_read', {
       p_conversation_id: conversationId,
       p_user_id: userId
