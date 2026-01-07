@@ -157,9 +157,9 @@ export function SamsungGSPNTab() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setMessage({ type: 'error', text: 'Sessão não encontrada' });
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session) {
+        setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
         return;
       }
 
@@ -206,9 +206,9 @@ export function SamsungGSPNTab() {
     setMessage(null);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        setMessage({ type: 'error', text: 'Sessão não encontrada' });
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session) {
+        setMessage({ type: 'error', text: 'Sessão expirada. Faça login novamente.' });
         return;
       }
 

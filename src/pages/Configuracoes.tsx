@@ -286,9 +286,9 @@ export function Configuracoes() {
             return alert('Unidade é obrigatória para este tipo de usuário');
           }
 
-          const { data: { session } } = await supabase.auth.getSession();
-          if (!session?.access_token) {
-            throw new Error('Sessão não encontrada. Faça login novamente.');
+          const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+          if (sessionError || !session?.access_token) {
+            throw new Error('Sessão expirada. Faça login novamente.');
           }
 
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
@@ -464,9 +464,9 @@ export function Configuracoes() {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.access_token) {
-        throw new Error('Sessão não encontrada. Faça login novamente.');
+      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
+      if (sessionError || !session?.access_token) {
+        throw new Error('Sessão expirada. Faça login novamente.');
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
