@@ -74,6 +74,17 @@ export function ChatConversationList({
           loadConversations();
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'chat_participants'
+        },
+        () => {
+          loadConversations();
+        }
+      )
       .subscribe();
 
     return () => {
@@ -168,6 +179,15 @@ export function ChatConversationList({
     } finally {
       setCreatingConversation(false);
     }
+  };
+
+  const handleSelectConversation = async (conversationId: string) => {
+    await supabase.rpc('mark_messages_as_read', {
+      p_conversation_id: conversationId,
+      p_user_id: userId
+    });
+
+    onSelectConversation(conversationId);
   };
 
   const filteredConversations = conversations.filter((conv) => {
@@ -282,7 +302,7 @@ export function ChatConversationList({
                 return (
                   <button
                     key={conv.id}
-                    onClick={() => onSelectConversation(conv.id)}
+                    onClick={() => handleSelectConversation(conv.id)}
                     className={`w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 ${
                       selectedConversationId === conv.id
                         ? 'bg-[#00D4FF]/10'

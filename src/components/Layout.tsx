@@ -194,10 +194,10 @@ export function Layout({ children }: LayoutProps) {
                   />
                   {item.id === 'chat' && unreadConversations > 0 && (
                     <div
-                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse"
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-black"
                       style={{
-                        background: 'linear-gradient(135deg, #ff0055, #ff4081)',
-                        boxShadow: '0 0 10px rgba(255, 0, 85, 0.8), 0 0 20px rgba(255, 0, 85, 0.4)',
+                        background: '#00D4FF',
+                        boxShadow: '0 0 8px rgba(0, 212, 255, 0.6)',
                         border: '1.5px solid rgba(255, 255, 255, 0.3)',
                         padding: '0 4px'
                       }}
