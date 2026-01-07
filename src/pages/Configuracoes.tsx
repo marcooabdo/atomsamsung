@@ -141,10 +141,19 @@ export function Configuracoes() {
           setUnidades(unidadesData || []);
           break;
         case 'usuarios':
-          const { data: usuariosData, error: usuariosError } = await supabase
+          let usuariosQuery = supabase
             .from('usuarios')
-            .select('*')
-            .order('nome');
+            .select('*');
+
+          // Filtrar por unidade se o usuário não for master sem unidade
+          if (usuarioLogado?.tipo === 'master' && !usuarioLogado?.unidade_id) {
+            // Master sem unidade vê todos
+          } else if (usuarioLogado?.unidade_id) {
+            // Gerente ou master com unidade veem apenas da sua unidade
+            usuariosQuery = usuariosQuery.eq('unidade_id', usuarioLogado.unidade_id);
+          }
+
+          const { data: usuariosData, error: usuariosError } = await usuariosQuery.order('nome');
           if (usuariosError) {
             alert(`Erro ao carregar usuários: ${usuariosError.message}`);
           }
@@ -226,7 +235,9 @@ export function Configuracoes() {
       }
     } else {
       setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
-      setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
+      // Se gerente ou master com unidade, já define a unidade automaticamente
+      const defaultUnidadeId = (usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) ? (usuarioLogado?.unidade_id || '') : '';
+      setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
       setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
@@ -284,6 +295,13 @@ export function Configuracoes() {
           if (!formUsuario.nome.trim() || !formUsuario.email.trim()) return alert('Nome e email são obrigatórios');
           if (!formUsuario.unidade_id && formUsuario.tipo !== 'master' && formUsuario.tipo !== 'diretoria') {
             return alert('Unidade é obrigatória para este tipo de usuário');
+          }
+
+          // Validar que gerentes só podem criar/editar usuários da sua unidade
+          if (usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) {
+            if (formUsuario.unidade_id !== usuarioLogado?.unidade_id) {
+              return alert('Você só pode gerenciar usuários da sua unidade');
+            }
           }
 
           const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
@@ -664,7 +682,12 @@ export function Configuracoes() {
                     <label className="block text-xs text-gray-400 uppercase mb-2">
                       Unidade {(formUsuario.tipo !== 'master' && formUsuario.tipo !== 'diretoria') && '*'}
                     </label>
-                    <select value={formUsuario.unidade_id} onChange={(e) => setFormUsuario({...formUsuario, unidade_id: e.target.value})} className="neon-input">
+                    <select
+                      value={formUsuario.unidade_id}
+                      onChange={(e) => setFormUsuario({...formUsuario, unidade_id: e.target.value})}
+                      disabled={usuarioLogado?.tipo !== 'master' || !!usuarioLogado?.unidade_id}
+                      className="neon-input disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
                       {(formUsuario.tipo === 'master' || formUsuario.tipo === 'diretoria') && (
                         <option value="">Todas as Unidades</option>
                       )}
@@ -678,6 +701,11 @@ export function Configuracoes() {
                     {(formUsuario.tipo === 'master' || formUsuario.tipo === 'diretoria') && (
                       <p className="text-xs text-gray-500 mt-1">
                         Deixe "Todas as Unidades" para acesso irrestrito ou selecione uma unidade específica
+                      </p>
+                    )}
+                    {(usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) && (
+                      <p className="text-xs text-yellow-500 mt-1">
+                        A unidade está bloqueada pois você só pode gerenciar usuários da sua unidade
                       </p>
                     )}
                   </div>
