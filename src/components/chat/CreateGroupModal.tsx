@@ -62,55 +62,31 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
 
     setCreating(true);
     try {
-      console.log('[CreateGroupModal] Criando grupo:', {
-        tipo: 'group',
-        nome: groupName.trim(),
-        descricao: groupDescription.trim() || null,
-        created_by: userId
+      const memberIds = Array.from(selectedUsers);
+
+      console.log('[CreateGroupModal] Criando grupo via RPC:', {
+        p_nome: groupName.trim(),
+        p_descricao: groupDescription.trim() || null,
+        p_created_by: userId,
+        p_member_ids: memberIds
       });
 
-      const { data: conversation, error: convError } = await supabase
-        .from('chat_conversations')
-        .insert({
-          tipo: 'group',
-          nome: groupName.trim(),
-          descricao: groupDescription.trim() || null,
-          created_by: userId
-        })
-        .select()
-        .single();
+      const { data: conversationId, error } = await supabase.rpc('create_group_conversation', {
+        p_nome: groupName.trim(),
+        p_descricao: groupDescription.trim() || null,
+        p_created_by: userId,
+        p_member_ids: memberIds
+      });
 
-      console.log('[CreateGroupModal] Resultado da criação:', { conversation, convError });
+      console.log('[CreateGroupModal] Resultado da RPC:', { conversationId, error });
 
-      if (convError) {
-        console.error('[CreateGroupModal] Erro ao criar conversa:', convError);
-        throw convError;
+      if (error) {
+        console.error('[CreateGroupModal] Erro ao criar grupo:', error);
+        throw error;
       }
 
-      const participants = [
-        { conversation_id: conversation.id, user_id: userId, role: 'admin' },
-        ...Array.from(selectedUsers).map(uid => ({
-          conversation_id: conversation.id,
-          user_id: uid,
-          role: 'member'
-        }))
-      ];
-
-      console.log('[CreateGroupModal] Inserindo participantes:', participants);
-
-      const { error: partError } = await supabase
-        .from('chat_participants')
-        .insert(participants);
-
-      console.log('[CreateGroupModal] Resultado participantes:', { partError });
-
-      if (partError) {
-        console.error('[CreateGroupModal] Erro ao adicionar participantes:', partError);
-        throw partError;
-      }
-
-      console.log('[CreateGroupModal] ✅ Grupo criado com sucesso!');
-      onGroupCreated(conversation.id);
+      console.log('[CreateGroupModal] Grupo criado com sucesso! ID:', conversationId);
+      onGroupCreated(conversationId);
       handleClose();
     } catch (err) {
       console.error('[CreateGroupModal] Erro completo:', err);
