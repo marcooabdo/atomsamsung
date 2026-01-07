@@ -145,11 +145,11 @@ export function Configuracoes() {
             .from('usuarios')
             .select('*');
 
-          // Filtrar por unidade se o usuário não for master sem unidade
-          if (usuarioLogado?.tipo === 'master' && !usuarioLogado?.unidade_id) {
-            // Master sem unidade vê todos
+          // Master e Diretoria veem todos os usuários
+          if (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') {
+            // Não aplica filtro - vê todos
           } else if (usuarioLogado?.unidade_id) {
-            // Gerente ou master com unidade veem apenas da sua unidade
+            // Gerentes e outros veem apenas da sua unidade
             usuariosQuery = usuariosQuery.eq('unidade_id', usuarioLogado.unidade_id);
           }
 
@@ -235,8 +235,8 @@ export function Configuracoes() {
       }
     } else {
       setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
-      // Se gerente ou master com unidade, já define a unidade automaticamente
-      const defaultUnidadeId = (usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) ? (usuarioLogado?.unidade_id || '') : '';
+      // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
+      const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
       setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
@@ -297,8 +297,8 @@ export function Configuracoes() {
             return alert('Unidade é obrigatória para este tipo de usuário');
           }
 
-          // Validar que gerentes só podem criar/editar usuários da sua unidade
-          if (usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) {
+          // Validar que apenas gerentes e administradores têm restrição de unidade
+          if (usuarioLogado?.tipo !== 'master' && usuarioLogado?.tipo !== 'diretoria') {
             if (formUsuario.unidade_id !== usuarioLogado?.unidade_id) {
               return alert('Você só pode gerenciar usuários da sua unidade');
             }
@@ -685,7 +685,7 @@ export function Configuracoes() {
                     <select
                       value={formUsuario.unidade_id}
                       onChange={(e) => setFormUsuario({...formUsuario, unidade_id: e.target.value})}
-                      disabled={usuarioLogado?.tipo !== 'master' || !!usuarioLogado?.unidade_id}
+                      disabled={usuarioLogado?.tipo !== 'master' && usuarioLogado?.tipo !== 'diretoria'}
                       className="neon-input disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {(formUsuario.tipo === 'master' || formUsuario.tipo === 'diretoria') && (
@@ -703,7 +703,7 @@ export function Configuracoes() {
                         Deixe "Todas as Unidades" para acesso irrestrito ou selecione uma unidade específica
                       </p>
                     )}
-                    {(usuarioLogado?.tipo !== 'master' || usuarioLogado?.unidade_id) && (
+                    {(usuarioLogado?.tipo !== 'master' && usuarioLogado?.tipo !== 'diretoria') && (
                       <p className="text-xs text-yellow-500 mt-1">
                         A unidade está bloqueada pois você só pode gerenciar usuários da sua unidade
                       </p>
