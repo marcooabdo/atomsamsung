@@ -55,22 +55,33 @@ export function Layout({ children }: LayoutProps) {
 
     const fetchUnreadConversations = async () => {
       try {
+        console.log('[Layout] Buscando conversas para usuario.id:', usuario.id);
+
         const { data, error } = await supabase
           .from('chat_conversations_with_info')
           .select('id, unread_count')
           .eq('user_id', usuario.id);
 
+        console.log('[Layout] Resultado da query:', { data, error });
+
         if (error) {
-          console.error('Erro ao buscar conversas:', error);
+          console.error('[Layout] Erro ao buscar conversas:', error);
           setUnreadConversations(0);
           return;
         }
 
-        const unreadCount = data?.filter(conv => conv.unread_count > 0).length || 0;
-        console.log('Conversas não lidas:', unreadCount);
-        setUnreadConversations(unreadCount);
+        if (!data || data.length === 0) {
+          console.log('[Layout] Nenhuma conversa encontrada');
+          setUnreadConversations(0);
+          return;
+        }
+
+        const conversasComNaoLidas = data.filter(conv => conv.unread_count > 0);
+        console.log('[Layout] Conversas com mensagens não lidas:', conversasComNaoLidas);
+
+        setUnreadConversations(conversasComNaoLidas.length);
       } catch (error) {
-        console.error('Erro geral ao buscar conversas não lidas:', error);
+        console.error('[Layout] Erro geral:', error);
         setUnreadConversations(0);
       }
     };
