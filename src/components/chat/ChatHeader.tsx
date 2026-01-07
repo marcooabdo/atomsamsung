@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Settings, Users } from 'lucide-react';
 import { EditGroupModal } from './EditGroupModal';
+import { GroupDetailsModal } from './GroupDetailsModal';
 
 interface ConversationInfo {
   id: string;
@@ -25,6 +26,7 @@ interface ChatHeaderProps {
 
 export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps) {
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
 
   const displayName = conversation.tipo === 'direct' && conversation.other_user
     ? conversation.other_user.nome
@@ -83,9 +85,15 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
           )}
         </div>
 
-        <div className="flex-1 min-w-0">
-          <h2 className="font-semibold text-white truncate">
+        <div
+          className={`flex-1 min-w-0 ${conversation.tipo === 'group' ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+          onClick={() => conversation.tipo === 'group' && setShowDetailsModal(true)}
+        >
+          <h2 className="font-semibold text-white truncate flex items-center gap-2">
             {displayName}
+            {conversation.tipo === 'group' && (
+              <span className="text-[10px] text-gray-500 font-normal">(ver detalhes)</span>
+            )}
           </h2>
           <p className="text-xs text-gray-400 flex items-center gap-1.5 mt-0.5">
             {conversation.tipo === 'direct' && conversation.other_user?.status === 'online' && (
@@ -112,6 +120,16 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
           onClose={() => setShowEditModal(false)}
           conversationId={conversation.id}
           onUpdate={onRefresh}
+        />
+      )}
+
+      {showDetailsModal && (
+        <GroupDetailsModal
+          isOpen={showDetailsModal}
+          onClose={() => setShowDetailsModal(false)}
+          conversationId={conversation.id}
+          groupName={conversation.nome}
+          groupDescription={conversation.descricao}
         />
       )}
     </>
