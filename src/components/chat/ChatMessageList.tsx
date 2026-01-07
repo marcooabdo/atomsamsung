@@ -158,7 +158,12 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
             sender_name: sender?.nome || 'Usuário'
           };
 
-          setMessages(prev => [...prev, newMessage as Message]);
+          setMessages(prev => {
+            if (prev.some(m => m.id === newMessage.id)) {
+              return prev;
+            }
+            return [...prev, newMessage as Message];
+          });
 
           setTimeout(() => {
             scrollToBottom();
