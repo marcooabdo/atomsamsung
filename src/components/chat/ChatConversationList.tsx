@@ -223,10 +223,20 @@ export function ChatConversationList({
     const date = new Date(timestamp);
     const now = new Date();
     const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
     const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-    if (hours < 24) return `${hours}h`;
-    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+    if (minutes < 1) return 'Agora';
+    if (minutes < 60) return `${minutes}min`;
+    if (hours < 24) {
+      return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    if (days < 7) {
+      return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }) + ' ' +
+             date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    }
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
   };
 
   const getMessagePreview = (conv: Conversation) => {
