@@ -8,6 +8,7 @@ interface Participant {
   role: string;
   nome: string;
   tipo: string;
+  cidade?: string | null;
 }
 
 interface EditGroupModalProps {
@@ -56,7 +57,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
           id,
           user_id,
           role,
-          usuarios(id, nome, tipo)
+          usuarios(id, nome, tipo, unidade:unidades(cidade))
         `)
         .eq('conversation_id', conversationId);
 
@@ -69,7 +70,8 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
           user_id: p.user_id,
           role: p.role,
           nome: user.nome,
-          tipo: user.tipo
+          tipo: user.tipo,
+          cidade: user.unidade?.cidade
         };
       });
 
@@ -82,7 +84,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     try {
       const { data: allUsers, error: usersError } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo')
+        .select('id, nome, tipo, unidade:unidades(cidade)')
         .eq('ativo', true)
         .order('nome');
 
@@ -260,7 +262,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 uppercase">{participant.tipo}</p>
+                    <p className="text-xs text-gray-500 uppercase">{participant.tipo}{participant.cidade ? ` - ${participant.cidade}` : ''}</p>
                   </div>
 
                   <button
@@ -315,7 +317,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
 
                     <div className="flex-1 text-left">
                       <p className="font-semibold text-gray-200">{user.nome}</p>
-                      <p className="text-xs text-gray-500 uppercase">{user.tipo}</p>
+                      <p className="text-xs text-gray-500 uppercase">{user.tipo}{user.unidade?.cidade ? ` - ${user.unidade.cidade}` : ''}</p>
                     </div>
 
                     <Check className="w-5 h-5 text-[#00D4FF]" />

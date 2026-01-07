@@ -24,6 +24,9 @@ interface User {
   nome: string;
   tipo: string;
   ativo: boolean;
+  unidade?: {
+    cidade: string | null;
+  } | null;
 }
 
 interface ChatConversationListProps {
@@ -145,7 +148,7 @@ export function ChatConversationList({
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo, ativo')
+        .select('id, nome, tipo, ativo, unidade:unidades(cidade)')
         .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
@@ -400,7 +403,7 @@ export function ChatConversationList({
                       {user.nome}
                     </h3>
                     <p className="text-xs text-gray-500 uppercase mt-0.5">
-                      {user.tipo}
+                      {user.tipo}{user.unidade?.cidade ? ` - ${user.unidade.cidade}` : ''}
                     </p>
                   </div>
                 </button>

@@ -6,6 +6,9 @@ interface User {
   id: string;
   nome: string;
   tipo: string;
+  unidade?: {
+    cidade: string | null;
+  } | null;
 }
 
 interface CreateGroupModalProps {
@@ -33,7 +36,7 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo')
+        .select('id, nome, tipo, unidade:unidades(cidade)')
         .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
@@ -203,7 +206,7 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
 
                     <div className="flex-1 text-left">
                       <p className="font-semibold text-gray-200">{user.nome}</p>
-                      <p className="text-xs text-gray-500 uppercase">{user.tipo}</p>
+                      <p className="text-xs text-gray-500 uppercase">{user.tipo}{user.unidade?.cidade ? ` - ${user.unidade.cidade}` : ''}</p>
                     </div>
 
                     {isSelected && (

@@ -10,6 +10,9 @@ interface Participant {
     id: string;
     nome: string;
     tipo: string;
+    unidade?: {
+      cidade: string | null;
+    } | null;
   };
 }
 
@@ -46,7 +49,7 @@ export function GroupDetailsModal({
           user_id,
           role,
           joined_at,
-          user:usuarios!chat_participants_user_id_fkey(id, nome, tipo)
+          user:usuarios!chat_participants_user_id_fkey(id, nome, tipo, unidade:unidades(cidade))
         `)
         .eq('conversation_id', conversationId)
         .order('role', { ascending: true })
@@ -134,8 +137,8 @@ export function GroupDetailsModal({
                       <p className="text-sm text-white font-medium truncate">
                         {participant.user?.nome || 'Usuario'}
                       </p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        {participant.user?.tipo || ''}
+                      <p className="text-xs text-gray-500 uppercase">
+                        {participant.user?.tipo || ''}{participant.user?.unidade?.cidade ? ` - ${participant.user.unidade.cidade}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 px-2 py-1 bg-amber-500/20 rounded-full">
@@ -159,8 +162,8 @@ export function GroupDetailsModal({
                       <p className="text-sm text-white font-medium truncate">
                         {participant.user?.nome || 'Usuario'}
                       </p>
-                      <p className="text-xs text-gray-500 capitalize">
-                        {participant.user?.tipo || ''}
+                      <p className="text-xs text-gray-500 uppercase">
+                        {participant.user?.tipo || ''}{participant.user?.unidade?.cidade ? ` - ${participant.user.unidade.cidade}` : ''}
                       </p>
                     </div>
                     <div className="flex items-center gap-1 px-2 py-1 bg-[#1a3a4a] rounded-full">
