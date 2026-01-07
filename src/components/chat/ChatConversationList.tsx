@@ -182,12 +182,22 @@ export function ChatConversationList({
   };
 
   const handleSelectConversation = async (conversationId: string) => {
+    setConversations(prev =>
+      prev.map(conv =>
+        conv.id === conversationId
+          ? { ...conv, unread_count: 0 }
+          : conv
+      )
+    );
+
+    onSelectConversation(conversationId);
+
     await supabase.rpc('mark_messages_as_read', {
       p_conversation_id: conversationId,
       p_user_id: userId
     });
 
-    onSelectConversation(conversationId);
+    await loadConversations();
   };
 
   const filteredConversations = conversations.filter((conv) => {
