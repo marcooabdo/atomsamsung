@@ -1,7 +1,8 @@
-import { ReactNode, useState } from 'react';
+import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { supabase } from '../lib/supabase';
 import {
   LayoutDashboard,
   FileText,
@@ -42,11 +43,76 @@ export function Layout({ children }: LayoutProps) {
   const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [unreadConversations, setUnreadConversations] = useState(0);
 
   const menuItems = allMenuItems.filter(item => {
     if (!item.onlyFor) return true;
     return usuario && item.onlyFor.includes(usuario.tipo);
   });
+
+  useEffect(() => {
+    if (!usuario?.id) return;
+
+    const fetchUnreadConversations = async () => {
+      const { data: participantData } = await supabase
+        .from('chat_participants')
+        .select('conversation_id, last_read_at')
+        .eq('usuario_id', usuario.id);
+
+      if (!participantData || participantData.length === 0) {
+        setUnreadConversations(0);
+        return;
+      }
+
+      const conversationIds = participantData.map(p => p.conversation_id);
+
+      const { data: messages } = await supabase
+        .from('chat_messages')
+        .select('conversation_id, created_at')
+        .in('conversation_id', conversationIds)
+        .neq('usuario_id', usuario.id)
+        .order('created_at', { ascending: false });
+
+      if (!messages) {
+        setUnreadConversations(0);
+        return;
+      }
+
+      const conversationsWithUnread = new Set();
+
+      messages.forEach(msg => {
+        const participant = participantData.find(p => p.conversation_id === msg.conversation_id);
+        if (participant) {
+          const lastRead = participant.last_read_at ? new Date(participant.last_read_at) : null;
+          const messageDate = new Date(msg.created_at);
+
+          if (!lastRead || messageDate > lastRead) {
+            conversationsWithUnread.add(msg.conversation_id);
+          }
+        }
+      });
+
+      setUnreadConversations(conversationsWithUnread.size);
+    };
+
+    fetchUnreadConversations();
+
+    const messagesSubscription = supabase
+      .channel('layout-messages')
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_messages' },
+        () => fetchUnreadConversations()
+      )
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'chat_participants' },
+        () => fetchUnreadConversations()
+      )
+      .subscribe();
+
+    return () => {
+      messagesSubscription.unsubscribe();
+    };
+  }, [usuario?.id]);
 
   const handleSignOut = async () => {
     try {
@@ -123,11 +189,26 @@ export function Layout({ children }: LayoutProps) {
                 }}
                 title={!sidebarOpen ? item.label : ''}
               >
-                <Icon
-                  className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
-                    isActive ? 'scale-105' : 'group-hover:scale-105'
-                  }`}
-                />
+                <div className="relative">
+                  <Icon
+                    className={`w-5 h-5 flex-shrink-0 transition-all duration-300 ${
+                      isActive ? 'scale-105' : 'group-hover:scale-105'
+                    }`}
+                  />
+                  {item.id === 'chat' && unreadConversations > 0 && (
+                    <div
+                      className="absolute -top-1 -right-1 min-w-[18px] h-[18px] rounded-full flex items-center justify-center text-[10px] font-bold text-white animate-pulse"
+                      style={{
+                        background: 'linear-gradient(135deg, #ff0055, #ff4081)',
+                        boxShadow: '0 0 10px rgba(255, 0, 85, 0.8), 0 0 20px rgba(255, 0, 85, 0.4)',
+                        border: '1.5px solid rgba(255, 255, 255, 0.3)',
+                        padding: '0 4px'
+                      }}
+                    >
+                      {unreadConversations > 99 ? '99+' : unreadConversations}
+                    </div>
+                  )}
+                </div>
                 {sidebarOpen && (
                   <span className={`font-medium text-sm tracking-wider transition-all duration-300 ${
                     isActive ? 'font-semibold' : ''
