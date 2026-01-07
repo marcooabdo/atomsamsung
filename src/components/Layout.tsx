@@ -1,7 +1,6 @@
 import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import {
   LayoutDashboard,
@@ -16,8 +15,6 @@ import {
   X,
   ClipboardList,
   Zap,
-  Sun,
-  Moon,
   Rocket
 } from 'lucide-react';
 
@@ -40,7 +37,6 @@ const allMenuItems = [
 
 export function Layout({ children }: LayoutProps) {
   const { usuario, signOut } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [unreadConversations, setUnreadConversations] = useState(0);
@@ -248,36 +244,7 @@ export function Layout({ children }: LayoutProps) {
             </div>
           )}
 
-          <div className={`flex gap-2 ${sidebarOpen ? 'flex-row' : 'flex-col'}`}>
-            <button
-              onClick={toggleTheme}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border transition-all duration-300 group"
-              title={!sidebarOpen ? (theme === 'dark' ? 'Modo Claro' : 'Modo Escuro') : ''}
-              style={{
-                background: 'var(--bg-secondary)',
-                borderColor: 'var(--border-primary)',
-                color: 'var(--text-accent)',
-                boxShadow: '0 0 8px var(--border-primary)',
-                flex: sidebarOpen ? 1 : 'none'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-accent)';
-                e.currentTarget.style.background = 'var(--bg-hover)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = 'var(--border-primary)';
-                e.currentTarget.style.background = 'var(--bg-secondary)';
-              }}
-            >
-              {theme === 'dark' ? (
-                <Sun className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
-              ) : (
-                <Moon className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
-              )}
-              {sidebarOpen && <span className="font-medium text-xs tracking-wider">{theme === 'dark' ? 'CLARO' : 'ESCURO'}</span>}
-            </button>
-
-            <button
+          <button
               onClick={handleSignOut}
               className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg border border-red-500/25 hover:border-red-500/50 hover:bg-red-500/10 transition-all duration-300 text-red-400 hover:text-red-300 group"
               title={!sidebarOpen ? 'Sair' : ''}
@@ -290,7 +257,6 @@ export function Layout({ children }: LayoutProps) {
               <LogOut className="w-4 h-4 flex-shrink-0 group-hover:scale-105 transition-transform" />
               {sidebarOpen && <span className="font-medium text-xs tracking-wider">SAIR</span>}
             </button>
-          </div>
         </div>
       </aside>
 
