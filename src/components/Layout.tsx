@@ -87,24 +87,35 @@ export function Layout({ children }: LayoutProps) {
     window.addEventListener('chat:messages-read', handleMessagesRead);
 
     const messagesSubscription = supabase
-      .channel('layout-messages')
+      .channel(`layout-messages-${usuario.id}-${Date.now()}`)
       .on('postgres_changes',
-        { event: '*', schema: 'public', table: 'chat_messages' },
-        () => {
-          console.log('Nova mensagem, atualizando badge...');
-          fetchUnreadConversations();
+        { event: 'INSERT', schema: 'public', table: 'chat_messages' },
+        (payload) => {
+          console.log('[Layout] Nova mensagem recebida:', payload);
+          if (payload.new.sender_id !== usuario.id) {
+            setTimeout(fetchUnreadConversations, 100);
+          }
         }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chat_participants' },
-        () => {
-          console.log('Participante atualizado, atualizando badge...');
-          setTimeout(fetchUnreadConversations, 300);
+        (payload) => {
+          console.log('[Layout] Participante atualizado:', payload);
+          if (payload.new.user_id === usuario.id) {
+            setTimeout(fetchUnreadConversations, 100);
+          }
         }
       )
-      .subscribe();
+      .subscribe((status, err) => {
+        console.log('[Layout] Subscription status:', status);
+        if (err) console.error('[Layout] Subscription error:', err);
+        if (status === 'SUBSCRIBED') {
+          console.log('[Layout] ✅ Subscription ativa para realtime de chat');
+        }
+      });
 
     return () => {
+      console.log('[Layout] Limpando subscription...');
       window.removeEventListener('chat:messages-read', handleMessagesRead);
       messagesSubscription.unsubscribe();
     };

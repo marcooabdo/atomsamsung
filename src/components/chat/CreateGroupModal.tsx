@@ -62,6 +62,13 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
 
     setCreating(true);
     try {
+      console.log('[CreateGroupModal] Criando grupo:', {
+        tipo: 'group',
+        nome: groupName.trim(),
+        descricao: groupDescription.trim() || null,
+        created_by: userId
+      });
+
       const { data: conversation, error: convError } = await supabase
         .from('chat_conversations')
         .insert({
@@ -73,7 +80,12 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
         .select()
         .single();
 
-      if (convError) throw convError;
+      console.log('[CreateGroupModal] Resultado da criação:', { conversation, convError });
+
+      if (convError) {
+        console.error('[CreateGroupModal] Erro ao criar conversa:', convError);
+        throw convError;
+      }
 
       const participants = [
         { conversation_id: conversation.id, user_id: userId, role: 'admin' },
@@ -84,16 +96,25 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
         }))
       ];
 
+      console.log('[CreateGroupModal] Inserindo participantes:', participants);
+
       const { error: partError } = await supabase
         .from('chat_participants')
         .insert(participants);
 
-      if (partError) throw partError;
+      console.log('[CreateGroupModal] Resultado participantes:', { partError });
 
+      if (partError) {
+        console.error('[CreateGroupModal] Erro ao adicionar participantes:', partError);
+        throw partError;
+      }
+
+      console.log('[CreateGroupModal] ✅ Grupo criado com sucesso!');
       onGroupCreated(conversation.id);
       handleClose();
     } catch (err) {
-      alert('Erro ao criar grupo');
+      console.error('[CreateGroupModal] Erro completo:', err);
+      alert(`Erro ao criar grupo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
       setCreating(false);
     }
