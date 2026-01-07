@@ -136,7 +136,9 @@ export function ChatConversationList({
         })
       );
 
-      setConversations(enrichedConversations);
+      const conversationsWithMessages = enrichedConversations.filter(conv => conv.last_message !== null);
+
+      setConversations(conversationsWithMessages);
     } catch (err) {
     } finally {
       setLoading(false);
