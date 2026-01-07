@@ -54,45 +54,25 @@ export function Layout({ children }: LayoutProps) {
     if (!usuario?.id) return;
 
     const fetchUnreadConversations = async () => {
-      const { data: participantData } = await supabase
-        .from('chat_participants')
-        .select('conversation_id, last_read_at')
-        .eq('usuario_id', usuario.id);
+      try {
+        const { data, error } = await supabase
+          .from('chat_conversations_with_info')
+          .select('id, unread_count')
+          .eq('user_id', usuario.id);
 
-      if (!participantData || participantData.length === 0) {
-        setUnreadConversations(0);
-        return;
-      }
-
-      const conversationIds = participantData.map(p => p.conversation_id);
-
-      const { data: messages } = await supabase
-        .from('chat_messages')
-        .select('conversation_id, created_at')
-        .in('conversation_id', conversationIds)
-        .neq('usuario_id', usuario.id)
-        .order('created_at', { ascending: false });
-
-      if (!messages) {
-        setUnreadConversations(0);
-        return;
-      }
-
-      const conversationsWithUnread = new Set();
-
-      messages.forEach(msg => {
-        const participant = participantData.find(p => p.conversation_id === msg.conversation_id);
-        if (participant) {
-          const lastRead = participant.last_read_at ? new Date(participant.last_read_at) : null;
-          const messageDate = new Date(msg.created_at);
-
-          if (!lastRead || messageDate > lastRead) {
-            conversationsWithUnread.add(msg.conversation_id);
-          }
+        if (error) {
+          console.error('Erro ao buscar conversas:', error);
+          setUnreadConversations(0);
+          return;
         }
-      });
 
-      setUnreadConversations(conversationsWithUnread.size);
+        const unreadCount = data?.filter(conv => conv.unread_count > 0).length || 0;
+        console.log('Conversas não lidas:', unreadCount);
+        setUnreadConversations(unreadCount);
+      } catch (error) {
+        console.error('Erro geral ao buscar conversas não lidas:', error);
+        setUnreadConversations(0);
+      }
     };
 
     fetchUnreadConversations();
@@ -101,11 +81,17 @@ export function Layout({ children }: LayoutProps) {
       .channel('layout-messages')
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'chat_messages' },
-        () => fetchUnreadConversations()
+        () => {
+          console.log('Nova mensagem, atualizando badge...');
+          fetchUnreadConversations();
+        }
       )
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'chat_participants' },
-        () => fetchUnreadConversations()
+        () => {
+          console.log('Participante atualizado, atualizando badge...');
+          fetchUnreadConversations();
+        }
       )
       .subscribe();
 
