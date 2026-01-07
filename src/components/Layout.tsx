@@ -55,11 +55,9 @@ export function Layout({ children }: LayoutProps) {
 
     const fetchUnreadConversations = async () => {
       try {
-        console.log('[Layout] Buscando conversas não lidas para usuario.id:', usuario.id);
-
-        const { data, error } = await supabase.rpc('get_unread_conversations_count');
-
-        console.log('[Layout] Resultado da RPC:', { data, error });
+        const { data, error } = await supabase.rpc('get_unread_conversations_count', {
+          p_user_id: usuario.id
+        });
 
         if (error) {
           console.error('[Layout] Erro ao buscar conversas:', error);
@@ -68,8 +66,6 @@ export function Layout({ children }: LayoutProps) {
         }
 
         const count = typeof data === 'number' ? data : 0;
-        console.log('[Layout] Total de conversas não lidas:', count);
-
         setUnreadConversations(count);
       } catch (error) {
         console.error('[Layout] Erro geral:', error);
@@ -80,44 +76,45 @@ export function Layout({ children }: LayoutProps) {
     fetchUnreadConversations();
 
     const handleMessagesRead = () => {
-      console.log('[Layout] Evento chat:messages-read recebido, atualizando badge...');
-      setTimeout(fetchUnreadConversations, 200);
+      fetchUnreadConversations();
     };
 
     window.addEventListener('chat:messages-read', handleMessagesRead);
 
-    const messagesSubscription = supabase
-      .channel(`layout-messages-${usuario.id}-${Date.now()}`)
+    const channelName = `layout-unread-${usuario.id}`;
+
+    const channel = supabase.channel(channelName, {
+      config: { broadcast: { self: false } }
+    });
+
+    channel
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_messages' },
         (payload) => {
-          console.log('[Layout] Nova mensagem recebida:', payload);
-          if (payload.new.sender_id !== usuario.id) {
-            setTimeout(fetchUnreadConversations, 100);
+          if (payload.new && payload.new.sender_id !== usuario.id) {
+            fetchUnreadConversations();
           }
+        }
+      )
+      .on('postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'chat_message_reads' },
+        () => {
+          fetchUnreadConversations();
         }
       )
       .on('postgres_changes',
         { event: 'UPDATE', schema: 'public', table: 'chat_participants' },
         (payload) => {
-          console.log('[Layout] Participante atualizado:', payload);
-          if (payload.new.user_id === usuario.id) {
-            setTimeout(fetchUnreadConversations, 100);
+          if (payload.new && payload.new.user_id === usuario.id) {
+            fetchUnreadConversations();
           }
         }
       )
-      .subscribe((status, err) => {
-        console.log('[Layout] Subscription status:', status);
-        if (err) console.error('[Layout] Subscription error:', err);
-        if (status === 'SUBSCRIBED') {
-          console.log('[Layout] ✅ Subscription ativa para realtime de chat');
-        }
-      });
+      .subscribe();
 
     return () => {
-      console.log('[Layout] Limpando subscription...');
       window.removeEventListener('chat:messages-read', handleMessagesRead);
-      messagesSubscription.unsubscribe();
+      supabase.removeChannel(channel);
     };
   }, [usuario?.id]);
 
