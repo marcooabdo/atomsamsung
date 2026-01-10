@@ -27,6 +27,8 @@ import { CotacaoModal } from '../components/CotacaoModal';
 
 type Cotacao = Database['public']['Tables']['cotacoes']['Row'] & {
   valor_calculado?: number;
+  valor_pago?: number;
+  saldo_restante?: number;
 };
 
 export function Cotacoes() {
@@ -131,9 +133,20 @@ export function Cotacoes() {
 
           const valorTotal = Math.round((subtotal - desconto) * 100) / 100;
 
+          // Buscar pagamentos da cotação
+          const { data: pagamentos } = await supabase
+            .from('pagamentos')
+            .select('valor_bruto, valor')
+            .eq('cotacao_id', cotacao.id);
+
+          const valorPago = (pagamentos || []).reduce((sum, p) => sum + (p.valor_bruto || p.valor || 0), 0);
+          const saldoRestante = valorTotal - valorPago;
+
           return {
             ...cotacao,
             valor_calculado: valorTotal,
+            valor_pago: valorPago,
+            saldo_restante: saldoRestante,
             os_vinculada: null
           };
         })
@@ -1346,10 +1359,10 @@ Assistencia Tecnica Samsung`;
                       <span className="text-gray-300 uppercase">{cotacao.tipo_atendimento}</span>
                     </div>
 
-                    {cotacao.cliente_cep && (
+                    {cotacao.cliente_cidade && (
                       <div className="flex items-center justify-between text-xs">
-                        <span className="text-gray-500">CEP:</span>
-                        <span className="font-mono text-gray-300">{cotacao.cliente_cep.replace(/(\d{5})(\d{3})/, '$1-$2')}</span>
+                        <span className="text-gray-500">Cidade:</span>
+                        <span className="text-gray-300">{cotacao.cliente_cidade}{cotacao.cliente_estado ? ` - ${cotacao.cliente_estado}` : ''}</span>
                       </div>
                     )}
 
@@ -1368,6 +1381,15 @@ Assistencia Tecnica Samsung`;
                           R$ {cotacao.valor_calculado.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
                       </div>
+
+                      {cotacao.saldo_restante !== undefined && cotacao.saldo_restante !== cotacao.valor_calculado && (
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-gray-500 uppercase">Saldo Restante:</span>
+                          <span className="text-sm font-bold text-[#FFBF00]">
+                            R$ {cotacao.saldo_restante.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      )}
 
                       {(cotacao as any).os_vinculada && (
                         <div className="space-y-1 mt-3 pt-3 border-t border-gray-700">
