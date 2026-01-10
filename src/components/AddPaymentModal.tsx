@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, DollarSign, Upload, CreditCard, Clock, Save, CheckCircle, FileText, AlertCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -15,6 +15,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const { usuario } = useAuth();
   const [loading, setLoading] = useState(false);
   const [taxasMaquina, setTaxasMaquina] = useState<any[]>([]);
+  const isSubmitting = useRef(false);
 
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>('pix');
   const [valor, setValor] = useState('');
@@ -137,6 +138,12 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const handleSubmit = async () => {
     if (!validarFormulario()) return;
 
+    // Proteção contra duplo submit
+    if (isSubmitting.current || loading) {
+      return;
+    }
+
+    isSubmitting.current = true;
     setLoading(true);
 
     try {
@@ -201,8 +208,10 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
       onClose();
     } catch (error: any) {
       alert(`❌ Erro ao registrar pagamento: ${error.message}`);
+      isSubmitting.current = false;
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, DollarSign, Upload, Save, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -16,6 +16,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
   const { usuario } = useAuth();
   const [loading, setLoading] = useState(false);
   const [taxasMaquina, setTaxasMaquina] = useState<any[]>([]);
+  const isSubmitting = useRef(false);
 
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>(payment?.forma_pagamento || 'pix');
   const [valor, setValor] = useState(payment?.valor?.toString() || '');
@@ -52,6 +53,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
       setObservacoes(payment.observacoes || '');
       setTrocarComprovante(false);
       setComprovante(null);
+      isSubmitting.current = false;
     }
   }, [isOpen, payment]);
 
@@ -149,6 +151,12 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
   const handleSubmit = async () => {
     if (!validarFormulario()) return;
 
+    // Proteção contra duplo submit
+    if (isSubmitting.current || loading) {
+      return;
+    }
+
+    isSubmitting.current = true;
     setLoading(true);
 
     try {
@@ -201,8 +209,10 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
       onClose();
     } catch (error: any) {
       alert(`❌ Erro ao atualizar pagamento: ${error.message}`);
+      isSubmitting.current = false;
     } finally {
       setLoading(false);
+      isSubmitting.current = false;
     }
   };
 
