@@ -719,10 +719,66 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
-      // Nota: NÃO sincronizamos os_pecas de volta para cotacoes_pecas porque:
-      // - cotacoes_pecas = peças do orçamento com valores comerciais (mantidos intactos)
-      // - os_pecas = peças físicas do estoque (são deletadas com a OS via CASCADE)
-      // - Peças GSPN da API = preservadas automaticamente via os_id=NULL e reconectadas depois
+      // Sincroniza peças e serviços de volta para a cotação
+      // (garante que peças adicionadas/alteradas na OS não sejam perdidas)
+      const { data: pecasOS } = await supabase
+        .from('os_pecas')
+        .select('*')
+        .eq('os_id', osId)
+        .neq('status', 'gspn'); // Exclui peças GSPN que serão preservadas separadamente
+
+      const { data: servicosOS } = await supabase
+        .from('os_servicos')
+        .select('*')
+        .eq('os_id', osId);
+
+      // Se a cotação já existia (refazer), deleta peças/serviços antigos para sincronizar
+      if (cotacaoJaExistia) {
+        await supabase
+          .from('cotacoes_pecas')
+          .delete()
+          .eq('cotacao_id', cotacaoId);
+
+        await supabase
+          .from('cotacoes_servicos')
+          .delete()
+          .eq('cotacao_id', cotacaoId);
+      }
+
+      // Insere peças atualizadas da OS (se houver)
+      if (pecasOS && pecasOS.length > 0) {
+        await supabase
+          .from('cotacoes_pecas')
+          .insert(
+            pecasOS.map(peca => ({
+              cotacao_id: cotacaoId,
+              pn: peca.pn,
+              descricao: peca.descricao,
+              quantidade: peca.quantidade,
+              valor_base_gspn: 0,
+              valor_final_unitario: peca.valor_unitario || 0,
+              valor_total: peca.valor_total || 0,
+              markup_aplicado: 0
+            }))
+          );
+      }
+
+      // Insere serviços atualizados da OS (se houver)
+      if (servicosOS && servicosOS.length > 0) {
+        await supabase
+          .from('cotacoes_servicos')
+          .insert(
+            servicosOS.map(servico => ({
+              cotacao_id: cotacaoId,
+              servico_id: servico.servico_id,
+              descricao: servico.descricao,
+              quantidade: servico.quantidade,
+              valor_unitario: servico.valor_unitario,
+              valor_total: servico.valor_total,
+              observacao: servico.observacao
+            }))
+          );
+      }
 
       // Vincula pagamentos à cotação antes de deletar OS
       // (constraint exige que pagamentos tenham os_id OU cotacao_id)
