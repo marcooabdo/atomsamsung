@@ -1263,12 +1263,13 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         }
       }
 
-      // Salvar pagamentos temporários (sempre que houver)
-      if (pagamentosTemporarios.length > 0) {
+      // Salvar pagamentos temporários (somente os que não foram salvos ainda)
+      const pagamentosParaSalvar = pagamentosTemporarios.filter(p => !p.id);
+      if (pagamentosParaSalvar.length > 0) {
         let pagamentosSalvosCount = 0;
         const pagamentosFalhados: string[] = [];
 
-        for (const pagamento of pagamentosTemporarios) {
+        for (const pagamento of pagamentosParaSalvar) {
           try {
             const file = pagamento.comprovante_file;
             if (!file) continue;
@@ -1318,7 +1319,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         }
 
         if (pagamentosFalhados.length > 0) {
-          alert(`Cotação salva! Porém ${pagamentosFalhados.length} de ${pagamentosTemporarios.length} pagamento(s) falharam:\n${pagamentosFalhados.join(', ')}`);
+          alert(`Cotação salva! Porém ${pagamentosFalhados.length} de ${pagamentosParaSalvar.length} pagamento(s) falharam:\n${pagamentosFalhados.join(', ')}`);
         }
       }
 
