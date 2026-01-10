@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -2269,17 +2269,31 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
               {abaAtiva === 'estoque' && (
                 <div className="space-y-6">
-                  <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
-                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Adicionar Nova Requisição
-                    </h3>
-                    <p className="text-xs text-gray-400 mt-2">
-                      Requisite peças do estoque. O almoxarife receberá e atenderá sua requisição.
-                    </p>
-                  </div>
+                  {os?.coluna_kanban === 'diagnostico' && (
+                    <div className="bg-[#FFBF00]/10 border border-[#FFBF00]/30 rounded-lg p-4">
+                      <h3 className="text-sm font-bold text-[#FFBF00] uppercase tracking-wider flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Requisição Bloqueada
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-2">
+                        OS em DIAGNÓSTICO. Conclua a análise técnica para liberar requisição de peças.
+                      </p>
+                    </div>
+                  )}
 
-                  <div className="premium-card p-4">
+                  {os?.coluna_kanban !== 'diagnostico' && (
+                    <>
+                      <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+                        <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+                          <Package className="w-4 h-4" />
+                          Adicionar Nova Requisição
+                        </h3>
+                        <p className="text-xs text-gray-400 mt-2">
+                          Requisite peças do estoque. O almoxarife receberá e atenderá sua requisição.
+                        </p>
+                      </div>
+
+                      <div className="premium-card p-4">
                     <div className="grid grid-cols-4 gap-3">
                       <div className="relative">
                         <label className="text-xs text-gray-400 uppercase block mb-2">
@@ -2600,18 +2614,22 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 </div>
                               </div>
 
-                              <button
-                                onClick={() => handleRequisitarPeca(peca)}
-                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                              >
-                                <Send className="w-3 h-3" />
-                                REQUISITAR
-                              </button>
+                              {os?.coluna_kanban !== 'diagnostico' && (
+                                <button
+                                  onClick={() => handleRequisitarPeca(peca)}
+                                  className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                >
+                                  <Send className="w-3 h-3" />
+                                  REQUISITAR
+                                </button>
+                              )}
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
+                  )}
+                    </>
                   )}
                 </div>
               )}

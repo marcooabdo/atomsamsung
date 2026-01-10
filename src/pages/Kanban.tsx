@@ -5,6 +5,7 @@ import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
 import { JobStatusCard } from '../components/JobStatusCard';
+import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
@@ -52,6 +53,8 @@ export function Kanban() {
   const [mostrarStatusSamsung, setMostrarStatusSamsung] = useState(false);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
   const [hasJobRunning, setHasJobRunning] = useState(false);
+  const [showAnaliseModal, setShowAnaliseModal] = useState(false);
+  const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const autoScrollInterval = useRef<number | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
@@ -229,6 +232,11 @@ export function Kanban() {
   };
 
   const handleDragStart = (e: React.DragEvent, os: OS) => {
+    if (os.coluna_kanban === 'diagnostico') {
+      e.preventDefault();
+      alert('⚠️ MOVIMENTAÇÃO BLOQUEADA\n\nOS em DIAGNÓSTICO não pode ser movida.\n\nPara liberar:\n• Clique em "Análise Concluída" no card da OS\n• Descreva a análise realizada\n• A OS será movida automaticamente para "Aguardando Cotação"');
+      return;
+    }
     setDraggedCard(os);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -1144,6 +1152,31 @@ export function Kanban() {
                                 </div>
                               </div>
                             ))}
+
+                            {coluna.id === 'diagnostico' && (
+                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSelectedOSForAnalise({
+                                      id: os.id,
+                                      numero: os.numero_os_samsung || os.numero_os_interna || 'S/N'
+                                    });
+                                    setShowAnaliseModal(true);
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
+                                    border: '1px solid #00D4FF',
+                                    color: '#00D4FF',
+                                    boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                                  }}
+                                >
+                                  <CheckCircle className="w-3.5 h-3.5" />
+                                  ANÁLISE CONCLUÍDA
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                       ))}
@@ -1206,6 +1239,19 @@ export function Kanban() {
           onClose={() => setCriarOSLP(false)}
           onReload={loadKanbanData}
           mode="create"
+        />
+      )}
+
+      {showAnaliseModal && selectedOSForAnalise && (
+        <AnaliseConcluidaModal
+          isOpen={showAnaliseModal}
+          osId={selectedOSForAnalise.id}
+          osNumero={selectedOSForAnalise.numero}
+          onClose={() => {
+            setShowAnaliseModal(false);
+            setSelectedOSForAnalise(null);
+          }}
+          onSuccess={loadKanbanData}
         />
       )}
     </div>

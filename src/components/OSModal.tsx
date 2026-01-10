@@ -2264,7 +2264,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                           {/* Botões conforme status */}
                           <div className="flex gap-2">
-                            {!requisicao && (
+                            {!requisicao && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2348,7 +2348,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicao?.status === 'reprovada' && !temNovaRequisicaoPendente && (
+                            {!criandoRequisicao && requisicao?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicao)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2363,7 +2363,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && (
+                            {!criandoRequisicao && requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicao)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
