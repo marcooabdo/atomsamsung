@@ -6,6 +6,7 @@ import { DevolucaoModal } from './DevolucaoModal';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
+import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import type { Database } from '../lib/database.types';
@@ -89,6 +90,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [convertendo, setConvertendo] = useState(false);
   const [mostrarModalDevolucao, setMostrarModalDevolucao] = useState(false);
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
+  const [mostrarModalAnalise, setMostrarModalAnalise] = useState(false);
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
@@ -2092,7 +2094,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       </div>
                     </div>
                     <button
-                      onClick={handleAnaliseConcluida}
+                      onClick={() => setMostrarModalAnalise(true)}
                       disabled={finalizandoAnalise}
                       className="neon-button flex items-center gap-2 text-sm"
                       style={{
@@ -2907,6 +2909,19 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             descricao: requisicaoSelecionada.descricao
           }}
           tipoOS={os?.tipo_os || 'OW'}
+        />
+      )}
+
+      {mostrarModalAnalise && os && (
+        <AnaliseConcluidaModal
+          isOpen={mostrarModalAnalise}
+          osId={os.id}
+          osNumero={os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+          onClose={() => setMostrarModalAnalise(false)}
+          onSuccess={() => {
+            loadOS();
+            onReload?.();
+          }}
         />
       )}
     </div>
