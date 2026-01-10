@@ -60,6 +60,7 @@ interface PecaItem {
   observacao: string;
   origem?: string;
   valor_unitario?: number;
+  is_gspn?: boolean; // Marca se é peça da API Samsung GSPN
 }
 
 interface PNSugestao {
@@ -302,7 +303,8 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         quantidade: p.quantidade,
         valor_gspn: p.valor_base_gspn,
         valor_final: p.valor_final_unitario,
-        observacao: p.observacao || ''
+        observacao: p.observacao || '',
+        is_gspn: p.is_gspn || false
       }));
 
       setPecas(pecasCarregadas);
@@ -1096,7 +1098,8 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                 markup_aplicado: valorComMarkup - peca.valor_gspn,
                 valor_final_unitario: valorComMarkup,
                 valor_total: valorComMarkup * peca.quantidade,
-                observacao: peca.observacao || null
+                observacao: peca.observacao || null,
+                is_gspn: peca.is_gspn || false
               })
               .eq('id', peca.id);
           }
@@ -1172,7 +1175,8 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
               markup_aplicado: valorComMarkup - p.valor_gspn,
               valor_final_unitario: valorComMarkup,
               valor_total: valorComMarkup * p.quantidade,
-              observacao: p.observacao || null
+              observacao: p.observacao || null,
+              is_gspn: p.is_gspn || false
             };
           });
 
@@ -2252,7 +2256,22 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                     const config = pecaInfo ? statusConfig[pecaInfo.status] : null;
 
                     return (
-                    <div key={peca.id} className={`premium-card p-4 ${isPecaBloqueada && config ? `border-2` : ''}`} style={isPecaBloqueada && config ? { backgroundColor: config.bg, borderColor: `${config.color}40` } : {}}>
+                    <div key={peca.id} className={`premium-card p-4 ${isPecaBloqueada && config ? `border-2` : ''} ${peca.is_gspn ? 'border-l-4 border-blue-400' : ''}`} style={isPecaBloqueada && config ? { backgroundColor: config.bg, borderColor: `${config.color}40` } : {}}>
+                      {peca.is_gspn && (
+                        <div className="flex items-center gap-2 mb-3 pb-3 border-b border-blue-400/20">
+                          <span className="text-base">📡</span>
+                          <span
+                            className="px-2 py-1 rounded text-xs font-bold uppercase flex-1"
+                            style={{
+                              backgroundColor: '#3B82F620',
+                              color: '#60A5FA',
+                              border: '1px solid #3B82F640'
+                            }}
+                          >
+                            PEÇA API GSPN - Não pode ser removida (apenas editada)
+                          </span>
+                        </div>
+                      )}
                       {isPecaBloqueada && config && (
                         <div className="flex items-center gap-2 mb-3 pb-3 border-b" style={{ borderColor: `${config.color}20` }}>
                           <span className="text-base">{config.icon}</span>
@@ -2364,14 +2383,23 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                         </div>
 
                         <div className="flex items-end">
-                          <button
-                            onClick={() => handleRemovePeca(peca.id)}
-                            className="p-2 hover:bg-red-500/10 rounded-lg transition-colors w-full disabled:opacity-30 disabled:cursor-not-allowed"
-                            disabled={isPecaBloqueada}
-                            title={isPecaBloqueada ? 'Esta peça está bloqueada e não pode ser removida até resolução no Kanban ou Estoque' : ''}
-                          >
-                            <Trash2 className="w-4 h-4 text-red-400 mx-auto" />
-                          </button>
+                          {!peca.is_gspn && (
+                            <button
+                              onClick={() => handleRemovePeca(peca.id)}
+                              className="p-2 hover:bg-red-500/10 rounded-lg transition-colors w-full disabled:opacity-30 disabled:cursor-not-allowed"
+                              disabled={isPecaBloqueada}
+                              title={isPecaBloqueada ? 'Esta peça está bloqueada e não pode ser removida até resolução no Kanban ou Estoque' : ''}
+                            >
+                              <Trash2 className="w-4 h-4 text-red-400 mx-auto" />
+                            </button>
+                          )}
+                          {peca.is_gspn && (
+                            <div className="flex items-center justify-center w-full p-2">
+                              <span className="text-xs font-bold text-blue-400 uppercase" title="Peça da API Samsung GSPN - Não pode ser removida">
+                                API GSPN
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         <div className="col-span-6 flex justify-between items-center">

@@ -719,13 +719,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
-      // Sincroniza peças e serviços de volta para a cotação
+      // Sincroniza TODAS as peças de volta para a cotação (incluindo GSPN)
       // (garante que peças adicionadas/alteradas na OS não sejam perdidas)
       const { data: pecasOS } = await supabase
         .from('os_pecas')
         .select('*')
-        .eq('os_id', osId)
-        .neq('status', 'gspn'); // Exclui peças GSPN que serão preservadas separadamente
+        .eq('os_id', osId);
 
       const { data: servicosOS } = await supabase
         .from('os_servicos')
@@ -745,7 +744,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           .eq('cotacao_id', cotacaoId);
       }
 
-      // Insere peças atualizadas da OS (se houver)
+      // Insere peças atualizadas da OS (se houver), incluindo peças GSPN
       if (pecasOS && pecasOS.length > 0) {
         await supabase
           .from('cotacoes_pecas')
@@ -755,10 +754,11 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
               pn: peca.pn,
               descricao: peca.descricao,
               quantidade: peca.quantidade,
-              valor_base_gspn: 0,
+              valor_base_gspn: peca.valor_base_gspn || 0,
               valor_final_unitario: peca.valor_unitario || 0,
               valor_total: peca.valor_total || 0,
-              markup_aplicado: 0
+              markup_aplicado: 0,
+              is_gspn: peca.status === 'gspn' // Marca peças da API GSPN
             }))
           );
       }
