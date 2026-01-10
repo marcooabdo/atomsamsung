@@ -164,7 +164,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
           cotacao_id: cotacao?.id || null,
           unidade_id: os.unidade_id,
           forma_pagamento: formaPagamento,
-          valor: valorBruto,
+          valor: valorLiquido, // Campo legado - usar valor líquido
           valor_bruto: valorBruto,
           valor_liquido: valorLiquido,
           parcelamento: isCredito ? parseInt(parcelamento) : 1,

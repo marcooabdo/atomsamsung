@@ -984,12 +984,12 @@ export function Kanban() {
                                           <span className="text-[#39FF14] font-mono">R$ {(os.valor_pago || 0).toFixed(2)}</span>
                                         </div>
                                       )}
-                                      {os.saldo_restante > 0 && (
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-gray-500">Saldo:</span>
-                                          <span className="text-[#FFBF00] font-mono">R$ {(os.saldo_restante || 0).toFixed(2)}</span>
-                                        </div>
-                                      )}
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-gray-500">Saldo:</span>
+                                        <span className={`font-mono font-bold ${(os.saldo_restante || 0) > 0 ? 'text-[#FFBF00]' : 'text-[#39FF14]'}`}>
+                                          R$ {(os.saldo_restante || 0).toFixed(2)}
+                                        </span>
+                                      </div>
                                     </div>
                                   </div>
                                 </div>
