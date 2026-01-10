@@ -1,6 +1,12 @@
 import jsPDF from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import JsBarcode from 'jsbarcode';
+
+declare module 'jspdf' {
+  interface jsPDF {
+    autoTable: (options: any) => jsPDF;
+  }
+}
 
 interface OSData {
   numero_os_samsung: string | null;
@@ -162,7 +168,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     ['', '', 'Tipo de Serviço', tipoServico]
   ];
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [],
     body: tableData,
@@ -193,7 +199,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     ['', '', 'Retornado por/Data', '☐']
   ];
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [],
     body: garantiaData,
@@ -217,7 +223,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   yPos += 5;
 
-  (doc as any).autoTable({
+  autoTable(doc, {
     startY: yPos,
     head: [],
     body: [
@@ -258,7 +264,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       `R$ ${peca.valor_total.toFixed(2)}`
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['PN', 'Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
       body: pecasData,
@@ -286,7 +292,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       `R$ ${servico.valor_total.toFixed(2)}`
     ]);
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [['Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
       body: servicosData,
@@ -315,7 +321,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
                  osData.status_pagamento === 'parcial' ? 'PARCIAL' : 'PENDENTE']
     ];
 
-    (doc as any).autoTable({
+    autoTable(doc, {
       startY: yPos,
       head: [],
       body: pagamentoData,
