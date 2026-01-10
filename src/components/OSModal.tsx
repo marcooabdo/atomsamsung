@@ -535,12 +535,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .from('os')
         .select(`
           *,
-          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone),
-          cotacao:cotacoes!os_cotacao_id_fkey(
-            numero_cotacao,
-            cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total)
-          ),
-          cotacoes_servicos(descricao, quantidade, valor_unitario, valor_total)
+          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone)
         `)
         .eq('id', osId)
         .maybeSingle();
@@ -550,6 +545,19 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         alert(`Erro ao buscar dados da OS: ${osError?.message || 'Desconhecido'}`);
         return;
       }
+
+      const { data: cotacaoPecas } = await supabase
+        .from('cotacoes_pecas')
+        .select('pn, descricao, quantidade, valor_final_unitario, valor_total')
+        .eq('os_id', osId);
+
+      const { data: cotacaoServicos } = await supabase
+        .from('cotacoes_servicos')
+        .select('descricao, quantidade, valor_unitario, valor_total')
+        .eq('os_id', osId);
+
+      (osData as any).cotacoes_pecas = cotacaoPecas || [];
+      (osData as any).cotacoes_servicos = cotacaoServicos || [];
 
       const { data: pdfConfig, error: configError } = await supabase
         .from('configuracoes_pdf_os')

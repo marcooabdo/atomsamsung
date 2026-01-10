@@ -34,16 +34,13 @@ interface OSData {
     samsung_asccode: string | null;
     telefone: string | null;
   };
-  cotacao?: {
-    numero_cotacao: string;
-    cotacoes_pecas?: Array<{
-      pn: string;
-      descricao: string;
-      quantidade: number;
-      valor_final_unitario: number;
-      valor_total: number;
-    }>;
-  };
+  cotacoes_pecas?: Array<{
+    pn: string;
+    descricao: string;
+    quantidade: number;
+    valor_final_unitario: number;
+    valor_total: number;
+  }>;
   cotacoes_servicos?: Array<{
     descricao: string;
     quantidade: number;
@@ -94,16 +91,17 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   const pageHeight = doc.internal.pageSize.getHeight();
   let yPos = 20;
 
-  doc.setFontSize(24);
+  doc.setFontSize(26);
   doc.setFont('helvetica', 'bold');
-  doc.setTextColor(0, 0, 0);
+  doc.setTextColor(0, 114, 198);
   doc.text('SAMSUNG', 20, yPos);
 
-  doc.setFontSize(18);
-  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(20);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(0, 0, 0);
   doc.text('Ordem de Serviço', pageWidth / 2, yPos, { align: 'center' });
 
-  yPos += 15;
+  yPos += 12;
 
   const numeroOS = osData.numero_os_samsung || osData.numero_os_interna || 'N/A';
   const centroReparo = osData.unidade.samsung_asccode
@@ -111,18 +109,14 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     : osData.unidade.nome;
   const centralAtendimento = osData.unidade.telefone || '';
 
-  doc.setFontSize(9);
+  doc.setFontSize(10);
   doc.setFont('helvetica', 'normal');
   doc.text(`SO No.: ${numeroOS}`, 20, yPos);
-  yPos += 5;
+  yPos += 6;
   doc.text(`Centro de Reparo: ${centroReparo}`, 20, yPos);
-  yPos += 5;
-  doc.text(`ASSISTANCE LTDA`, 20, yPos);
-  yPos += 5;
+  yPos += 6;
   doc.text(`Central de Atendimento: ${centralAtendimento}`, 20, yPos);
-  yPos += 5;
-
-  yPos = 50;
+  yPos += 10;
 
   const enderecoPartes = [
     osData.cliente_endereco,
@@ -156,23 +150,23 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     body: tableData,
     theme: 'grid',
     styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      lineColor: [0, 0, 0],
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [200, 200, 200],
       lineWidth: 0.1
     },
     columnStyles: {
-      0: { cellWidth: 40, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 35, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      3: { cellWidth: 50 }
+      0: { cellWidth: 42, fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8 },
+      1: { cellWidth: 58 },
+      2: { cellWidth: 38, fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8 },
+      3: { cellWidth: 47 }
     },
     didDrawPage: function(data: any) {
       yPos = data.cursor.y;
     }
   });
 
-  yPos += 5;
+  yPos += 3;
 
   autoTable(doc, {
     startY: yPos,
@@ -182,21 +176,21 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     ],
     theme: 'grid',
     styles: {
-      fontSize: 8,
-      cellPadding: 2,
-      lineColor: [0, 0, 0],
+      fontSize: 9,
+      cellPadding: 3,
+      lineColor: [200, 200, 200],
       lineWidth: 0.1
     },
     columnStyles: {
-      0: { cellWidth: 40, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      1: { cellWidth: 145 }
+      0: { cellWidth: 42, fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8 },
+      1: { cellWidth: 143 }
     },
     didDrawPage: function(data: any) {
       yPos = data.cursor.y;
     }
   });
 
-  yPos += 5;
+  yPos += 3;
 
   autoTable(doc, {
     startY: yPos,
@@ -209,29 +203,30 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     ],
     theme: 'grid',
     styles: {
-      fontSize: 8,
+      fontSize: 9,
       cellPadding: 3,
-      lineColor: [0, 0, 0],
+      lineColor: [200, 200, 200],
       lineWidth: 0.1
     },
     columnStyles: {
-      0: { cellWidth: 40, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      1: { cellWidth: 145 }
+      0: { cellWidth: 42, fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8 },
+      1: { cellWidth: 143 }
     },
     didDrawPage: function(data: any) {
       yPos = data.cursor.y;
     }
   });
 
-  yPos += 10;
+  yPos += 8;
 
-  if (osData.cotacao?.cotacoes_pecas && osData.cotacao.cotacoes_pecas.length > 0) {
-    doc.setFontSize(10);
+  if (osData.cotacoes_pecas && osData.cotacoes_pecas.length > 0) {
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
     doc.text('PEÇAS', 20, yPos);
     yPos += 5;
 
-    const pecasData = osData.cotacao.cotacoes_pecas.map(peca => [
+    const pecasData = osData.cotacoes_pecas.map(peca => [
       peca.pn,
       peca.descricao,
       peca.quantidade.toString(),
@@ -239,7 +234,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       `R$ ${peca.valor_total.toFixed(2)}`
     ]);
 
-    const totalPecas = osData.cotacao.cotacoes_pecas.reduce((sum, peca) => sum + peca.valor_total, 0);
+    const totalPecas = osData.cotacoes_pecas.reduce((sum, peca) => sum + peca.valor_total, 0);
 
     autoTable(doc, {
       startY: yPos,
@@ -247,7 +242,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       body: pecasData,
       foot: [['', '', '', 'TOTAL PEÇAS:', `R$ ${totalPecas.toFixed(2)}`]],
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
       footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
       didDrawPage: function(data: any) {
@@ -255,12 +250,13 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       }
     });
 
-    yPos += 5;
+    yPos += 6;
   }
 
   if (osData.cotacoes_servicos && osData.cotacoes_servicos.length > 0) {
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
     doc.text('SERVIÇOS', 20, yPos);
     yPos += 5;
 
@@ -271,24 +267,29 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       `R$ ${servico.valor_total.toFixed(2)}`
     ]);
 
+    const totalServicos = osData.cotacoes_servicos.reduce((sum, servico) => sum + servico.valor_total, 0);
+
     autoTable(doc, {
       startY: yPos,
       head: [['Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
       body: servicosData,
+      foot: [['', '', 'TOTAL SERVIÇOS:', `R$ ${totalServicos.toFixed(2)}`]],
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 9, cellPadding: 2.5 },
       headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+      footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
       didDrawPage: function(data: any) {
         yPos = data.cursor.y;
       }
     });
 
-    yPos += 5;
+    yPos += 6;
   }
 
   if (osData.valor_total && osData.valor_total > 0) {
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0, 0, 0);
     doc.text('INFORMAÇÕES DE PAGAMENTO', 20, yPos);
     yPos += 5;
 
@@ -305,9 +306,9 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       head: [],
       body: pagamentoData,
       theme: 'grid',
-      styles: { fontSize: 8, cellPadding: 2 },
+      styles: { fontSize: 9, cellPadding: 2.5 },
       columnStyles: {
-        0: { cellWidth: 50, fontStyle: 'bold', fillColor: [240, 240, 240] },
+        0: { cellWidth: 50, fontStyle: 'bold', fillColor: [245, 245, 245], fontSize: 8 },
         1: { cellWidth: 135 }
       },
       didDrawPage: function(data: any) {
