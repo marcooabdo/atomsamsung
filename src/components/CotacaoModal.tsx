@@ -1729,13 +1729,14 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
 
         if (pagamentoError) throw pagamentoError;
 
-        const pagamentoCompleto = {
-          ...paymentData,
-          comprovante_url: urlData.publicUrl,
-          temp_id: Date.now()
-        };
+        const { data: pagamentosAtualizados } = await supabase
+          .from('pagamentos')
+          .select('*')
+          .eq('cotacao_id', cotacaoId)
+          .is('os_id', null)
+          .order('created_at', { ascending: false });
 
-        setPagamentosTemporarios(prev => [...prev, pagamentoCompleto]);
+        setPagamentosTemporarios(pagamentosAtualizados || []);
         setShowAddPaymentModal(false);
 
         alert('✅ Pagamento salvo com sucesso!');
