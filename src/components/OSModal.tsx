@@ -536,15 +536,18 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .select(`
           *,
           unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode),
-          cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao),
-          cotacao_pecas:cotacoes_pecas!cotacao_id(pn, descricao, quantidade, valor_final_unitario, valor_total),
-          cotacoes_servicos:cotacoes_servicos!os_id(descricao, quantidade, valor_unitario, valor_total)
+          cotacao:cotacoes!os_cotacao_id_fkey(
+            numero_cotacao,
+            cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total)
+          ),
+          cotacoes_servicos(descricao, quantidade, valor_unitario, valor_total)
         `)
         .eq('id', osId)
         .maybeSingle();
 
       if (osError || !osData) {
-        alert('Erro ao buscar dados da OS');
+        console.error('Erro ao buscar OS:', osError);
+        alert(`Erro ao buscar dados da OS: ${osError?.message || 'Desconhecido'}`);
         return;
       }
 

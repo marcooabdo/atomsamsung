@@ -28,14 +28,14 @@ interface OSData {
   };
   cotacao?: {
     numero_cotacao: string;
+    cotacoes_pecas?: Array<{
+      pn: string;
+      descricao: string;
+      quantidade: number;
+      valor_final_unitario: number;
+      valor_total: number;
+    }>;
   };
-  cotacao_pecas?: Array<{
-    pn: string;
-    descricao: string;
-    quantidade: number;
-    valor_final_unitario: number;
-    valor_total: number;
-  }>;
   cotacoes_servicos?: Array<{
     descricao: string;
     quantidade: number;
@@ -244,13 +244,13 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   yPos += 10;
 
-  if (osData.cotacao_pecas && osData.cotacao_pecas.length > 0) {
+  if (osData.cotacao?.cotacoes_pecas && osData.cotacao.cotacoes_pecas.length > 0) {
     doc.setFontSize(10);
     doc.setFont('helvetica', 'bold');
     doc.text('PEÇAS', 20, yPos);
     yPos += 5;
 
-    const pecasData = osData.cotacao_pecas.map(peca => [
+    const pecasData = osData.cotacao.cotacoes_pecas.map(peca => [
       peca.pn,
       peca.descricao,
       peca.quantidade.toString(),
