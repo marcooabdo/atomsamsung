@@ -1,6 +1,5 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import JsBarcode from 'jsbarcode';
 
 declare module 'jspdf' {
   interface jsPDF {
@@ -13,6 +12,7 @@ interface OSData {
   numero_os_interna: string | null;
   cliente_nome: string;
   cliente_endereco: string | null;
+  cliente_numero: string | null;
   cliente_bairro: string | null;
   cliente_cidade: string | null;
   cliente_estado: string | null;
@@ -23,6 +23,7 @@ interface OSData {
   aparelho_linha: string | null;
   aparelho_imei: string | null;
   defeito_relatado: string | null;
+  observacoes_internas: string | null;
   tipo_atendimento: 'IH' | 'CI';
   tipo_os: 'LP' | 'OW';
   tipo_orcamento: string | null;
@@ -31,6 +32,7 @@ interface OSData {
   unidade: {
     nome: string;
     samsung_asccode: string | null;
+    telefone_atendimento: string | null;
   };
   cotacao?: {
     numero_cotacao: string;
@@ -61,18 +63,6 @@ interface PDFConfig {
   observacoes_gerais: string;
   logo_url: string | null;
   rodape_personalizado: string | null;
-}
-
-function generateBarcode(text: string): string {
-  const canvas = document.createElement('canvas');
-  JsBarcode(canvas, text, {
-    format: 'CODE128',
-    displayValue: false,
-    height: 40,
-    width: 1,
-    margin: 0
-  });
-  return canvas.toDataURL('image/png');
 }
 
 function splitTextToLines(text: string, maxCharsPerLine: number): string[] {
@@ -117,8 +107,9 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   const numeroOS = osData.numero_os_samsung || osData.numero_os_interna || 'N/A';
   const centroReparo = osData.unidade.samsung_asccode
-    ? `${osData.unidade.samsung_asccode} - ${osData.unidade.nome}`
+    ? `${osData.unidade.samsung_asccode} GROUP GLOBAL`
     : osData.unidade.nome;
+  const centralAtendimento = osData.unidade.telefone_atendimento || '';
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');
@@ -128,27 +119,19 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   yPos += 5;
   doc.text(`ASSISTANCE LTDA`, 20, yPos);
   yPos += 5;
-  doc.text(`Central de Atendimento:`, 20, yPos);
+  doc.text(`Central de Atendimento: ${centralAtendimento}`, 20, yPos);
   yPos += 5;
-  doc.text(`ASC Job No.: ${numeroOS}`, 20, yPos);
 
-  if (numeroOS && numeroOS !== 'N/A') {
-    try {
-      const barcodeImg = generateBarcode(numeroOS);
-      doc.addImage(barcodeImg, 'PNG', pageWidth / 2 - 30, 35, 60, 12);
-    } catch (error) {
-      console.error('Erro ao gerar código de barras:', error);
-    }
-  }
+  yPos = 50;
 
-  yPos = 60;
-
-  const enderecoCompleto = [
+  const enderecoPartes = [
     osData.cliente_endereco,
+    osData.cliente_numero ? `Nº ${osData.cliente_numero}` : null,
     osData.cliente_bairro,
     osData.cliente_cidade,
     osData.cliente_estado
-  ].filter(Boolean).join(', ');
+  ].filter(Boolean);
+  const enderecoCompleto = enderecoPartes.join(', ');
 
   const dataAbertura = osData.data_abertura
     ? new Date(osData.data_abertura).toLocaleDateString('pt-BR')
@@ -162,10 +145,9 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   const tableData = [
     ['Nome Consumidor', osData.cliente_nome, 'Data de Solicitação', dataAbertura],
-    ['Endereço', enderecoCompleto, 'Código do Engenheiro', ''],
-    ['Telefone', osData.cliente_telefone || '', 'e-MAIL', osData.cliente_email || ''],
-    ['Modelo', osData.aparelho_modelo || '', 'No. de Série (IMEI)', osData.aparelho_imei || ''],
-    ['', '', 'Tipo de Serviço', tipoServico]
+    ['Endereço', enderecoCompleto, 'e-MAIL', osData.cliente_email || ''],
+    ['Telefone', osData.cliente_telefone || '', 'Tipo de Serviço', tipoServico],
+    ['Modelo', osData.aparelho_modelo || '', 'No. de Série (IMEI)', osData.aparelho_imei || '']
   ];
 
   autoTable(doc, {
@@ -192,17 +174,12 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   yPos += 5;
 
-  const garantiaData = [
-    ['Status da Garantia', statusGarantia, 'Recebimento de reparo', '☐'],
-    ['', '', 'Reparo Completo', '☐'],
-    ['', '', 'Produto entregue', '☐'],
-    ['', '', 'Retornado por/Data', '☐']
-  ];
-
   autoTable(doc, {
     startY: yPos,
     head: [],
-    body: garantiaData,
+    body: [
+      ['Status da Garantia', statusGarantia]
+    ],
     theme: 'grid',
     styles: {
       fontSize: 8,
@@ -212,9 +189,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     },
     columnStyles: {
       0: { cellWidth: 40, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      1: { cellWidth: 60 },
-      2: { cellWidth: 35, fontStyle: 'bold', fillColor: [240, 240, 240] },
-      3: { cellWidth: 50 }
+      1: { cellWidth: 145 }
     },
     didDrawPage: function(data: any) {
       yPos = data.cursor.y;
@@ -230,7 +205,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       ['Acessório', ''],
       ['Descrição do defeito', osData.defeito_relatado || 'SEM IMAGEM'],
       ['Descrição do Reparo', ''],
-      ['Observação', '']
+      ['Observações', osData.observacoes_internas || '']
     ],
     theme: 'grid',
     styles: {
@@ -264,13 +239,17 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       `R$ ${peca.valor_total.toFixed(2)}`
     ]);
 
+    const totalPecas = osData.cotacao.cotacoes_pecas.reduce((sum, peca) => sum + peca.valor_total, 0);
+
     autoTable(doc, {
       startY: yPos,
       head: [['PN', 'Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
       body: pecasData,
+      foot: [['', '', '', 'TOTAL PEÇAS:', `R$ ${totalPecas.toFixed(2)}`]],
       theme: 'grid',
       styles: { fontSize: 8, cellPadding: 2 },
       headStyles: { fillColor: [240, 240, 240], textColor: [0, 0, 0], fontStyle: 'bold' },
+      footStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0], fontStyle: 'bold' },
       didDrawPage: function(data: any) {
         yPos = data.cursor.y;
       }

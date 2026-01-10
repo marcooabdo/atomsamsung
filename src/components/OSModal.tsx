@@ -535,7 +535,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .from('os')
         .select(`
           *,
-          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode),
+          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone_atendimento),
           cotacao:cotacoes!os_cotacao_id_fkey(
             numero_cotacao,
             cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total)
@@ -1946,7 +1946,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.defeito_relatado || '-'}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 uppercase">Observações Internas</label>
+                    <label className="text-xs text-gray-500 uppercase">Observações</label>
                     <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.observacoes_internas || '-'}</p>
                   </div>
                 </div>
