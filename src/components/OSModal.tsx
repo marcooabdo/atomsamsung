@@ -617,22 +617,30 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         const { data: novaCotacao, error: cotacaoError } = await supabase
           .from('cotacoes')
           .insert({
+            numero_os_samsung: osData.numero_os_samsung,
             unidade_id: osData.unidade_id,
             tipo_os: osData.tipo_os,
             tipo_atendimento: osData.tipo_atendimento,
+            tipo_orcamento: osData.tipo_orcamento,
             cliente_nome: osData.cliente_nome,
             cliente_telefone: osData.cliente_telefone,
+            cliente_email: osData.cliente_email,
             cliente_cpf_cnpj: osData.cliente_cpf_cnpj,
             cliente_endereco: osData.cliente_endereco,
+            cliente_cep: osData.cliente_cep,
+            cliente_logradouro: osData.cliente_logradouro,
+            cliente_numero: osData.cliente_numero,
+            cliente_complemento: osData.cliente_complemento,
             cliente_bairro: osData.cliente_bairro,
             cliente_cidade: osData.cliente_cidade,
             cliente_estado: osData.cliente_estado,
-            cliente_cep: osData.cliente_cep,
             aparelho_marca: osData.aparelho_marca,
             aparelho_linha: osData.aparelho_linha,
             aparelho_modelo: osData.aparelho_modelo,
             aparelho_numero_serie: osData.aparelho_numero_serie,
+            aparelho_imei: osData.aparelho_imei,
             defeito_relatado: osData.defeito_relatado,
+            observacoes_internas: osData.observacoes_internas,
             criado_por: usuario?.id,
             status: 'pendente_preenchimento',
             versao: 1
@@ -651,50 +659,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           .from('os')
           .update({ cotacao_id: cotacaoId })
           .eq('id', osId);
-
-        // Copia as peças e serviços da OS para a cotação
-        const { data: pecasOS } = await supabase
-          .from('os_pecas')
-          .select('*')
-          .eq('os_id', osId);
-
-        if (pecasOS && pecasOS.length > 0) {
-          await supabase
-            .from('cotacoes_pecas')
-            .insert(
-              pecasOS.map(peca => ({
-                cotacao_id: cotacaoId,
-                pn: peca.codigo_peca,
-                descricao: peca.descricao,
-                quantidade: peca.quantidade,
-                valor_base_gspn: peca.valor_base_gspn || 0,
-                valor_final_unitario: peca.valor_unitario || 0,
-                valor_total: peca.valor_total || 0,
-                markup_aplicado: peca.markup_aplicado || 0
-              }))
-            );
-        }
-
-        const { data: servicosOS } = await supabase
-          .from('os_servicos')
-          .select('*')
-          .eq('os_id', osId);
-
-        if (servicosOS && servicosOS.length > 0) {
-          await supabase
-            .from('cotacoes_servicos')
-            .insert(
-              servicosOS.map(servico => ({
-                cotacao_id: cotacaoId,
-                servico_id: servico.servico_id,
-                descricao: servico.descricao,
-                quantidade: servico.quantidade,
-                valor_unitario: servico.valor_unitario,
-                valor_total: servico.valor_total,
-                observacao: servico.observacao
-              }))
-            );
-        }
       }
 
       // Verifica se há peças em trânsito
@@ -755,6 +719,11 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
+      // Nota: NÃO sincronizamos os_pecas de volta para cotacoes_pecas porque:
+      // - cotacoes_pecas = peças do orçamento com valores comerciais (mantidos intactos)
+      // - os_pecas = peças físicas do estoque (são deletadas com a OS via CASCADE)
+      // - Peças GSPN da API = preservadas automaticamente via os_id=NULL e reconectadas depois
+
       // Vincula pagamentos à cotação antes de deletar OS
       // (constraint exige que pagamentos tenham os_id OU cotacao_id)
       await supabase
@@ -762,11 +731,34 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .update({ cotacao_id: cotacaoId })
         .eq('os_id', osId);
 
-      // Atualiza o status da cotação para pendente_preenchimento
-      // Só incrementa versão se a cotação já existia antes (é um refazer de verdade)
+      // Atualiza a cotação sincronizando TODOS os campos da OS
+      // (garante que nenhuma informação seja perdida, mesmo que tenha sido alterada na OS)
       await supabase
         .from('cotacoes')
         .update({
+          numero_os_samsung: osData.numero_os_samsung,
+          tipo_atendimento: osData.tipo_atendimento,
+          tipo_os: osData.tipo_os,
+          tipo_orcamento: osData.tipo_orcamento,
+          cliente_nome: osData.cliente_nome,
+          cliente_telefone: osData.cliente_telefone,
+          cliente_email: osData.cliente_email,
+          cliente_cpf_cnpj: osData.cliente_cpf_cnpj,
+          cliente_endereco: osData.cliente_endereco,
+          cliente_cep: osData.cliente_cep,
+          cliente_logradouro: osData.cliente_logradouro,
+          cliente_numero: osData.cliente_numero,
+          cliente_complemento: osData.cliente_complemento,
+          cliente_bairro: osData.cliente_bairro,
+          cliente_cidade: osData.cliente_cidade,
+          cliente_estado: osData.cliente_estado,
+          aparelho_marca: osData.aparelho_marca,
+          aparelho_linha: osData.aparelho_linha,
+          aparelho_modelo: osData.aparelho_modelo,
+          aparelho_numero_serie: osData.aparelho_numero_serie,
+          aparelho_imei: osData.aparelho_imei,
+          defeito_relatado: osData.defeito_relatado,
+          observacoes_internas: osData.observacoes_internas,
           status: 'pendente_preenchimento',
           versao: cotacaoJaExistia ? versaoAtual + 1 : 1,
           updated_at: new Date().toISOString()
