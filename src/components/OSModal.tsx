@@ -2526,28 +2526,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
           {abaAtiva === 'pagamento' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Informações de Pagamento</h3>
-
-              {!pagamento ? (
-                <div className="text-center py-12">
-                  <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm">Nenhuma informação de pagamento</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Valor Final */}
-                  <div className="premium-card p-6 bg-gradient-to-br from-[#39FF14]/10 to-transparent border-2 border-[#39FF14]/30">
-                    <div className="flex items-center justify-between">
-                      <span className="text-lg font-bold text-gray-400 uppercase">Valor Total</span>
-                      <span className="text-3xl font-bold text-[#39FF14]">
-                        R$ {Number(pagamento.valor_total || 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Botão Refazer Orçamento - sempre visível para OS do tipo OW */}
               <div className="premium-card p-6 bg-[#FFBF00]/5 border border-[#FFBF00]/20">
                 <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Ajustes Necessários?</p>
                 <button
