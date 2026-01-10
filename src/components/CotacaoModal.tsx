@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { X, Save, Building, User, Wrench, DollarSign, Paperclip, MessageSquare, Plus, Trash2, Upload, Send, Lock, AlertTriangle, Edit, Microscope, Copy, Check } from 'lucide-react';
@@ -141,6 +141,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
   const [osData, setOsData] = useState<any>(null);
   const [pagamentosTemporarios, setPagamentosTemporarios] = useState<any[]>([]);
   const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const isAddingPayment = useRef(false);
   const [selectedPayment, setSelectedPayment] = useState<any>(null);
   const [showPaymentDetailsModal, setShowPaymentDetailsModal] = useState(false);
   const [showEditPaymentModal, setShowEditPaymentModal] = useState(false);
@@ -1669,16 +1670,22 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
   };
 
   const handleAddPaymentTemporario = async (paymentData: any) => {
+    if (isAddingPayment.current) {
+      return;
+    }
 
     if (!unidadeId) {
       alert('❌ Selecione uma unidade antes de adicionar pagamentos!');
       return;
     }
 
+    isAddingPayment.current = true;
+
     try {
       const file = paymentData.comprovante_file;
       if (!file) {
         alert('Comprovante é obrigatório');
+        isAddingPayment.current = false;
         return;
       }
 
@@ -1747,6 +1754,8 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       }
     } catch (error: any) {
       alert(`❌ Erro ao processar pagamento: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      isAddingPayment.current = false;
     }
   };
 
@@ -3140,6 +3149,8 @@ function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onC
   const [observacoes, setObservacoes] = useState('');
   const [comprovanteFile, setComprovanteFile] = useState<File | null>(null);
   const [taxasMaquina, setTaxasMaquina] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
 
   const formasPagamento = [
     { value: 'pix', label: 'PIX', icon: '💳', color: '#00D4FF' },
@@ -3202,6 +3213,9 @@ function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onC
   };
 
   const handleSubmit = () => {
+    if (isSubmittingRef.current || isSubmitting) {
+      return;
+    }
 
     const valorNum = parseFloat(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) {
@@ -3219,6 +3233,8 @@ function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onC
       return;
     }
 
+    isSubmittingRef.current = true;
+    setIsSubmitting(true);
 
     const paymentData = {
       forma_pagamento: formaPagamento,
@@ -3238,9 +3254,7 @@ function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onC
       data_lancamento: new Date().toISOString()
     };
 
-
     onSave(paymentData);
-
   };
 
   return (
@@ -3432,12 +3446,12 @@ function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onC
         </div>
 
         <div className="p-6 border-t border-[#39FF14]/20 flex gap-4">
-          <button onClick={onClose} className="flex-1 px-6 py-4 rounded-xl border-2 border-gray-600 text-gray-400 hover:text-white font-bold uppercase">
+          <button onClick={onClose} disabled={isSubmitting} className="flex-1 px-6 py-4 rounded-xl border-2 border-gray-600 text-gray-400 hover:text-white font-bold uppercase disabled:opacity-50 disabled:cursor-not-allowed">
             Cancelar
           </button>
-          <button onClick={handleSubmit} className="flex-1 px-6 py-4 rounded-xl font-bold uppercase bg-[#39FF1420] border-2 border-[#39FF14] text-[#39FF14]">
+          <button onClick={handleSubmit} disabled={isSubmitting} className="flex-1 px-6 py-4 rounded-xl font-bold uppercase bg-[#39FF1420] border-2 border-[#39FF14] text-[#39FF14] disabled:opacity-50 disabled:cursor-not-allowed">
             <Save className="w-5 h-5 inline mr-2" />
-            Adicionar
+            {isSubmitting ? 'Salvando...' : 'Adicionar'}
           </button>
         </div>
       </div>
