@@ -548,18 +548,29 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         return;
       }
 
-      const { data: cotacaoPecas } = await supabase
-        .from('cotacoes_pecas')
-        .select('pn, descricao, quantidade, valor_final_unitario, valor_total')
-        .eq('os_id', osId);
+      const [osPecasResult, cotacaoPecasResult, cotacaoServicosResult, pagamentosResult] = await Promise.all([
+        supabase
+          .from('os_pecas')
+          .select('pn, descricao, quantidade, valor_unitario, valor_total')
+          .eq('os_id', osId),
+        supabase
+          .from('cotacoes_pecas')
+          .select('pn, descricao, quantidade, valor_final_unitario, valor_total')
+          .eq('os_id', osId),
+        supabase
+          .from('cotacoes_servicos')
+          .select('descricao, quantidade, valor_unitario, valor_total')
+          .eq('os_id', osId),
+        supabase
+          .from('pagamentos')
+          .select('valor, forma_pagamento, data_pagamento, observacoes')
+          .eq('os_id', osId)
+      ]);
 
-      const { data: cotacaoServicos } = await supabase
-        .from('cotacoes_servicos')
-        .select('descricao, quantidade, valor_unitario, valor_total')
-        .eq('os_id', osId);
-
-      (osData as any).cotacoes_pecas = cotacaoPecas || [];
-      (osData as any).cotacoes_servicos = cotacaoServicos || [];
+      (osData as any).os_pecas = osPecasResult.data || [];
+      (osData as any).cotacoes_pecas = cotacaoPecasResult.data || [];
+      (osData as any).cotacoes_servicos = cotacaoServicosResult.data || [];
+      (osData as any).pagamentos = pagamentosResult.data || [];
 
       const { data: pdfConfig, error: configError } = await supabase
         .from('configuracoes_pdf_os')
@@ -570,12 +581,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .maybeSingle();
 
       if (configError) {
-        alert('Erro ao buscar configurações do PDF');
+        alert('Erro ao buscar configuracoes do PDF');
         return;
       }
 
       if (!pdfConfig) {
-        alert('Nenhuma configuração de PDF encontrada. Configure em ATOM CORE SETTINGS → PDF da OS');
+        alert('Nenhuma configuracao de PDF encontrada. Configure em ATOM CORE SETTINGS -> PDF da OS');
         return;
       }
 

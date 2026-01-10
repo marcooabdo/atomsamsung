@@ -7,6 +7,29 @@ declare module 'jspdf' {
   }
 }
 
+interface OSPeca {
+  pn: string;
+  descricao: string;
+  quantidade: number;
+  valor_unitario?: number;
+  valor_final_unitario?: number;
+  valor_total?: number;
+}
+
+interface OSServico {
+  descricao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
+interface Pagamento {
+  valor: number;
+  forma_pagamento: string;
+  data_pagamento: string | null;
+  observacoes?: string | null;
+}
+
 interface OSData {
   numero_os_samsung: string | null;
   numero_os_interna: string | null;
@@ -36,25 +59,15 @@ interface OSData {
   data_agendamento: string | null;
   data_compra: string | null;
   created_at: string;
-  codigo_engenheiro: string | null;
   unidade: {
     nome: string;
     samsung_asccode: string | null;
     telefone: string | null;
   };
-  cotacoes_pecas?: Array<{
-    pn: string;
-    descricao: string;
-    quantidade: number;
-    valor_final_unitario: number;
-    valor_total: number;
-  }>;
-  cotacoes_servicos?: Array<{
-    descricao: string;
-    quantidade: number;
-    valor_unitario: number;
-    valor_total: number;
-  }>;
+  os_pecas?: OSPeca[];
+  cotacoes_pecas?: OSPeca[];
+  cotacoes_servicos?: OSServico[];
+  pagamentos?: Pagamento[];
   valor_total: number | null;
   valor_pago: number | null;
   saldo_restante: number | null;
@@ -147,6 +160,19 @@ function drawCheckbox(doc: jsPDF, x: number, y: number, checked: boolean, size: 
   }
 }
 
+function formatFormaPagamento(forma: string): string {
+  const formas: Record<string, string> = {
+    'dinheiro': 'Dinheiro',
+    'pix': 'PIX',
+    'cartao_credito': 'Cartao de Credito',
+    'cartao_debito': 'Cartao de Debito',
+    'transferencia': 'Transferencia',
+    'boleto': 'Boleto',
+    'cheque': 'Cheque'
+  };
+  return formas[forma] || forma;
+}
+
 export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig): Promise<Blob> {
   const doc = new jsPDF({
     orientation: 'portrait',
@@ -163,6 +189,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   const centroReparo = osData.unidade.samsung_asccode
     ? `${osData.unidade.samsung_asccode} - GLOBAL`
     : osData.unidade.nome;
+  const centralAtendimento = osData.unidade.telefone || '';
 
   doc.setFontSize(28);
   doc.setFont('helvetica', 'bold');
@@ -172,7 +199,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   doc.setFontSize(22);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(...COLORS.black);
-  doc.text('Ordem de Serviço', pageWidth / 2, yPos + 5, { align: 'center' });
+  doc.text('Ordem de Servico', pageWidth / 2, yPos + 5, { align: 'center' });
 
   doc.setFontSize(7);
   doc.setTextColor(...COLORS.darkGray);
@@ -197,31 +224,13 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
   yPos += 5;
   doc.text(`No da Revenda :`, MARGINS.left, yPos);
-  doc.text(`Central de Atendimento :`, pageWidth / 2 + 10, yPos);
-
-  yPos += 5;
-  doc.text(`ASC Job No. : ${numeroOS}`, pageWidth / 2 + 10, yPos);
-
-  const barcodeY = yPos - 12;
-  const barcodeX = pageWidth / 2 - 25;
-  doc.setDrawColor(...COLORS.black);
-  doc.setLineWidth(0.5);
-
-  const barcodeData = numeroOS.replace(/[^0-9]/g, '') || '0000000000';
-  for (let i = 0; i < 40; i++) {
-    const barWidth = (parseInt(barcodeData[i % barcodeData.length]) % 3) + 1;
-    const x = barcodeX + (i * 1.2);
-    if (i % 2 === 0) {
-      doc.setLineWidth(barWidth * 0.3);
-      doc.line(x, barcodeY, x, barcodeY + 10);
-    }
-  }
+  doc.text(`Central de Atendimento : ${centralAtendimento}`, pageWidth / 2 + 10, yPos);
 
   yPos += 8;
 
   const enderecoPartes = [
     osData.cliente_endereco,
-    osData.cliente_numero ? `${osData.cliente_numero}` : null,
+    osData.cliente_numero ? `N ${osData.cliente_numero}` : null,
     osData.cliente_bairro,
     osData.cliente_cidade,
     osData.cliente_estado,
@@ -244,18 +253,16 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     [
       { content: 'Nome Consumidor', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: osData.cliente_nome || '', colSpan: 2 },
-      { content: 'Data de Solicitação', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+      { content: 'Data de Solicitacao', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: dataAbertura }
     ],
     [
-      { content: 'Endereço', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+      { content: 'Endereco', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: enderecoCompleto, colSpan: 4 }
     ],
     [
       { content: 'Data de agendamento', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
-      { content: formatDateTime(osData.data_agendamento) },
-      { content: 'Código do Engenheiro', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
-      { content: osData.codigo_engenheiro || '', colSpan: 2 }
+      { content: formatDateTime(osData.data_agendamento), colSpan: 4 }
     ],
     [
       { content: 'Telefone', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
@@ -266,13 +273,13 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     [
       { content: 'Modelo', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: osData.aparelho_modelo || '' },
-      { content: 'No. de Série ( IMEI )', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+      { content: 'No. de Serie ( IMEI )', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: osData.aparelho_imei || '', colSpan: 2 }
     ],
     [
       { content: 'Data da compra', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: formatDate(osData.data_compra) },
-      { content: 'Tipo de Serviço', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+      { content: 'Tipo de Servico', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
       { content: tipoServico, colSpan: 2 }
     ]
   ];
@@ -313,26 +320,18 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       [
         { content: 'Status da Garantia', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' }, rowSpan: 4 },
         { content: 'Garantia completa' },
-        { content: '', styles: { cellWidth: 8 } },
-        { content: 'Recebimento do reparo', styles: { textColor: COLORS.samsungBlue } },
+        { content: '', styles: { cellWidth: 8 } }
+      ],
+      [
+        { content: 'Somente mao de obra' },
         { content: '' }
       ],
       [
-        { content: 'Somente mão de obra' },
-        { content: '' },
-        { content: 'Reparo Completo', styles: { textColor: COLORS.samsungBlue } },
-        { content: '' }
-      ],
-      [
-        { content: 'Somente peças' },
-        { content: '' },
-        { content: 'Produto entregue', styles: { textColor: COLORS.samsungBlue } },
+        { content: 'Somente pecas' },
         { content: '' }
       ],
       [
         { content: 'Fora de garantia' },
-        { content: '' },
-        { content: 'Retornado por/Data', styles: { textColor: COLORS.samsungBlue } },
         { content: '' }
       ]
     ],
@@ -346,14 +345,12 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     },
     columnStyles: {
       0: { cellWidth: 35 },
-      1: { cellWidth: 35 },
-      2: { cellWidth: 8 },
-      3: { cellWidth: 40 },
-      4: { cellWidth: 62 }
+      1: { cellWidth: 130 },
+      2: { cellWidth: 15 }
     },
     didDrawCell: (data: any) => {
       if (data.column.index === 2 && data.row.index >= 0) {
-        const cellX = data.cell.x + 2;
+        const cellX = data.cell.x + 5;
         const cellY = data.cell.y + data.cell.height / 2 + 1;
 
         let isChecked = false;
@@ -376,19 +373,19 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     startY: yPos,
     body: [
       [
-        { content: 'Acessório', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: 'Acessorio', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
         { content: osData.acessorios || '' }
       ],
       [
-        { content: 'Descrição do defeito', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
-        { content: osData.defeito_relatado || 'SEM IMAGEM' }
+        { content: 'Descricao do defeito', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: osData.defeito_relatado || '' }
       ],
       [
-        { content: 'Descrição do Reparo', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: 'Descricao do Reparo', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
         { content: osData.descricao_reparo || '' }
       ],
       [
-        { content: 'Observação', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: 'Observacoes', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
         { content: osData.observacoes_internas || '' }
       ]
     ],
@@ -410,9 +407,24 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     }
   });
 
-  if ((osData.cotacoes_pecas && osData.cotacoes_pecas.length > 0) ||
-      (osData.cotacoes_servicos && osData.cotacoes_servicos.length > 0)) {
+  const allPecas: OSPeca[] = [];
+  if (osData.os_pecas && osData.os_pecas.length > 0) {
+    allPecas.push(...osData.os_pecas);
+  }
+  if (osData.cotacoes_pecas && osData.cotacoes_pecas.length > 0) {
+    osData.cotacoes_pecas.forEach(peca => {
+      const exists = allPecas.some(p => p.pn === peca.pn);
+      if (!exists) {
+        allPecas.push(peca);
+      }
+    });
+  }
 
+  const hasPecas = allPecas.length > 0;
+  const hasServicos = osData.cotacoes_servicos && osData.cotacoes_servicos.length > 0;
+  const hasPagamentos = osData.pagamentos && osData.pagamentos.length > 0;
+
+  if (hasPecas || hasServicos || hasPagamentos) {
     yPos += 6;
 
     if (yPos > pageHeight - 60) {
@@ -420,26 +432,34 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       yPos = MARGINS.top;
     }
 
-    if (osData.cotacoes_pecas && osData.cotacoes_pecas.length > 0) {
+    if (hasPecas) {
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(...COLORS.black);
       doc.text('PECAS', MARGINS.left, yPos);
       yPos += 4;
 
-      const pecasData = osData.cotacoes_pecas.map(peca => [
-        peca.pn,
-        peca.descricao,
-        peca.quantidade.toString(),
-        `R$ ${peca.valor_final_unitario.toFixed(2)}`,
-        `R$ ${peca.valor_total.toFixed(2)}`
-      ]);
+      const pecasData = allPecas.map(peca => {
+        const valorUnit = peca.valor_final_unitario ?? peca.valor_unitario ?? 0;
+        const valorTotal = peca.valor_total ?? (valorUnit * peca.quantidade);
+        return [
+          peca.pn || '',
+          peca.descricao || '',
+          peca.quantidade?.toString() || '1',
+          `R$ ${valorUnit.toFixed(2)}`,
+          `R$ ${valorTotal.toFixed(2)}`
+        ];
+      });
 
-      const totalPecas = osData.cotacoes_pecas.reduce((sum, peca) => sum + peca.valor_total, 0);
+      const totalPecas = allPecas.reduce((sum, peca) => {
+        const valorUnit = peca.valor_final_unitario ?? peca.valor_unitario ?? 0;
+        const valorTotal = peca.valor_total ?? (valorUnit * peca.quantidade);
+        return sum + valorTotal;
+      }, 0);
 
       autoTable(doc, {
         startY: yPos,
-        head: [['PN', 'Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
+        head: [['PN', 'Descricao', 'Qtd', 'Valor Unit.', 'Valor Total']],
         body: pecasData,
         foot: [['', '', '', 'TOTAL PECAS:', `R$ ${totalPecas.toFixed(2)}`]],
         theme: 'grid',
@@ -468,7 +488,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       yPos += 4;
     }
 
-    if (osData.cotacoes_servicos && osData.cotacoes_servicos.length > 0) {
+    if (hasServicos) {
       if (yPos > pageHeight - 50) {
         doc.addPage();
         yPos = MARGINS.top;
@@ -480,20 +500,72 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
       doc.text('SERVICOS', MARGINS.left, yPos);
       yPos += 4;
 
-      const servicosData = osData.cotacoes_servicos.map(servico => [
+      const servicosData = osData.cotacoes_servicos!.map(servico => [
         servico.descricao,
         servico.quantidade.toString(),
         `R$ ${servico.valor_unitario.toFixed(2)}`,
         `R$ ${servico.valor_total.toFixed(2)}`
       ]);
 
-      const totalServicos = osData.cotacoes_servicos.reduce((sum, servico) => sum + servico.valor_total, 0);
+      const totalServicos = osData.cotacoes_servicos!.reduce((sum, servico) => sum + servico.valor_total, 0);
 
       autoTable(doc, {
         startY: yPos,
-        head: [['Descrição', 'Qtd', 'Valor Unit.', 'Valor Total']],
+        head: [['Descricao', 'Qtd', 'Valor Unit.', 'Valor Total']],
         body: servicosData,
         foot: [['', '', 'TOTAL SERVICOS:', `R$ ${totalServicos.toFixed(2)}`]],
+        theme: 'grid',
+        styles: {
+          fontSize: 8,
+          cellPadding: 2,
+          lineColor: COLORS.borderGray,
+          lineWidth: 0.2
+        },
+        headStyles: {
+          fillColor: COLORS.lightGray,
+          textColor: COLORS.black,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        footStyles: {
+          fillColor: COLORS.headerBg,
+          textColor: COLORS.black,
+          fontStyle: 'bold'
+        },
+        didDrawPage: (data: any) => {
+          yPos = data.cursor.y;
+        }
+      });
+
+      yPos += 4;
+    }
+
+    if (hasPagamentos) {
+      if (yPos > pageHeight - 50) {
+        doc.addPage();
+        yPos = MARGINS.top;
+      }
+
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.black);
+      doc.text('PAGAMENTOS', MARGINS.left, yPos);
+      yPos += 4;
+
+      const pagamentosData = osData.pagamentos!.map(pag => [
+        formatFormaPagamento(pag.forma_pagamento),
+        formatDate(pag.data_pagamento),
+        `R$ ${pag.valor.toFixed(2)}`,
+        pag.observacoes || ''
+      ]);
+
+      const totalPagamentos = osData.pagamentos!.reduce((sum, pag) => sum + pag.valor, 0);
+
+      autoTable(doc, {
+        startY: yPos,
+        head: [['Forma', 'Data', 'Valor', 'Obs']],
+        body: pagamentosData,
+        foot: [['', '', `R$ ${totalPagamentos.toFixed(2)}`, 'TOTAL PAGO']],
         theme: 'grid',
         styles: {
           fontSize: 8,
@@ -528,7 +600,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
 
       doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
-      doc.text('RESUMO DO PAGAMENTO', MARGINS.left, yPos);
+      doc.text('RESUMO FINANCEIRO', MARGINS.left, yPos);
       yPos += 4;
 
       autoTable(doc, {
