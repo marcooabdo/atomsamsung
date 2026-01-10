@@ -755,6 +755,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .is('cotacao_id', null);
 
+      // Vincula pagamentos à cotação antes de deletar OS
+      // (constraint exige que pagamentos tenham os_id OU cotacao_id)
+      await supabase
+        .from('pagamentos')
+        .update({ cotacao_id: cotacaoId })
+        .eq('os_id', osId);
+
       // Atualiza o status da cotação para pendente_preenchimento
       // Só incrementa versão se a cotação já existia antes (é um refazer de verdade)
       await supabase
