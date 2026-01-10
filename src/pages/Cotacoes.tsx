@@ -309,6 +309,17 @@ export function Cotacoes() {
         return;
       }
 
+      // Reconecta peças GSPN órfãs (peças da API Samsung que ficaram sem os_id quando OS foi deletada)
+      // Busca peças com status='gspn', os_id=NULL e mesmo numero_os_samsung
+      if (cotacao.numero_os_samsung?.trim()) {
+        await supabase
+          .from('os_pecas')
+          .update({ os_id: os.id })
+          .is('os_id', null)
+          .eq('status', 'gspn')
+          .eq('numero_os_samsung', cotacao.numero_os_samsung);
+      }
+
       // Vincula peças à OS (mantém cotacao_id para preservar histórico)
       const { data: pecasVinculadas, error: pecasError } = await supabase
         .from('cotacoes_pecas')
@@ -492,9 +503,20 @@ export function Cotacoes() {
 
       if (osError) throw osError;
 
+      // Reconecta peças GSPN órfãs (peças da API Samsung que ficaram sem os_id quando OS foi deletada)
+      if (cotacao.numero_os_samsung?.trim()) {
+        await supabase
+          .from('os_pecas')
+          .update({ os_id: os.id })
+          .is('os_id', null)
+          .eq('status', 'gspn')
+          .eq('numero_os_samsung', cotacao.numero_os_samsung);
+      }
+
       await supabase.from('cotacoes_pecas').update({ os_id: os.id }).eq('cotacao_id', id);
       await supabase.from('cotacoes_servicos').update({ os_id: os.id }).eq('cotacao_id', id);
       await supabase.from('os_anexos').update({ os_id: os.id }).eq('cotacao_id', id).is('os_id', null);
+      await supabase.from('pagamentos').update({ os_id: os.id }).eq('cotacao_id', id).is('os_id', null);
 
       await supabase
         .from('cotacoes')
