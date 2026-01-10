@@ -3030,13 +3030,21 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         </div>
 
         <div className="border-t border-[#00D4FF]/20 p-6 flex items-center justify-between bg-gradient-to-t from-black/60 to-transparent">
-          <div className="text-sm flex items-center gap-4">
+          <div className="text-sm flex items-center gap-6">
             <div>
               <span className="text-gray-400 uppercase tracking-wider">Valor Total:</span>
               <span className="text-2xl font-bold text-[#39FF14] ml-3">
                 R$ {calcularValorTotal().toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
+            {pagamentosTemporarios.length > 0 && (
+              <div>
+                <span className="text-gray-400 uppercase tracking-wider">Saldo Restante:</span>
+                <span className="text-2xl font-bold text-[#FFBF00] ml-3">
+                  R$ {(calcularValorTotal() - pagamentosTemporarios.reduce((sum, p) => sum + (p.valor_bruto || p.valor), 0)).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             {analiseTecnicoConcluida && (
               <span className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase bg-[#9D4EDD]/20 text-[#9D4EDD] border border-[#9D4EDD]/40 flex items-center gap-1.5 animate-pulse">
                 <Microscope className="w-4 h-4" />
@@ -3083,6 +3091,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       {showAddPaymentModal && (!cotacaoId || (cotacaoId && !osData)) && (
         <AddPaymentModalSimplified
           valorTotal={calcularValorTotal()}
+          saldoRestante={calcularValorTotal() - pagamentosTemporarios.reduce((sum, p) => sum + (p.valor_bruto || p.valor), 0)}
           clienteNome={clienteNome}
           onClose={() => setShowAddPaymentModal(false)}
           onSave={handleAddPaymentTemporario}
@@ -3113,12 +3122,13 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
 
 interface AddPaymentModalSimplifiedProps {
   valorTotal: number;
+  saldoRestante: number;
   clienteNome: string;
   onClose: () => void;
   onSave: (paymentData: any) => void;
 }
 
-function AddPaymentModalSimplified({ valorTotal, clienteNome, onClose, onSave }: AddPaymentModalSimplifiedProps) {
+function AddPaymentModalSimplified({ valorTotal, saldoRestante, clienteNome, onClose, onSave }: AddPaymentModalSimplifiedProps) {
   const { usuario } = useAuth();
   const [formaPagamento, setFormaPagamento] = useState<'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia' | 'boleto' | 'outro'>('pix');
   const [valor, setValor] = useState('');
@@ -3257,10 +3267,14 @@ function AddPaymentModalSimplified({ valorTotal, clienteNome, onClose, onSave }:
         <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 space-y-6">
           {/* Resumo */}
           <div className="premium-card p-5 bg-gradient-to-br from-[#00D4FF]/10 to-transparent border-2 border-[#00D4FF]/30">
-            <div className="flex items-center justify-between">
+            <div className="grid grid-cols-2 gap-6">
               <div>
                 <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Valor Total da Cotação</p>
                 <p className="text-[#00D4FF] font-bold text-2xl">R$ {valorTotal.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Saldo Restante</p>
+                <p className="text-[#FFBF00] font-bold text-2xl">R$ {saldoRestante.toFixed(2)}</p>
               </div>
             </div>
           </div>
