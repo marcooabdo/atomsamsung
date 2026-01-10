@@ -780,6 +780,31 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           );
       }
 
+      // Copia comentários da OS para a cotação (histórico completo preservado)
+      const { data: comentariosOS } = await supabase
+        .from('os_comentarios')
+        .select('*')
+        .eq('os_id', osId);
+
+      if (comentariosOS && comentariosOS.length > 0) {
+        await supabase
+          .from('cotacao_comentarios')
+          .insert(
+            comentariosOS.map(comentario => ({
+              cotacao_id: cotacaoId,
+              usuario_id: comentario.usuario_id,
+              texto: comentario.comentario,
+              created_at: comentario.created_at
+            }))
+          );
+      }
+
+      // Transfere anexos para a cotação (preserva documentação)
+      await supabase
+        .from('os_anexos')
+        .update({ cotacao_id: cotacaoId })
+        .eq('os_id', osId);
+
       // Vincula pagamentos à cotação antes de deletar OS
       // (constraint exige que pagamentos tenham os_id OU cotacao_id)
       await supabase

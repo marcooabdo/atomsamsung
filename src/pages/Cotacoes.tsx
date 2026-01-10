@@ -376,7 +376,26 @@ export function Cotacoes() {
         .eq('cotacao_id', id)
         .is('os_id', null);
 
-      // Adiciona comentário de sistema na cotação
+      // Copia todos os comentários da cotação para a OS (histórico completo preservado)
+      const { data: comentariosCotacao } = await supabase
+        .from('cotacao_comentarios')
+        .select('*')
+        .eq('cotacao_id', id);
+
+      if (comentariosCotacao && comentariosCotacao.length > 0) {
+        await supabase
+          .from('os_comentarios')
+          .insert(
+            comentariosCotacao.map(comentario => ({
+              os_id: os.id,
+              usuario_id: comentario.usuario_id,
+              comentario: comentario.texto,
+              created_at: comentario.created_at
+            }))
+          );
+      }
+
+      // Adiciona comentário de sistema na cotação E na OS
       await supabase
         .from('cotacao_comentarios')
         .insert({
@@ -384,6 +403,14 @@ export function Cotacoes() {
           usuario_id: usuario?.id,
           texto: `Cotação #${cotacao.numero_cotacao} aprovada e movida para o Kanban por ${usuario?.nome || 'Sistema'}`,
           is_system: true
+        });
+
+      await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: os.id,
+          usuario_id: usuario?.id,
+          comentario: `Cotação #${cotacao.numero_cotacao} aprovada e movida para o Kanban por ${usuario?.nome || 'Sistema'}`
         });
 
       // Cria lançamento financeiro se houver forma de pagamento
@@ -525,6 +552,25 @@ export function Cotacoes() {
           enviada_diagnostico_em: new Date().toISOString()
         })
         .eq('id', id);
+
+      // Copia todos os comentários da cotação para a OS (histórico completo preservado)
+      const { data: comentariosCotacao } = await supabase
+        .from('cotacao_comentarios')
+        .select('*')
+        .eq('cotacao_id', id);
+
+      if (comentariosCotacao && comentariosCotacao.length > 0) {
+        await supabase
+          .from('os_comentarios')
+          .insert(
+            comentariosCotacao.map(comentario => ({
+              os_id: os.id,
+              usuario_id: comentario.usuario_id,
+              comentario: comentario.texto,
+              created_at: comentario.created_at
+            }))
+          );
+      }
 
       await supabase.from('cotacao_comentarios').insert({
         cotacao_id: id,
@@ -760,6 +806,39 @@ export function Cotacoes() {
             lancado_por: usuario?.id
           });
       }
+
+      // Copia todos os comentários da cotação para a OS (histórico completo preservado)
+      const { data: comentariosCotacao } = await supabase
+        .from('cotacao_comentarios')
+        .select('*')
+        .eq('cotacao_id', id);
+
+      if (comentariosCotacao && comentariosCotacao.length > 0) {
+        await supabase
+          .from('os_comentarios')
+          .insert(
+            comentariosCotacao.map(comentario => ({
+              os_id: os.id,
+              usuario_id: comentario.usuario_id,
+              comentario: comentario.texto,
+              created_at: comentario.created_at
+            }))
+          );
+      }
+
+      // Adiciona comentário de sistema na cotação E na OS
+      await supabase.from('cotacao_comentarios').insert({
+        cotacao_id: id,
+        usuario_id: usuario?.id,
+        texto: `Cotação rejeitada: ${motivo}`,
+        is_system: true
+      });
+
+      await supabase.from('os_comentarios').insert({
+        os_id: os.id,
+        usuario_id: usuario?.id,
+        comentario: `Cotação rejeitada: ${motivo}`
+      });
 
       // Atualiza status da cotação
       await supabase
