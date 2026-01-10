@@ -7,6 +7,7 @@ import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
+import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import type { Database } from '../lib/database.types';
 
 const COLUNAS_KANBAN = [
@@ -525,6 +526,58 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingGSPN(false);
+    }
+  };
+
+  const handleGerarPDFOS = async () => {
+    try {
+      const { data: osData, error: osError } = await supabase
+        .from('os')
+        .select(`
+          *,
+          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode),
+          cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao),
+          cotacao_pecas:cotacoes_pecas!cotacao_id(pn, descricao, quantidade, valor_final_unitario, valor_total),
+          cotacoes_servicos:cotacoes_servicos!os_id(descricao, quantidade, valor_unitario, valor_total)
+        `)
+        .eq('id', osId)
+        .maybeSingle();
+
+      if (osError || !osData) {
+        alert('Erro ao buscar dados da OS');
+        return;
+      }
+
+      const { data: pdfConfig, error: configError } = await supabase
+        .from('configuracoes_pdf_os')
+        .select('*')
+        .or(`unidade_id.eq.${osData.unidade_id},unidade_id.is.null`)
+        .order('unidade_id', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (configError) {
+        alert('Erro ao buscar configurações do PDF');
+        return;
+      }
+
+      if (!pdfConfig) {
+        alert('Nenhuma configuração de PDF encontrada. Configure em ATOM CORE SETTINGS → PDF da OS');
+        return;
+      }
+
+      const pdfBlob = await gerarPDFOrdemServico(osData as any, pdfConfig as any);
+
+      const url = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `OS_${osData.numero_os_samsung || osData.numero_os_interna || osData.id}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      alert(`Erro ao gerar PDF: ${error.message}`);
     }
   };
 
@@ -1420,7 +1473,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           </div>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => gerarRelatorioOS(osId)}
+              onClick={handleGerarPDFOS}
               className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-green-500/20"
               style={{
                 background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
@@ -1428,7 +1481,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                 color: '#22c55e',
                 boxShadow: '0 0 10px rgba(34,197,94,0.2)'
               }}
-              title="Exportar Relatório PDF"
+              title="Gerar PDF da Ordem de Serviço"
             >
               <FileDown className="w-4 h-4" />
               PDF

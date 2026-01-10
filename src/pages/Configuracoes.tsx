@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType } from 'lucide-react';
+import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os';
 
 interface Unidade {
   id: string;
@@ -537,7 +538,8 @@ export function Configuracoes() {
     { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064' },
     { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD' },
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981' },
-    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' }
+    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' },
+    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6' }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -1853,6 +1855,10 @@ export function Configuracoes() {
                       </div>
                     )}
                   </div>
+                )}
+
+                {activeTab === 'pdf_os' && (
+                  <ConfiguracoesPDFOS />
                 )}
               </>
             )}
