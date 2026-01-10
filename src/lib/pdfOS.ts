@@ -32,7 +32,7 @@ interface OSData {
   unidade: {
     nome: string;
     samsung_asccode: string | null;
-    telefone_atendimento: string | null;
+    telefone: string | null;
   };
   cotacao?: {
     numero_cotacao: string;
@@ -109,7 +109,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   const centroReparo = osData.unidade.samsung_asccode
     ? `${osData.unidade.samsung_asccode} GROUP GLOBAL`
     : osData.unidade.nome;
-  const centralAtendimento = osData.unidade.telefone_atendimento || '';
+  const centralAtendimento = osData.unidade.telefone || '';
 
   doc.setFontSize(9);
   doc.setFont('helvetica', 'normal');

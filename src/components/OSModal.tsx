@@ -535,7 +535,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .from('os')
         .select(`
           *,
-          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone_atendimento),
+          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone),
           cotacao:cotacoes!os_cotacao_id_fkey(
             numero_cotacao,
             cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total)
