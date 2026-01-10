@@ -639,84 +639,65 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
     yPos = MARGINS.top;
   }
 
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.samsungBlue);
-  doc.text('Canais de Atendimento SAMSUNG', MARGINS.left, yPos);
+  if (pdfConfig.canais_atendimento) {
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.samsungBlue);
+    doc.text('Canais de Atendimento SAMSUNG', MARGINS.left, yPos);
+    yPos += 4;
 
-  yPos += 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.black);
-  doc.text('Online:', MARGINS.left, yPos);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(...COLORS.black);
 
-  yPos += 3;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
+    const canaisLinhas = pdfConfig.canais_atendimento.split('\n');
+    canaisLinhas.forEach(linha => {
+      if (linha.trim()) {
+        if (yPos > pageHeight - 20) {
+          doc.addPage();
+          yPos = MARGINS.top;
+        }
+        const wrappedLines = wrapText(doc, linha, contentWidth, 6);
+        wrappedLines.forEach(l => {
+          doc.text(l, MARGINS.left, yPos);
+          yPos += 3;
+        });
+      }
+    });
 
-  const canaisOnline = [
-    'Para suporte, realizar agendamentos ou acompanhar seu reparo acesse: https://www.samsung.com/br/support/your-service/main',
-    'Acesse tambem nosso app Samsung Members para suporte, diagnostico e agendamentos.',
-    'Para suporte via Chat ou e-mail: acesse www.samsung.com/br/support',
-    'Videos no Youtube com dicas de configuracao, atualizacao de softwares: acesse www.youtube.com/samsungbrasil'
-  ];
+    yPos += 4;
+  }
 
-  canaisOnline.forEach(linha => {
-    doc.text(linha, MARGINS.left, yPos);
-    yPos += 3;
-  });
-
-  yPos += 2;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('Tipos de atendimento:', MARGINS.left, yPos);
-  yPos += 3;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.text('Balcao / Via Correios / Em Domicilio', MARGINS.left, yPos);
-
-  yPos += 4;
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('Central de Atendimento:', MARGINS.left, yPos);
-  yPos += 3;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6);
-  doc.text('4004-0000 (Capitais) / 0800 555 000 (Demais Cidades) / 3003-0000 (Clientes Corporativos)', MARGINS.left, yPos);
-
-  yPos += 6;
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.setTextColor(...COLORS.black);
-  doc.text('IMPORTANTE:', MARGINS.left, yPos);
-
-  yPos += 3;
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(5.5);
-
-  const importanteTexto = [
-    'E de responsabilidade do cliente realizar copia de seguranca (backup) de agenda, fotos, documentos, musicas, aplicativos ou quaisquer outros tipos de dados, informacoes gravadas no produto.',
-    'Alem do backup obrigatorio, e dever do cliente excluir todos dados, fotos e demais informacoes pessoais do usuario.',
-    'O Cliente fica ciente que todos os dados do aparelho serao apagados pela Empresa para a realizacao do reparo, caso o Cliente ainda nao os tenha apagado.',
-    'Nao nos responsabilizamos pela pelicula instalada no produto.',
-    'Autorizo a Samsung a utilizar meus dados pessoais presentes nesta Ordem de Servico para a finalidade especifica de realizacao do reparo do produto.',
-    'Para maior comodidade e satisfacao de nossos consumidores, mesmo quando nao constatado nenhum vicio, todos os aparelhos avaliados ja retornam com a versao do Software atualizada.',
-    'O Cliente, como agente participante do Programa Nacional de destinacao dos Residuos Solidos, concorda neste ato que a Samsung dara a destinacao correta a peca eventualmente substituida neste reparo.',
-    'O cliente concorda e autoriza a Samsung a empregar no reparo do seu produto pecas ou componentes de reposicao novos ou recondicionados, os quais possuirao as mesmas especificacoes tecnicas e de qualidade de pecas ou componentes novos',
-    '(art. 21, Codigo de Defesa do Consumidor).'
-  ];
-
-  importanteTexto.forEach(linha => {
-    if (yPos > pageHeight - 25) {
+  if (pdfConfig.observacoes_gerais) {
+    if (yPos > pageHeight - 40) {
       doc.addPage();
       yPos = MARGINS.top;
     }
-    const wrappedLines = wrapText(doc, linha, contentWidth, 5.5);
-    wrappedLines.forEach(l => {
-      doc.text(l, MARGINS.left, yPos);
-      yPos += 2.5;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7);
+    doc.setTextColor(...COLORS.black);
+    doc.text('IMPORTANTE:', MARGINS.left, yPos);
+    yPos += 3;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(5.5);
+
+    const obsLinhas = pdfConfig.observacoes_gerais.split('\n');
+    obsLinhas.forEach(linha => {
+      if (linha.trim()) {
+        if (yPos > pageHeight - 20) {
+          doc.addPage();
+          yPos = MARGINS.top;
+        }
+        const wrappedLines = wrapText(doc, linha, contentWidth, 5.5);
+        wrappedLines.forEach(l => {
+          doc.text(l, MARGINS.left, yPos);
+          yPos += 2.5;
+        });
+      }
     });
-  });
+  }
 
   yPos += 8;
 
@@ -733,181 +714,156 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
   doc.setFontSize(8);
   doc.text('Assinatura do Cliente', MARGINS.left, yPos);
 
-  doc.addPage();
-  yPos = MARGINS.top;
+  const hasTermos = pdfConfig.termo_orcamento || pdfConfig.termo_garantia;
 
-  doc.setFontSize(14);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.black);
-  doc.text('TERMOS DE SERVICO', pageWidth / 2, yPos, { align: 'center' });
+  if (hasTermos) {
+    doc.addPage();
+    yPos = MARGINS.top;
 
-  yPos += 8;
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.black);
+    doc.text('TERMOS DE SERVICO', pageWidth / 2, yPos, { align: 'center' });
 
-  const termosCompletos = `Para efeito deste termo e considerado "Cliente" o contratante descrito neste documento como cliente, e e considerada "Empresa" a Contratada, e tem como objeto o "Produto" identificado em detalhes.
+    yPos += 8;
 
-1 - ORCAMENTO
-1.1 O prazo de validade do orcamento e de 10 dias contados da data de elaboracao do mesmo. Apos este periodo o orcamento perde automaticamente a validade.
-1.2 O orcamento sera informado ao Cliente atraves do telefone, e-mail, SMS ou outro meio de comunicacao informado por este e que venha a ser utilizado pela Assistencia. O Cliente podera ser informado sobre o orcamento imediatamente quando o servico for prestado via balcao.
-1.2.1 O Cliente autoriza o envio do orcamento nos contatos e canais informados pelo mesmo.
-1.3 Apos a analise do produto, se for identificada a necessidade de reparo de mais pecas do que as previstas no orcamento inicial, o Cliente sera notificado para que aprove a inclusao do reparo das referidas pecas em novo orcamento. Aprovando esta, o Cliente esta ciente da modificacao no valor do orcamento para casos fora de garantia.
-1.4 No caso do orcamento apresentado nao ser aprovado, o Cliente concedera a empresa um prazo de 48 horas uteis, contadas da manifestacao do Cliente sobre a nao aprovacao do orcamento, para retornar o produto as mesmas condicoes em a Assistencia o recebeu.
-1.5 No caso da cobranca de um orcamento preliminar para a recuperacao da tela do aparelho do Cliente, ficando ciente que este orcamento e exclusivamente para o reparo da tela. Caso apos a abertura do aparelho for identificado que outros componentes necessitem de reparo, sera apresentado ao Cliente uma cotacao complementar. A nao aprovacao do orcamento complementar, nao da direito ao Cliente ao ressarcimento do valor previamente pago no orcamento preliminar, ja que este servico sera realizado.
+    const renderTermoSection = (titulo: string, texto: string) => {
+      if (!texto) return;
 
-2 - GARANTIA
-2.1 O Produto conta com a garantia legal de 90 dias do servico de reparo, conforme determinado pelo Codigo de Defesa do Consumidor, contada a partir da data de retirada indicada nesta ordem de servico, sendo obrigatoria a apresentacao deste documento pelo Cliente no caso da peca trocada ou servico realizado apresentar algum outro vicio durante o periodo de garantia legal do servico realizado.
-2.2 A garantia perdera sua validade: se houver violacao de pecas colocadas pela Empresa no Produto; se for utilizado em rede eletrica incompativel ou sujeita a flutuacoes; se for instalado ou utilizado de maneira inadequada conforme especificado no seu manual de instrucoes; caso sofra danos causados por acidentes ou agentes da natureza ou se for manuseado por tecnicos ou pessoas nao autorizadas pela Empresa, ou qualquer outro caso em desacordo com o manual de instrucoes e termos de garantia do produto.
-2.3 No caso do produto apresentar, durante o periodo coberto pela GARANTIA LEGAL de 90 dias, algum defeito envolvendo componente(s) que nao tenha(m) sido relacionado(s) ao servico de reparo realizado e cobrado(s) acima, o(s) mesmo(s) sera(ao) substituido(s) mediante o pagamento do(s) referido(s) componente(s), incluindo a mao de obra.
-
-3 - DO PRODUTO FORA DE GARANTIA
-3.1 O produto que der entrada na autorizada fora do periodo legal e contratual de garantia sera reparado mediante aprovacao de orcamento pelo Cliente.
-3.1.1 A aprovacao do orcamento se dara por escrito, pelo Cliente, via balcao; por telefone, mediante gravacao da chamada; por SMS, whatsapp ou e-mail com descricao das pecas que serao utilizadas e servicos que serao realizados.
-3.1.2 A aprovacao do orcamento confirma o aceite do Cliente aos termos de servico apresentados neste documento.
-3.1.3 O Cliente esta ciente de que havera cobranca de taxa de analise para diagnostico do problema e elaboracao de orcamento para produtos fora de garantia, oportunidade em que o valor sera previamente comunicado.
-
-4 - DA RETIRADA DOS PRODUTOS
-4.1 A retirada do produto somente podera ser feita pelo proprio Cliente com a apresentacao da ORDEM DE SERVICO, que e entregue ao mesmo pela Assistencia Tecnica Autorizada Samsung no momento da entrada do produto.
-4.1.1 No caso de o Cliente enviar um portador para a retirada, o mesmo devera apresentar, alem da Ordem de Servico, procuracao com firma reconhecida e estar munido de copia do RG ou CNH (foto).
-A procuracao devera seguir o modelo abaixo:
-Eu, (Nome do Cliente), portador do CPF 000.000.00-00 e ordem de servico N. XXXXXXX, autorizo que (Nome do Portador), portador do CPF 000.000.000-00 efetue a retirada do meu aparelho, passando a exercer o dever de guarda do produto.
-4.2 O Cliente sera informado pela Empresa sobre a finalizacao do reparo do produto por meio de telefone, e-mail, SMS ou outro meio de comunicacao que a Assistencia venha a utilizar, cabendo ao Cliente disponibilizar os meios de contato atuais e eventual canal de preferencia.
-4.2.1 O cliente autoriza a Empresa a enviar o produto pelos correios, ao endereco informado na abertura da ordem de servico, caso nao haja a retirada no prazo de 5 (cinco) dias, apos comunicacao de finalizacao do reparo (Item 4.2).
-4.3 Na hipotese de o envio pelos Correios nao ser viavel, decorrido o prazo de 60 dias da data de comunicacao ao Cliente sobre a finalizacao do reparo ou da recusa do orcamento, nao havendo a retirada do produto, o Cliente, por meio da assinatura do presente documento, fica ciente de que perdera a propriedade do mesmo, autorizando desde ja, nesta hipotese, a destinacao do bem, por parte da Empresa, incluindo a destruicao e descarte do mesmo, de acordo com a legislacao vigente a epoca, nao sendo devido ao Cliente qualquer compensacao ou indenizacao.
-4.3.1 O prazo acima pode ser alterado de acordo com Legislacao Local que determine prazo divergente para descarte, cabendo assim, o prazo determinado por esta.
-
-5 - AUTORIZACAO
-5.1 O Cliente autoriza a empresa a proceder com a desmontagem do seu Produto para efetuar a devida analise do defeito visando o diagnostico do problema.
-5.1.1 Para produtos fora de garantia, havendo a necessidade de substituicao de componentes e/ou ajustes, estes so serao efetuados mediante previa autorizacao do Cliente e aceite do orcamento apresentado.
-5.2 O cliente concorda e autoriza a Samsung a empregar no reparo do seu produto pecas ou componentes de reposicao novos ou recondicionados, os quais possuirao as mesmas especificacoes tecnicas e de qualidade de pecas ou componentes novos, nos moldes previstos no artigo 21, do Codigo de Defesa do Consumidor.
-5.3 O Cliente autoriza a Empresa a utilizar os dados pessoais presentes nesta Ordem de Servico para entrar em contato, atraves dos meios cabiveis, informando sobre o status do reparo, evidencias do produto analisado, orcamentos e quaisquer informacoes relevantes sobre o produto, inclusive relativas a satisfacao do servico prestado.
-
-6 - DO PRODUTO E ACESSORIOS
-6.1 E necessario o envio ou entrega de acessorios originais juntamente com o produto que sera analisado pela Assistencia Tecnica (carregadores, cabos USB, fontes de notebooks, baterias, entre outros).
-6.2 Se o produto for protegido com senha ou padroes, sera necessario desabilitar e retirar o bloqueio antes do envio ou entrega no posto autorizado.
-6.3 Nao nos responsabilizamos pela pelicula instalada no produto, ficando o Cliente desde logo ciente sobre a possibilidade de danos nao reparaveis na pelicula instalada.
-6.4 Cabera ao cliente retirar do seu produto acessorios nao originais antes do envio ou entrega do produto que sera analisado Empresa (Chips de celular, cartoes de memoria, capinhas de celular, entre outros).
-
-7 - DA RESPONSABILIDADE SOBRE DADOS
-7.1 Cabera ao Cliente realizar copia de seguranca de todos os dados, informacoes e/ou aplicativos gravados no produto antes do ingresso do produto na Assistencia Tecnica.
-7.2 Alem do backup que obrigatoriamente deve ser realizado pelo Cliente, e dever do cliente excluir todos os dados, fotos e demais informacoes pessoais do usuario.
-7.3 O Cliente fica ciente que todos os dados do aparelho, serao apagados pela Empresa para a realizacao do reparo, caso o Cliente ainda nao os tenha apagado conforme item 7.2.
-7.4 O Cliente esta ciente e concorda que em nenhum procedimento ou reparo efetuado pela Empresa ha acesso a dados pessoais do Cliente ou informacoes confidenciais como senhas bancarias, senhas de e-mails, etc.
-
-Declaro estar ciente e de acordo com as clausulas contratuais e condicoes do aparelho descritas acima.`;
-
-  doc.setFontSize(6);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.black);
-
-  const paragraphs = termosCompletos.split('\n\n');
-
-  paragraphs.forEach(paragraph => {
-    if (paragraph.trim()) {
-      const isBold = paragraph.startsWith('1 -') || paragraph.startsWith('2 -') ||
-                     paragraph.startsWith('3 -') || paragraph.startsWith('4 -') ||
-                     paragraph.startsWith('5 -') || paragraph.startsWith('6 -') ||
-                     paragraph.startsWith('7 -');
-
-      if (isBold) {
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(7);
-      } else {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(6);
+      if (yPos > pageHeight - 30) {
+        doc.addPage();
+        yPos = MARGINS.top;
       }
 
-      const lines = paragraph.split('\n');
-      lines.forEach(line => {
-        if (line.trim()) {
-          const wrappedLines = wrapText(doc, line, contentWidth, isBold ? 7 : 6);
-          wrappedLines.forEach(wrappedLine => {
-            if (yPos > pageHeight - 15) {
-              doc.addPage();
-              yPos = MARGINS.top;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.setTextColor(...COLORS.samsungBlue);
+      doc.text(titulo, MARGINS.left, yPos);
+      yPos += 5;
+
+      doc.setFontSize(6);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(...COLORS.black);
+
+      const paragraphs = texto.split('\n\n');
+
+      paragraphs.forEach(paragraph => {
+        if (paragraph.trim()) {
+          const isBold = /^\d+[\.\-\)]/.test(paragraph.trim());
+
+          if (isBold) {
+            doc.setFont('helvetica', 'bold');
+            doc.setFontSize(7);
+          } else {
+            doc.setFont('helvetica', 'normal');
+            doc.setFontSize(6);
+          }
+
+          const lines = paragraph.split('\n');
+          lines.forEach(line => {
+            if (line.trim()) {
+              const wrappedLines = wrapText(doc, line, contentWidth, isBold ? 7 : 6);
+              wrappedLines.forEach(wrappedLine => {
+                if (yPos > pageHeight - 15) {
+                  doc.addPage();
+                  yPos = MARGINS.top;
+                }
+                doc.text(wrappedLine, MARGINS.left, yPos);
+                yPos += isBold ? 3.5 : 2.8;
+              });
             }
-            doc.text(wrappedLine, MARGINS.left, yPos);
-            yPos += isBold ? 3.5 : 2.8;
           });
+          yPos += 1.5;
         }
       });
-      yPos += 1.5;
+
+      yPos += 6;
+    };
+
+    if (pdfConfig.termo_orcamento) {
+      renderTermoSection('TERMO DE ORCAMENTO', pdfConfig.termo_orcamento);
     }
-  });
 
-  yPos += 6;
+    if (pdfConfig.termo_garantia) {
+      renderTermoSection('TERMO DE GARANTIA', pdfConfig.termo_garantia);
+    }
 
-  if (yPos > pageHeight - 50) {
-    doc.addPage();
-    yPos = MARGINS.top;
+    yPos += 6;
+
+    if (yPos > pageHeight - 50) {
+      doc.addPage();
+      yPos = MARGINS.top;
+    }
+
+    doc.setDrawColor(...COLORS.black);
+    doc.setLineWidth(0.3);
+    doc.line(MARGINS.left, yPos, MARGINS.left + 80, yPos);
+    yPos += 4;
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.text('CPF DO CLIENTE EXTENSO', MARGINS.left, yPos);
+
+    yPos += 12;
+
+    doc.line(MARGINS.left, yPos, MARGINS.left + 80, yPos);
+    yPos += 4;
+    doc.text('ASSINATURA CLIENTE', MARGINS.left, yPos);
+
+    yPos += 12;
+
+    if (yPos > pageHeight - 40) {
+      doc.addPage();
+      yPos = MARGINS.top;
+    }
+
+    const boxX = MARGINS.left;
+    const boxY = yPos;
+    const boxWidth = 80;
+    const boxHeight = 30;
+
+    doc.setDrawColor(...COLORS.samsungBlue);
+    doc.setLineWidth(0.5);
+    doc.rect(boxX, boxY, boxWidth, boxHeight);
+
+    doc.setFontSize(9);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...COLORS.black);
+    doc.text('Samsung Smart Xperience:', boxX + 3, boxY + 6);
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text('O jeito mais smart de', boxX + 3, boxY + 11);
+    doc.text('atender voce.', boxX + 3, boxY + 15);
+
+    doc.setTextColor(...COLORS.samsungBlue);
+    doc.text('Conheca:', boxX + 3, boxY + 19);
+
+    const box2X = pageWidth / 2 + 5;
+    doc.setDrawColor(...COLORS.borderGray);
+    doc.rect(box2X, boxY, boxWidth, boxHeight);
+
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...COLORS.black);
+
+    const smartThingsTexto = [
+      'Com o app Smarthings, transforme',
+      'sua casa em um lar inteligente.',
+      'Controle seus dispositivos com seu',
+      'telefone, reduza o gasto de energia',
+      'da sua casa e automatize suas',
+      'rotinas.'
+    ];
+
+    let smartY = boxY + 5;
+    smartThingsTexto.forEach(linha => {
+      doc.text(linha, box2X + 3, smartY);
+      smartY += 4;
+    });
+
+    doc.setTextColor(...COLORS.samsungBlue);
+    doc.text('Conheca mais:', box2X + 3, smartY);
   }
-
-  doc.setDrawColor(...COLORS.black);
-  doc.setLineWidth(0.3);
-  doc.line(MARGINS.left, yPos, MARGINS.left + 80, yPos);
-  yPos += 4;
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.text('CPF DO CLIENTE EXTENSO', MARGINS.left, yPos);
-
-  yPos += 12;
-
-  doc.line(MARGINS.left, yPos, MARGINS.left + 80, yPos);
-  yPos += 4;
-  doc.text('ASSINATURA CLIENTE', MARGINS.left, yPos);
-
-  yPos += 12;
-
-  if (yPos > pageHeight - 40) {
-    doc.addPage();
-    yPos = MARGINS.top;
-  }
-
-  const boxX = MARGINS.left;
-  const boxY = yPos;
-  const boxWidth = 80;
-  const boxHeight = 30;
-
-  doc.setDrawColor(...COLORS.samsungBlue);
-  doc.setLineWidth(0.5);
-  doc.rect(boxX, boxY, boxWidth, boxHeight);
-
-  doc.setFontSize(9);
-  doc.setFont('helvetica', 'bold');
-  doc.setTextColor(...COLORS.black);
-  doc.text('Samsung Smart Xperience:', boxX + 3, boxY + 6);
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.text('O jeito mais smart de', boxX + 3, boxY + 11);
-  doc.text('atender voce.', boxX + 3, boxY + 15);
-
-  doc.setTextColor(...COLORS.samsungBlue);
-  doc.text('Conheca:', boxX + 3, boxY + 19);
-
-  const box2X = pageWidth / 2 + 5;
-  doc.setDrawColor(...COLORS.borderGray);
-  doc.rect(box2X, boxY, boxWidth, boxHeight);
-
-  doc.setFontSize(7);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(...COLORS.black);
-
-  const smartThingsTexto = [
-    'Com o app Smarthings, transforme',
-    'sua casa em um lar inteligente.',
-    'Controle seus dispositivos com seu',
-    'telefone, reduza o gasto de energia',
-    'da sua casa e automatize suas',
-    'rotinas.'
-  ];
-
-  let smartY = boxY + 5;
-  smartThingsTexto.forEach(linha => {
-    doc.text(linha, box2X + 3, smartY);
-    smartY += 4;
-  });
-
-  doc.setTextColor(...COLORS.samsungBlue);
-  doc.text('Conheca mais:', box2X + 3, smartY);
 
   return doc.output('blob');
 }
