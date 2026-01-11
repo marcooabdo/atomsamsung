@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.39.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, X-Client-Info, Apikey',
 };
 
@@ -17,159 +17,118 @@ Deno.serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const authHeader = req.headers.get('Authorization')!;
-    
-    const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
     });
 
-    const supabaseClient = createClient(supabaseUrl, supabaseServiceKey, {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    });
+    const body = await req.json();
+    const { secret_key, user_id, senha } = body;
 
-    const { data: { user: requestingUser } } = await supabaseClient.auth.getUser();
-    if (!requestingUser) {
-      throw new Error('Não autenticado');
+    if (secret_key !== 'migrate-orphan-2024') {
+      throw new Error('Chave secreta invalida');
     }
 
-    const { data: requestingUsuario } = await supabaseClient
-      .from('usuarios')
-      .select('tipo')
-      .eq('id', requestingUser.id)
-      .single();
-
-    if (!requestingUsuario || requestingUsuario.tipo !== 'master') {
-      throw new Error('Apenas usuários master podem migrar usuários órfãos');
+    if (!user_id || !senha) {
+      throw new Error('user_id e senha sao obrigatorios');
     }
 
-    const { data: orphanUsers } = await supabaseAdmin
+    const { data: usuario } = await supabase
       .from('usuarios')
       .select('*')
-      .not('id', 'in', `(SELECT id FROM auth.users)`);
+      .eq('id', user_id)
+      .single();
 
-    if (!orphanUsers || orphanUsers.length === 0) {
+    if (!usuario) {
+      throw new Error('Usuario nao encontrado na tabela usuarios');
+    }
+
+    const { data: existingAuth } = await supabase.auth.admin.listUsers();
+    const authUser = existingAuth?.users?.find(u => u.id === user_id);
+
+    if (authUser) {
+      const { error: passwordError } = await supabase.auth.admin.updateUserById(
+        user_id,
+        { password: senha }
+      );
+      if (passwordError) throw passwordError;
+
       return new Response(
         JSON.stringify({
           success: true,
-          message: 'Nenhum usuário órfão encontrado',
-          migrated: []
+          message: 'Usuario ja existe no auth, senha atualizada',
+          user_id: user_id,
+          email: usuario.email
         }),
-        {
-          headers: {
-            ...corsHeaders,
-            'Content-Type': 'application/json',
-          },
-        }
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    const results = [];
+    const emailUser = existingAuth?.users?.find(u => u.email === usuario.email);
+    
+    if (emailUser) {
+      const { error: migrateError } = await supabase.rpc('migrate_user_id', {
+        old_user_id: user_id,
+        new_user_id: emailUser.id
+      });
 
-    for (const user of orphanUsers) {
-      try {
-        const tempPassword = `Temp@${Math.random().toString(36).slice(-8)}`;
+      if (migrateError) throw migrateError;
 
-        const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: user.email,
-          password: tempPassword,
-          email_confirm: true,
-          user_metadata: {
-            name: user.nome
-          }
-        });
+      const { error: passwordError } = await supabase.auth.admin.updateUserById(
+        emailUser.id,
+        { password: senha }
+      );
+      if (passwordError) throw passwordError;
 
-        if (authError) {
-          results.push({
-            old_id: user.id,
-            email: user.email,
-            nome: user.nome,
-            success: false,
-            error: authError.message
-          });
-          continue;
-        }
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Usuario migrado para auth existente com mesmo email',
+          old_id: user_id,
+          new_id: emailUser.id,
+          email: usuario.email
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
-        await supabaseAdmin
-          .from('usuarios')
-          .delete()
-          .eq('id', user.id);
+    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      email: usuario.email,
+      password: senha,
+      email_confirm: true,
+      user_metadata: { name: usuario.nome }
+    });
 
-        const { error: insertError } = await supabaseAdmin
-          .from('usuarios')
-          .insert({
-            id: authData.user.id,
-            nome: user.nome,
-            email: user.email,
-            tipo: user.tipo,
-            unidade_id: user.unidade_id,
-            ativo: user.ativo
-          });
+    if (authError) throw authError;
 
-        if (insertError) {
-          await supabaseAdmin.auth.admin.deleteUser(authData.user.id);
-          results.push({
-            old_id: user.id,
-            email: user.email,
-            nome: user.nome,
-            success: false,
-            error: insertError.message
-          });
-          continue;
-        }
+    const { error: migrateError } = await supabase.rpc('migrate_user_id', {
+      old_user_id: user_id,
+      new_user_id: authData.user.id
+    });
 
-        results.push({
-          old_id: user.id,
-          new_id: authData.user.id,
-          email: user.email,
-          nome: user.nome,
-          temp_password: tempPassword,
-          success: true
-        });
-      } catch (error) {
-        results.push({
-          old_id: user.id,
-          email: user.email,
-          nome: user.nome,
-          success: false,
-          error: error.message
-        });
-      }
+    if (migrateError) {
+      await supabase.auth.admin.deleteUser(authData.user.id);
+      throw migrateError;
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Migração concluída. ${results.filter(r => r.success).length} de ${results.length} usuários migrados com sucesso.`,
-        migrated: results
+        message: 'Usuario criado no auth e migrado com sucesso',
+        old_id: user_id,
+        new_id: authData.user.id,
+        email: usuario.email
       }),
-      {
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Erro ao migrar usuários:', error);
+    console.error('Erro:', error);
     return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Erro ao migrar usuários órfãos'
-      }),
-      {
-        status: 400,
-        headers: {
-          ...corsHeaders,
-          'Content-Type': 'application/json',
-        },
-      }
+      JSON.stringify({ success: false, error: error.message }),
+      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
 });
