@@ -305,16 +305,22 @@ export function Configuracoes() {
             }
           }
 
-          const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
-          if (sessionError || !session?.access_token) {
-            throw new Error('Sessão expirada. Faça login novamente.');
+          let session = (await supabase.auth.getSession()).data.session;
+
+          if (!session || !session.access_token) {
+            const refreshResult = await supabase.auth.refreshSession();
+            session = refreshResult.data.session;
+          }
+
+          if (!session || !session.access_token) {
+            alert('Sessão expirada. Faça login novamente.');
+            return;
           }
 
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
           const headers = {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           };
 
           if (editingId) {
@@ -338,11 +344,15 @@ export function Configuracoes() {
 
             if (!response.ok) {
               const errorData = await response.json();
-              throw new Error(errorData.error || 'Erro ao atualizar usuário');
+              console.error('Erro da API:', errorData);
+              throw new Error(errorData.error || errorData.details || 'Erro ao atualizar usuário');
             }
 
             const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'Erro ao atualizar usuário');
+            if (!result.success) {
+              console.error('Erro no resultado:', result);
+              throw new Error(result.error || result.details || 'Erro ao atualizar usuário');
+            }
           } else {
             if (!formUsuario.senha) return alert('Senha é obrigatória para novo usuário');
 
@@ -365,11 +375,15 @@ export function Configuracoes() {
 
             if (!response.ok) {
               const errorData = await response.json();
-              throw new Error(errorData.error || 'Erro ao criar usuário');
+              console.error('Erro da API:', errorData);
+              throw new Error(errorData.error || errorData.details || 'Erro ao criar usuário');
             }
 
             const result = await response.json();
-            if (!result.success) throw new Error(result.error || 'Erro ao criar usuário');
+            if (!result.success) {
+              console.error('Erro no resultado:', result);
+              throw new Error(result.error || result.details || 'Erro ao criar usuário');
+            }
           }
           break;
         case 'servicos':
@@ -483,9 +497,16 @@ export function Configuracoes() {
     if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
 
     try {
-      const { data: { session }, error: sessionError } = await supabase.auth.refreshSession();
-      if (sessionError || !session?.access_token) {
-        throw new Error('Sessão expirada. Faça login novamente.');
+      let session = (await supabase.auth.getSession()).data.session;
+
+      if (!session || !session.access_token) {
+        const refreshResult = await supabase.auth.refreshSession();
+        session = refreshResult.data.session;
+      }
+
+      if (!session || !session.access_token) {
+        alert('Sessão expirada. Faça login novamente.');
+        return;
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
@@ -495,7 +516,6 @@ export function Configuracoes() {
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
-          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           action: 'delete',

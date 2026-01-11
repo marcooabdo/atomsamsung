@@ -32,7 +32,10 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get('Authorization');
 
     if (!authHeader) {
-      throw new Error('Token de autenticacao nao fornecido');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Token de autenticacao nao fornecido' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
@@ -43,11 +46,19 @@ Deno.serve(async (req: Request) => {
     });
 
     const token = authHeader.replace('Bearer ', '');
+
     const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !requestingUser) {
-      console.error('Erro de autenticacao:', authError);
-      throw new Error('Nao autenticado ou token invalido');
+      console.error('Erro de autenticacao:', authError?.message || 'User not found');
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Nao autenticado ou token invalido',
+          details: authError?.message
+        }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const { data: requestingUsuario, error: usuarioError } = await supabaseAdmin
@@ -58,11 +69,17 @@ Deno.serve(async (req: Request) => {
 
     if (usuarioError || !requestingUsuario) {
       console.error('Erro ao buscar usuario:', usuarioError);
-      throw new Error('Usuario nao encontrado');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Usuario nao encontrado no sistema' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     if (!['master', 'gerente', 'diretoria'].includes(requestingUsuario.tipo)) {
-      throw new Error('Sem permissao para gerenciar usuarios');
+      return new Response(
+        JSON.stringify({ success: false, error: 'Sem permissao para gerenciar usuarios' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
     const body: CreateUserRequest = await req.json();
