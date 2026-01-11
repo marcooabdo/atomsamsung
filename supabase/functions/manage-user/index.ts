@@ -128,21 +128,23 @@ Deno.serve(async (req: Request) => {
         throw new Error('ID do usuario e obrigatorio para atualizacao');
       }
 
-      const updateData: any = {
-        nome,
-        email,
-        tipo,
-        unidade_id: unidade_id || null,
-        ativo,
-        numero_tecnico: numero_tecnico || null
-      };
+      const updateData: any = {};
 
-      const { error: profileError } = await supabaseAdmin
-        .from('usuarios')
-        .update(updateData)
-        .eq('id', user_id);
+      if (nome !== undefined) updateData.nome = nome;
+      if (email !== undefined) updateData.email = email;
+      if (tipo !== undefined) updateData.tipo = tipo;
+      if (unidade_id !== undefined) updateData.unidade_id = unidade_id || null;
+      if (ativo !== undefined) updateData.ativo = ativo;
+      if (numero_tecnico !== undefined) updateData.numero_tecnico = numero_tecnico || null;
 
-      if (profileError) throw profileError;
+      if (Object.keys(updateData).length > 0) {
+        const { error: profileError } = await supabaseAdmin
+          .from('usuarios')
+          .update(updateData)
+          .eq('id', user_id);
+
+        if (profileError) throw profileError;
+      }
 
       if (senha) {
         const { error: passwordError } = await supabaseAdmin.auth.admin.updateUserById(
@@ -152,7 +154,7 @@ Deno.serve(async (req: Request) => {
         if (passwordError) throw passwordError;
       }
 
-      if (email) {
+      if (email && updateData.email) {
         const { error: emailError } = await supabaseAdmin.auth.admin.updateUserById(
           user_id,
           { email }
