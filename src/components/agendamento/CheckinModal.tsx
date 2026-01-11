@@ -140,6 +140,19 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
 
       if (updateError) throw updateError;
 
+      // Atualizar status da OS no kanban baseado no tipo de usuário
+      const novoStatusKanban = usuario?.tipo === 'tecnico_ih' ? 'em_rota_ih' : 'em_rota_ci';
+
+      const { error: osUpdateError } = await supabase
+        .from('os')
+        .update({
+          status_kanban: novoStatusKanban,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', agendamento.os_id);
+
+      if (osUpdateError) throw osUpdateError;
+
       await supabase.from('os_comentarios').insert({
         os_id: agendamento.os_id,
         usuario_id: usuario?.id,
