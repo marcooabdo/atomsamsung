@@ -712,6 +712,45 @@ export function Kanban() {
 
                     <div className="flex-1 min-h-0 overflow-y-auto space-y-2 cyber-scrollbar px-3 pb-3">
                       {filteredData[coluna.id]?.map((os) => (
+                        coluna.id === 'os_fechada' ? (
+                          <div
+                            key={os.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, os)}
+                            onDragEnd={handleDragEnd}
+                            onClick={() => {
+                              setSelectedOSId(os.id);
+                              setSelectedOSTipo(os.tipo_os as 'LP' | 'OW');
+                            }}
+                            className="rounded-lg p-2 cursor-pointer group relative overflow-hidden"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.2) 100%)',
+                              border: `1px solid ${getTextColor(coluna.id, coluna.color)}20`,
+                              boxShadow: `0 1px 4px rgba(0,0,0,0.2)`,
+                              transition: 'all 0.3s ease'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}50`;
+                              e.currentTarget.style.boxShadow = `0 2px 8px ${coluna.color}20`;
+                              e.currentTarget.style.transform = 'translateY(-1px)';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}20`;
+                              e.currentTarget.style.boxShadow = `0 1px 4px rgba(0,0,0,0.2)`;
+                              e.currentTarget.style.transform = 'translateY(0)';
+                            }}
+                          >
+                            <div className="flex items-center gap-2">
+                              <CheckCircle className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 3px #39FF14)' }} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-[10px] text-white truncate">
+                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+                                </p>
+                                <p className="text-[9px] text-gray-400 truncate">{os.cliente_nome}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
                         <div
                           key={os.id}
                           draggable
@@ -1179,6 +1218,7 @@ export function Kanban() {
                             )}
                           </div>
                         </div>
+                        )
                       ))}
 
                       {(!filteredData[coluna.id] || filteredData[coluna.id].length === 0) && (
