@@ -911,6 +911,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const handleRequisitarPeca = async (peca: OSPeca) => {
+    setCriandoRequisicao(true);
+
     try {
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida) para esta peça
       // Busca tanto por os_id quanto por cotacao_id para evitar duplicações
@@ -939,6 +941,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         };
         const statusLabel = statusLabels[existente.status] || existente.status.toUpperCase();
         alert(`❌ Não é possível criar nova requisição!\n\nJá existe uma requisição ${statusLabel} para esta peça.\n\nID da requisição: ${existente.id.slice(0, 8)}`);
+        setCriandoRequisicao(false);
         return;
       }
 
@@ -990,6 +993,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       onReload?.();
     } catch (error) {
       alert('Erro ao criar requisição de peça');
+    } finally {
+      setCriandoRequisicao(false);
     }
   };
 
@@ -2279,7 +2284,22 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                           {/* Botões conforme status */}
                           <div className="flex gap-2">
-                            {!requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                            {criandoRequisicao && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                              <button
+                                disabled
+                                className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
+                                style={{
+                                  backgroundColor: '#00D4FF20',
+                                  borderColor: '#00D4FF',
+                                  color: '#00D4FF'
+                                }}
+                              >
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                REQUISITANDO...
+                              </button>
+                            )}
+
+                            {!criandoRequisicao && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
