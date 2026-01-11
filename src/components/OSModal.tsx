@@ -912,20 +912,21 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
   const handleRequisitarPeca = async (peca: OSPeca) => {
     try {
-      if (!os?.cotacao_id) {
-        alert('❌ Erro: Esta OS não possui uma cotação vinculada!\n\nNão é possível requisitar peças sem uma cotação.');
-        return;
-      }
-
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida) para esta peça
       // Busca tanto por os_id quanto por cotacao_id para evitar duplicações
-      const { data: existente } = await supabase
+      let query = supabase
         .from('requisicoes_pecas')
         .select('id, status')
-        .or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`)
         .eq('cotacao_peca_id', peca.cotacao_peca_id || peca.id)
-        .not('status', 'in', '(reprovada,devolvida)')
-        .maybeSingle();
+        .not('status', 'in', '(reprovada,devolvida)');
+
+      if (os?.cotacao_id) {
+        query = query.or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`);
+      } else {
+        query = query.eq('os_id', osId);
+      }
+
+      const { data: existente } = await query.maybeSingle();
 
       if (existente) {
         const statusLabels: Record<string, string> = {
@@ -946,7 +947,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .from('requisicoes_pecas')
         .insert({
           os_id: osId,
-          cotacao_id: os.cotacao_id,
+          cotacao_id: os?.cotacao_id || null,
           cotacao_peca_id: peca.cotacao_peca_id || peca.id,
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
@@ -993,11 +994,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const handleRequisitarNovamente = async (peca: OSPeca, requisicaoReprovada: any) => {
-    if (!os?.cotacao_id) {
-      alert('❌ Erro: Esta OS não possui uma cotação vinculada!\n\nNão é possível requisitar peças sem uma cotação.');
-      return;
-    }
-
     const motivo = prompt('Informe o motivo para requisitar novamente esta peça:');
     if (!motivo || !motivo.trim()) {
       alert('É necessário informar o motivo da nova requisição');
@@ -1009,13 +1005,19 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     try {
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida)
       // Busca tanto por os_id quanto por cotacao_id para evitar duplicações
-      const { data: existente } = await supabase
+      let queryExistente = supabase
         .from('requisicoes_pecas')
         .select('id, status')
-        .or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`)
         .eq('cotacao_peca_id', peca.cotacao_peca_id || peca.id)
-        .not('status', 'in', '(reprovada,devolvida)')
-        .maybeSingle();
+        .not('status', 'in', '(reprovada,devolvida)');
+
+      if (os?.cotacao_id) {
+        queryExistente = queryExistente.or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`);
+      } else {
+        queryExistente = queryExistente.eq('os_id', osId);
+      }
+
+      const { data: existente } = await queryExistente.maybeSingle();
 
       if (existente) {
         const statusLabels: Record<string, string> = {
@@ -1037,7 +1039,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .from('requisicoes_pecas')
         .insert({
           os_id: osId,
-          cotacao_id: os.cotacao_id,
+          cotacao_id: os?.cotacao_id || null,
           cotacao_peca_id: peca.cotacao_peca_id || peca.id,
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
