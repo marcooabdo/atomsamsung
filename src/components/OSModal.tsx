@@ -92,6 +92,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalAnalise, setMostrarModalAnalise] = useState(false);
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
+  const [pecaRequisitandoId, setPecaRequisitandoId] = useState<string | null>(null);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
@@ -911,6 +912,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const handleRequisitarPeca = async (peca: OSPeca) => {
+    const pecaId = peca.cotacao_peca_id || peca.id;
+    setPecaRequisitandoId(pecaId);
     setCriandoRequisicao(true);
 
     try {
@@ -919,7 +922,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       let query = supabase
         .from('requisicoes_pecas')
         .select('id, status')
-        .eq('cotacao_peca_id', peca.cotacao_peca_id || peca.id)
+        .eq('cotacao_peca_id', pecaId)
         .not('status', 'in', '(reprovada,devolvida)');
 
       if (os?.cotacao_id) {
@@ -941,6 +944,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         };
         const statusLabel = statusLabels[existente.status] || existente.status.toUpperCase();
         alert(`❌ Não é possível criar nova requisição!\n\nJá existe uma requisição ${statusLabel} para esta peça.\n\nID da requisição: ${existente.id.slice(0, 8)}`);
+        setPecaRequisitandoId(null);
         setCriandoRequisicao(false);
         return;
       }
@@ -951,7 +955,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .insert({
           os_id: osId,
           cotacao_id: os?.cotacao_id || null,
-          cotacao_peca_id: peca.cotacao_peca_id || peca.id,
+          cotacao_peca_id: pecaId,
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
           quantidade_requisitada: peca.quantidade || 1,
@@ -987,13 +991,17 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         });
       }
 
-      alert('Requisição de peça criada com sucesso! OS movida para "Aguardando Peça".');
+      // Recarregar dados
       await loadRequisicoes();
       await loadOS();
       onReload?.();
+
+      alert('Requisição de peça criada com sucesso! OS movida para "Aguardando Peça".');
     } catch (error) {
+      console.error('Erro ao criar requisição:', error);
       alert('Erro ao criar requisição de peça');
     } finally {
+      setPecaRequisitandoId(null);
       setCriandoRequisicao(false);
     }
   };
@@ -2284,7 +2292,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                           {/* Botões conforme status */}
                           <div className="flex gap-2">
-                            {criandoRequisicao && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                            {pecaRequisitandoId === (peca.cotacao_peca_id || peca.id) && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
@@ -2299,10 +2307,11 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                disabled={pecaRequisitandoId !== null}
                               >
                                 <Send className="w-3 h-3" />
                                 REQUISITAR
