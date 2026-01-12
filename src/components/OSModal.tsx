@@ -220,6 +220,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .order('created_at', { ascending: true })
     ]);
 
+    console.log('os_pecas:', osPecasResult.data?.length || 0, 'cotacoes_pecas:', cotacaoPecasResult.data?.length || 0);
+
     // Converte cotacoes_pecas para o formato de os_pecas
     const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
       id: p.id,
@@ -235,7 +237,15 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       updated_at: p.updated_at
     }));
 
-    setPecas([...(osPecasResult.data || []), ...cotacaoPecas]);
+    // Para os_pecas, garante que cotacao_peca_id está preenchido (usa seu próprio ID se não tiver)
+    const osPecasFormatted = (osPecasResult.data || []).map(p => ({
+      ...p,
+      cotacao_peca_id: p.cotacao_peca_id || p.id
+    }));
+
+    const todasPecas = [...osPecasFormatted, ...cotacaoPecas];
+    console.log('Total de peças:', todasPecas.length, todasPecas.map(p => ({ desc: p.descricao, id: p.cotacao_peca_id })));
+    setPecas(todasPecas);
   };
 
   const loadServicos = async () => {
@@ -288,11 +298,15 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
+      console.error('Erro ao carregar requisições:', error);
       return;
     }
 
-    data?.forEach(req => {
-    });
+    console.log('Requisições carregadas:', data?.length || 0, data?.map(r => ({
+      cotacao_peca_id: r.cotacao_peca_id,
+      status: r.status,
+      descricao: r.descricao
+    })));
 
     setRequisicoes(data || []);
   };
@@ -2152,17 +2166,32 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                 <div className="space-y-3">
                   {pecas.map((peca) => {
                     // Buscar requisição desta peça (prioriza ativas, senão pega a mais recente)
+                    const pecaId = peca.cotacao_peca_id || peca.id;
                     const requisicoesDestaPeca = requisicoes.filter(r =>
-                      r.cotacao_peca_id === (peca.cotacao_peca_id || peca.id)
+                      r.cotacao_peca_id === pecaId
                     ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
                     const requisicaoAtiva = requisicoesDestaPeca.find(r =>
-                      r.status !== 'devolvida' && r.status !== 'reprovada'
+                      r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada'
                     );
                     const requisicaoDevolvida = requisicoesDestaPeca.find(r =>
                       r.status === 'devolvida' || r.status === 'reprovada'
                     );
-                    const requisicao = requisicaoAtiva || requisicoesDestaPeca[0];
+
+                    // IMPORTANTE: Apenas requisições ativas devem ser consideradas para controlar o botão
+                    const requisicao = requisicaoAtiva;
+
+                    // Debug detalhado
+                    if (requisicoesDestaPeca.length > 0) {
+                      console.log('✅ Peça com requisição:', peca.descricao, {
+                        pecaId: pecaId,
+                        totalReqs: requisicoesDestaPeca.length,
+                        ativa: requisicaoAtiva ? requisicaoAtiva.status : 'NENHUMA',
+                        todas: requisicoesDestaPeca.map(r => r.status)
+                      });
+                    } else {
+                      console.log('⚪ Peça sem requisição:', peca.descricao, { pecaId });
+                    }
 
                     // Verifica se existe nova requisição pendente após devolução/reprovação
                     const temNovaRequisicaoPendente = requisicaoAtiva && requisicaoDevolvida &&
