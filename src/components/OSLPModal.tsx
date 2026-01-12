@@ -2591,7 +2591,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                         Peças da Cotação (Disponíveis para Requisitar)
                       </h3>
                       <div className="space-y-3">
-                        {pecas.filter(peca => !requisicoes.find(r => r.cotacao_peca_id === peca.cotacao_peca_id)).map((peca) => (
+                        {pecas.filter(peca => {
+                          // Verifica se existe requisição ATIVA (não devolvida/cancelada) para esta peça específica
+                          const temRequisicaoAtiva = requisicoes.find(r =>
+                            r.cotacao_peca_id === peca.cotacao_peca_id &&
+                            r.status !== 'devolvida' &&
+                            r.status !== 'reprovada' &&
+                            r.status !== 'cancelada'
+                          );
+                          return !temRequisicaoAtiva;
+                        }).map((peca) => (
                           <div
                             key={peca.id}
                             className="premium-card p-4 border-l-4"

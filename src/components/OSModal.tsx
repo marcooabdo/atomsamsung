@@ -220,8 +220,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .order('created_at', { ascending: true })
     ]);
 
-    console.log('os_pecas:', osPecasResult.data?.length || 0, 'cotacoes_pecas:', cotacaoPecasResult.data?.length || 0);
-
     // Converte cotacoes_pecas para o formato de os_pecas
     const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
       id: p.id,
@@ -244,7 +242,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     }));
 
     const todasPecas = [...osPecasFormatted, ...cotacaoPecas];
-    console.log('Total de peças:', todasPecas.length, todasPecas.map(p => ({ desc: p.descricao, id: p.cotacao_peca_id })));
     setPecas(todasPecas);
   };
 
@@ -298,15 +295,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
-      console.error('Erro ao carregar requisições:', error);
       return;
     }
-
-    console.log('Requisições carregadas:', data?.length || 0, data?.map(r => ({
-      cotacao_peca_id: r.cotacao_peca_id,
-      status: r.status,
-      descricao: r.descricao
-    })));
 
     setRequisicoes(data || []);
   };
@@ -2180,18 +2170,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                     // IMPORTANTE: Apenas requisições ativas devem ser consideradas para controlar o botão
                     const requisicao = requisicaoAtiva;
-
-                    // Debug detalhado
-                    if (requisicoesDestaPeca.length > 0) {
-                      console.log('✅ Peça com requisição:', peca.descricao, {
-                        pecaId: pecaId,
-                        totalReqs: requisicoesDestaPeca.length,
-                        ativa: requisicaoAtiva ? requisicaoAtiva.status : 'NENHUMA',
-                        todas: requisicoesDestaPeca.map(r => r.status)
-                      });
-                    } else {
-                      console.log('⚪ Peça sem requisição:', peca.descricao, { pecaId });
-                    }
 
                     // Verifica se existe nova requisição pendente após devolução/reprovação
                     const temNovaRequisicaoPendente = requisicaoAtiva && requisicaoDevolvida &&
