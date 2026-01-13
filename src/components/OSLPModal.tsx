@@ -532,10 +532,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       .neq('status', 'cancelada')
       .order('created_at', { ascending: false });
 
-    console.log('🔍 Requisições carregadas LP:', data?.map(r => ({
+    console.log('🔍 Requisições carregadas LP (TOTAL:', data?.length, '):', data?.map(r => ({
+      id: r.id,
       cotacao_peca_id: r.cotacao_peca_id,
       status: r.status,
-      descricao: r.descricao?.substring(0, 30)
+      descricao: r.descricao?.substring(0, 30),
+      codigo: r.codigo_peca
     })));
 
     setRequisicoes(data || []);
@@ -836,10 +838,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         descricao: peca.descricao?.substring(0, 30)
       });
 
-      const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
+      const { data: novaRequisicao, error: insertError } = await supabase.from('requisicoes_pecas').insert({
         os_id: osId,
         cotacao_id: os?.cotacao_id || null,
-        cotacao_peca_id: peca.cotacao_peca_id,
+        cotacao_peca_id: peca.cotacao_peca_id || null,
         codigo_peca: peca.codigo || peca.pn,
         descricao: peca.descricao,
         quantidade_requisitada: peca.quantidade,
@@ -847,9 +849,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         requisitado_por: usuario?.id,
         numero_os_samsung: os?.numero_os_samsung,
         unidade_id: os?.unidade_id
-      });
+      }).select();
 
       if (insertError) throw insertError;
+
+      console.log('✅ Requisição criada:', novaRequisicao);
 
       // Mover OS para "Aguardando Peça" se não estiver lá ainda
       const colunasQueNaoPrecisamMover = ['aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
@@ -880,13 +884,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         });
       }
 
-      alert('Requisição enviada! OS movida para "Aguardando Peça".');
+      await new Promise(resolve => setTimeout(resolve, 300));
+
       await loadPecas();
       await loadRequisicoes();
       await loadComentarios();
       await loadOS();
       onReload?.();
+
+      alert('Requisição enviada! OS movida para "Aguardando Peça".');
     } catch (error) {
+      console.error('Erro ao requisitar peça:', error);
       alert('Erro ao requisitar peça');
     }
   };
@@ -2541,6 +2549,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                             const requisicaoDevolvida = requisicoesDestaPeca.find(r =>
                               r.status === 'devolvida' || r.status === 'reprovada'
                             );
+
+                            console.log(`🔍 LP Peça ${peca.descricao?.substring(0, 20)}:`, {
+                              peca_cotacao_id: peca.cotacao_peca_id,
+                              peca_id: peca.id,
+                              pecaId_usado: pecaId,
+                              num_requisicoes: requisicoesDestaPeca.length,
+                              requisicao_ativa: requisicaoAtiva?.status,
+                              todas_requisicoes_ids: requisicoes.map(r => ({ id: r.id, cotacao_peca_id: r.cotacao_peca_id, status: r.status }))
+                            });
 
                             todasPecasParaExibir.push({
                               peca,
