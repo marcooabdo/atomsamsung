@@ -2232,6 +2232,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                                 </span>
                               )}
                               {requisicao && getStatusBadge(requisicao.status)}
+                              {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
                             </div>
                             <div className="flex items-center gap-4">
                               <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
@@ -2250,9 +2251,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                                 Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                               </p>
                             </div>
-                            {requisicao && (
+                            {(requisicao || requisicaoDevolvida) && (
                               <p className="text-xs text-gray-500 mt-2">
-                                Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
+                                Requisitado em: {new Date((requisicao || requisicaoDevolvida)!.created_at).toLocaleString('pt-BR')}
                               </p>
                             )}
                             {requisicao?.status === 'pedido_feito' && (
@@ -2363,7 +2364,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2433,7 +2434,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {criandoRequisicao && (requisicao?.status === 'reprovada' || requisicao?.status === 'devolvida') && (
+                            {criandoRequisicao && (requisicaoDevolvida?.status === 'reprovada' || requisicaoDevolvida?.status === 'devolvida') && !requisicao && (
                               <button
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
@@ -2448,9 +2449,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicao?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'reprovada' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                               <button
-                                onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                 style={{
                                   backgroundColor: '#FFBF0020',
@@ -2463,9 +2464,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                               <button
-                                onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                 style={{
                                   backgroundColor: '#39FF1420',
