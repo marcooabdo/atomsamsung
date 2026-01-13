@@ -95,7 +95,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
         .from('estoque_devolucoes')
         .select(`
           *,
-          peca_id(id_numerico, pn, descricao, status, os_id),
+          peca_id(id, id_numerico, pn, descricao, status, os_id),
           solicitada_usuario:solicitada_por(nome),
           aprovada_usuario:aprovada_por(nome)
         `)
@@ -111,11 +111,13 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           let numero_os_samsung = null;
           let numero_cotacao = null;
 
+          const pecaId = typeof dev.peca_id === 'object' ? dev.peca_id?.id : dev.peca_id;
+
           // Buscar requisição original para pegar numero_os_samsung e cotacao_id
           const { data: requisicao } = await supabase
             .from('requisicoes_pecas')
             .select('numero_os_samsung, cotacao_id, cotacao:cotacao_id(numero_cotacao)')
-            .eq('peca_estoque_id', dev.peca_id.id)
+            .eq('peca_estoque_id', pecaId)
             .eq('status', 'devolvida')
             .maybeSingle();
 
