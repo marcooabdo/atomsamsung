@@ -923,18 +923,24 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     setCriandoRequisicao(true);
 
     try {
+      // Para peças GSPN, cotacao_peca_id deve ser null
+      const isGSPN = peca.status === 'gspn';
+      const cotacaoPecaId = isGSPN ? null : (peca.cotacao_peca_id || peca.id);
+
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida) para esta peça
-      // Busca tanto por os_id quanto por cotacao_id para evitar duplicações
+      // Para GSPN, verifica por código da peça; para outras, por cotacao_peca_id
       let query = supabase
         .from('requisicoes_pecas')
         .select('id, status')
-        .eq('cotacao_peca_id', pecaId)
+        .eq('os_id', osId)
         .not('status', 'in', '(reprovada,devolvida)');
 
-      if (os?.cotacao_id) {
-        query = query.or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`);
+      if (isGSPN) {
+        // Para GSPN, verifica pelo código da peça
+        query = query.eq('codigo_peca', peca.codigo || peca.pn || 'N/A');
       } else {
-        query = query.eq('os_id', osId);
+        // Para peças normais, verifica pelo cotacao_peca_id
+        query = query.eq('cotacao_peca_id', cotacaoPecaId);
       }
 
       const { data: existente } = await query.maybeSingle();
@@ -961,7 +967,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .insert({
           os_id: osId,
           cotacao_id: os?.cotacao_id || null,
-          cotacao_peca_id: pecaId,
+          cotacao_peca_id: cotacaoPecaId, // null para GSPN, ID válido para outras
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
           quantidade_requisitada: peca.quantidade || 1,
@@ -1038,18 +1044,23 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     setCriandoRequisicao(true);
 
     try {
+      // Para peças GSPN, cotacao_peca_id deve ser null
+      const isGSPN = peca.status === 'gspn';
+      const cotacaoPecaId = isGSPN ? null : (peca.cotacao_peca_id || peca.id);
+
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida)
-      // Busca tanto por os_id quanto por cotacao_id para evitar duplicações
       let queryExistente = supabase
         .from('requisicoes_pecas')
         .select('id, status')
-        .eq('cotacao_peca_id', peca.cotacao_peca_id || peca.id)
+        .eq('os_id', osId)
         .not('status', 'in', '(reprovada,devolvida)');
 
-      if (os?.cotacao_id) {
-        queryExistente = queryExistente.or(`os_id.eq.${osId},cotacao_id.eq.${os.cotacao_id}`);
+      if (isGSPN) {
+        // Para GSPN, verifica pelo código da peça
+        queryExistente = queryExistente.eq('codigo_peca', peca.codigo || peca.pn || 'N/A');
       } else {
-        queryExistente = queryExistente.eq('os_id', osId);
+        // Para peças normais, verifica pelo cotacao_peca_id
+        queryExistente = queryExistente.eq('cotacao_peca_id', cotacaoPecaId);
       }
 
       const { data: existente } = await queryExistente.maybeSingle();
@@ -1075,7 +1086,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .insert({
           os_id: osId,
           cotacao_id: os?.cotacao_id || null,
-          cotacao_peca_id: peca.cotacao_peca_id || peca.id,
+          cotacao_peca_id: cotacaoPecaId, // null para GSPN, ID válido para outras
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
           quantidade_requisitada: peca.quantidade || 1,
