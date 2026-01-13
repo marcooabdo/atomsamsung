@@ -70,8 +70,6 @@ export function Kanban() {
   const [tipoOSFilters, setTipoOSFilters] = useState<string[]>([]);
   const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
   const [minDiasAbertos, setMinDiasAbertos] = useState<number>(0);
-  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
-  const [filtroLPCI, setFiltroLPCI] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
@@ -617,9 +615,7 @@ export function Kanban() {
 
       const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
 
-      const matchesLPCI = !filtroLPCI || (os.tipo_os === 'LP' && os.tipo_atendimento === 'CI');
-
-      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTAT && matchesLPCI;
+      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTAT;
     });
     return acc;
   }, {} as Record<string, OS[]>);
@@ -803,16 +799,16 @@ export function Kanban() {
                 onClick={() => setShowTipoFilter(!showTipoFilter)}
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
                 style={{
-                  background: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0)
+                  background: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0)
                     ? 'linear-gradient(135deg, rgba(255,191,0,0.2) 0%, rgba(255,191,0,0.05) 100%)'
                     : 'rgba(107,114,128,0.1)',
-                  border: `1px solid ${(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0) ? '#FFBF00' : '#6B7280'}`,
-                  color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0) ? '#FFBF00' : '#6B7280',
-                  boxShadow: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0) ? '0 0 10px rgba(255,191,0,0.2)' : 'none'
+                  border: `1px solid ${(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280'}`,
+                  color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280',
+                  boxShadow: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '0 0 10px rgba(255,191,0,0.2)' : 'none'
                 }}
               >
                 <Filter className="w-3.5 h-3.5" />
-                TIPO OS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length})`}
+                TIPO OS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length + (minDiasAbertos > 0 ? 1 : 0)})`}
                 <ChevronDown className="w-3 h-3" />
               </button>
 
@@ -895,7 +891,25 @@ export function Kanban() {
                     ))}
                   </div>
 
-                  <div className="flex gap-2 pt-2 border-t border-[#FFBF00]/30">
+                  <div className="pt-3 mt-3 border-t border-[#FFBF00]/30">
+                    <label className="text-[10px] text-[#FFBF00] mb-1.5 block font-bold">TAT MÍNIMO (dias abertos)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={minDiasAbertos}
+                      onChange={(e) => setMinDiasAbertos(Math.max(0, parseInt(e.target.value) || 0))}
+                      onClick={(e) => e.stopPropagation()}
+                      className="w-full px-2 py-1.5 rounded text-xs"
+                      style={{
+                        background: 'rgba(255,191,0,0.05)',
+                        border: '1px solid rgba(255,191,0,0.3)',
+                        color: '#FFBF00'
+                      }}
+                      placeholder="Ex: 7 (mostra OS com 7+ dias)"
+                    />
+                  </div>
+
+                  <div className="flex gap-2 pt-3 mt-3 border-t border-[#FFBF00]/30">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -916,6 +930,7 @@ export function Kanban() {
                         e.stopPropagation();
                         setTipoOSFilters([]);
                         setTipoAtendimentoFilters([]);
+                        setMinDiasAbertos(0);
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
                       style={{
@@ -925,98 +940,6 @@ export function Kanban() {
                       }}
                     >
                       LIMPAR TUDO
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="relative">
-              <button
-                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
-                style={{
-                  background: (minDiasAbertos > 0 || filtroLPCI)
-                    ? 'linear-gradient(135deg, rgba(255,0,255,0.2) 0%, rgba(255,0,255,0.05) 100%)'
-                    : 'rgba(107,114,128,0.1)',
-                  border: `1px solid ${(minDiasAbertos > 0 || filtroLPCI) ? '#FF00FF' : '#6B7280'}`,
-                  color: (minDiasAbertos > 0 || filtroLPCI) ? '#FF00FF' : '#6B7280',
-                  boxShadow: (minDiasAbertos > 0 || filtroLPCI) ? '0 0 10px rgba(255,0,255,0.2)' : 'none'
-                }}
-              >
-                <Filter className="w-3.5 h-3.5" />
-                FILTROS {(minDiasAbertos > 0 || filtroLPCI) && `(${(minDiasAbertos > 0 ? 1 : 0) + (filtroLPCI ? 1 : 0)})`}
-                <ChevronDown className="w-3 h-3" />
-              </button>
-
-              {showAdvancedFilters && (
-                <div
-                  className="absolute top-full mt-2 right-0 z-50 min-w-[250px] rounded-lg p-3"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
-                    border: '1px solid rgba(255,0,255,0.3)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,0,255,0.1)'
-                  }}
-                >
-                  <div className="text-xs font-bold text-[#FF00FF] mb-3 pb-2 border-b border-[#FF00FF]/30">
-                    FILTROS AVANÇADOS
-                  </div>
-
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-[10px] text-gray-400 mb-1.5 block">TAT Mínimo (dias abertos)</label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={minDiasAbertos}
-                        onChange={(e) => setMinDiasAbertos(Math.max(0, parseInt(e.target.value) || 0))}
-                        className="w-full px-2 py-1.5 rounded text-xs"
-                        style={{
-                          background: 'rgba(255,0,255,0.05)',
-                          border: '1px solid rgba(255,0,255,0.3)',
-                          color: '#FF00FF'
-                        }}
-                        placeholder="Ex: 7"
-                      />
-                    </div>
-
-                    <div
-                      onClick={() => setFiltroLPCI(!filtroLPCI)}
-                      className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
-                      style={{
-                        background: filtroLPCI
-                          ? 'linear-gradient(135deg, rgba(255,0,255,0.15) 0%, rgba(255,0,255,0.05) 100%)'
-                          : 'transparent',
-                        border: `1px solid ${filtroLPCI ? 'rgba(255,0,255,0.3)' : 'transparent'}`
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={filtroLPCI}
-                        onChange={() => {}}
-                        className="w-3.5 h-3.5 rounded accent-[#FF00FF] pointer-events-none"
-                      />
-                      <span className={`text-xs flex-1 ${filtroLPCI ? 'text-[#FF00FF] font-medium' : 'text-gray-300'}`}>
-                        Apenas LP CI
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#FF00FF]/30">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setMinDiasAbertos(0);
-                        setFiltroLPCI(false);
-                      }}
-                      className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
-                      style={{
-                        background: 'rgba(255,0,100,0.1)',
-                        border: '1px solid rgba(255,0,100,0.3)',
-                        color: '#FF0064'
-                      }}
-                    >
-                      LIMPAR
                     </button>
                   </div>
                 </div>
