@@ -506,21 +506,25 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                           DEVOLVIDA
                         </span>
                       </div>
+
+                      {(dev.numero_os_samsung || dev.numero_cotacao) && (
+                        <div className="mb-2">
+                          <p className="text-sm font-bold text-white">
+                            {dev.numero_os_samsung
+                              ? `OS ${dev.numero_os_samsung}`
+                              : dev.numero_cotacao
+                                ? `Cotação #${dev.numero_cotacao}`
+                                : ''}
+                          </p>
+                        </div>
+                      )}
+
                       <p className="text-sm text-gray-400 mb-1">
                         PN: <span className="font-mono">{dev.peca_id?.pn || 'N/A'}</span>
                       </p>
                       <p className="text-sm text-gray-400 mb-2">
                         {dev.peca_id?.descricao || 'N/A'}
                       </p>
-
-                      <div className="flex items-center gap-3 mb-2 text-xs text-gray-500">
-                        {dev.numero_os_samsung && (
-                          <span>OS Samsung: <span className="font-bold text-[#00D4FF]">#{dev.numero_os_samsung}</span></span>
-                        )}
-                        {!dev.numero_os_samsung && dev.numero_cotacao && (
-                          <span>Cotação: <span className="font-bold text-[#00D4FF]">#{dev.numero_cotacao}</span></span>
-                        )}
-                      </div>
 
                       {dev.observacao && (
                         <div className="bg-gray-900/50 rounded-lg p-3 mt-2">
