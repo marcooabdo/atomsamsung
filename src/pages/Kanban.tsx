@@ -6,7 +6,7 @@ import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
 import { JobStatusCard } from '../components/JobStatusCard';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -69,6 +69,10 @@ export function Kanban() {
   });
   const [tipoOSFilters, setTipoOSFilters] = useState<string[]>([]);
   const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
+  const [minDiasAbertos, setMinDiasAbertos] = useState<number>(0);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filtroLPCI, setFiltroLPCI] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -81,6 +85,31 @@ export function Kanban() {
     const now = new Date();
     const updated = new Date(updatedAt);
     const diffMs = now.getTime() - updated.getTime();
+
+    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    const parts = [];
+    if (dias > 0) parts.push(`${dias}d`);
+    if (horas > 0) parts.push(`${horas}h`);
+    if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
+
+    return parts.join(' ');
+  };
+
+  const calcularTAT = (createdAt: string) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffMs = now.getTime() - created.getTime();
+    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    return dias;
+  };
+
+  const formatTAT = (createdAt: string) => {
+    const now = new Date();
+    const created = new Date(createdAt);
+    const diffMs = now.getTime() - created.getTime();
 
     const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
@@ -586,7 +615,11 @@ export function Kanban() {
       const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
         (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
 
-      return matchesSearch && matchesTipoOS && matchesTipoAtendimento;
+      const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
+
+      const matchesLPCI = !filtroLPCI || (os.tipo_os === 'LP' && os.tipo_atendimento === 'CI');
+
+      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTAT && matchesLPCI;
     });
     return acc;
   }, {} as Record<string, OS[]>);
@@ -898,6 +931,112 @@ export function Kanban() {
               )}
             </div>
 
+            <div className="relative">
+              <button
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                style={{
+                  background: (minDiasAbertos > 0 || filtroLPCI)
+                    ? 'linear-gradient(135deg, rgba(255,0,255,0.2) 0%, rgba(255,0,255,0.05) 100%)'
+                    : 'rgba(107,114,128,0.1)',
+                  border: `1px solid ${(minDiasAbertos > 0 || filtroLPCI) ? '#FF00FF' : '#6B7280'}`,
+                  color: (minDiasAbertos > 0 || filtroLPCI) ? '#FF00FF' : '#6B7280',
+                  boxShadow: (minDiasAbertos > 0 || filtroLPCI) ? '0 0 10px rgba(255,0,255,0.2)' : 'none'
+                }}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                FILTROS {(minDiasAbertos > 0 || filtroLPCI) && `(${(minDiasAbertos > 0 ? 1 : 0) + (filtroLPCI ? 1 : 0)})`}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {showAdvancedFilters && (
+                <div
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[250px] rounded-lg p-3"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
+                    border: '1px solid rgba(255,0,255,0.3)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,0,255,0.1)'
+                  }}
+                >
+                  <div className="text-xs font-bold text-[#FF00FF] mb-3 pb-2 border-b border-[#FF00FF]/30">
+                    FILTROS AVANÇADOS
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-gray-400 mb-1.5 block">TAT Mínimo (dias abertos)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={minDiasAbertos}
+                        onChange={(e) => setMinDiasAbertos(Math.max(0, parseInt(e.target.value) || 0))}
+                        className="w-full px-2 py-1.5 rounded text-xs"
+                        style={{
+                          background: 'rgba(255,0,255,0.05)',
+                          border: '1px solid rgba(255,0,255,0.3)',
+                          color: '#FF00FF'
+                        }}
+                        placeholder="Ex: 7"
+                      />
+                    </div>
+
+                    <div
+                      onClick={() => setFiltroLPCI(!filtroLPCI)}
+                      className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
+                      style={{
+                        background: filtroLPCI
+                          ? 'linear-gradient(135deg, rgba(255,0,255,0.15) 0%, rgba(255,0,255,0.05) 100%)'
+                          : 'transparent',
+                        border: `1px solid ${filtroLPCI ? 'rgba(255,0,255,0.3)' : 'transparent'}`
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={filtroLPCI}
+                        onChange={() => {}}
+                        className="w-3.5 h-3.5 rounded accent-[#FF00FF] pointer-events-none"
+                      />
+                      <span className={`text-xs flex-1 ${filtroLPCI ? 'text-[#FF00FF] font-medium' : 'text-gray-300'}`}>
+                        Apenas LP CI
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 mt-3 pt-3 border-t border-[#FF00FF]/30">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setMinDiasAbertos(0);
+                        setFiltroLPCI(false);
+                      }}
+                      className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
+                      style={{
+                        background: 'rgba(255,0,100,0.1)',
+                        border: '1px solid rgba(255,0,100,0.3)',
+                        color: '#FF0064'
+                      }}
+                    >
+                      LIMPAR
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+              style={{
+                background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.05) 100%)',
+                border: '1px solid #10B981',
+                color: '#10B981',
+                boxShadow: '0 0 10px rgba(16,185,129,0.2)'
+              }}
+            >
+              <Download className="w-3.5 h-3.5" />
+              EXPORTAR
+            </button>
+
             <button
               onClick={() => setCriarOSLP(true)}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
@@ -1165,6 +1304,18 @@ export function Kanban() {
                                 }}
                               >
                                 {os.tipo_os}
+                              </span>
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[9px] font-bold ml-auto"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(255,0,255,0.25) 0%, rgba(255,0,255,0.1) 100%)',
+                                  color: '#FF00FF',
+                                  border: '1px solid rgba(255,0,255,0.5)',
+                                  boxShadow: '0 0 8px rgba(255,0,255,0.2)'
+                                }}
+                                title={`Tempo total desde abertura: ${formatTAT(os.created_at)}`}
+                              >
+                                TAT: {calcularTAT(os.created_at)}d
                               </span>
                             </div>
 
@@ -1591,6 +1742,312 @@ export function Kanban() {
           onSuccess={loadKanbanData}
         />
       )}
+
+      {showExportModal && (
+        <ExportModal
+          osData={Object.values(filteredData).flat()}
+          onClose={() => setShowExportModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+interface ExportModalProps {
+  osData: OS[];
+  onClose: () => void;
+}
+
+function ExportModal({ osData, onClose }: ExportModalProps) {
+  const [exportConfig, setExportConfig] = useState({
+    dadosBasicos: true,
+    dadosCliente: true,
+    dadosAparelho: true,
+    dadosFinanceiros: true,
+    dadosTempo: true,
+    comentarios: false,
+    pecas: false,
+    anexos: false,
+    agendamento: false
+  });
+  const [exporting, setExporting] = useState(false);
+
+  const handleExport = async () => {
+    if (osData.length === 0) {
+      alert('Nenhuma OS para exportar');
+      return;
+    }
+
+    setExporting(true);
+    try {
+      const XLSX = await import('xlsx');
+      const workbook = XLSX.utils.book_new();
+
+      // Buscar dados adicionais se necessário
+      const osIds = osData.map(os => os.id);
+      let comentariosData: any[] = [];
+      let pecasData: any[] = [];
+      let anexosData: any[] = [];
+      let agendamentosData: any[] = [];
+
+      if (exportConfig.comentarios) {
+        const { data } = await supabase
+          .from('os_comentarios')
+          .select('*')
+          .in('os_id', osIds);
+        comentariosData = data || [];
+      }
+
+      if (exportConfig.pecas) {
+        const { data } = await supabase
+          .from('cotacoes')
+          .select(`
+            id,
+            os_id,
+            cotacoes_pecas(*)
+          `)
+          .in('os_id', osIds);
+        pecasData = data || [];
+      }
+
+      if (exportConfig.anexos) {
+        const { data } = await supabase
+          .from('os_anexos')
+          .select('*')
+          .in('os_id', osIds);
+        anexosData = data || [];
+      }
+
+      if (exportConfig.agendamento) {
+        const { data } = await supabase
+          .from('agendamentos')
+          .select('*')
+          .in('os_id', osIds);
+        agendamentosData = data || [];
+      }
+
+      // Criar planilha principal com OS
+      const osRows = osData.map((os: any) => {
+        const row: any = {};
+
+        if (exportConfig.dadosBasicos) {
+          row['Número OS Samsung'] = os.numero_os_samsung || '';
+          row['Número OS Interna'] = os.numero_os_interna || '';
+          row['Coluna'] = os.coluna_kanban || '';
+          row['Tipo OS'] = os.tipo_os || '';
+          row['Tipo Atendimento'] = os.tipo_atendimento || '';
+          row['Tipo Orçamento'] = os.tipo_orcamento || '';
+          row['Status GSPN'] = os.status_gspn || '';
+        }
+
+        if (exportConfig.dadosCliente) {
+          row['Cliente Nome'] = os.cliente_nome || '';
+          row['Cliente CPF/CNPJ'] = os.cliente_cpf_cnpj || '';
+          row['Cliente Telefone'] = os.cliente_telefone || '';
+          row['Cliente Email'] = os.cliente_email || '';
+          row['Cliente Endereço'] = os.cliente_endereco || '';
+          row['Cliente CEP'] = os.cliente_cep || '';
+          row['Cliente Cidade'] = os.cliente_cidade || '';
+          row['Cliente Estado'] = os.cliente_estado || '';
+          row['Cliente VIP'] = os.cliente_vip ? 'Sim' : 'Não';
+        }
+
+        if (exportConfig.dadosAparelho) {
+          row['Aparelho Marca'] = os.aparelho_marca || '';
+          row['Aparelho Linha'] = os.aparelho_linha || '';
+          row['Aparelho Modelo'] = os.aparelho_modelo || '';
+          row['Aparelho N° Série'] = os.aparelho_numero_serie || '';
+          row['Aparelho IMEI'] = os.aparelho_imei || '';
+          row['Defeito Relatado'] = os.defeito_relatado || '';
+        }
+
+        if (exportConfig.dadosFinanceiros) {
+          row['Valor Total'] = os.valor_total || 0;
+          row['Valor Pago'] = os.valor_pago || 0;
+          row['Saldo Restante'] = os.saldo_restante || 0;
+          row['Status Pagamento'] = os.status_pagamento || '';
+        }
+
+        if (exportConfig.dadosTempo) {
+          const tat = Math.floor((new Date().getTime() - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
+          const tempoNaEtapa = Math.floor((new Date().getTime() - new Date(os.updated_at).getTime()) / (1000 * 60 * 60 * 24));
+          row['TAT (dias)'] = tat;
+          row['Tempo na Etapa (dias)'] = tempoNaEtapa;
+          row['Data Criação'] = new Date(os.created_at).toLocaleString('pt-BR');
+          row['Última Atualização'] = new Date(os.updated_at).toLocaleString('pt-BR');
+        }
+
+        return row;
+      });
+
+      const wsOS = XLSX.utils.json_to_sheet(osRows);
+      XLSX.utils.book_append_sheet(workbook, wsOS, 'Ordens de Serviço');
+
+      // Adicionar planilhas adicionais
+      if (exportConfig.comentarios && comentariosData.length > 0) {
+        const comentariosRows = comentariosData.map((c: any) => ({
+          'OS ID': c.os_id,
+          'Usuário': c.usuario_id,
+          'Comentário': c.comentario,
+          'Sistema': c.is_system ? 'Sim' : 'Não',
+          'Data': new Date(c.created_at).toLocaleString('pt-BR')
+        }));
+        const wsComentarios = XLSX.utils.json_to_sheet(comentariosRows);
+        XLSX.utils.book_append_sheet(workbook, wsComentarios, 'Comentários');
+      }
+
+      if (exportConfig.pecas && pecasData.length > 0) {
+        const pecasRows: any[] = [];
+        pecasData.forEach((cotacao: any) => {
+          if (cotacao.cotacoes_pecas) {
+            cotacao.cotacoes_pecas.forEach((peca: any) => {
+              pecasRows.push({
+                'OS ID': cotacao.os_id,
+                'Código': peca.codigo || '',
+                'Descrição': peca.descricao || '',
+                'Quantidade': peca.quantidade || 0,
+                'Valor Unitário': peca.valor_unitario || 0,
+                'Valor Total': peca.valor_total || 0,
+                'Status': peca.status || '',
+                'Delivery': peca.delivery || ''
+              });
+            });
+          }
+        });
+        if (pecasRows.length > 0) {
+          const wsPecas = XLSX.utils.json_to_sheet(pecasRows);
+          XLSX.utils.book_append_sheet(workbook, wsPecas, 'Peças');
+        }
+      }
+
+      if (exportConfig.anexos && anexosData.length > 0) {
+        const anexosRows = anexosData.map((a: any) => ({
+          'OS ID': a.os_id,
+          'Nome Arquivo': a.nome_arquivo,
+          'Tipo': a.tipo,
+          'URL': a.url,
+          'Data Upload': new Date(a.created_at).toLocaleString('pt-BR')
+        }));
+        const wsAnexos = XLSX.utils.json_to_sheet(anexosRows);
+        XLSX.utils.book_append_sheet(workbook, wsAnexos, 'Anexos');
+      }
+
+      if (exportConfig.agendamento && agendamentosData.length > 0) {
+        const agendamentosRows = agendamentosData.map((a: any) => ({
+          'OS ID': a.os_id,
+          'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento).toLocaleDateString('pt-BR') : '',
+          'Período': a.periodo_agendamento || '',
+          'Técnico': a.tecnico_agendado_id || '',
+          'Confirmado': a.confirmado_com_cliente ? 'Sim' : 'Não',
+          'Check-in': a.data_checkin ? new Date(a.data_checkin).toLocaleString('pt-BR') : '',
+          'Check-out': a.data_checkout ? new Date(a.data_checkout).toLocaleString('pt-BR') : ''
+        }));
+        const wsAgendamentos = XLSX.utils.json_to_sheet(agendamentosRows);
+        XLSX.utils.book_append_sheet(workbook, wsAgendamentos, 'Agendamentos');
+      }
+
+      // Salvar arquivo
+      const fileName = `OS_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
+      XLSX.writeFile(workbook, fileName);
+
+      onClose();
+    } catch (error) {
+      console.error('Erro ao exportar:', error);
+      alert('Erro ao exportar dados');
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.8)' }}>
+      <div
+        className="w-full max-w-md rounded-xl p-6"
+        style={{
+          background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
+          border: '1px solid rgba(16,185,129,0.3)',
+          boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(16,185,129,0.2)'
+        }}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-xl font-bold text-[#10B981]">Exportar para Excel</h2>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-white transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mb-4 text-sm text-gray-300">
+          {osData.length} OS serão exportadas
+        </div>
+
+        <div className="space-y-3 mb-6">
+          <div className="text-xs font-bold text-[#10B981] mb-2">SELECIONE OS DADOS PARA EXPORTAR:</div>
+
+          {[
+            { key: 'dadosBasicos', label: 'Dados Básicos da OS' },
+            { key: 'dadosCliente', label: 'Dados do Cliente' },
+            { key: 'dadosAparelho', label: 'Dados do Aparelho' },
+            { key: 'dadosFinanceiros', label: 'Dados Financeiros' },
+            { key: 'dadosTempo', label: 'Tempo (TAT e SLA)' },
+            { key: 'comentarios', label: 'Comentários' },
+            { key: 'pecas', label: 'Peças' },
+            { key: 'anexos', label: 'Anexos' },
+            { key: 'agendamento', label: 'Agendamento' }
+          ].map(({ key, label }) => (
+            <div
+              key={key}
+              onClick={() => setExportConfig({ ...exportConfig, [key]: !exportConfig[key as keyof typeof exportConfig] })}
+              className="flex items-center gap-3 cursor-pointer p-3 rounded transition-all"
+              style={{
+                background: exportConfig[key as keyof typeof exportConfig]
+                  ? 'linear-gradient(135deg, rgba(16,185,129,0.15) 0%, rgba(16,185,129,0.05) 100%)'
+                  : 'rgba(107,114,128,0.05)',
+                border: `1px solid ${exportConfig[key as keyof typeof exportConfig] ? 'rgba(16,185,129,0.3)' : 'transparent'}`
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={exportConfig[key as keyof typeof exportConfig]}
+                onChange={() => {}}
+                className="w-4 h-4 rounded accent-[#10B981] pointer-events-none"
+              />
+              <span className={`text-sm flex-1 ${exportConfig[key as keyof typeof exportConfig] ? 'text-[#10B981] font-medium' : 'text-gray-400'}`}>
+                {label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-colors"
+            style={{
+              background: 'rgba(107,114,128,0.1)',
+              border: '1px solid rgba(107,114,128,0.3)',
+              color: '#9CA3AF'
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleExport}
+            disabled={exporting}
+            className="flex-1 px-4 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50"
+            style={{
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)',
+              border: '1px solid #10B981',
+              color: '#10B981',
+              boxShadow: '0 0 10px rgba(16,185,129,0.2)'
+            }}
+          >
+            {exporting ? 'Exportando...' : 'Exportar'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

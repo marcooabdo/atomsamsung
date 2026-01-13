@@ -1889,6 +1889,42 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       <p className="text-sm text-gray-300 mt-1 font-semibold uppercase">{(os as any).unidade.nome}</p>
                     </div>
                   )}
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase">TAT (Tempo Aberto)</label>
+                    <p className="text-sm font-bold mt-1" style={{ color: '#FF00FF' }}>
+                      {(() => {
+                        const now = new Date();
+                        const created = new Date(os.created_at);
+                        const diffMs = now.getTime() - created.getTime();
+                        const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                        const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const parts = [];
+                        if (dias > 0) parts.push(`${dias}d`);
+                        if (horas > 0) parts.push(`${horas}h`);
+                        if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
+                        return parts.join(' ');
+                      })()}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase">Tempo na Etapa</label>
+                    <p className="text-sm font-bold mt-1" style={{ color: '#FFBF00' }}>
+                      {(() => {
+                        const now = new Date();
+                        const updated = new Date(os.updated_at);
+                        const diffMs = now.getTime() - updated.getTime();
+                        const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                        const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                        const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                        const parts = [];
+                        if (dias > 0) parts.push(`${dias}d`);
+                        if (horas > 0) parts.push(`${horas}h`);
+                        if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
+                        return parts.join(' ');
+                      })()}
+                    </p>
+                  </div>
                   {os.numero_os_samsung && (
                     <>
                       <div>
