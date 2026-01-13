@@ -1891,21 +1891,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   )}
                   <div>
                     <label className="text-xs text-gray-500 uppercase">TAT (Tempo Aberto)</label>
-                    <p className="text-sm font-bold mt-1" style={{
-                      color: (() => {
-                        const now = new Date();
-                        const created = new Date(os.created_at);
-                        const diasAberto = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-                        const limite = os.tipo_os === 'LP'
-                          ? (os.tipo_atendimento === 'CI' ? 3 : 6)
-                          : (os.tipo_atendimento === 'CI' ? 5 : 10);
-                        const percentual = (diasAberto / limite) * 100;
-
-                        if (percentual <= 70) return '#10b981';
-                        else if (percentual <= 100) return '#fbbf24';
-                        else return '#ef4444';
-                      })()
-                    }}>
+                    <p className="text-sm font-bold mt-1" style={{ color: '#FF00FF' }}>
                       {(() => {
                         const now = new Date();
                         const created = new Date(os.created_at);
@@ -1917,10 +1903,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         if (dias > 0) parts.push(`${dias}d`);
                         if (horas > 0) parts.push(`${horas}h`);
                         if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
-                        const limite = os.tipo_os === 'LP'
-                          ? (os.tipo_atendimento === 'CI' ? 3 : 6)
-                          : (os.tipo_atendimento === 'CI' ? 5 : 10);
-                        return `${parts.join(' ')} (Limite: ${limite}d)`;
+                        return parts.join(' ');
                       })()}
                     </p>
                   </div>
