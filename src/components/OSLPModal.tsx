@@ -881,9 +881,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       }
 
       alert('Requisição enviada! OS movida para "Aguardando Peça".');
-      loadRequisicoes();
-      loadComentarios();
-      loadOS();
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
+      await loadOS();
       onReload?.();
     } catch (error) {
       alert('Erro ao requisitar peça');
@@ -934,9 +935,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       });
 
       alert('Nova requisição criada com sucesso!');
-      loadRequisicoes();
-      loadComentarios();
-      loadOS();
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
+      await loadOS();
       onReload?.();
     } catch (error: any) {
       alert(`Erro ao criar nova requisição: ${error.message}`);
@@ -968,8 +970,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       }
 
       alert('Requisição cancelada!');
-      loadRequisicoes();
-      loadComentarios();
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
     } catch (error) {
       alert('Erro ao cancelar requisição');
     }
@@ -1014,8 +1017,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       }
 
       alert('GI postada com sucesso!');
-      loadRequisicoes();
-      loadComentarios();
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
       onReload?.();
     } catch (error) {
       alert('Erro ao postar GI');
@@ -1047,8 +1051,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       });
 
       alert('Peça devolvida com sucesso!');
-      loadRequisicoes();
-      loadComentarios();
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
       onReload?.();
     } catch (error) {
       alert('Erro ao devolver peça');
@@ -1101,6 +1106,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         });
       }
 
+      await loadPecas();
       await loadRequisicoes();
       await loadComentarios();
 
@@ -2492,6 +2498,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                 setNovaPecaQuantidade(1);
                                 setNovaPecaValor('');
                                 setSugestoesPecas([]);
+                                await loadPecas();
                                 await loadRequisicoes();
                                 await loadComentarios();
                                 alert('Requisição criada com sucesso!');
@@ -2514,9 +2521,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
-                      Peças da Cotação
-                    </h3>
                     {pecas.length === 0 && requisicoes.length === 0 ? (
                       <p className="text-gray-500 text-sm">Nenhuma peça cadastrada</p>
                     ) : (
@@ -2576,6 +2580,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                       <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
+                                      {tipo === 'cotacao' && (
+                                        <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{
+                                          backgroundColor: '#9333EA20',
+                                          color: '#9333EA',
+                                          border: '1px solid #9333EA60'
+                                        }}>
+                                          GSPN
+                                        </span>
+                                      )}
                                       {requisicao && getStatusBadge(requisicao.status)}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
