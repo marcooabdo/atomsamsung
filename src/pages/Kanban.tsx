@@ -79,6 +79,45 @@ export function Kanban() {
     return originalColor;
   };
 
+  const getTATLimite = (tipoOS: string, tipoAtendimento: string): number => {
+    if (tipoOS === 'LP') {
+      return tipoAtendimento === 'CI' ? 3 : 6;
+    } else {
+      return tipoAtendimento === 'CI' ? 5 : 10;
+    }
+  };
+
+  const getTATColor = (createdAt: string, tipoOS: string, tipoAtendimento: string) => {
+    const diasAberto = Math.floor(
+      (new Date().getTime() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
+    );
+    const limite = getTATLimite(tipoOS, tipoAtendimento);
+    const percentual = (diasAberto / limite) * 100;
+
+    if (percentual <= 70) {
+      return {
+        background: 'linear-gradient(135deg, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0.15) 100%)',
+        color: '#10b981',
+        border: '1px solid rgba(16,185,129,0.5)',
+        boxShadow: '0 0 8px rgba(16,185,129,0.3)'
+      };
+    } else if (percentual <= 100) {
+      return {
+        background: 'linear-gradient(135deg, rgba(251,191,36,0.3) 0%, rgba(251,191,36,0.15) 100%)',
+        color: '#fbbf24',
+        border: '1px solid rgba(251,191,36,0.5)',
+        boxShadow: '0 0 8px rgba(251,191,36,0.3)'
+      };
+    } else {
+      return {
+        background: 'linear-gradient(135deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.15) 100%)',
+        color: '#ef4444',
+        border: '1px solid rgba(239,68,68,0.5)',
+        boxShadow: '0 0 8px rgba(239,68,68,0.3)'
+      };
+    }
+  };
+
   const formatTempoNaEtapa = (updatedAt: string) => {
     const now = new Date();
     const updated = new Date(updatedAt);
@@ -1230,13 +1269,8 @@ export function Kanban() {
                               </span>
                               <span
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold ml-auto"
-                                style={{
-                                  background: 'linear-gradient(135deg, rgba(255,0,255,0.25) 0%, rgba(255,0,255,0.1) 100%)',
-                                  color: '#FF00FF',
-                                  border: '1px solid rgba(255,0,255,0.5)',
-                                  boxShadow: '0 0 8px rgba(255,0,255,0.2)'
-                                }}
-                                title={`Tempo total desde abertura: ${formatTAT(os.created_at)}`}
+                                style={getTATColor(os.created_at, os.tipo_os, os.tipo_atendimento)}
+                                title={`TAT: ${calcularTAT(os.created_at)}d - Limite: ${getTATLimite(os.tipo_os, os.tipo_atendimento)}d (${os.tipo_os} ${os.tipo_atendimento})`}
                               >
                                 TAT: {calcularTAT(os.created_at)}d
                               </span>
