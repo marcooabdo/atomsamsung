@@ -967,10 +967,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           quantidade_requisitada: peca.quantidade || 1,
           status: 'pendente',
           requisitado_por: usuario?.id,
+          numero_os_samsung: os?.numero_os_samsung,
           unidade_id: os?.unidade_id
         });
 
       if (insertError) {
+        console.error('❌ Erro ao criar requisição OW:', insertError);
         throw insertError;
       }
 
@@ -1016,9 +1018,10 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       }
 
       alert('Requisição de peça criada com sucesso! OS movida para "Aguardando Peça".');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao criar requisição:', error);
-      alert('Erro ao criar requisição de peça');
+      const errorMsg = error?.message || 'Erro desconhecido';
+      alert(`Erro ao criar requisição de peça:\n${errorMsg}`);
     } finally {
       setPecaRequisitandoId(null);
       setCriandoRequisicao(false);
