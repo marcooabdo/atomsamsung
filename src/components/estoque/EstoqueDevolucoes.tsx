@@ -162,13 +162,16 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           requisicao.tipo_devolucao === 'nova_com_defeito' ? 'devolvida_defeito' :
           'usada';
 
+        const updateData: any = { status: novoStatus };
+
+        if (requisicao.tipo_devolucao !== 'usada') {
+          updateData.os_id = null;
+          updateData.tecnico_id = null;
+        }
+
         await supabase
           .from('estoque_pecas')
-          .update({
-            status: novoStatus,
-            os_id: null,
-            tecnico_id: null
-          })
+          .update(updateData)
           .eq('id', requisicao.peca_estoque_id);
 
         await supabase
