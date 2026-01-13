@@ -2644,6 +2644,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                         </span>
                                       )}
                                       {requisicao && getStatusBadge(requisicao.status)}
+                                      {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
                                     <div className="flex items-center gap-4 mt-2">
@@ -2655,9 +2656,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                         Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                       </p>
                                     </div>
-                                    {requisicao && (
+                                    {(requisicao || requisicaoDevolvida) && (
                                       <p className="text-xs text-gray-500 mt-2">
-                                        Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
+                                        Requisitado em: {new Date((requisicao || requisicaoDevolvida)!.created_at).toLocaleString('pt-BR')}
                                       </p>
                                     )}
                                     {requisicao?.status === 'pedido_feito' && (
@@ -2702,33 +2703,38 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                         </div>
                                       </div>
                                     )}
-                                    {(requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') && requisicao.motivo_devolucao && (
-                                      <div className="mt-3 p-3 rounded-lg" style={{
-                                        backgroundColor: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : '#FFBF0010',
-                                        border: requisicao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : '1px solid #FFBF0060'
-                                      }}>
-                                        <div className="flex items-start gap-2">
-                                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
-                                            color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
-                                          }} />
-                                          <div className="flex-1">
-                                            <p className="text-xs font-bold mb-1" style={{
-                                              color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
-                                            }}>
-                                              {requisicao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {requisicao.tipo_devolucao === 'nova' ? 'NOVA' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
-                                            </p>
-                                            <p className="text-xs text-gray-300">
-                                              {requisicao.tipo_devolucao === 'nova_com_defeito' ? 'DEFEITO: ' : 'Motivo: '}
-                                              {requisicao.motivo_devolucao}
-                                            </p>
+                                    {(() => {
+                                      const reqComDevolucao = (requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') ? requisicao :
+                                                              (requisicaoDevolvida?.status === 'devolucao_pendente' || requisicaoDevolvida?.status === 'devolvida') ? requisicaoDevolvida : null;
+
+                                      return reqComDevolucao && reqComDevolucao.motivo_devolucao && (
+                                        <div className="mt-3 p-3 rounded-lg" style={{
+                                          backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF1410' : '#FFBF0010',
+                                          border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid #39FF1460' : '1px solid #FFBF0060'
+                                        }}>
+                                          <div className="flex items-start gap-2">
+                                            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
+                                              color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                            }} />
+                                            <div className="flex-1">
+                                              <p className="text-xs font-bold mb-1" style={{
+                                                color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                              }}>
+                                                {reqComDevolucao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {reqComDevolucao.tipo_devolucao === 'nova' ? 'NOVA' : reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
+                                              </p>
+                                              <p className="text-xs text-gray-300">
+                                                {reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? 'DEFEITO: ' : 'Motivo: '}
+                                                {reqComDevolucao.motivo_devolucao}
+                                              </p>
+                                            </div>
                                           </div>
                                         </div>
-                                      </div>
-                                    )}
+                                      );
+                                    })()}
                                   </div>
 
                                   <div className="flex gap-2">
-                                    {!requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                                    {!requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
                                         onClick={() => {
                                           console.log('🎯 CLIQUE NO BOTÃO - Objeto peca:', {
@@ -2807,9 +2813,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                       </button>
                                     )}
 
-                                    {requisicao?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                                    {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
-                                        onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                        onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                         style={{
                                           backgroundColor: '#FFBF0020',
@@ -2822,9 +2828,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                       </button>
                                     )}
 
-                                    {requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicao?.tipo_devolucao === 'usada' && (
+                                    {requisicaoDevolvida?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                                       <button
-                                        onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                        onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                         style={{
                                           backgroundColor: '#39FF1420',

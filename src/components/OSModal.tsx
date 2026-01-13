@@ -2318,34 +2318,39 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                                 </div>
                               </div>
                             )}
-                            {(requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') && requisicao.motivo_devolucao && (
-                              <div className="mt-3 p-3 rounded-lg" style={{
-                                backgroundColor: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : '#FFBF0010',
-                                border: requisicao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : '1px solid #FFBF0060'
-                              }}>
-                                <div className="flex items-start gap-2">
-                                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
-                                    color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
-                                  }} />
-                                  <div className="flex-1">
-                                    <p className="text-xs font-bold mb-1" style={{
-                                      color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
-                                    }}>
-                                      {requisicao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {requisicao.tipo_devolucao === 'nova' ? 'NOVA' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
-                                    </p>
-                                    <p className="text-xs text-gray-300">
-                                      {requisicao.tipo_devolucao === 'nova_com_defeito' ? '⚠️ DEFEITO: ' : 'Motivo: '}
-                                      {requisicao.motivo_devolucao}
-                                    </p>
-                                    {requisicao.status === 'devolucao_pendente' && (
-                                      <p className="text-xs text-gray-500 mt-2">
-                                        Aguardando aprovação do estoque
+                            {(() => {
+                              const reqComDevolucao = (requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') ? requisicao :
+                                                      (requisicaoDevolvida?.status === 'devolucao_pendente' || requisicaoDevolvida?.status === 'devolvida') ? requisicaoDevolvida : null;
+
+                              return reqComDevolucao && reqComDevolucao.motivo_devolucao && (
+                                <div className="mt-3 p-3 rounded-lg" style={{
+                                  backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF1410' : '#FFBF0010',
+                                  border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid #39FF1460' : '1px solid #FFBF0060'
+                                }}>
+                                  <div className="flex items-start gap-2">
+                                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
+                                      color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                    }} />
+                                    <div className="flex-1">
+                                      <p className="text-xs font-bold mb-1" style={{
+                                        color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                      }}>
+                                        {reqComDevolucao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {reqComDevolucao.tipo_devolucao === 'nova' ? 'NOVA' : reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
                                       </p>
-                                    )}
+                                      <p className="text-xs text-gray-300">
+                                        {reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '⚠️ DEFEITO: ' : 'Motivo: '}
+                                        {reqComDevolucao.motivo_devolucao}
+                                      </p>
+                                      {reqComDevolucao.status === 'devolucao_pendente' && (
+                                        <p className="text-xs text-gray-500 mt-2">
+                                          Aguardando aprovação do estoque
+                                        </p>
+                                      )}
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
                           </div>
 
                           {/* Botões conforme status */}
