@@ -2200,6 +2200,15 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
                               <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
+                              {peca.status === 'gspn' && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{
+                                  backgroundColor: '#9333EA20',
+                                  color: '#9333EA',
+                                  border: '1px solid #9333EA60'
+                                }}>
+                                  GSPN
+                                </span>
+                              )}
                               {requisicao && getStatusBadge(requisicao.status)}
                             </div>
                             <div className="flex items-center gap-4">
