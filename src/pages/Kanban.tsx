@@ -47,7 +47,7 @@ export function Kanban() {
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('1b9ff2d1-474e-4783-aa39-80c89a6a48cf');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
-  const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | null>(null);
+  const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | 'NA' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
@@ -1118,7 +1118,7 @@ export function Kanban() {
                             onDragEnd={handleDragEnd}
                             onClick={() => {
                               setSelectedOSId(os.id);
-                              setSelectedOSTipo(os.tipo_os as 'LP' | 'OW');
+                              setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
                             }}
                             className="rounded-lg p-2 cursor-pointer group relative overflow-hidden"
                             style={{
@@ -1156,7 +1156,7 @@ export function Kanban() {
                           onDragEnd={handleDragEnd}
                           onClick={() => {
                             setSelectedOSId(os.id);
-                            setSelectedOSTipo(os.tipo_os as 'LP' | 'OW');
+                            setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
                           }}
                           className="rounded-lg p-2.5 cursor-pointer group relative overflow-hidden"
                           style={{
@@ -1655,7 +1655,7 @@ export function Kanban() {
         </div>
       </div>
 
-      {selectedOSId && selectedOSTipo === 'OW' && (
+      {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA') && (
         <OSModal
           osId={selectedOSId}
           onClose={() => {
