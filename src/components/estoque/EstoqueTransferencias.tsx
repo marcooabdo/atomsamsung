@@ -31,6 +31,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const [loading, setLoading] = useState(true);
   const [osExpandida, setOsExpandida] = useState<string | null>(null);
   const [osExpandidaPedido, setOsExpandidaPedido] = useState<string | null>(null);
+  const [osExpandidaAtendida, setOsExpandidaAtendida] = useState<string | null>(null);
   const [modalSelecionarID, setModalSelecionarID] = useState<any>(null);
   const [modalPedirPeca, setModalPedirPeca] = useState<any>(null);
   const [modalRegistrarValor, setModalRegistrarValor] = useState<any>(null);
@@ -1230,25 +1231,121 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             <Check className="w-5 h-5" />
             REQUISIÇÕES ATENDIDAS ({requisicoesAtendidas.length} OSs)
           </h3>
-          <div className="space-y-2">
-            {requisicoesAtendidas.slice(0, 5).map((grupo) => (
-              <div key={grupo.os_id} className="premium-card p-3 opacity-60">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <p className="text-sm font-medium text-gray-300">
-                        OS: {grupo.numero_os_samsung || grupo.numero_os_interna}
-                      </p>
-                      <BadgeTipoOS tipo={grupo.tipo_os} />
+          <div className="space-y-3">
+            {requisicoesAtendidas.map((grupo) => (
+              <div key={grupo.os_id} className="premium-card border-[#39FF14]/30">
+                <div
+                  className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
+                  onClick={() => setOsExpandidaAtendida(osExpandidaAtendida === grupo.os_id ? null : grupo.os_id)}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      {osExpandidaAtendida === grupo.os_id ? (
+                        <ChevronDown className="w-5 h-5 text-[#39FF14]" />
+                      ) : (
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      )}
+                      <Check className="w-5 h-5 text-[#39FF14]" />
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <p className="font-bold text-white">
+                            OS {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
+                          </p>
+                          <BadgeTipoOS tipo={grupo.tipo_os} />
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          {grupo.totalPecas} peça(s) atendida(s)
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-xs text-gray-500">{grupo.totalPecas} peça(s) atendida(s)</p>
+                    {grupo.valorTotal > 0 && (
+                      <div className="flex items-center gap-1">
+                        <DollarSign className="w-4 h-4 text-[#39FF14]" />
+                        <p className="text-lg text-[#39FF14] font-bold">
+                          R$ {grupo.valorTotal.toFixed(2)}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  {grupo.valorTotal > 0 && (
-                    <p className="text-sm text-[#39FF14] font-bold">
-                      R$ {grupo.valorTotal.toFixed(2)}
-                    </p>
-                  )}
                 </div>
+
+                {osExpandidaAtendida === grupo.os_id && (
+                  <div className="border-t border-[#39FF14]/20 p-4 space-y-3">
+                    {grupo.requisicoes.map((req: any) => (
+                      <div key={req.id} className="bg-[#39FF14]/5 border border-[#39FF14]/20 rounded-lg p-4">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-2">
+                              <p className="font-bold text-white">{req.descricao}</p>
+                              {getStatusBadge(req.status)}
+                            </div>
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">Part Number:</span>
+                                <span className="font-mono font-bold text-gray-200">{req.codigo_peca}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">Quantidade:</span>
+                                <span className="text-[#39FF14] font-bold">{req.quantidade_requisitada}</span>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-gray-400">Requisição ID:</span>
+                                <span className="font-mono text-gray-300">{req.id.slice(0, 8)}</span>
+                              </div>
+                              {req.peca_estoque && (
+                                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-3 mt-2">
+                                  <p className="text-xs text-[#39FF14] font-bold uppercase mb-2">Peça Vinculada</p>
+                                  <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-gray-400 text-xs">ID da Peça:</span>
+                                      <span className="font-mono text-[#39FF14] font-bold">#{req.peca_estoque.id_numerico}</span>
+                                    </div>
+                                    {req.peca_estoque.pn && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-xs">PN:</span>
+                                        <span className="font-mono text-gray-300 text-xs">{req.peca_estoque.pn}</span>
+                                      </div>
+                                    )}
+                                    {req.peca_estoque.delivery && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-xs">Delivery:</span>
+                                        <span className="text-gray-300 text-xs">{req.peca_estoque.delivery}</span>
+                                      </div>
+                                    )}
+                                    {req.peca_estoque.valor_com_impostos && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-gray-400 text-xs">Valor:</span>
+                                        <span className="text-[#39FF14] font-bold text-xs">
+                                          R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {req.numero_pedido_samsung && req.numero_pedido_samsung !== 'N/A' && !req.numero_pedido_samsung.startsWith('PENDENTE-') && (
+                                <div className="bg-blue-900/20 rounded-lg p-3 mt-2 border border-blue-500/30">
+                                  <p className="text-xs text-blue-400 uppercase font-semibold mb-1">Pedido Samsung:</p>
+                                  <p className="text-sm text-gray-300 font-mono">{req.numero_pedido_samsung}</p>
+                                </div>
+                              )}
+                              {req.observacoes_pedido && (
+                                <div className="bg-gray-900/50 rounded-lg p-3 mt-2">
+                                  <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Observações do Pedido:</p>
+                                  <p className="text-sm text-gray-300">{req.observacoes_pedido}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-2 text-xs text-gray-500 mt-3">
+                                <Clock className="w-3 h-3" />
+                                <span>Atendida em: {new Date(req.aprovado_em || req.updated_at).toLocaleString('pt-BR')}</span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>
