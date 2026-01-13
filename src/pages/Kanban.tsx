@@ -50,7 +50,6 @@ export function Kanban() {
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
-  const [mostrarStatusSamsung, setMostrarStatusSamsung] = useState(false);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
   const [hasJobRunning, setHasJobRunning] = useState(false);
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
@@ -76,6 +75,23 @@ export function Kanban() {
       return '#ffffff';
     }
     return originalColor;
+  };
+
+  const formatTempoNaEtapa = (updatedAt: string) => {
+    const now = new Date();
+    const updated = new Date(updatedAt);
+    const diffMs = now.getTime() - updated.getTime();
+
+    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+    const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    const parts = [];
+    if (dias > 0) parts.push(`${dias}d`);
+    if (horas > 0) parts.push(`${horas}h`);
+    if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
+
+    return parts.join(' ');
   };
 
   useEffect(() => {
@@ -635,22 +651,6 @@ export function Kanban() {
           </div>
 
           <div className="flex gap-2">
-            <button
-              onClick={() => setMostrarStatusSamsung(!mostrarStatusSamsung)}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
-              style={{
-                background: mostrarStatusSamsung
-                  ? 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)'
-                  : 'rgba(107,114,128,0.1)',
-                border: `1px solid ${mostrarStatusSamsung ? '#8B5CF6' : '#6B7280'}`,
-                color: mostrarStatusSamsung ? '#8B5CF6' : '#6B7280',
-                boxShadow: mostrarStatusSamsung ? '0 0 10px rgba(139,92,246,0.2)' : 'none'
-              }}
-            >
-              {mostrarStatusSamsung ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-              STATUS
-            </button>
-
             <div className="relative">
               <button
                 onClick={() => setShowBadgeFilter(!showBadgeFilter)}
@@ -687,7 +687,7 @@ export function Kanban() {
                       { key: 'agendamento', label: 'Agendamento' },
                       { key: 'financeiro', label: 'Financeiro' },
                       { key: 'lucro', label: 'Lucro/Prejuízo' },
-                      { key: 'sla', label: 'SLA (Dias na Etapa)' },
+                      { key: 'sla', label: 'Tempo na Etapa' },
                       { key: 'status', label: 'Status Samsung' }
                     ].map(({ key, label }) => (
                       <div
@@ -1397,14 +1397,14 @@ export function Kanban() {
                                 </div>
                               );
                             })()}
-                            {badgeFilters.sla && os.dias_na_etapa > 0 && (
+                            {badgeFilters.sla && (
                               <div
                                 className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t"
                                 style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}
                               >
                                 <Clock className="w-3 h-3 text-[#FFBF00]" style={{ filter: 'drop-shadow(0 0 4px #FFBF00)' }} />
                                 <span className="text-[#FFBF00] font-bold text-[10px]">
-                                  SLA: {os.dias_na_etapa}d
+                                  Tempo na Etapa: {formatTempoNaEtapa(os.updated_at)}
                                 </span>
                               </div>
                             )}
