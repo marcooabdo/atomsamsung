@@ -557,11 +557,6 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                         </p>
                       </div>
                     </div>
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium border ${
-                      dev.conferida ? 'bg-green-500/20 text-green-400 border-green-500/30' : 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30'
-                    }`}>
-                      {dev.conferida ? 'Conferida' : 'Pendente Conferência'}
-                    </span>
                   </div>
                 </div>
               ))}
