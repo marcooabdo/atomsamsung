@@ -6,7 +6,7 @@ import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
 import { JobStatusCard } from '../components/JobStatusCard';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -56,6 +56,18 @@ export function Kanban() {
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
   const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const autoScrollInterval = useRef<number | null>(null);
+  const [showBadgeFilter, setShowBadgeFilter] = useState(false);
+  const [showTipoFilter, setShowTipoFilter] = useState(false);
+  const [badgeFilters, setBadgeFilters] = useState({
+    pedidoAtivo: true,
+    pecaTransito: true,
+    comTecnico: true,
+    agendamento: true,
+    financeiro: true,
+    lucro: true,
+    sla: true
+  });
+  const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -66,8 +78,23 @@ export function Kanban() {
 
   useEffect(() => {
     loadUnidades();
+    const savedBadgeFilters = localStorage.getItem('kanban_badge_filters');
+    if (savedBadgeFilters) {
+      setBadgeFilters(JSON.parse(savedBadgeFilters));
+    }
+    const savedTipoFilters = localStorage.getItem('kanban_tipo_filters');
+    if (savedTipoFilters) {
+      setTipoAtendimentoFilters(JSON.parse(savedTipoFilters));
+    }
   }, []);
 
+  useEffect(() => {
+    localStorage.setItem('kanban_badge_filters', JSON.stringify(badgeFilters));
+  }, [badgeFilters]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban_tipo_filters', JSON.stringify(tipoAtendimentoFilters));
+  }, [tipoAtendimentoFilters]);
 
   useEffect(() => {
     if (usuario) {
@@ -81,6 +108,19 @@ export function Kanban() {
         clearInterval(autoScrollInterval.current);
       }
     };
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.relative')) {
+        setShowBadgeFilter(false);
+        setShowTipoFilter(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadUnidades = async () => {
@@ -509,11 +549,16 @@ export function Kanban() {
   };
 
   const filteredData = Object.keys(osData).reduce((acc, coluna) => {
-    acc[coluna] = osData[coluna].filter(os =>
-      os.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (os.numero_os_samsung && os.numero_os_samsung.toLowerCase().includes(searchTerm.toLowerCase())) ||
-      (os.numero_os_interna && os.numero_os_interna.toLowerCase().includes(searchTerm.toLowerCase()))
-    );
+    acc[coluna] = osData[coluna].filter(os => {
+      const matchesSearch = os.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (os.numero_os_samsung && os.numero_os_samsung.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (os.numero_os_interna && os.numero_os_interna.toLowerCase().includes(searchTerm.toLowerCase()));
+
+      const matchesTipo = tipoAtendimentoFilters.length === 0 ||
+        (os.tipo_os && tipoAtendimentoFilters.includes(os.tipo_os));
+
+      return matchesSearch && matchesTipo;
+    });
     return acc;
   }, {} as Record<string, OS[]>);
 
@@ -600,6 +645,122 @@ export function Kanban() {
               {mostrarStatusSamsung ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
               STATUS
             </button>
+
+            <div className="relative">
+              <button
+                onClick={() => setShowBadgeFilter(!showBadgeFilter)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.05) 100%)',
+                  border: '1px solid #39FF14',
+                  color: '#39FF14',
+                  boxShadow: '0 0 10px rgba(57,255,20,0.2)'
+                }}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                BADGES
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {showBadgeFilter && (
+                <div
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[220px] rounded-lg p-3 space-y-2"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
+                    border: '1px solid rgba(57,255,20,0.3)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)'
+                  }}
+                >
+                  <div className="text-xs font-bold text-[#39FF14] mb-3 pb-2 border-b border-[#39FF14]/30">
+                    EXIBIR NO CARD
+                  </div>
+                  {[
+                    { key: 'pedidoAtivo', label: 'Pedido Ativo' },
+                    { key: 'pecaTransito', label: 'Peça em Trânsito' },
+                    { key: 'comTecnico', label: 'Com Técnico / GI' },
+                    { key: 'agendamento', label: 'Agendamento' },
+                    { key: 'financeiro', label: 'Financeiro' },
+                    { key: 'lucro', label: 'Lucro/Prejuízo' },
+                    { key: 'sla', label: 'SLA (Dias na Etapa)' }
+                  ].map(({ key, label }) => (
+                    <label
+                      key={key}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1.5 rounded transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={badgeFilters[key as keyof typeof badgeFilters]}
+                        onChange={(e) => setBadgeFilters({ ...badgeFilters, [key]: e.target.checked })}
+                        className="w-3.5 h-3.5 rounded accent-[#39FF14]"
+                      />
+                      <span className="text-xs text-gray-300">{label}</span>
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setShowTipoFilter(!showTipoFilter)}
+                className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+                style={{
+                  background: tipoAtendimentoFilters.length > 0
+                    ? 'linear-gradient(135deg, rgba(255,191,0,0.2) 0%, rgba(255,191,0,0.05) 100%)'
+                    : 'rgba(107,114,128,0.1)',
+                  border: `1px solid ${tipoAtendimentoFilters.length > 0 ? '#FFBF00' : '#6B7280'}`,
+                  color: tipoAtendimentoFilters.length > 0 ? '#FFBF00' : '#6B7280',
+                  boxShadow: tipoAtendimentoFilters.length > 0 ? '0 0 10px rgba(255,191,0,0.2)' : 'none'
+                }}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                TIPO OS {tipoAtendimentoFilters.length > 0 && `(${tipoAtendimentoFilters.length})`}
+                <ChevronDown className="w-3 h-3" />
+              </button>
+
+              {showTipoFilter && (
+                <div
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[180px] rounded-lg p-3 space-y-2"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
+                    border: '1px solid rgba(255,191,0,0.3)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,191,0,0.1)'
+                  }}
+                >
+                  <div className="text-xs font-bold text-[#FFBF00] mb-3 pb-2 border-b border-[#FFBF00]/30">
+                    FILTRAR POR TIPO
+                  </div>
+                  {['OW CI', 'OW IH', 'LP CI', 'LP IH', 'SAMSUNG'].map((tipo) => (
+                    <label
+                      key={tipo}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-white/5 p-1.5 rounded transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={tipoAtendimentoFilters.includes(tipo)}
+                        onChange={(e) => {
+                          if (e.target.checked) {
+                            setTipoAtendimentoFilters([...tipoAtendimentoFilters, tipo]);
+                          } else {
+                            setTipoAtendimentoFilters(tipoAtendimentoFilters.filter(t => t !== tipo));
+                          }
+                        }}
+                        className="w-3.5 h-3.5 rounded accent-[#FFBF00]"
+                      />
+                      <span className="text-xs text-gray-300">{tipo}</span>
+                    </label>
+                  ))}
+                  {tipoAtendimentoFilters.length > 0 && (
+                    <button
+                      onClick={() => setTipoAtendimentoFilters([])}
+                      className="w-full mt-2 pt-2 border-t border-[#FFBF00]/30 text-xs text-[#FF0064] hover:text-[#FF0064]/80 transition-colors"
+                    >
+                      Limpar Filtros
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
 
             <button
               onClick={() => setCriarOSLP(true)}
@@ -896,7 +1057,7 @@ export function Kanban() {
                               </div>
                             )}
 
-                            {(() => {
+                            {badgeFilters.pecaTransito && (() => {
                               const pecasEmTransito = (os as any).requisicoes?.filter((req: any) =>
                                 req.status === 'pedido_feito'
                               ) || [];
@@ -952,7 +1113,7 @@ export function Kanban() {
                               );
                             })()}
 
-                            {os.data_agendamento && os.tecnico_agendado_id && os.confirmado_com_cliente && (
+                            {badgeFilters.agendamento && os.data_agendamento && os.tecnico_agendado_id && os.confirmado_com_cliente && (
                               <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
                                   borderColor: 'rgba(57,255,20,0.3)',
@@ -987,7 +1148,7 @@ export function Kanban() {
                               </div>
                             )}
 
-                            {mostrarInfoFinanceira && os.valor_total && os.valor_total > 0 && (
+                            {badgeFilters.financeiro && mostrarInfoFinanceira && os.valor_total && os.valor_total > 0 && (
                               <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
                                   borderColor: os.status_pagamento === 'pago' ? 'rgba(57,255,20,0.3)' :
@@ -1043,7 +1204,7 @@ export function Kanban() {
                               </div>
                             )}
 
-                            {mostrarInfoFinanceira && (() => {
+                            {badgeFilters.lucro && mostrarInfoFinanceira && (() => {
                               const valorPecas = calcularValorPecas(os);
                               const valorGSPN = calcularValorGSPN(os);
                               const lucro = calcularLucro(os);
@@ -1100,7 +1261,7 @@ export function Kanban() {
                                 </div>
                               );
                             })()}
-                            {os.dias_na_etapa > 0 && (
+                            {badgeFilters.sla && os.dias_na_etapa > 0 && (
                               <div
                                 className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t"
                                 style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}
@@ -1111,7 +1272,7 @@ export function Kanban() {
                                 </span>
                               </div>
                             )}
-                            {(os as any).requisicoes?.filter((r: any) => r.status === 'pedido_feito').map((req: any) => (
+                            {badgeFilters.pedidoAtivo && (os as any).requisicoes?.filter((r: any) => r.status === 'pedido_feito').map((req: any) => (
                               <div
                                 key={req.id}
                                 className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
@@ -1151,7 +1312,7 @@ export function Kanban() {
                                 </div>
                               </div>
                             ))}
-                            {(os as any).requisicoes?.filter((r: any) => ['atendida', 'em_uso', 'gi_postada'].includes(r.status)).map((req: any) => (
+                            {badgeFilters.comTecnico && (os as any).requisicoes?.filter((r: any) => ['atendida', 'em_uso', 'gi_postada'].includes(r.status)).map((req: any) => (
                               <div
                                 key={req.id}
                                 className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
