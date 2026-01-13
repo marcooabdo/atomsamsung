@@ -1292,9 +1292,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       atendida: { label: 'ATENDIDA', color: '#00D4FF' },
       em_uso: { label: 'EM USO', color: '#9D00FF' },
       gi_postada: { label: 'GI POSTADA', color: '#39FF14' },
-      devolvida: { label: 'DEVOLVIDA', color: '#FF0064' },
+      devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FF6B00' },
+      devolvida: { label: 'DEVOLVIDA', color: '#39FF14' },
       cancelada: { label: 'CANCELADA', color: '#808080' },
-      reprovada: { label: 'REPROVADA', color: '#FF0064' }
+      reprovada: { label: 'REPROVADA', color: '#FF0064' },
+      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' }
     };
 
     const config = statusConfig[status] || { label: status.toUpperCase(), color: '#6B7280' };
@@ -2820,7 +2822,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                       </button>
                                     )}
 
-                                    {requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                                    {requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicao?.tipo_devolucao === 'usada' && (
                                       <button
                                         onClick={() => handleRequisitarNovamente(peca, requisicao)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"

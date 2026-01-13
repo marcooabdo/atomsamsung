@@ -1589,8 +1589,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       atendida: { label: 'ATENDIDA', color: '#00D4FF' },
       em_uso: { label: 'EM USO', color: '#9D00FF' },
       gi_postada: { label: 'GI POSTADA', color: '#39FF14' },
-      devolucao_pendente: { label: 'DEV. PENDENTE', color: '#FF6B00' },
-      devolvida: { label: 'DEVOLVIDA', color: '#FF0064' },
+      devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FF6B00' },
+      devolvida: { label: 'DEVOLVIDA', color: '#39FF14' },
+      cancelada: { label: 'CANCELADA', color: '#808080' },
       reprovada: { label: 'REPROVADA', color: '#FF0064' },
       pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' }
     };
@@ -2464,7 +2465,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
