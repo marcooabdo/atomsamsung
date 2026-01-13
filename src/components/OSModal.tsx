@@ -292,7 +292,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       query = query.eq('os_id', osId);
     }
 
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query
+      .neq('status', 'cancelada')
+      .order('created_at', { ascending: false });
 
     if (error) {
       return;
@@ -954,7 +956,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       }
 
 
-      await supabase
+      const { error: insertError } = await supabase
         .from('requisicoes_pecas')
         .insert({
           os_id: osId,
@@ -967,6 +969,10 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           requisitado_por: usuario?.id,
           unidade_id: os?.unidade_id
         });
+
+      if (insertError) {
+        throw insertError;
+      }
 
       // Mover OS para "Aguardando Peça" se não estiver lá ainda
       if (os?.coluna_kanban !== 'aguardando_peca') {
@@ -995,10 +1001,19 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         });
       }
 
-      // Recarregar dados
-      await loadRequisicoes();
-      await loadOS();
-      onReload?.();
+      // Aguarda um breve momento para garantir que o banco processou tudo
+      await new Promise(resolve => setTimeout(resolve, 200));
+
+      // Recarregar dados (aguarda para garantir que o estado seja atualizado)
+      await Promise.all([
+        loadRequisicoes(),
+        loadOS()
+      ]);
+
+      // Chama onReload se existir
+      if (onReload) {
+        await onReload();
+      }
 
       alert('Requisição de peça criada com sucesso! OS movida para "Aguardando Peça".');
     } catch (error) {
