@@ -514,7 +514,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       updated_at: p.updated_at
     }));
 
-    setPecas([...(osPecasResult.data || []), ...cotacaoPecas]);
+    const todasPecas = [...(osPecasResult.data || []), ...cotacaoPecas];
+    console.log('🔍 Peças carregadas LP:', todasPecas.map(p => ({
+      desc: p.descricao?.substring(0, 30),
+      id: p.id,
+      cotacao_peca_id: p.cotacao_peca_id
+    })));
+    setPecas(todasPecas);
   };
 
   const loadRequisicoes = async () => {
@@ -525,6 +531,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       .eq('os_id', osId)
       .neq('status', 'cancelada')
       .order('created_at', { ascending: false });
+
+    console.log('🔍 Requisições carregadas LP:', data?.map(r => ({
+      cotacao_peca_id: r.cotacao_peca_id,
+      status: r.status,
+      descricao: r.descricao?.substring(0, 30)
+    })));
 
     setRequisicoes(data || []);
   };
@@ -818,6 +830,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
   const handleRequisitarPeca = async (peca: any) => {
     try {
+      console.log('🚀 Requisitando peça LP:', {
+        peca_id: peca.id,
+        cotacao_peca_id: peca.cotacao_peca_id,
+        descricao: peca.descricao?.substring(0, 30)
+      });
+
       const { error: insertError } = await supabase.from('requisicoes_pecas').insert({
         os_id: osId,
         cotacao_id: os?.cotacao_id || null,
@@ -2599,6 +2617,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                             r.status !== 'reprovada' &&
                             r.status !== 'cancelada'
                           );
+
+                          console.log(`🔍 Filtro LP - ${peca.descricao?.substring(0, 20)}:`, {
+                            peca_id: peca.id,
+                            cotacao_peca_id: peca.cotacao_peca_id,
+                            temRequisicaoAtiva: !!temRequisicaoAtiva,
+                            mostrar: !temRequisicaoAtiva,
+                            requisicao_status: temRequisicaoAtiva?.status
+                          });
+
                           return !temRequisicaoAtiva;
                         }).map((peca) => (
                           <div
