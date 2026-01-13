@@ -377,7 +377,11 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                         <Clock className="w-5 h-5 text-[#FF6B00]" />
                         <div>
                           <p className="font-bold text-white">
-                            OS {grupo.numero_os_samsung || grupo.numero_cotacao ? `#${grupo.numero_cotacao}` : grupo.cliente_nome || grupo.numero_os_interna || 'N/A'}
+                            {grupo.numero_os_samsung
+                              ? `OS ${grupo.numero_os_samsung}`
+                              : grupo.numero_cotacao
+                                ? `Cotação #${grupo.numero_cotacao}`
+                                : grupo.cliente_nome || grupo.numero_os_interna || 'N/A'}
                           </p>
                           <p className="text-xs text-gray-400">
                             {grupo.totalPecas} peça(s) aguardando aprovação
