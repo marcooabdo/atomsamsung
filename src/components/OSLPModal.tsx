@@ -500,9 +500,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         .order('created_at', { ascending: true })
     ]);
 
+    const osPecasFormatadas = (osPecasResult.data || []).map(p => ({
+      id: p.id,
+      os_id: p.os_id,
+      os_peca_id: p.id,
+      cotacao_peca_id: null,
+      codigo: p.pn,
+      pn: p.pn,
+      descricao: p.descricao,
+      quantidade: p.quantidade,
+      valor_unitario: p.valor_unitario,
+      valor_total: p.valor_total,
+      created_at: p.created_at,
+      updated_at: p.updated_at,
+      tipo: 'os_peca'
+    }));
+
     const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
       id: p.id,
       os_id: p.os_id,
+      os_peca_id: null,
       cotacao_peca_id: p.id,
       codigo: p.pn,
       pn: p.pn,
@@ -511,14 +528,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
       valor_unitario: p.valor_base_gspn,
       valor_total: p.valor_base_gspn * p.quantidade,
       created_at: p.created_at,
-      updated_at: p.updated_at
+      updated_at: p.updated_at,
+      tipo: 'cotacao'
     }));
 
-    const todasPecas = [...(osPecasResult.data || []), ...cotacaoPecas];
-    console.log('🔍 Peças carregadas LP:', todasPecas.map(p => ({
+    const todasPecas = [...osPecasFormatadas, ...cotacaoPecas];
+    console.log('🔍 Todas peças LP:', todasPecas.map(p => ({
       desc: p.descricao?.substring(0, 30),
-      id: p.id,
-      cotacao_peca_id: p.cotacao_peca_id
+      os_peca_id: p.os_peca_id,
+      cotacao_peca_id: p.cotacao_peca_id,
+      tipo: p.tipo
     })));
     setPecas(todasPecas);
   };
@@ -534,6 +553,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
     console.log('🔍 Requisições carregadas LP (TOTAL:', data?.length, '):', data?.map(r => ({
       id: r.id,
+      os_peca_id: r.os_peca_id,
       cotacao_peca_id: r.cotacao_peca_id,
       status: r.status,
       descricao: r.descricao?.substring(0, 30),
@@ -834,7 +854,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     try {
       console.log('🚀 Requisitando peça LP:', {
         peca_id: peca.id,
+        os_peca_id: peca.os_peca_id,
         cotacao_peca_id: peca.cotacao_peca_id,
+        tipo: peca.tipo,
         descricao: peca.descricao?.substring(0, 30)
       });
 
@@ -842,6 +864,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         os_id: osId,
         cotacao_id: os?.cotacao_id || null,
         cotacao_peca_id: peca.cotacao_peca_id || null,
+        os_peca_id: peca.os_peca_id || null,
         codigo_peca: peca.codigo || peca.pn,
         descricao: peca.descricao,
         quantidade_requisitada: peca.quantidade,
@@ -2538,10 +2561,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                           const codigosPecasJaExibidos = new Set<string>();
 
                           pecas.forEach(peca => {
-                            const pecaId = peca.cotacao_peca_id || peca.id;
-                            const requisicoesDestaPeca = requisicoes.filter(r =>
-                              r.cotacao_peca_id === pecaId
-                            ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                            const requisicoesDestaPeca = requisicoes.filter(r => {
+                              if (peca.os_peca_id) {
+                                return r.os_peca_id === peca.os_peca_id;
+                              } else if (peca.cotacao_peca_id) {
+                                return r.cotacao_peca_id === peca.cotacao_peca_id;
+                              }
+                              return false;
+                            }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
                             const requisicaoAtiva = requisicoesDestaPeca.find(r =>
                               r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada'
@@ -2551,25 +2578,24 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                             );
 
                             console.log(`🔍 LP Peça ${peca.descricao?.substring(0, 20)}:`, {
+                              peca_os_peca_id: peca.os_peca_id,
                               peca_cotacao_id: peca.cotacao_peca_id,
-                              peca_id: peca.id,
-                              pecaId_usado: pecaId,
+                              tipo: peca.tipo,
                               num_requisicoes: requisicoesDestaPeca.length,
-                              requisicao_ativa: requisicaoAtiva?.status,
-                              todas_requisicoes_ids: requisicoes.map(r => ({ id: r.id, cotacao_peca_id: r.cotacao_peca_id, status: r.status }))
+                              requisicao_ativa: requisicaoAtiva?.status
                             });
 
                             todasPecasParaExibir.push({
                               peca,
                               requisicao: requisicaoAtiva,
                               requisicaoDevolvida,
-                              tipo: 'cotacao'
+                              tipo: peca.tipo || 'cotacao'
                             });
                             codigosPecasJaExibidos.add(peca.codigo || peca.pn || '');
                           });
 
                           requisicoes.filter(r =>
-                            !r.cotacao_peca_id && !codigosPecasJaExibidos.has(r.codigo_peca || '')
+                            !r.cotacao_peca_id && !r.os_peca_id && !codigosPecasJaExibidos.has(r.codigo_peca || '')
                           ).forEach(r => {
                             todasPecasParaExibir.push({
                               peca: {
@@ -2597,7 +2623,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                   <div className="flex-1">
                                     <div className="flex items-center gap-2 mb-2">
                                       <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
-                                      {tipo === 'cotacao' && (
+                                      {(tipo === 'cotacao' || tipo === 'os_peca') && (
                                         <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{
                                           backgroundColor: '#9333EA20',
                                           color: '#9333EA',
@@ -2693,7 +2719,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                   <div className="flex gap-2">
                                     {!requisicao && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
-                                        onClick={() => handleRequisitarPeca(peca)}
+                                        onClick={() => {
+                                          console.log('🎯 CLIQUE NO BOTÃO - Objeto peca:', {
+                                            id: peca.id,
+                                            cotacao_peca_id: peca.cotacao_peca_id,
+                                            codigo: peca.codigo,
+                                            pn: peca.pn,
+                                            descricao: peca.descricao?.substring(0, 30),
+                                            todas_props: Object.keys(peca)
+                                          });
+                                          handleRequisitarPeca(peca);
+                                        }}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                       >
                                         <Send className="w-3 h-3" />
