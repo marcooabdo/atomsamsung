@@ -1712,6 +1712,13 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
       let pecasData: any[] = [];
       let anexosData: any[] = [];
       let agendamentosData: any[] = [];
+      let analiseTecnicaData: any = {};
+
+      // Buscar usuários para mapear nomes
+      const { data: usuariosData } = await supabase
+        .from('usuarios')
+        .select('id, nome');
+      const usuariosMap = new Map(usuariosData?.map(u => [u.id, u.nome]) || []);
 
       if (exportConfig.comentarios) {
         const { data } = await supabase
@@ -1722,15 +1729,32 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
       }
 
       if (exportConfig.pecas) {
-        const { data } = await supabase
+        // Buscar peças de cotações E requisições
+        const { data: cotacoesData } = await supabase
           .from('cotacoes')
           .select(`
             id,
             os_id,
+            numero_cotacao,
             cotacoes_pecas(*)
           `)
           .in('os_id', osIds);
-        pecasData = data || [];
+
+        const { data: requisicoesData } = await supabase
+          .from('requisicoes_pecas')
+          .select('*')
+          .in('os_id', osIds);
+
+        const { data: osPecasData } = await supabase
+          .from('os_pecas')
+          .select('*')
+          .in('os_id', osIds);
+
+        pecasData = {
+          cotacoes: cotacoesData || [],
+          requisicoes: requisicoesData || [],
+          osPecas: osPecasData || []
+        };
       }
 
       if (exportConfig.anexos) {
@@ -1744,10 +1768,25 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
       if (exportConfig.agendamento) {
         const { data } = await supabase
           .from('agendamentos')
-          .select('*')
+          .select(`
+            *,
+            tecnico:usuarios!agendamentos_tecnico_agendado_id_fkey(nome)
+          `)
           .in('os_id', osIds);
         agendamentosData = data || [];
       }
+
+      // Buscar análise técnica das cotações
+      const { data: cotacoesAnalise } = await supabase
+        .from('cotacoes')
+        .select('os_id, analise_tecnico')
+        .in('os_id', osIds);
+
+      cotacoesAnalise?.forEach(c => {
+        if (c.analise_tecnico) {
+          analiseTecnicaData[c.os_id] = c.analise_tecnico;
+        }
+      });
 
       // Criar planilha principal com OS
       const osRows = osData.map((os: any) => {
@@ -1756,11 +1795,21 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
         if (exportConfig.dadosBasicos) {
           row['Número OS Samsung'] = os.numero_os_samsung || '';
           row['Número OS Interna'] = os.numero_os_interna || '';
-          row['Coluna'] = os.coluna_kanban || '';
+
+          // Adicionar Status (nome da coluna kanban)
+          const colunaInfo = COLUNAS_KANBAN.find(c => c.id === os.coluna_kanban);
+          row['Status'] = colunaInfo?.label || os.coluna_kanban || '';
+
+          // Adicionar Motivo (se existir campo motivo_recusa ou similar)
+          row['Motivo'] = os.motivo_recusa || os.observacoes || '';
+
           row['Tipo OS'] = os.tipo_os || '';
           row['Tipo Atendimento'] = os.tipo_atendimento || '';
           row['Tipo Orçamento'] = os.tipo_orcamento || '';
           row['Status GSPN'] = os.status_gspn || '';
+
+          // Adicionar Análise Técnica
+          row['Análise Técnica'] = analiseTecnicaData[os.id] || '';
         }
 
         if (exportConfig.dadosCliente) {
@@ -1808,35 +1857,105 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
 
       // Adicionar planilhas adicionais
       if (exportConfig.comentarios && comentariosData.length > 0) {
-        const comentariosRows = comentariosData.map((c: any) => ({
-          'OS ID': c.os_id,
-          'Usuário': c.usuario_id,
-          'Comentário': c.comentario,
-          'Sistema': c.is_system ? 'Sim' : 'Não',
-          'Data': new Date(c.created_at).toLocaleString('pt-BR')
-        }));
+        const comentariosRows = comentariosData.map((c: any) => {
+          const os = osData.find(o => o.id === c.os_id);
+          const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+          const nomeUsuario = usuariosMap.get(c.usuario_id) || 'Sistema';
+
+          return {
+            'Número OS': numeroOS,
+            'Usuário': nomeUsuario,
+            'Comentário': c.comentario,
+            'Sistema': c.is_system ? 'Sim' : 'Não',
+            'Data': new Date(c.created_at).toLocaleString('pt-BR')
+          };
+        });
         const wsComentarios = XLSX.utils.json_to_sheet(comentariosRows);
         XLSX.utils.book_append_sheet(workbook, wsComentarios, 'Comentários');
       }
 
-      if (exportConfig.pecas && pecasData.length > 0) {
+      if (exportConfig.pecas && pecasData) {
         const pecasRows: any[] = [];
-        pecasData.forEach((cotacao: any) => {
-          if (cotacao.cotacoes_pecas) {
-            cotacao.cotacoes_pecas.forEach((peca: any) => {
-              pecasRows.push({
-                'OS ID': cotacao.os_id,
-                'Código': peca.codigo || '',
-                'Descrição': peca.descricao || '',
-                'Quantidade': peca.quantidade || 0,
-                'Valor Unitário': peca.valor_unitario || 0,
-                'Valor Total': peca.valor_total || 0,
-                'Status': peca.status || '',
-                'Delivery': peca.delivery || ''
+
+        // Peças de Cotações
+        if (pecasData.cotacoes && Array.isArray(pecasData.cotacoes)) {
+          pecasData.cotacoes.forEach((cotacao: any) => {
+            const os = osData.find(o => o.id === cotacao.os_id);
+            const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+
+            if (cotacao.cotacoes_pecas && Array.isArray(cotacao.cotacoes_pecas)) {
+              cotacao.cotacoes_pecas.forEach((peca: any) => {
+                pecasRows.push({
+                  'Número OS': numeroOS,
+                  'Origem': 'Cotação',
+                  'Número Cotação': cotacao.numero_cotacao || '',
+                  'Código': peca.codigo || '',
+                  'Descrição': peca.descricao || '',
+                  'Quantidade': peca.quantidade || 0,
+                  'Valor Unitário': peca.valor_unitario || 0,
+                  'Valor Total': peca.valor_total || 0,
+                  'Valor Base GSPN': peca.valor_base_gspn || 0,
+                  'Status': peca.status || '',
+                  'Delivery': peca.delivery || '',
+                  'É GSPN': peca.is_gspn ? 'Sim' : 'Não'
+                });
               });
+            }
+          });
+        }
+
+        // Requisições de Peças
+        if (pecasData.requisicoes && Array.isArray(pecasData.requisicoes)) {
+          pecasData.requisicoes.forEach((req: any) => {
+            const os = osData.find(o => o.id === req.os_id);
+            const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+            const nomeUsuario = usuariosMap.get(req.requisitada_por) || 'N/A';
+
+            pecasRows.push({
+              'Número OS': numeroOS,
+              'Origem': 'Requisição',
+              'Número Cotação': '',
+              'Código': req.codigo_peca || '',
+              'Descrição': req.descricao || '',
+              'Quantidade': req.quantidade_solicitada || 0,
+              'Valor Unitário': 0,
+              'Valor Total': 0,
+              'Valor Base GSPN': 0,
+              'Status': req.status || '',
+              'Delivery': '',
+              'É GSPN': '',
+              'Requisitada Por': nomeUsuario,
+              'Motivo': req.motivo || '',
+              'Pedido Samsung': req.numero_pedido_samsung || '',
+              'GI Postada': req.gi_postada_samsung ? 'Sim' : 'Não'
             });
-          }
-        });
+          });
+        }
+
+        // OS Peças (GSPN)
+        if (pecasData.osPecas && Array.isArray(pecasData.osPecas)) {
+          pecasData.osPecas.forEach((peca: any) => {
+            const os = osData.find(o => o.id === peca.os_id);
+            const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+
+            pecasRows.push({
+              'Número OS': numeroOS,
+              'Origem': 'GSPN',
+              'Número Cotação': '',
+              'Código': peca.sku || '',
+              'Descrição': peca.nome || '',
+              'Quantidade': peca.quantidade || 0,
+              'Valor Unitário': peca.preco || 0,
+              'Valor Total': (peca.preco || 0) * (peca.quantidade || 0),
+              'Valor Base GSPN': peca.preco || 0,
+              'Status': peca.status_gspn || '',
+              'Delivery': '',
+              'É GSPN': 'Sim',
+              'ID GSPN': peca.gspn_id || ''
+            });
+          });
+        }
+
         if (pecasRows.length > 0) {
           const wsPecas = XLSX.utils.json_to_sheet(pecasRows);
           XLSX.utils.book_append_sheet(workbook, wsPecas, 'Peças');
@@ -1844,27 +1963,46 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
       }
 
       if (exportConfig.anexos && anexosData.length > 0) {
-        const anexosRows = anexosData.map((a: any) => ({
-          'OS ID': a.os_id,
-          'Nome Arquivo': a.nome_arquivo,
-          'Tipo': a.tipo,
-          'URL': a.url,
-          'Data Upload': new Date(a.created_at).toLocaleString('pt-BR')
-        }));
+        const anexosRows = anexosData.map((a: any) => {
+          const os = osData.find(o => o.id === a.os_id);
+          const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+          const nomeUsuario = usuariosMap.get(a.usuario_id) || 'Sistema';
+
+          return {
+            'Número OS': numeroOS,
+            'Nome Arquivo': a.nome_arquivo,
+            'Tipo': a.tipo,
+            'URL': a.url,
+            'Usuário': nomeUsuario,
+            'Data Upload': new Date(a.created_at).toLocaleString('pt-BR')
+          };
+        });
         const wsAnexos = XLSX.utils.json_to_sheet(anexosRows);
         XLSX.utils.book_append_sheet(workbook, wsAnexos, 'Anexos');
       }
 
       if (exportConfig.agendamento && agendamentosData.length > 0) {
-        const agendamentosRows = agendamentosData.map((a: any) => ({
-          'OS ID': a.os_id,
-          'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento).toLocaleDateString('pt-BR') : '',
-          'Período': a.periodo_agendamento || '',
-          'Técnico': a.tecnico_agendado_id || '',
-          'Confirmado': a.confirmado_com_cliente ? 'Sim' : 'Não',
-          'Check-in': a.data_checkin ? new Date(a.data_checkin).toLocaleString('pt-BR') : '',
-          'Check-out': a.data_checkout ? new Date(a.data_checkout).toLocaleString('pt-BR') : ''
-        }));
+        const agendamentosRows = agendamentosData.map((a: any) => {
+          const os = osData.find(o => o.id === a.os_id);
+          const numeroOS = os?.numero_os_samsung || os?.numero_os_interna || 'S/N';
+          const nomeTecnico = a.tecnico?.nome || 'Não designado';
+
+          return {
+            'Número OS': numeroOS,
+            'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento).toLocaleDateString('pt-BR') : '',
+            'Período': a.periodo_agendamento || '',
+            'Técnico Designado': nomeTecnico,
+            'Cidade': os?.cliente_cidade || '',
+            'Endereço': os?.cliente_endereco || '',
+            'Bairro': os?.cliente_bairro || '',
+            'CEP': os?.cliente_cep || '',
+            'Confirmado': a.confirmado_com_cliente ? 'Sim' : 'Não',
+            'Check-in': a.data_checkin ? new Date(a.data_checkin).toLocaleString('pt-BR') : '',
+            'Check-out': a.data_checkout ? new Date(a.data_checkout).toLocaleString('pt-BR') : '',
+            'Latitude': a.lat || '',
+            'Longitude': a.lng || ''
+          };
+        });
         const wsAgendamentos = XLSX.utils.json_to_sheet(agendamentosRows);
         XLSX.utils.book_append_sheet(workbook, wsAgendamentos, 'Agendamentos');
       }
