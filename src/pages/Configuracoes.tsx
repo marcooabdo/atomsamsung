@@ -88,6 +88,9 @@ interface ChecklistTemplate {
   descricao: string | null;
   unidade_id: string | null;
   tipo_servico: 'IH' | 'CI' | 'geral' | 'instalacao' | 'manutencao';
+  tipo_os: string[];
+  tipos_atendimento: string[];
+  tipo_checklist: 'ADM' | 'TÉCNICO';
   itens: ChecklistItem[];
   ativo: boolean;
   created_at: string;
@@ -119,7 +122,7 @@ export function Configuracoes() {
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
-  const [formChecklist, setFormChecklist] = useState({ nome: '', descricao: '', tipo_servico: 'geral' as const, unidade_id: '', itens: [] as ChecklistItem[], ativo: true });
+  const [formChecklist, setFormChecklist] = useState({ nome: '', descricao: '', tipo_servico: 'geral' as const, tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM' as const, unidade_id: '', itens: [] as ChecklistItem[], ativo: true });
   const [novaCidade, setNovaCidade] = useState('');
   const [novoItem, setNovoItem] = useState({ texto: '', tipo_resposta: 'checkbox' as const });
 
@@ -231,7 +234,7 @@ export function Configuracoes() {
           break;
         case 'checklists':
           const checklist = checklists.find(c => c.id === id);
-          if (checklist) setFormChecklist({ nome: checklist.nome, descricao: checklist.descricao || '', tipo_servico: checklist.tipo_servico, unidade_id: checklist.unidade_id || '', itens: checklist.itens || [], ativo: checklist.ativo });
+          if (checklist) setFormChecklist({ nome: checklist.nome, descricao: checklist.descricao || '', tipo_servico: checklist.tipo_servico, tipo_os: checklist.tipo_os || ['LP', 'OW', 'NA'], tipos_atendimento: checklist.tipos_atendimento || ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: checklist.tipo_checklist || 'ADM', unidade_id: checklist.unidade_id || '', itens: checklist.itens || [], ativo: checklist.ativo });
           break;
       }
     } else {
@@ -242,7 +245,7 @@ export function Configuracoes() {
       setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
-      setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', unidade_id: selectedUnidadeChecklist, itens: [], ativo: true });
+      setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist, itens: [], ativo: true });
     }
     setShowModal(true);
   };
@@ -461,6 +464,9 @@ export function Configuracoes() {
             nome: formChecklist.nome,
             descricao: formChecklist.descricao || null,
             tipo_servico: formChecklist.tipo_servico,
+            tipo_os: formChecklist.tipo_os,
+            tipos_atendimento: formChecklist.tipos_atendimento,
+            tipo_checklist: formChecklist.tipo_checklist,
             unidade_id: formChecklist.unidade_id || null,
             itens: formChecklist.itens,
             ativo: formChecklist.ativo
@@ -1035,6 +1041,66 @@ export function Configuracoes() {
                       <option value="instalacao">Instalação</option>
                       <option value="manutencao">Manutenção</option>
                     </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Checklist *</label>
+                    <select
+                      value={formChecklist.tipo_checklist}
+                      onChange={(e) => setFormChecklist({...formChecklist, tipo_checklist: e.target.value as 'ADM' | 'TÉCNICO'})}
+                      className="neon-input"
+                    >
+                      <option value="ADM">ADM (Administrativo - aparece na OS)</option>
+                      <option value="TÉCNICO">TÉCNICO (aparece no Agendamento)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de OS *</label>
+                    <div className="premium-card p-3 bg-[#3b82f6]/5 border border-[#3b82f6]/20 space-y-2">
+                      {['LP', 'OW', 'NA'].map(tipo => (
+                        <label key={tipo} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formChecklist.tipo_os.includes(tipo)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormChecklist({...formChecklist, tipo_os: [...formChecklist.tipo_os, tipo]});
+                              } else {
+                                setFormChecklist({...formChecklist, tipo_os: formChecklist.tipo_os.filter(t => t !== tipo)});
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-300">{tipo}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Selecione para quais tipos de OS este checklist se aplica</p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Tipos de Atendimento *</label>
+                    <div className="premium-card p-3 bg-[#3b82f6]/5 border border-[#3b82f6]/20 grid grid-cols-3 gap-2">
+                      {['CI', 'IH', 'II', 'RH', 'SH', 'PS'].map(tipo => (
+                        <label key={tipo} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={formChecklist.tipos_atendimento.includes(tipo)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setFormChecklist({...formChecklist, tipos_atendimento: [...formChecklist.tipos_atendimento, tipo]});
+                              } else {
+                                setFormChecklist({...formChecklist, tipos_atendimento: formChecklist.tipos_atendimento.filter(t => t !== tipo)});
+                              }
+                            }}
+                            className="w-4 h-4"
+                          />
+                          <span className="text-sm text-gray-300">{tipo}</span>
+                        </label>
+                      ))}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-1">Selecione para quais tipos de atendimento este checklist se aplica</p>
                   </div>
 
                   <div>

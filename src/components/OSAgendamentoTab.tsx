@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
 
 const TIPOS_REPARO_IH = [
   'Troca de placa',
@@ -40,6 +41,7 @@ export function OSAgendamentoTab({
 }: OSAgendamentoTabProps) {
   const { usuario } = useAuth();
   const [tecnicos, setTecnicos] = useState<Array<{ id: string; nome: string }>>([]);
+  const [agendamentoId, setAgendamentoId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     data_agendamento: dataAgendamento || '',
     tecnico_agendado_id: tecnicoAgendadoId || '',
@@ -128,7 +130,9 @@ export function OSAgendamentoTab({
 
       if (error) throw error;
       setAgendamento(data);
+      setAgendamentoId(data?.id || null);
     } catch (error) {
+      setAgendamentoId(null);
     }
   };
 
@@ -401,6 +405,14 @@ export function OSAgendamentoTab({
             <span>A confirmação com cliente é importante para o técnico saber se pode ir direto</span>
           </li>
         </ul>
+      </div>
+
+      {/* Seção de Checklists Técnicos */}
+      <div className="border-t border-gray-700/30 pt-6">
+        <AgendamentoChecklistSection
+          agendamentoId={agendamentoId}
+          unidadeId={unidadeId}
+        />
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
+import { OSChecklistTab } from './OSChecklistTab';
 import type { Database } from '../lib/database.types';
 
 const COLUNAS_KANBAN = [
@@ -2892,43 +2893,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                 </div>
               )}
 
-              {abaAtiva === 'checklist' && (
-                <div>
-                  <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
-                    Checklist de Verificação
-                  </h3>
-                  {checklist.length === 0 ? (
-                    <p className="text-gray-500 text-sm">Nenhum item de checklist definido</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {checklist.map((item) => (
-                        <div
-                          key={item.id}
-                          className="premium-card p-4 flex items-center justify-between"
-                        >
-                          <div className="flex items-center gap-3">
-                            <input
-                              type="checkbox"
-                              checked={item.concluido}
-                              onChange={() => handleToggleChecklist(item)}
-                              className="w-5 h-5"
-                            />
-                            <div>
-                              <p className={`text-sm ${item.concluido ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                                {item.item}
-                              </p>
-                              {item.concluido && item.concluido_por && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  Concluído por: {item.concluido_por.nome}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+              {abaAtiva === 'checklist' && os && (
+                <OSChecklistTab
+                  osId={os.id}
+                  tipoOS={os.tipo_os}
+                  tipoAtendimento={os.tipo_atendimento}
+                  unidadeId={os.unidade_id}
+                />
               )}
 
               {abaAtiva === 'agendamento' && os && (

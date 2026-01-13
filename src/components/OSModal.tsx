@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { OSChecklistTab } from './OSChecklistTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
@@ -79,6 +80,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [anexoPreview, setAnexoPreview] = useState<OSAnexo | null>(null);
   const [pagamento, setPagamento] = useState<any>(null);
   const [checklist, setChecklist] = useState<any[]>([]);
+  const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
+  const [checklistsVinculados, setChecklistsVinculados] = useState<any[]>([]);
+  const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
   const [novoComentario, setNovoComentario] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('dados');
   const [loading, setLoading] = useState(true);
@@ -304,13 +308,62 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const loadChecklist = async () => {
-    const { data } = await supabase
-      .from('os_checklist')
-      .select('*, concluido_por:usuarios(nome)')
-      .eq('os_id', osId)
-      .order('ordem', { ascending: true });
+    // Carregar checklists vinculados
+    const { data: vinculados } = await supabase
+      .from('os_checklist_vinculados')
+      .select(`
+        *,
+        checklist_template:checklist_templates(*)
+      `)
+      .eq('os_id', osId);
 
-    setChecklist(data || []);
+    setChecklistsVinculados(vinculados || []);
+
+    // Carregar templates ADM disponíveis
+    const { data: os } = await supabase
+      .from('os')
+      .select('tipo_os, tipo_atendimento, unidade_id')
+      .eq('id', osId)
+      .single();
+
+    if (os) {
+      const { data: templates } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('tipo_checklist', 'ADM')
+        .eq('ativo', true)
+        .or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`);
+
+      setChecklistTemplates(templates || []);
+
+      // Vincular automaticamente checklists que se aplicam
+      for (const template of templates || []) {
+        const jaVinculado = vinculados?.some(v => v.checklist_template_id === template.id);
+        if (!jaVinculado &&
+            template.tipo_os.includes(os.tipo_os) &&
+            template.tipos_atendimento.includes(os.tipo_atendimento)) {
+          await supabase
+            .from('os_checklist_vinculados')
+            .insert({
+              os_id: osId,
+              checklist_template_id: template.id,
+              vinculado_automaticamente: true,
+              vinculado_por: usuario?.id
+            });
+        }
+      }
+
+      // Recarregar vinculados após adicionar automaticamente
+      const { data: vinculadosAtualizados } = await supabase
+        .from('os_checklist_vinculados')
+        .select(`
+          *,
+          checklist_template:checklist_templates(*)
+        `)
+        .eq('os_id', osId);
+
+      setChecklistsVinculados(vinculadosAtualizados || []);
+    }
   };
 
   const loadComentarios = async () => {
@@ -2545,69 +2598,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
             </div>
           )}
 
-          {abaAtiva === 'checklist' && (
-            <div className="space-y-6">
-              <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4">
-                <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider flex items-center gap-2">
-                  <CheckSquare className="w-4 h-4" />
-                  Checklist do Reparo
-                </h3>
-                <p className="text-xs text-gray-400 mt-2">
-                  Itens de verificação para garantir a qualidade do serviço
-                </p>
-              </div>
-
-              {checklist.length === 0 ? (
-                <div className="text-center py-12 premium-card">
-                  <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm mb-4">Nenhum item no checklist</p>
-                  <button
-                    onClick={handleCriarChecklistPadrao}
-                    className="neon-button text-xs px-4 py-2"
-                    style={{
-                      backgroundColor: '#39FF1420',
-                      color: '#39FF14',
-                      borderColor: '#39FF1460'
-                    }}
-                  >
-                    CRIAR CHECKLIST PADRÃO
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {checklist.map((item) => (
-                    <div key={item.id} className="premium-card p-4 hover-lift">
-                      <div className="flex items-start gap-3">
-                        <button
-                          onClick={() => handleToggleChecklistItem(item.id, !item.concluido)}
-                          className={`flex-shrink-0 w-5 h-5 rounded border-2 flex items-center justify-center transition-all ${
-                            item.concluido
-                              ? 'bg-[#39FF14]/20 border-[#39FF14]'
-                              : 'border-gray-500 hover:border-[#39FF14]'
-                          }`}
-                        >
-                          {item.concluido && <CheckSquare className="w-4 h-4 text-[#39FF14]" />}
-                        </button>
-                        <div className="flex-1">
-                          <p className={`text-sm ${item.concluido ? 'line-through text-gray-500' : 'text-gray-200'}`}>
-                            {item.item}
-                          </p>
-                          {item.concluido && (
-                            <p className="text-xs text-gray-500 mt-1">
-                              Concluído por {item.concluido_por?.nome || 'Desconhecido'} em{' '}
-                              {new Date(item.concluido_em).toLocaleString('pt-BR')}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                      {item.observacao && (
-                        <p className="text-xs text-gray-400 mt-2 ml-8">Obs: {item.observacao}</p>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+          {abaAtiva === 'checklist' && os && (
+            <OSChecklistTab
+              osId={osId!}
+              tipoOS={os.tipo_os}
+              tipoAtendimento={os.tipo_atendimento}
+              unidadeId={os.unidade_id}
+            />
           )}
 
           {abaAtiva === 'servicos' && (
