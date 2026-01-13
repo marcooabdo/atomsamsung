@@ -890,6 +890,59 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     }
   };
 
+  const handleRequisitarNovamente = async (peca: any, requisicaoAnterior: any) => {
+    const motivo = prompt('Informe o motivo para requisitar novamente esta peça:');
+    if (!motivo || !motivo.trim()) {
+      alert('É necessário informar o motivo da nova requisição');
+      return;
+    }
+
+    try {
+      const { data: novaRequisicao, error: insertError } = await supabase
+        .from('requisicoes_pecas')
+        .insert({
+          os_id: osId,
+          cotacao_id: os?.cotacao_id || null,
+          cotacao_peca_id: peca.cotacao_peca_id || null,
+          codigo_peca: peca.codigo || peca.pn || 'N/A',
+          descricao: peca.descricao || 'Peça sem descrição',
+          quantidade_requisitada: peca.quantidade || 1,
+          status: 'pendente',
+          requisitado_por: usuario?.id,
+          unidade_id: os?.unidade_id
+        })
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      if (os?.coluna_kanban !== 'aguardando_peca') {
+        await supabase
+          .from('os')
+          .update({
+            coluna_kanban: 'aguardando_peca',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', osId);
+      }
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Nova requisição criada para peça ${peca.descricao} (${peca.codigo || peca.pn}). Motivo: ${motivo}`,
+        is_system: true
+      });
+
+      alert('Nova requisição criada com sucesso!');
+      loadRequisicoes();
+      loadComentarios();
+      loadOS();
+      onReload?.();
+    } catch (error: any) {
+      alert(`Erro ao criar nova requisição: ${error.message}`);
+    }
+  };
+
   const handleCancelarRequisicao = async (requisicao: RequisicaoPeca) => {
     const motivo = prompt('Digite o motivo do cancelamento:');
     if (!motivo) return;
@@ -2461,85 +2514,164 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">
-                      Requisições de Peças
+                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                      Peças da Cotação
                     </h3>
-                    {requisicoes.length === 0 ? (
-                      <p className="text-gray-500 text-sm">Nenhuma requisição criada ainda</p>
+                    {pecas.length === 0 && requisicoes.length === 0 ? (
+                      <p className="text-gray-500 text-sm">Nenhuma peça cadastrada</p>
                     ) : (
                       <div className="space-y-3">
-                        {requisicoes.map((requisicao) => {
-                          const peca = pecas.find(p => p.cotacao_peca_id === requisicao.cotacao_peca_id);
+                        {(() => {
+                          const todasPecasParaExibir: any[] = [];
+                          const codigosPecasJaExibidos = new Set<string>();
 
-                          return (
-                            <div
-                              key={requisicao.id}
-                              className="premium-card p-4 border-l-4"
-                              style={{ borderLeftColor: '#00D4FF' }}
-                            >
-                              <div className="flex items-start justify-between mb-2">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <p className="text-sm font-bold text-gray-300">{requisicao.descricao || 'Sem descrição'}</p>
-                                    {getStatusBadge(requisicao.status)}
-                                  </div>
-                                  <p className="text-xs text-gray-500 mt-1">Código: {requisicao.codigo_peca || 'N/A'}</p>
-                                  <div className="flex items-center gap-4 mt-2">
-                                    <p className="text-xs text-gray-500">Qtd: {requisicao.quantidade_requisitada}</p>
-                                    {requisicao.valor_peca && (
-                                      <>
-                                        <p className="text-xs text-gray-500">
-                                          Unit: R$ {Number(requisicao.valor_peca).toFixed(2)}
-                                        </p>
-                                        <p className="text-xs font-bold text-[#00D4FF]">
-                                          Total: R$ {(Number(requisicao.valor_peca) * requisicao.quantidade_requisitada).toFixed(2)}
-                                        </p>
-                                      </>
+                          pecas.forEach(peca => {
+                            const pecaId = peca.cotacao_peca_id || peca.id;
+                            const requisicoesDestaPeca = requisicoes.filter(r =>
+                              r.cotacao_peca_id === pecaId
+                            ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                            const requisicaoAtiva = requisicoesDestaPeca.find(r =>
+                              r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada'
+                            );
+                            const requisicaoDevolvida = requisicoesDestaPeca.find(r =>
+                              r.status === 'devolvida' || r.status === 'reprovada'
+                            );
+
+                            todasPecasParaExibir.push({
+                              peca,
+                              requisicao: requisicaoAtiva,
+                              requisicaoDevolvida,
+                              tipo: 'cotacao'
+                            });
+                            codigosPecasJaExibidos.add(peca.codigo || peca.pn || '');
+                          });
+
+                          requisicoes.filter(r =>
+                            !r.cotacao_peca_id && !codigosPecasJaExibidos.has(r.codigo_peca || '')
+                          ).forEach(r => {
+                            todasPecasParaExibir.push({
+                              peca: {
+                                id: r.id,
+                                descricao: r.descricao,
+                                codigo: r.codigo_peca,
+                                quantidade: r.quantidade_requisitada,
+                                valor_unitario: r.valor_peca,
+                                valor_total: (r.valor_peca || 0) * r.quantidade_requisitada
+                              },
+                              requisicao: r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada' ? r : null,
+                              requisicaoDevolvida: r.status === 'devolvida' || r.status === 'reprovada' ? r : null,
+                              tipo: 'manual'
+                            });
+                          });
+
+                          return todasPecasParaExibir.map(({ peca, requisicao, requisicaoDevolvida, tipo }, idx) => {
+                            const temNovaRequisicaoPendente = requisicao && requisicaoDevolvida &&
+                              requisicao.status === 'pendente' &&
+                              new Date(requisicao.created_at) > new Date(requisicaoDevolvida.created_at);
+
+                            return (
+                              <div key={`${tipo}-${peca.id}-${idx}`} className="premium-card p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2">
+                                      <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
+                                      {requisicao && getStatusBadge(requisicao.status)}
+                                    </div>
+                                    <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                    <div className="flex items-center gap-4 mt-2">
+                                      <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                                      <p className="text-xs text-gray-500">
+                                        Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                      </p>
+                                      <p className="text-xs font-bold text-[#39FF14]">
+                                        Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                      </p>
+                                    </div>
+                                    {requisicao && (
+                                      <p className="text-xs text-gray-500 mt-2">
+                                        Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
+                                      </p>
                                     )}
-                                    {peca && (
-                                      <>
-                                        <p className="text-xs text-gray-500">
-                                          Unit GSPN: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                        </p>
-                                        <p className="text-xs font-bold text-[#FFA500]">
-                                          Total GSPN: R$ {Number(peca.valor_total || 0).toFixed(2)}
-                                        </p>
-                                      </>
-                                    )}
-                                  </div>
-                                  <p className="text-xs text-gray-500 mt-2">
-                                    Requisitado em: {new Date(requisicao.created_at).toLocaleString('pt-BR')}
-                                  </p>
-                                  {(requisicao.status === 'em_uso' && requisicao.motivo_reprovacao) && (
-                                    <div className="mt-3 p-3 rounded-lg" style={{
-                                      backgroundColor: '#FF006410',
-                                      border: '1px solid #FF006460'
-                                    }}>
-                                      <div className="flex items-start gap-2">
-                                        <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
-                                        <div className="flex-1">
-                                          <p className="text-xs font-bold text-[#FF0064] mb-1">DEVOLUÇÃO REJEITADA PELO ESTOQUE:</p>
-                                          <p className="text-xs text-gray-300">{requisicao.motivo_reprovacao}</p>
-                                          <p className="text-xs text-[#FFBF00] mt-2 italic">
-                                            ⚠️ Você pode postar uma nova GI ou devolver a peça novamente
-                                          </p>
+                                    {requisicao?.status === 'pedido_feito' && (
+                                      <div className="mt-3 p-3 rounded-lg" style={{
+                                        backgroundColor: '#00D4FF10',
+                                        border: '1px solid #00D4FF60'
+                                      }}>
+                                        <div className="flex items-start gap-2">
+                                          <Clock className="w-4 h-4 text-[#00D4FF] flex-shrink-0 mt-0.5" />
+                                          <div className="flex-1">
+                                            <p className="text-xs font-bold text-[#00D4FF] mb-1">PEDIDO REGISTRADO</p>
+                                            {requisicao.numero_pedido_samsung && requisicao.numero_pedido_samsung !== 'N/A' && !requisicao.numero_pedido_samsung.startsWith('PENDENTE-') && (
+                                              <p className="text-xs text-gray-300">
+                                                Pedido Samsung: <span className="font-mono text-[#00D4FF]">{requisicao.numero_pedido_samsung}</span>
+                                              </p>
+                                            )}
+                                            <p className="text-xs text-gray-500 mt-2">
+                                              Aguardando chegada da peça
+                                            </p>
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="flex gap-2">
-                                  {requisicao.status === 'pendente' ? (
-                                    <>
-                                      <div className="flex items-center gap-2 px-4 py-2 rounded-lg border" style={{
-                                        backgroundColor: '#FFBF0010',
-                                        borderColor: '#FFBF00',
-                                        color: '#FFBF00'
+                                    )}
+                                    {(requisicao?.status === 'reprovada' || (requisicao?.status === 'em_uso' && requisicao.motivo_reprovacao)) && requisicao.motivo_reprovacao && (
+                                      <div className="mt-3 p-3 rounded-lg" style={{
+                                        backgroundColor: '#FF006410',
+                                        border: '1px solid #FF006460'
                                       }}>
-                                        <Clock className="w-3 h-3" />
-                                        <span className="text-xs font-bold">AGUARDANDO ESTOQUE</span>
+                                        <div className="flex items-start gap-2">
+                                          <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
+                                          <div className="flex-1">
+                                            <p className="text-xs font-bold text-[#FF0064] mb-1">
+                                              {requisicao.status === 'em_uso' ? 'DEVOLUÇÃO REJEITADA PELO ESTOQUE:' : 'MOTIVO DA REPROVAÇÃO:'}
+                                            </p>
+                                            <p className="text-xs text-gray-300">{requisicao.motivo_reprovacao}</p>
+                                            {requisicao.status === 'em_uso' && (
+                                              <p className="text-xs text-[#FFBF00] mt-2 italic">
+                                                Voce pode postar uma nova GI ou devolver a peca novamente
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
                                       </div>
+                                    )}
+                                    {(requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') && requisicao.motivo_devolucao && (
+                                      <div className="mt-3 p-3 rounded-lg" style={{
+                                        backgroundColor: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : '#FFBF0010',
+                                        border: requisicao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : '1px solid #FFBF0060'
+                                      }}>
+                                        <div className="flex items-start gap-2">
+                                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
+                                            color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
+                                          }} />
+                                          <div className="flex-1">
+                                            <p className="text-xs font-bold mb-1" style={{
+                                              color: requisicao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : '#FFBF00'
+                                            }}>
+                                              {requisicao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {requisicao.tipo_devolucao === 'nova' ? 'NOVA' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
+                                            </p>
+                                            <p className="text-xs text-gray-300">
+                                              {requisicao.tipo_devolucao === 'nova_com_defeito' ? 'DEFEITO: ' : 'Motivo: '}
+                                              {requisicao.motivo_devolucao}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    {!requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                                      <button
+                                        onClick={() => handleRequisitarPeca(peca)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                      >
+                                        <Send className="w-3 h-3" />
+                                        REQUISITAR
+                                      </button>
+                                    )}
+
+                                    {requisicao?.status === 'pendente' && (
                                       <button
                                         onClick={() => handleCancelarRequisicao(requisicao)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2552,23 +2684,40 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                         <X className="w-3 h-3" />
                                         CANCELAR
                                       </button>
-                                    </>
-                                  ) : (requisicao.status === 'atendida' || requisicao.status === 'em_uso') ? (
-                                    <>
+                                    )}
+
+                                    {(requisicao?.status === 'atendida' || requisicao?.status === 'em_uso') && (
+                                      <>
+                                        <button
+                                          onClick={() => handlePostarGI(requisicao)}
+                                          className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                          style={{
+                                            backgroundColor: '#39FF1410',
+                                            borderColor: '#39FF14',
+                                            color: '#39FF14'
+                                          }}
+                                        >
+                                          <Send className="w-3 h-3" />
+                                          POSTAR GI
+                                        </button>
+                                        <button
+                                          onClick={() => handleRemoverPeca(requisicao)}
+                                          className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                          style={{
+                                            backgroundColor: '#FF006410',
+                                            borderColor: '#FF0064',
+                                            color: '#FF0064'
+                                          }}
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                          DEVOLVER
+                                        </button>
+                                      </>
+                                    )}
+
+                                    {requisicao?.status === 'gi_postada' && (
                                       <button
-                                        onClick={() => handlePostarGI(requisicao)}
-                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                        style={{
-                                          backgroundColor: '#39FF1410',
-                                          borderColor: '#39FF14',
-                                          color: '#39FF14'
-                                        }}
-                                      >
-                                        <Send className="w-3 h-3" />
-                                        POSTAR GI
-                                      </button>
-                                      <button
-                                        onClick={() => handleRemoverPeca(requisicao)}
+                                        onClick={() => handleCancelarGI(requisicao)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                         style={{
                                           backgroundColor: '#FF006410',
@@ -2576,95 +2725,49 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                                           color: '#FF0064'
                                         }}
                                       >
-                                        <Trash2 className="w-3 h-3" />
-                                        DEVOLVER
+                                        <X className="w-3 h-3" />
+                                        CANCELAR GI
                                       </button>
-                                    </>
-                                  ) : requisicao.status === 'gi_postada' ? (
-                                    <button
-                                      onClick={() => handleCancelarGI(requisicao)}
-                                      className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                      style={{
-                                        backgroundColor: '#FF006410',
-                                        borderColor: '#FF0064',
-                                        color: '#FF0064'
-                                      }}
-                                    >
-                                      <X className="w-3 h-3" />
-                                      CANCELAR GI
-                                    </button>
-                                  ) : null}
+                                    )}
+
+                                    {requisicao?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                                      <button
+                                        onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#FFBF0020',
+                                          borderColor: '#FFBF00',
+                                          color: '#FFBF00'
+                                        }}
+                                      >
+                                        <RefreshCw className="w-3 h-3" />
+                                        REQUISITAR NOVAMENTE
+                                      </button>
+                                    )}
+
+                                    {requisicao?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                                      <button
+                                        onClick={() => handleRequisitarNovamente(peca, requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#39FF1420',
+                                          borderColor: '#39FF14',
+                                          color: '#39FF14'
+                                        }}
+                                      >
+                                        <RefreshCw className="w-3 h-3" />
+                                        REQUISITAR NOVAMENTE
+                                      </button>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          });
+                        })()}
                       </div>
                     )}
                   </div>
-
-                  {pecas.length > 0 && (
-                    <div className="mt-6">
-                      <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
-                        Peças da Cotação (Disponíveis para Requisitar)
-                      </h3>
-                      <div className="space-y-3">
-                        {pecas.filter(peca => {
-                          // Verifica se existe requisição ATIVA (não devolvida/cancelada) para esta peça específica
-                          const temRequisicaoAtiva = requisicoes.find(r =>
-                            r.cotacao_peca_id === peca.cotacao_peca_id &&
-                            r.status !== 'devolvida' &&
-                            r.status !== 'reprovada' &&
-                            r.status !== 'cancelada'
-                          );
-
-                          console.log(`🔍 Filtro LP - ${peca.descricao?.substring(0, 20)}:`, {
-                            peca_id: peca.id,
-                            cotacao_peca_id: peca.cotacao_peca_id,
-                            temRequisicaoAtiva: !!temRequisicaoAtiva,
-                            mostrar: !temRequisicaoAtiva,
-                            requisicao_status: temRequisicaoAtiva?.status
-                          });
-
-                          return !temRequisicaoAtiva;
-                        }).map((peca) => (
-                          <div
-                            key={peca.id}
-                            className="premium-card p-4 border-l-4"
-                            style={{ borderLeftColor: '#FFA500' }}
-                          >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2 mb-2">
-                                  <p className="text-sm font-bold text-gray-300">{peca.descricao || 'Sem descrição'}</p>
-                                </div>
-                                <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
-                                <div className="flex items-center gap-4 mt-2">
-                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
-                                  <p className="text-xs text-gray-500">
-                                    Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                  </p>
-                                  <p className="text-xs font-bold text-[#FFA500]">
-                                    Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {os?.coluna_kanban !== 'diagnostico' && (
-                                <button
-                                  onClick={() => handleRequisitarPeca(peca)}
-                                  className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                >
-                                  <Send className="w-3 h-3" />
-                                  REQUISITAR
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
                     </>
                   )}
                 </div>
