@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
+import { DevolucaoModal } from './DevolucaoModal';
 import type { Database } from '../lib/database.types';
 
 const COLUNAS_KANBAN = [
@@ -75,6 +76,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   const [convertendo, setConvertendo] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
+  const [mostrarModalDevolucao, setMostrarModalDevolucao] = useState(false);
+  const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
 
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -1057,37 +1060,43 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
     }
   };
 
-  const handleRemoverPeca = async (requisicao: RequisicaoPeca) => {
-    const motivo = prompt('Motivo da devolução:');
-    if (!motivo) return;
+  const handleRemoverPeca = (requisicao: RequisicaoPeca) => {
+    setRequisicaoSelecionada(requisicao);
+    setMostrarModalDevolucao(true);
+  };
 
-    const tipo = prompt('Tipo de devolução:\n1 = Nova\n2 = Nova com defeito\n3 = Usada');
-    const tipoDevolucao = tipo === '1' ? 'nova' : tipo === '2' ? 'nova_com_defeito' : 'usada';
+  const handleConfirmarDevolucao = async (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada') => {
+    if (!requisicaoSelecionada) return;
 
     try {
       await supabase
         .from('requisicoes_pecas')
         .update({
-          status: 'devolvida',
+          status: 'devolucao_pendente',
           motivo_devolucao: motivo,
-          tipo_devolucao: tipoDevolucao
+          tipo_devolucao: tipo
         })
-        .eq('id', requisicao.id);
+        .eq('id', requisicaoSelecionada.id);
+
+      const tipoLabel = tipo === 'nova' ? 'Nova' : tipo === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada';
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Peça devolvida por ${usuario?.nome}: ${requisicao.descricao}\nTipo: ${tipoDevolucao}\nMotivo: ${motivo}`,
+        comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao}\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
         is_system: true
       });
 
-      alert('Peça devolvida com sucesso!');
+      alert('Devolução solicitada com sucesso! Aguardando aprovação do estoque.');
       await loadPecas();
       await loadRequisicoes();
       await loadComentarios();
       onReload?.();
+      setMostrarModalDevolucao(false);
+      setRequisicaoSelecionada(null);
     } catch (error) {
-      alert('Erro ao devolver peça');
+      alert('Erro ao solicitar devolução');
+      throw error;
     }
   };
 
@@ -3153,6 +3162,22 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
             </div>
           </div>
         </div>
+      )}
+
+      {mostrarModalDevolucao && requisicaoSelecionada && (
+        <DevolucaoModal
+          isOpen={mostrarModalDevolucao}
+          onClose={() => {
+            setMostrarModalDevolucao(false);
+            setRequisicaoSelecionada(null);
+          }}
+          onConfirm={handleConfirmarDevolucao}
+          requisicao={{
+            codigo_peca: requisicaoSelecionada.codigo_peca,
+            descricao: requisicaoSelecionada.descricao
+          }}
+          tipoOS={os?.tipo_os || 'LP'}
+        />
       )}
     </div>
   );

@@ -393,17 +393,29 @@ export function ExecucaoOS() {
       if (action === 'gi') {
         await supabase
           .from('requisicoes_pecas')
-          .update({ status: 'gi_postado' })
+          .update({
+            status: 'gi_postado',
+            tipo_devolucao: 'usada',
+            motivo_devolucao: 'Peça consumida durante o reparo'
+          })
           .eq('id', pecaId);
       } else if (action === 'devolucao_nova') {
         await supabase
           .from('requisicoes_pecas')
-          .update({ status: 'devolvida' })
+          .update({
+            status: 'devolucao_pendente',
+            tipo_devolucao: 'nova',
+            motivo_devolucao: 'Peça não utilizada no reparo'
+          })
           .eq('id', pecaId);
       } else if (action === 'devolucao_defeito') {
         await supabase
           .from('requisicoes_pecas')
-          .update({ status: 'devolvida', observacoes: 'Peça com defeito - RMA' })
+          .update({
+            status: 'devolucao_pendente',
+            tipo_devolucao: 'nova_com_defeito',
+            motivo_devolucao: 'Peça apresentou defeito de fábrica - RMA'
+          })
           .eq('id', pecaId);
       }
     }
