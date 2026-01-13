@@ -2186,9 +2186,18 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   {pecas.map((peca) => {
                     // Buscar requisição desta peça (prioriza ativas, senão pega a mais recente)
                     const pecaId = peca.cotacao_peca_id || peca.id;
-                    const requisicoesDestaPeca = requisicoes.filter(r =>
-                      r.cotacao_peca_id === pecaId
-                    ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+                    const isGSPN = peca.status === 'gspn';
+
+                    // Para GSPN, busca por código da peça; para outras, por cotacao_peca_id
+                    const requisicoesDestaPeca = requisicoes.filter(r => {
+                      if (isGSPN) {
+                        // Para GSPN, busca pelo código da peça
+                        return r.codigo_peca === (peca.codigo || peca.pn || 'N/A');
+                      } else {
+                        // Para peças normais, busca pelo cotacao_peca_id
+                        return r.cotacao_peca_id === pecaId;
+                      }
+                    }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
                     const requisicaoAtiva = requisicoesDestaPeca.find(r =>
                       r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada'
