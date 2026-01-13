@@ -306,8 +306,8 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       <div className="bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg p-6">
         <h4 className="font-semibold text-[#FF0064] mb-2">Controle de Devoluções</h4>
         <p className="text-sm text-gray-300">
-          Aprove ou reprove devoluções pendentes de peças com GI postada.
-          Peças aprovadas são devolvidas ao estoque.
+          Aprove ou reprove devoluções pendentes de peças com GI postada, novas ou com defeito.
+          Peças aprovadas são retornadas ao estoque ou UPC.
         </p>
       </div>
 
