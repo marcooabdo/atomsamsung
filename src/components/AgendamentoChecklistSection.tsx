@@ -174,99 +174,6 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
     }
   };
 
-  const handleToggleItem = async (vinculoId: string, itemOrdem: number, checked: boolean) => {
-    try {
-      const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
-      if (!vinculo) return;
-
-      const template = vinculo.checklist_template;
-      const item = template?.itens?.find((i: any) => i.ordem === itemOrdem);
-      const itemTexto = item?.texto || `Item ${itemOrdem}`;
-      const nomeChecklist = template?.nome || 'Checklist';
-
-      const respostas = vinculo.respostas || [];
-      const respostaExistente = respostas.find((r: any) => r.ordem === itemOrdem);
-
-      // Se está tentando DESMARCAR um item que já estava marcado, exige justificativa
-      if (respostaExistente?.checked && !checked) {
-        const justificativa = prompt(`Por que você está desmarcando o item "${itemTexto}"?\n\nJustificativa:`);
-
-        if (!justificativa || justificativa.trim() === '') {
-          alert('Justificativa é obrigatória para desmarcar um item já marcado.');
-          return;
-        }
-
-        let novasRespostas = respostas.map((r: any) =>
-          r.ordem === itemOrdem
-            ? {
-                ...r,
-                checked,
-                updated_at: new Date().toISOString(),
-                updated_by: usuario?.id,
-                updated_by_name: usuario?.nome,
-                justificativa_desmarcacao: justificativa
-              }
-            : r
-        );
-
-        await supabase
-          .from('agendamento_checklist_vinculados')
-          .update({ respostas: novasRespostas })
-          .eq('id', vinculoId);
-
-        if (osId) {
-          await supabase.from('os_comentarios').insert({
-            os_id: osId,
-            usuario_id: usuario?.id,
-            comentario: `[CHECKLIST TÉCNICO "${nomeChecklist}"] ${usuario?.nome} DESMARCOU: "${itemTexto}"\n\nJustificativa: ${justificativa}`,
-            is_system: true
-          });
-        }
-
-        await loadChecklists();
-        return;
-      }
-
-      // Marcar item normalmente (sem justificativa)
-      let novasRespostas;
-      if (respostaExistente) {
-        novasRespostas = respostas.map((r: any) =>
-          r.ordem === itemOrdem
-            ? { ...r, checked, updated_at: new Date().toISOString(), updated_by: usuario?.id, updated_by_name: usuario?.nome }
-            : r
-        );
-      } else {
-        novasRespostas = [
-          ...respostas,
-          {
-            ordem: itemOrdem,
-            checked,
-            updated_at: new Date().toISOString(),
-            updated_by: usuario?.id,
-            updated_by_name: usuario?.nome
-          }
-        ];
-      }
-
-      await supabase
-        .from('agendamento_checklist_vinculados')
-        .update({ respostas: novasRespostas })
-        .eq('id', vinculoId);
-
-      if (osId && checked) {
-        await supabase.from('os_comentarios').insert({
-          os_id: osId,
-          usuario_id: usuario?.id,
-          comentario: `[CHECKLIST TÉCNICO "${nomeChecklist}"] ${usuario?.nome} MARCOU: "${itemTexto}"`,
-          is_system: true
-        });
-      }
-
-      await loadChecklists();
-    } catch (error) {
-      alert('Erro ao atualizar item do checklist');
-    }
-  };
 
   const templatesDisponiveis = checklistTemplates.filter(t => {
     console.log('Avaliando template técnico:', t.nome, {
@@ -335,7 +242,7 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
             Checklists Técnicos
           </h4>
           <p className="text-xs text-gray-400 mt-1">
-            {isReadOnly ? 'Visualização dos checklists técnicos' : 'Checklists para serem preenchidos pelo técnico durante a execução'}
+            Visualização dos checklists vinculados. Preenchimento feito apenas pelo técnico no mobile
           </p>
         </div>
         {!isReadOnly && (
@@ -394,27 +301,23 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
                     const checked = resposta?.checked || false;
 
                     return (
-                      <div key={item.ordem} className="flex items-start gap-2 p-1.5 rounded hover:bg-white/5 transition-colors">
-                        <button
-                          onClick={() => !isReadOnly && handleToggleItem(vinculo.id, item.ordem, !checked)}
-                          disabled={isReadOnly}
-                          className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
+                      <div key={item.ordem} className="flex items-start gap-2 p-1.5 rounded">
+                        <div
+                          className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
                             checked
                               ? 'bg-[#00D4FF]/20 border-[#00D4FF]'
-                              : isReadOnly
-                                ? 'border-gray-600 cursor-not-allowed'
-                                : 'border-gray-500 hover:border-[#00D4FF] cursor-pointer'
+                              : 'border-gray-600'
                           }`}
                         >
                           {checked && <CheckSquare className="w-3 h-3 text-[#00D4FF]" />}
-                        </button>
+                        </div>
                         <div className="flex-1">
                           <p className={`text-xs ${checked ? 'line-through text-gray-500' : 'text-gray-200'}`}>
                             {item.texto}
                           </p>
                           {checked && resposta?.updated_at && (
                             <p className="text-[10px] text-gray-500 mt-0.5">
-                              {resposta.updated_by_name || 'Usuario'} - {new Date(resposta.updated_at).toLocaleString('pt-BR')}
+                              Preenchido por: {resposta.updated_by_name || 'Técnico'} - {new Date(resposta.updated_at).toLocaleString('pt-BR')}
                             </p>
                           )}
                         </div>

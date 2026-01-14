@@ -49,10 +49,27 @@ interface Evidencia {
 }
 
 interface ChecklistItem {
+  ordem: number;
+  texto: string;
+  checked: boolean;
+  updated_at?: string;
+  updated_by?: string;
+  updated_by_name?: string;
+}
+
+interface ChecklistVinculado {
   id: string;
-  item: string;
-  concluido: boolean;
-  observacao: string;
+  checklist_template_id: string;
+  respostas: ChecklistItem[];
+  checklist_template: {
+    id: string;
+    nome: string;
+    descricao: string | null;
+    itens: Array<{
+      ordem: number;
+      texto: string;
+    }>;
+  };
 }
 
 interface AgendamentoDetalhes {
@@ -85,7 +102,7 @@ export function ExecucaoOS() {
   const [loading, setLoading] = useState(true);
   const [hasActiveOS, setHasActiveOS] = useState(false);
 
-  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [checklistsVinculados, setChecklistsVinculados] = useState<ChecklistVinculado[]>([]);
   const [defeitoEncontrado, setDefeitoEncontrado] = useState('');
   const [diagnostico, setDiagnostico] = useState('');
   const [acaoRealizada, setAcaoRealizada] = useState('');
@@ -204,7 +221,7 @@ export function ExecucaoOS() {
     }
 
     await loadPecas(data.id);
-    await loadChecklist(data.id);
+    await loadChecklist(agendamentoData?.id || '');
     await loadComentarios(data.id);
 
     setLoading(false);
@@ -242,37 +259,37 @@ export function ExecucaoOS() {
     }
   };
 
-  const loadChecklist = async (osId: string) => {
+  const loadChecklist = async (agendamentoId: string) => {
     if (!usuario) return;
 
-    const { data: osData } = await supabase
-      .from('os')
-      .select('tipo_atendimento, unidade_id')
-      .eq('id', osId)
-      .maybeSingle();
+    try {
+      console.log('🔍 Mobile: Carregando checklists técnicos vinculados para agendamento:', agendamentoId);
 
-    if (!osData) return;
+      const { data: vinculados, error } = await supabase
+        .from('agendamento_checklist_vinculados')
+        .select(`
+          id,
+          checklist_template_id,
+          respostas,
+          checklist_template:checklist_templates(
+            id,
+            nome,
+            descricao,
+            itens
+          )
+        `)
+        .eq('agendamento_id', agendamentoId);
 
-    const { data: template } = await supabase
-      .from('checklist_templates')
-      .select('itens')
-      .eq('tipo_servico', osData.tipo_atendimento)
-      .eq('ativo', true)
-      .or(`unidade_id.is.null,unidade_id.eq.${osData.unidade_id}`)
-      .order('unidade_id', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      if (error) {
+        console.error('❌ Erro ao carregar checklists vinculados:', error);
+        return;
+      }
 
-    if (template && template.itens && Array.isArray(template.itens) && template.itens.length > 0) {
-      const checklistItems: ChecklistItem[] = template.itens.map((item: any, index: number) => ({
-        id: String(index + 1),
-        item: item.texto || item.item || '',
-        concluido: false,
-        observacao: ''
-      }));
-      setChecklist(checklistItems);
-    } else {
-      setChecklist([]);
+      console.log('✅ Checklists técnicos vinculados encontrados:', vinculados?.length || 0);
+      setChecklistsVinculados((vinculados as any) || []);
+    } catch (error) {
+      console.error('❌ Erro ao carregar checklists:', error);
+      setChecklistsVinculados([]);
     }
   };
 
@@ -342,11 +359,34 @@ export function ExecucaoOS() {
 
     let comentario = '';
 
-    if (checklist.length > 0) {
-      const checklistText = checklist
-        .map(item => `[${item.concluido ? 'X' : ' '}] ${item.item}${item.observacao ? ` - ${item.observacao}` : ''}`)
-        .join('\n');
-      comentario = `CHECKLIST DE SERVIÇO:\n${checklistText}\n\n`;
+    // Salvar respostas dos checklists técnicos vinculados
+    for (const vinculo of checklistsVinculados) {
+      const respostas = vinculo.respostas || [];
+
+      await supabase
+        .from('agendamento_checklist_vinculados')
+        .update({ respostas })
+        .eq('id', vinculo.id);
+    }
+
+    // Adicionar comentário com informações do checklist
+    if (checklistsVinculados.length > 0) {
+      let checklistTexts: string[] = [];
+
+      checklistsVinculados.forEach(vinculo => {
+        const respostas = vinculo.respostas || [];
+        const template = vinculo.checklist_template;
+        const itens = template.itens || [];
+
+        const checklistText = itens.map(item => {
+          const resposta = respostas.find(r => r.ordem === item.ordem);
+          return `[${resposta?.checked ? 'X' : ' '}] ${item.texto}`;
+        }).join('\n');
+
+        checklistTexts.push(`${template.nome}:\n${checklistText}`);
+      });
+
+      comentario = `CHECKLISTS TÉCNICOS:\n${checklistTexts.join('\n\n')}\n\n`;
     }
 
     comentario += `DEFEITO ENCONTRADO:\n${defeitoEncontrado || 'Não informado'}\n\nDIAGNÓSTICO:\n${diagnostico || 'Não informado'}\n\nAÇÃO REALIZADA:\n${acaoRealizada || 'Não informado'}`;
@@ -371,9 +411,21 @@ export function ExecucaoOS() {
   };
 
   const isChecklistValid = () => {
-    const checklistCompleto = checklist.length === 0 || checklist.every(item => item.concluido);
+    // Verificar se todos os checklists vinculados estão completos
+    const todosChecklistsCompletos = checklistsVinculados.every(vinculo => {
+      const template = vinculo.checklist_template;
+      const itens = template.itens || [];
+      const respostas = vinculo.respostas || [];
+
+      // Todos os itens devem estar marcados
+      return itens.every(item => {
+        const resposta = respostas.find(r => r.ordem === item.ordem);
+        return resposta?.checked === true;
+      });
+    });
+
     const camposObrigatorios = defeitoEncontrado.trim() && diagnostico.trim() && acaoRealizada.trim();
-    return checklistCompleto && camposObrigatorios;
+    return todosChecklistsCompletos && camposObrigatorios;
   };
 
   const isEncerramentoValid = () => {
@@ -514,7 +566,29 @@ export function ExecucaoOS() {
         return;
       }
       if (!isChecklistValid()) {
-        alert('Complete todos os campos obrigatórios: Defeito Encontrado, Diagnóstico e Ação Realizada' + (checklist.length > 0 ? ', e todos os itens do checklist.' : '.'));
+        const pendencias: string[] = [];
+
+        // Verificar checklists técnicos
+        checklistsVinculados.forEach(vinculo => {
+          const template = vinculo.checklist_template;
+          const itens = template.itens || [];
+          const respostas = vinculo.respostas || [];
+
+          const itensIncompletos = itens.filter(item => {
+            const resposta = respostas.find(r => r.ordem === item.ordem);
+            return !resposta?.checked;
+          });
+
+          if (itensIncompletos.length > 0) {
+            pendencias.push(`${template.nome}: ${itensIncompletos.length} item(ns) pendente(s)`);
+          }
+        });
+
+        if (!defeitoEncontrado.trim()) pendencias.push('Defeito Encontrado');
+        if (!diagnostico.trim()) pendencias.push('Diagnóstico');
+        if (!acaoRealizada.trim()) pendencias.push('Ação Realizada');
+
+        alert('Complete os seguintes campos:\n\n' + pendencias.join('\n'));
         return;
       }
       if (!isEncerramentoValid()) {
@@ -764,39 +838,79 @@ export function ExecucaoOS() {
             </button>
 
             {expandedSections.checklist && (
-              <div className="space-y-3">
-                {checklist.map((item, index) => (
-                  <div key={item.id} className="bg-gray-900 border border-gray-700 rounded-xl p-4">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={item.concluido}
-                        onChange={(e) => {
-                          const newChecklist = [...checklist];
-                          newChecklist[index].concluido = e.target.checked;
-                          setChecklist(newChecklist);
-                        }}
-                        className="mt-1 w-5 h-5 rounded border-gray-600 text-cyan-500 focus:ring-cyan-500"
-                      />
-                      <div className="flex-1">
-                        <p className={`text-white font-medium ${item.concluido ? 'line-through opacity-50' : ''}`}>
-                          {item.item}
-                        </p>
-                        <input
-                          type="text"
-                          placeholder="Observações (opcional)"
-                          value={item.observacao}
-                          onChange={(e) => {
-                            const newChecklist = [...checklist];
-                            newChecklist[index].observacao = e.target.value;
-                            setChecklist(newChecklist);
-                          }}
-                          className="mt-2 w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white text-sm placeholder-gray-500 focus:outline-none focus:border-cyan-500"
-                        />
-                      </div>
-                    </label>
+              <div className="space-y-4">
+                {checklistsVinculados.length === 0 ? (
+                  <div className="bg-gray-900 border border-gray-700 rounded-xl p-6 text-center">
+                    <CheckCircle className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-400">Nenhum checklist técnico vinculado a esta OS</p>
+                    <p className="text-gray-500 text-sm mt-2">Os checklists devem ser adicionados na aba de Agendamento da OS</p>
                   </div>
-                ))}
+                ) : (
+                  checklistsVinculados.map((vinculo, vinculoIndex) => {
+                    const template = vinculo.checklist_template;
+                    const itens = template.itens || [];
+                    const respostas = vinculo.respostas || [];
+
+                    return (
+                      <div key={vinculo.id} className="bg-gray-900 border border-cyan-500/30 rounded-xl p-4">
+                        <h3 className="text-cyan-400 font-bold mb-1">{template.nome}</h3>
+                        {template.descricao && (
+                          <p className="text-gray-400 text-sm mb-3">{template.descricao}</p>
+                        )}
+
+                        <div className="space-y-2">
+                          {itens.map((item) => {
+                            const resposta = respostas.find(r => r.ordem === item.ordem);
+                            const checked = resposta?.checked || false;
+
+                            return (
+                              <label key={item.ordem} className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-gray-800/50 transition-colors">
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => {
+                                    const novosVinculos = [...checklistsVinculados];
+                                    const respostas = novosVinculos[vinculoIndex].respostas || [];
+
+                                    const respostaIndex = respostas.findIndex(r => r.ordem === item.ordem);
+
+                                    if (respostaIndex >= 0) {
+                                      respostas[respostaIndex] = {
+                                        ...respostas[respostaIndex],
+                                        checked: e.target.checked,
+                                        updated_at: new Date().toISOString(),
+                                        updated_by: usuario?.id,
+                                        updated_by_name: usuario?.nome
+                                      };
+                                    } else {
+                                      respostas.push({
+                                        ordem: item.ordem,
+                                        texto: item.texto,
+                                        checked: e.target.checked,
+                                        updated_at: new Date().toISOString(),
+                                        updated_by: usuario?.id,
+                                        updated_by_name: usuario?.nome
+                                      });
+                                    }
+
+                                    novosVinculos[vinculoIndex].respostas = respostas;
+                                    setChecklistsVinculados(novosVinculos);
+                                  }}
+                                  className="mt-1 w-5 h-5 rounded border-gray-600 text-cyan-500 focus:ring-cyan-500"
+                                />
+                                <div className="flex-1">
+                                  <p className={`text-white font-medium ${checked ? 'line-through opacity-50' : ''}`}>
+                                    {item.texto}
+                                  </p>
+                                </div>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
 
                 <div className="bg-gray-900 border border-gray-700 rounded-xl p-4 space-y-4">
                   <div>
