@@ -39,6 +39,8 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
   const [selectedAgendamento, setSelectedAgendamento] = useState<any>(null);
   const [checklistModalOpen, setChecklistModalOpen] = useState(false);
   const [selectedVisitaForChecklist, setSelectedVisitaForChecklist] = useState<string | null>(null);
+  const [processingCheckin, setProcessingCheckin] = useState<string | null>(null);
+  const [processingCheckout, setProcessingCheckout] = useState<string | null>(null);
 
   const enderecoCompleto = `${os.cliente_endereco}, ${os.cliente_bairro || ''}, ${os.cliente_cidade}${os.cliente_cep ? ` - CEP: ${os.cliente_cep}` : ''}`.trim();
 
@@ -284,26 +286,56 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
                         {!visita.checkin_realizado && visita.status !== 'concluido' && (
                           <button
                             onClick={() => {
+                              setProcessingCheckin(visita.id);
                               setSelectedAgendamento(visita);
                               setCheckinModalOpen(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all"
+                            disabled={processingCheckin === visita.id}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                              processingCheckin === visita.id
+                                ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 cursor-wait'
+                                : 'bg-green-500/20 border border-green-500/50 text-green-400 hover:bg-green-500/30'
+                            }`}
                           >
-                            <Navigation className="w-4 h-4" />
-                            Check-in
+                            {processingCheckin === visita.id ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                                Processando...
+                              </>
+                            ) : (
+                              <>
+                                <Navigation className="w-4 h-4" />
+                                Check-in
+                              </>
+                            )}
                           </button>
                         )}
 
                         {visita.checkin_realizado && !visita.checkout_realizado && visita.status !== 'concluido' && (
                           <button
                             onClick={() => {
+                              setProcessingCheckout(visita.id);
                               setSelectedAgendamento(visita);
                               setCheckoutModalOpen(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-all"
+                            disabled={processingCheckout === visita.id}
+                            className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all ${
+                              processingCheckout === visita.id
+                                ? 'bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 cursor-wait'
+                                : 'bg-blue-500/20 border border-blue-500/50 text-blue-400 hover:bg-blue-500/30'
+                            }`}
                           >
-                            <CheckCircle className="w-4 h-4" />
-                            Check-out
+                            {processingCheckout === visita.id ? (
+                              <>
+                                <div className="w-4 h-4 border-2 border-yellow-400 border-t-transparent rounded-full animate-spin" />
+                                Processando...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-4 h-4" />
+                                Check-out
+                              </>
+                            )}
                           </button>
                         )}
                       </div>
@@ -348,9 +380,11 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
           onClose={() => {
             setCheckinModalOpen(false);
             setSelectedAgendamento(null);
+            setProcessingCheckin(null);
           }}
           onSuccess={() => {
             loadVisitas();
+            setProcessingCheckin(null);
           }}
         />
       )}
@@ -361,9 +395,11 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
           onClose={() => {
             setCheckoutModalOpen(false);
             setSelectedAgendamento(null);
+            setProcessingCheckout(null);
           }}
           onSuccess={() => {
             loadVisitas();
+            setProcessingCheckout(null);
           }}
         />
       )}
