@@ -323,7 +323,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
                           )}
                           <div className="flex gap-2 mt-2">
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                              {template.tipo_servico}
+                              {template.tipos_atendimento?.join(', ')}
                             </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
                               {template.itens?.length || 0} itens

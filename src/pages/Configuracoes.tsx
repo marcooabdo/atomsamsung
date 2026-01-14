@@ -1029,21 +1029,6 @@ export function Configuracoes() {
                   </div>
 
                   <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Serviço *</label>
-                    <select
-                      value={formChecklist.tipo_servico}
-                      onChange={(e) => setFormChecklist({...formChecklist, tipo_servico: e.target.value as any})}
-                      className="neon-input"
-                    >
-                      <option value="geral">Geral</option>
-                      <option value="IH">IH (In-Home)</option>
-                      <option value="CI">CI (Carry-In)</option>
-                      <option value="instalacao">Instalação</option>
-                      <option value="manutencao">Manutenção</option>
-                    </select>
-                  </div>
-
-                  <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Checklist *</label>
                     <select
                       value={formChecklist.tipo_checklist}
@@ -1856,12 +1841,22 @@ export function Configuracoes() {
                                 <span
                                   className="px-3 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: '#00D4FF20',
-                                    color: '#00D4FF',
-                                    border: '1px solid #00D4FF60'
+                                    backgroundColor: checklist.tipo_checklist === 'ADM' ? '#3b82f620' : '#00D4FF20',
+                                    color: checklist.tipo_checklist === 'ADM' ? '#3b82f6' : '#00D4FF',
+                                    border: `1px solid ${checklist.tipo_checklist === 'ADM' ? '#3b82f6' : '#00D4FF'}60`
                                   }}
                                 >
-                                  {checklist.tipo_servico.toUpperCase()}
+                                  {checklist.tipo_checklist}
+                                </span>
+                                <span
+                                  className="px-3 py-1 rounded text-xs font-bold uppercase"
+                                  style={{
+                                    backgroundColor: '#9333ea20',
+                                    color: '#9333ea',
+                                    border: '1px solid #9333ea60'
+                                  }}
+                                >
+                                  {checklist.tipo_os?.join(', ')}
                                 </span>
                                 {checklist.unidade_id === null && (
                                   <span
