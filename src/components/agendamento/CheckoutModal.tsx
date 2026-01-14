@@ -29,6 +29,7 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
   const [captandoLocalizacao, setCaptandoLocalizacao] = useState(false);
   const [isDrawing, setIsDrawing] = useState(false);
   const [hasSignature, setHasSignature] = useState(false);
+  const [uploadingFotos, setUploadingFotos] = useState(false);
 
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [loadingChecklist, setLoadingChecklist] = useState(true);
@@ -233,6 +234,11 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
 
     try {
       const fotoUrls: string[] = [];
+
+      if (fotos.length > 0) {
+        setUploadingFotos(true);
+      }
+
       for (const foto of fotos) {
         const fileName = `checkout_${agendamento.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const { error: uploadError } = await supabase.storage
@@ -247,6 +253,8 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
 
         fotoUrls.push(publicUrl);
       }
+
+      setUploadingFotos(false);
 
       const canvas = canvasRef.current;
       let assinaturaUrl = '';
@@ -552,7 +560,7 @@ export function CheckoutModal({ agendamento, onClose, onSuccess }: CheckoutModal
             {loading ? (
               <span className="flex items-center justify-center gap-2">
                 <Clock className="w-4 h-4 animate-spin" />
-                Processando...
+                {uploadingFotos ? 'Enviando fotos...' : 'Processando check-out...'}
               </span>
             ) : (
               <span className="flex items-center justify-center gap-2">

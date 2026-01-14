@@ -18,6 +18,7 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
   const [fotos, setFotos] = useState<File[]>([]);
   const [observacao, setObservacao] = useState('');
   const [captandoLocalizacao, setCaptandoLocalizacao] = useState(false);
+  const [uploadingFotos, setUploadingFotos] = useState(false);
 
   useEffect(() => {
     captarLocalizacao();
@@ -100,6 +101,10 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
     try {
       const fotoUrls: string[] = [];
 
+      if (fotos.length > 0) {
+        setUploadingFotos(true);
+      }
+
       for (const foto of fotos) {
         const fileName = `checkin_${agendamento.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
         const { data: uploadData, error: uploadError } = await supabase.storage
@@ -114,6 +119,8 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
 
         fotoUrls.push(publicUrl);
       }
+
+      setUploadingFotos(false);
 
       const { error: checkinError } = await supabase
         .from('agendamentos_checkin_checkout')
@@ -342,7 +349,7 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
             {loading ? (
               <>
                 <Clock className="w-4 h-4 animate-spin" />
-                Processando check-in...
+                {uploadingFotos ? 'Enviando fotos...' : 'Processando check-in...'}
               </>
             ) : (
               <>
