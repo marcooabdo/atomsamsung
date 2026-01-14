@@ -76,6 +76,9 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
     try {
       console.log('Vinculando checklist técnico:', templateId, 'para agendamento:', agendamentoId);
 
+      const template = checklistTemplates.find(t => t.id === templateId);
+      const nomeChecklist = template?.nome || 'Checklist';
+
       const { data, error } = await supabase
         .from('agendamento_checklist_vinculados')
         .insert({
@@ -96,6 +99,15 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
 
       setShowAddModal(false);
       await loadChecklists();
+
+      if (osId) {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `${usuario?.nome} adicionou o checklist TÉCNICO "${nomeChecklist}" manualmente`,
+          is_system: true
+        });
+      }
     } catch (error) {
       console.error('Erro ao vincular checklist:', error);
       alert('Erro ao vincular checklist');
@@ -124,10 +136,53 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
 
       const template = vinculo.checklist_template;
       const item = template?.itens?.find((i: any) => i.ordem === itemOrdem);
+      const itemTexto = item?.texto || `Item ${itemOrdem}`;
+      const nomeChecklist = template?.nome || 'Checklist';
 
       const respostas = vinculo.respostas || [];
       const respostaExistente = respostas.find((r: any) => r.ordem === itemOrdem);
 
+      // Se está tentando DESMARCAR um item que já estava marcado, exige justificativa
+      if (respostaExistente?.checked && !checked) {
+        const justificativa = prompt(`Por que você está desmarcando o item "${itemTexto}"?\n\nJustificativa:`);
+
+        if (!justificativa || justificativa.trim() === '') {
+          alert('Justificativa é obrigatória para desmarcar um item já marcado.');
+          return;
+        }
+
+        let novasRespostas = respostas.map((r: any) =>
+          r.ordem === itemOrdem
+            ? {
+                ...r,
+                checked,
+                updated_at: new Date().toISOString(),
+                updated_by: usuario?.id,
+                updated_by_name: usuario?.nome,
+                justificativa_desmarcacao: justificativa
+              }
+            : r
+        );
+
+        await supabase
+          .from('agendamento_checklist_vinculados')
+          .update({ respostas: novasRespostas })
+          .eq('id', vinculoId);
+
+        if (osId) {
+          await supabase.from('os_comentarios').insert({
+            os_id: osId,
+            usuario_id: usuario?.id,
+            comentario: `[CHECKLIST TÉCNICO "${nomeChecklist}"] ${usuario?.nome} DESMARCOU: "${itemTexto}"\n\nJustificativa: ${justificativa}`,
+            is_system: true
+          });
+        }
+
+        await loadChecklists();
+        return;
+      }
+
+      // Marcar item normalmente (sem justificativa)
       let novasRespostas;
       if (respostaExistente) {
         novasRespostas = respostas.map((r: any) =>
@@ -153,13 +208,11 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .update({ respostas: novasRespostas })
         .eq('id', vinculoId);
 
-      if (osId) {
-        const acao = checked ? 'marcou' : 'desmarcou';
-        const itemTexto = item?.texto || `Item ${itemOrdem}`;
+      if (osId && checked) {
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
-          comentario: `[CHECKLIST TECNICO] ${usuario?.nome} ${acao}: "${itemTexto}"`,
+          comentario: `[CHECKLIST TÉCNICO "${nomeChecklist}"] ${usuario?.nome} MARCOU: "${itemTexto}"`,
           is_system: true
         });
       }

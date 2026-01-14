@@ -95,6 +95,9 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
     try {
       console.log('Vinculando checklist:', templateId, 'para OS:', osId);
 
+      const template = checklistTemplates.find(t => t.id === templateId);
+      const nomeChecklist = template?.nome || 'Checklist';
+
       const { data, error } = await supabase
         .from('os_checklist_vinculados')
         .insert({
@@ -120,7 +123,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `${usuario?.nome} adicionou um checklist manualmente`,
+        comentario: `${usuario?.nome} adicionou o checklist ADM "${nomeChecklist}" manualmente`,
         is_system: true
       });
     } catch (error) {
@@ -158,10 +161,51 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
 
       const template = vinculo.checklist_template;
       const item = template?.itens?.find((i: any) => i.ordem === itemOrdem);
+      const itemTexto = item?.texto || `Item ${itemOrdem}`;
+      const nomeChecklist = template?.nome || 'Checklist';
 
       const respostas = vinculo.respostas || [];
       const respostaExistente = respostas.find((r: any) => r.ordem === itemOrdem);
 
+      // Se está tentando DESMARCAR um item que já estava marcado, exige justificativa
+      if (respostaExistente?.checked && !checked) {
+        const justificativa = prompt(`Por que você está desmarcando o item "${itemTexto}"?\n\nJustificativa:`);
+
+        if (!justificativa || justificativa.trim() === '') {
+          alert('Justificativa é obrigatória para desmarcar um item já marcado.');
+          return;
+        }
+
+        let novasRespostas = respostas.map((r: any) =>
+          r.ordem === itemOrdem
+            ? {
+                ...r,
+                checked,
+                updated_at: new Date().toISOString(),
+                updated_by: usuario?.id,
+                updated_by_name: usuario?.nome,
+                justificativa_desmarcacao: justificativa
+              }
+            : r
+        );
+
+        await supabase
+          .from('os_checklist_vinculados')
+          .update({ respostas: novasRespostas })
+          .eq('id', vinculoId);
+
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `[CHECKLIST ADM "${nomeChecklist}"] ${usuario?.nome} DESMARCOU: "${itemTexto}"\n\nJustificativa: ${justificativa}`,
+          is_system: true
+        });
+
+        await loadChecklists();
+        return;
+      }
+
+      // Marcar item normalmente (sem justificativa)
       let novasRespostas;
       if (respostaExistente) {
         novasRespostas = respostas.map((r: any) =>
@@ -187,14 +231,14 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         .update({ respostas: novasRespostas })
         .eq('id', vinculoId);
 
-      const acao = checked ? 'marcou' : 'desmarcou';
-      const itemTexto = item?.texto || `Item ${itemOrdem}`;
-      await supabase.from('os_comentarios').insert({
-        os_id: osId,
-        usuario_id: usuario?.id,
-        comentario: `[CHECKLIST ADM] ${usuario?.nome} ${acao}: "${itemTexto}"`,
-        is_system: true
-      });
+      if (checked) {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `[CHECKLIST ADM "${nomeChecklist}"] ${usuario?.nome} MARCOU: "${itemTexto}"`,
+          is_system: true
+        });
+      }
 
       await loadChecklists();
     } catch (error) {
