@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Clock, CheckCircle, Package, TrendingUp, User, Calendar, Award } from 'lucide-react';
+import { Clock, CheckCircle, Package, TrendingUp, User, Calendar, Award, Eye } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { OSFinalizadaModal } from '../../components/mobile/OSFinalizadaModal';
 
 interface KPIs {
   velocidade_media: number;
@@ -13,6 +14,7 @@ interface KPIs {
 
 interface HistoricoOS {
   id: string;
+  os_id: string;
   numero_os: string;
   cliente_nome: string;
   data_conclusao: string;
@@ -31,6 +33,7 @@ export function DesempenhoMobile() {
   });
   const [historico, setHistorico] = useState<HistoricoOS[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedOS, setSelectedOS] = useState<{ osId: string; agendamentoId: string } | null>(null);
 
   const loadKPIs = async () => {
     if (!usuario) return;
@@ -107,9 +110,11 @@ export function DesempenhoMobile() {
       .from('agendamentos')
       .select(`
         id,
+        os_id,
         checkin_hora,
         checkout_hora,
         os:os_id (
+          id,
           numero_os_samsung,
           numero_os_interna,
           cliente_nome,
@@ -136,6 +141,7 @@ export function DesempenhoMobile() {
 
           return {
             id: a.id,
+            os_id: a.os_id,
             numero_os: a.os?.numero_os_samsung || a.os?.numero_os_interna || 'S/N',
             cliente_nome: a.os?.cliente_nome || '',
             data_conclusao: checkout.toLocaleDateString('pt-BR') + ' ' + checkout.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
@@ -291,7 +297,7 @@ export function DesempenhoMobile() {
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-sm">
+                <div className="flex items-center justify-between text-sm mb-3">
                   <div className="flex items-center gap-2 text-gray-500">
                     <Calendar className="w-4 h-4" />
                     {item.data_conclusao}
@@ -301,11 +307,28 @@ export function DesempenhoMobile() {
                     {item.tempo_atendimento} min
                   </div>
                 </div>
+
+                <button
+                  onClick={() => setSelectedOS({ osId: item.os_id, agendamentoId: item.id })}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium hover:bg-cyan-500/30 transition-all"
+                >
+                  <Eye className="w-4 h-4" />
+                  Ver Detalhes
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
+
+      {/* Modal de OS Finalizada */}
+      {selectedOS && (
+        <OSFinalizadaModal
+          osId={selectedOS.osId}
+          agendamentoId={selectedOS.agendamentoId}
+          onClose={() => setSelectedOS(null)}
+        />
+      )}
     </div>
   );
 }
