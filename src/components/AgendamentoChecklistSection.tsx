@@ -14,7 +14,6 @@ interface AgendamentoChecklistSectionProps {
 export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, tipoAtendimento, osId }: AgendamentoChecklistSectionProps) {
   const { usuario } = useAuth();
   const [checklistsVinculados, setChecklistsVinculados] = useState<any[]>([]);
-  const [checklistsOS, setChecklistsOS] = useState<any[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -48,24 +47,7 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
       console.log('Checklists técnicos vinculados:', vinculados);
       setChecklistsVinculados(vinculados || []);
 
-      // Carregar checklists vinculados da OS (ADM - visualização read-only)
-      if (osId) {
-        const { data: checklistsOSData, error: errorOS } = await supabase
-          .from('os_checklist_vinculados')
-          .select(`
-            *,
-            checklist_template:checklist_templates(*)
-          `)
-          .eq('os_id', osId);
-
-        if (errorOS) {
-          console.error('Erro ao carregar checklists da OS:', errorOS);
-        }
-
-        console.log('Checklists ADM da OS:', checklistsOSData);
-        setChecklistsOS(checklistsOSData || []);
-      }
-
+    
       // Carregar templates TÉCNICO disponíveis
       const { data: templates, error: errorTemplates } = await supabase
         .from('checklist_templates')
@@ -225,71 +207,7 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
 
   return (
     <div className="space-y-6">
-      {/* Checklists ADM da OS - Visualização Read-Only */}
-      {checklistsOS.length > 0 && (
-        <div className="space-y-4">
-          <div>
-            <h4 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">
-              Checklists Administrativos da OS
-            </h4>
-            <p className="text-xs text-gray-400 mt-1">
-              Visualização apenas - preenchido pela administração
-            </p>
-          </div>
-          <div className="space-y-3">
-            {checklistsOS.map((vinculo) => {
-              const template = vinculo.checklist_template;
-              if (!template) return null;
-
-              const respostas = vinculo.respostas || [];
-
-              return (
-                <div key={vinculo.id} className="premium-card p-3 opacity-80">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h5 className="text-xs font-bold text-[#39FF14]">{template.nome}</h5>
-                      {template.descricao && (
-                        <p className="text-[10px] text-gray-400 mt-0.5">{template.descricao}</p>
-                      )}
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-500/20 text-gray-400 border border-gray-500/30">
-                      SOMENTE LEITURA
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    {template.itens?.map((item: any) => {
-                      const resposta = respostas.find((r: any) => r.ordem === item.ordem);
-                      const checked = resposta?.checked || false;
-
-                      return (
-                        <div key={item.ordem} className="flex items-start gap-2 p-1.5 rounded">
-                          <div
-                            className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
-                              checked
-                                ? 'bg-[#39FF14]/20 border-[#39FF14]'
-                                : 'border-gray-600'
-                            }`}
-                          >
-                            {checked && <CheckSquare className="w-3 h-3 text-[#39FF14]" />}
-                          </div>
-                          <div className="flex-1">
-                            <p className={`text-xs ${checked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                              {item.texto}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Checklists Técnicos do Agendamento - Editáveis */}
+      {/* Checklists Tecnicos do Agendamento - Editaveis */}
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
