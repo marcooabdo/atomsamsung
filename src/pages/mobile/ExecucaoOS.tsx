@@ -46,6 +46,9 @@ interface Evidencia {
   path: string;
   nome: string;
   tipo: string | null;
+  url?: string;
+  size?: number;
+  fileType?: string;
 }
 
 interface ChecklistItem {
@@ -117,6 +120,7 @@ export function ExecucaoOS() {
   const [showAssinaturaCliente, setShowAssinaturaCliente] = useState(false);
   const [assinaturaTecnico, setAssinaturaTecnico] = useState<string | null>(null);
   const [assinaturaCliente, setAssinaturaCliente] = useState<string | null>(null);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
 
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({
     checklist: true,
@@ -487,6 +491,10 @@ export function ExecucaoOS() {
       .upload(filePath, file);
 
     if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('os-anexos')
+        .getPublicUrl(filePath);
+
       await supabase
         .from('os_anexos')
         .insert({
@@ -494,7 +502,8 @@ export function ExecucaoOS() {
           usuario_id: usuario?.id,
           tipo: `peca_${tipo}`,
           nome_arquivo: file.name,
-          caminho_storage: filePath
+          url: publicUrl,
+          tamanho_bytes: file.size
         });
 
       setPecaPhotos(prev => ({
@@ -522,11 +531,18 @@ export function ExecucaoOS() {
       .upload(filePath, file);
 
     if (!uploadError) {
+      const { data: { publicUrl } } = supabase.storage
+        .from('os-anexos')
+        .getPublicUrl(filePath);
+
       const newEvidencia: Evidencia = {
         id: Date.now().toString(),
         path: filePath,
         nome: file.name,
-        tipo: null
+        tipo: null,
+        url: publicUrl,
+        size: file.size,
+        fileType: file.type
       };
 
       setUploadedEvidencias(prev => [...prev, newEvidencia]);
@@ -547,7 +563,8 @@ export function ExecucaoOS() {
         usuario_id: usuario?.id,
         tipo: tipo,
         nome_arquivo: evidencia.nome,
-        caminho_storage: evidencia.path
+        url: evidencia.url || '',
+        tamanho_bytes: evidencia.size
       });
 
     setUploadedEvidencias(prev =>
@@ -560,6 +577,8 @@ export function ExecucaoOS() {
   };
 
   const handleCheckout = async () => {
+    if (isCheckingOut) return;
+
     if (!canCheckout()) {
       if (!agendamento?.checkin_realizado) {
         alert('É necessário fazer check-in primeiro.');
@@ -568,7 +587,6 @@ export function ExecucaoOS() {
       if (!isChecklistValid()) {
         const pendencias: string[] = [];
 
-        // Verificar checklists técnicos
         checklistsVinculados.forEach(vinculo => {
           const template = vinculo.checklist_template;
           const itens = template.itens || [];
@@ -603,69 +621,88 @@ export function ExecucaoOS() {
       return;
     }
 
+    setIsCheckingOut(true);
+
     navigator.geolocation.getCurrentPosition(async (position) => {
-      const { latitude, longitude } = position.coords;
-      const checkoutTime = new Date();
+      try {
+        const { latitude, longitude } = position.coords;
+        const checkoutTime = new Date();
 
-      const enderecoTecnico = await reverseGeocode(latitude, longitude);
+        const enderecoTecnico = await reverseGeocode(latitude, longitude);
 
-      const tecnicoBlob = await fetch(assinaturaTecnico).then(r => r.blob());
-      const clienteBlob = await fetch(assinaturaCliente).then(r => r.blob());
+        const tecnicoBlob = await fetch(assinaturaTecnico).then(r => r.blob());
+        const clienteBlob = await fetch(assinaturaCliente).then(r => r.blob());
 
-      const tecnicoPath = `assinaturas/${agendamento.os_id}_tecnico_${Date.now()}.png`;
-      const clientePath = `assinaturas/${agendamento.os_id}_cliente_${Date.now()}.png`;
+        const tecnicoPath = `assinaturas/${agendamento.os_id}_tecnico_${Date.now()}.png`;
+        const clientePath = `assinaturas/${agendamento.os_id}_cliente_${Date.now()}.png`;
 
-      await supabase.storage.from('os-anexos').upload(tecnicoPath, tecnicoBlob);
-      await supabase.storage.from('os-anexos').upload(clientePath, clienteBlob);
+        await supabase.storage.from('os-anexos').upload(tecnicoPath, tecnicoBlob);
+        await supabase.storage.from('os-anexos').upload(clientePath, clienteBlob);
 
-      await supabase.from('os_anexos').insert([
-        {
-          os_id: agendamento.os_id,
-          usuario_id: usuario?.id,
-          tipo: 'assinatura_tecnico',
-          nome_arquivo: 'Assinatura Técnico',
-          caminho_storage: tecnicoPath
-        },
-        {
-          os_id: agendamento.os_id,
-          usuario_id: usuario?.id,
-          tipo: 'assinatura_cliente',
-          nome_arquivo: 'Assinatura Cliente',
-          caminho_storage: clientePath
-        }
-      ]);
+        const { data: { publicUrl: tecnicoUrl } } = supabase.storage
+          .from('os-anexos')
+          .getPublicUrl(tecnicoPath);
 
-      await supabase
-        .from('agendamentos')
-        .update({
-          checkout_realizado: true,
-          checkout_hora: checkoutTime.toISOString(),
-          checkout_latitude: latitude,
-          checkout_longitude: longitude
-        })
-        .eq('os_id', agendamento.os_id)
-        .eq('tecnico_id', usuario?.id);
+        const { data: { publicUrl: clienteUrl } } = supabase.storage
+          .from('os-anexos')
+          .getPublicUrl(clientePath);
 
-      await supabase
-        .from('os_comentarios')
-        .insert({
-          os_id: agendamento.os_id,
-          usuario_id: usuario?.id,
-          comentario: `CHECK-OUT REALIZADO\nData/Hora: ${checkoutTime.toLocaleString('pt-BR')}\nResultado: ${resultado === 'sucesso' ? 'Reparo com Sucesso' : resultado === 'improdutiva' ? 'Improdutiva/Revisita' : 'Peça com Defeito'}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
-          is_system: true
-        });
+        await supabase.from('os_anexos').insert([
+          {
+            os_id: agendamento.os_id,
+            usuario_id: usuario?.id,
+            tipo: 'assinatura_tecnico',
+            nome_arquivo: 'Assinatura Técnico',
+            url: tecnicoUrl,
+            tamanho_bytes: tecnicoBlob.size
+          },
+          {
+            os_id: agendamento.os_id,
+            usuario_id: usuario?.id,
+            tipo: 'assinatura_cliente',
+            nome_arquivo: 'Assinatura Cliente',
+            url: clienteUrl,
+            tamanho_bytes: clienteBlob.size
+          }
+        ]);
 
-      const novoStatus = resultado === 'sucesso' ? 'reparo_concluido' :
-                         resultado === 'improdutiva' ? 'aguardando_peca' : 'aguardando_peca';
+        await supabase
+          .from('agendamentos')
+          .update({
+            checkout_realizado: true,
+            checkout_hora: checkoutTime.toISOString(),
+            checkout_latitude: latitude,
+            checkout_longitude: longitude
+          })
+          .eq('os_id', agendamento.os_id)
+          .eq('tecnico_id', usuario?.id);
 
-      await supabase
-        .from('os')
-        .update({ coluna_kanban: novoStatus })
-        .eq('id', agendamento.os_id);
+        await supabase
+          .from('os_comentarios')
+          .insert({
+            os_id: agendamento.os_id,
+            usuario_id: usuario?.id,
+            comentario: `CHECK-OUT REALIZADO\nData/Hora: ${checkoutTime.toLocaleString('pt-BR')}\nResultado: ${resultado === 'sucesso' ? 'Reparo com Sucesso' : resultado === 'improdutiva' ? 'Improdutiva/Revisita' : 'Peça com Defeito'}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
+            is_system: true
+          });
 
-      navigate('/mobile/agenda');
+        const novoStatus = resultado === 'sucesso' ? 'reparo_concluido' :
+                           resultado === 'improdutiva' ? 'aguardando_peca' : 'aguardando_peca';
+
+        await supabase
+          .from('os')
+          .update({ coluna_kanban: novoStatus })
+          .eq('id', agendamento.os_id);
+
+        navigate('/mobile/agenda');
+      } catch (error) {
+        console.error('Erro no checkout:', error);
+        alert('Erro ao realizar check-out. Tente novamente.');
+        setIsCheckingOut(false);
+      }
     }, (error) => {
       alert('Não foi possível obter sua localização. Ative o GPS e tente novamente.');
+      setIsCheckingOut(false);
     });
   };
 
@@ -1382,10 +1419,20 @@ export function ExecucaoOS() {
 
               <button
                 onClick={handleCheckout}
-                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-600 transition-all"
+                disabled={isCheckingOut}
+                className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
               >
-                <CheckCircle className="w-6 h-6" />
-                Finalizar Atendimento
+                {isCheckingOut ? (
+                  <>
+                    <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" />
+                    Processando Check-out...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-6 h-6" />
+                    Finalizar Atendimento
+                  </>
+                )}
               </button>
             </div>
           </div>
