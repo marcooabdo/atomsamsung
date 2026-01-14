@@ -24,8 +24,10 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   const loadChecklists = async () => {
     setLoading(true);
     try {
+      console.log('Carregando checklists para OS:', osId, 'tipo:', tipoOS, 'atendimento:', tipoAtendimento);
+
       // Carregar checklists vinculados
-      const { data: vinculados } = await supabase
+      const { data: vinculados, error: errorVinculados } = await supabase
         .from('os_checklist_vinculados')
         .select(`
           *,
@@ -33,16 +35,26 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         `)
         .eq('os_id', osId);
 
+      if (errorVinculados) {
+        console.error('Erro ao carregar vinculados:', errorVinculados);
+      }
+
+      console.log('Checklists vinculados carregados:', vinculados);
       setChecklistsVinculados(vinculados || []);
 
       // Carregar templates ADM disponíveis
-      const { data: templates } = await supabase
+      const { data: templates, error: errorTemplates } = await supabase
         .from('checklist_templates')
         .select('*')
         .eq('tipo_checklist', 'ADM')
         .eq('ativo', true)
         .or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
 
+      if (errorTemplates) {
+        console.error('Erro ao carregar templates:', errorTemplates);
+      }
+
+      console.log('Templates disponíveis:', templates);
       setChecklistTemplates(templates || []);
 
       // Vincular automaticamente checklists que se aplicam
@@ -81,17 +93,29 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
 
   const handleVincularChecklist = async (templateId: string) => {
     try {
-      await supabase
+      console.log('Vinculando checklist:', templateId, 'para OS:', osId);
+
+      const { data, error } = await supabase
         .from('os_checklist_vinculados')
         .insert({
           os_id: osId,
           checklist_template_id: templateId,
           vinculado_automaticamente: false,
-          vinculado_por: usuario?.id
-        });
+          vinculado_por: usuario?.id,
+          respostas: []
+        })
+        .select();
 
-      await loadChecklists();
+      if (error) {
+        console.error('Erro ao inserir vínculo:', error);
+        alert(`Erro ao vincular checklist: ${error.message}`);
+        return;
+      }
+
+      console.log('Checklist vinculado com sucesso:', data);
+
       setShowAddModal(false);
+      await loadChecklists();
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
@@ -100,6 +124,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         is_system: true
       });
     } catch (error) {
+      console.error('Erro ao vincular checklist:', error);
       alert('Erro ao vincular checklist');
     }
   };
@@ -165,23 +190,36 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   };
 
   const templatesDisponiveis = checklistTemplates.filter(t => {
+    console.log('Avaliando template:', t.nome, {
+      tipo_os: t.tipo_os,
+      tipos_atendimento: t.tipos_atendimento,
+      osAtual: tipoOS,
+      atendimentoAtual: tipoAtendimento
+    });
+
     // Não mostrar se já está vinculado
     if (checklistsVinculados.some(v => v.checklist_template_id === t.id)) {
+      console.log('Template já vinculado:', t.nome);
       return false;
     }
 
     // Filtrar por tipo de OS
     if (t.tipo_os && t.tipo_os.length > 0 && !t.tipo_os.includes(tipoOS)) {
+      console.log('Template filtrado por tipo_os:', t.nome);
       return false;
     }
 
     // Filtrar por tipo de atendimento
     if (t.tipos_atendimento && t.tipos_atendimento.length > 0 && !t.tipos_atendimento.includes(tipoAtendimento)) {
+      console.log('Template filtrado por tipos_atendimento:', t.nome);
       return false;
     }
 
+    console.log('Template disponível:', t.nome);
     return true;
   });
+
+  console.log('Total templates disponíveis após filtro:', templatesDisponiveis.length);
 
   if (loading) {
     return (
