@@ -90,6 +90,7 @@ interface AgendamentoDetalhes {
     endereco_completo: string;
     tipo_servico: string;
     descricao_problema: string;
+    tipo_os: string;
   };
 }
 
@@ -181,7 +182,7 @@ export function ExecucaoOS() {
 
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_relatado, coluna_kanban, tecnico_agendado_id')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_relatado, coluna_kanban, tecnico_agendado_id, tipo_os')
       .eq('id', osId)
       .maybeSingle();
 
@@ -220,7 +221,8 @@ export function ExecucaoOS() {
         cliente_nome: data.cliente_nome,
         endereco_completo: `${data.cliente_endereco}, ${data.cliente_bairro || ''}, ${data.cliente_cidade}`.trim(),
         tipo_servico: data.tipo_atendimento === 'IH' ? `IH - ${data.tipo_reparo || ''}` : data.tipo_atendimento || '',
-        descricao_problema: data.defeito_relatado || ''
+        descricao_problema: data.defeito_relatado || '',
+        tipo_os: data.tipo_os || data.tipo_atendimento || ''
       }
     };
 
@@ -410,12 +412,16 @@ export function ExecucaoOS() {
         is_system: false
       });
 
-    await supabase
-      .from('os')
-      .update({
-        coluna_kanban: 'em_reparo_ci'
-      })
-      .eq('id', agendamento.os_id);
+    const isIH = agendamento.os.tipo_os === 'IH' || agendamento.os.tipo_servico.includes('IH');
+
+    if (!isIH) {
+      await supabase
+        .from('os')
+        .update({
+          coluna_kanban: 'em_reparo_ci'
+        })
+        .eq('id', agendamento.os_id);
+    }
 
     setCurrentStep('pecas');
   };
@@ -756,8 +762,14 @@ export function ExecucaoOS() {
             is_system: true
           });
 
-        const novoStatus = resultado === 'sucesso' ? 'reparo_concluido' :
-                           resultado === 'improdutiva' ? 'aguardando_peca' : 'aguardando_peca';
+        const isIH = agendamento.os.tipo_os === 'IH' || agendamento.os.tipo_servico.includes('IH');
+
+        let novoStatus: string;
+        if (resultado === 'sucesso') {
+          novoStatus = 'reparo_concluido';
+        } else {
+          novoStatus = 'aguardando_peca';
+        }
 
         await supabase
           .from('os')
