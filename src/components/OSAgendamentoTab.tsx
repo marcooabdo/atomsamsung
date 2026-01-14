@@ -54,11 +54,28 @@ export function OSAgendamentoTab({
   const [sucesso, setSucesso] = useState('');
   const [agendamento, setAgendamento] = useState<any>(null);
   const [dadosSalvos, setDadosSalvos] = useState<any>(null);
+  const [tipoOS, setTipoOS] = useState<string>('');
 
   useEffect(() => {
     loadTecnicos();
     loadAgendamento();
+    loadTipoOS();
   }, [osId, tipoAtendimento]);
+
+  const loadTipoOS = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('os')
+        .select('tipo_os')
+        .eq('id', osId)
+        .single();
+
+      if (error) throw error;
+      setTipoOS(data?.tipo_os || '');
+    } catch (error) {
+      console.error('Erro ao carregar tipo da OS:', error);
+    }
+  };
 
   useEffect(() => {
     setFormData({
@@ -412,6 +429,9 @@ export function OSAgendamentoTab({
         <AgendamentoChecklistSection
           agendamentoId={agendamentoId}
           unidadeId={unidadeId}
+          tipoOS={tipoOS}
+          tipoAtendimento={tipoAtendimento}
+          osId={osId}
         />
       </div>
     </div>

@@ -164,9 +164,24 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
     }
   };
 
-  const templatesDisponiveis = checklistTemplates.filter(
-    t => !checklistsVinculados.some(v => v.checklist_template_id === t.id)
-  );
+  const templatesDisponiveis = checklistTemplates.filter(t => {
+    // Não mostrar se já está vinculado
+    if (checklistsVinculados.some(v => v.checklist_template_id === t.id)) {
+      return false;
+    }
+
+    // Filtrar por tipo de OS
+    if (t.tipo_os && t.tipo_os.length > 0 && !t.tipo_os.includes(tipoOS)) {
+      return false;
+    }
+
+    // Filtrar por tipo de atendimento
+    if (t.tipos_atendimento && t.tipos_atendimento.length > 0 && !t.tipos_atendimento.includes(tipoAtendimento)) {
+      return false;
+    }
+
+    return true;
+  });
 
   if (loading) {
     return (
@@ -321,9 +336,12 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
                           {template.descricao && (
                             <p className="text-xs text-gray-400 mt-1">{template.descricao}</p>
                           )}
-                          <div className="flex gap-2 mt-2">
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                              OS: {template.tipo_os?.join(', ') || 'Todos'}
+                            </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                              {template.tipos_atendimento?.join(', ')}
+                              Atend: {template.tipos_atendimento?.join(', ') || 'Todos'}
                             </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
                               {template.itens?.length || 0} itens

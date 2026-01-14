@@ -6,11 +6,15 @@ import { useAuth } from '../contexts/AuthContext';
 interface AgendamentoChecklistSectionProps {
   agendamentoId: string | null;
   unidadeId: string;
+  tipoOS?: string;
+  tipoAtendimento?: string;
+  osId?: string;
 }
 
-export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: AgendamentoChecklistSectionProps) {
+export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, tipoAtendimento, osId }: AgendamentoChecklistSectionProps) {
   const { usuario } = useAuth();
   const [checklistsVinculados, setChecklistsVinculados] = useState<any[]>([]);
+  const [checklistsOS, setChecklistsOS] = useState<any[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -26,7 +30,7 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: Agenda
 
     setLoading(true);
     try {
-      // Carregar checklists vinculados
+      // Carregar checklists vinculados do agendamento (técnico)
       const { data: vinculados } = await supabase
         .from('agendamento_checklist_vinculados')
         .select(`
@@ -36,6 +40,19 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: Agenda
         .eq('agendamento_id', agendamentoId);
 
       setChecklistsVinculados(vinculados || []);
+
+      // Carregar checklists vinculados da OS (ADM - visualização read-only)
+      if (osId) {
+        const { data: checklistsOSData } = await supabase
+          .from('os_checklist_vinculados')
+          .select(`
+            *,
+            checklist_template:checklist_templates(*)
+          `)
+          .eq('os_id', osId);
+
+        setChecklistsOS(checklistsOSData || []);
+      }
 
       // Carregar templates TÉCNICO disponíveis
       const { data: templates } = await supabase
@@ -125,9 +142,24 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: Agenda
     }
   };
 
-  const templatesDisponiveis = checklistTemplates.filter(
-    t => !checklistsVinculados.some(v => v.checklist_template_id === t.id)
-  );
+  const templatesDisponiveis = checklistTemplates.filter(t => {
+    // Não mostrar se já está vinculado
+    if (checklistsVinculados.some(v => v.checklist_template_id === t.id)) {
+      return false;
+    }
+
+    // Filtrar por tipo de OS
+    if (tipoOS && t.tipo_os && t.tipo_os.length > 0 && !t.tipo_os.includes(tipoOS)) {
+      return false;
+    }
+
+    // Filtrar por tipo de atendimento
+    if (tipoAtendimento && t.tipos_atendimento && t.tipos_atendimento.length > 0 && !t.tipos_atendimento.includes(tipoAtendimento)) {
+      return false;
+    }
+
+    return true;
+  });
 
   if (!agendamentoId) {
     return (
@@ -149,7 +181,72 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: Agenda
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-6">
+      {/* Checklists ADM da OS - Visualização Read-Only */}
+      {checklistsOS.length > 0 && (
+        <div className="space-y-4">
+          <div>
+            <h4 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">
+              Checklists Administrativos da OS
+            </h4>
+            <p className="text-xs text-gray-400 mt-1">
+              Visualização apenas - preenchido pela administração
+            </p>
+          </div>
+          <div className="space-y-3">
+            {checklistsOS.map((vinculo) => {
+              const template = vinculo.checklist_template;
+              if (!template) return null;
+
+              const respostas = vinculo.respostas || [];
+
+              return (
+                <div key={vinculo.id} className="premium-card p-3 opacity-80">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex-1">
+                      <h5 className="text-xs font-bold text-[#39FF14]">{template.nome}</h5>
+                      {template.descricao && (
+                        <p className="text-[10px] text-gray-400 mt-0.5">{template.descricao}</p>
+                      )}
+                    </div>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-500/20 text-gray-400 border border-gray-500/30">
+                      SOMENTE LEITURA
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    {template.itens?.map((item: any) => {
+                      const resposta = respostas.find((r: any) => r.ordem === item.ordem);
+                      const checked = resposta?.checked || false;
+
+                      return (
+                        <div key={item.ordem} className="flex items-start gap-2 p-1.5 rounded">
+                          <div
+                            className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center ${
+                              checked
+                                ? 'bg-[#39FF14]/20 border-[#39FF14]'
+                                : 'border-gray-600'
+                            }`}
+                          >
+                            {checked && <CheckSquare className="w-3 h-3 text-[#39FF14]" />}
+                          </div>
+                          <div className="flex-1">
+                            <p className={`text-xs ${checked ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                              {item.texto}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Checklists Técnicos do Agendamento - Editáveis */}
       <div className="flex items-center justify-between">
         <div>
           <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
@@ -275,9 +372,12 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId }: Agenda
                           {template.descricao && (
                             <p className="text-xs text-gray-400 mt-1">{template.descricao}</p>
                           )}
-                          <div className="flex gap-2 mt-2">
+                          <div className="flex gap-2 mt-2 flex-wrap">
+                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                              OS: {template.tipo_os?.join(', ') || 'Todos'}
+                            </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                              {template.tipos_atendimento?.join(', ')}
+                              Atend: {template.tipos_atendimento?.join(', ') || 'Todos'}
                             </span>
                             <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
                               {template.itens?.length || 0} itens
