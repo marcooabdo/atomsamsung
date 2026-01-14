@@ -7,6 +7,7 @@ import { OSDetailsModal } from '../../components/mobile/OSDetailsModal';
 
 interface AgendamentoOS {
   id: string;
+  agendamento_id: string;
   numero_os_interna: string | null;
   numero_os_samsung: string | null;
   tipo_atendimento: string;
@@ -28,6 +29,7 @@ interface AgendamentoOS {
   observacoes: string | null;
   latitude: number | null;
   longitude: number | null;
+  agendamento_status: string;
 }
 
 export function AgendaMobile() {
@@ -44,39 +46,71 @@ export function AgendaMobile() {
 
     setLoading(true);
     const { data, error } = await supabase
-      .from('v_agendamentos_com_status_visual')
-      .select('os_id, numero_os_interna, numero_os_samsung, tipo_atendimento, tipo_reparo, tipo_os, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, cliente_cep, coluna_kanban, data_agendamento, confirmado_com_cliente, aparelho_marca, aparelho_modelo, defeito_relatado, os_observacoes, latitude, longitude, horario_inicio, horario_fim')
+      .from('agendamentos')
+      .select(`
+        id,
+        os_id,
+        data_agendamento,
+        horario_inicio,
+        horario_fim,
+        confirmado_com_cliente,
+        status,
+        os:os_id (
+          numero_os_interna,
+          numero_os_samsung,
+          tipo_atendimento,
+          tipo_reparo,
+          tipo_os,
+          cliente_nome,
+          cliente_telefone,
+          cliente_endereco,
+          cliente_bairro,
+          cliente_cidade,
+          cliente_cep,
+          coluna_kanban,
+          aparelho_marca,
+          aparelho_modelo,
+          defeito_relatado,
+          observacoes_internas,
+          latitude,
+          longitude
+        )
+      `)
       .eq('tecnico_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
+      .in('status', ['confirmado', 'em_andamento', 'pendente_confirmacao'])
       .order('horario_inicio', { ascending: true });
 
     if (error) {
+      console.error('Erro ao carregar agendamentos:', error);
     } else if (data) {
       const mappedData = data.map(item => ({
         id: item.os_id,
-        numero_os_interna: item.numero_os_interna,
-        numero_os_samsung: item.numero_os_samsung,
-        tipo_atendimento: item.tipo_atendimento,
-        tipo_reparo: item.tipo_reparo,
-        tipo_os: item.tipo_os,
-        cliente_nome: item.cliente_nome,
-        cliente_telefone: item.cliente_telefone,
-        cliente_endereco: item.cliente_endereco,
-        cliente_bairro: item.cliente_bairro,
-        cliente_cidade: item.cliente_cidade,
-        cliente_cep: item.cliente_cep,
-        coluna_kanban: item.coluna_kanban,
+        agendamento_id: item.id,
+        numero_os_interna: item.os?.numero_os_interna,
+        numero_os_samsung: item.os?.numero_os_samsung,
+        tipo_atendimento: item.os?.tipo_atendimento,
+        tipo_reparo: item.os?.tipo_reparo,
+        tipo_os: item.os?.tipo_os,
+        cliente_nome: item.os?.cliente_nome,
+        cliente_telefone: item.os?.cliente_telefone,
+        cliente_endereco: item.os?.cliente_endereco,
+        cliente_bairro: item.os?.cliente_bairro,
+        cliente_cidade: item.os?.cliente_cidade,
+        cliente_cep: item.os?.cliente_cep,
+        coluna_kanban: item.os?.coluna_kanban,
         data_agendamento: item.data_agendamento,
         periodo_agendamento: item.horario_inicio < '12:00' ? 'manha' : 'tarde',
         confirmado_com_cliente: item.confirmado_com_cliente,
-        aparelho_marca: item.aparelho_marca,
-        aparelho_modelo: item.aparelho_modelo,
-        defeito_relatado: item.defeito_relatado,
-        observacoes: item.os_observacoes,
-        latitude: item.latitude,
-        longitude: item.longitude
+        aparelho_marca: item.os?.aparelho_marca,
+        aparelho_modelo: item.os?.aparelho_modelo,
+        defeito_relatado: item.os?.defeito_relatado,
+        observacoes: item.os?.observacoes_internas,
+        latitude: item.os?.latitude,
+        longitude: item.os?.longitude,
+        agendamento_status: item.status
       }));
-      setAgendamentos(mappedData as AgendamentoOS[]);
+      setAgendamentos(mappedData as any[]);
     }
     setLoading(false);
   };
