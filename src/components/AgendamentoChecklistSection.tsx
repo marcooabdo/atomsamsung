@@ -257,23 +257,30 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
       return false;
     }
 
-    // Filtrar por tipo de OS
-    if (tipoOS && t.tipo_os && t.tipo_os.length > 0 && !t.tipo_os.includes(tipoOS)) {
-      console.log('Template filtrado por tipo_os:', t.nome);
-      return false;
+    // Se não tem filtros definidos (null ou vazio), mostra para todos
+    // Filtrar por tipo de OS apenas se houver filtros E houver tipo de OS na OS
+    if (t.tipo_os && Array.isArray(t.tipo_os) && t.tipo_os.length > 0) {
+      if (tipoOS && !t.tipo_os.includes(tipoOS)) {
+        console.log('Template filtrado por tipo_os:', t.nome, 'esperava um de:', t.tipo_os, 'mas OS é:', tipoOS);
+        return false;
+      }
     }
 
-    // Filtrar por tipo de atendimento
-    if (tipoAtendimento && t.tipos_atendimento && t.tipos_atendimento.length > 0 && !t.tipos_atendimento.includes(tipoAtendimento)) {
-      console.log('Template filtrado por tipos_atendimento:', t.nome);
-      return false;
+    // Filtrar por tipo de atendimento apenas se houver filtros E houver tipo de atendimento na OS
+    if (t.tipos_atendimento && Array.isArray(t.tipos_atendimento) && t.tipos_atendimento.length > 0) {
+      if (tipoAtendimento && !t.tipos_atendimento.includes(tipoAtendimento)) {
+        console.log('Template filtrado por tipos_atendimento:', t.nome, 'esperava um de:', t.tipos_atendimento, 'mas OS é:', tipoAtendimento);
+        return false;
+      }
     }
 
-    console.log('Template técnico disponível:', t.nome);
+    console.log('✅ Template técnico DISPONÍVEL:', t.nome);
     return true;
   });
 
-  console.log('Total templates técnicos disponíveis:', templatesDisponiveis.length);
+  console.log('🔍 Total de templates carregados do BD:', checklistTemplates.length);
+  console.log('✅ Total templates técnicos DISPONÍVEIS após filtros:', templatesDisponiveis.length);
+  console.log('📋 Templates disponíveis:', templatesDisponiveis.map(t => t.nome));
 
   if (!agendamentoId) {
     return (
