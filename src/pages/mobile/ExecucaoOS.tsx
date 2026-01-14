@@ -508,17 +508,23 @@ export function ExecucaoOS() {
       const tipoTexto = tipo === 'nova' ? 'Nova' : 'Velha (Substituída)';
       const descricaoAnexo = `Foto da Peça ${tipoTexto}: ${pecaPN} - ${pecaDescricao}`;
 
-      await supabase
+      const { error: insertError } = await supabase
         .from('os_anexos')
         .insert({
           os_id: agendamento.os_id,
-          usuario_id: usuario?.id,
+          usuario_id: usuario?.id || null,
           tipo: `peca_${tipo}`,
           nome_arquivo: file.name,
           url: publicUrl,
           tamanho_bytes: file.size,
           descricao: descricaoAnexo
         });
+
+      if (insertError) {
+        console.error('Erro ao salvar anexo de peca:', insertError);
+        alert(`Erro ao salvar foto: ${insertError.message}`);
+        return;
+      }
 
       setPecaPhotos(prev => ({
         ...prev,
@@ -570,16 +576,22 @@ export function ExecucaoOS() {
     const evidencia = uploadedEvidencias.find(e => e.id === evidenciaId);
     if (!evidencia) return;
 
-    await supabase
+    const { error: insertError } = await supabase
       .from('os_anexos')
       .insert({
         os_id: agendamento.os_id,
-        usuario_id: usuario?.id,
+        usuario_id: usuario?.id || null,
         tipo: tipo,
         nome_arquivo: evidencia.nome,
         url: evidencia.url || '',
         tamanho_bytes: evidencia.size
       });
+
+    if (insertError) {
+      console.error('Erro ao salvar evidencia:', insertError);
+      alert(`Erro ao salvar evidencia: ${insertError.message}`);
+      return;
+    }
 
     setUploadedEvidencias(prev =>
       prev.map(e => e.id === evidenciaId ? { ...e, tipo } : e)
@@ -661,10 +673,10 @@ export function ExecucaoOS() {
           .from('os-anexos')
           .getPublicUrl(clientePath);
 
-        await supabase.from('os_anexos').insert([
+        const { error: anexosError } = await supabase.from('os_anexos').insert([
           {
             os_id: agendamento.os_id,
-            usuario_id: usuario?.id,
+            usuario_id: usuario?.id || null,
             tipo: 'assinatura_tecnico',
             nome_arquivo: 'Assinatura Técnico',
             url: tecnicoUrl,
@@ -672,13 +684,17 @@ export function ExecucaoOS() {
           },
           {
             os_id: agendamento.os_id,
-            usuario_id: usuario?.id,
+            usuario_id: usuario?.id || null,
             tipo: 'assinatura_cliente',
             nome_arquivo: 'Assinatura Cliente',
             url: clienteUrl,
             tamanho_bytes: clienteBlob.size
           }
         ]);
+
+        if (anexosError) {
+          console.error('Erro ao salvar assinaturas:', anexosError);
+        }
 
         await supabase
           .from('agendamentos')
