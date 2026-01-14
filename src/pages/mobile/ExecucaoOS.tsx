@@ -143,16 +143,15 @@ export function ExecucaoOS() {
 
     const { data } = await supabase
       .from('agendamentos')
-      .select('os_id, os:os_id(coluna_kanban)')
+      .select('os_id, checkin_realizado, checkout_realizado, os:os_id(coluna_kanban)')
       .eq('tecnico_id', usuario.id)
+      .eq('checkin_realizado', true)
+      .eq('checkout_realizado', false)
       .neq('os_id', osId || '')
       .limit(10);
 
-    if (data) {
-      const activeOS = data.find((a: any) =>
-        a.os?.coluna_kanban === 'em_reparo_ci' || a.os?.coluna_kanban === 'em_rota_ih'
-      );
-      return !!activeOS;
+    if (data && data.length > 0) {
+      return true;
     }
     return false;
   };
