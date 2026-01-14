@@ -115,7 +115,18 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
   };
 
   const handleRemoverChecklist = async (vinculoId: string) => {
-    if (!confirm('Deseja remover este checklist?')) return;
+    const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
+    if (!vinculo) return;
+
+    const template = vinculo.checklist_template;
+    const nomeChecklist = template?.nome || 'Checklist';
+
+    const justificativa = prompt(`Por que você está removendo o checklist "${nomeChecklist}"?\n\nJustificativa:`);
+
+    if (!justificativa || justificativa.trim() === '') {
+      alert('Justificativa é obrigatória para remover um checklist.');
+      return;
+    }
 
     try {
       await supabase
@@ -124,6 +135,15 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .eq('id', vinculoId);
 
       await loadChecklists();
+
+      if (osId) {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `${usuario?.nome} REMOVEU o checklist TÉCNICO "${nomeChecklist}"\n\nJustificativa: ${justificativa}`,
+          is_system: true
+        });
+      }
     } catch (error) {
       alert('Erro ao remover checklist');
     }

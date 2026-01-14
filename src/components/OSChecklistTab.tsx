@@ -56,34 +56,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
 
       console.log('Templates disponíveis:', templates);
       setChecklistTemplates(templates || []);
-
-      // Vincular automaticamente checklists que se aplicam
-      for (const template of templates || []) {
-        const jaVinculado = vinculados?.some(v => v.checklist_template_id === template.id);
-        if (!jaVinculado &&
-            template.tipo_os?.includes(tipoOS) &&
-            template.tipos_atendimento?.includes(tipoAtendimento)) {
-          await supabase
-            .from('os_checklist_vinculados')
-            .insert({
-              os_id: osId,
-              checklist_template_id: template.id,
-              vinculado_automaticamente: true,
-              vinculado_por: usuario?.id
-            });
-        }
-      }
-
-      // Recarregar vinculados após adicionar automaticamente
-      const { data: vinculadosAtualizados } = await supabase
-        .from('os_checklist_vinculados')
-        .select(`
-          *,
-          checklist_template:checklist_templates(*)
-        `)
-        .eq('os_id', osId);
-
-      setChecklistsVinculados(vinculadosAtualizados || []);
     } catch (error) {
       console.error('Erro ao carregar checklists:', error);
     } finally {
@@ -133,7 +105,18 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   };
 
   const handleRemoverChecklist = async (vinculoId: string) => {
-    if (!confirm('Deseja remover este checklist?')) return;
+    const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
+    if (!vinculo) return;
+
+    const template = vinculo.checklist_template;
+    const nomeChecklist = template?.nome || 'Checklist';
+
+    const justificativa = prompt(`Por que você está removendo o checklist "${nomeChecklist}"?\n\nJustificativa:`);
+
+    if (!justificativa || justificativa.trim() === '') {
+      alert('Justificativa é obrigatória para remover um checklist.');
+      return;
+    }
 
     try {
       await supabase
@@ -146,7 +129,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `${usuario?.nome} removeu um checklist`,
+        comentario: `${usuario?.nome} REMOVEU o checklist ADM "${nomeChecklist}"\n\nJustificativa: ${justificativa}`,
         is_system: true
       });
     } catch (error) {
