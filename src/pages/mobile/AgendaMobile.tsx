@@ -71,9 +71,7 @@ export function AgendaMobile() {
           aparelho_marca,
           aparelho_modelo,
           defeito_relatado,
-          observacoes_internas,
-          latitude,
-          longitude
+          observacoes_internas
         )
       `)
       .eq('tecnico_id', usuario.id)
@@ -106,8 +104,8 @@ export function AgendaMobile() {
         aparelho_modelo: item.os?.aparelho_modelo,
         defeito_relatado: item.os?.defeito_relatado,
         observacoes: item.os?.observacoes_internas,
-        latitude: item.os?.latitude,
-        longitude: item.os?.longitude,
+        latitude: null,
+        longitude: null,
         agendamento_status: item.status
       }));
       setAgendamentos(mappedData as any[]);
