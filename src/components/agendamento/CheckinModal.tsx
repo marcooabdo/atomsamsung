@@ -342,7 +342,7 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
             {loading ? (
               <>
                 <Clock className="w-4 h-4 animate-spin" />
-                Processando...
+                Processando check-in...
               </>
             ) : (
               <>

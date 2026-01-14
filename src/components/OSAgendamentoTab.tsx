@@ -508,53 +508,56 @@ export function OSAgendamentoTab({
           )}
 
           <div className="space-y-3">
-            {todosAgendamentos.map((agend, index) => (
-              <div key={agend.id} className="premium-card p-4 bg-gray-800/50">
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-[#00D4FF20] flex items-center justify-center">
-                      <span className="text-[#00D4FF] font-bold text-sm">{index + 1}</span>
+            {todosAgendamentos.map((agend, index) => {
+              const isPrimeiraVisita = index === todosAgendamentos.length - 1;
+
+              return (
+                <div key={agend.id} className="premium-card p-4 bg-gray-800/50">
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-[#00D4FF20] flex items-center justify-center">
+                        <span className="text-[#00D4FF] font-bold text-sm">{todosAgendamentos.length - index}</span>
+                      </div>
+                      <div>
+                        <p className="text-white font-semibold">
+                          Visita {todosAgendamentos.length - index} {isPrimeiraVisita && <span className="text-[#00D4FF] text-xs">(Inicial)</span>}
+                        </p>
+                        <p className="text-xs text-gray-400">
+                          {new Date(agend.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                      agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :
+                      agend.status === 'em_andamento' ? 'bg-[#FFBF0020] text-[#FFBF00]' :
+                      agend.status === 'concluido' ? 'bg-[#39FF1420] text-[#39FF14]' :
+                      'bg-gray-700 text-gray-400'
+                    }`}>
+                      {agend.status === 'confirmado' ? 'Agendado' :
+                       agend.status === 'em_andamento' ? 'Em Andamento' :
+                       agend.status === 'concluido' ? 'Concluído' : agend.status}
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 text-sm mb-3">
+                    <div>
+                      <span className="text-gray-400 block mb-1">Técnico:</span>
+                      <div className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-[#00D4FF]" />
+                        <p className="text-white font-semibold">
+                          {agend.tecnico?.nome || 'N/A'}
+                        </p>
+                      </div>
                     </div>
                     <div>
-                      <p className="text-white font-semibold">
-                        Visita {index + 1}
-                      </p>
-                      <p className="text-xs text-gray-400">
-                        {new Date(agend.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
+                      <span className="text-gray-400 block mb-1">Status:</span>
+                      <p className="text-white font-semibold capitalize">
+                        {agend.confirmado_com_cliente ? 'Confirmado' : 'Pendente confirmação'}
                       </p>
                     </div>
                   </div>
-                  <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :
-                    agend.status === 'em_andamento' ? 'bg-[#FFBF0020] text-[#FFBF00]' :
-                    agend.status === 'concluido' ? 'bg-[#39FF1420] text-[#39FF14]' :
-                    'bg-gray-700 text-gray-400'
-                  }`}>
-                    {agend.status === 'confirmado' ? 'Agendado' :
-                     agend.status === 'em_andamento' ? 'Em Andamento' :
-                     agend.status === 'concluido' ? 'Concluído' : agend.status}
-                  </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 text-sm mb-3">
-                  <div>
-                    <span className="text-gray-400 block mb-1">Técnico:</span>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4 text-[#00D4FF]" />
-                      <p className="text-white font-semibold">
-                        {agend.tecnico?.nome || 'N/A'}
-                      </p>
-                    </div>
-                  </div>
-                  <div>
-                    <span className="text-gray-400 block mb-1">Status:</span>
-                    <p className="text-white font-semibold capitalize">
-                      {agend.confirmado_com_cliente ? 'Confirmado' : 'Pendente confirmação'}
-                    </p>
-                  </div>
-                </div>
-
-                {agend.checkin_realizado && (
+                  {isPrimeiraVisita && agend.checkin_realizado && (
                   <div className="mt-3 p-3 bg-[#39FF1410] border border-[#39FF1430] rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="w-4 h-4 text-[#39FF14]" />
@@ -582,7 +585,7 @@ export function OSAgendamentoTab({
                   </div>
                 )}
 
-                {agend.checkout_realizado && (
+                {isPrimeiraVisita && agend.checkout_realizado && (
                   <div className="mt-3 p-3 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
                       <CheckCircle className="w-4 h-4 text-[#00D4FF]" />
@@ -610,15 +613,24 @@ export function OSAgendamentoTab({
                   </div>
                 )}
 
-                {!agend.checkin_realizado && !agend.checkout_realizado && (
+                {isPrimeiraVisita && !agend.checkin_realizado && !agend.checkout_realizado && (
                   <div className="mt-3 p-3 bg-gray-700/30 border border-gray-600 rounded-lg">
                     <p className="text-gray-400 text-xs text-center">
                       Aguardando check-in do técnico
                     </p>
                   </div>
                 )}
+
+                {!isPrimeiraVisita && (
+                  <div className="mt-3 p-3 bg-gray-700/20 border border-gray-600/30 rounded-lg">
+                    <p className="text-gray-400 text-xs text-center">
+                      Visita adicional agendada
+                    </p>
+                  </div>
+                )}
               </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
