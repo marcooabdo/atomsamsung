@@ -335,34 +335,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`);
 
       setChecklistTemplates(templates || []);
-
-      // Vincular automaticamente checklists que se aplicam
-      for (const template of templates || []) {
-        const jaVinculado = vinculados?.some(v => v.checklist_template_id === template.id);
-        if (!jaVinculado &&
-            template.tipo_os.includes(os.tipo_os) &&
-            template.tipos_atendimento.includes(os.tipo_atendimento)) {
-          await supabase
-            .from('os_checklist_vinculados')
-            .insert({
-              os_id: osId,
-              checklist_template_id: template.id,
-              vinculado_automaticamente: true,
-              vinculado_por: usuario?.id
-            });
-        }
-      }
-
-      // Recarregar vinculados após adicionar automaticamente
-      const { data: vinculadosAtualizados } = await supabase
-        .from('os_checklist_vinculados')
-        .select(`
-          *,
-          checklist_template:checklist_templates(*)
-        `)
-        .eq('os_id', osId);
-
-      setChecklistsVinculados(vinculadosAtualizados || []);
     }
   };
 
