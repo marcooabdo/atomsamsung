@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X } from 'lucide-react';
+import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
@@ -59,6 +59,9 @@ export function OSAgendamentoTab({
   const [mostrarNovaVisita, setMostrarNovaVisita] = useState(false);
   const [salvandoNovaVisita, setSalvandoNovaVisita] = useState(false);
   const [visitaChecklistAberta, setVisitaChecklistAberta] = useState<string | null>(null);
+  const [cancelamentoModal, setCancelamentoModal] = useState<{ aberto: boolean; agendamentoId: string | null }>({ aberto: false, agendamentoId: null });
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [salvandoCancelamento, setSalvandoCancelamento] = useState(false);
 
   useEffect(() => {
     loadTecnicos();
@@ -279,6 +282,50 @@ export function OSAgendamentoTab({
       setErro(error.message || 'Erro ao agendar nova visita');
     } finally {
       setSalvandoNovaVisita(false);
+    }
+  };
+
+  const handleCancelarAgendamento = async () => {
+    if (!cancelamentoModal.agendamentoId || !motivoCancelamento.trim()) {
+      setErro('Motivo do cancelamento é obrigatório');
+      return;
+    }
+
+    setSalvandoCancelamento(true);
+    setErro('');
+
+    try {
+      const { error: updateError } = await supabase
+        .from('agendamentos')
+        .update({ status: 'cancelado' })
+        .eq('id', cancelamentoModal.agendamentoId);
+
+      if (updateError) throw updateError;
+
+      const { error: comentarioError } = await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `🚫 Agendamento cancelado: ${motivoCancelamento}`,
+          is_system: true
+        });
+
+      if (comentarioError) throw comentarioError;
+
+      setSucesso('Agendamento cancelado com sucesso!');
+      setCancelamentoModal({ aberto: false, agendamentoId: null });
+      setMotivoCancelamento('');
+
+      await loadAgendamento();
+
+      setTimeout(() => {
+        setSucesso('');
+      }, 5000);
+    } catch (error: any) {
+      setErro(error.message || 'Erro ao cancelar agendamento');
+    } finally {
+      setSalvandoCancelamento(false);
     }
   };
 
@@ -558,13 +605,25 @@ export function OSAgendamentoTab({
                     </div>
                   </div>
 
-                  <button
-                    onClick={() => setVisitaChecklistAberta(agend.id)}
-                    className="w-full mt-3 px-4 py-2 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg text-[#00D4FF] hover:bg-[#00D4FF20] transition-all flex items-center justify-center gap-2 text-sm font-semibold"
-                  >
-                    <ClipboardList className="w-4 h-4" />
-                    Checklist Técnico
-                  </button>
+                  <div className="space-y-2 mt-3">
+                    <button
+                      onClick={() => setVisitaChecklistAberta(agend.id)}
+                      className="w-full px-4 py-2 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg text-[#00D4FF] hover:bg-[#00D4FF20] transition-all flex items-center justify-center gap-2 text-sm font-semibold"
+                    >
+                      <ClipboardList className="w-4 h-4" />
+                      Checklist Técnico
+                    </button>
+
+                    {!agend.checkin_realizado && agend.status !== 'concluido' && agend.status !== 'cancelado' && (
+                      <button
+                        onClick={() => setCancelamentoModal({ aberto: true, agendamentoId: agend.id })}
+                        className="w-full px-4 py-2 bg-[#FF006410] border border-[#FF006430] rounded-lg text-[#FF0064] hover:bg-[#FF006420] transition-all flex items-center justify-center gap-2 text-sm font-semibold"
+                      >
+                        <XCircle className="w-4 h-4" />
+                        Cancelar Agendamento
+                      </button>
+                    )}
+                  </div>
 
                   {isPrimeiraVisita && agend.checkin_realizado && (
                   <div className="mt-3 p-3 bg-[#39FF1410] border border-[#39FF1430] rounded-lg">
@@ -707,6 +766,88 @@ export function OSAgendamentoTab({
                 osId={osId}
                 isReadOnly={false}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Cancelamento de Agendamento */}
+      {cancelamentoModal.aberto && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6 border-b border-[#FF0064]/20">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#FF0064]/20 flex items-center justify-center">
+                    <XCircle className="w-6 h-6 text-[#FF0064]" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Cancelar Agendamento</h3>
+                    <p className="text-sm text-gray-400">Informe o motivo do cancelamento</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setCancelamentoModal({ aberto: false, agendamentoId: null });
+                    setMotivoCancelamento('');
+                    setErro('');
+                  }}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-white mb-2">
+                  Motivo do Cancelamento *
+                </label>
+                <textarea
+                  value={motivoCancelamento}
+                  onChange={(e) => setMotivoCancelamento(e.target.value)}
+                  placeholder="Descreva o motivo do cancelamento..."
+                  rows={4}
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-[#FF0064]"
+                />
+              </div>
+
+              {erro && (
+                <div className="premium-card p-3 bg-[#FF006410] border border-[#FF006430]">
+                  <p className="text-[#FF0064] text-sm">{erro}</p>
+                </div>
+              )}
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setCancelamentoModal({ aberto: false, agendamentoId: null });
+                    setMotivoCancelamento('');
+                    setErro('');
+                  }}
+                  className="flex-1 px-4 py-3 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition-colors font-semibold"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={handleCancelarAgendamento}
+                  disabled={salvandoCancelamento || !motivoCancelamento.trim()}
+                  className="flex-1 px-4 py-3 bg-[#FF0064] hover:bg-[#FF0064]/80 text-white rounded-lg transition-colors font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {salvandoCancelamento ? (
+                    <>
+                      <Clock className="w-4 h-4 animate-spin" />
+                      Cancelando...
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="w-4 h-4" />
+                      Confirmar Cancelamento
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

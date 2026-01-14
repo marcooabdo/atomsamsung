@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle, ClipboardList, Calendar, XCircle } from 'lucide-react';
+import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle, ClipboardList, Calendar } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { CheckinModal } from '../agendamento/CheckinModal';
 import { CheckoutModal } from '../agendamento/CheckoutModal';
@@ -107,26 +107,6 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
   const openWhatsApp = () => {
     const phone = os.cliente_telefone.replace(/\D/g, '');
     window.open(`https://wa.me/55${phone}`, '_blank');
-  };
-
-  const handleCancelarAgendamento = async (agendamentoId: string) => {
-    if (!confirm('Deseja realmente cancelar este agendamento?')) {
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('agendamentos')
-        .update({ status: 'cancelado' })
-        .eq('id', agendamentoId);
-
-      if (error) throw error;
-
-      await loadVisitas();
-    } catch (error) {
-      console.error('Erro ao cancelar agendamento:', error);
-      alert('Erro ao cancelar agendamento');
-    }
   };
 
   return (
@@ -288,53 +268,41 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
                       {new Date(visita.data_agendamento).toLocaleDateString('pt-BR')}
                     </p>
 
-                    <div className="flex flex-col gap-2">
-                      <div className="flex gap-2">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => {
+                          setSelectedVisitaForChecklist(visita.id);
+                          setChecklistModalOpen(true);
+                        }}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-medium hover:bg-cyan-500/30 transition-all"
+                      >
+                        <ClipboardList className="w-4 h-4" />
+                        Checklist
+                      </button>
+
+                      {!visita.checkin_realizado && visita.status !== 'concluido' && (
                         <button
                           onClick={() => {
-                            setSelectedVisitaForChecklist(visita.id);
-                            setChecklistModalOpen(true);
+                            setSelectedAgendamento(visita);
+                            setCheckinModalOpen(true);
                           }}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-medium hover:bg-cyan-500/30 transition-all"
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all"
                         >
-                          <ClipboardList className="w-4 h-4" />
-                          Checklist
+                          <Navigation className="w-4 h-4" />
+                          Check-in
                         </button>
+                      )}
 
-                        {!visita.checkin_realizado && visita.status !== 'concluido' && (
-                          <button
-                            onClick={() => {
-                              setSelectedAgendamento(visita);
-                              setCheckinModalOpen(true);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all"
-                          >
-                            <Navigation className="w-4 h-4" />
-                            Check-in
-                          </button>
-                        )}
-
-                        {visita.checkin_realizado && !visita.checkout_realizado && visita.status !== 'concluido' && (
-                          <button
-                            onClick={() => {
-                              setSelectedAgendamento(visita);
-                              setCheckoutModalOpen(true);
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-all"
-                          >
-                            <CheckCircle className="w-4 h-4" />
-                            Check-out
-                          </button>
-                        )}
-                      </div>
-
-                      {!visita.checkin_realizado && visita.status !== 'concluido' && visita.status !== 'cancelado' && (
+                      {visita.checkin_realizado && !visita.checkout_realizado && visita.status !== 'concluido' && (
                         <button
-                          onClick={() => handleCancelarAgendamento(visita.id)}
-                          className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-red-500/20 border border-red-500/50 rounded-lg text-red-400 text-xs font-medium hover:bg-red-500/30 transition-all"
+                          onClick={() => {
+                            setSelectedAgendamento(visita);
+                            setCheckoutModalOpen(true);
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-all"
                         >
-                          <XCircle className="w-4 h-4" />
-                          Cancelar Agendamento
+                          <CheckCircle className="w-4 h-4" />
+                          Check-out
                         </button>
                       )}
                     </div>
