@@ -487,6 +487,9 @@ export function ExecucaoOS() {
   const handleUploadPecaPhoto = async (pecaId: string, tipo: 'nova' | 'velha', file: File) => {
     if (!agendamento) return;
 
+    const peca = pecas.find(p => p.id === pecaId);
+    if (!peca) return;
+
     const fileExt = file.name.split('.').pop();
     const fileName = `${agendamento.os_id}_peca_${pecaId}_${tipo}_${Date.now()}.${fileExt}`;
     const filePath = `os-anexos/${fileName}`;
@@ -500,6 +503,11 @@ export function ExecucaoOS() {
         .from('os-anexos')
         .getPublicUrl(filePath);
 
+      const pecaDescricao = peca.estoque_pecas?.descricao || peca.descricao;
+      const pecaPN = peca.estoque_pecas?.pn || peca.codigo_peca;
+      const tipoTexto = tipo === 'nova' ? 'Nova' : 'Velha (Substituída)';
+      const descricaoAnexo = `Foto da Peça ${tipoTexto}: ${pecaPN} - ${pecaDescricao}`;
+
       await supabase
         .from('os_anexos')
         .insert({
@@ -508,7 +516,8 @@ export function ExecucaoOS() {
           tipo: `peca_${tipo}`,
           nome_arquivo: file.name,
           url: publicUrl,
-          tamanho_bytes: file.size
+          tamanho_bytes: file.size,
+          descricao: descricaoAnexo
         });
 
       setPecaPhotos(prev => ({
@@ -1111,7 +1120,7 @@ export function ExecucaoOS() {
                                         : 'bg-gray-800 border border-gray-700 text-gray-400 hover:border-red-500/50'
                                     }`}
                                   >
-                                    ⚠ Devolução - Defeito (RMA)
+                                    ⚠ Devolução - Defeito
                                   </button>
                                 </div>
                               </div>
