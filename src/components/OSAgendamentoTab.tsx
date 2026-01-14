@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus } from 'lucide-react';
+import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
@@ -58,6 +58,7 @@ export function OSAgendamentoTab({
   const [tipoOS, setTipoOS] = useState<string>('');
   const [mostrarNovaVisita, setMostrarNovaVisita] = useState(false);
   const [salvandoNovaVisita, setSalvandoNovaVisita] = useState(false);
+  const [visitaChecklistAberta, setVisitaChecklistAberta] = useState<string | null>(null);
 
   useEffect(() => {
     loadTecnicos();
@@ -557,6 +558,14 @@ export function OSAgendamentoTab({
                     </div>
                   </div>
 
+                  <button
+                    onClick={() => setVisitaChecklistAberta(agend.id)}
+                    className="w-full mt-3 px-4 py-2 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg text-[#00D4FF] hover:bg-[#00D4FF20] transition-all flex items-center justify-center gap-2 text-sm font-semibold"
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    Checklist Técnico
+                  </button>
+
                   {isPrimeiraVisita && agend.checkin_realizado && (
                   <div className="mt-3 p-3 bg-[#39FF1410] border border-[#39FF1430] rounded-lg">
                     <div className="flex items-center gap-2 mb-2">
@@ -654,20 +663,54 @@ export function OSAgendamentoTab({
             <span className="text-[#00D4FF] mt-0.5">•</span>
             <span>Use "Agendar Nova Visita" para criar visitas adicionais (revisitas)</span>
           </li>
+          <li className="flex items-start gap-2">
+            <span className="text-[#00D4FF] mt-0.5">•</span>
+            <span>Clique no botão "Checklist Técnico" de cada visita para vincular e visualizar checklists</span>
+          </li>
         </ul>
       </div>
 
-      {/* Seção de Checklists Técnicos */}
-      <div className="border-t border-gray-700/30 pt-6">
-        <AgendamentoChecklistSection
-          agendamentoId={agendamentoId}
-          unidadeId={unidadeId}
-          tipoOS={tipoOS}
-          tipoAtendimento={tipoAtendimento}
-          osId={osId}
-          isReadOnly={false}
-        />
-      </div>
+      {/* Modal de Checklist por Visita */}
+      {visitaChecklistAberta && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div className="premium-card w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#00D4FF]/20 sticky top-0 bg-gray-900 z-10">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-full bg-[#00D4FF]/20 flex items-center justify-center">
+                    <ClipboardList className="w-6 h-6 text-[#00D4FF]" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-white">Checklist Técnico</h3>
+                    <p className="text-sm text-gray-400">
+                      Visita {todosAgendamentos.findIndex(a => a.id === visitaChecklistAberta) !== -1
+                        ? todosAgendamentos.length - todosAgendamentos.findIndex(a => a.id === visitaChecklistAberta)
+                        : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setVisitaChecklistAberta(null)}
+                  className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                >
+                  <X className="w-6 h-6 text-gray-400" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-6">
+              <AgendamentoChecklistSection
+                agendamentoId={visitaChecklistAberta}
+                unidadeId={unidadeId}
+                tipoOS={tipoOS}
+                tipoAtendimento={tipoAtendimento}
+                osId={osId}
+                isReadOnly={false}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
