@@ -163,14 +163,20 @@ export function ExecucaoOS() {
     const activeOSExists = await checkForActiveOS();
     setHasActiveOS(activeOSExists);
 
-    const { data: agendamentoData, error: agendamentoError } = await supabase
+    const { data: agendamentosData, error: agendamentoError } = await supabase
       .from('agendamentos')
-      .select('id, tecnico_id, checkin_realizado, checkout_realizado, checkin_hora, checkout_hora, checkin_latitude, checkin_longitude')
+      .select('id, tecnico_id, checkin_realizado, checkout_realizado, checkin_hora, checkout_hora, checkin_latitude, checkin_longitude, created_at')
       .eq('os_id', osId)
       .eq('tecnico_id', usuario.id)
-      .maybeSingle();
+      .order('created_at', { ascending: false });
 
     if (agendamentoError) {
+    }
+
+    let agendamentoData = null;
+    if (agendamentosData && agendamentosData.length > 0) {
+      const agendamentoPendente = agendamentosData.find(a => !a.checkout_realizado);
+      agendamentoData = agendamentoPendente || agendamentosData[0];
     }
 
     const { data, error } = await supabase
