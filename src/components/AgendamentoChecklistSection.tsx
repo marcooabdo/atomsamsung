@@ -121,6 +121,9 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
       const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
       if (!vinculo) return;
 
+      const template = vinculo.checklist_template;
+      const item = template?.itens?.find((i: any) => i.ordem === itemOrdem);
+
       const respostas = vinculo.respostas || [];
       const respostaExistente = respostas.find((r: any) => r.ordem === itemOrdem);
 
@@ -128,7 +131,7 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
       if (respostaExistente) {
         novasRespostas = respostas.map((r: any) =>
           r.ordem === itemOrdem
-            ? { ...r, checked, updated_at: new Date().toISOString(), updated_by: usuario?.id }
+            ? { ...r, checked, updated_at: new Date().toISOString(), updated_by: usuario?.id, updated_by_name: usuario?.nome }
             : r
         );
       } else {
@@ -138,7 +141,8 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
             ordem: itemOrdem,
             checked,
             updated_at: new Date().toISOString(),
-            updated_by: usuario?.id
+            updated_by: usuario?.id,
+            updated_by_name: usuario?.nome
           }
         ];
       }
@@ -147,6 +151,17 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .from('agendamento_checklist_vinculados')
         .update({ respostas: novasRespostas })
         .eq('id', vinculoId);
+
+      if (osId) {
+        const acao = checked ? 'marcou' : 'desmarcou';
+        const itemTexto = item?.texto || `Item ${itemOrdem}`;
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `[CHECKLIST TECNICO] ${usuario?.nome} ${acao}: "${itemTexto}"`,
+          is_system: true
+        });
+      }
 
       await loadChecklists();
     } catch (error) {
@@ -284,6 +299,11 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
                           <p className={`text-xs ${checked ? 'line-through text-gray-500' : 'text-gray-200'}`}>
                             {item.texto}
                           </p>
+                          {checked && resposta?.updated_at && (
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {resposta.updated_by_name || 'Usuario'} - {new Date(resposta.updated_at).toLocaleString('pt-BR')}
+                            </p>
+                          )}
                         </div>
                       </div>
                     );

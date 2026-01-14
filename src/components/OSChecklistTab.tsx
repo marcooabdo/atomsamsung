@@ -156,6 +156,9 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
       const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
       if (!vinculo) return;
 
+      const template = vinculo.checklist_template;
+      const item = template?.itens?.find((i: any) => i.ordem === itemOrdem);
+
       const respostas = vinculo.respostas || [];
       const respostaExistente = respostas.find((r: any) => r.ordem === itemOrdem);
 
@@ -163,7 +166,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
       if (respostaExistente) {
         novasRespostas = respostas.map((r: any) =>
           r.ordem === itemOrdem
-            ? { ...r, checked, updated_at: new Date().toISOString(), updated_by: usuario?.id }
+            ? { ...r, checked, updated_at: new Date().toISOString(), updated_by: usuario?.id, updated_by_name: usuario?.nome }
             : r
         );
       } else {
@@ -173,7 +176,8 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
             ordem: itemOrdem,
             checked,
             updated_at: new Date().toISOString(),
-            updated_by: usuario?.id
+            updated_by: usuario?.id,
+            updated_by_name: usuario?.nome
           }
         ];
       }
@@ -182,6 +186,15 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         .from('os_checklist_vinculados')
         .update({ respostas: novasRespostas })
         .eq('id', vinculoId);
+
+      const acao = checked ? 'marcou' : 'desmarcou';
+      const itemTexto = item?.texto || `Item ${itemOrdem}`;
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `[CHECKLIST ADM] ${usuario?.nome} ${acao}: "${itemTexto}"`,
+        is_system: true
+      });
 
       await loadChecklists();
     } catch (error) {
@@ -322,7 +335,7 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
                           </p>
                           {checked && resposta?.updated_at && (
                             <p className="text-xs text-gray-500 mt-1">
-                              Concluído em {new Date(resposta.updated_at).toLocaleString('pt-BR')}
+                              {resposta.updated_by_name || 'Usuario'} - {new Date(resposta.updated_at).toLocaleString('pt-BR')}
                             </p>
                           )}
                         </div>
