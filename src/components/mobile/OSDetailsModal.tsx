@@ -268,44 +268,46 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
                       {new Date(visita.data_agendamento).toLocaleDateString('pt-BR')}
                     </p>
 
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          setSelectedVisitaForChecklist(visita.id);
-                          setChecklistModalOpen(true);
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-medium hover:bg-cyan-500/30 transition-all"
-                      >
-                        <ClipboardList className="w-4 h-4" />
-                        Checklist
-                      </button>
-
-                      {!visita.checkin_realizado && visita.status !== 'concluido' && (
+                    {os.tipo_atendimento !== 'IH' && (
+                      <div className="flex gap-2">
                         <button
                           onClick={() => {
-                            setSelectedAgendamento(visita);
-                            setCheckinModalOpen(true);
+                            setSelectedVisitaForChecklist(visita.id);
+                            setChecklistModalOpen(true);
                           }}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all"
+                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 text-xs font-medium hover:bg-cyan-500/30 transition-all"
                         >
-                          <Navigation className="w-4 h-4" />
-                          Check-in
+                          <ClipboardList className="w-4 h-4" />
+                          Checklist
                         </button>
-                      )}
 
-                      {visita.checkin_realizado && !visita.checkout_realizado && visita.status !== 'concluido' && (
-                        <button
-                          onClick={() => {
-                            setSelectedAgendamento(visita);
-                            setCheckoutModalOpen(true);
-                          }}
-                          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-all"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                          Check-out
-                        </button>
-                      )}
-                    </div>
+                        {!visita.checkin_realizado && visita.status !== 'concluido' && (
+                          <button
+                            onClick={() => {
+                              setSelectedAgendamento(visita);
+                              setCheckinModalOpen(true);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-green-500/20 border border-green-500/50 rounded-lg text-green-400 text-xs font-medium hover:bg-green-500/30 transition-all"
+                          >
+                            <Navigation className="w-4 h-4" />
+                            Check-in
+                          </button>
+                        )}
+
+                        {visita.checkin_realizado && !visita.checkout_realizado && visita.status !== 'concluido' && (
+                          <button
+                            onClick={() => {
+                              setSelectedAgendamento(visita);
+                              setCheckoutModalOpen(true);
+                            }}
+                            className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-500/20 border border-blue-500/50 rounded-lg text-blue-400 text-xs font-medium hover:bg-blue-500/30 transition-all"
+                          >
+                            <CheckCircle className="w-4 h-4" />
+                            Check-out
+                          </button>
+                        )}
+                      </div>
+                    )}
 
                     {visita.checkin_realizado && (
                       <div className="text-xs text-gray-400 pt-2 border-t border-gray-600">
