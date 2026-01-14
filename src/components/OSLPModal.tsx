@@ -2940,9 +2940,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                       {anexos.map((anexo) => (
                         <div key={anexo.id} className="premium-card p-4">
                           <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Enviado por: {anexo.usuario?.nome || 'Desconhecido'}
-                          </p>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
+                            <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.usuario?.nome || 'Sistema'}</span>
+                          </div>
                         </div>
                       ))}
                     </div>

@@ -394,7 +394,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     // Busca anexos vinculados à OS ou à cotação original
     const { data, error } = await supabase
       .from('os_anexos')
-      .select('*')
+      .select('*, usuario:usuarios(nome)')
       .or(`os_id.eq.${osId}${osData?.cotacao_id ? `,cotacao_id.eq.${osData.cotacao_id}` : ''}`)
       .order('created_at', { ascending: false });
 
@@ -2737,8 +2737,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                           <div className="flex items-center gap-2">
                             <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
                             <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.usuario?.nome || 'Sistema'}</span>
                           </div>
                         </div>
                       </div>
