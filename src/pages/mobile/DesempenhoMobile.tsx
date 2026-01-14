@@ -35,25 +35,37 @@ export function DesempenhoMobile() {
   const loadKPIs = async () => {
     if (!usuario) return;
 
-    const hoje = new Date().toISOString().split('T')[0];
-    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+    const agora = new Date();
+    const hoje = agora.toISOString().split('T')[0];
+    const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1).toISOString();
+    const fimHoje = new Date(hoje + 'T23:59:59.999Z').toISOString();
 
-    const { data: agendamentosData } = await supabase
+    const { data: agendamentosMes } = await supabase
       .from('agendamentos')
-      .select('id, checkin_hora, checkout_hora, checkout_realizado, data_agendamento, os:os_id(status_kanban)')
+      .select('id, checkin_hora, checkout_hora, os:os_id(coluna_kanban)')
       .eq('tecnico_id', usuario.id)
       .eq('checkout_realizado', true)
-      .gte('created_at', inicioMes);
+      .not('checkout_hora', 'is', null)
+      .gte('checkout_hora', inicioMes);
+
+    const { data: agendamentosHoje } = await supabase
+      .from('agendamentos')
+      .select('id')
+      .eq('tecnico_id', usuario.id)
+      .eq('checkout_realizado', true)
+      .not('checkout_hora', 'is', null)
+      .gte('checkout_hora', hoje)
+      .lte('checkout_hora', fimHoje);
 
     const { data: pecasData } = await supabase
       .from('requisicoes_pecas')
-      .select('id')
+      .select('id, updated_at')
       .eq('solicitante_id', usuario.id)
       .eq('status', 'gi_postado')
-      .gte('created_at', inicioMes);
+      .gte('updated_at', inicioMes);
 
-    if (agendamentosData) {
-      const temposAtendimento = agendamentosData
+    if (agendamentosMes) {
+      const temposAtendimento = agendamentosMes
         .filter(a => a.checkin_hora && a.checkout_hora)
         .map(a => {
           const checkin = new Date(a.checkin_hora!);
@@ -65,17 +77,20 @@ export function DesempenhoMobile() {
         ? temposAtendimento.reduce((sum, t) => sum + t, 0) / temposAtendimento.length
         : 0;
 
-      const totalConcluidas = agendamentosData.length;
-      const sucesso = agendamentosData.filter(a => a.os?.status_kanban === 'finalizado').length;
-      const taxaSucesso = totalConcluidas > 0 ? (sucesso / totalConcluidas) * 100 : 0;
+      const totalConcluidasMes = agendamentosMes.length;
+      const osComSucesso = agendamentosMes.filter(a =>
+        a.os?.coluna_kanban === 'reparo_concluido' ||
+        a.os?.coluna_kanban === 'finalizado'
+      ).length;
+      const taxaSucesso = totalConcluidasMes > 0 ? (osComSucesso / totalConcluidasMes) * 100 : 0;
 
-      const concluidasHoje = agendamentosData.filter(a => a.data_agendamento === hoje).length;
+      const concluidasHoje = agendamentosHoje?.length || 0;
 
       setKpis({
         velocidade_media: Math.round(velocidadeMedia),
         taxa_sucesso: Math.round(taxaSucesso),
         giro_pecas: pecasData?.length || 0,
-        os_concluidas_mes: totalConcluidas,
+        os_concluidas_mes: totalConcluidasMes,
         os_concluidas_hoje: concluidasHoje
       });
     }
@@ -86,39 +101,48 @@ export function DesempenhoMobile() {
   const loadHistorico = async () => {
     if (!usuario) return;
 
+    const inicioMes = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
     const { data } = await supabase
       .from('agendamentos')
       .select(`
         id,
         checkin_hora,
         checkout_hora,
-        data_agendamento,
         os:os_id (
-          numero_os,
+          numero_os_samsung,
+          numero_os_interna,
           cliente_nome,
-          status_kanban
+          coluna_kanban
         )
       `)
       .eq('tecnico_id', usuario.id)
       .eq('checkout_realizado', true)
+      .not('checkout_hora', 'is', null)
+      .gte('checkout_hora', inicioMes)
       .order('checkout_hora', { ascending: false })
-      .limit(10);
+      .limit(20);
 
     if (data) {
-      const historicoFormatado = data.map(a => {
-        const checkin = new Date(a.checkin_hora!);
-        const checkout = new Date(a.checkout_hora!);
-        const tempoMinutos = (checkout.getTime() - checkin.getTime()) / (1000 * 60);
+      const historicoFormatado = data
+        .filter(a => a.checkin_hora && a.checkout_hora)
+        .map(a => {
+          const checkin = new Date(a.checkin_hora!);
+          const checkout = new Date(a.checkout_hora!);
+          const tempoMinutos = (checkout.getTime() - checkin.getTime()) / (1000 * 60);
 
-        return {
-          id: a.id,
-          numero_os: a.os?.numero_os || '',
-          cliente_nome: a.os?.cliente_nome || '',
-          data_conclusao: checkout.toLocaleDateString('pt-BR'),
-          tempo_atendimento: Math.round(tempoMinutos),
-          resultado: a.os?.status_kanban === 'finalizado' ? 'Sucesso' : 'Pendente'
-        };
-      });
+          const isSuccess = a.os?.coluna_kanban === 'reparo_concluido' ||
+                           a.os?.coluna_kanban === 'finalizado';
+
+          return {
+            id: a.id,
+            numero_os: a.os?.numero_os_samsung || a.os?.numero_os_interna || 'S/N',
+            cliente_nome: a.os?.cliente_nome || '',
+            data_conclusao: checkout.toLocaleDateString('pt-BR') + ' ' + checkout.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+            tempo_atendimento: Math.round(tempoMinutos),
+            resultado: isSuccess ? 'Sucesso' : 'Pendente'
+          };
+        });
 
       setHistorico(historicoFormatado);
     }
@@ -167,7 +191,7 @@ export function DesempenhoMobile() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Award className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Indicadores de Performance</h2>
+          <h2 className="text-xl font-bold text-white">Performance do Mês</h2>
         </div>
 
         <div className="grid grid-cols-1 gap-3">
@@ -179,7 +203,7 @@ export function DesempenhoMobile() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Velocidade Média</p>
-                  <p className="text-white text-xs">Tempo médio por atendimento</p>
+                  <p className="text-white text-xs">Tempo médio por atendimento no mês</p>
                 </div>
               </div>
               <p className="text-3xl font-black text-cyan-400">{kpis.velocidade_media}</p>
@@ -200,7 +224,7 @@ export function DesempenhoMobile() {
                 </div>
                 <div>
                   <p className="text-gray-400 text-sm">Taxa de Sucesso</p>
-                  <p className="text-white text-xs">OS finalizadas com êxito</p>
+                  <p className="text-white text-xs">OS finalizadas com êxito no mês</p>
                 </div>
               </div>
               <p className="text-3xl font-black text-green-400">{kpis.taxa_sucesso}%</p>
@@ -239,7 +263,7 @@ export function DesempenhoMobile() {
       <div>
         <div className="flex items-center gap-2 mb-4">
           <Calendar className="w-6 h-6 text-cyan-400" />
-          <h2 className="text-xl font-bold text-white">Histórico Recente</h2>
+          <h2 className="text-xl font-bold text-white">OS Finalizadas do Mês</h2>
         </div>
 
         {historico.length === 0 ? (
