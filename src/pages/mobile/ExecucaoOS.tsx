@@ -112,8 +112,9 @@ export function ExecucaoOS() {
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [expandedPecas, setExpandedPecas] = useState<Record<string, boolean>>({});
   const [selectedPecaActions, setSelectedPecaActions] = useState<Record<string, 'gi' | 'devolucao_nova' | 'devolucao_defeito'>>({});
-  const [pecaPhotos, setPecaPhotos] = useState<Record<string, { nova: string | null; velha: string | null }>>({});
+  const [pecaPhotos, setPecaPhotos] = useState<Record<string, { nova: string[]; velha: string[] }>>({});
   const [uploadedEvidencias, setUploadedEvidencias] = useState<Evidencia[]>([]);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [resultado, setResultado] = useState<'sucesso' | 'peca_defeito' | 'improdutiva'>('sucesso');
   const [showAssinaturaTecnico, setShowAssinaturaTecnico] = useState(false);
@@ -484,66 +485,87 @@ export function ExecucaoOS() {
     setCurrentStep('evidencias');
   };
 
-  const handleUploadPecaPhoto = async (pecaId: string, tipo: 'nova' | 'velha', file: File) => {
-    if (!agendamento) return;
+  const handleUploadPecaPhoto = async (pecaId: string, tipo: 'nova' | 'velha', files: FileList) => {
+    if (!agendamento || !files || files.length === 0) return;
 
     const peca = pecas.find(p => p.id === pecaId);
     if (!peca) return;
 
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${agendamento.os_id}_peca_${pecaId}_${tipo}_${Date.now()}.${fileExt}`;
-    const filePath = `os-anexos/${fileName}`;
+    setUploadingPhoto(true);
 
-    const { error: uploadError } = await supabase.storage
-      .from('os-anexos')
-      .upload(filePath, file);
-
-    if (!uploadError) {
-      const { data: { publicUrl } } = supabase.storage
-        .from('os-anexos')
-        .getPublicUrl(filePath);
-
+    try {
       const pecaDescricao = peca.estoque_pecas?.descricao || peca.descricao;
       const pecaPN = peca.estoque_pecas?.pn || peca.codigo_peca;
-      const tipoTexto = tipo === 'nova' ? 'Nova' : 'Velha (Substituída)';
-      const descricaoAnexo = `Foto da Peça ${tipoTexto}: ${pecaPN} - ${pecaDescricao}`;
+      const tipoTexto = tipo === 'nova' ? 'Nova' : 'Usada';
 
-      const { error: insertError } = await supabase
-        .from('os_anexos')
-        .insert({
-          os_id: agendamento.os_id,
-          usuario_id: usuario?.id || null,
-          tipo: `peca_${tipo}`,
-          nome_arquivo: file.name,
-          url: publicUrl,
-          tamanho_bytes: file.size,
-          descricao: descricaoAnexo
-        });
+      const uploadedPaths: string[] = [];
 
-      if (insertError) {
-        console.error('Erro ao salvar anexo de peca:', insertError);
-        alert(`Erro ao salvar foto: ${insertError.message}`);
-        return;
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const fileExt = file.name.split('.').pop();
+        const timestamp = Date.now() + i;
+        const fileName = `peca_${tipo}_${pecaPN}_${timestamp}.${fileExt}`;
+        const filePath = `os-anexos/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('os-anexos')
+          .upload(filePath, file);
+
+        if (uploadError) {
+          console.error('Erro no upload:', uploadError);
+          continue;
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('os-anexos')
+          .getPublicUrl(filePath);
+
+        const descricaoAnexo = `Foto da Peça ${tipoTexto}: ${pecaPN} - ${pecaDescricao}`;
+
+        const { error: insertError } = await supabase
+          .from('os_anexos')
+          .insert({
+            os_id: agendamento.os_id,
+            usuario_id: usuario?.id || null,
+            tipo: `peca_${tipo}`,
+            nome_arquivo: fileName,
+            url: publicUrl,
+            tamanho_bytes: file.size,
+            descricao: descricaoAnexo
+          });
+
+        if (insertError) {
+          console.error('Erro ao salvar anexo:', insertError);
+          continue;
+        }
+
+        uploadedPaths.push(filePath);
       }
 
-      setPecaPhotos(prev => ({
-        ...prev,
-        [pecaId]: {
-          ...prev[pecaId],
-          [tipo]: filePath
-        }
-      }));
+      if (uploadedPaths.length > 0) {
+        setPecaPhotos(prev => ({
+          ...prev,
+          [pecaId]: {
+            nova: tipo === 'nova' ? [...(prev[pecaId]?.nova || []), ...uploadedPaths] : (prev[pecaId]?.nova || []),
+            velha: tipo === 'velha' ? [...(prev[pecaId]?.velha || []), ...uploadedPaths] : (prev[pecaId]?.velha || [])
+          }
+        }));
 
-      alert(`Foto da peça ${tipo} anexada com sucesso!`);
+        alert(`${uploadedPaths.length} foto(s) da peça ${tipoTexto} anexada(s) com sucesso!`);
+      }
+    } finally {
+      setUploadingPhoto(false);
     }
   };
 
   const handleUploadEvidencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!agendamento || !e.target.files?.[0]) return;
 
+    setUploadingPhoto(true);
+
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
-    const fileName = `${agendamento.os_id}_evidencia_${Date.now()}.${fileExt}`;
+    const fileName = `evidencia_${Date.now()}.${fileExt}`;
     const filePath = `os-anexos/${fileName}`;
 
     const { error: uploadError } = await supabase.storage
@@ -558,7 +580,7 @@ export function ExecucaoOS() {
       const newEvidencia: Evidencia = {
         id: Date.now().toString(),
         path: filePath,
-        nome: file.name,
+        nome: fileName,
         tipo: null,
         url: publicUrl,
         size: file.size,
@@ -568,6 +590,8 @@ export function ExecucaoOS() {
       setUploadedEvidencias(prev => [...prev, newEvidencia]);
       alert('Foto anexada! Agora selecione o tipo da evidência.');
     }
+
+    setUploadingPhoto(false);
   };
 
   const handleUpdateEvidenciaTipo = async (evidenciaId: string, tipo: string) => {
@@ -576,13 +600,29 @@ export function ExecucaoOS() {
     const evidencia = uploadedEvidencias.find(e => e.id === evidenciaId);
     if (!evidencia) return;
 
+    const tipoNomeMap: Record<string, string> = {
+      'defeito': 'Defeito',
+      'reparo': 'Reparo',
+      'etiqueta_serial': 'Etiqueta_Serial',
+      'nota_fiscal': 'Nota_Fiscal',
+      'menu_servico': 'Menu_Servico',
+      'contador_erros': 'Contador_Erros',
+      'qrcode_barras': 'QRCode',
+      'fachada': 'Fachada'
+    };
+
+    const tipoNome = tipoNomeMap[tipo] || tipo;
+    const fileExt = evidencia.nome.split('.').pop();
+    const timestamp = Date.now();
+    const novoNome = `${tipoNome}_${timestamp}.${fileExt}`;
+
     const { error: insertError } = await supabase
       .from('os_anexos')
       .insert({
         os_id: agendamento.os_id,
         usuario_id: usuario?.id || null,
         tipo: tipo,
-        nome_arquivo: evidencia.nome,
+        nome_arquivo: novoNome,
         url: evidencia.url || '',
         tamanho_bytes: evidencia.size
       });
@@ -594,7 +634,7 @@ export function ExecucaoOS() {
     }
 
     setUploadedEvidencias(prev =>
-      prev.map(e => e.id === evidenciaId ? { ...e, tipo } : e)
+      prev.map(e => e.id === evidenciaId ? { ...e, tipo, nome: novoNome } : e)
     );
   };
 
@@ -1153,30 +1193,40 @@ export function ExecucaoOS() {
                             )}
 
                             {peca.status === 'atendida' && (
-                              <div className="grid grid-cols-2 gap-2 pt-2">
+                              <div className="space-y-2 pt-2">
                                 <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
                                   <Camera className="w-5 h-5 text-cyan-400" />
-                                  <span className="text-xs text-gray-400">Foto Peça Nova</span>
-                                  {pecaPhotos[peca.id]?.nova && <CheckCircle className="w-4 h-4 text-green-400" />}
+                                  <span className="text-xs text-gray-400">
+                                    Fotos Peça Nova {pecaPhotos[peca.id]?.nova?.length > 0 && `(${pecaPhotos[peca.id].nova.length})`}
+                                  </span>
+                                  {pecaPhotos[peca.id]?.nova?.length > 0 && <CheckCircle className="w-4 h-4 text-green-400" />}
+                                  {uploadingPhoto && <div className="text-xs text-cyan-400">Enviando...</div>}
                                   <input
                                     type="file"
                                     accept="image/*"
                                     capture="environment"
-                                    onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'nova', e.target.files[0])}
+                                    multiple
+                                    onChange={(e) => e.target.files && handleUploadPecaPhoto(peca.id, 'nova', e.target.files)}
                                     className="hidden"
+                                    disabled={uploadingPhoto}
                                   />
                                 </label>
 
                                 <label className="flex flex-col items-center gap-2 px-3 py-3 bg-gray-800 border border-gray-700 rounded-lg cursor-pointer hover:border-cyan-500/50 transition-colors">
                                   <Camera className="w-5 h-5 text-cyan-400" />
-                                  <span className="text-xs text-gray-400">Foto Peça Velha</span>
-                                  {pecaPhotos[peca.id]?.velha && <CheckCircle className="w-4 h-4 text-green-400" />}
+                                  <span className="text-xs text-gray-400">
+                                    Fotos Peça Usada {pecaPhotos[peca.id]?.velha?.length > 0 && `(${pecaPhotos[peca.id].velha.length})`}
+                                  </span>
+                                  {pecaPhotos[peca.id]?.velha?.length > 0 && <CheckCircle className="w-4 h-4 text-green-400" />}
+                                  {uploadingPhoto && <div className="text-xs text-cyan-400">Enviando...</div>}
                                   <input
                                     type="file"
                                     accept="image/*"
                                     capture="environment"
-                                    onChange={(e) => e.target.files?.[0] && handleUploadPecaPhoto(peca.id, 'velha', e.target.files[0])}
+                                    multiple
+                                    onChange={(e) => e.target.files && handleUploadPecaPhoto(peca.id, 'velha', e.target.files)}
                                     className="hidden"
+                                    disabled={uploadingPhoto}
                                   />
                                 </label>
                               </div>
@@ -1231,9 +1281,10 @@ export function ExecucaoOS() {
                       capture="environment"
                       onChange={handleUploadEvidencia}
                       className="hidden"
+                      disabled={uploadingPhoto}
                     />
-                    <div className="px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium">
-                      Adicionar Foto
+                    <div className={`px-6 py-3 bg-cyan-500/20 border border-cyan-500/50 rounded-lg text-cyan-400 font-medium ${uploadingPhoto ? 'opacity-50' : ''}`}>
+                      {uploadingPhoto ? 'Enviando...' : 'Adicionar Foto'}
                     </div>
                   </label>
                 </div>
