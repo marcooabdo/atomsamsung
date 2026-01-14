@@ -9,9 +9,10 @@ interface AgendamentoChecklistSectionProps {
   tipoOS?: string;
   tipoAtendimento?: string;
   osId?: string;
+  isReadOnly?: boolean;
 }
 
-export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, tipoAtendimento, osId }: AgendamentoChecklistSectionProps) {
+export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, tipoAtendimento, osId, isReadOnly = false }: AgendamentoChecklistSectionProps) {
   const { usuario } = useAuth();
   const [checklistsVinculados, setChecklistsVinculados] = useState<any[]>([]);
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
@@ -229,21 +230,23 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
             Checklists Técnicos
           </h4>
           <p className="text-xs text-gray-400 mt-1">
-            Checklists para serem preenchidos pelo técnico durante a execução
+            {isReadOnly ? 'Visualização dos checklists técnicos' : 'Checklists para serem preenchidos pelo técnico durante a execução'}
           </p>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="neon-button text-xs px-3 py-2 flex items-center gap-2"
-          style={{
-            backgroundColor: '#00D4FF20',
-            color: '#00D4FF',
-            borderColor: '#00D4FF60'
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          ADICIONAR
-        </button>
+        {!isReadOnly && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="neon-button text-xs px-3 py-2 flex items-center gap-2"
+            style={{
+              backgroundColor: '#00D4FF20',
+              color: '#00D4FF',
+              borderColor: '#00D4FF60'
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            ADICIONAR
+          </button>
+        )}
       </div>
 
       {checklistsVinculados.length === 0 ? (
@@ -270,12 +273,14 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
                       <p className="text-[10px] text-gray-400 mt-0.5">{template.descricao}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => handleRemoverChecklist(vinculo.id)}
-                    className="text-red-400 hover:text-red-300 transition-colors"
-                  >
-                    <Trash2 className="w-3 h-3" />
-                  </button>
+                  {!isReadOnly && (
+                    <button
+                      onClick={() => handleRemoverChecklist(vinculo.id)}
+                      className="text-red-400 hover:text-red-300 transition-colors"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -286,11 +291,14 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
                     return (
                       <div key={item.ordem} className="flex items-start gap-2 p-1.5 rounded hover:bg-white/5 transition-colors">
                         <button
-                          onClick={() => handleToggleItem(vinculo.id, item.ordem, !checked)}
+                          onClick={() => !isReadOnly && handleToggleItem(vinculo.id, item.ordem, !checked)}
+                          disabled={isReadOnly}
                           className={`flex-shrink-0 w-4 h-4 rounded border-2 flex items-center justify-center transition-all ${
                             checked
                               ? 'bg-[#00D4FF]/20 border-[#00D4FF]'
-                              : 'border-gray-500 hover:border-[#00D4FF]'
+                              : isReadOnly
+                                ? 'border-gray-600 cursor-not-allowed'
+                                : 'border-gray-500 hover:border-[#00D4FF] cursor-pointer'
                           }`}
                         >
                           {checked && <CheckSquare className="w-3 h-3 text-[#00D4FF]" />}

@@ -432,6 +432,7 @@ export function OSAgendamentoTab({
           tipoOS={tipoOS}
           tipoAtendimento={tipoAtendimento}
           osId={osId}
+          isReadOnly={true}
         />
       </div>
     </div>
