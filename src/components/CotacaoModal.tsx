@@ -464,14 +464,14 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
   };
 
   const loadMarkups = async () => {
-    if (!unidadeId || (tipoOS === 'OW' && !tipoOrcamento)) {
+    if (!unidadeId) {
       setMarkups([]);
       return;
     }
     const { data } = await supabase
       .rpc('get_markup_for_unidade_and_tipo', {
         p_unidade_id: unidadeId,
-        p_tipo_orcamento: tipoOS === 'OW' ? tipoOrcamento : 'normal'
+        p_tipo_orcamento: 'normal'
       });
     setMarkups(data || []);
   };
@@ -1050,7 +1050,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
             numero_os_samsung: numeroOSSamsung || null,
             tipo_atendimento: tipoAtendimento,
             tipo_os: tipoOS,
-            tipo_orcamento: tipoOS === 'OW' ? tipoOrcamento : null,
+            tipo_orcamento: tipoOS === 'OW' ? 'normal' : null,
             unidade_id: unidadeId || null,
             cliente_nome: clienteNome,
             cliente_cpf_cnpj: clienteCPF || null,
@@ -1125,7 +1125,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
             numero_os_samsung: numeroOSSamsung || null,
             tipo_atendimento: tipoAtendimento,
             tipo_os: tipoOS,
-            tipo_orcamento: tipoOS === 'OW' ? tipoOrcamento : null,
+            tipo_orcamento: tipoOS === 'OW' ? 'normal' : null,
             unidade_id: unidadeId || null,
             cliente_nome: clienteNome,
             cliente_cpf_cnpj: clienteCPF || null,
@@ -1370,7 +1370,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         numero_os_samsung: numeroOSSamsung || null,
         tipo_atendimento: tipoAtendimento,
         tipo_os: tipoOS,
-        tipo_orcamento: tipoOS === 'OW' ? tipoOrcamento : null,
+        tipo_orcamento: tipoOS === 'OW' ? 'normal' : null,
         unidade_id: unidadeId || null,
         cliente_nome: clienteNome,
         cliente_cpf_cnpj: clienteCPF || null,
@@ -1875,29 +1875,6 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                   </select>
                 </div>
 
-                {tipoOS === 'OW' && (
-                  <div>
-                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Tipo de Orçamento *</label>
-                    <select
-                      value={tipoOrcamento}
-                      onChange={(e) => setTipoOrcamento(e.target.value as 'normal' | 'acessorios' | 'samsung_contigo')}
-                      className="neon-input"
-                      style={{
-                        backgroundColor: tipoOrcamento === 'samsung_contigo' ? '#FFA50010' : undefined,
-                        borderColor: tipoOrcamento === 'samsung_contigo' ? '#FFA500' : undefined
-                      }}
-                    >
-                      <option value="normal">Orçamento Normal</option>
-                      <option value="acessorios">Acessórios</option>
-                      <option value="samsung_contigo">Samsung Contigo</option>
-                    </select>
-                    {tipoOrcamento === 'samsung_contigo' && (
-                      <p className="text-xs text-[#FFA500] mt-1">
-                        🏷️ Samsung Contigo: Orçamento com markup diferenciado
-                      </p>
-                    )}
-                  </div>
-                )}
               </div>
 
               <div className="border-t border-[#00D4FF]/20 pt-6">
