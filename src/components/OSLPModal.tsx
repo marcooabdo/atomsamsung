@@ -87,6 +87,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [unidadeId, setUnidadeId] = useState('');
   const [tipoAtendimento, setTipoAtendimento] = useState<'IH' | 'CI'>('CI');
+  const [tipoOrcamento, setTipoOrcamento] = useState<'normal' | 'garantia' | 'cortesia'>('normal');
   const [numeroOSSamsung, setNumeroOSSamsung] = useState('');
   const [clienteNome, setClienteNome] = useState('');
   const [clienteCPF, setClienteCPF] = useState('');
@@ -703,15 +704,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
           // Buscar markup ativo
           const tipoOSAtual = mode === 'view' ? os?.tipo_os : tipoOS;
+          const tipoOrcamentoAtual = mode === 'view' ? os?.tipo_orcamento : tipoOrcamento;
           let valorComMarkup = pedido?.valor_estimado || null;
-          if (valorComMarkup && tipoOSAtual === 'OW') {
-            const { data: markupData } = await supabase.rpc('get_markup_ativo', {
+          if (valorComMarkup && tipoOSAtual === 'OW' && tipoOrcamentoAtual) {
+            const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
               p_unidade_id: unidadeParaBusca,
-              p_valor_peca: valorComMarkup
+              p_tipo_orcamento: tipoOrcamentoAtual,
+              p_valor: valorComMarkup
             });
 
-            if (markupData && markupData.percentual) {
-              valorComMarkup = valorComMarkup * (1 + markupData.percentual / 100);
+            if (markupData && markupData.length > 0 && markupData[0].valor) {
+              valorComMarkup = valorComMarkup * (1 + markupData[0].valor / 100);
             }
           }
 
@@ -744,19 +747,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const calcularMarkup = async () => {
       const valorGSPN = parseFloat(novaPecaValor);
 
-      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId) {
+      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId || !tipoOrcamento) {
         setNovaPecaValorComMarkup(null);
         return;
       }
 
       try {
-        const { data: markupData } = await supabase.rpc('get_markup_ativo', {
+        const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
           p_unidade_id: unidadeId,
-          p_valor_peca: valorGSPN
+          p_tipo_orcamento: tipoOrcamento,
+          p_valor: valorGSPN
         });
 
-        if (markupData && markupData.percentual) {
-          const valorComMarkup = valorGSPN * (1 + markupData.percentual / 100);
+        if (markupData && markupData.length > 0 && markupData[0].valor) {
+          const valorComMarkup = valorGSPN * (1 + markupData[0].valor / 100);
           setNovaPecaValorComMarkup(valorComMarkup);
         } else {
           setNovaPecaValorComMarkup(null);
@@ -767,7 +771,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     };
 
     calcularMarkup();
-  }, [novaPecaValor, tipoOS, unidadeId]);
+  }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento]);
 
   const loadComentarios = async () => {
     if (!osId) return;
@@ -852,6 +856,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           unidade_id: unidadeId,
           tipo_os: tipoOS,
           tipo_atendimento: tipoAtendimento,
+          tipo_orcamento: tipoOrcamento,
           numero_os_samsung: numeroOSSamsung || null,
           cliente_nome: clienteNome,
           cliente_cpf_cnpj: clienteCPF || null,
@@ -1835,7 +1840,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
                   Informações Básicas
                 </h3>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <div>
                     <label className="text-xs text-gray-400 uppercase block mb-2">
                       Unidade *
@@ -1864,7 +1869,21 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       <option value="IH">IH - In Home</option>
                     </select>
                   </div>
-                  <div className="col-span-2">
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Tipo Orçamento *
+                    </label>
+                    <select
+                      value={tipoOrcamento}
+                      onChange={(e) => setTipoOrcamento(e.target.value as 'normal' | 'garantia' | 'cortesia')}
+                      className="neon-input w-full"
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="garantia">Garantia</option>
+                      <option value="cortesia">Cortesia</option>
+                    </select>
+                  </div>
+                  <div className="col-span-3">
                     <label className="text-xs text-gray-400 uppercase block mb-2">
                       Número OS Samsung *
                     </label>
