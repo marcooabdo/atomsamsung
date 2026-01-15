@@ -63,6 +63,8 @@ type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | '
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP' }: OSLPModalProps) {
   const { usuario } = useAuth();
+  const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
+  const [currentMode, setCurrentMode] = useState<'create' | 'view'>(mode);
   const [os, setOS] = useState<OS | null>(null);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
@@ -72,7 +74,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [checklist, setChecklist] = useState<any[]>([]);
   const [novoComentario, setNovoComentario] = useState('');
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('dados');
-  const [loading, setLoading] = useState(mode === 'view');
+  const [loading, setLoading] = useState(currentMode === 'view');
   const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);
   const [mostrarModalConversao, setMostrarModalConversao] = useState(false);
   const [motivoConversao, setMotivoConversao] = useState('');
@@ -190,12 +192,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   }, [currentJob?.is_running, currentJob?.created_at, currentJob?.finished_at]);
 
   useEffect(() => {
-    if (mode === 'create') {
+    if (currentMode === 'create') {
       loadUnidades();
       if (usuario?.unidade_id) {
         setUnidadeId(usuario.unidade_id);
       }
-    } else if (osId) {
+    } else if (currentOsId) {
       loadOS();
       loadPecas();
       loadRequisicoes();
@@ -204,7 +206,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       loadComentarios();
       loadAnexos();
     }
-  }, [osId, mode]);
+  }, [currentOsId, currentMode]);
 
   // Debounce para buscar sugestões
   useEffect(() => {
@@ -221,7 +223,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   }, [novaPecaCodigo, unidadeId]);
 
   useEffect(() => {
-    if (mode === 'view' && osId) {
+    if (currentMode === 'view' && currentOsId) {
       loadCurrentJob();
 
       const channel = supabase
@@ -230,7 +232,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           event: '*',
           schema: 'public',
           table: 'jobs',
-          filter: `os_id=eq.${osId}`
+          filter: `os_id=eq.${currentOsId}`
         }, (payload) => {
           loadCurrentJob();
         })
@@ -241,7 +243,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         supabase.removeChannel(channel);
       };
     }
-  }, [osId, mode]);
+  }, [currentOsId, currentMode]);
 
   useEffect(() => {
     if (currentJob?.is_running) {
@@ -264,15 +266,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   }, [currentJob?.is_running]);
 
   const loadCurrentJob = async () => {
-    if (!osId) {
+    if (!currentOsId) {
       return;
     }
 
 
-    const { data, error } = await supabase
+    const { data, error} = await supabase
       .from('jobs')
       .select('*')
-      .eq('os_id', osId)
+      .eq('os_id', currentOsId)
       .eq('modulo', 'pipeline_operacional')
       .order('created_at', { ascending: false })
       .limit(1)
@@ -352,7 +354,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           const { data: job, error } = await supabase
             .from('jobs')
             .select('*')
-            .eq('os_id', osId)
+            .eq('os_id', currentOsId)
             .eq('modulo', 'pipeline_operacional')
             .order('created_at', { ascending: false })
             .limit(1)
@@ -500,7 +502,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadOS = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     try {
       const { data, error } = await supabase
         .from('os')
@@ -509,7 +511,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           unidade:unidades!os_unidade_id_fkey(nome),
           cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao)
         `)
-        .eq('id', osId)
+        .eq('id', currentOsId)
         .single();
 
       if (error) throw error;
@@ -521,17 +523,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadPecas = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const [osPecasResult, cotacaoPecasResult] = await Promise.all([
       supabase
         .from('os_pecas')
         .select('*')
-        .eq('os_id', osId)
+        .eq('os_id', currentOsId)
         .order('created_at', { ascending: true }),
       supabase
         .from('cotacoes_pecas')
         .select('*')
-        .eq('os_id', osId)
+        .eq('os_id', currentOsId)
         .order('created_at', { ascending: true })
     ]);
 
@@ -578,11 +580,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadRequisicoes = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const { data } = await supabase
       .from('requisicoes_pecas')
       .select('*')
-      .eq('os_id', osId)
+      .eq('os_id', currentOsId)
       .neq('status', 'cancelada')
       .order('created_at', { ascending: false });
 
@@ -599,18 +601,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadServicos = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const { data } = await supabase
       .from('os_servicos')
       .select('*')
-      .eq('os_id', osId)
+      .eq('os_id', currentOsId)
       .order('created_at', { ascending: true});
 
     setServicos(data || []);
   };
 
   const loadServicosCadastrados = async () => {
-    const unidadeParaBusca = mode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
+    const unidadeParaBusca = currentMode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
     if (!unidadeParaBusca) return;
 
     const { data } = await supabase
@@ -630,7 +632,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
 
     try {
-      if (mode === 'view' && osId) {
+      if (currentMode === 'view' && currentOsId) {
         // Modo view - adicionar diretamente no banco
         await supabase.from('os_servicos').insert({
           os_id: osId,
@@ -661,7 +663,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
 
     try {
-      const unidadeParaBusca = mode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
+      const unidadeParaBusca = currentMode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
       if (!unidadeParaBusca) {
         setSugestoesPecas([]);
         return;
@@ -703,8 +705,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             .maybeSingle();
 
           // Buscar markup ativo
-          const tipoOSAtual = mode === 'view' ? os?.tipo_os : tipoOS;
-          const tipoOrcamentoAtual = mode === 'view' ? os?.tipo_orcamento : tipoOrcamento;
+          const tipoOSAtual = currentMode === 'view' ? os?.tipo_os : tipoOS;
+          const tipoOrcamentoAtual = currentMode === 'view' ? os?.tipo_orcamento : tipoOrcamento;
           let valorComMarkup = pedido?.valor_estimado || null;
           if (valorComMarkup && tipoOSAtual === 'OW' && tipoOrcamentoAtual) {
             const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
@@ -733,11 +735,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadChecklist = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const { data } = await supabase
       .from('os_checklist')
       .select('*, concluido_por:usuarios(nome)')
-      .eq('os_id', osId)
+      .eq('os_id', currentOsId)
       .order('ordem', { ascending: true });
 
     setChecklist(data || []);
@@ -774,18 +776,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento]);
 
   const loadComentarios = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const { data: osData } = await supabase
       .from('os')
       .select('cotacao_id')
-      .eq('id', osId)
+      .eq('id', currentOsId)
       .maybeSingle();
 
     const [osComentariosResult, cotacaoComentariosResult] = await Promise.all([
       supabase
         .from('os_comentarios')
         .select('*')
-        .eq('os_id', osId)
+        .eq('os_id', currentOsId)
         .order('created_at', { ascending: false }),
       osData?.cotacao_id
         ? supabase
@@ -814,11 +816,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadAnexos = async () => {
-    if (!osId) return;
+    if (!currentOsId) return;
     const { data } = await supabase
       .from('os_anexos')
       .select('*, usuario:usuarios(nome)')
-      .eq('os_id', osId)
+      .eq('os_id', currentOsId)
       .order('created_at', { ascending: false });
 
     setAnexos(data || []);
@@ -948,38 +950,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }
       }
 
-      // Usar checklist temporário ou checklist padrão
-      let checklistInsert: any[] = [];
-      if (checklistTemporario.length > 0) {
-        checklistInsert = checklistTemporario.map((item, index) => ({
-          os_id: novaOS.id,
-          item: item.descricao,
-          ordem: index + 1,
-          concluido: item.concluido
-        }));
-      } else {
-        const checklistPadrao = [
-          'Verificar número de série do aparelho',
-          'Conferir IMEI com sistema Samsung',
-          'Testar funcionamento geral do aparelho',
-          'Fotografar defeito relatado',
-          'Embalar aparelho adequadamente'
-        ];
-
-        checklistInsert = checklistPadrao.map((item, index) => ({
-          os_id: novaOS.id,
-          item: item,
-          ordem: index + 1,
-          concluido: false
-        }));
-      }
-
-      const { error: checklistError } = await supabase
-        .from('os_checklist')
-        .insert(checklistInsert);
-
-      if (checklistError) throw checklistError;
-
       if (anexosTemporarios.length > 0) {
         for (const anexo of anexosTemporarios) {
           const fileExt = anexo.file.name.split('.').pop();
@@ -1040,9 +1010,64 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (comentariosError) throw comentariosError;
 
+      // Vincular automaticamente checklists ADM baseado no tipo de OS e atendimento
+      const { data: checklistsAdm } = await supabase
+        .from('checklist_templates')
+        .select('*')
+        .eq('tipo_checklist', 'ADM')
+        .eq('ativo', true)
+        .or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
+
+      if (checklistsAdm && checklistsAdm.length > 0) {
+        const checklistsParaVincular = checklistsAdm.filter(template => {
+          // Se tem filtros de tipo_os, verificar se a OS atual está incluída
+          if (template.tipo_os && Array.isArray(template.tipo_os) && template.tipo_os.length > 0) {
+            if (!template.tipo_os.includes(tipoOS)) {
+              return false;
+            }
+          }
+
+          // Se tem filtros de tipos_atendimento, verificar se o atendimento atual está incluído
+          if (template.tipos_atendimento && Array.isArray(template.tipos_atendimento) && template.tipos_atendimento.length > 0) {
+            if (!template.tipos_atendimento.includes(tipoAtendimento)) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+
+        if (checklistsParaVincular.length > 0) {
+          const vinculos = checklistsParaVincular.map(template => ({
+            os_id: novaOS.id,
+            checklist_template_id: template.id,
+            vinculado_automaticamente: true,
+            vinculado_por: usuario?.id,
+            respostas: []
+          }));
+
+          await supabase.from('os_checklist_vinculados').insert(vinculos);
+
+          // Adicionar comentário informando sobre checklists vinculados
+          if (checklistsParaVincular.length > 0) {
+            await supabase.from('os_comentarios').insert({
+              os_id: novaOS.id,
+              usuario_id: usuario?.id,
+              comentario: `Sistema vinculou automaticamente ${checklistsParaVincular.length} checklist(s) ADM: ${checklistsParaVincular.map(c => c.nome).join(', ')}`,
+              is_system: true
+            });
+          }
+        }
+      }
+
       alert(`OS ${tipoOS} criada com sucesso!`);
+
+      // Mudar para modo de visualização e carregar a OS criada
+      setCurrentOsId(novaOS.id);
+      setCurrentMode('view');
+      setAbaAtiva('checklist');
+
       onReload?.();
-      onClose();
     } catch (error) {
       alert(`Erro ao criar OS ${tipoOS}`);
     } finally {
@@ -1087,7 +1112,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             coluna_kanban: 'aguardando_peca',
             updated_at: new Date().toISOString()
           })
-          .eq('id', osId);
+          .eq('id', currentOsId);
 
         if (updateError) {
         }
@@ -1155,7 +1180,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             coluna_kanban: 'aguardando_peca',
             updated_at: new Date().toISOString()
           })
-          .eq('id', osId);
+          .eq('id', currentOsId);
       }
 
       await supabase.from('os_comentarios').insert({
@@ -1356,7 +1381,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const handleAdicionarComentario = async () => {
-    if (!novoComentario.trim() || !osId) return;
+    if (!novoComentario.trim() || !currentOsId) return;
 
     try {
       await supabase.from('os_comentarios').insert({
@@ -1389,7 +1414,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const handleUploadAnexo = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0] || !osId) return;
+    if (!e.target.files?.[0] || !currentOsId) return;
 
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
@@ -1435,7 +1460,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       const { error: updateError } = await supabase
         .from('os')
         .update({ tipo_os: 'OW' })
-        .eq('id', osId);
+        .eq('id', currentOsId);
 
       if (updateError) throw updateError;
 
@@ -1538,7 +1563,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
-  if (loading && mode === 'view') {
+  if (loading && currentMode === 'view') {
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
         <div className="futuristic-loader"></div>
@@ -1555,7 +1580,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           <div>
             <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
               {tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia'}
-              {mode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
+              {currentMode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
             </h2>
             {os && (
               <p className="text-sm text-gray-400 mt-1">
@@ -1564,7 +1589,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             )}
           </div>
           <div className="flex items-center gap-2">
-            {mode === 'view' && os && (
+            {currentMode === 'view' && os && (
               <div className="relative">
                 <button
                   onClick={() => setMostrarMoverPara(!mostrarMoverPara)}
@@ -1624,7 +1649,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
             )}
 
-            {mode === 'view' && os?.numero_os_samsung && (
+            {currentMode === 'view' && os?.numero_os_samsung && (
               <button
                 onClick={syncGSPN}
                 disabled={syncingGSPN || currentJob?.is_running}
@@ -1660,7 +1685,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </div>
         </div>
 
-        {mode === 'view' && currentJob && (
+        {currentMode === 'view' && currentJob && (
           <div className="px-6 pt-4 pb-4">
             <div
               className="p-3 rounded-lg border"
@@ -1772,7 +1797,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </div>
         )}
 
-        {mode === 'create' ? (
+        {currentMode === 'create' ? (
           <>
             <div className="flex border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
               {[
@@ -2363,96 +2388,22 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
             )}
 
-            {abaAtiva === 'checklist' && (
+            {abaAtiva === 'checklist' && currentMode === 'create' && (
               <div className="space-y-6">
-                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4">
-                  <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider flex items-center gap-2">
-                    <CheckSquare className="w-4 h-4" />
-                    Checklist do Reparo {tipoOS}
+                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-6 text-center">
+                  <CheckSquare className="w-16 h-16 text-[#39FF14] mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-[#39FF14] uppercase tracking-wider mb-2">
+                    Checklists Administrativos
                   </h3>
-                  <p className="text-xs text-gray-400 mt-2">
-                    Itens de verificação para garantir a qualidade do serviço
+                  <p className="text-sm text-gray-300 mb-4">
+                    Os checklists ADM serão vinculados automaticamente após você criar a OS.
                   </p>
-                </div>
-
-                <div className="premium-card p-4">
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={novoItemChecklist}
-                      onChange={(e) => setNovoItemChecklist(e.target.value)}
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter' && novoItemChecklist.trim()) {
-                          setChecklistTemporario([...checklistTemporario, {
-                            descricao: novoItemChecklist.trim(),
-                            concluido: false
-                          }]);
-                          setNovoItemChecklist('');
-                        }
-                      }}
-                      className="neon-input flex-1"
-                      placeholder="Digite o item do checklist..."
-                    />
-                    <button
-                      onClick={() => {
-                        if (novoItemChecklist.trim()) {
-                          setChecklistTemporario([...checklistTemporario, {
-                            descricao: novoItemChecklist.trim(),
-                            concluido: false
-                          }]);
-                          setNovoItemChecklist('');
-                        }
-                      }}
-                      className="neon-button px-6 py-2"
-                      style={{
-                        backgroundColor: '#39FF1420',
-                        borderColor: '#39FF14',
-                        color: '#39FF14'
-                      }}
-                    >
-                      ADICIONAR
-                    </button>
-                  </div>
-                </div>
-
-                <div>
-                  {checklistTemporario.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">Nenhum item adicionado ainda</p>
-                  ) : (
-                    <div className="space-y-2">
-                      {checklistTemporario.map((item, index) => (
-                        <div key={index} className="premium-card p-3">
-                          <div className="flex items-center gap-3">
-                            <button
-                              onClick={() => {
-                                const novosItens = [...checklistTemporario];
-                                novosItens[index].concluido = !novosItens[index].concluido;
-                                setChecklistTemporario(novosItens);
-                              }}
-                              className="flex-shrink-0"
-                            >
-                              {item.concluido ? (
-                                <CheckSquare className="w-5 h-5" style={{ color: '#39FF14' }} />
-                              ) : (
-                                <div className="w-5 h-5 border-2 rounded" style={{ borderColor: '#39FF14' }} />
-                              )}
-                            </button>
-                            <span className={`flex-1 text-sm ${item.concluido ? 'line-through text-gray-500' : 'text-gray-300'}`}>
-                              {item.descricao}
-                            </span>
-                            <button
-                              onClick={() => {
-                                setChecklistTemporario(checklistTemporario.filter((_, i) => i !== index));
-                              }}
-                              className="flex-shrink-0 text-red-500 hover:text-red-400"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  <p className="text-xs text-gray-400">
+                    Baseado no tipo de OS ({tipoOS}) e tipo de atendimento ({tipoAtendimento}), o sistema vai vincular automaticamente todos os checklists compatíveis.
+                  </p>
+                  <p className="text-xs text-[#39FF14] mt-4">
+                    Depois de criar a OS, você poderá adicionar mais checklists manualmente nesta aba.
+                  </p>
                 </div>
               </div>
             )}
@@ -3757,7 +3708,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </>
         )}
 
-        {mode === 'create' && (
+        {currentMode === 'create' && (
           <div className="p-6 border-t" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex gap-4 text-xs text-gray-400">
