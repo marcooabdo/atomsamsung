@@ -134,6 +134,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     count: number;
   }>>([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
+  const [mostrarModalServico, setMostrarModalServico] = useState(false);
+  const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
+  const [servicoSelecionado, setServicoSelecionado] = useState<any>(null);
+  const [quantidadeServico, setQuantidadeServico] = useState(1);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -186,13 +190,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   // Debounce para buscar sugestões
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (novaPecaCodigo) {
+      if (novaPecaCodigo && novaPecaCodigo.length >= 2) {
         buscarSugestoesPecas(novaPecaCodigo);
+      } else {
+        setSugestoesPecas([]);
+        setMostrarSugestoes(false);
       }
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [novaPecaCodigo]);
+  }, [novaPecaCodigo, unidadeId]);
 
   useEffect(() => {
     if (mode === 'view' && osId) {
@@ -581,6 +588,50 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       .order('created_at', { ascending: true});
 
     setServicos(data || []);
+  };
+
+  const loadServicosCadastrados = async () => {
+    const unidadeParaBusca = mode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
+    if (!unidadeParaBusca) return;
+
+    const { data } = await supabase
+      .from('servicos')
+      .select('*')
+      .or(`unidade_id.eq.${unidadeParaBusca},unidade_id.is.null`)
+      .eq('ativo', true)
+      .order('codigo', { ascending: true });
+
+    setServicosCadastrados(data || []);
+  };
+
+  const handleAdicionarServico = async () => {
+    if (!servicoSelecionado) {
+      alert('Selecione um serviço');
+      return;
+    }
+
+    try {
+      if (mode === 'view' && osId) {
+        // Modo view - adicionar diretamente no banco
+        await supabase.from('os_servicos').insert({
+          os_id: osId,
+          codigo_servico: servicoSelecionado.codigo,
+          descricao: servicoSelecionado.descricao,
+          quantidade: quantidadeServico,
+          valor_unitario: servicoSelecionado.valor,
+          valor_total: servicoSelecionado.valor * quantidadeServico
+        });
+
+        await loadServicos();
+        alert('Serviço adicionado com sucesso!');
+      }
+
+      setMostrarModalServico(false);
+      setServicoSelecionado(null);
+      setQuantidadeServico(1);
+    } catch (error) {
+      alert('Erro ao adicionar serviço');
+    }
   };
 
   const buscarSugestoesPecas = async (codigo: string) => {
@@ -1412,10 +1463,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   disabled={movendoOS}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(255,165,0,0.2) 0%, rgba(255,165,0,0.05) 100%)',
-                    border: '1px solid #FFA500',
-                    color: '#FFA500',
-                    boxShadow: '0 0 10px rgba(255,165,0,0.2)'
+                    background: os?.tipo_os === 'OW' ? 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)' : 'linear-gradient(135deg, rgba(255,165,0,0.2) 0%, rgba(255,165,0,0.05) 100%)',
+                    border: os?.tipo_os === 'OW' ? '1px solid #00D4FF' : '1px solid #FFA500',
+                    color: os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500',
+                    boxShadow: os?.tipo_os === 'OW' ? '0 0 10px rgba(0,212,255,0.2)' : '0 0 10px rgba(255,165,0,0.2)'
                   }}
                 >
                   <MoveHorizontal className="w-4 h-4" />
@@ -1425,9 +1476,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                 {mostrarMoverPara && (
                   <div className="absolute right-0 top-full mt-2 w-72 max-h-96 overflow-y-auto premium-card p-3 z-50 cyber-scrollbar">
-                    <div className="mb-3 pb-2 border-b border-[#FFA500]/20">
+                    <div className="mb-3 pb-2" style={{ borderBottom: `1px solid ${os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'}33` }}>
                       <p className="text-xs text-gray-400">Coluna Atual:</p>
-                      <p className="text-sm font-bold text-[#FFA500]">{colunaAtual?.label || 'N/A'}</p>
+                      <p className="text-sm font-bold" style={{ color: os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500' }}>{colunaAtual?.label || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
                       {COLUNAS_KANBAN.filter(c => c.id !== os.coluna_kanban).map((coluna) => (
@@ -1439,18 +1490,21 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             }
                           }}
                           disabled={movendoOS}
-                          className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[#FFA500]/10 disabled:opacity-50"
+                          className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all disabled:opacity-50"
                           style={{
                             color: '#fff',
                             border: '1px solid transparent'
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = '#FFA500';
-                            e.currentTarget.style.boxShadow = '0 0 10px rgba(255,165,0,0.2)';
+                            const cor = os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500';
+                            e.currentTarget.style.borderColor = cor;
+                            e.currentTarget.style.boxShadow = os?.tipo_os === 'OW' ? '0 0 10px rgba(0,212,255,0.2)' : '0 0 10px rgba(255,165,0,0.2)';
+                            e.currentTarget.style.backgroundColor = os?.tipo_os === 'OW' ? '#00D4FF10' : '#FFA50010';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = 'transparent';
                             e.currentTarget.style.boxShadow = 'none';
+                            e.currentTarget.style.backgroundColor = 'transparent';
                           }}
                         >
                           {coluna.label}
@@ -1613,35 +1667,53 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 ...(tipoAtendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setAbaAtiva(id as AbaAtiva)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
-                    abaAtiva === id
-                      ? 'bg-[#FFA500]/10 text-[#FFA500] border-b-2 border-[#FFA500]'
-                      : 'text-gray-400 hover:bg-[#FFA500]/5 hover:text-[#FFA500]'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                  {id === 'estoque' && requisicoesTemporarias.length > 0 && (
-                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
-                      {requisicoesTemporarias.length}
-                    </span>
-                  )}
-                  {id === 'anexos' && anexosTemporarios.length > 0 && (
-                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
-                      {anexosTemporarios.length}
-                    </span>
-                  )}
-                  {id === 'comentarios' && comentariosTemporarios.length > 0 && (
-                    <span className="ml-1 px-2 py-0.5 bg-[#FFA500] text-black rounded-full text-xs font-bold">
-                      {comentariosTemporarios.length}
-                    </span>
-                  )}
-                </button>
-              ))}
+              ].map(({ id, label, icon: Icon }) => {
+                const corPrimaria = tipoOS === 'OW' ? '#00D4FF' : '#FFA500';
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setAbaAtiva(id as AbaAtiva)}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
+                      abaAtiva === id ? '' : 'text-gray-400'
+                    }`}
+                    style={abaAtiva === id ? {
+                      backgroundColor: `${corPrimaria}1a`,
+                      color: corPrimaria,
+                      borderBottom: `2px solid ${corPrimaria}`
+                    } : {}}
+                    onMouseEnter={(e) => {
+                      if (abaAtiva !== id) {
+                        e.currentTarget.style.backgroundColor = `${corPrimaria}0d`;
+                        e.currentTarget.style.color = corPrimaria;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (abaAtiva !== id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#9CA3AF';
+                      }
+                    }}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                    {id === 'estoque' && requisicoesTemporarias.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 text-black rounded-full text-xs font-bold" style={{ backgroundColor: corPrimaria }}>
+                        {requisicoesTemporarias.length}
+                      </span>
+                    )}
+                    {id === 'anexos' && anexosTemporarios.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 text-black rounded-full text-xs font-bold" style={{ backgroundColor: corPrimaria }}>
+                        {anexosTemporarios.length}
+                      </span>
+                    )}
+                    {id === 'comentarios' && comentariosTemporarios.length > 0 && (
+                      <span className="ml-1 px-2 py-0.5 text-black rounded-full text-xs font-bold" style={{ backgroundColor: corPrimaria }}>
+                        {comentariosTemporarios.length}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
@@ -1985,20 +2057,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 <div className="flex-1 min-w-0">
                                   <p className="text-xs font-bold text-[#00D4FF] truncate">{peca.pn}</p>
                                   <p className="text-xs text-gray-400 mt-0.5 truncate">{peca.descricao}</p>
-                                  {tipoOS === 'OW' && peca.valor_com_markup && (
-                                    <p className="text-xs text-[#39FF14] mt-1 font-bold">
-                                      R$ {peca.valor_com_markup.toFixed(2)} (com markup)
-                                    </p>
-                                  )}
                                 </div>
                                 <div className="flex-shrink-0">
-                                  <span className="text-xs px-2 py-0.5 rounded" style={{
-                                    backgroundColor: peca.count > 0 ? '#39FF1420' : '#FF006420',
-                                    color: peca.count > 0 ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${peca.count > 0 ? '#39FF14' : '#FF0064'}40`
-                                  }}>
-                                    {peca.count} em estoque
-                                  </span>
+                                  {tipoOS === 'OW' && peca.valor_com_markup ? (
+                                    <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
+                                      backgroundColor: '#39FF1420',
+                                      color: '#39FF14',
+                                      border: '1px solid #39FF1440'
+                                    }}>
+                                      R$ {peca.valor_com_markup.toFixed(2)}
+                                    </span>
+                                  ) : (
+                                    <span className="text-xs px-2 py-0.5 rounded" style={{
+                                      backgroundColor: peca.count > 0 ? '#39FF1420' : '#FF006420',
+                                      color: peca.count > 0 ? '#39FF14' : '#FF0064',
+                                      border: `1px solid ${peca.count > 0 ? '#39FF14' : '#FF0064'}40`
+                                    }}>
+                                      {peca.count} disponível
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </button>
@@ -2026,9 +2103,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         <input
                           type="number"
                           min="1"
-                          value={novaPecaQuantidade}
-                          onChange={(e) => setNovaPecaQuantidade(Number(e.target.value))}
-                          className="neon-input w-20"
+                          max="1"
+                          value={1}
+                          readOnly
+                          className="neon-input w-20 bg-gray-800 cursor-not-allowed"
                         />
                         <button
                           onClick={() => {
@@ -2039,7 +2117,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             setRequisicoesTemporarias([...requisicoesTemporarias, {
                               codigo: novaPecaCodigo,
                               descricao: novaPecaDescricao,
-                              quantidade: novaPecaQuantidade
+                              quantidade: 1
                             }]);
                             setNovaPecaCodigo('');
                             setNovaPecaDescricao('');
@@ -2056,6 +2134,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         </button>
                       </div>
                     </div>
+                  </div>
+                  <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: '#00D4FF' }}>
+                    <AlertCircle className="w-4 h-4" />
+                    <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                   </div>
                 </div>
 
@@ -2140,11 +2222,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="text-center py-12">
                   <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                   <p className="text-gray-500 text-sm mb-4">Nenhum serviço adicionado</p>
-                  <button className="neon-button px-6 py-2" style={{
-                    backgroundColor: '#00D4FF20',
-                    borderColor: '#00D4FF',
-                    color: '#00D4FF'
-                  }}>
+                  <button
+                    onClick={() => {
+                      loadServicosCadastrados();
+                      setMostrarModalServico(true);
+                    }}
+                    className="neon-button px-6 py-2"
+                    style={{
+                      backgroundColor: '#00D4FF20',
+                      borderColor: '#00D4FF',
+                      color: '#00D4FF'
+                    }}
+                  >
                     ADICIONAR SERVIÇO
                   </button>
                 </div>
@@ -2297,7 +2386,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </>
         ) : (
           <>
-            <div className="flex border-b border-[#FFA500]/20">
+            <div className="flex border-b" style={{ borderColor: `${os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'}33` }}>
               {[
                 { id: 'dados', label: 'Dados OS/Cliente', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
@@ -2307,20 +2396,38 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 ...(os?.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
-              ].map(({ id, label, icon: Icon }) => (
-                <button
-                  key={id}
-                  onClick={() => setAbaAtiva(id as AbaAtiva)}
-                  className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
-                    abaAtiva === id
-                      ? 'bg-[#FFA500]/10 text-[#FFA500] border-b-2 border-[#FFA500]'
-                      : 'text-gray-400 hover:bg-[#FFA500]/5 hover:text-[#FFA500]'
-                  }`}
-                >
-                  <Icon className="w-4 h-4" />
-                  {label}
-                </button>
-              ))}
+              ].map(({ id, label, icon: Icon }) => {
+                const corPrimaria = os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500';
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setAbaAtiva(id as AbaAtiva)}
+                    className={`flex-1 flex items-center justify-center gap-2 px-4 py-4 text-xs font-bold uppercase tracking-wider transition-all ${
+                      abaAtiva === id ? '' : 'text-gray-400'
+                    }`}
+                    style={abaAtiva === id ? {
+                      backgroundColor: `${corPrimaria}1a`,
+                      color: corPrimaria,
+                      borderBottom: `2px solid ${corPrimaria}`
+                    } : {}}
+                    onMouseEnter={(e) => {
+                      if (abaAtiva !== id) {
+                        e.currentTarget.style.backgroundColor = `${corPrimaria}0d`;
+                        e.currentTarget.style.color = corPrimaria;
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (abaAtiva !== id) {
+                        e.currentTarget.style.backgroundColor = 'transparent';
+                        e.currentTarget.style.color = '#9CA3AF';
+                      }
+                    }}
+                  >
+                    <Icon className="w-4 h-4" />
+                    {label}
+                  </button>
+                );
+              })}
             </div>
 
             <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
@@ -2598,7 +2705,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 onClick={() => {
                                   setNovaPecaCodigo(sugestao.pn);
                                   setNovaPecaDescricao(sugestao.descricao);
-                                  setNovaPecaValor((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
+                                  if (os?.tipo_os === 'OW' && sugestao.valor_com_markup) {
+                                    setNovaPecaValor(sugestao.valor_com_markup.toFixed(2));
+                                  } else {
+                                    setNovaPecaValor((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
+                                  }
                                   setMostrarSugestoes(false);
                                 }}
                                 className="p-3 hover:bg-[#00D4FF]/10 cursor-pointer border-b border-gray-800 last:border-0"
@@ -2607,20 +2718,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   <div className="flex-1">
                                     <p className="text-sm font-bold text-[#00D4FF]">{sugestao.pn}</p>
                                     <p className="text-xs text-gray-400 mt-1">{sugestao.descricao}</p>
-                                    <div className="flex items-center gap-3 mt-2">
-                                      <span className="text-[10px] text-gray-500">
-                                        GSPN/NF: R$ {sugestao.valor_com_impostos?.toFixed(2) || '0.00'}
-                                      </span>
-                                      {sugestao.valor_corrigido && (
-                                        <span className="text-[10px] text-[#39FF14]">
-                                          Corrigido: R$ {sugestao.valor_corrigido.toFixed(2)}
-                                        </span>
-                                      )}
-                                    </div>
                                   </div>
-                                  <span className="text-xs text-gray-600">
-                                    {sugestao.count} em estoque
-                                  </span>
+                                  <div className="flex-shrink-0">
+                                    {os?.tipo_os === 'OW' && sugestao.valor_com_markup ? (
+                                      <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
+                                        backgroundColor: '#39FF1420',
+                                        color: '#39FF14',
+                                        border: '1px solid #39FF1440'
+                                      }}>
+                                        R$ {sugestao.valor_com_markup.toFixed(2)}
+                                      </span>
+                                    ) : (
+                                      <span className="text-xs px-2 py-0.5 rounded" style={{
+                                        backgroundColor: sugestao.count > 0 ? '#39FF1420' : '#FF006420',
+                                        color: sugestao.count > 0 ? '#39FF14' : '#FF0064',
+                                        border: `1px solid ${sugestao.count > 0 ? '#39FF14' : '#FF0064'}40`
+                                      }}>
+                                        {sugestao.count} disponível
+                                      </span>
+                                    )}
+                                  </div>
                                 </div>
                               </div>
                             ))}
@@ -2661,9 +2778,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           <input
                             type="number"
                             min="1"
-                            value={novaPecaQuantidade}
-                            onChange={(e) => setNovaPecaQuantidade(Number(e.target.value))}
-                            className="neon-input w-20"
+                            max="1"
+                            value={1}
+                            readOnly
+                            className="neon-input w-20 bg-gray-800 cursor-not-allowed"
                           />
                           <button
                             onClick={async () => {
@@ -2680,7 +2798,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   p_cotacao_peca_id: null,
                                   p_codigo_peca: novaPecaCodigo,
                                   p_descricao: novaPecaDescricao,
-                                  p_quantidade_requisitada: novaPecaQuantidade,
+                                  p_quantidade_requisitada: 1,
                                   p_valor_peca: valorNumerico,
                                   p_numero_os_samsung: os?.numero_os_samsung || null
                                 });
@@ -2692,7 +2810,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 await supabase.from('os_comentarios').insert({
                                   os_id: osId,
                                   usuario_id: usuario?.id,
-                                  comentario: `✚ Requisição adicionada: ${novaPecaDescricao} (${novaPecaCodigo}) - Qtd: ${novaPecaQuantidade}${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
+                                  comentario: `✚ Requisição adicionada: ${novaPecaDescricao} (${novaPecaCodigo}) - Qtd: 1${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
                                   is_system: true
                                 });
 
@@ -2720,6 +2838,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           </button>
                         </div>
                       </div>
+                    </div>
+                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: '#00D4FF' }}>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                     </div>
                   </div>
 
@@ -3028,7 +3150,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
               {abaAtiva === 'servicos' && os && os.tipo_os === 'OW' && (
                 <div className="space-y-4">
-                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Serviços</h3>
+                    <button
+                      onClick={() => {
+                        loadServicosCadastrados();
+                        setMostrarModalServico(true);
+                      }}
+                      className="neon-button px-4 py-2 text-xs"
+                      style={{
+                        backgroundColor: '#00D4FF20',
+                        borderColor: '#00D4FF',
+                        color: '#00D4FF'
+                      }}
+                    >
+                      ADICIONAR SERVIÇO
+                    </button>
+                  </div>
 
                   {servicos.length === 0 ? (
                     <div className="text-center py-12">
@@ -3389,6 +3527,86 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           }}
           tipoOS={os?.tipo_os || 'LP'}
         />
+      )}
+
+      {mostrarModalServico && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/80" onClick={() => setMostrarModalServico(false)}></div>
+          <div className="relative bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-lg p-6 max-w-lg w-full mx-4" style={{
+            boxShadow: '0 0 30px rgba(0,212,255,0.3)'
+          }}>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-[#00D4FF]">Adicionar Serviço</h3>
+              <button onClick={() => setMostrarModalServico(false)} className="text-gray-400 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="text-xs text-gray-400 uppercase block mb-2">Serviço *</label>
+                <select
+                  value={servicoSelecionado?.id || ''}
+                  onChange={(e) => {
+                    const servico = servicosCadastrados.find(s => s.id === e.target.value);
+                    setServicoSelecionado(servico);
+                  }}
+                  className="neon-input w-full"
+                >
+                  <option value="">Selecione um serviço...</option>
+                  {servicosCadastrados.map((servico) => (
+                    <option key={servico.id} value={servico.id}>
+                      {servico.codigo} - {servico.descricao} - R$ {servico.valor?.toFixed(2)}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-xs text-gray-400 uppercase block mb-2">Quantidade *</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={quantidadeServico}
+                  onChange={(e) => setQuantidadeServico(Number(e.target.value))}
+                  className="neon-input w-full"
+                />
+              </div>
+
+              {servicoSelecionado && (
+                <div className="premium-card p-4 bg-[#00D4FF]/5">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-gray-400">Total:</span>
+                    <span className="text-lg font-bold text-[#39FF14]">
+                      R$ {(servicoSelecionado.valor * quantidadeServico).toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setMostrarModalServico(false)}
+                  className="flex-1 px-4 py-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  CANCELAR
+                </button>
+                <button
+                  onClick={handleAdicionarServico}
+                  disabled={!servicoSelecionado}
+                  className="flex-1 neon-button px-4 py-2 disabled:opacity-50"
+                  style={{
+                    backgroundColor: '#00D4FF20',
+                    borderColor: '#00D4FF',
+                    color: '#00D4FF'
+                  }}
+                >
+                  ADICIONAR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
