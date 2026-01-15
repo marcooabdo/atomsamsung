@@ -2465,7 +2465,52 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             {abaAtiva === 'pagamento' && tipoOS === 'OW' && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Pagamento Antecipado</h3>
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Informações de Pagamento</h3>
+
+                {(() => {
+                  const valorTotal = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
+                  const valorPago = pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0);
+                  const saldoRestante = valorTotal - valorPago;
+
+                  return (
+                    <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5 mb-6">
+                      <div className="grid grid-cols-3 gap-6 mb-4">
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Valor Total</p>
+                          <p className="text-2xl font-bold text-[#00D4FF]">
+                            R$ {valorTotal.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Valor Pago</p>
+                          <p className="text-2xl font-bold text-[#39FF14]">
+                            R$ {valorPago.toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Saldo Restante</p>
+                          <p className="text-2xl font-bold text-[#FFBF00]">
+                            R$ {saldoRestante.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <span className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
+                          saldoRestante === 0 && valorTotal > 0 ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
+                          valorPago > 0 && saldoRestante > 0 ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
+                          'bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40'
+                        }`}>
+                          {saldoRestante === 0 && valorTotal > 0 ? 'Pago 100%' :
+                           valorPago > 0 && saldoRestante > 0 ? 'Pago Parcial' :
+                           'Pendente'}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Adicionar Pagamento</h3>
 
                 <div className="premium-card p-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -2589,19 +2634,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                   )}
                 </div>
-
-                {pagamentosTemporarios.length > 0 && (
-                  <div className="premium-card p-4 border-l-4" style={{
-                    borderLeftColor: '#39FF14'
-                  }}>
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold" style={{ color: '#39FF14' }}>Total de Pagamentos:</span>
-                      <span className="text-lg font-bold font-mono" style={{ color: '#39FF14' }}>
-                        R$ {pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}
-                      </span>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
