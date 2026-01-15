@@ -1555,10 +1555,17 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         comentario: `OS criada para DIAGNOSTICO. Tecnico deve analisar e adicionar pecas necessarias.`
       });
 
+      const osInfo = os.numero_os_interna
+        ? `OS Interna ${os.numero_os_interna} criada`
+        : 'OS criada';
+      const samsungInfo = os.numero_os_samsung
+        ? ` (OS Samsung: ${os.numero_os_samsung})`
+        : '';
+
       alert(
         'ENVIADO PARA DIAGNOSTICO!\n\n' +
-        `OS #${os.numero_os_samsung || 'N/A'} criada no Kanban na coluna DIAGNOSTICO.\n\n` +
-        'O tecnico ira analisar o aparelho e adicionar as pecas.'
+        `${osInfo}${samsungInfo}\n\n` +
+        'O técnico irá analisar o aparelho e adicionar as peças necessárias.'
       );
 
       onSave();
