@@ -124,6 +124,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     valor: number;
     requisitada: boolean;
   }>>([]);
+  const [servicosAdicionados, setServicosAdicionados] = useState<Array<{
+    codigo: string;
+    descricao: string;
+    valor_unitario: number;
+    quantidade: number;
+  }>>([]);
   const [pagamentosTemporarios, setPagamentosTemporarios] = useState<Array<{
     forma_pagamento: string;
     valor: number;
@@ -164,6 +170,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
   const [servicoSelecionado, setServicoSelecionado] = useState<any>(null);
   const [quantidadeServico, setQuantidadeServico] = useState(1);
+  const [buscaServico, setBuscaServico] = useState('');
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -239,6 +246,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
     return () => clearTimeout(timer);
   }, [novaPecaCodigo, unidadeId]);
+
+  // Carregar serviços quando a aba de serviços é aberta no modo criar
+  useEffect(() => {
+    if (currentMode === 'create' && abaAtiva === 'servicos' && tipoOS === 'OW' && unidadeId) {
+      loadServicosCadastrados();
+    }
+  }, [currentMode, abaAtiva, tipoOS, unidadeId]);
 
   useEffect(() => {
     if (currentMode === 'view' && currentOsId) {
@@ -924,6 +938,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
         if (pecasError) {
           console.error('Erro ao salvar peças:', pecasError);
+        }
+      }
+
+      // Salvar serviços adicionados
+      if (servicosAdicionados.length > 0) {
+        const servicosInsert = servicosAdicionados.map(servico => ({
+          os_id: novaOS.id,
+          codigo_servico: servico.codigo,
+          descricao: servico.descricao,
+          quantidade: servico.quantidade,
+          valor_unitario: servico.valor_unitario,
+          valor_total: servico.valor_unitario * servico.quantidade
+        }));
+
+        const { error: servicosError } = await supabase
+          .from('os_servicos')
+          .insert(servicosInsert);
+
+        if (servicosError) {
+          console.error('Erro ao salvar serviços:', servicosError);
         }
       }
 
@@ -2480,7 +2514,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             {abaAtiva === 'pagamento' && tipoOS === 'OW' && currentMode === 'create' && (
               <div className="space-y-4">
                 {(() => {
-                  const valorTotal = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
+                  const valorPecas = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
+                  const valorServicos = servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0);
+                  const valorTotal = valorPecas + valorServicos;
                   const valorPago = pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0);
                   const saldoRestante = valorTotal - valorPago;
 
@@ -2688,6 +2724,165 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             )}
 
             {abaAtiva === 'servicos' && tipoOS === 'OW' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Serviços Executados</h3>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      placeholder="Buscar serviço..."
+                      value={buscaServico}
+                      onChange={(e) => setBuscaServico(e.target.value)}
+                      className="neon-input text-sm px-3 py-2 w-64"
+                    />
+                  </div>
+                </div>
+
+                {/* Grid de Serviços Disponíveis */}
+                <div className="grid grid-cols-2 gap-3 mb-6 max-h-96 overflow-y-auto cyber-scrollbar">
+                  {(() => {
+                    const servicosFiltrados = servicosCadastrados.filter(servico =>
+                      servico.codigo.toLowerCase().includes(buscaServico.toLowerCase()) ||
+                      servico.descricao.toLowerCase().includes(buscaServico.toLowerCase())
+                    );
+
+                    if (servicosFiltrados.length === 0) {
+                      return (
+                        <div className="col-span-2 text-center py-8 text-gray-500">
+                          {buscaServico ? 'Nenhum serviço encontrado' : 'Carregando serviços...'}
+                        </div>
+                      );
+                    }
+
+                    return servicosFiltrados.map((servico) => (
+                      <div
+                        key={servico.id}
+                        onClick={() => {
+                          const servicoExistente = servicosAdicionados.find(s => s.codigo === servico.codigo);
+                          if (servicoExistente) {
+                            setServicosAdicionados(servicosAdicionados.map(s =>
+                              s.codigo === servico.codigo
+                                ? { ...s, quantidade: s.quantidade + 1 }
+                                : s
+                            ));
+                          } else {
+                            setServicosAdicionados([...servicosAdicionados, {
+                              codigo: servico.codigo,
+                              descricao: servico.descricao,
+                              valor_unitario: servico.valor || 0,
+                              quantidade: 1
+                            }]);
+                          }
+                          setBuscaServico('');
+                        }}
+                        className="premium-card p-3 cursor-pointer transition-all hover:scale-[1.02]"
+                        style={{
+                          borderColor: '#00D4FF40',
+                          backgroundColor: 'rgba(0,212,255,0.05)'
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-[#00D4FF] mb-1">{servico.codigo}</p>
+                            <p className="text-xs text-gray-300 line-clamp-2">{servico.descricao}</p>
+                          </div>
+                          <div className="flex-shrink-0 text-right">
+                            <p className="text-sm font-bold text-[#39FF14]">
+                              R$ {(servico.valor || 0).toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+
+                {/* Serviços Adicionados */}
+                <div className="border-t border-[#00D4FF]/20 pt-6">
+                  <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">
+                    Serviços Selecionados ({servicosAdicionados.length})
+                  </h4>
+
+                  {servicosAdicionados.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">Nenhum serviço adicionado</p>
+                      <p className="text-gray-600 text-xs mt-2">Clique nos serviços acima para adicionar</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {servicosAdicionados.map((servico, index) => (
+                        <div key={index} className="premium-card p-4">
+                          <div className="flex items-center gap-4">
+                            <div className="flex-1">
+                              <p className="text-xs font-bold text-[#00D4FF] mb-1">{servico.codigo}</p>
+                              <p className="text-xs text-gray-400">{servico.descricao}</p>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => {
+                                    if (servico.quantidade > 1) {
+                                      setServicosAdicionados(servicosAdicionados.map(s =>
+                                        s.codigo === servico.codigo
+                                          ? { ...s, quantidade: s.quantidade - 1 }
+                                          : s
+                                      ));
+                                    }
+                                  }}
+                                  className="w-7 h-7 rounded bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold"
+                                >
+                                  −
+                                </button>
+                                <span className="text-sm font-bold text-white w-8 text-center">{servico.quantidade}</span>
+                                <button
+                                  onClick={() => {
+                                    setServicosAdicionados(servicosAdicionados.map(s =>
+                                      s.codigo === servico.codigo
+                                        ? { ...s, quantidade: s.quantidade + 1 }
+                                        : s
+                                    ));
+                                  }}
+                                  className="w-7 h-7 rounded bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold"
+                                >
+                                  +
+                                </button>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-xs text-gray-400">R$ {servico.valor_unitario.toFixed(2)} × {servico.quantidade}</p>
+                                <p className="text-sm font-bold text-[#39FF14]">
+                                  R$ {(servico.valor_unitario * servico.quantidade).toFixed(2)}
+                                </p>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setServicosAdicionados(servicosAdicionados.filter((_, i) => i !== index));
+                                }}
+                                className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                              >
+                                <X className="w-4 h-4 text-red-400" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+
+                      {/* Total de Serviços */}
+                      <div className="premium-card p-4 bg-[#00D4FF]/10">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total Serviços:</span>
+                          <span className="text-xl font-bold text-[#39FF14]">
+                            R$ {servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {false && abaAtiva === 'servicos' && tipoOS === 'OW' && (
               <div className="space-y-4">
                 <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
                 <div>
@@ -3888,7 +4083,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-[#00D4FF]" />
                   <span>
-                    {pecasAdicionadas.length} peça(s) • {checklistTemporario.length} checklist • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
+                    {pecasAdicionadas.length} peça(s) • {servicosAdicionados.length} serviço(s) • {checklistTemporario.length} checklist • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
                   </span>
                 </div>
               </div>
@@ -3896,7 +4091,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => {
-                  const temDados = pecasAdicionadas.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistTemporario.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
+                  const temDados = pecasAdicionadas.length > 0 || servicosAdicionados.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistTemporario.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
                   if (temDados) {
                     const confirmar = confirm('Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
                     if (!confirmar) return;
@@ -4187,13 +4382,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Valor Total</p>
                     <p className="text-[#00D4FF] font-bold text-2xl">
-                      R$ {pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}
+                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0)).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Saldo Restante</p>
                     <p className="text-[#FFBF00] font-bold text-2xl">
-                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) - pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0)).toFixed(2)}
+                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0) - pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0)).toFixed(2)}
                     </p>
                   </div>
                 </div>
