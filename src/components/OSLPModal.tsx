@@ -4136,6 +4136,141 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 />
               )}
 
+              {abaAtiva === 'servicos' && os && os.tipo_os === 'OW' && (
+                <div className="space-y-4">
+                  {servicos.length === 0 ? (
+                    <div className="text-center py-16">
+                      <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#00D4FF]/10 to-[#39FF14]/10 flex items-center justify-center mx-auto mb-4 border border-[#00D4FF]/20">
+                        <Wrench className="w-10 h-10 text-[#00D4FF]/60" />
+                      </div>
+                      <p className="text-gray-400 text-sm mb-6">Nenhum servico adicionado</p>
+                      <button
+                        onClick={() => {
+                          loadServicosCadastrados();
+                          setMostrarModalServico(true);
+                        }}
+                        className="neon-button px-8 py-3 text-sm"
+                        style={{
+                          backgroundColor: '#00D4FF20',
+                          borderColor: '#00D4FF',
+                          color: '#00D4FF'
+                        }}
+                      >
+                        <Plus className="w-4 h-4 inline mr-2" />
+                        ADICIONAR SERVICO
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
+                          Servicos ({servicos.length})
+                        </h3>
+                        <button
+                          onClick={() => {
+                            loadServicosCadastrados();
+                            setMostrarModalServico(true);
+                          }}
+                          className="neon-button px-4 py-2 text-xs"
+                          style={{
+                            backgroundColor: '#00D4FF20',
+                            borderColor: '#00D4FF',
+                            color: '#00D4FF'
+                          }}
+                        >
+                          <Plus className="w-3 h-3 inline mr-1" />
+                          ADICIONAR
+                        </button>
+                      </div>
+
+                      <div className="space-y-3">
+                        {servicos.map((servico) => (
+                          <div key={servico.id} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                            <div className="flex items-start gap-4">
+                              <div className="flex-1">
+                                <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
+                                <p className="text-xs text-gray-500">Cod: {servico.codigo_servico}</p>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={async () => {
+                                      if (servico.quantidade > 1) {
+                                        await supabase
+                                          .from('os_servicos')
+                                          .update({ quantidade: servico.quantidade - 1, valor_total: servico.valor_unitario * (servico.quantidade - 1) })
+                                          .eq('id', servico.id);
+                                        loadServicos();
+                                      }
+                                    }}
+                                    className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
+                                  >
+                                    -
+                                  </button>
+                                  <span className="text-sm font-bold text-white w-8 text-center">{servico.quantidade}</span>
+                                  <button
+                                    onClick={async () => {
+                                      await supabase
+                                        .from('os_servicos')
+                                        .update({ quantidade: servico.quantidade + 1, valor_total: servico.valor_unitario * (servico.quantidade + 1) })
+                                        .eq('id', servico.id);
+                                      loadServicos();
+                                    }}
+                                    className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                                <div className="text-right min-w-[100px]">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    defaultValue={servico.valor_unitario}
+                                    onBlur={async (e) => {
+                                      const novoValor = parseFloat(e.target.value) || 0;
+                                      await supabase
+                                        .from('os_servicos')
+                                        .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
+                                        .eq('id', servico.id);
+                                      loadServicos();
+                                    }}
+                                    className="neon-input w-24 text-right text-sm py-1 px-2"
+                                    placeholder="0.00"
+                                  />
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Total: <span className="text-[#39FF14] font-bold">R$ {(servico.valor_total || 0).toFixed(2)}</span>
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('Remover este servico?')) {
+                                      await supabase.from('os_servicos').delete().eq('id', servico.id);
+                                      loadServicos();
+                                    }
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                                >
+                                  <X className="w-4 h-4 text-red-400" />
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
+                          <span className="text-2xl font-bold text-[#39FF14]">
+                            R$ {servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
               {abaAtiva === 'pagamento' && os && os.tipo_os === 'OW' && (
                 <OSPagamentoTab
                   osId={os.id}
