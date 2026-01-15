@@ -1111,7 +1111,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }
       }
 
-      alert(`OS ${tipoOS} criada com sucesso!`);
+      const osInfo = novaOS.numero_os_interna
+        ? `OS Interna ${novaOS.numero_os_interna} criada`
+        : `OS ${tipoOS} criada`;
+      const samsungInfo = novaOS.numero_os_samsung
+        ? ` (OS Samsung: ${novaOS.numero_os_samsung})`
+        : '';
+
+      alert(`${osInfo}${samsungInfo}`);
 
       // Mudar para modo de visualização e carregar a OS criada
       setCurrentOsId(novaOS.id);
@@ -1945,30 +1952,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       <option value="IH">IH - In Home</option>
                     </select>
                   </div>
-                  <div>
+                  <div className="col-span-2">
                     <label className="text-xs text-gray-400 uppercase block mb-2">
-                      Tipo Orçamento *
-                    </label>
-                    <select
-                      value={tipoOrcamento}
-                      onChange={(e) => setTipoOrcamento(e.target.value as 'normal' | 'garantia' | 'cortesia')}
-                      className="neon-input w-full"
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="garantia">Garantia</option>
-                      <option value="cortesia">Cortesia</option>
-                    </select>
-                  </div>
-                  <div className="col-span-3">
-                    <label className="text-xs text-gray-400 uppercase block mb-2">
-                      Número OS Samsung *
+                      Número OS Samsung
                     </label>
                     <input
                       type="text"
                       value={numeroOSSamsung}
                       onChange={(e) => setNumeroOSSamsung(e.target.value)}
                       className="neon-input w-full"
-                      placeholder="Obrigatório para OS Samsung"
+                      placeholder="Ex: OS123456 (Opcional)"
                     />
                   </div>
                 </div>
