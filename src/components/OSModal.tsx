@@ -2212,12 +2212,30 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       <div>
                         <p className="text-sm font-bold text-[#9D4EDD]">OS EM DIAGNOSTICO</p>
                         <p className="text-xs text-gray-400">
-                          Adicione as pecas necessarias e clique em "Analise Concluida" para enviar ao orcamento
+                          {pecas.length === 0 ? (
+                            <span className="text-[#FFBF00]">
+                              <AlertCircle className="w-3 h-3 inline mr-1" />
+                              ATENCAO: Adicione as pecas necessarias ANTES de concluir a analise. Se nao houver pecas, escreva isso no relato do diagnostico.
+                            </span>
+                          ) : (
+                            'Pecas adicionadas. Clique em "Analise Concluida" para finalizar o diagnostico e escrever o relato tecnico.'
+                          )}
                         </p>
                       </div>
                     </div>
                     <button
-                      onClick={() => setMostrarModalAnalise(true)}
+                      onClick={() => {
+                        if (pecas.length === 0) {
+                          const confirma = confirm(
+                            'ATENCAO!\n\n' +
+                            'Nenhuma peca foi adicionada a esta OS.\n\n' +
+                            'Se realmente nao ha pecas necessarias, ESCREVA isso no relato do diagnostico que sera solicitado.\n\n' +
+                            'Deseja continuar mesmo assim?'
+                          );
+                          if (!confirma) return;
+                        }
+                        setMostrarModalAnalise(true);
+                      }}
                       disabled={finalizandoAnalise}
                       className="neon-button flex items-center gap-2 text-sm"
                       style={{
@@ -2633,24 +2651,6 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   </table>
                 </div>
               )}
-            </div>
-          )}
-
-          {abaAtiva === 'pagamento' && (
-            <div className="space-y-4">
-              <div className="premium-card p-6 bg-[#FFBF00]/5 border border-[#FFBF00]/20">
-                <p className="text-xs text-gray-400 uppercase tracking-wider mb-4">Ajustes Necessários?</p>
-                <button
-                  onClick={handleRefazerOrcamento}
-                  disabled={refazendoOrcamento}
-                  className="w-full neon-button bg-[#FFBF00]/10 hover:bg-[#FFBF00]/20 border border-[#FFBF00]/30 text-[#FFBF00] py-3 px-6 rounded-lg font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {refazendoOrcamento ? '⏳ Processando...' : '🔄 Refazer Orçamento'}
-                </button>
-                <p className="text-xs text-gray-500 mt-3 text-center">
-                  Move a OS de volta para Cotações para editar peças, serviços ou valores
-                </p>
-              </div>
             </div>
           )}
 
