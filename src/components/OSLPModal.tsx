@@ -115,6 +115,22 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     descricao: string;
     quantidade: number;
   }>>([]);
+  const [pecasAdicionadas, setPecasAdicionadas] = useState<Array<{
+    codigo: string;
+    descricao: string;
+    valor: number;
+    requisitada: boolean;
+  }>>([]);
+  const [pagamentosTemporarios, setPagamentosTemporarios] = useState<Array<{
+    forma_pagamento: string;
+    valor: number;
+    data_pagamento: string;
+    observacoes?: string;
+  }>>([]);
+  const [checklistTemporario, setChecklistTemporario] = useState<Array<{
+    descricao: string;
+    concluido: boolean;
+  }>>([]);
   const [anexosTemporarios, setAnexosTemporarios] = useState<Array<{
     file: File;
     nome: string;
@@ -142,6 +158,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
+  const [novoItemChecklist, setNovoItemChecklist] = useState('');
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -833,6 +850,29 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (osError) throw osError;
 
+      // Salvar peças adicionadas
+      if (pecasAdicionadas.length > 0) {
+        const pecasInsert = pecasAdicionadas.map(peca => ({
+          os_id: novaOS.id,
+          pn: peca.codigo,
+          descricao: peca.descricao,
+          quantidade: 1,
+          valor_gspn: peca.valor,
+          status_gspn: 'pendente',
+          requisitada_por: usuario?.id,
+          numero_os_samsung: numeroOSSamsung || null
+        }));
+
+        const { error: pecasError } = await supabase
+          .from('os_pecas')
+          .insert(pecasInsert);
+
+        if (pecasError) {
+          console.error('Erro ao salvar peças:', pecasError);
+        }
+      }
+
+      // Salvar requisições (apenas das peças que foram marcadas para requisitar)
       if (requisicoesTemporarias.length > 0) {
         const requisicoesInsert = requisicoesTemporarias.map(req => ({
           os_id: novaOS.id,
@@ -852,20 +892,52 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         if (requisicoesError) throw requisicoesError;
       }
 
-      const checklistPadrao = [
-        'Verificar número de série do aparelho',
-        'Conferir IMEI com sistema Samsung',
-        'Testar funcionamento geral do aparelho',
-        'Fotografar defeito relatado',
-        'Embalar aparelho adequadamente'
-      ];
+      // Salvar pagamentos temporários
+      if (pagamentosTemporarios.length > 0 && tipoOS === 'OW') {
+        const pagamentosInsert = pagamentosTemporarios.map(pag => ({
+          os_id: novaOS.id,
+          forma_pagamento: pag.forma_pagamento,
+          valor: pag.valor,
+          data_lancamento: pag.data_pagamento,
+          observacoes: pag.observacoes || null,
+          lancado_por: usuario?.id,
+          status: 'confirmado'
+        }));
 
-      const checklistInsert = checklistPadrao.map((item, index) => ({
-        os_id: novaOS.id,
-        item: item,
-        ordem: index + 1,
-        concluido: false
-      }));
+        const { error: pagamentosError } = await supabase
+          .from('pagamentos')
+          .insert(pagamentosInsert);
+
+        if (pagamentosError) {
+          console.error('Erro ao salvar pagamentos:', pagamentosError);
+        }
+      }
+
+      // Usar checklist temporário ou checklist padrão
+      let checklistInsert: any[] = [];
+      if (checklistTemporario.length > 0) {
+        checklistInsert = checklistTemporario.map((item, index) => ({
+          os_id: novaOS.id,
+          item: item.descricao,
+          ordem: index + 1,
+          concluido: item.concluido
+        }));
+      } else {
+        const checklistPadrao = [
+          'Verificar número de série do aparelho',
+          'Conferir IMEI com sistema Samsung',
+          'Testar funcionamento geral do aparelho',
+          'Fotografar defeito relatado',
+          'Embalar aparelho adequadamente'
+        ];
+
+        checklistInsert = checklistPadrao.map((item, index) => ({
+          os_id: novaOS.id,
+          item: item,
+          ordem: index + 1,
+          concluido: false
+        }));
+      }
 
       const { error: checklistError } = await supabase
         .from('os_checklist')
@@ -2128,78 +2200,152 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                               alert('Preencha código e descrição');
                               return;
                             }
-                            setRequisicoesTemporarias([...requisicoesTemporarias, {
+                            const valorPeca = parseFloat(novaPecaValor) || 0;
+                            setPecasAdicionadas([...pecasAdicionadas, {
                               codigo: novaPecaCodigo,
                               descricao: novaPecaDescricao,
-                              quantidade: 1
+                              valor: valorPeca,
+                              requisitada: false
                             }]);
                             setNovaPecaCodigo('');
                             setNovaPecaDescricao('');
-                            setNovaPecaQuantidade(1);
+                            setNovaPecaValor('');
                           }}
                           className="neon-button px-4 py-2 flex-1 text-xs"
                           style={{
-                            backgroundColor: '#00D4FF20',
-                            borderColor: '#00D4FF',
-                            color: '#00D4FF'
+                            backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
+                            borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
+                            color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
                           }}
                         >
-                          REQUISITAR
+                          ADICIONAR
                         </button>
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: '#00D4FF' }}>
+                  <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
                     <AlertCircle className="w-4 h-4" />
                     <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                   </div>
                 </div>
 
                 <div>
-                  {requisicoesTemporarias.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">Nenhuma peça requisitada ainda</p>
+                  {pecasAdicionadas.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhuma peça adicionada ainda</p>
                   ) : (
                     <div className="space-y-3">
-                      {requisicoesTemporarias.map((req, index) => (
+                      {pecasAdicionadas.map((peca, index) => (
                         <div key={index} className="premium-card p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <p className="text-sm font-bold text-gray-300">{req.descricao}</p>
-                                <span
-                                  className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                <p className="text-sm font-bold text-gray-300">{peca.descricao}</p>
+                                {peca.requisitada && (
+                                  <span
+                                    className="px-2 py-1 rounded text-xs font-bold uppercase"
+                                    style={{
+                                      backgroundColor: '#FFBF0020',
+                                      color: '#FFBF00',
+                                      border: '1px solid #FFBF0060'
+                                    }}
+                                  >
+                                    REQUISITADA
+                                  </span>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">Código: {peca.codigo}</p>
+                              <p className="text-xs text-gray-500 mt-1">Valor GSPN: R$ {peca.valor.toFixed(2)}</p>
+                            </div>
+                            <div className="flex gap-2">
+                              {!peca.requisitada && (
+                                <button
+                                  onClick={() => {
+                                    const novasPecas = [...pecasAdicionadas];
+                                    novasPecas[index].requisitada = true;
+                                    setPecasAdicionadas(novasPecas);
+                                    setRequisicoesTemporarias([...requisicoesTemporarias, {
+                                      codigo: peca.codigo,
+                                      descricao: peca.descricao,
+                                      quantidade: 1
+                                    }]);
+                                  }}
+                                  className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                   style={{
                                     backgroundColor: '#FFBF0020',
-                                    color: '#FFBF00',
-                                    border: '1px solid #FFBF0060'
+                                    borderColor: '#FFBF00',
+                                    color: '#FFBF00'
                                   }}
                                 >
-                                  PENDENTE
-                                </span>
-                              </div>
-                              <p className="text-xs text-gray-500">Código: {req.codigo}</p>
-                              <p className="text-xs text-gray-500 mt-1">Qtd: {req.quantidade}</p>
+                                  <Package className="w-3 h-3" />
+                                  REQUISITAR
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  if (peca.requisitada) {
+                                    setRequisicoesTemporarias(requisicoesTemporarias.filter(req => req.codigo !== peca.codigo));
+                                  }
+                                  setPecasAdicionadas(pecasAdicionadas.filter((_, i) => i !== index));
+                                }}
+                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                style={{
+                                  backgroundColor: '#FF006410',
+                                  borderColor: '#FF0064',
+                                  color: '#FF0064'
+                                }}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                REMOVER
+                              </button>
                             </div>
-                            <button
-                              onClick={() => {
-                                setRequisicoesTemporarias(requisicoesTemporarias.filter((_, i) => i !== index));
-                              }}
-                              className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                              style={{
-                                backgroundColor: '#FF006410',
-                                borderColor: '#FF0064',
-                                color: '#FF0064'
-                              }}
-                            >
-                              <Trash2 className="w-3 h-3" />
-                              REMOVER
-                            </button>
                           </div>
                         </div>
                       ))}
                     </div>
                   )}
                 </div>
+
+                {pecasAdicionadas.length > 0 && (
+                  <div className="premium-card p-4 border-l-4" style={{
+                    borderLeftColor: '#39FF14'
+                  }}>
+                    <h3 className="text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2" style={{
+                      color: '#39FF14'
+                    }}>
+                      <DollarSign className="w-4 h-4" />
+                      Resumo Financeiro
+                    </h3>
+                    <div className="space-y-2">
+                      {(() => {
+                        const valorBase = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
+                        if (tipoOS === 'OW') {
+                          return (
+                            <>
+                              <div className="flex justify-between text-sm">
+                                <span className="text-gray-400">Valor Base GSPN:</span>
+                                <span className="text-gray-300 font-mono">R$ {valorBase.toFixed(2)}</span>
+                              </div>
+                              <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
+                                <span className="font-bold" style={{ color: '#39FF14' }}>Valor c/ Markup:</span>
+                                <span className="font-bold font-mono" style={{ color: '#39FF14' }}>R$ {valorBase.toFixed(2)}</span>
+                              </div>
+                              <p className="text-xs text-gray-500 mt-2">
+                                * Markup será aplicado automaticamente ao criar a OS
+                              </p>
+                            </>
+                          );
+                        } else {
+                          return (
+                            <div className="flex justify-between text-sm">
+                              <span className="font-bold" style={{ color: '#39FF14' }}>Valor Total GSPN:</span>
+                              <span className="font-bold font-mono" style={{ color: '#39FF14' }}>R$ {valorBase.toFixed(2)}</span>
+                            </div>
+                          );
+                        }
+                      })()}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -2215,16 +2361,84 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   </p>
                 </div>
 
-                <div className="text-center py-12">
-                  <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm mb-4">Nenhum checklist adicionado</p>
-                  <button className="neon-button px-6 py-2" style={{
-                    backgroundColor: '#39FF1420',
-                    borderColor: '#39FF14',
-                    color: '#39FF14'
-                  }}>
-                    ADICIONAR CHECKLIST
-                  </button>
+                <div className="premium-card p-4">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={novoItemChecklist}
+                      onChange={(e) => setNovoItemChecklist(e.target.value)}
+                      onKeyPress={(e) => {
+                        if (e.key === 'Enter' && novoItemChecklist.trim()) {
+                          setChecklistTemporario([...checklistTemporario, {
+                            descricao: novoItemChecklist.trim(),
+                            concluido: false
+                          }]);
+                          setNovoItemChecklist('');
+                        }
+                      }}
+                      className="neon-input flex-1"
+                      placeholder="Digite o item do checklist..."
+                    />
+                    <button
+                      onClick={() => {
+                        if (novoItemChecklist.trim()) {
+                          setChecklistTemporario([...checklistTemporario, {
+                            descricao: novoItemChecklist.trim(),
+                            concluido: false
+                          }]);
+                          setNovoItemChecklist('');
+                        }
+                      }}
+                      className="neon-button px-6 py-2"
+                      style={{
+                        backgroundColor: '#39FF1420',
+                        borderColor: '#39FF14',
+                        color: '#39FF14'
+                      }}
+                    >
+                      ADICIONAR
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  {checklistTemporario.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhum item adicionado ainda</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {checklistTemporario.map((item, index) => (
+                        <div key={index} className="premium-card p-3">
+                          <div className="flex items-center gap-3">
+                            <button
+                              onClick={() => {
+                                const novosItens = [...checklistTemporario];
+                                novosItens[index].concluido = !novosItens[index].concluido;
+                                setChecklistTemporario(novosItens);
+                              }}
+                              className="flex-shrink-0"
+                            >
+                              {item.concluido ? (
+                                <CheckSquare className="w-5 h-5" style={{ color: '#39FF14' }} />
+                              ) : (
+                                <div className="w-5 h-5 border-2 rounded" style={{ borderColor: '#39FF14' }} />
+                              )}
+                            </button>
+                            <span className={`flex-1 text-sm ${item.concluido ? 'line-through text-gray-500' : 'text-gray-300'}`}>
+                              {item.descricao}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setChecklistTemporario(checklistTemporario.filter((_, i) => i !== index));
+                              }}
+                              className="flex-shrink-0 text-red-500 hover:text-red-400"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
@@ -2256,12 +2470,143 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             {abaAtiva === 'pagamento' && tipoOS === 'OW' && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Pagamento</h3>
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Pagamento Antecipado</h3>
 
-                <div className="text-center py-12">
-                  <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm">Informações de pagamento estarão disponíveis após a criação da OS</p>
+                <div className="premium-card p-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Forma de Pagamento
+                      </label>
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          const forma = e.target.value;
+                          if (!forma) return;
+
+                          setPagamentosTemporarios([...pagamentosTemporarios, {
+                            forma_pagamento: forma,
+                            valor: 0,
+                            data_pagamento: new Date().toISOString().split('T')[0],
+                            observacoes: ''
+                          }]);
+                          e.target.value = '';
+                        }}
+                        className="neon-input w-full"
+                      >
+                        <option value="">Selecionar forma...</option>
+                        <option value="pix">PIX</option>
+                        <option value="cartao_credito">Cartão de Crédito</option>
+                        <option value="cartao_debito">Cartão de Débito</option>
+                        <option value="dinheiro">Dinheiro</option>
+                        <option value="transferencia">Transferência</option>
+                        <option value="boleto">Boleto</option>
+                        <option value="outro">Outro</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
+
+                <div>
+                  {pagamentosTemporarios.length === 0 ? (
+                    <p className="text-center text-gray-500 py-8">Nenhum pagamento lançado ainda</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {pagamentosTemporarios.map((pag, index) => (
+                        <div key={index} className="premium-card p-4">
+                          <div className="grid grid-cols-3 gap-3 mb-3">
+                            <div>
+                              <label className="text-xs text-gray-400 uppercase block mb-2">
+                                Valor (R$)
+                              </label>
+                              <input
+                                type="number"
+                                step="0.01"
+                                value={pag.valor}
+                                onChange={(e) => {
+                                  const novosPagamentos = [...pagamentosTemporarios];
+                                  novosPagamentos[index].valor = parseFloat(e.target.value) || 0;
+                                  setPagamentosTemporarios(novosPagamentos);
+                                }}
+                                className="neon-input w-full"
+                                placeholder="0.00"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-xs text-gray-400 uppercase block mb-2">
+                                Data
+                              </label>
+                              <input
+                                type="date"
+                                value={pag.data_pagamento}
+                                onChange={(e) => {
+                                  const novosPagamentos = [...pagamentosTemporarios];
+                                  novosPagamentos[index].data_pagamento = e.target.value;
+                                  setPagamentosTemporarios(novosPagamentos);
+                                }}
+                                className="neon-input w-full"
+                              />
+                            </div>
+                            <div className="flex items-end">
+                              <button
+                                onClick={() => {
+                                  setPagamentosTemporarios(pagamentosTemporarios.filter((_, i) => i !== index));
+                                }}
+                                className="neon-button flex items-center gap-2 text-xs px-4 py-2 w-full"
+                                style={{
+                                  backgroundColor: '#FF006410',
+                                  borderColor: '#FF0064',
+                                  color: '#FF0064'
+                                }}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                REMOVER
+                              </button>
+                            </div>
+                          </div>
+                          <div>
+                            <label className="text-xs text-gray-400 uppercase block mb-2">
+                              Observações
+                            </label>
+                            <textarea
+                              value={pag.observacoes || ''}
+                              onChange={(e) => {
+                                const novosPagamentos = [...pagamentosTemporarios];
+                                novosPagamentos[index].observacoes = e.target.value;
+                                setPagamentosTemporarios(novosPagamentos);
+                              }}
+                              className="neon-input w-full"
+                              rows={2}
+                              placeholder="Observações sobre o pagamento..."
+                            />
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className="text-xs px-2 py-1 rounded font-bold" style={{
+                              backgroundColor: '#00D4FF20',
+                              color: '#00D4FF',
+                              border: '1px solid #00D4FF60'
+                            }}>
+                              {pag.forma_pagamento.toUpperCase().replace('_', ' ')}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {pagamentosTemporarios.length > 0 && (
+                  <div className="premium-card p-4 border-l-4" style={{
+                    borderLeftColor: '#39FF14'
+                  }}>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold" style={{ color: '#39FF14' }}>Total de Pagamentos:</span>
+                      <span className="text-lg font-bold font-mono" style={{ color: '#39FF14' }}>
+                        R$ {pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -3373,7 +3718,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-[#00D4FF]" />
                   <span>
-                    {requisicoesTemporarias.length} requisição(ões) • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
+                    {pecasAdicionadas.length} peça(s) • {checklistTemporario.length} checklist • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
                   </span>
                 </div>
               </div>
@@ -3381,7 +3726,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => {
-                  const temDados = requisicoesTemporarias.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
+                  const temDados = pecasAdicionadas.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistTemporario.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
                   if (temDados) {
                     const confirmar = confirm('Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
                     if (!confirmar) return;
