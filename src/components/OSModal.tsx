@@ -254,6 +254,25 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     };
   }, [osId]);
 
+  // Realtime subscription para comentários
+  useEffect(() => {
+    const channel = supabase
+      .channel('os-comentarios-changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'os_comentarios',
+        filter: `os_id=eq.${osId}`
+      }, () => {
+        loadComentarios();
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [osId]);
+
   useEffect(() => {
     if (currentJob?.is_running) {
       const interval = setInterval(() => {
