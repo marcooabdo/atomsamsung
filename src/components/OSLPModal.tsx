@@ -142,6 +142,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [novaPecaDescricao, setNovaPecaDescricao] = useState('');
   const [novaPecaQuantidade, setNovaPecaQuantidade] = useState(1);
   const [novaPecaValor, setNovaPecaValor] = useState('');
+  const [novaPecaValorComMarkup, setNovaPecaValorComMarkup] = useState<number | null>(null);
   const [sugestoesPecas, setSugestoesPecas] = useState<Array<{
     pn: string;
     descricao: string;
@@ -738,6 +739,35 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
     setChecklist(data || []);
   };
+
+  useEffect(() => {
+    const calcularMarkup = async () => {
+      const valorGSPN = parseFloat(novaPecaValor);
+
+      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId) {
+        setNovaPecaValorComMarkup(null);
+        return;
+      }
+
+      try {
+        const { data: markupData } = await supabase.rpc('get_markup_ativo', {
+          p_unidade_id: unidadeId,
+          p_valor_peca: valorGSPN
+        });
+
+        if (markupData && markupData.percentual) {
+          const valorComMarkup = valorGSPN * (1 + markupData.percentual / 100);
+          setNovaPecaValorComMarkup(valorComMarkup);
+        } else {
+          setNovaPecaValorComMarkup(null);
+        }
+      } catch (error) {
+        setNovaPecaValorComMarkup(null);
+      }
+    };
+
+    calcularMarkup();
+  }, [novaPecaValor, tipoOS, unidadeId]);
 
   const loadComentarios = async () => {
     if (!osId) return;
@@ -2186,14 +2216,21 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         Valor GSPN (R$)
                       </label>
                       <div className="flex gap-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={novaPecaValor}
-                          onChange={(e) => setNovaPecaValor(e.target.value)}
-                          className="neon-input flex-1"
-                          placeholder="0.00"
-                        />
+                        <div className="flex-1">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={novaPecaValor}
+                            onChange={(e) => setNovaPecaValor(e.target.value)}
+                            className="neon-input w-full"
+                            placeholder="0.00"
+                          />
+                          {tipoOS === 'OW' && novaPecaValorComMarkup !== null && (
+                            <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                              Valor c/ Markup: R$ {novaPecaValorComMarkup.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
                         <button
                           onClick={() => {
                             if (!novaPecaCodigo || !novaPecaDescricao) {
@@ -2304,48 +2341,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                   )}
                 </div>
-
-                {pecasAdicionadas.length > 0 && (
-                  <div className="premium-card p-4 border-l-4" style={{
-                    borderLeftColor: '#39FF14'
-                  }}>
-                    <h3 className="text-sm font-bold uppercase tracking-wider mb-3 flex items-center gap-2" style={{
-                      color: '#39FF14'
-                    }}>
-                      <DollarSign className="w-4 h-4" />
-                      Resumo Financeiro
-                    </h3>
-                    <div className="space-y-2">
-                      {(() => {
-                        const valorBase = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
-                        if (tipoOS === 'OW') {
-                          return (
-                            <>
-                              <div className="flex justify-between text-sm">
-                                <span className="text-gray-400">Valor Base GSPN:</span>
-                                <span className="text-gray-300 font-mono">R$ {valorBase.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between text-sm pt-2 border-t border-gray-700">
-                                <span className="font-bold" style={{ color: '#39FF14' }}>Valor c/ Markup:</span>
-                                <span className="font-bold font-mono" style={{ color: '#39FF14' }}>R$ {valorBase.toFixed(2)}</span>
-                              </div>
-                              <p className="text-xs text-gray-500 mt-2">
-                                * Markup será aplicado automaticamente ao criar a OS
-                              </p>
-                            </>
-                          );
-                        } else {
-                          return (
-                            <div className="flex justify-between text-sm">
-                              <span className="font-bold" style={{ color: '#39FF14' }}>Valor Total GSPN:</span>
-                              <span className="font-bold font-mono" style={{ color: '#39FF14' }}>R$ {valorBase.toFixed(2)}</span>
-                            </div>
-                          );
-                        }
-                      })()}
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
