@@ -363,6 +363,31 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     setServicosCadastrados(data || []);
   };
 
+  const handleSalvarServicos = async () => {
+    try {
+      const totalServicos = servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0);
+      const totalPecas = pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0);
+      const novoValorTotal = totalPecas + totalServicos;
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          valor_total: novoValorTotal,
+          saldo_restante: novoValorTotal - (os?.valor_pago || 0),
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      await loadOS();
+      onReload?.();
+      alert('Servicos salvos com sucesso!');
+    } catch (err: any) {
+      alert('Erro ao salvar servicos: ' + err.message);
+    }
+  };
+
   const loadRequisicoes = async () => {
 
     // Busca cotacao_id da OS para incluir requisições da cotação original
@@ -2163,7 +2188,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
           ))}
         </div>
 
-        <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
+        <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 min-h-[400px]">
           {abaAtiva === 'dados' && (
             <div className="space-y-6">
               <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#FFA500]/10 border-l-4 border-[#00D4FF]">
@@ -3142,6 +3167,22 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                         R$ {servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0).toFixed(2)}
                       </span>
                     </div>
+                  </div>
+
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={handleSalvarServicos}
+                      className="neon-button px-8 py-3 text-sm flex items-center gap-2"
+                      style={{
+                        backgroundColor: '#39FF1420',
+                        borderColor: '#39FF14',
+                        color: '#39FF14',
+                        boxShadow: '0 0 20px rgba(57,255,20,0.3)'
+                      }}
+                    >
+                      <CheckCircle className="w-4 h-4" />
+                      SALVAR E ATUALIZAR PAGAMENTO
+                    </button>
                   </div>
                 </>
               )}
