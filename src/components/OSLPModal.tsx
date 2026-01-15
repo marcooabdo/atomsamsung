@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -2612,7 +2612,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
             )}
 
-            {abaAtiva === 'servicos' && tipoOS === 'OW' && currentMode === 'create' && (
+            {abaAtiva === 'servicos' && (tipoOS === 'OW' || os?.tipo_os === 'OW') && currentMode === 'create' && (
               <div className="space-y-4">
                 {servicosAdicionados.length === 0 ? (
                   <div className="text-center py-16">
@@ -2947,7 +2947,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               />
             )}
 
-            {abaAtiva === 'servicos' && tipoOS === 'OW' && currentMode === 'view' && (
+            {abaAtiva === 'servicos' && (tipoOS === 'OW' || os?.tipo_os === 'OW') && currentMode === 'view' && (
               <div className="space-y-4">
                 {servicos.length === 0 ? (
                   <div className="text-center py-16">
