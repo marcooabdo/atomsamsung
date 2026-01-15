@@ -49,6 +49,7 @@ export function Kanban() {
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | 'NA' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
+  const [criarOSOW, setCriarOSOW] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
   const [hasJobRunning, setHasJobRunning] = useState(false);
@@ -1014,6 +1015,20 @@ export function Kanban() {
             </button>
 
             <button
+              onClick={() => setCriarOSOW(true)}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
+                border: '1px solid #00D4FF',
+                color: '#00D4FF',
+                boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+              }}
+            >
+              <Plus className="w-3.5 h-3.5" />
+              CRIAR OW
+            </button>
+
+            <button
               onClick={syncSamsungGSPN}
               disabled={syncingSamsung || !selectedUnidade || hasJobRunning}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
@@ -1709,6 +1724,17 @@ export function Kanban() {
           onClose={() => setCriarOSLP(false)}
           onReload={loadKanbanData}
           mode="create"
+          tipoOS="LP"
+        />
+      )}
+
+      {criarOSOW && (
+        <OSLPModal
+          osId={null}
+          onClose={() => setCriarOSOW(false)}
+          onReload={loadKanbanData}
+          mode="create"
+          tipoOS="OW"
         />
       )}
 

@@ -55,11 +55,12 @@ interface OSLPModalProps {
   onClose: () => void;
   onReload?: () => void;
   mode?: 'create' | 'view';
+  tipoOS?: 'LP' | 'OW';
 }
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalProps) {
+export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP' }: OSLPModalProps) {
   const { usuario } = useAuth();
   const [os, setOS] = useState<OS | null>(null);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
@@ -716,7 +717,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         .from('os')
         .insert({
           unidade_id: unidadeId,
-          tipo_os: 'LP',
+          tipo_os: tipoOS,
           tipo_atendimento: tipoAtendimento,
           numero_os_samsung: numeroOSSamsung || null,
           cliente_nome: clienteNome,
@@ -815,7 +816,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
         {
           os_id: novaOS.id,
           usuario_id: usuario?.id,
-          comentario: `OS LP criada por ${usuario?.nome}`,
+          comentario: `OS ${tipoOS} criada por ${usuario?.nome}`,
           is_system: true
         }
       ];
@@ -846,11 +847,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
 
       if (comentariosError) throw comentariosError;
 
-      alert('OS LP criada com sucesso!');
+      alert(`OS ${tipoOS} criada com sucesso!`);
       onReload?.();
       onClose();
     } catch (error) {
-      alert('Erro ao criar OS LP');
+      alert(`Erro ao criar OS ${tipoOS}`);
     } finally {
       setLoading(false);
     }
@@ -1357,10 +1358,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-[#FFA500]/20">
+        <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
           <div>
-            <h2 className="tech-heading text-xl text-[#FFA500] flex items-center gap-2">
-              LP - Garantia
+            <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+              {tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia'}
               {mode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
             </h2>
             {os && (
@@ -3067,12 +3068,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                 disabled={loading || !unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado}
                 className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: '#FFA50020',
-                  borderColor: '#FFA500',
-                  color: '#FFA500'
+                  backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
+                  borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
+                  color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
                 }}
               >
-                {loading ? 'CRIANDO...' : 'SALVAR OS LP'}
+                {loading ? 'CRIANDO...' : `SALVAR OS ${tipoOS}`}
               </button>
             </div>
             {(!unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado) && (
