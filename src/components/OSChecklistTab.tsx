@@ -332,20 +332,17 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
             const respostas = vinculo.respostas || [];
 
             return (
-              <div key={vinculo.id} className="premium-card p-4">
-                <div className="flex items-start justify-between mb-4">
+              <div key={vinculo.id} className="bg-[#0a0f1a] border border-gray-800 rounded-lg p-4">
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-800">
                   <div className="flex-1">
                     <div className="flex items-center gap-3">
-                      <h4 className="text-sm font-bold text-[#39FF14]">{template.nome}</h4>
+                      <h4 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">{template.nome}</h4>
                       {vinculo.vinculado_automaticamente && (
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
                           AUTOMÁTICO
                         </span>
                       )}
                     </div>
-                    {template.descricao && (
-                      <p className="text-xs text-gray-400 mt-1">{template.descricao}</p>
-                    )}
                   </div>
                   {!vinculo.vinculado_automaticamente && (
                     <button
@@ -397,10 +394,10 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
       {/* Modal para adicionar checklist */}
       {showAddModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
-          <div className="bg-[#1a1f2e] border border-[#39FF14]/30 rounded-lg w-full max-w-2xl max-h-[80vh] overflow-hidden">
-            <div className="p-6 border-b border-[#39FF14]/20">
+          <div className="bg-[#0f1419] border border-[#39FF14]/40 rounded-lg w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl shadow-[#39FF14]/10">
+            <div className="p-6 border-b border-[#39FF14]/30 bg-gradient-to-r from-[#0f1419] to-[#1a1f2e]">
               <div className="flex items-center justify-between">
-                <h3 className="text-lg font-bold text-[#39FF14]">Adicionar Checklist</h3>
+                <h3 className="text-xl font-bold text-[#39FF14] uppercase tracking-wider">Adicionar Checklist</h3>
                 <button
                   onClick={() => setShowAddModal(false)}
                   className="text-gray-400 hover:text-white transition-colors"
@@ -419,32 +416,36 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {templatesDisponiveis.map((template) => (
                     <div
                       key={template.id}
-                      className="premium-card p-4 hover:border-[#39FF14]/50 transition-all cursor-pointer"
-                      onClick={() => handleVincularChecklist(template.id)}
+                      className="bg-[#1a1f2e] border border-gray-700 rounded-lg p-5 hover:border-[#39FF14]/50 hover:shadow-lg hover:shadow-[#39FF14]/10 transition-all group"
                     >
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h4 className="text-sm font-bold text-gray-200">{template.nome}</h4>
+                          <h4 className="text-base font-bold text-gray-100 mb-2">{template.nome}</h4>
                           {template.descricao && (
-                            <p className="text-xs text-gray-400 mt-1">{template.descricao}</p>
+                            <p className="text-sm text-gray-400 mb-3">{template.descricao}</p>
                           )}
-                          <div className="flex gap-2 mt-2 flex-wrap">
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                              OS: {template.tipo_os?.join(', ') || 'Todos'}
+                          <div className="flex gap-2 flex-wrap">
+                            <span className="px-3 py-1 rounded text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                              OS: {(template.tipo_os && template.tipo_os.length > 0) ? template.tipo_os.join(', ') : 'Todos'}
                             </span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                              Atend: {template.tipos_atendimento?.join(', ') || 'Todos'}
+                            <span className="px-3 py-1 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                              Atend: {(template.tipos_atendimento && template.tipos_atendimento.length > 0) ? template.tipos_atendimento.join(', ') : 'Todos'}
                             </span>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-purple-500/20 text-purple-400 border border-purple-500/30">
+                            <span className="px-3 py-1 rounded text-xs font-bold bg-purple-500/20 text-purple-400 border border-purple-500/40">
                               {template.itens?.length || 0} itens
                             </span>
                           </div>
                         </div>
-                        <Plus className="w-5 h-5 text-[#39FF14] flex-shrink-0" />
+                        <button
+                          onClick={() => handleVincularChecklist(template.id)}
+                          className="ml-4 w-10 h-10 rounded-lg bg-[#39FF14]/20 border border-[#39FF14]/40 flex items-center justify-center hover:bg-[#39FF14]/30 transition-colors group-hover:scale-110 transform"
+                        >
+                          <Plus className="w-5 h-5 text-[#39FF14]" />
+                        </button>
                       </div>
                     </div>
                   ))}
