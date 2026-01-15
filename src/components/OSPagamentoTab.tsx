@@ -262,7 +262,7 @@ Assistencia Tecnica Samsung`;
         return;
       }
 
-      const valorBruto = (os.valor_pecas || 0) + (os.valor_servicos || 0);
+      const valorBruto = calcularSubtotal();
       if (descontoTipo === 'valor' && valorNumerico > valorBruto) {
         alert('O desconto em valor nao pode ser maior que o valor total');
         return;
@@ -328,8 +328,14 @@ Assistencia Tecnica Samsung`;
     }
   };
 
+  const calcularSubtotal = () => {
+    const totalPecas = pecas.reduce((sum, p) => sum + (p.valor_total || 0), 0);
+    const totalServicos = servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0);
+    return totalPecas + totalServicos;
+  };
+
   const calcularDescontoPreview = () => {
-    const valorBruto = (os.valor_pecas || 0) + (os.valor_servicos || 0);
+    const valorBruto = calcularSubtotal();
     const valorNumerico = parseFloat(descontoValor.replace(',', '.')) || 0;
 
     if (descontoTipo === 'percentual') {
@@ -504,7 +510,7 @@ Assistencia Tecnica Samsung`;
                   -R$ {calcularDescontoPreview().toFixed(2)}
                 </p>
                 <p className="text-xs text-gray-500">
-                  Valor final: R$ {Math.max(((os.valor_pecas || 0) + (os.valor_servicos || 0)) - calcularDescontoPreview(), 0).toFixed(2)}
+                  Valor final: R$ {Math.max(calcularSubtotal() - calcularDescontoPreview(), 0).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -547,7 +553,7 @@ Assistencia Tecnica Samsung`;
             <div>
               <p className="text-xs text-gray-400 uppercase mb-1">Subtotal</p>
               <p className="text-xl font-bold text-gray-300">
-                R$ {((os.valor_pecas || 0) + (os.valor_servicos || 0)).toFixed(2)}
+                R$ {calcularSubtotal().toFixed(2)}
               </p>
             </div>
             <div>
