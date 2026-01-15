@@ -724,9 +724,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
           // Buscar markup ativo
           const tipoOSAtual = currentMode === 'view' ? os?.tipo_os : tipoOS;
-          const tipoOrcamentoAtual = currentMode === 'view' ? os?.tipo_orcamento : tipoOrcamento;
+          const tipoOrcamentoAtual = currentMode === 'view' ? (os?.tipo_orcamento || 'normal') : (tipoOrcamento || 'normal');
           let valorComMarkup = pedido?.valor_estimado || null;
-          if (valorComMarkup && tipoOSAtual === 'OW' && tipoOrcamentoAtual) {
+          if (valorComMarkup && tipoOSAtual === 'OW') {
             const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
               p_unidade_id: unidadeParaBusca,
               p_tipo_orcamento: tipoOrcamentoAtual,
@@ -767,7 +767,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const calcularMarkup = async () => {
       const valorGSPN = parseFloat(novaPecaValor);
 
-      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId || !tipoOrcamento) {
+      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId) {
         setNovaPecaValorComMarkup(null);
         return;
       }
@@ -775,7 +775,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       try {
         const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
           p_unidade_id: unidadeId,
-          p_tipo_orcamento: tipoOrcamento,
+          p_tipo_orcamento: tipoOrcamento || 'normal',
           p_valor: valorGSPN
         });
 

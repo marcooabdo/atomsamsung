@@ -1202,7 +1202,7 @@ export function Kanban() {
                                 <h5 className="font-bold text-xs text-white truncate" style={{
                                   textShadow: '0 0 8px rgba(0,212,255,0.5)'
                                 }}>
-                                  {os.numero_os_samsung || os.cliente_nome}
+                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
                                 </h5>
                                 {os.numero_os_samsung && (
                                   <button
@@ -1237,9 +1237,7 @@ export function Kanban() {
                                   </span>
                                 )}
                               </div>
-                              {os.numero_os_samsung && (
-                                <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
-                              )}
+                              <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
                             </div>
                             {os.alerta_divergencia_gspn && (
                               <div className="p-1 rounded-md flex-shrink-0" style={{
