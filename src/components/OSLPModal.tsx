@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -129,6 +129,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     valor: number;
     data_pagamento: string;
     observacoes?: string;
+    nsu?: string;
+    pix_id_transacao?: string;
+    parcelamento?: number;
+    taxa_percentual?: number;
+    taxa_paga_por?: 'cliente' | 'empresa';
+    comprovante?: File;
   }>>([]);
   const [checklistTemporario, setChecklistTemporario] = useState<Array<{
     descricao: string;
@@ -163,6 +169,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
   const [novoItemChecklist, setNovoItemChecklist] = useState('');
+
+  // Estados para modal de pagamento no modo create
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [novoPagamentoForma, setNovoPagamentoForma] = useState<'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 'transferencia' | 'boleto' | 'outro'>('pix');
+  const [novoPagamentoValor, setNovoPagamentoValor] = useState('');
+  const [novoPagamentoNSU, setNovoPagamentoNSU] = useState('');
+  const [novoPagamentoPixId, setNovoPagamentoPixId] = useState('');
+  const [novoPagamentoParcelamento, setNovoPagamentoParcelamento] = useState('1');
+  const [novoPagamentoTaxa, setNovoPagamentoTaxa] = useState('0');
+  const [novoPagamentoTaxaPagaPor, setNovoPagamentoTaxaPagaPor] = useState<'cliente' | 'empresa'>('empresa');
+  const [novoPagamentoComprovante, setNovoPagamentoComprovante] = useState<File | null>(null);
+  const [novoPagamentoObservacoes, setNovoPagamentoObservacoes] = useState('');
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -931,22 +949,55 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       // Salvar pagamentos temporários
       if (pagamentosTemporarios.length > 0 && tipoOS === 'OW') {
-        const pagamentosInsert = pagamentosTemporarios.map(pag => ({
-          os_id: novaOS.id,
-          forma_pagamento: pag.forma_pagamento,
-          valor: pag.valor,
-          data_lancamento: pag.data_pagamento,
-          observacoes: pag.observacoes || null,
-          lancado_por: usuario?.id,
-          status: 'confirmado'
-        }));
+        for (const pag of pagamentosTemporarios) {
+          let comprovanteUrl = null;
 
-        const { error: pagamentosError } = await supabase
-          .from('pagamentos')
-          .insert(pagamentosInsert);
+          // Upload do comprovante se houver
+          if (pag.comprovante) {
+            const fileName = `pagamento_${novaOS.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            const { error: uploadError } = await supabase.storage
+              .from('pagamentos-comprovantes')
+              .upload(fileName, pag.comprovante);
 
-        if (pagamentosError) {
-          console.error('Erro ao salvar pagamentos:', pagamentosError);
+            if (!uploadError) {
+              const { data: { publicUrl } } = supabase.storage
+                .from('pagamentos-comprovantes')
+                .getPublicUrl(fileName);
+
+              comprovanteUrl = publicUrl;
+            }
+          }
+
+          // Calcular valores
+          const valorBruto = pag.valor;
+          const taxaValor = pag.taxa_percentual ? (valorBruto * pag.taxa_percentual) / 100 : 0;
+          const valorLiquido = pag.taxa_paga_por === 'empresa' ? valorBruto - taxaValor : valorBruto;
+
+          const { error: pagamentoError } = await supabase
+            .from('pagamentos')
+            .insert({
+              os_id: novaOS.id,
+              unidade_id: unidadeId,
+              forma_pagamento: pag.forma_pagamento,
+              valor: valorLiquido,
+              valor_bruto: valorBruto,
+              valor_liquido: valorLiquido,
+              parcelamento: pag.parcelamento || 1,
+              taxa_percentual: pag.taxa_percentual || 0,
+              taxa_valor: taxaValor,
+              taxa_paga_por: pag.taxa_paga_por || null,
+              nsu: pag.nsu || null,
+              pix_id_transacao: pag.pix_id_transacao || null,
+              comprovante_url: comprovanteUrl,
+              observacoes: pag.observacoes || null,
+              lancado_por: usuario?.id,
+              responsavel_fechamento: usuario?.id,
+              data_lancamento: new Date().toISOString()
+            });
+
+          if (pagamentoError) {
+            console.error('Erro ao salvar pagamento:', pagamentoError);
+          }
         }
       }
 
@@ -2433,10 +2484,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
             )}
 
-            {abaAtiva === 'pagamento' && tipoOS === 'OW' && (
+            {abaAtiva === 'pagamento' && tipoOS === 'OW' && currentMode === 'create' && (
               <div className="space-y-4">
-                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Informações de Pagamento</h3>
-
                 {(() => {
                   const valorTotal = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
                   const valorPago = pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0);
@@ -2465,7 +2514,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         </div>
                       </div>
 
-                      <div>
+                      <div className="flex items-center justify-between">
                         <span className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
                           saldoRestante === 0 && valorTotal > 0 ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
                           valorPago > 0 && saldoRestante > 0 ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
@@ -2475,51 +2524,182 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                            valorPago > 0 && saldoRestante > 0 ? 'Pago Parcial' :
                            'Pendente'}
                         </span>
+                        <button
+                          onClick={() => setShowAddPaymentModal(true)}
+                          className="neon-button px-6 py-3"
+                        >
+                          <DollarSign className="w-4 h-4 inline mr-2" />
+                          Adicionar Pagamento
+                        </button>
                       </div>
                     </div>
                   );
                 })()}
 
-                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Adicionar Pagamento</h3>
+                <div>
+                  <h4 className="text-[#00D4FF] font-bold mb-3 uppercase text-sm flex items-center gap-2">
+                    <DollarSign className="w-4 h-4" />
+                    Pagamentos ({pagamentosTemporarios.length})
+                  </h4>
 
-                <div className="premium-card p-4">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Forma de Pagamento
-                      </label>
-                      <select
-                        value=""
-                        onChange={(e) => {
-                          const forma = e.target.value;
-                          if (!forma) return;
-
-                          setPagamentosTemporarios([...pagamentosTemporarios, {
-                            forma_pagamento: forma,
-                            valor: 0,
-                            data_pagamento: new Date().toISOString().split('T')[0],
-                            observacoes: ''
-                          }]);
-                          e.target.value = '';
-                        }}
-                        className="neon-input w-full"
-                      >
-                        <option value="">Selecionar forma...</option>
-                        <option value="pix">PIX</option>
-                        <option value="cartao_credito">Cartão de Crédito</option>
-                        <option value="cartao_debito">Cartão de Débito</option>
-                        <option value="dinheiro">Dinheiro</option>
-                        <option value="transferencia">Transferência</option>
-                        <option value="boleto">Boleto</option>
-                        <option value="outro">Outro</option>
-                      </select>
+                  {pagamentosTemporarios.length === 0 ? (
+                    <div className="text-center py-12">
+                      <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">Nenhum pagamento registrado ainda</p>
+                      <p className="text-xs text-gray-600 mt-2">Clique em "Adicionar Pagamento" para registrar</p>
                     </div>
-                  </div>
-                </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {pagamentosTemporarios.map((pag, index) => {
+                        const getFormaPagamentoLabel = (forma: string) => {
+                          const labels: Record<string, string> = {
+                            pix: 'PIX',
+                            cartao_credito: 'Cartao de Credito',
+                            cartao_debito: 'Cartao de Debito',
+                            dinheiro: 'Dinheiro',
+                            transferencia: 'Transferencia',
+                            boleto: 'Boleto',
+                            outro: 'Outro'
+                          };
+                          return labels[forma] || forma;
+                        };
 
+                        const getFormaPagamentoColor = (forma: string) => {
+                          const colors: Record<string, string> = {
+                            pix: '#00D4FF',
+                            cartao_credito: '#9D4EDD',
+                            cartao_debito: '#3b82f6',
+                            dinheiro: '#39FF14',
+                            transferencia: '#10b981',
+                            boleto: '#FFBF00',
+                            outro: '#6B7280'
+                          };
+                          return colors[forma] || '#6B7280';
+                        };
+
+                        return (
+                          <div
+                            key={index}
+                            className="premium-card p-5 transition-all"
+                            style={{
+                              borderLeft: `4px solid ${getFormaPagamentoColor(pag.forma_pagamento)}`
+                            }}
+                          >
+                            <div className="flex items-start justify-between mb-4">
+                              <div className="flex items-center gap-3">
+                                <div
+                                  className="w-10 h-10 rounded-lg flex items-center justify-center"
+                                  style={{
+                                    backgroundColor: `${getFormaPagamentoColor(pag.forma_pagamento)}20`,
+                                    borderColor: getFormaPagamentoColor(pag.forma_pagamento),
+                                    borderWidth: '2px'
+                                  }}
+                                >
+                                  <DollarSign
+                                    className="w-5 h-5"
+                                    style={{ color: getFormaPagamentoColor(pag.forma_pagamento) }}
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-lg font-bold text-white">
+                                    R$ {pag.valor.toFixed(2)}
+                                  </p>
+                                  <p
+                                    className="text-xs font-semibold"
+                                    style={{ color: getFormaPagamentoColor(pag.forma_pagamento) }}
+                                  >
+                                    {getFormaPagamentoLabel(pag.forma_pagamento)}
+                                    {pag.parcelamento && pag.parcelamento > 1 && ` - ${pag.parcelamento}x`}
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => {
+                                  setPagamentosTemporarios(pagamentosTemporarios.filter((_, i) => i !== index));
+                                }}
+                                className="text-red-400 hover:text-red-300 transition-colors"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
+
+                            {pag.nsu && (
+                              <div className="mb-2">
+                                <p className="text-xs text-gray-400 uppercase">NSU</p>
+                                <p className="text-sm text-gray-300 font-mono">{pag.nsu}</p>
+                              </div>
+                            )}
+
+                            {pag.pix_id_transacao && (
+                              <div className="mb-2">
+                                <p className="text-xs text-gray-400 uppercase">ID Transação PIX</p>
+                                <p className="text-sm text-gray-300 font-mono">{pag.pix_id_transacao}</p>
+                              </div>
+                            )}
+
+                            {pag.taxa_percentual && pag.taxa_percentual > 0 && (
+                              <div className="mb-2">
+                                <p className="text-xs text-gray-400 uppercase">Taxa</p>
+                                <p className="text-sm text-[#FFBF00]">{pag.taxa_percentual}% - Paga por: {pag.taxa_paga_por === 'empresa' ? 'Empresa' : 'Cliente'}</p>
+                              </div>
+                            )}
+
+                            {pag.observacoes && (
+                              <div className="mt-3 premium-card p-3 bg-[#00D4FF]/5">
+                                <p className="text-xs text-gray-400 uppercase mb-1">Observações</p>
+                                <p className="text-sm text-gray-300">{pag.observacoes}</p>
+                              </div>
+                            )}
+
+                            {pag.comprovante && (
+                              <div className="mt-3">
+                                <p className="text-xs text-[#39FF14]">
+                                  <CheckCircle className="w-3 h-3 inline mr-1" />
+                                  Comprovante anexado</p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'pagamento' && tipoOS === 'OW' && currentMode === 'view' && (
+              <div className="space-y-6">
+                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-6 text-center">
+                  <DollarSign className="w-16 h-16 text-[#39FF14] mx-auto mb-4" />
+                  <h3 className="text-lg font-bold text-[#39FF14] uppercase tracking-wider mb-2">
+                    Pagamentos
+                  </h3>
+                  <p className="text-sm text-gray-300 mb-4">
+                    Os pagamentos serão gerenciados após você criar a OS.
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Após criar a OS, você terá acesso completo ao gerenciamento de pagamentos nesta aba.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'pagamento' && currentMode === 'view' && os && os.tipo_os === 'OW' && (
+              <OSPagamentoTab
+                osId={os.id}
+                os={os}
+                onUpdate={async () => {
+                  await loadOS();
+                }}
+              />
+            )}
+
+            {abaAtiva === 'servicos' && tipoOS === 'OW' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
                 <div>
                   {pagamentosTemporarios.length === 0 ? (
-                    <p className="text-center text-gray-500 py-8">Nenhum pagamento lançado ainda</p>
+                    <p className="text-center text-gray-500 py-8">Recurso de serviços ainda não implementado no modo de criação</p>
                   ) : (
                     <div className="space-y-3">
                       {pagamentosTemporarios.map((pag, index) => (
@@ -3964,6 +4144,362 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   ADICIONAR
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal para adicionar pagamento */}
+      {showAddPaymentModal && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[70] flex items-center justify-center p-4">
+          <div className="premium-card w-full max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="p-6 border-b border-[#39FF14]/20 bg-gradient-to-r from-[#39FF14]/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-[#39FF14]/20 to-[#00D4FF]/20 flex items-center justify-center border-2 border-[#39FF14]/30">
+                    <DollarSign className="w-7 h-7 text-[#39FF14]" />
+                  </div>
+                  <div>
+                    <h2 className="text-2xl font-bold text-[#39FF14]">REGISTRAR PAGAMENTO</h2>
+                    <p className="text-sm text-gray-400 mt-1">OS: {numeroOSSamsung || 'Nova OS'}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowAddPaymentModal(false);
+                    setNovoPagamentoForma('pix');
+                    setNovoPagamentoValor('');
+                    setNovoPagamentoNSU('');
+                    setNovoPagamentoPixId('');
+                    setNovoPagamentoParcelamento('1');
+                    setNovoPagamentoTaxa('0');
+                    setNovoPagamentoComprovante(null);
+                    setNovoPagamentoObservacoes('');
+                  }}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                >
+                  <X className="w-6 h-6 text-gray-400 hover:text-white" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+              {/* Resumo */}
+              <div className="premium-card p-5 bg-gradient-to-br from-[#00D4FF]/10 to-transparent border-2 border-[#00D4FF]/30">
+                <div className="grid grid-cols-3 gap-6">
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Cliente</p>
+                    <p className="text-white font-bold text-lg">{clienteNome || '-'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Valor Total</p>
+                    <p className="text-[#00D4FF] font-bold text-2xl">
+                      R$ {pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0).toFixed(2)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Saldo Restante</p>
+                    <p className="text-[#FFBF00] font-bold text-2xl">
+                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) - pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0)).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Forma de Pagamento */}
+              <div>
+                <label className="block text-sm font-bold text-[#00D4FF] uppercase mb-3 tracking-wider">
+                  Forma de Pagamento *
+                </label>
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { value: 'pix', label: 'PIX', icon: '💳', color: '#00D4FF' },
+                    { value: 'cartao_credito', label: 'Cartão de Crédito', icon: '💳', color: '#9D4EDD' },
+                    { value: 'cartao_debito', label: 'Cartão de Débito', icon: '💳', color: '#3b82f6' },
+                    { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: '#39FF14' },
+                    { value: 'transferencia', label: 'Transferência', icon: '🏦', color: '#10b981' },
+                    { value: 'boleto', label: 'Boleto', icon: '📄', color: '#FFBF00' },
+                    { value: 'outro', label: 'Outro', icon: '📋', color: '#6B7280' }
+                  ].map(forma => (
+                    <button
+                      key={forma.value}
+                      type="button"
+                      onClick={() => setNovoPagamentoForma(forma.value as any)}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        novoPagamentoForma === forma.value
+                          ? 'border-[#00D4FF] bg-[#00D4FF]/20 scale-105'
+                          : 'border-gray-700 bg-black/30 hover:border-gray-500'
+                      }`}
+                    >
+                      <div className="text-3xl mb-2">{forma.icon}</div>
+                      <p className={`text-xs font-bold uppercase ${
+                        novoPagamentoForma === forma.value ? 'text-[#00D4FF]' : 'text-gray-400'
+                      }`}>
+                        {forma.label}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Valor */}
+              <div>
+                <label className="block text-sm font-bold text-[#39FF14] uppercase mb-3 tracking-wider">
+                  Valor do Pagamento *
+                </label>
+                <div className="relative">
+                  <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-[#39FF14]" />
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={novoPagamentoValor}
+                    onChange={(e) => setNovoPagamentoValor(e.target.value)}
+                    placeholder="0,00"
+                    className="neon-input pl-14 text-2xl font-bold"
+                    style={{ height: '60px' }}
+                  />
+                </div>
+              </div>
+
+              {/* Parcelamento - Só para Crédito */}
+              {novoPagamentoForma === 'cartao_credito' && (
+                <div>
+                  <label className="block text-sm font-bold text-[#9D4EDD] uppercase mb-3 tracking-wider">
+                    <CreditCard className="w-4 h-4 inline mr-2" />
+                    Parcelamento
+                  </label>
+                  <select
+                    value={novoPagamentoParcelamento}
+                    onChange={(e) => setNovoPagamentoParcelamento(e.target.value)}
+                    className="neon-input"
+                  >
+                    <option value="1">À vista (1x)</option>
+                    {[...Array(12)].map((_, i) => (
+                      <option key={i + 2} value={i + 2}>{i + 2}x</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Campos específicos para Cartão */}
+              {(novoPagamentoForma === 'cartao_credito' || novoPagamentoForma === 'cartao_debito') && (
+                <div className="premium-card p-6 bg-gradient-to-br from-[#FFBF00]/10 to-transparent border-2 border-[#FFBF00]/30 space-y-5">
+                  <h3 className="text-sm font-bold text-[#FFBF00] uppercase tracking-wider flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Informações do Cartão
+                  </h3>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                      NSU da Transação *
+                    </label>
+                    <input
+                      type="text"
+                      value={novoPagamentoNSU}
+                      onChange={(e) => setNovoPagamentoNSU(e.target.value)}
+                      placeholder="Ex: 123456789"
+                      className="neon-input font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Número sequencial único da transação do cartão
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        Taxa de Cartão (%)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        max="100"
+                        value={novoPagamentoTaxa}
+                        onChange={(e) => setNovoPagamentoTaxa(e.target.value)}
+                        className="neon-input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        Quem Paga a Taxa?
+                      </label>
+                      <select
+                        value={novoPagamentoTaxaPagaPor}
+                        onChange={(e) => setNovoPagamentoTaxaPagaPor(e.target.value as 'cliente' | 'empresa')}
+                        className="neon-input"
+                      >
+                        <option value="empresa">Empresa (absorve)</option>
+                        <option value="cliente">Cliente (repassa)</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Campos específicos para PIX */}
+              {novoPagamentoForma === 'pix' && (
+                <div className="premium-card p-6 bg-gradient-to-br from-[#00D4FF]/10 to-transparent border-2 border-[#00D4FF]/30 space-y-5">
+                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
+                    Informações do PIX
+                  </h3>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        ID da Transação PIX
+                      </label>
+                      <input
+                        type="text"
+                        value={novoPagamentoPixId}
+                        onChange={(e) => setNovoPagamentoPixId(e.target.value)}
+                        placeholder="Ex: E123456789..."
+                        className="neon-input font-mono"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        NSU (Opcional)
+                      </label>
+                      <input
+                        type="text"
+                        value={novoPagamentoNSU}
+                        onChange={(e) => setNovoPagamentoNSU(e.target.value)}
+                        placeholder="Ex: 123456789"
+                        className="neon-input font-mono"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Comprovante */}
+              <div>
+                <label className="block text-sm font-bold text-gray-300 uppercase mb-3 tracking-wider">
+                  Comprovante
+                </label>
+                <div className="premium-card p-4 border-2 border-dashed border-gray-700 hover:border-[#39FF14]/50 transition-all">
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        setNovoPagamentoComprovante(e.target.files[0]);
+                      }
+                    }}
+                    className="hidden"
+                    id="comprovante-upload"
+                  />
+                  <label htmlFor="comprovante-upload" className="cursor-pointer flex items-center gap-3">
+                    <Upload className="w-6 h-6 text-[#39FF14]" />
+                    <div>
+                      <p className="text-sm text-white font-bold">
+                        {novoPagamentoComprovante ? novoPagamentoComprovante.name : 'Clique para fazer upload'}
+                      </p>
+                      <p className="text-xs text-gray-400 mt-1">PNG, JPG ou PDF (máx. 10MB)</p>
+                    </div>
+                  </label>
+                  {novoPagamentoComprovante && (
+                    <button
+                      onClick={() => setNovoPagamentoComprovante(null)}
+                      className="mt-3 text-xs text-red-400 hover:text-red-300 flex items-center gap-2"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Remover arquivo
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div>
+                <label className="block text-sm font-bold text-gray-300 uppercase mb-3 tracking-wider">
+                  Observações
+                </label>
+                <textarea
+                  value={novoPagamentoObservacoes}
+                  onChange={(e) => setNovoPagamentoObservacoes(e.target.value)}
+                  placeholder="Informações adicionais sobre o pagamento..."
+                  className="neon-input w-full resize-none"
+                  rows={3}
+                />
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-700 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowAddPaymentModal(false);
+                  setNovoPagamentoForma('pix');
+                  setNovoPagamentoValor('');
+                  setNovoPagamentoNSU('');
+                  setNovoPagamentoPixId('');
+                  setNovoPagamentoParcelamento('1');
+                  setNovoPagamentoTaxa('0');
+                  setNovoPagamentoComprovante(null);
+                  setNovoPagamentoObservacoes('');
+                }}
+                className="flex-1 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all border border-gray-700 text-gray-400 hover:bg-gray-800/60"
+              >
+                CANCELAR
+              </button>
+              <button
+                onClick={() => {
+                  const valorNum = parseFloat(novoPagamentoValor);
+                  if (!novoPagamentoValor || isNaN(valorNum) || valorNum <= 0) {
+                    alert('Digite um valor válido maior que zero');
+                    return;
+                  }
+
+                  const isCartao = novoPagamentoForma === 'cartao_credito' || novoPagamentoForma === 'cartao_debito';
+                  const isPix = novoPagamentoForma === 'pix';
+
+                  if (isCartao && !novoPagamentoNSU.trim()) {
+                    alert('NSU é obrigatório para pagamentos com cartão');
+                    return;
+                  }
+
+                  if (isPix && !novoPagamentoPixId.trim() && !novoPagamentoNSU.trim()) {
+                    alert('Informe o ID da transação ou NSU para pagamentos PIX');
+                    return;
+                  }
+
+                  setPagamentosTemporarios([...pagamentosTemporarios, {
+                    forma_pagamento: novoPagamentoForma,
+                    valor: valorNum,
+                    data_pagamento: new Date().toISOString().split('T')[0],
+                    observacoes: novoPagamentoObservacoes || undefined,
+                    nsu: novoPagamentoNSU || undefined,
+                    pix_id_transacao: novoPagamentoPixId || undefined,
+                    parcelamento: novoPagamentoForma === 'cartao_credito' ? parseInt(novoPagamentoParcelamento) : undefined,
+                    taxa_percentual: isCartao && parseFloat(novoPagamentoTaxa) > 0 ? parseFloat(novoPagamentoTaxa) : undefined,
+                    taxa_paga_por: isCartao && parseFloat(novoPagamentoTaxa) > 0 ? novoPagamentoTaxaPagaPor : undefined,
+                    comprovante: novoPagamentoComprovante || undefined
+                  }]);
+
+                  setShowAddPaymentModal(false);
+                  setNovoPagamentoForma('pix');
+                  setNovoPagamentoValor('');
+                  setNovoPagamentoNSU('');
+                  setNovoPagamentoPixId('');
+                  setNovoPagamentoParcelamento('1');
+                  setNovoPagamentoTaxa('0');
+                  setNovoPagamentoComprovante(null);
+                  setNovoPagamentoObservacoes('');
+                }}
+                className="flex-1 neon-button flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: '#39FF1420',
+                  color: '#39FF14',
+                  border: '1px solid #39FF1460'
+                }}
+              >
+                <Save className="w-5 h-5" />
+                REGISTRAR PAGAMENTO
+              </button>
             </div>
           </div>
         </div>
