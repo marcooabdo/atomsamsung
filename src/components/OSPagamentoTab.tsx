@@ -181,6 +181,8 @@ Assistencia Tecnica Samsung`;
         .from('os')
         .update({
           coluna_kanban: 'orcamento_aprovado',
+          orcamento_aprovado_em: new Date().toISOString(),
+          orcamento_aprovado_por: usuario?.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
@@ -215,6 +217,8 @@ Assistencia Tecnica Samsung`;
         .from('os')
         .update({
           coluna_kanban: 'orcamentos_rejeitados',
+          orcamento_reprovado_em: new Date().toISOString(),
+          orcamento_reprovado_por: usuario?.id,
           observacoes_internas: `${os.observacoes_internas || ''}\n\n**ORCAMENTO REPROVADO:** ${motivoReprovacao}`,
           updated_at: new Date().toISOString()
         })
@@ -240,85 +244,97 @@ Assistencia Tecnica Samsung`;
     }
   };
 
-  const podeGerenciarOrcamento = os.coluna_kanban === 'negociacao_em_andamento' ||
-                                  os.coluna_kanban === 'aguardando_aprovacao' ||
-                                  os.coluna_kanban === 'diagnostico';
-
   return (
     <>
       <div className="space-y-4">
-        {podeGerenciarOrcamento && (
-          <div className="premium-card p-6 bg-gradient-to-r from-[#F59E0B]/10 to-[#00D4FF]/10 border border-[#F59E0B]/30">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-lg bg-[#F59E0B]/20 flex items-center justify-center border border-[#F59E0B]/40">
-                  <MessageSquare className="w-5 h-5 text-[#F59E0B]" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-[#F59E0B]">NEGOCIACAO DE ORCAMENTO</h3>
-                  <p className="text-xs text-gray-400">Envie, aprove ou reprove o orcamento</p>
-                </div>
+        <div className="premium-card p-6 bg-gradient-to-r from-[#F59E0B]/10 to-[#00D4FF]/10 border border-[#F59E0B]/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#F59E0B]/20 flex items-center justify-center border border-[#F59E0B]/40">
+                <MessageSquare className="w-5 h-5 text-[#F59E0B]" />
               </div>
-              {os.versao_orcamento > 1 && (
-                <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40 animate-pulse">
-                  <AlertTriangle className="w-3 h-3 inline mr-1" />
-                  {os.versao_orcamento}o ORCAMENTO
-                </span>
-              )}
+              <div>
+                <h3 className="text-lg font-bold text-[#F59E0B]">NEGOCIACAO DE ORCAMENTO</h3>
+                <p className="text-xs text-gray-400">Envie, aprove ou reprove o orcamento</p>
+              </div>
             </div>
-
-            {os.orcamento_enviado && (
-              <div className="mb-4 p-3 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30">
-                <p className="text-xs text-[#00D4FF]">
-                  <Check className="w-3 h-3 inline mr-1" />
-                  Orcamento enviado em {new Date(os.orcamento_enviado_em).toLocaleString('pt-BR')}
-                </p>
-              </div>
+            {os.versao_orcamento > 1 && (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40 animate-pulse">
+                <AlertTriangle className="w-3 h-3 inline mr-1" />
+                {os.versao_orcamento}o ORCAMENTO
+              </span>
             )}
-
-            <div className="grid grid-cols-3 gap-3">
-              <button
-                onClick={() => setShowWhatsAppModal(true)}
-                disabled={processando}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
-                style={{
-                  backgroundColor: '#25D36620',
-                  color: '#25D366',
-                  border: '1px solid #25D36660'
-                }}
-              >
-                <Send className="w-4 h-4" />
-                {os.orcamento_enviado ? 'Reenviar' : 'Enviar'}
-              </button>
-              <button
-                onClick={handleAprovarOrcamento}
-                disabled={processando}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
-                style={{
-                  backgroundColor: '#39FF1420',
-                  color: '#39FF14',
-                  border: '1px solid #39FF1460'
-                }}
-              >
-                <ThumbsUp className="w-4 h-4" />
-                Aprovar
-              </button>
-              <button
-                onClick={() => setShowReprovarModal(true)}
-                disabled={processando}
-                className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
-                style={{
-                  backgroundColor: '#FF006420',
-                  color: '#FF0064',
-                  border: '1px solid #FF006460'
-                }}
-              >
-                <ThumbsDown className="w-4 h-4" />
-                Reprovar
-              </button>
-            </div>
           </div>
-        )}
+
+          {os.orcamento_enviado && (
+            <div className="mb-4 p-3 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30">
+              <p className="text-xs text-[#00D4FF]">
+                <Check className="w-3 h-3 inline mr-1" />
+                Orcamento enviado em {new Date(os.orcamento_enviado_em).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          )}
+
+          <div className="grid grid-cols-3 gap-3 mb-4">
+            <button
+              onClick={() => setShowWhatsAppModal(true)}
+              disabled={processando}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
+              style={{
+                backgroundColor: '#25D36620',
+                color: '#25D366',
+                border: '1px solid #25D36660'
+              }}
+            >
+              <Send className="w-4 h-4" />
+              {os.orcamento_enviado ? 'Reenviar' : 'Enviar'}
+            </button>
+            <button
+              onClick={handleAprovarOrcamento}
+              disabled={processando}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
+              style={{
+                backgroundColor: '#39FF1420',
+                color: '#39FF14',
+                border: '1px solid #39FF1460'
+              }}
+            >
+              <ThumbsUp className="w-4 h-4" />
+              Aprovar
+            </button>
+            <button
+              onClick={() => setShowReprovarModal(true)}
+              disabled={processando}
+              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
+              style={{
+                backgroundColor: '#FF006420',
+                color: '#FF0064',
+                border: '1px solid #FF006460'
+              }}
+            >
+              <ThumbsDown className="w-4 h-4" />
+              Reprovar
+            </button>
+          </div>
+
+          {os.orcamento_aprovado_em && (
+            <div className="mb-3 p-3 rounded-lg bg-[#39FF14]/10 border border-[#39FF14]/30">
+              <p className="text-xs text-[#39FF14]">
+                <ThumbsUp className="w-3 h-3 inline mr-1" />
+                Orçamento APROVADO em {new Date(os.orcamento_aprovado_em).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          )}
+
+          {os.orcamento_reprovado_em && (
+            <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
+              <p className="text-xs text-[#FF0064]">
+                <ThumbsDown className="w-3 h-3 inline mr-1" />
+                Orçamento REPROVADO em {new Date(os.orcamento_reprovado_em).toLocaleString('pt-BR')}
+              </p>
+            </div>
+          )}
+        </div>
 
         <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5">
           <div className="grid grid-cols-3 gap-6 mb-4">
