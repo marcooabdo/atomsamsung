@@ -5,7 +5,6 @@ import { Login } from './pages/Login';
 import { Layout } from './components/Layout';
 import { MobileLayout } from './components/MobileLayout';
 import { Dashboard } from './pages/Dashboard';
-import { Cotacoes } from './pages/Cotacoes';
 import { Kanban } from './pages/Kanban';
 import { Estoque } from './pages/Estoque';
 import { Chat } from './pages/Chat';
@@ -115,17 +114,6 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <Dashboard />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/cotacoes"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Cotacoes />
               </Layout>
             </ProtectedRoute>
           }

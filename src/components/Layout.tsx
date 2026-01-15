@@ -4,7 +4,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import {
   LayoutDashboard,
-  FileText,
   Layers,
   Package,
   MessageSquare,
@@ -24,7 +23,6 @@ interface LayoutProps {
 
 const allMenuItems = [
   { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
-  { id: 'cotacoes', label: 'Nexus de Cotações', icon: FileText, path: '/cotacoes' },
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', label: 'Núcleo de Peças', icon: Package, path: '/estoque' },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },

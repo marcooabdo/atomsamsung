@@ -15,7 +15,7 @@ type OS = Database['public']['Tables']['os']['Row'];
 const COLUNAS_KANBAN = [
   { id: 'os_nova', label: 'OS Nova', color: '#0EA5E9', icon: Zap },
   { id: 'diagnostico', label: 'Diagnóstico', color: '#06B6D4', icon: Activity },
-  { id: 'aguardando_cotacao', label: 'Aguardando Cotação', color: '#F59E0B', icon: Clock },
+  { id: 'negociacao_em_andamento', label: 'Negociação em Andamento', color: '#F59E0B', icon: Clock },
   { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação', color: '#F97316', icon: Clock },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado', color: '#10B981', icon: Zap },
   { id: 'aguardando_peca', label: 'Aguardando Peça', color: '#8B5CF6', icon: Clock },
@@ -366,7 +366,7 @@ export function Kanban() {
   const handleDragStart = (e: React.DragEvent, os: OS) => {
     if (os.coluna_kanban === 'diagnostico') {
       e.preventDefault();
-      alert('⚠️ MOVIMENTAÇÃO BLOQUEADA\n\nOS em DIAGNÓSTICO não pode ser movida.\n\nPara liberar:\n• Clique em "Análise Concluída" no card da OS\n• Descreva a análise realizada\n• A OS será movida automaticamente para "Aguardando Cotação"');
+      alert('MOVIMENTACAO BLOQUEADA\n\nOS em DIAGNOSTICO nao pode ser movida.\n\nPara liberar:\n - Clique em "Analise Concluida" no card da OS\n - Descreva a analise realizada\n - A OS sera movida automaticamente para "Negociacao em Andamento"');
       return;
     }
     setDraggedCard(os);
@@ -1275,6 +1275,31 @@ export function Kanban() {
                                 TAT: {calcularTAT(os.created_at)}d
                               </span>
                             </div>
+
+                            {(os as any).versao_orcamento > 1 && (
+                              <div className="mt-1.5 rounded-md p-1.5"
+                                style={{
+                                  background: 'linear-gradient(135deg, rgba(255,0,100,0.15) 0%, rgba(255,0,100,0.05) 100%)',
+                                  border: '1px solid rgba(255,0,100,0.4)',
+                                  boxShadow: '0 0 10px rgba(255,0,100,0.2)',
+                                  animation: 'pulse 2s infinite'
+                                }}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <AlertCircle className="w-3 h-3 text-[#FF0064] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #FF0064)' }} />
+                                  <span
+                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(255,0,100,0.3) 0%, rgba(255,0,100,0.15) 100%)',
+                                      color: '#FF0064',
+                                      border: '1px solid rgba(255,0,100,0.5)'
+                                    }}
+                                  >
+                                    {(os as any).versao_orcamento}o ORCAMENTO
+                                  </span>
+                                </div>
+                              </div>
+                            )}
 
                             {badgeFilters.status && os.numero_os_samsung && ((os as any).status_samsung_desc || (os as any).status_samsung_reason) && (
                               <div className="mt-1.5 rounded-md p-1.5"

@@ -42,14 +42,14 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
       const { error: osError } = await supabase
         .from('os')
         .update({
-          coluna_kanban: 'aguardando_cotacao',
+          coluna_kanban: 'negociacao_em_andamento',
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
 
       if (osError) throw osError;
 
-      alert('✓ Análise registrada e OS movida para "Aguardando Cotação"');
+      alert('Analise registrada e OS movida para "Negociacao em Andamento"');
       onSuccess();
       handleClose();
     } catch (error: any) {

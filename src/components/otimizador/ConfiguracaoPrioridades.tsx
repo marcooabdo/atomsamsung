@@ -29,7 +29,7 @@ const PRIORIDADES = [
 ];
 
 const COLUNAS_KANBAN = [
-  'os_nova', 'diagnostico', 'aguardando_cotacao', 'aguardando_aprovacao',
+  'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao',
   'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel',
   'em_reparo_ci', 'rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde',
   'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih', 'reparo_concluido',

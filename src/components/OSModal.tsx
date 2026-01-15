@@ -15,7 +15,7 @@ import type { Database } from '../lib/database.types';
 const COLUNAS_KANBAN = [
   { id: 'os_nova', label: 'OS Nova' },
   { id: 'diagnostico', label: 'Diagnóstico' },
-  { id: 'aguardando_cotacao', label: 'Aguardando Cotação' },
+  { id: 'negociacao_em_andamento', label: 'Negociação em Andamento' },
   { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação' },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
   { id: 'aguardando_peca', label: 'Aguardando Peça' },
