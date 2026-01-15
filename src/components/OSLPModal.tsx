@@ -684,8 +684,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             .maybeSingle();
 
           // Buscar markup ativo
+          const tipoOSAtual = mode === 'view' ? os?.tipo_os : tipoOS;
           let valorComMarkup = pedido?.valor_estimado || null;
-          if (valorComMarkup && tipoOS === 'OW') {
+          if (valorComMarkup && tipoOSAtual === 'OW') {
             const { data: markupData } = await supabase.rpc('get_markup_ativo', {
               p_unidade_id: unidadeParaBusca,
               p_valor_peca: valorComMarkup
@@ -1536,9 +1537,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             <button
               onClick={onClose}
-              className="p-2 hover:bg-[#FFA500]/10 rounded-lg transition-colors"
+              className="p-2 rounded-lg transition-colors"
+              style={{
+                color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.backgroundColor = tipoOS === 'LP' ? '#FFA50010' : '#00D4FF10';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.backgroundColor = 'transparent';
+              }}
             >
-              <X className="w-5 h-5 text-[#FFA500]" />
+              <X className="w-5 h-5" />
             </button>
           </div>
         </div>
@@ -1657,7 +1667,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
         {mode === 'create' ? (
           <>
-            <div className="flex border-b border-[#FFA500]/20">
+            <div className="flex border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
               {[
                 { id: 'dados', label: 'Dados Básicos', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
@@ -1720,7 +1730,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {abaAtiva === 'dados' && (
                 <div className="space-y-6">
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
                   Informações Básicas
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -1768,7 +1778,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
 
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
                   Dados do Cliente
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -1927,7 +1937,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
 
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
                   Dados do Aparelho
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -2048,6 +2058,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 setNovaPecaDescricao(peca.descricao);
                                 if (tipoOS === 'OW' && peca.valor_com_markup) {
                                   setNovaPecaValor(peca.valor_com_markup.toFixed(2));
+                                } else if (peca.valor_corrigido) {
+                                  setNovaPecaValor(peca.valor_corrigido.toFixed(2));
+                                } else if (peca.valor_com_impostos) {
+                                  setNovaPecaValor(peca.valor_com_impostos.toFixed(2));
                                 }
                                 setMostrarSugestoes(false);
                               }}
@@ -2097,16 +2111,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Qtd
+                        Valor GSPN (R$)
                       </label>
                       <div className="flex gap-2">
                         <input
                           type="number"
-                          min="1"
-                          max="1"
-                          value={1}
-                          readOnly
-                          className="neon-input w-20 bg-gray-800 cursor-not-allowed"
+                          step="0.01"
+                          value={novaPecaValor}
+                          onChange={(e) => setNovaPecaValor(e.target.value)}
+                          className="neon-input flex-1"
+                          placeholder="0.00"
                         />
                         <button
                           onClick={() => {
@@ -2256,9 +2270,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="premium-card p-6">
                   <label className="neon-button flex items-center justify-center gap-2 w-full px-4 py-3 cursor-pointer"
                     style={{
-                      backgroundColor: '#FFA50020',
-                      borderColor: '#FFA500',
-                      color: '#FFA500'
+                      backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
+                      borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
+                      color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
                     }}>
                     <Paperclip className="w-4 h-4" />
                     SELECIONAR ARQUIVO
@@ -2315,8 +2329,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             {abaAtiva === 'agendamento' && (
               <div className="space-y-6">
-                <div className="bg-[#FFA500]/10 border border-[#FFA500]/30 rounded-lg p-4">
-                  <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider flex items-center gap-2">
+                <div className="rounded-lg p-4" style={{
+                  backgroundColor: tipoOS === 'LP' ? '#FFA5001a' : '#00D4FF1a',
+                  border: `1px solid ${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}4d`
+                }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{
+                    color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+                  }}>
                     <Calendar className="w-4 h-4" />
                     Agendamento
                   </h3>
@@ -2433,8 +2452,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             <div className="flex-1 overflow-y-auto cyber-scrollbar p-6">
               {abaAtiva === 'dados' && os && (
                 <div className="space-y-6">
-                  <div className="premium-card p-4 bg-gradient-to-r from-[#FFA500]/10 to-[#00D4FF]/10 border-l-4 border-[#FFA500]">
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <div className="premium-card p-4 border-l-4" style={{
+                    background: os.tipo_os === 'OW' ? 'linear-gradient(to right, #00D4FF1a, #00D4FF0a)' : 'linear-gradient(to right, #FFA5001a, #00D4FF0a)',
+                    borderLeftColor: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                  }}>
+                    <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{
+                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    }}>
                       <FileText className="w-4 h-4" />
                       Informações da OS
                     </h3>
@@ -2534,7 +2558,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   </div>
 
                   <div>
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{
+                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    }}>
                       <User className="w-4 h-4" />
                       Cliente
                     </h3>
@@ -2596,7 +2622,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   </div>
 
                   <div className="border-t border-gray-700 pt-6">
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{
+                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    }}>
                       Aparelho
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
@@ -2756,32 +2784,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           placeholder="Ex: Display LCD"
                         />
                       </div>
-                      <div>
+                      <div className="col-span-2">
                         <label className="text-xs text-gray-400 uppercase block mb-2">
-                          Valor (R$)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={novaPecaValor}
-                          onChange={(e) => setNovaPecaValor(e.target.value)}
-                          className="neon-input w-full"
-                          placeholder="0.00"
-                        />
-                        <p className="text-[10px] text-gray-500 mt-1">Valor GSPN/NF</p>
-                      </div>
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase block mb-2">
-                          Qtd *
+                          Valor GSPN (R$)
                         </label>
                         <div className="flex gap-2">
                           <input
                             type="number"
-                            min="1"
-                            max="1"
-                            value={1}
-                            readOnly
-                            className="neon-input w-20 bg-gray-800 cursor-not-allowed"
+                            step="0.01"
+                            value={novaPecaValor}
+                            onChange={(e) => setNovaPecaValor(e.target.value)}
+                            className="neon-input flex-1"
+                            placeholder="0.00"
                           />
                           <button
                             onClick={async () => {
@@ -3249,7 +3263,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {abaAtiva === 'anexos' && (
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider">
+                    <h3 className="text-sm font-bold uppercase tracking-wider" style={{
+                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    }}>
                       Anexos
                     </h3>
                     <label className="neon-button flex items-center gap-2 text-xs px-4 py-2 cursor-pointer">
@@ -3287,7 +3303,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {abaAtiva === 'comentarios' && (
                 <div>
                   <div className="mb-4">
-                    <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-4">
+                    <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{
+                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    }}>
                       Adicionar Comentário
                     </h3>
                     <div className="flex gap-2">
@@ -3349,7 +3367,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         )}
 
         {mode === 'create' && (
-          <div className="p-6 border-t border-[#FFA500]/20">
+          <div className="p-6 border-t" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex gap-4 text-xs text-gray-400">
                 <div className="flex items-center gap-2">
