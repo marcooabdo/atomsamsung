@@ -146,6 +146,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     descricao: string;
     concluido: boolean;
   }>>([]);
+  const [checklistsDisponiveis, setChecklistsDisponiveis] = useState<any[]>([]);
+  const [checklistsSelecionados, setChecklistsSelecionados] = useState<string[]>([]);
   const [anexosTemporarios, setAnexosTemporarios] = useState<Array<{
     file: File;
     nome: string;
@@ -253,6 +255,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       loadServicosCadastrados();
     }
   }, [currentMode, abaAtiva, tipoOS, unidadeId]);
+
+  // Carregar checklists quando a aba de checklist é aberta no modo criar
+  useEffect(() => {
+    if (currentMode === 'create' && abaAtiva === 'checklist' && unidadeId) {
+      loadChecklistsDisponiveis();
+    }
+  }, [currentMode, abaAtiva, tipoOS, tipoAtendimento, unidadeId]);
 
   useEffect(() => {
     if (currentMode === 'view' && currentOsId) {
@@ -657,6 +666,32 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     setServicosCadastrados(data || []);
   };
 
+  const loadChecklistsDisponiveis = async () => {
+    const unidadeParaBusca = currentMode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
+    const tipoAtendimentoParaBusca = currentMode === 'create' ? tipoAtendimento : os?.tipo_atendimento;
+    const tipoOSParaBusca = currentMode === 'create' ? tipoOS : os?.tipo_os;
+
+    if (!unidadeParaBusca || !tipoOSParaBusca) return;
+
+    const { data } = await supabase
+      .from('checklist_templates')
+      .select('*')
+      .or(`unidade_id.eq.${unidadeParaBusca},unidade_id.is.null`)
+      .eq('ativo', true)
+      .eq('tipo_checklist', 'ADM')
+      .contains('tipo_os', [tipoOSParaBusca])
+      .order('nome', { ascending: true });
+
+    // Filtrar adicionalmente por tipo de atendimento se especificado
+    const filtered = data?.filter(checklist =>
+      !tipoAtendimentoParaBusca ||
+      !checklist.tipos_atendimento ||
+      checklist.tipos_atendimento.includes(tipoAtendimentoParaBusca)
+    ) || [];
+
+    setChecklistsDisponiveis(filtered);
+  };
+
   const handleAdicionarServico = async () => {
     if (!servicoSelecionado) {
       alert('Selecione um serviço');
@@ -958,6 +993,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
         if (servicosError) {
           console.error('Erro ao salvar serviços:', servicosError);
+        }
+      }
+
+      // Salvar checklists selecionados
+      if (checklistsSelecionados.length > 0) {
+        const checklistsInsert = checklistsSelecionados.map(checklistId => ({
+          os_id: novaOS.id,
+          checklist_template_id: checklistId,
+          vinculado_automaticamente: false,
+          vinculado_por: usuario?.id,
+          respostas: []
+        }));
+
+        const { error: checklistsError } = await supabase
+          .from('os_checklist_vinculados')
+          .insert(checklistsInsert);
+
+        if (checklistsError) {
+          console.error('Erro ao salvar checklists:', checklistsError);
         }
       }
 
@@ -2468,21 +2522,93 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             {abaAtiva === 'checklist' && currentMode === 'create' && (
               <div className="space-y-6">
-                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-6 text-center">
-                  <CheckSquare className="w-16 h-16 text-[#39FF14] mx-auto mb-4" />
-                  <h3 className="text-lg font-bold text-[#39FF14] uppercase tracking-wider mb-2">
-                    Checklists Administrativos
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">
+                    Selecionar Checklists
                   </h3>
-                  <p className="text-sm text-gray-300 mb-4">
-                    Os checklists ADM serão vinculados automaticamente após você criar a OS.
-                  </p>
-                  <p className="text-xs text-gray-400">
-                    Baseado no tipo de OS ({tipoOS}) e tipo de atendimento ({tipoAtendimento}), o sistema vai vincular automaticamente todos os checklists compatíveis.
-                  </p>
-                  <p className="text-xs text-[#39FF14] mt-4">
-                    Depois de criar a OS, você poderá adicionar mais checklists manualmente nesta aba.
+                  <div className="text-xs text-gray-400">
+                    {checklistsSelecionados.length} selecionado(s)
+                  </div>
+                </div>
+
+                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4 mb-4">
+                  <p className="text-xs text-gray-300">
+                    <strong className="text-[#39FF14]">Dica:</strong> Selecione os checklists que deseja vincular a esta OS.
+                    Baseado no tipo de OS (<strong>{tipoOS}</strong>) e tipo de atendimento (<strong>{tipoAtendimento}</strong>).
                   </p>
                 </div>
+
+                {checklistsDisponiveis.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-500 text-sm">Nenhum checklist disponível para esta OS</p>
+                    <p className="text-gray-600 text-xs mt-2">
+                      Configure checklists em Configurações para aparecerem aqui
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {checklistsDisponiveis.map((checklist) => {
+                      const isSelecionado = checklistsSelecionados.includes(checklist.id);
+                      return (
+                        <div
+                          key={checklist.id}
+                          onClick={() => {
+                            if (isSelecionado) {
+                              setChecklistsSelecionados(checklistsSelecionados.filter(id => id !== checklist.id));
+                            } else {
+                              setChecklistsSelecionados([...checklistsSelecionados, checklist.id]);
+                            }
+                          }}
+                          className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01]"
+                          style={{
+                            borderColor: isSelecionado ? '#39FF14' : '#39FF1440',
+                            backgroundColor: isSelecionado ? 'rgba(57, 255, 20, 0.15)' : 'rgba(57, 255, 20, 0.05)'
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 mt-1">
+                              <div
+                                className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all"
+                                style={{
+                                  borderColor: isSelecionado ? '#39FF14' : '#39FF1460',
+                                  backgroundColor: isSelecionado ? '#39FF14' : 'transparent'
+                                }}
+                              >
+                                {isSelecionado && (
+                                  <CheckCircle className="w-4 h-4 text-black" />
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-[#39FF14] mb-1">{checklist.nome}</p>
+                              {checklist.descricao && (
+                                <p className="text-xs text-gray-400 mb-2">{checklist.descricao}</p>
+                              )}
+                              <div className="flex flex-wrap gap-2">
+                                {checklist.tipo_os && checklist.tipo_os.length > 0 && (
+                                  <span className="text-xs px-2 py-1 rounded bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40">
+                                    {checklist.tipo_os.join(', ')}
+                                  </span>
+                                )}
+                                {checklist.tipos_atendimento && checklist.tipos_atendimento.length > 0 && (
+                                  <span className="text-xs px-2 py-1 rounded bg-[#FFA500]/20 text-[#FFA500] border border-[#FFA500]/40">
+                                    {checklist.tipos_atendimento.join(', ')}
+                                  </span>
+                                )}
+                                {checklist.itens && Array.isArray(checklist.itens) && (
+                                  <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
+                                    {checklist.itens.length} item(ns)
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -4083,7 +4209,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="flex items-center gap-2">
                   <Package className="w-4 h-4 text-[#00D4FF]" />
                   <span>
-                    {pecasAdicionadas.length} peça(s) • {servicosAdicionados.length} serviço(s) • {checklistTemporario.length} checklist • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
+                    {pecasAdicionadas.length} peça(s) • {servicosAdicionados.length} serviço(s) • {checklistsSelecionados.length} checklist • {anexosTemporarios.length} anexo(s) • {comentariosTemporarios.length} comentário(s)
                   </span>
                 </div>
               </div>
@@ -4091,7 +4217,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             <div className="flex gap-4 justify-end">
               <button
                 onClick={() => {
-                  const temDados = pecasAdicionadas.length > 0 || servicosAdicionados.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistTemporario.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
+                  const temDados = pecasAdicionadas.length > 0 || servicosAdicionados.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistsSelecionados.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
                   if (temDados) {
                     const confirmar = confirm('Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
                     if (!confirmar) return;
