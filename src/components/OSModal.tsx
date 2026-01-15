@@ -105,7 +105,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
 
-  // Estados para adicionar peça GSPN manualmente (OW)
+  // Estados para adicionar peça manualmente (OW)
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
   const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
   const [novaPecaValorGSPN, setNovaPecaValorGSPN] = useState('');
@@ -545,7 +545,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
     const valorGSPNNum = parseFloat(novaPecaValorGSPN);
     if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
-      alert('Valor GSPN inválido');
+      alert('Valor inválido');
       return;
     }
 
@@ -565,7 +565,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           quantidade: quantidade,
           valor_unitario: valorComMarkup,
           valor_total: valorTotal,
-          status: 'gspn',
+          status: 'manual',
           numero_os_samsung: os?.numero_os_samsung
         });
 
@@ -574,7 +574,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Peça GSPN adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Valor GSPN: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        comentario: `Peça adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
         is_system: true
       });
 
@@ -585,7 +585,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
       await loadPecas();
       await loadComentarios();
-      alert('Peça GSPN adicionada com sucesso!');
+      alert('Peça adicionada com sucesso!');
     } catch (error: any) {
       alert(`Erro ao adicionar peça: ${error.message}`);
     } finally {
@@ -1159,20 +1159,20 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     setCriandoRequisicao(true);
 
     try {
-      // Para peças GSPN, cotacao_peca_id deve ser null
-      const isGSPN = peca.status === 'gspn';
-      const cotacaoPecaId = isGSPN ? null : (peca.cotacao_peca_id || peca.id);
+      // Para peças GSPN e manuais, cotacao_peca_id deve ser null (usam os_peca_id)
+      const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual';
+      const cotacaoPecaId = usaOsPecaId ? null : (peca.cotacao_peca_id || peca.id);
 
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida) para esta peça
-      // Para GSPN, verifica por os_peca_id; para outras, por cotacao_peca_id
+      // Para GSPN/manual, verifica por os_peca_id; para outras, por cotacao_peca_id
       let query = supabase
         .from('requisicoes_pecas')
         .select('id, status')
         .eq('os_id', osId)
         .not('status', 'in', '(reprovada,devolvida)');
 
-      if (isGSPN) {
-        // Para GSPN, verifica pelo os_peca_id (ID único da peça)
+      if (usaOsPecaId) {
+        // Para GSPN e manual, verifica pelo os_peca_id (ID único da peça)
         query = query.eq('os_peca_id', peca.id);
       } else {
         // Para peças normais, verifica pelo cotacao_peca_id
@@ -1203,8 +1203,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .insert({
           os_id: osId,
           cotacao_id: os?.cotacao_id || null,
-          cotacao_peca_id: cotacaoPecaId, // null para GSPN, ID válido para outras
-          os_peca_id: isGSPN ? peca.id : null, // ID único para GSPN
+          cotacao_peca_id: cotacaoPecaId, // null para GSPN/manual, ID válido para outras
+          os_peca_id: usaOsPecaId ? peca.id : null, // ID único para GSPN e manual
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
           quantidade_requisitada: peca.quantidade || 1,
@@ -1281,9 +1281,9 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     setCriandoRequisicao(true);
 
     try {
-      // Para peças GSPN, cotacao_peca_id deve ser null
-      const isGSPN = peca.status === 'gspn';
-      const cotacaoPecaId = isGSPN ? null : (peca.cotacao_peca_id || peca.id);
+      // Para peças GSPN e manuais, cotacao_peca_id deve ser null (usam os_peca_id)
+      const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual';
+      const cotacaoPecaId = usaOsPecaId ? null : (peca.cotacao_peca_id || peca.id);
 
       // Verifica se já existe requisição ATIVA (qualquer status exceto reprovada e devolvida)
       let queryExistente = supabase
@@ -1292,8 +1292,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .eq('os_id', osId)
         .not('status', 'in', '(reprovada,devolvida)');
 
-      if (isGSPN) {
-        // Para GSPN, verifica pelo os_peca_id (ID único da peça)
+      if (usaOsPecaId) {
+        // Para GSPN e manual, verifica pelo os_peca_id (ID único da peça)
         queryExistente = queryExistente.eq('os_peca_id', peca.id);
       } else {
         // Para peças normais, verifica pelo cotacao_peca_id
@@ -1323,8 +1323,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         .insert({
           os_id: osId,
           cotacao_id: os?.cotacao_id || null,
-          cotacao_peca_id: cotacaoPecaId, // null para GSPN, ID válido para outras
-          os_peca_id: isGSPN ? peca.id : null, // ID único para GSPN
+          cotacao_peca_id: cotacaoPecaId, // null para GSPN/manual, ID válido para outras
+          os_peca_id: usaOsPecaId ? peca.id : null, // ID único para GSPN e manual
           codigo_peca: peca.codigo || peca.pn || 'N/A',
           descricao: peca.descricao || 'Peça sem descrição',
           quantidade_requisitada: peca.quantidade || 1,
@@ -2476,7 +2476,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                 <div className="premium-card p-4 bg-[#00D4FF]/10 border border-[#00D4FF]/30 mb-4">
                   <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4 flex items-center gap-2">
                     <Package className="w-4 h-4" />
-                    Adicionar Peça GSPN Manualmente
+                    Adicionar Peça Manualmente
                   </h3>
                   <div className="grid grid-cols-4 gap-3">
                     <div className="relative">
@@ -2547,7 +2547,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Valor GSPN (R$) *
+                        Valor Base (R$) *
                       </label>
                       <input
                         type="number"
@@ -2590,7 +2590,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-500 mt-3">
-                    * Cada peça é adicionada com quantidade 1. Para adicionar mais, clique em "Adicionar Peça" novamente. O valor final é calculado automaticamente com markup.
+                    * Peças adicionadas manualmente seguem o fluxo de requisição padrão. Cada peça é adicionada com quantidade 1. O valor final é calculado automaticamente com markup configurado.
                   </p>
                 </div>
               )}
@@ -2602,12 +2602,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                   {pecas.map((peca) => {
                     // Buscar requisição desta peça (prioriza ativas, senão pega a mais recente)
                     const pecaId = peca.cotacao_peca_id || peca.id;
-                    const isGSPN = peca.status === 'gspn';
+                    const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual';
 
-                    // Para GSPN, busca por os_peca_id; para outras, por cotacao_peca_id
+                    // Para GSPN/manual, busca por os_peca_id; para outras, por cotacao_peca_id
                     const requisicoesDestaPeca = requisicoes.filter(r => {
-                      if (isGSPN) {
-                        // Para GSPN, busca pelo os_peca_id (ID único da peça)
+                      if (usaOsPecaId) {
+                        // Para GSPN e manual, busca pelo os_peca_id (ID único da peça)
                         return r.os_peca_id === peca.id;
                       } else {
                         // Para peças normais, busca pelo cotacao_peca_id
@@ -2643,6 +2643,15 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                                   border: '1px solid #9333EA60'
                                 }}>
                                   GSPN
+                                </span>
+                              )}
+                              {peca.status === 'manual' && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{
+                                  backgroundColor: '#00D4FF20',
+                                  color: '#00D4FF',
+                                  border: '1px solid #00D4FF60'
+                                }}>
+                                  MANUAL
                                 </span>
                               )}
                               {requisicao && getStatusBadge(requisicao.status)}
