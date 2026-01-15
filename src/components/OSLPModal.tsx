@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -191,6 +191,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [novoPagamentoTaxaPagaPor, setNovoPagamentoTaxaPagaPor] = useState<'cliente' | 'empresa'>('empresa');
   const [novoPagamentoComprovante, setNovoPagamentoComprovante] = useState<File | null>(null);
   const [novoPagamentoObservacoes, setNovoPagamentoObservacoes] = useState('');
+
+  // Estados para desconto no modo create
+  const [descontoTipoCreate, setDescontoTipoCreate] = useState<'valor' | 'percentual'>('valor');
+  const [descontoValorCreate, setDescontoValorCreate] = useState('');
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -920,6 +924,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         clienteEstado
       ].filter(Boolean).join(', ');
 
+      const descontoNum = parseFloat(descontoValorCreate.replace(',', '.')) || 0;
+
       const { data: novaOS, error: osError } = await supabase
         .from('os')
         .insert({
@@ -948,7 +954,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           defeito_relatado: defeitoRelatado,
           observacoes_internas: observacoesInternas || null,
           coluna_kanban: 'os_nova',
-          criado_por: usuario?.id
+          criado_por: usuario?.id,
+          desconto_tipo: descontoNum > 0 ? descontoTipoCreate : null,
+          desconto_valor: descontoNum > 0 ? descontoNum : 0
         })
         .select()
         .single();
@@ -2804,52 +2812,154 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 {(() => {
                   const valorPecas = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
                   const valorServicos = servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0);
-                  const valorTotal = valorPecas + valorServicos;
+                  const subtotal = valorPecas + valorServicos;
+                  const descontoNum = parseFloat(descontoValorCreate.replace(',', '.')) || 0;
+                  const valorDesconto = descontoTipoCreate === 'percentual'
+                    ? (subtotal * descontoNum / 100)
+                    : descontoNum;
+                  const valorTotal = Math.max(subtotal - valorDesconto, 0);
                   const valorPago = pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0);
                   const saldoRestante = valorTotal - valorPago;
 
                   return (
-                    <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5 mb-6">
-                      <div className="grid grid-cols-3 gap-6 mb-4">
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase mb-1">Valor Total</p>
-                          <p className="text-2xl font-bold text-[#00D4FF]">
-                            R$ {valorTotal.toFixed(2)}
-                          </p>
+                    <>
+                      <div className="premium-card p-6 bg-gradient-to-r from-[#9D4EDD]/10 to-[#FF0064]/10 border border-[#9D4EDD]/30">
+                        <div className="flex items-center justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-lg bg-[#9D4EDD]/20 flex items-center justify-center border border-[#9D4EDD]/40">
+                              <Tag className="w-5 h-5 text-[#9D4EDD]" />
+                            </div>
+                            <div>
+                              <h3 className="text-lg font-bold text-[#9D4EDD]">DESCONTO</h3>
+                              <p className="text-xs text-gray-400">Aplique desconto para o cliente</p>
+                            </div>
+                          </div>
+                          {valorDesconto > 0 && (
+                            <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+                              -R$ {valorDesconto.toFixed(2)}
+                            </span>
+                          )}
                         </div>
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase mb-1">Valor Pago</p>
-                          <p className="text-2xl font-bold text-[#39FF14]">
-                            R$ {valorPago.toFixed(2)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-xs text-gray-400 uppercase mb-1">Saldo Restante</p>
-                          <p className="text-2xl font-bold text-[#FFBF00]">
-                            R$ {saldoRestante.toFixed(2)}
-                          </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Desconto</label>
+                            <div className="flex rounded-lg overflow-hidden border border-gray-700">
+                              <button
+                                type="button"
+                                onClick={() => setDescontoTipoCreate('valor')}
+                                className={`flex-1 px-4 py-3 text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 ${
+                                  descontoTipoCreate === 'valor'
+                                    ? 'bg-[#9D4EDD] text-white'
+                                    : 'bg-black/30 text-gray-400 hover:bg-gray-800'
+                                }`}
+                              >
+                                <DollarSign className="w-4 h-4" />
+                                Valor
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setDescontoTipoCreate('percentual')}
+                                className={`flex-1 px-4 py-3 text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 ${
+                                  descontoTipoCreate === 'percentual'
+                                    ? 'bg-[#9D4EDD] text-white'
+                                    : 'bg-black/30 text-gray-400 hover:bg-gray-800'
+                                }`}
+                              >
+                                <Percent className="w-4 h-4" />
+                                %
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-400 uppercase mb-2">
+                              {descontoTipoCreate === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}
+                            </label>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                                {descontoTipoCreate === 'percentual' ? '%' : 'R$'}
+                              </span>
+                              <input
+                                type="text"
+                                value={descontoValorCreate}
+                                onChange={(e) => setDescontoValorCreate(e.target.value.replace(/[^0-9.,]/g, ''))}
+                                placeholder="0,00"
+                                className="w-full pl-10 pr-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-[#9D4EDD] focus:outline-none text-lg font-mono"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-400 uppercase mb-2">Preview</label>
+                            <div className="px-4 py-3 bg-black/50 border border-gray-700 rounded-lg">
+                              <p className="text-lg font-bold text-[#FF0064] font-mono">
+                                -R$ {valorDesconto.toFixed(2)}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Final: R$ {valorTotal.toFixed(2)}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
-                          saldoRestante === 0 && valorTotal > 0 ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
-                          valorPago > 0 && saldoRestante > 0 ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
-                          'bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40'
-                        }`}>
-                          {saldoRestante === 0 && valorTotal > 0 ? 'Pago 100%' :
-                           valorPago > 0 && saldoRestante > 0 ? 'Pago Parcial' :
-                           'Pendente'}
-                        </span>
-                        <button
-                          onClick={() => setShowAddPaymentModal(true)}
-                          className="neon-button px-6 py-3"
-                        >
-                          <DollarSign className="w-4 h-4 inline mr-2" />
-                          Adicionar Pagamento
-                        </button>
+                      <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase mb-1">Subtotal</p>
+                            <p className="text-xl font-bold text-gray-300">
+                              R$ {subtotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase mb-1">Desconto</p>
+                            <p className={`text-xl font-bold ${valorDesconto > 0 ? 'text-[#FF0064]' : 'text-gray-500'}`}>
+                              {valorDesconto > 0 ? '-' : ''}R$ {valorDesconto.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase mb-1">Valor Final</p>
+                            <p className="text-2xl font-bold text-[#00D4FF]">
+                              R$ {valorTotal.toFixed(2)}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase mb-1">Valor Pago</p>
+                            <p className="text-2xl font-bold text-[#39FF14]">
+                              R$ {valorPago.toFixed(2)}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                          <div>
+                            <p className="text-xs text-gray-400 uppercase mb-1">Saldo Restante</p>
+                            <p className="text-2xl font-bold text-[#FFBF00]">
+                              R$ {saldoRestante.toFixed(2)}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
+                              saldoRestante <= 0 && valorTotal > 0 ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
+                              valorPago > 0 && saldoRestante > 0 ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
+                              'bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40'
+                            }`}>
+                              {saldoRestante <= 0 && valorTotal > 0 ? 'Pago 100%' :
+                               valorPago > 0 && saldoRestante > 0 ? 'Pago Parcial' :
+                               'Pendente'}
+                            </span>
+                            <button
+                              onClick={() => setShowAddPaymentModal(true)}
+                              className="neon-button px-6 py-3"
+                            >
+                              <DollarSign className="w-4 h-4 inline mr-2" />
+                              Adicionar Pagamento
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </>
                   );
                 })()}
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
@@ -28,11 +28,19 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [processando, setProcessando] = useState(false);
   const [showReprovarModal, setShowReprovarModal] = useState(false);
   const [motivoReprovacao, setMotivoReprovacao] = useState('');
+  const [descontoTipo, setDescontoTipo] = useState<'valor' | 'percentual'>(os.desconto_tipo || 'valor');
+  const [descontoValor, setDescontoValor] = useState<string>(os.desconto_valor?.toString() || '');
+  const [salvandoDesconto, setSalvandoDesconto] = useState(false);
 
   useEffect(() => {
     loadPagamentos();
     loadPecasServicos();
   }, [osId]);
+
+  useEffect(() => {
+    setDescontoTipo(os.desconto_tipo || 'valor');
+    setDescontoValor(os.desconto_valor?.toString() || '');
+  }, [os.desconto_tipo, os.desconto_valor]);
 
   const loadPagamentos = async () => {
     setLoading(true);
@@ -244,6 +252,92 @@ Assistencia Tecnica Samsung`;
     }
   };
 
+  const handleSalvarDesconto = async () => {
+    setSalvandoDesconto(true);
+    try {
+      const valorNumerico = parseFloat(descontoValor.replace(',', '.')) || 0;
+
+      if (descontoTipo === 'percentual' && valorNumerico > 100) {
+        alert('O desconto percentual nao pode ser maior que 100%');
+        return;
+      }
+
+      const valorBruto = (os.valor_pecas || 0) + (os.valor_servicos || 0);
+      if (descontoTipo === 'valor' && valorNumerico > valorBruto) {
+        alert('O desconto em valor nao pode ser maior que o valor total');
+        return;
+      }
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          desconto_tipo: valorNumerico > 0 ? descontoTipo : null,
+          desconto_valor: valorNumerico,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: valorNumerico > 0
+          ? `Desconto aplicado: ${descontoTipo === 'percentual' ? `${valorNumerico}%` : `R$ ${valorNumerico.toFixed(2)}`}`
+          : 'Desconto removido',
+        is_system: true
+      });
+
+      onUpdate();
+    } catch (error: any) {
+      alert(`Erro ao salvar desconto: ${error.message}`);
+    } finally {
+      setSalvandoDesconto(false);
+    }
+  };
+
+  const handleRemoverDesconto = async () => {
+    setSalvandoDesconto(true);
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({
+          desconto_tipo: null,
+          desconto_valor: 0,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      setDescontoValor('');
+      setDescontoTipo('valor');
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: 'Desconto removido',
+        is_system: true
+      });
+
+      onUpdate();
+    } catch (error: any) {
+      alert(`Erro ao remover desconto: ${error.message}`);
+    } finally {
+      setSalvandoDesconto(false);
+    }
+  };
+
+  const calcularDescontoPreview = () => {
+    const valorBruto = (os.valor_pecas || 0) + (os.valor_servicos || 0);
+    const valorNumerico = parseFloat(descontoValor.replace(',', '.')) || 0;
+
+    if (descontoTipo === 'percentual') {
+      return (valorBruto * valorNumerico / 100);
+    }
+    return valorNumerico;
+  };
+
   return (
     <>
       <div className="space-y-4">
@@ -336,10 +430,134 @@ Assistencia Tecnica Samsung`;
           )}
         </div>
 
-        <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5">
-          <div className="grid grid-cols-3 gap-6 mb-4">
+        <div className="premium-card p-6 bg-gradient-to-r from-[#9D4EDD]/10 to-[#FF0064]/10 border border-[#9D4EDD]/30">
+          <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-[#9D4EDD]/20 flex items-center justify-center border border-[#9D4EDD]/40">
+                <Tag className="w-5 h-5 text-[#9D4EDD]" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-[#9D4EDD]">DESCONTO</h3>
+                <p className="text-xs text-gray-400">Aplique desconto para o cliente</p>
+              </div>
+            </div>
+            {os.valor_desconto_calculado > 0 && (
+              <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+                -R$ {(os.valor_desconto_calculado || 0).toFixed(2)} APLICADO
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <div>
-              <p className="text-xs text-gray-400 uppercase mb-1">Valor Total</p>
+              <label className="block text-xs text-gray-400 uppercase mb-2">Tipo de Desconto</label>
+              <div className="flex rounded-lg overflow-hidden border border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setDescontoTipo('valor')}
+                  className={`flex-1 px-4 py-3 text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 ${
+                    descontoTipo === 'valor'
+                      ? 'bg-[#9D4EDD] text-white'
+                      : 'bg-black/30 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  <DollarSign className="w-4 h-4" />
+                  Valor (R$)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDescontoTipo('percentual')}
+                  className={`flex-1 px-4 py-3 text-sm font-bold uppercase transition-all flex items-center justify-center gap-2 ${
+                    descontoTipo === 'percentual'
+                      ? 'bg-[#9D4EDD] text-white'
+                      : 'bg-black/30 text-gray-400 hover:bg-gray-800'
+                  }`}
+                >
+                  <Percent className="w-4 h-4" />
+                  Percentual (%)
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 uppercase mb-2">
+                {descontoTipo === 'percentual' ? 'Percentual (%)' : 'Valor (R$)'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm">
+                  {descontoTipo === 'percentual' ? '%' : 'R$'}
+                </span>
+                <input
+                  type="text"
+                  value={descontoValor}
+                  onChange={(e) => setDescontoValor(e.target.value.replace(/[^0-9.,]/g, ''))}
+                  placeholder="0,00"
+                  className="w-full pl-10 pr-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-[#9D4EDD] focus:outline-none text-lg font-mono"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs text-gray-400 uppercase mb-2">Preview do Desconto</label>
+              <div className="px-4 py-3 bg-black/50 border border-gray-700 rounded-lg">
+                <p className="text-lg font-bold text-[#FF0064] font-mono">
+                  -R$ {calcularDescontoPreview().toFixed(2)}
+                </p>
+                <p className="text-xs text-gray-500">
+                  Valor final: R$ {Math.max(((os.valor_pecas || 0) + (os.valor_servicos || 0)) - calcularDescontoPreview(), 0).toFixed(2)}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <button
+              onClick={handleSalvarDesconto}
+              disabled={salvandoDesconto}
+              className="flex-1 px-6 py-3 rounded-lg font-bold text-sm uppercase transition-all flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: '#9D4EDD20',
+                color: '#9D4EDD',
+                border: '1px solid #9D4EDD60'
+              }}
+            >
+              <Check className="w-4 h-4" />
+              {salvandoDesconto ? 'Salvando...' : 'Aplicar Desconto'}
+            </button>
+            {os.valor_desconto_calculado > 0 && (
+              <button
+                onClick={handleRemoverDesconto}
+                disabled={salvandoDesconto}
+                className="px-6 py-3 rounded-lg font-bold text-sm uppercase transition-all flex items-center justify-center gap-2"
+                style={{
+                  backgroundColor: '#FF006420',
+                  color: '#FF0064',
+                  border: '1px solid #FF006460'
+                }}
+              >
+                <X className="w-4 h-4" />
+                Remover
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div>
+              <p className="text-xs text-gray-400 uppercase mb-1">Subtotal</p>
+              <p className="text-xl font-bold text-gray-300">
+                R$ {((os.valor_pecas || 0) + (os.valor_servicos || 0)).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase mb-1">Desconto</p>
+              <p className={`text-xl font-bold ${os.valor_desconto_calculado > 0 ? 'text-[#FF0064]' : 'text-gray-500'}`}>
+                {os.valor_desconto_calculado > 0 ? '-' : ''}R$ {(os.valor_desconto_calculado || 0).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400 uppercase mb-1">Valor Final</p>
               <p className="text-2xl font-bold text-[#00D4FF]">
                 R$ {(os.valor_total || 0).toFixed(2)}
               </p>
@@ -350,25 +568,14 @@ Assistencia Tecnica Samsung`;
                 R$ {(os.valor_pago || 0).toFixed(2)}
               </p>
             </div>
+          </div>
+
+          <div className="flex items-center justify-between pt-4 border-t border-gray-700">
             <div>
               <p className="text-xs text-gray-400 uppercase mb-1">Saldo Restante</p>
               <p className="text-2xl font-bold text-[#FFBF00]">
                 R$ {((os.saldo_restante) || 0).toFixed(2)}
               </p>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between">
-            <div>
-              <span className={`px-4 py-2 rounded-lg text-xs font-bold uppercase ${
-                os.status_pagamento === 'pago' ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
-                os.status_pagamento === 'parcial' ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
-                'bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40'
-              }`}>
-                {os.status_pagamento === 'pago' ? 'Pago 100%' :
-                 os.status_pagamento === 'parcial' ? 'Pago Parcial' :
-                 'Pendente'}
-              </span>
             </div>
             <button
               onClick={() => setShowAddModal(true)}
