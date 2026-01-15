@@ -111,6 +111,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
   const [mostrarModalServico, setMostrarModalServico] = useState(false);
   const [buscaServico, setBuscaServico] = useState('');
+  const [servicosSalvos, setServicosSalvos] = useState(false);
+  const [salvandoServicos, setSalvandoServicos] = useState(false);
 
   // Estados para adicionar peça manualmente (OW)
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
@@ -332,7 +334,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     setPecas(todasPecas);
   };
 
-  const loadServicos = async () => {
+  const loadServicos = async (resetSaved = false) => {
     const { data } = await supabase
       .from('cotacoes_servicos')
       .select(`
@@ -348,6 +350,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     }));
 
     setServicos(servicosFormatados);
+    if (resetSaved) setServicosSalvos(false);
   };
 
   const loadServicosCadastrados = async () => {
@@ -364,6 +367,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const handleSalvarServicos = async () => {
+    setSalvandoServicos(true);
     try {
       const totalServicos = servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0);
       const totalPecas = pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0);
@@ -382,9 +386,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       await loadOS();
       onReload?.();
-      alert('Servicos salvos com sucesso!');
+      setServicosSalvos(true);
     } catch (err: any) {
       alert('Erro ao salvar servicos: ' + err.message);
+    } finally {
+      setSalvandoServicos(false);
     }
   };
 
@@ -3102,7 +3108,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                       .from('cotacoes_servicos')
                                       .update({ quantidade: servico.quantidade - 1, valor_total: servico.valor_unitario * (servico.quantidade - 1) })
                                       .eq('id', servico.id);
-                                    loadServicos();
+                                    loadServicos(true);
                                   }
                                 }}
                                 className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
@@ -3116,7 +3122,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     .from('cotacoes_servicos')
                                     .update({ quantidade: servico.quantidade + 1, valor_total: servico.valor_unitario * (servico.quantidade + 1) })
                                     .eq('id', servico.id);
-                                  loadServicos();
+                                  loadServicos(true);
                                 }}
                                 className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
                               >
@@ -3134,7 +3140,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     .from('cotacoes_servicos')
                                     .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
                                     .eq('id', servico.id);
-                                  loadServicos();
+                                  loadServicos(true);
                                 }}
                                 className="neon-input w-24 text-right text-sm py-1 px-2"
                                 placeholder="0.00"
@@ -3147,7 +3153,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               onClick={async () => {
                                 if (confirm('Remover este servico?')) {
                                   await supabase.from('cotacoes_servicos').delete().eq('id', servico.id);
-                                  loadServicos();
+                                  loadServicos(true);
                                 }
                               }}
                               className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
@@ -3172,16 +3178,31 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   <div className="flex justify-end mt-4">
                     <button
                       onClick={handleSalvarServicos}
-                      className="neon-button px-8 py-3 text-sm flex items-center gap-2"
+                      disabled={salvandoServicos}
+                      className="neon-button px-8 py-3 text-sm flex items-center gap-2 disabled:opacity-50"
                       style={{
-                        backgroundColor: '#39FF1420',
+                        backgroundColor: servicosSalvos ? '#39FF1440' : '#39FF1420',
                         borderColor: '#39FF14',
                         color: '#39FF14',
-                        boxShadow: '0 0 20px rgba(57,255,20,0.3)'
+                        boxShadow: servicosSalvos ? '0 0 30px rgba(57,255,20,0.5)' : '0 0 20px rgba(57,255,20,0.3)'
                       }}
                     >
-                      <CheckCircle className="w-4 h-4" />
-                      SALVAR E ATUALIZAR PAGAMENTO
+                      {salvandoServicos ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          SALVANDO...
+                        </>
+                      ) : servicosSalvos ? (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          ATUALIZAR PAGAMENTO NOVAMENTE
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle className="w-4 h-4" />
+                          SALVAR E ATUALIZAR PAGAMENTO
+                        </>
+                      )}
                     </button>
                   </div>
                 </>
@@ -3676,7 +3697,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                   return;
                                 }
                               }
-                              await loadServicos();
+                              await loadServicos(true);
                               setBuscaServico('');
                               setMostrarModalServico(false);
                             } catch (err) {
