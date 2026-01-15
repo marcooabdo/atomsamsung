@@ -169,6 +169,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   }>>([]);
   const [mostrarSugestoes, setMostrarSugestoes] = useState(false);
   const [mostrarModalServico, setMostrarModalServico] = useState(false);
+  const [mostrarModalChecklist, setMostrarModalChecklist] = useState(false);
   const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
   const [servicoSelecionado, setServicoSelecionado] = useState<any>(null);
   const [quantidadeServico, setQuantidadeServico] = useState(1);
@@ -2522,91 +2523,154 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
             {abaAtiva === 'checklist' && currentMode === 'create' && (
               <div className="space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">
-                    Selecionar Checklists
-                  </h3>
-                  <div className="text-xs text-gray-400">
-                    {checklistsSelecionados.length} selecionado(s)
+                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider flex items-center gap-2">
+                        <CheckSquare className="w-4 h-4" />
+                        Checklists Administrativos
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-2">
+                        Checklists vinculados automaticamente e manualmente para esta OS
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => {
+                        loadChecklistsDisponiveis();
+                        setMostrarModalChecklist(true);
+                      }}
+                      className="neon-button text-xs px-3 py-2 flex items-center gap-2"
+                      style={{
+                        backgroundColor: '#39FF1420',
+                        color: '#39FF14',
+                        borderColor: '#39FF1460'
+                      }}
+                    >
+                      <Plus className="w-4 h-4" />
+                      ADICIONAR
+                    </button>
                   </div>
                 </div>
 
-                <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4 mb-4">
-                  <p className="text-xs text-gray-300">
-                    <strong className="text-[#39FF14]">Dica:</strong> Selecione os checklists que deseja vincular a esta OS.
-                    Baseado no tipo de OS (<strong>{tipoOS}</strong>) e tipo de atendimento (<strong>{tipoAtendimento}</strong>).
-                  </p>
-                </div>
-
-                {checklistsDisponiveis.length === 0 ? (
-                  <div className="text-center py-12">
+                {checklistsSelecionados.length === 0 ? (
+                  <div className="text-center py-12 premium-card">
                     <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                    <p className="text-gray-500 text-sm">Nenhum checklist disponível para esta OS</p>
-                    <p className="text-gray-600 text-xs mt-2">
-                      Configure checklists em Configurações para aparecerem aqui
+                    <p className="text-gray-500 text-sm mb-2">Nenhum checklist vinculado</p>
+                    <p className="text-xs text-gray-600">
+                      Clique em "ADICIONAR" para vincular um checklist manualmente
                     </p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
-                    {checklistsDisponiveis.map((checklist) => {
-                      const isSelecionado = checklistsSelecionados.includes(checklist.id);
+                  <div className="space-y-4">
+                    {checklistsSelecionados.map((checklistId) => {
+                      const template = checklistsDisponiveis.find(c => c.id === checklistId);
+                      if (!template) return null;
+
                       return (
-                        <div
-                          key={checklist.id}
-                          onClick={() => {
-                            if (isSelecionado) {
-                              setChecklistsSelecionados(checklistsSelecionados.filter(id => id !== checklist.id));
-                            } else {
-                              setChecklistsSelecionados([...checklistsSelecionados, checklist.id]);
-                            }
-                          }}
-                          className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01]"
-                          style={{
-                            borderColor: isSelecionado ? '#39FF14' : '#39FF1440',
-                            backgroundColor: isSelecionado ? 'rgba(57, 255, 20, 0.15)' : 'rgba(57, 255, 20, 0.05)'
-                          }}
-                        >
-                          <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 mt-1">
-                              <div
-                                className="w-5 h-5 rounded border-2 flex items-center justify-center transition-all"
-                                style={{
-                                  borderColor: isSelecionado ? '#39FF14' : '#39FF1460',
-                                  backgroundColor: isSelecionado ? '#39FF14' : 'transparent'
-                                }}
-                              >
-                                {isSelecionado && (
-                                  <CheckCircle className="w-4 h-4 text-black" />
-                                )}
-                              </div>
-                            </div>
+                        <div key={checklistId} className="bg-[#0a0f1a] border border-gray-800 rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-800">
                             <div className="flex-1">
-                              <p className="text-sm font-bold text-[#39FF14] mb-1">{checklist.nome}</p>
-                              {checklist.descricao && (
-                                <p className="text-xs text-gray-400 mb-2">{checklist.descricao}</p>
-                              )}
-                              <div className="flex flex-wrap gap-2">
-                                {checklist.tipo_os && checklist.tipo_os.length > 0 && (
-                                  <span className="text-xs px-2 py-1 rounded bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40">
-                                    {checklist.tipo_os.join(', ')}
-                                  </span>
-                                )}
-                                {checklist.tipos_atendimento && checklist.tipos_atendimento.length > 0 && (
-                                  <span className="text-xs px-2 py-1 rounded bg-[#FFA500]/20 text-[#FFA500] border border-[#FFA500]/40">
-                                    {checklist.tipos_atendimento.join(', ')}
-                                  </span>
-                                )}
-                                {checklist.itens && Array.isArray(checklist.itens) && (
-                                  <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
-                                    {checklist.itens.length} item(ns)
-                                  </span>
-                                )}
+                              <div className="flex items-center gap-3">
+                                <h4 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider">{template.nome}</h4>
                               </div>
                             </div>
+                            <button
+                              onClick={() => setChecklistsSelecionados(checklistsSelecionados.filter(id => id !== checklistId))}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {template.itens?.map((item: any) => (
+                              <div key={item.ordem} className="flex items-start gap-3 p-2 rounded hover:bg-white/5 transition-colors">
+                                <div className="flex-shrink-0 w-5 h-5 rounded border-2 border-gray-500 flex items-center justify-center">
+                                </div>
+                                <div className="flex-1">
+                                  <p className="text-sm text-gray-200">{item.texto}</p>
+                                </div>
+                              </div>
+                            ))}
                           </div>
                         </div>
                       );
                     })}
+                  </div>
+                )}
+
+                {mostrarModalChecklist && (
+                  <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100]">
+                    <div className="bg-[#0f1419] border border-[#39FF14]/40 rounded-lg w-full max-w-3xl max-h-[80vh] overflow-hidden shadow-2xl shadow-[#39FF14]/10">
+                      <div className="p-6 border-b border-[#39FF14]/30 bg-gradient-to-r from-[#0f1419] to-[#1a1f2e]">
+                        <div className="flex items-center justify-between">
+                          <h3 className="text-xl font-bold text-[#39FF14] uppercase tracking-wider">Adicionar Checklist</h3>
+                          <button
+                            onClick={() => setMostrarModalChecklist(false)}
+                            className="text-gray-400 hover:text-white transition-colors"
+                          >
+                            <X className="w-5 h-5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="p-6 overflow-y-auto max-h-[calc(80vh-100px)]">
+                        {(() => {
+                          const templatesDisponiveis = checklistsDisponiveis.filter(t => !checklistsSelecionados.includes(t.id));
+
+                          if (templatesDisponiveis.length === 0) {
+                            return (
+                              <div className="text-center py-12">
+                                <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                                <p className="text-gray-500 text-sm">
+                                  Todos os checklists disponiveis ja foram vinculados
+                                </p>
+                              </div>
+                            );
+                          }
+
+                          return (
+                            <div className="space-y-4">
+                              {templatesDisponiveis.map((template) => (
+                                <div
+                                  key={template.id}
+                                  className="bg-[#1a1f2e] border border-gray-700 rounded-lg p-5 hover:border-[#39FF14]/50 hover:shadow-lg hover:shadow-[#39FF14]/10 transition-all group"
+                                >
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <h4 className="text-base font-bold text-gray-100 mb-2">{template.nome}</h4>
+                                      {template.descricao && (
+                                        <p className="text-sm text-gray-400 mb-3">{template.descricao}</p>
+                                      )}
+                                      <div className="flex gap-2 flex-wrap">
+                                        <span className="px-3 py-1 rounded text-xs font-bold bg-cyan-500/20 text-cyan-400 border border-cyan-500/40">
+                                          OS: {(template.tipo_os && template.tipo_os.length > 0) ? template.tipo_os.join(', ') : 'Todos'}
+                                        </span>
+                                        <span className="px-3 py-1 rounded text-xs font-bold bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                                          Atend: {(template.tipos_atendimento && template.tipos_atendimento.length > 0) ? template.tipos_atendimento.join(', ') : 'Todos'}
+                                        </span>
+                                        <span className="px-3 py-1 rounded text-xs font-bold bg-green-500/20 text-green-400 border border-green-500/40">
+                                          {template.itens?.length || 0} itens
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <button
+                                      onClick={() => {
+                                        setChecklistsSelecionados([...checklistsSelecionados, template.id]);
+                                        setMostrarModalChecklist(false);
+                                      }}
+                                      className="ml-4 w-10 h-10 rounded-lg bg-[#39FF14]/20 border border-[#39FF14]/40 flex items-center justify-center hover:bg-[#39FF14]/30 transition-colors group-hover:scale-110 transform"
+                                    >
+                                      <Plus className="w-5 h-5 text-[#39FF14]" />
+                                    </button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    </div>
                   </div>
                 )}
               </div>
