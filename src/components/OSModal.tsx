@@ -108,10 +108,17 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   // Estados para adicionar peça GSPN manualmente (OW)
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
   const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
-  const [novaPecaQuantidadeOW, setNovaPecaQuantidadeOW] = useState(1);
   const [novaPecaValorGSPN, setNovaPecaValorGSPN] = useState('');
   const [markups, setMarkups] = useState<any[]>([]);
   const [adicionandoPecaOW, setAdicionandoPecaOW] = useState(false);
+  const [sugestoesPecasOW, setSugestoesPecasOW] = useState<Array<{
+    pn: string;
+    descricao: string;
+    valor_com_impostos: number;
+    valor_corrigido?: number;
+    count: number;
+  }>>([]);
+  const [mostrarSugestoesOW, setMostrarSugestoesOW] = useState(false);
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -156,6 +163,17 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       loadMarkups();
     }
   }, [os?.tipo_os, os?.unidade_id, os?.tipo_orcamento]);
+
+  // Debounce para buscar sugestões de peças (OW)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (novaPecaCodigoOW && os?.tipo_os === 'OW') {
+        buscarSugestoesPecasOW(novaPecaCodigoOW);
+      }
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [novaPecaCodigoOW]);
 
   // Carrega pagamento depois que peças e serviços estiverem prontos
   useEffect(() => {
@@ -424,6 +442,61 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     return valorGSPN * (1 + markupAplicavel.percentual_markup / 100);
   };
 
+  const buscarSugestoesPecasOW = async (codigo: string) => {
+    if (!codigo || codigo.length < 2) {
+      setSugestoesPecasOW([]);
+      setMostrarSugestoesOW(false);
+      return;
+    }
+
+    try {
+      const { data: pecasEstoque } = await supabase
+        .from('estoque_pecas')
+        .select('pn, descricao, valor_com_impostos')
+        .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+        .ilike('pn', `%${codigo}%`)
+        .limit(10);
+
+      const pecasAgrupadas = (pecasEstoque || []).reduce((acc, peca) => {
+        const key = `${peca.pn}-${peca.descricao}`;
+        if (!acc[key]) {
+          acc[key] = {
+            pn: peca.pn,
+            descricao: peca.descricao,
+            valor_com_impostos: peca.valor_com_impostos,
+            count: 0
+          };
+        }
+        acc[key].count++;
+        return acc;
+      }, {} as Record<string, any>);
+
+      const sugestoesComValor = await Promise.all(
+        Object.values(pecasAgrupadas).map(async (peca: any) => {
+          const { data: pedido } = await supabase
+            .from('estoque_pedidos')
+            .select('valor_estimado')
+            .eq('pn', peca.pn)
+            .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          return {
+            ...peca,
+            valor_corrigido: pedido?.valor_estimado || null
+          };
+        })
+      );
+
+      setSugestoesPecasOW(sugestoesComValor);
+      setMostrarSugestoesOW(true);
+    } catch (error) {
+      console.error('Erro ao buscar sugestões:', error);
+      setSugestoesPecasOW([]);
+    }
+  };
+
   const handleAdicionarPecaOW = async () => {
     if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || !novaPecaValorGSPN) {
       alert('Preencha todos os campos obrigatórios');
@@ -439,7 +512,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     setAdicionandoPecaOW(true);
     try {
       const valorComMarkup = calcularValorComMarkup(valorGSPNNum);
-      const valorTotal = valorComMarkup * novaPecaQuantidadeOW;
+      const quantidade = 1;
+      const valorTotal = valorComMarkup * quantidade;
 
       const { error: insertError } = await supabase
         .from('os_pecas')
@@ -448,7 +522,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
           codigo: novaPecaCodigoOW.trim(),
           pn: novaPecaCodigoOW.trim(),
           descricao: novaPecaDescricaoOW.trim(),
-          quantidade: novaPecaQuantidadeOW,
+          quantidade: quantidade,
           valor_unitario: valorComMarkup,
           valor_total: valorTotal,
           status: 'gspn',
@@ -460,14 +534,14 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Peça GSPN adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${novaPecaQuantidadeOW} - Valor GSPN: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        comentario: `Peça GSPN adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Valor GSPN: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
         is_system: true
       });
 
       setNovaPecaCodigoOW('');
       setNovaPecaDescricaoOW('');
-      setNovaPecaQuantidadeOW(1);
       setNovaPecaValorGSPN('');
+      setSugestoesPecasOW([]);
 
       await loadPecas();
       await loadComentarios();
@@ -2365,17 +2439,59 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     Adicionar Peça GSPN Manualmente
                   </h3>
                   <div className="grid grid-cols-4 gap-3">
-                    <div>
+                    <div className="relative">
                       <label className="text-xs text-gray-400 uppercase block mb-2">
                         Código/PN *
                       </label>
                       <input
                         type="text"
                         value={novaPecaCodigoOW}
-                        onChange={(e) => setNovaPecaCodigoOW(e.target.value)}
+                        onChange={(e) => {
+                          setNovaPecaCodigoOW(e.target.value);
+                          setMostrarSugestoesOW(true);
+                        }}
+                        onBlur={() => setTimeout(() => setMostrarSugestoesOW(false), 200)}
                         className="neon-input w-full"
                         placeholder="Ex: GH82-12345A"
                       />
+                      {mostrarSugestoesOW && sugestoesPecasOW.length > 0 && (
+                        <div className="absolute z-50 mt-1 w-full max-w-md bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                          {sugestoesPecasOW.map((sugestao, idx) => (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setNovaPecaCodigoOW(sugestao.pn);
+                                setNovaPecaDescricaoOW(sugestao.descricao);
+                                setNovaPecaValorGSPN((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
+                                setMostrarSugestoesOW(false);
+                              }}
+                              className="p-3 hover:bg-[#00D4FF]/10 cursor-pointer border-b border-gray-800 last:border-0"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1">
+                                  <p className="text-sm font-bold text-[#00D4FF]">{sugestao.pn}</p>
+                                  <p className="text-xs text-gray-400 mt-1">{sugestao.descricao}</p>
+                                  <div className="flex items-center gap-3 mt-2">
+                                    <span className="text-[10px] text-gray-500">
+                                      GSPN/NF: R$ {sugestao.valor_com_impostos?.toFixed(2) || '0.00'}
+                                    </span>
+                                    {sugestao.valor_corrigido && (
+                                      <span className="text-[10px] text-[#39FF14]">
+                                        Último Pedido: R$ {sugestao.valor_corrigido.toFixed(2)}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                <div className="flex flex-col items-end gap-1">
+                                  <span className="text-[10px] px-2 py-1 bg-[#00D4FF]/20 text-[#00D4FF] rounded">
+                                    {sugestao.count}x em estoque
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
@@ -2409,33 +2525,24 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Quantidade *
+                        Ações
                       </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={novaPecaQuantidadeOW}
-                          onChange={(e) => setNovaPecaQuantidadeOW(Number(e.target.value))}
-                          className="neon-input w-20"
-                        />
-                        <button
-                          onClick={handleAdicionarPecaOW}
-                          disabled={adicionandoPecaOW || !novaPecaCodigoOW || !novaPecaDescricaoOW || !novaPecaValorGSPN}
-                          className="neon-button px-4 py-2 flex-1 text-xs disabled:opacity-50"
-                          style={{
-                            backgroundColor: '#00D4FF20',
-                            borderColor: '#00D4FF',
-                            color: '#00D4FF'
-                          }}
-                        >
-                          {adicionandoPecaOW ? 'ADICIONANDO...' : 'ADICIONAR'}
-                        </button>
-                      </div>
+                      <button
+                        onClick={handleAdicionarPecaOW}
+                        disabled={adicionandoPecaOW || !novaPecaCodigoOW || !novaPecaDescricaoOW || !novaPecaValorGSPN}
+                        className="neon-button px-4 py-2 w-full text-xs disabled:opacity-50"
+                        style={{
+                          backgroundColor: '#00D4FF20',
+                          borderColor: '#00D4FF',
+                          color: '#00D4FF'
+                        }}
+                      >
+                        {adicionandoPecaOW ? 'ADICIONANDO...' : 'ADICIONAR PEÇA'}
+                      </button>
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-500 mt-3">
-                    * Campos obrigatórios. O valor final será calculado automaticamente com base no markup configurado para esta unidade.
+                    * Cada peça é adicionada com quantidade 1. Para adicionar mais, clique em "Adicionar Peça" novamente. O valor final é calculado automaticamente com markup.
                   </p>
                 </div>
               )}
