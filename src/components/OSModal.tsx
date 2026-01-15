@@ -416,20 +416,47 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   };
 
   const loadMarkups = async () => {
-    if (!os?.unidade_id || !os?.tipo_orcamento) return;
+    if (!os?.unidade_id || !os?.tipo_orcamento) {
+      console.log('⚠️ Markups não carregados - faltam dados:', {
+        unidade_id: os?.unidade_id,
+        tipo_orcamento: os?.tipo_orcamento
+      });
+      return;
+    }
 
-    const { data } = await supabase
+    console.log('🔍 Carregando markups para:', {
+      unidade_id: os.unidade_id,
+      tipo_orcamento: os.tipo_orcamento
+    });
+
+    const { data, error } = await supabase
       .rpc('get_markup_for_unidade_and_tipo', {
         p_unidade_id: os.unidade_id,
         p_tipo_orcamento: os.tipo_orcamento
       });
 
-    setMarkups(data || []);
+    if (error) {
+      console.error('❌ Erro ao carregar markups:', error);
+    } else {
+      console.log('✅ Markups carregados:', data);
+      setMarkups(data || []);
+    }
   };
 
   const calcularValorComMarkup = (valorGSPN: number): number => {
-    if (markups.length === 0) return valorGSPN;
+    // Validação de entrada
+    if (isNaN(valorGSPN) || !isFinite(valorGSPN) || valorGSPN <= 0) {
+      console.warn('⚠️ Valor GSPN inválido:', valorGSPN);
+      return 0;
+    }
 
+    // Se não há markups, retorna o valor original
+    if (markups.length === 0) {
+      console.log('ℹ️ Nenhum markup disponível, retornando valor original:', valorGSPN);
+      return valorGSPN;
+    }
+
+    // Procura o markup aplicável
     const markupAplicavel = markups.find(m => {
       if (!m.ativo) return false;
       const dentroMin = m.valor_minimo === null || valorGSPN >= m.valor_minimo;
@@ -437,9 +464,22 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
       return dentroMin && dentroMax;
     });
 
-    if (!markupAplicavel) return valorGSPN;
+    if (!markupAplicavel) {
+      console.log('ℹ️ Nenhum markup aplicável para valor:', valorGSPN);
+      return valorGSPN;
+    }
 
-    return valorGSPN * (1 + markupAplicavel.percentual_markup / 100);
+    // A RPC retorna o campo como 'valor', não 'percentual_markup'
+    const percentual = markupAplicavel.valor || 0;
+    const valorFinal = valorGSPN * (1 + percentual / 100);
+    console.log('✅ Markup aplicado:', {
+      valorGSPN,
+      percentual,
+      valorFinal,
+      markupObj: markupAplicavel
+    });
+
+    return valorFinal;
   };
 
   const buscarSugestoesPecasOW = async (codigo: string) => {
@@ -2517,9 +2557,17 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         className="neon-input w-full"
                         placeholder="0.00"
                       />
-                      {novaPecaValorGSPN && !isNaN(parseFloat(novaPecaValorGSPN)) && (
+                      {novaPecaValorGSPN && !isNaN(parseFloat(novaPecaValorGSPN)) && parseFloat(novaPecaValorGSPN) > 0 && (
                         <p className="text-[10px] text-[#FFBF00] mt-1">
-                          Valor c/ Markup: R$ {calcularValorComMarkup(parseFloat(novaPecaValorGSPN)).toFixed(2)}
+                          Valor c/ Markup: R$ {(() => {
+                            const valor = calcularValorComMarkup(parseFloat(novaPecaValorGSPN));
+                            return (isNaN(valor) || !isFinite(valor)) ? '0.00' : valor.toFixed(2);
+                          })()}
+                        </p>
+                      )}
+                      {markups.length === 0 && (
+                        <p className="text-[10px] text-red-400 mt-1">
+                          ⚠️ Nenhum markup configurado
                         </p>
                       )}
                     </div>
