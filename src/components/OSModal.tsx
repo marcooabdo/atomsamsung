@@ -333,7 +333,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const loadServicos = async () => {
-    // Busca serviços de cotacoes_servicos (movidos da cotação)
     const { data } = await supabase
       .from('cotacoes_servicos')
       .select(`
@@ -343,13 +342,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       .eq('os_id', osId)
       .order('created_at', { ascending: true });
 
-    // Mapeia para incluir codigo_servico
-    const servicosComCodigo = (data || []).map(s => ({
+    const servicosFormatados = (data || []).map(s => ({
       ...s,
       codigo_servico: s.servico?.codigo || 'N/A'
     }));
 
-    setServicos(servicosComCodigo);
+    setServicos(servicosFormatados);
   };
 
   const loadServicosCadastrados = async () => {
@@ -3597,33 +3595,53 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                 return (
                   <div className="grid gap-3">
                     {servicosFiltrados.map((servico) => {
-                      const jaAdicionado = servicos.some(s => s.codigo_servico === servico.codigo);
+                      const jaAdicionado = servicos.some(s => s.servico_id === servico.id);
                       return (
                         <div
                           key={servico.id}
                           onClick={async () => {
-                            const servicoExistente = servicos.find(s => s.codigo_servico === servico.codigo);
-                            if (servicoExistente) {
-                              await supabase
-                                .from('cotacoes_servicos')
-                                .update({ quantidade: servicoExistente.quantidade + 1, valor_total: servicoExistente.valor_unitario * (servicoExistente.quantidade + 1) })
-                                .eq('id', servicoExistente.id);
-                            } else {
-                              const valorBase = Number(servico.valor_base) || 0;
-                              await supabase
-                                .from('cotacoes_servicos')
-                                .insert({
-                                  os_id: osId,
-                                  servico_id: servico.id,
-                                  descricao: servico.nome || servico.descricao,
-                                  valor_unitario: valorBase,
-                                  quantidade: 1,
-                                  valor_total: valorBase
-                                });
+                            try {
+                              const servicoExistente = servicos.find(s => s.servico_id === servico.id);
+                              if (servicoExistente) {
+                                const { error } = await supabase
+                                  .from('cotacoes_servicos')
+                                  .update({
+                                    quantidade: servicoExistente.quantidade + 1,
+                                    valor_total: servicoExistente.valor_unitario * (servicoExistente.quantidade + 1)
+                                  })
+                                  .eq('id', servicoExistente.id);
+
+                                if (error) {
+                                  console.error('Erro ao atualizar servico:', error);
+                                  alert('Erro ao atualizar servico');
+                                  return;
+                                }
+                              } else {
+                                const valorBase = Number(servico.valor_base) || 0;
+                                const { error } = await supabase
+                                  .from('cotacoes_servicos')
+                                  .insert({
+                                    os_id: osId,
+                                    servico_id: servico.id,
+                                    descricao: servico.nome || servico.descricao,
+                                    valor_unitario: valorBase,
+                                    quantidade: 1,
+                                    valor_total: valorBase
+                                  });
+
+                                if (error) {
+                                  console.error('Erro ao adicionar servico:', error);
+                                  alert('Erro ao adicionar servico: ' + error.message);
+                                  return;
+                                }
+                              }
+                              await loadServicos();
+                              setBuscaServico('');
+                              setMostrarModalServico(false);
+                            } catch (err) {
+                              console.error('Erro ao processar servico:', err);
+                              alert('Erro ao processar servico');
                             }
-                            loadServicos();
-                            setBuscaServico('');
-                            setMostrarModalServico(false);
                           }}
                           className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
                           style={{
