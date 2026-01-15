@@ -4136,79 +4136,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 />
               )}
 
-              {abaAtiva === 'servicos' && os && os.tipo_os === 'OW' && (
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Serviços</h3>
-                    <button
-                      onClick={() => {
-                        loadServicosCadastrados();
-                        setMostrarModalServico(true);
-                      }}
-                      className="neon-button px-4 py-2 text-xs"
-                      style={{
-                        backgroundColor: '#00D4FF20',
-                        borderColor: '#00D4FF',
-                        color: '#00D4FF'
-                      }}
-                    >
-                      ADICIONAR SERVIÇO
-                    </button>
-                  </div>
-
-                  {servicos.length === 0 ? (
-                    <div className="text-center py-12">
-                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                      <p className="text-gray-500 text-sm">Nenhum serviço adicionado</p>
-                    </div>
-                  ) : (
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b border-[#00D4FF]/20">
-                            <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Código</th>
-                            <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Descrição</th>
-                            <th className="text-center text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Qtd</th>
-                            <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Valor Unit.</th>
-                            <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Total</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {servicos.map((servico) => (
-                            <tr key={servico.id} className="border-b border-gray-800">
-                              <td className="py-3 px-2 text-sm text-gray-300">{servico.codigo_servico}</td>
-                              <td className="py-3 px-2 text-sm text-gray-300">
-                                <div>{servico.descricao}</div>
-                                {servico.observacao && (
-                                  <div className="text-xs text-gray-500 mt-1">{servico.observacao}</div>
-                                )}
-                              </td>
-                              <td className="py-3 px-2 text-sm text-gray-300 text-center">{servico.quantidade}</td>
-                              <td className="py-3 px-2 text-sm text-gray-300 text-right">
-                                R$ {Number(servico.valor_unitario || 0).toFixed(2)}
-                              </td>
-                              <td className="py-3 px-2 text-sm font-bold text-[#39FF14] text-right">
-                                R$ {Number(servico.valor_total || 0).toFixed(2)}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot>
-                          <tr className="border-t-2 border-[#00D4FF]/30">
-                            <td colSpan={4} className="py-3 px-2 text-right text-sm font-bold text-[#00D4FF] uppercase">
-                              Total Serviços:
-                            </td>
-                            <td className="py-3 px-2 text-right text-lg font-bold text-[#39FF14]">
-                              R$ {servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0).toFixed(2)}
-                            </td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {abaAtiva === 'pagamento' && os && os.tipo_os === 'OW' && (
                 <OSPagamentoTab
                   osId={os.id}
@@ -4562,6 +4489,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {(() => {
                 const servicosFiltrados = servicosCadastrados.filter(servico =>
                   servico.codigo?.toLowerCase().includes(buscaServico.toLowerCase()) ||
+                  servico.nome?.toLowerCase().includes(buscaServico.toLowerCase()) ||
                   servico.descricao?.toLowerCase().includes(buscaServico.toLowerCase())
                 );
 
@@ -4599,8 +4527,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                               } else {
                                 setServicosAdicionados([...servicosAdicionados, {
                                   codigo: servico.codigo,
+                                  nome: servico.nome,
                                   descricao: servico.descricao,
-                                  valor_unitario: servico.valor || 0,
+                                  valor_unitario: Number(servico.valor_base) || 0,
                                   quantidade: 1
                                 }]);
                               }
@@ -4612,15 +4541,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   .update({ quantidade: servicoExistente.quantidade + 1, valor_total: servicoExistente.valor_unitario * (servicoExistente.quantidade + 1) })
                                   .eq('id', servicoExistente.id);
                               } else {
+                                const valorBase = Number(servico.valor_base) || 0;
                                 await supabase
                                   .from('os_servicos')
                                   .insert({
                                     os_id: currentOsId,
                                     codigo_servico: servico.codigo,
-                                    descricao: servico.descricao,
-                                    valor_unitario: servico.valor || 0,
+                                    descricao: servico.nome || servico.descricao,
+                                    valor_unitario: valorBase,
                                     quantidade: 1,
-                                    valor_total: servico.valor || 0
+                                    valor_total: valorBase
                                   });
                               }
                               loadServicos();
@@ -4637,18 +4567,21 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           <div className="flex items-center justify-between gap-4">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-2 mb-1">
-                                <span className="text-sm font-bold text-[#00D4FF]">{servico.codigo}</span>
+                                <span className="text-sm font-bold text-[#00D4FF]">{servico.nome || servico.codigo}</span>
                                 {jaAdicionado && (
                                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
                                     JA ADICIONADO
                                   </span>
                                 )}
                               </div>
-                              <p className="text-sm text-gray-300 line-clamp-2">{servico.descricao}</p>
+                              {servico.descricao && (
+                                <p className="text-sm text-gray-300 line-clamp-2">{servico.descricao}</p>
+                              )}
+                              <p className="text-xs text-gray-500 mt-1">Cod: {servico.codigo}</p>
                             </div>
                             <div className="flex-shrink-0 text-right">
                               <p className="text-lg font-bold text-[#39FF14]">
-                                R$ {(servico.valor || 0).toFixed(2)}
+                                R$ {Number(servico.valor_base || 0).toFixed(2)}
                               </p>
                               <p className="text-xs text-gray-500">por unidade</p>
                             </div>
