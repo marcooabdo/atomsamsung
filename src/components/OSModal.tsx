@@ -2777,7 +2777,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
 
                           {/* Botões conforme status */}
                           <div className="flex gap-2">
-                            {pecaRequisitandoId === (peca.cotacao_peca_id || peca.id) && !requisicao && os?.coluna_kanban !== 'diagnostico' && (
+                            {pecaRequisitandoId === (peca.cotacao_peca_id || peca.id) && !requisicao && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
                               <button
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
@@ -2792,7 +2792,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
+                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && !requisicaoDevolvida && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2877,7 +2877,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicaoDevolvida?.status === 'reprovada' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'reprovada' && !requisicao && !temNovaRequisicaoPendente && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2892,7 +2892,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
