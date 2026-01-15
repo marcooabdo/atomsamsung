@@ -107,6 +107,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
 
+  // Estados para adicionar serviço
+  const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
+  const [mostrarModalServico, setMostrarModalServico] = useState(false);
+  const [buscaServico, setBuscaServico] = useState('');
+
   // Estados para adicionar peça manualmente (OW)
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
   const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
@@ -345,6 +350,19 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     }));
 
     setServicos(servicosComCodigo);
+  };
+
+  const loadServicosCadastrados = async () => {
+    if (!os?.unidade_id) return;
+
+    const { data } = await supabase
+      .from('servicos')
+      .select('*')
+      .or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`)
+      .eq('ativo', true)
+      .order('codigo', { ascending: true });
+
+    setServicosCadastrados(data || []);
   };
 
   const loadRequisicoes = async () => {
@@ -2995,57 +3013,139 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
           {abaAtiva === 'servicos' && (
             <div className="space-y-4">
-              <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
-
               {servicos.length === 0 ? (
-                <div className="text-center py-12">
-                  <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-500 text-sm">Nenhum serviço adicionado</p>
+                <div className="text-center py-16">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#00D4FF]/10 to-[#39FF14]/10 flex items-center justify-center mx-auto mb-4 border border-[#00D4FF]/20">
+                    <Wrench className="w-10 h-10 text-[#00D4FF]/60" />
+                  </div>
+                  <p className="text-gray-400 text-sm mb-6">Nenhum servico adicionado</p>
+                  <button
+                    onClick={() => {
+                      loadServicosCadastrados();
+                      setMostrarModalServico(true);
+                    }}
+                    className="neon-button px-8 py-3 text-sm"
+                    style={{
+                      backgroundColor: '#00D4FF20',
+                      borderColor: '#00D4FF',
+                      color: '#00D4FF'
+                    }}
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="text-lg">+</span>
+                      ADICIONAR SERVICO
+                    </span>
+                  </button>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-[#00D4FF]/20">
-                        <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Código</th>
-                        <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Descrição</th>
-                        <th className="text-center text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Qtd</th>
-                        <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Valor Unit.</th>
-                        <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {servicos.map((servico) => (
-                        <tr key={servico.id} className="border-b border-gray-800">
-                          <td className="py-3 px-2 text-sm text-gray-300">{servico.codigo_servico}</td>
-                          <td className="py-3 px-2 text-sm text-gray-300">
-                            <div>{servico.descricao}</div>
-                            {servico.observacao && (
-                              <div className="text-xs text-gray-500 mt-1">{servico.observacao}</div>
-                            )}
-                          </td>
-                          <td className="py-3 px-2 text-sm text-gray-300 text-center">{servico.quantidade}</td>
-                          <td className="py-3 px-2 text-sm text-gray-300 text-right">
-                            R$ {Number(servico.valor_unitario || 0).toFixed(2)}
-                          </td>
-                          <td className="py-3 px-2 text-sm font-bold text-[#39FF14] text-right">
-                            R$ {Number(servico.valor_total || 0).toFixed(2)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t-2 border-[#00D4FF]/30">
-                        <td colSpan={4} className="py-3 px-2 text-right text-sm font-bold text-[#00D4FF] uppercase">
-                          Total Serviços:
-                        </td>
-                        <td className="py-3 px-2 text-right text-lg font-bold text-[#39FF14]">
-                          R$ {servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0).toFixed(2)}
-                        </td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
+                <>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
+                      Servicos ({servicos.length})
+                    </h3>
+                    <button
+                      onClick={() => {
+                        loadServicosCadastrados();
+                        setMostrarModalServico(true);
+                      }}
+                      className="neon-button px-4 py-2 text-xs"
+                      style={{
+                        backgroundColor: '#00D4FF20',
+                        borderColor: '#00D4FF',
+                        color: '#00D4FF'
+                      }}
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-lg">+</span>
+                        ADICIONAR
+                      </span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-3">
+                    {servicos.map((servico) => (
+                      <div key={servico.id} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                        <div className="flex items-start gap-4">
+                          <div className="flex-1">
+                            <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
+                            <p className="text-xs text-gray-500">Cod: {servico.codigo_servico}</p>
+                          </div>
+                          <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={async () => {
+                                  if (servico.quantidade > 1) {
+                                    await supabase
+                                      .from('cotacoes_servicos')
+                                      .update({ quantidade: servico.quantidade - 1, valor_total: servico.valor_unitario * (servico.quantidade - 1) })
+                                      .eq('id', servico.id);
+                                    loadServicos();
+                                  }
+                                }}
+                                className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
+                              >
+                                -
+                              </button>
+                              <span className="text-sm font-bold text-white w-8 text-center">{servico.quantidade}</span>
+                              <button
+                                onClick={async () => {
+                                  await supabase
+                                    .from('cotacoes_servicos')
+                                    .update({ quantidade: servico.quantidade + 1, valor_total: servico.valor_unitario * (servico.quantidade + 1) })
+                                    .eq('id', servico.id);
+                                  loadServicos();
+                                }}
+                                className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
+                              >
+                                +
+                              </button>
+                            </div>
+                            <div className="text-right min-w-[100px]">
+                              <input
+                                type="number"
+                                step="0.01"
+                                defaultValue={servico.valor_unitario}
+                                onBlur={async (e) => {
+                                  const novoValor = parseFloat(e.target.value) || 0;
+                                  await supabase
+                                    .from('cotacoes_servicos')
+                                    .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
+                                    .eq('id', servico.id);
+                                  loadServicos();
+                                }}
+                                className="neon-input w-24 text-right text-sm py-1 px-2"
+                                placeholder="0.00"
+                              />
+                              <p className="text-xs text-gray-500 mt-1">
+                                Total: <span className="text-[#39FF14] font-bold">R$ {(servico.valor_total || 0).toFixed(2)}</span>
+                              </p>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                if (confirm('Remover este servico?')) {
+                                  await supabase.from('cotacoes_servicos').delete().eq('id', servico.id);
+                                  loadServicos();
+                                }
+                              }}
+                              className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
+                            >
+                              <X className="w-4 h-4 text-red-400" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
+                      <span className="text-2xl font-bold text-[#39FF14]">
+                        R$ {servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           )}
@@ -3434,6 +3534,148 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
             onReload?.();
           }}
         />
+      )}
+
+      {mostrarModalServico && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setMostrarModalServico(false)}></div>
+          <div className="relative bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" style={{
+            boxShadow: '0 0 40px rgba(0,212,255,0.2)'
+          }}>
+            <div className="p-6 border-b border-[#00D4FF]/20 bg-gradient-to-r from-[#00D4FF]/5 to-transparent">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#00D4FF]/20 to-[#39FF14]/20 flex items-center justify-center border-2 border-[#00D4FF]/30">
+                    <Wrench className="w-6 h-6 text-[#00D4FF]" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold text-[#00D4FF]">ADICIONAR SERVICO</h3>
+                    <p className="text-xs text-gray-400">Selecione um servico da lista</p>
+                  </div>
+                </div>
+                <button onClick={() => setMostrarModalServico(false)} className="text-gray-400 hover:text-white transition-colors">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+            </div>
+
+            <div className="p-4 border-b border-[#00D4FF]/20">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Buscar por codigo ou nome..."
+                  value={buscaServico}
+                  onChange={(e) => setBuscaServico(e.target.value)}
+                  className="neon-input w-full pl-4 pr-4 py-3"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto cyber-scrollbar p-4">
+              {(() => {
+                const servicosFiltrados = servicosCadastrados.filter(servico =>
+                  servico.codigo?.toLowerCase().includes(buscaServico.toLowerCase()) ||
+                  servico.nome?.toLowerCase().includes(buscaServico.toLowerCase()) ||
+                  servico.descricao?.toLowerCase().includes(buscaServico.toLowerCase())
+                );
+
+                if (servicosFiltrados.length === 0) {
+                  return (
+                    <div className="text-center py-12">
+                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">
+                        {buscaServico ? 'Nenhum servico encontrado' : 'Nenhum servico cadastrado'}
+                      </p>
+                      <p className="text-gray-600 text-xs mt-2">
+                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos em Configuracoes'}
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid gap-3">
+                    {servicosFiltrados.map((servico) => {
+                      const jaAdicionado = servicos.some(s => s.codigo_servico === servico.codigo);
+                      return (
+                        <div
+                          key={servico.id}
+                          onClick={async () => {
+                            const servicoExistente = servicos.find(s => s.codigo_servico === servico.codigo);
+                            if (servicoExistente) {
+                              await supabase
+                                .from('cotacoes_servicos')
+                                .update({ quantidade: servicoExistente.quantidade + 1, valor_total: servicoExistente.valor_unitario * (servicoExistente.quantidade + 1) })
+                                .eq('id', servicoExistente.id);
+                            } else {
+                              const valorBase = Number(servico.valor_base) || 0;
+                              await supabase
+                                .from('cotacoes_servicos')
+                                .insert({
+                                  os_id: osId,
+                                  servico_id: servico.id,
+                                  descricao: servico.nome || servico.descricao,
+                                  valor_unitario: valorBase,
+                                  quantidade: 1,
+                                  valor_total: valorBase
+                                });
+                            }
+                            loadServicos();
+                            setBuscaServico('');
+                            setMostrarModalServico(false);
+                          }}
+                          className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
+                          style={{
+                            borderColor: jaAdicionado ? '#39FF1460' : '#00D4FF40',
+                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(0,212,255,0.05)'
+                          }}
+                        >
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className="text-sm font-bold text-[#00D4FF]">{servico.nome || servico.codigo}</span>
+                                {jaAdicionado && (
+                                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+                                    JA ADICIONADO
+                                  </span>
+                                )}
+                              </div>
+                              {servico.descricao && (
+                                <p className="text-sm text-gray-300 line-clamp-2">{servico.descricao}</p>
+                              )}
+                              <p className="text-xs text-gray-500 mt-1">Cod: {servico.codigo}</p>
+                            </div>
+                            <div className="flex-shrink-0 text-right">
+                              <p className="text-lg font-bold text-[#39FF14]">
+                                R$ {Number(servico.valor_base || 0).toFixed(2)}
+                              </p>
+                              <p className="text-xs text-gray-500">por unidade</p>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
+            </div>
+
+            <div className="p-4 border-t border-[#00D4FF]/20 bg-[#0A0F1E]/80">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-gray-400">
+                  {servicosCadastrados.length} servico(s) disponiveis
+                </p>
+                <button
+                  onClick={() => setMostrarModalServico(false)}
+                  className="px-6 py-2 text-gray-400 hover:text-white transition-colors"
+                >
+                  FECHAR
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

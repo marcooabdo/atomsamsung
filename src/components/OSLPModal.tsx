@@ -3383,7 +3383,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {[
                 { id: 'dados', label: 'Dados OS/Cliente', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
-                ...(os?.tipo_os === 'OW' ? [{ id: 'servicos', label: 'Serviços', icon: FileText }] : []),
+                ...(os?.tipo_os === 'OW' ? [{ id: 'servicos', label: 'Serviços', icon: Wrench }] : []),
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
                 ...(os?.tipo_os === 'OW' ? [{ id: 'pagamento', label: 'Pagamento', icon: DollarSign }] : []),
                 ...(os?.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
