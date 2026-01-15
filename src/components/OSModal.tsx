@@ -2291,8 +2291,12 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                     <p className="text-sm text-gray-300 mt-1">{os.cliente_cpf_cnpj || '-'}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 uppercase">Telefone</label>
+                    <label className="text-xs text-gray-500 uppercase">Telefone 1</label>
                     <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone || '-'}</p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase">Telefone 2</label>
+                    <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone_2 || '-'}</p>
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Email</label>

@@ -88,6 +88,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
   const [clienteNome, setClienteNome] = useState('');
   const [clienteCPF, setClienteCPF] = useState('');
   const [clienteTelefone, setClienteTelefone] = useState('');
+  const [clienteTelefone2, setClienteTelefone2] = useState('');
   const [clienteEmail, setClienteEmail] = useState('');
   const [clienteCEP, setClienteCEP] = useState('');
   const [clienteLogradouro, setClienteLogradouro] = useState('');
@@ -721,6 +722,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
           cliente_nome: clienteNome,
           cliente_cpf_cnpj: clienteCPF || null,
           cliente_telefone: clienteTelefone || null,
+          cliente_telefone_2: clienteTelefone2 || null,
           cliente_email: clienteEmail || null,
           cliente_endereco: enderecoCompleto || null,
           cliente_cep: clienteCEP || null,
@@ -1690,12 +1692,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                   </div>
                   <div>
                     <label className="text-xs text-gray-400 uppercase block mb-2">
-                      Telefone
+                      Telefone 1
                     </label>
                     <input
                       type="text"
                       value={clienteTelefone}
                       onChange={(e) => setClienteTelefone(e.target.value)}
+                      className="neon-input w-full"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 uppercase block mb-2">
+                      Telefone 2 (Opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={clienteTelefone2}
+                      onChange={(e) => setClienteTelefone2(e.target.value)}
                       className="neon-input w-full"
                     />
                   </div>
@@ -2321,8 +2334,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view' }: OSLPModalP
                         <p className="text-sm text-gray-300 mt-1">{os.cliente_cpf_cnpj || '-'}</p>
                       </div>
                       <div>
-                        <label className="text-xs text-gray-500 uppercase">Telefone</label>
+                        <label className="text-xs text-gray-500 uppercase">Telefone 1</label>
                         <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone || '-'}</p>
+                      </div>
+                      <div>
+                        <label className="text-xs text-gray-500 uppercase">Telefone 2</label>
+                        <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone_2 || '-'}</p>
                       </div>
                       <div>
                         <label className="text-xs text-gray-500 uppercase">Email</label>
