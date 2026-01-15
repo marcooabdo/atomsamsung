@@ -2562,7 +2562,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                         placeholder="0.00"
                       />
                       {novaPecaValorGSPN && !isNaN(parseFloat(novaPecaValorGSPN)) && parseFloat(novaPecaValorGSPN) > 0 && (
-                        <p className="text-[10px] text-[#FFBF00] mt-1">
+                        <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
                           Valor c/ Markup: R$ {(() => {
                             const valor = calcularValorComMarkup(parseFloat(novaPecaValorGSPN));
                             return (isNaN(valor) || !isFinite(valor)) ? '0.00' : valor.toFixed(2);

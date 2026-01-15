@@ -2226,7 +2226,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             placeholder="0.00"
                           />
                           {tipoOS === 'OW' && novaPecaValorComMarkup !== null && (
-                            <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                            <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
                               Valor c/ Markup: R$ {novaPecaValorComMarkup.toFixed(2)}
                             </p>
                           )}
