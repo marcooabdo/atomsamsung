@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
+import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { OSChecklistTab } from './OSChecklistTab';
 import type { Database } from '../lib/database.types';
@@ -58,12 +59,13 @@ interface OSLPModalProps {
   tipoOS?: 'LP' | 'OW';
 }
 
-type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'anexos' | 'comentarios' | 'agendamento';
+type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'anexos' | 'comentarios' | 'agendamento';
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP' }: OSLPModalProps) {
   const { usuario } = useAuth();
   const [os, setOS] = useState<OS | null>(null);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
+  const [servicos, setServicos] = useState<any[]>([]);
   const [requisicoes, setRequisicoes] = useState<RequisicaoPeca[]>([]);
   const [comentarios, setComentarios] = useState<OSComentario[]>([]);
   const [anexos, setAnexos] = useState<OSAnexo[]>([]);
@@ -174,6 +176,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       loadOS();
       loadPecas();
       loadRequisicoes();
+      loadServicos();
       loadChecklist();
       loadComentarios();
       loadAnexos();
@@ -183,7 +186,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   // Debounce para buscar sugestões
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (novaPecaCodigo && mode === 'view') {
+      if (novaPecaCodigo) {
         buscarSugestoesPecas(novaPecaCodigo);
       }
     }, 300);
@@ -569,6 +572,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     setRequisicoes(data || []);
   };
 
+  const loadServicos = async () => {
+    if (!osId) return;
+    const { data } = await supabase
+      .from('os_servicos')
+      .select('*')
+      .eq('os_id', osId)
+      .order('created_at', { ascending: true});
+
+    setServicos(data || []);
+  };
+
   const buscarSugestoesPecas = async (codigo: string) => {
     if (!codigo || codigo.length < 2) {
       setSugestoesPecas([]);
@@ -577,11 +591,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
 
     try {
+      const unidadeParaBusca = mode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
+      if (!unidadeParaBusca) {
+        setSugestoesPecas([]);
+        return;
+      }
+
       // Buscar peças do estoque da unidade
       const { data: pecasEstoque } = await supabase
         .from('estoque_pecas')
         .select('pn, descricao, valor_com_impostos')
-        .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+        .eq('unidade_id', unidadeParaBusca)
         .ilike('pn', `%${codigo}%`)
         .limit(10);
 
@@ -600,21 +620,35 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         return acc;
       }, {} as Record<string, any>);
 
-      // Buscar valor corrigido do último pedido
+      // Buscar valor corrigido do último pedido e buscar markup
       const sugestoesComValor = await Promise.all(
         Object.values(pecasAgrupadas).map(async (peca: any) => {
           const { data: pedido } = await supabase
             .from('estoque_pedidos')
             .select('valor_estimado')
             .eq('pn', peca.pn)
-            .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
+            .eq('unidade_id', unidadeParaBusca)
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
+          // Buscar markup ativo
+          let valorComMarkup = pedido?.valor_estimado || null;
+          if (valorComMarkup && tipoOS === 'OW') {
+            const { data: markupData } = await supabase.rpc('get_markup_ativo', {
+              p_unidade_id: unidadeParaBusca,
+              p_valor_peca: valorComMarkup
+            });
+
+            if (markupData && markupData.percentual) {
+              valorComMarkup = valorComMarkup * (1 + markupData.percentual / 100);
+            }
+          }
+
           return {
             ...peca,
-            valor_corrigido: pedido?.valor_estimado || null
+            valor_corrigido: pedido?.valor_estimado || null,
+            valor_com_markup: valorComMarkup
           };
         })
       );
@@ -1573,7 +1607,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {[
                 { id: 'dados', label: 'Dados Básicos', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
+                ...(tipoOS === 'OW' ? [{ id: 'servicos', label: 'Serviços', icon: FileText }] : []),
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                ...(tipoOS === 'OW' ? [{ id: 'pagamento', label: 'Pagamento', icon: DollarSign }] : []),
                 ...(tipoAtendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
@@ -1908,17 +1944,67 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                 <div className="premium-card p-4">
                   <div className="grid grid-cols-3 gap-3">
-                    <div>
+                    <div className="relative">
                       <label className="text-xs text-gray-400 uppercase block mb-2">
                         Código/PN
                       </label>
                       <input
                         type="text"
                         value={novaPecaCodigo}
-                        onChange={(e) => setNovaPecaCodigo(e.target.value)}
+                        onChange={(e) => {
+                          setNovaPecaCodigo(e.target.value);
+                          setMostrarSugestoes(true);
+                        }}
+                        onBlur={() => setTimeout(() => setMostrarSugestoes(false), 200)}
+                        onFocus={() => {
+                          if (novaPecaCodigo && sugestoesPecas.length > 0) {
+                            setMostrarSugestoes(true);
+                          }
+                        }}
                         className="neon-input w-full"
                         placeholder="Ex: GH82-12345A"
                       />
+
+                      {mostrarSugestoes && sugestoesPecas.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 premium-card max-h-60 overflow-y-auto z-50">
+                          {sugestoesPecas.map((peca, index) => (
+                            <button
+                              key={index}
+                              type="button"
+                              onClick={() => {
+                                setNovaPecaCodigo(peca.pn);
+                                setNovaPecaDescricao(peca.descricao);
+                                if (tipoOS === 'OW' && peca.valor_com_markup) {
+                                  setNovaPecaValor(peca.valor_com_markup.toFixed(2));
+                                }
+                                setMostrarSugestoes(false);
+                              }}
+                              className="w-full text-left px-3 py-2 hover:bg-[#00D4FF]/10 border-b border-gray-800 last:border-b-0 transition-colors"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-xs font-bold text-[#00D4FF] truncate">{peca.pn}</p>
+                                  <p className="text-xs text-gray-400 mt-0.5 truncate">{peca.descricao}</p>
+                                  {tipoOS === 'OW' && peca.valor_com_markup && (
+                                    <p className="text-xs text-[#39FF14] mt-1 font-bold">
+                                      R$ {peca.valor_com_markup.toFixed(2)} (com markup)
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex-shrink-0">
+                                  <span className="text-xs px-2 py-0.5 rounded" style={{
+                                    backgroundColor: peca.count > 0 ? '#39FF1420' : '#FF006420',
+                                    color: peca.count > 0 ? '#39FF14' : '#FF0064',
+                                    border: `1px solid ${peca.count > 0 ? '#39FF14' : '#FF0064'}40`
+                                  }}>
+                                    {peca.count} em estoque
+                                  </span>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
@@ -2026,34 +2112,52 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4">
                   <h3 className="text-sm font-bold text-[#39FF14] uppercase tracking-wider flex items-center gap-2">
                     <CheckSquare className="w-4 h-4" />
-                    Checklist do Reparo LP
+                    Checklist do Reparo {tipoOS}
                   </h3>
                   <p className="text-xs text-gray-400 mt-2">
                     Itens de verificação para garantir a qualidade do serviço
                   </p>
                 </div>
 
-                <div className="space-y-3">
-                  {[
-                    'Verificar número de série do aparelho',
-                    'Conferir IMEI com sistema Samsung',
-                    'Testar funcionamento geral do aparelho',
-                    'Fotografar defeito relatado',
-                    'Embalar aparelho adequadamente'
-                  ].map((item, index) => (
-                    <div key={index} className="premium-card p-4 hover-lift">
-                      <div className="flex items-start gap-3">
-                        <div className="flex-shrink-0 w-5 h-5 rounded border-2 border-gray-500 flex items-center justify-center">
-                        </div>
-                        <div className="flex-1">
-                          <p className="text-sm text-gray-200">{item}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Será marcado após criação da OS
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="text-center py-12">
+                  <CheckSquare className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm mb-4">Nenhum checklist adicionado</p>
+                  <button className="neon-button px-6 py-2" style={{
+                    backgroundColor: '#39FF1420',
+                    borderColor: '#39FF14',
+                    color: '#39FF14'
+                  }}>
+                    ADICIONAR CHECKLIST
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'servicos' && tipoOS === 'OW' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
+
+                <div className="text-center py-12">
+                  <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm mb-4">Nenhum serviço adicionado</p>
+                  <button className="neon-button px-6 py-2" style={{
+                    backgroundColor: '#00D4FF20',
+                    borderColor: '#00D4FF',
+                    color: '#00D4FF'
+                  }}>
+                    ADICIONAR SERVIÇO
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {abaAtiva === 'pagamento' && tipoOS === 'OW' && (
+              <div className="space-y-4">
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Pagamento</h3>
+
+                <div className="text-center py-12">
+                  <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-500 text-sm">Informações de pagamento estarão disponíveis após a criação da OS</p>
                 </div>
               </div>
             )}
@@ -2197,7 +2301,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {[
                 { id: 'dados', label: 'Dados OS/Cliente', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
+                ...(os?.tipo_os === 'OW' ? [{ id: 'servicos', label: 'Serviços', icon: FileText }] : []),
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
+                ...(os?.tipo_os === 'OW' ? [{ id: 'pagamento', label: 'Pagamento', icon: DollarSign }] : []),
                 ...(os?.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
@@ -2920,6 +3026,73 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 />
               )}
 
+              {abaAtiva === 'servicos' && os && os.tipo_os === 'OW' && (
+                <div className="space-y-4">
+                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4">Serviços</h3>
+
+                  {servicos.length === 0 ? (
+                    <div className="text-center py-12">
+                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">Nenhum serviço adicionado</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-[#00D4FF]/20">
+                            <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Código</th>
+                            <th className="text-left text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Descrição</th>
+                            <th className="text-center text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Qtd</th>
+                            <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Valor Unit.</th>
+                            <th className="text-right text-xs font-bold text-[#00D4FF] uppercase py-3 px-2">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {servicos.map((servico) => (
+                            <tr key={servico.id} className="border-b border-gray-800">
+                              <td className="py-3 px-2 text-sm text-gray-300">{servico.codigo_servico}</td>
+                              <td className="py-3 px-2 text-sm text-gray-300">
+                                <div>{servico.descricao}</div>
+                                {servico.observacao && (
+                                  <div className="text-xs text-gray-500 mt-1">{servico.observacao}</div>
+                                )}
+                              </td>
+                              <td className="py-3 px-2 text-sm text-gray-300 text-center">{servico.quantidade}</td>
+                              <td className="py-3 px-2 text-sm text-gray-300 text-right">
+                                R$ {Number(servico.valor_unitario || 0).toFixed(2)}
+                              </td>
+                              <td className="py-3 px-2 text-sm font-bold text-[#39FF14] text-right">
+                                R$ {Number(servico.valor_total || 0).toFixed(2)}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot>
+                          <tr className="border-t-2 border-[#00D4FF]/30">
+                            <td colSpan={4} className="py-3 px-2 text-right text-sm font-bold text-[#00D4FF] uppercase">
+                              Total Serviços:
+                            </td>
+                            <td className="py-3 px-2 text-right text-lg font-bold text-[#39FF14]">
+                              R$ {servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0).toFixed(2)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {abaAtiva === 'pagamento' && os && os.tipo_os === 'OW' && (
+                <OSPagamentoTab
+                  osId={os.id}
+                  os={os}
+                  onUpdate={async () => {
+                    await loadOS();
+                  }}
+                />
+              )}
+
               {abaAtiva === 'agendamento' && os && (
                 <OSAgendamentoTab
                   osId={os.id}
@@ -3065,7 +3238,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </button>
               <button
                 onClick={handleCriarOS}
-                disabled={loading || !unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado}
+                disabled={loading || !unidadeId || !clienteNome || !defeitoRelatado}
                 className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
@@ -3076,10 +3249,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 {loading ? 'CRIANDO...' : `SALVAR OS ${tipoOS}`}
               </button>
             </div>
-            {(!unidadeId || !numeroOSSamsung || !clienteNome || !defeitoRelatado) && (
+            {(!unidadeId || !clienteNome || !defeitoRelatado) && (
               <div className="mt-3 flex items-center gap-2 text-xs text-yellow-400">
                 <AlertCircle className="w-4 h-4" />
-                <span>Preencha os campos obrigatórios: Unidade, Número OS Samsung, Nome do Cliente e Defeito Relatado</span>
+                <span>Preencha os campos obrigatórios: Unidade, Nome do Cliente e Defeito Relatado</span>
               </div>
             )}
           </div>
