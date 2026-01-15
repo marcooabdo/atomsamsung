@@ -105,6 +105,14 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
 
+  // Estados para adicionar peça GSPN manualmente (OW)
+  const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
+  const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
+  const [novaPecaQuantidadeOW, setNovaPecaQuantidadeOW] = useState(1);
+  const [novaPecaValorGSPN, setNovaPecaValorGSPN] = useState('');
+  const [markups, setMarkups] = useState<any[]>([]);
+  const [adicionandoPecaOW, setAdicionandoPecaOW] = useState(false);
+
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
     if (!currentJob) return;
@@ -141,6 +149,13 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     loadComentarios();
     loadAnexos();
   }, [osId]);
+
+  // Carrega markups quando a OS for carregada (para OW)
+  useEffect(() => {
+    if (os?.tipo_os === 'OW' && os?.unidade_id && os?.tipo_orcamento) {
+      loadMarkups();
+    }
+  }, [os?.tipo_os, os?.unidade_id, os?.tipo_orcamento]);
 
   // Carrega pagamento depois que peças e serviços estiverem prontos
   useEffect(() => {
@@ -380,6 +395,88 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     );
 
     setComentarios(todosComentarios);
+  };
+
+  const loadMarkups = async () => {
+    if (!os?.unidade_id || !os?.tipo_orcamento) return;
+
+    const { data } = await supabase
+      .rpc('get_markup_for_unidade_and_tipo', {
+        p_unidade_id: os.unidade_id,
+        p_tipo_orcamento: os.tipo_orcamento
+      });
+
+    setMarkups(data || []);
+  };
+
+  const calcularValorComMarkup = (valorGSPN: number): number => {
+    if (markups.length === 0) return valorGSPN;
+
+    const markupAplicavel = markups.find(m => {
+      if (!m.ativo) return false;
+      const dentroMin = m.valor_minimo === null || valorGSPN >= m.valor_minimo;
+      const dentroMax = m.valor_maximo === null || valorGSPN <= m.valor_maximo;
+      return dentroMin && dentroMax;
+    });
+
+    if (!markupAplicavel) return valorGSPN;
+
+    return valorGSPN * (1 + markupAplicavel.percentual_markup / 100);
+  };
+
+  const handleAdicionarPecaOW = async () => {
+    if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || !novaPecaValorGSPN) {
+      alert('Preencha todos os campos obrigatórios');
+      return;
+    }
+
+    const valorGSPNNum = parseFloat(novaPecaValorGSPN);
+    if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
+      alert('Valor GSPN inválido');
+      return;
+    }
+
+    setAdicionandoPecaOW(true);
+    try {
+      const valorComMarkup = calcularValorComMarkup(valorGSPNNum);
+      const valorTotal = valorComMarkup * novaPecaQuantidadeOW;
+
+      const { error: insertError } = await supabase
+        .from('os_pecas')
+        .insert({
+          os_id: osId,
+          codigo: novaPecaCodigoOW.trim(),
+          pn: novaPecaCodigoOW.trim(),
+          descricao: novaPecaDescricaoOW.trim(),
+          quantidade: novaPecaQuantidadeOW,
+          valor_unitario: valorComMarkup,
+          valor_total: valorTotal,
+          status: 'gspn',
+          numero_os_samsung: os?.numero_os_samsung
+        });
+
+      if (insertError) throw insertError;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Peça GSPN adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${novaPecaQuantidadeOW} - Valor GSPN: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        is_system: true
+      });
+
+      setNovaPecaCodigoOW('');
+      setNovaPecaDescricaoOW('');
+      setNovaPecaQuantidadeOW(1);
+      setNovaPecaValorGSPN('');
+
+      await loadPecas();
+      await loadComentarios();
+      alert('Peça GSPN adicionada com sucesso!');
+    } catch (error: any) {
+      alert(`Erro ao adicionar peça: ${error.message}`);
+    } finally {
+      setAdicionandoPecaOW(false);
+    }
   };
 
   const loadAnexos = async () => {
@@ -2258,6 +2355,88 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                       )}
                     </button>
                   </div>
+                </div>
+              )}
+
+              {os?.tipo_os === 'OW' && os?.coluna_kanban === 'diagnostico' && (
+                <div className="premium-card p-4 bg-[#00D4FF]/10 border border-[#00D4FF]/30 mb-4">
+                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4 flex items-center gap-2">
+                    <Package className="w-4 h-4" />
+                    Adicionar Peça GSPN Manualmente
+                  </h3>
+                  <div className="grid grid-cols-4 gap-3">
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Código/PN *
+                      </label>
+                      <input
+                        type="text"
+                        value={novaPecaCodigoOW}
+                        onChange={(e) => setNovaPecaCodigoOW(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="Ex: GH82-12345A"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Descrição *
+                      </label>
+                      <input
+                        type="text"
+                        value={novaPecaDescricaoOW}
+                        onChange={(e) => setNovaPecaDescricaoOW(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="Ex: Display LCD"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Valor GSPN (R$) *
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        value={novaPecaValorGSPN}
+                        onChange={(e) => setNovaPecaValorGSPN(e.target.value)}
+                        className="neon-input w-full"
+                        placeholder="0.00"
+                      />
+                      {novaPecaValorGSPN && !isNaN(parseFloat(novaPecaValorGSPN)) && (
+                        <p className="text-[10px] text-[#FFBF00] mt-1">
+                          Valor c/ Markup: R$ {calcularValorComMarkup(parseFloat(novaPecaValorGSPN)).toFixed(2)}
+                        </p>
+                      )}
+                    </div>
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Quantidade *
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="number"
+                          min="1"
+                          value={novaPecaQuantidadeOW}
+                          onChange={(e) => setNovaPecaQuantidadeOW(Number(e.target.value))}
+                          className="neon-input w-20"
+                        />
+                        <button
+                          onClick={handleAdicionarPecaOW}
+                          disabled={adicionandoPecaOW || !novaPecaCodigoOW || !novaPecaDescricaoOW || !novaPecaValorGSPN}
+                          className="neon-button px-4 py-2 flex-1 text-xs disabled:opacity-50"
+                          style={{
+                            backgroundColor: '#00D4FF20',
+                            borderColor: '#00D4FF',
+                            color: '#00D4FF'
+                          }}
+                        >
+                          {adicionandoPecaOW ? 'ADICIONANDO...' : 'ADICIONAR'}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-3">
+                    * Campos obrigatórios. O valor final será calculado automaticamente com base no markup configurado para esta unidade.
+                  </p>
                 </div>
               )}
 
