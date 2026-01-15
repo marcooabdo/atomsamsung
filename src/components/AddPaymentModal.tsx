@@ -23,6 +23,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const [taxaPercentual, setTaxaPercentual] = useState('0');
   const [taxaPagaPor, setTaxaPagaPor] = useState<'cliente' | 'empresa'>('empresa');
   const [nsu, setNsu] = useState('');
+  const [pixIdTransacao, setPixIdTransacao] = useState('');
   const [skuMaquininha, setSkuMaquininha] = useState('');
   const [comprovante, setComprovante] = useState<File | null>(null);
   const [observacoes, setObservacoes] = useState('');
@@ -39,6 +40,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
 
   const isCartao = formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito';
   const isCredito = formaPagamento === 'cartao_credito';
+  const isPix = formaPagamento === 'pix';
 
   useEffect(() => {
     const loadTaxasMaquina = async () => {
@@ -106,29 +108,29 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
 
   const validarFormulario = () => {
     if (!formaPagamento) {
-      alert('❌ Selecione a forma de pagamento');
+      alert('Selecione a forma de pagamento');
       return false;
     }
 
     const valorNum = parseFloat(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) {
-      alert('❌ Digite um valor válido maior que zero');
-      return false;
-    }
-
-    if (!comprovante) {
-      alert('❌ Comprovante é obrigatório. Anexe o arquivo de pagamento.');
+      alert('Digite um valor valido maior que zero');
       return false;
     }
 
     if (isCartao && !nsu.trim()) {
-      alert('❌ NSU é obrigatório para pagamentos com cartão');
+      alert('NSU e obrigatorio para pagamentos com cartao');
+      return false;
+    }
+
+    if (isPix && !pixIdTransacao.trim() && !nsu.trim()) {
+      alert('Informe o ID da transacao ou NSU para pagamentos PIX');
       return false;
     }
 
     const parcelaNum = parseInt(parcelamento);
     if (isCartao && parcelaNum > 1 && parseFloat(taxaPercentual) === 0) {
-      alert('❌ Taxa de cartão é obrigatória para pagamentos parcelados');
+      alert('Taxa de cartao e obrigatoria para pagamentos parcelados');
       return false;
     }
 
@@ -138,7 +140,6 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const handleSubmit = async () => {
     if (!validarFormulario()) return;
 
-    // Proteção contra duplo submit
     if (isSubmitting.current || loading) {
       return;
     }
@@ -147,16 +148,22 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
     setLoading(true);
 
     try {
-      const fileName = `pagamento_${os.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const { error: uploadError } = await supabase.storage
-        .from('pagamentos-comprovantes')
-        .upload(fileName, comprovante!);
+      let comprovanteUrl = null;
 
-      if (uploadError) throw uploadError;
+      if (comprovante) {
+        const fileName = `pagamento_${os.id}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const { error: uploadError } = await supabase.storage
+          .from('pagamentos-comprovantes')
+          .upload(fileName, comprovante);
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('pagamentos-comprovantes')
-        .getPublicUrl(fileName);
+        if (uploadError) throw uploadError;
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('pagamentos-comprovantes')
+          .getPublicUrl(fileName);
+
+        comprovanteUrl = publicUrl;
+      }
 
       const cotacao = os.cotacoes?.find((c: any) => c.status === 'aprovada');
 
@@ -171,15 +178,16 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
           cotacao_id: cotacao?.id || null,
           unidade_id: os.unidade_id,
           forma_pagamento: formaPagamento,
-          valor: valorLiquido, // Campo legado - usar valor líquido
+          valor: valorLiquido,
           valor_bruto: valorBruto,
           valor_liquido: valorLiquido,
           parcelamento: isCredito ? parseInt(parcelamento) : 1,
           taxa_percentual: parseFloat(taxaPercentual),
           taxa_valor: taxaValor,
           taxa_paga_por: isCartao && parseFloat(taxaPercentual) > 0 ? taxaPagaPor : null,
-          nsu: isCartao ? nsu.trim() : null,
-          comprovante_url: publicUrl,
+          nsu: isCartao ? nsu.trim() : (isPix && nsu.trim() ? nsu.trim() : null),
+          pix_id_transacao: isPix ? pixIdTransacao.trim() || null : null,
+          comprovante_url: comprovanteUrl,
           sku_maquininha: null,
           observacoes: observacoes.trim() || null,
           lancado_por: usuario?.id,
@@ -189,7 +197,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
 
       if (paymentError) {
         if (paymentError.message.includes('SKU')) {
-          alert('❌ ' + paymentError.message);
+          alert(paymentError.message);
         } else {
           throw paymentError;
         }
@@ -199,15 +207,15 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
       await supabase.from('os_comentarios').insert({
         os_id: os.id,
         usuario_id: usuario?.id,
-        comentario: `💰 Pagamento de R$ ${valorBruto.toFixed(2)} recebido via ${formasPagamento.find(f => f.value === formaPagamento)?.label}. Lançado por ${usuario?.nome}.`,
+        comentario: `Pagamento de R$ ${valorBruto.toFixed(2)} recebido via ${formasPagamento.find(f => f.value === formaPagamento)?.label}. Lancado por ${usuario?.nome}.`,
         is_system: true
       });
 
-      alert('✅ Pagamento registrado com sucesso!');
+      alert('Pagamento registrado com sucesso!');
       onSuccess();
       onClose();
     } catch (error: any) {
-      alert(`❌ Erro ao registrar pagamento: ${error.message}`);
+      alert(`Erro ao registrar pagamento: ${error.message}`);
       isSubmitting.current = false;
     } finally {
       setLoading(false);
@@ -428,11 +436,55 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
               </div>
             )}
 
+            {/* Campos especificos para PIX */}
+            {isPix && (
+              <div className="premium-card p-6 bg-gradient-to-br from-[#00D4FF]/10 to-transparent border-2 border-[#00D4FF]/30 space-y-5">
+                <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Informacoes do PIX
+                </h3>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                      ID da Transacao *
+                    </label>
+                    <input
+                      type="text"
+                      value={pixIdTransacao}
+                      onChange={(e) => setPixIdTransacao(e.target.value)}
+                      placeholder="Ex: E00000000202401151234..."
+                      className="neon-input font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      ID da transacao PIX (End-to-End ID)
+                    </p>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                      NSU (opcional)
+                    </label>
+                    <input
+                      type="text"
+                      value={nsu}
+                      onChange={(e) => setNsu(e.target.value)}
+                      placeholder="Ex: 123456789"
+                      className="neon-input font-mono"
+                    />
+                    <p className="text-xs text-gray-500 mt-2">
+                      Numero sequencial unico (se disponivel)
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Comprovante */}
             <div>
               <label className="block text-sm font-bold text-[#FF0064] uppercase mb-3 tracking-wider">
                 <Upload className="w-4 h-4 inline mr-2" />
-                Comprovante de Pagamento *
+                Comprovante de Pagamento (opcional)
               </label>
 
               {!comprovante ? (
