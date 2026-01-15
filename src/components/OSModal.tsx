@@ -62,14 +62,16 @@ interface RequisicaoPeca {
 }
 
 interface OSModalProps {
-  osId: string;
+  osId: string | null;
   onClose: () => void;
   onReload?: () => void;
+  mode?: 'view' | 'create';
+  tipoOS?: 'OW' | 'NA';
 }
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSModal({ osId, onClose, onReload }: OSModalProps) {
+export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' }: OSModalProps) {
   const { usuario } = useAuth();
   const [os, setOS] = useState<OS | null>(null);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
@@ -120,6 +122,45 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   }>>([]);
   const [mostrarSugestoesOW, setMostrarSugestoesOW] = useState(false);
 
+  // Estados temporários para modo de criação
+  const [dadosTemporarios, setDadosTemporarios] = useState({
+    cliente_nome: '',
+    cliente_telefone: '',
+    cliente_telefone_2: '',
+    cliente_cpf_cnpj: '',
+    equipamento: '',
+    modelo: '',
+    imei: '',
+    senha: '',
+    defeito_reclamado: '',
+    observacoes_internas: '',
+    tipo_orcamento: 'normal' as 'normal' | 'garantia' | 'cortesia',
+    cep: '',
+    endereco: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
+    estado: '',
+  });
+  const [pecasTemporarias, setPecasTemporarias] = useState<Array<{
+    codigo: string;
+    descricao: string;
+    valor: number;
+  }>>([]);
+  const [pagamentosTemporarios, setPagamentosTemporarios] = useState<Array<{
+    forma_pagamento: string;
+    valor: number;
+    data_pagamento: string;
+    observacoes?: string;
+  }>>([]);
+  const [comentariosTemporarios, setComentariosTemporarios] = useState<string[]>([]);
+  const [anexosTemporarios, setAnexosTemporarios] = useState<Array<{
+    file: File;
+    nome: string;
+  }>>([]);
+  const [criandoOS, setCriandoOS] = useState(false);
+
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
     if (!currentJob) return;
@@ -148,14 +189,18 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
   }, [currentJob?.is_running, currentJob?.created_at, currentJob?.finished_at]);
 
   useEffect(() => {
-    loadOS();
-    loadPecas();
-    loadServicos();
-    loadRequisicoes();
-    loadChecklist();
-    loadComentarios();
-    loadAnexos();
-  }, [osId]);
+    if (mode === 'view' && osId) {
+      loadOS();
+      loadPecas();
+      loadServicos();
+      loadRequisicoes();
+      loadChecklist();
+      loadComentarios();
+      loadAnexos();
+    } else if (mode === 'create') {
+      setLoading(false);
+    }
+  }, [osId, mode]);
 
   // Carrega markups quando a OS for carregada (para OW)
   useEffect(() => {
@@ -1817,7 +1862,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
     );
   }
 
-  if (!os) return null;
+  if (!os && mode === 'view') return null;
 
   const getStatusBadge = (status: string) => {
     const statusConfig: Record<string, { label: string; color: string }> = {
@@ -1856,29 +1901,31 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
         <div className="flex items-center justify-between p-6 border-b border-[#00D4FF]/20">
           <div>
             <h2 className="tech-heading text-xl text-[#00D4FF]">
-              ORDEM DE SERVIÇO
+              {mode === 'create' ? `NOVA ORDEM DE SERVIÇO - ${tipoOS}` : 'ORDEM DE SERVIÇO'}
             </h2>
             <p className="text-sm text-gray-400 mt-1">
-              {os.numero_os_samsung || os.numero_os_interna || 'N/A'}
+              {mode === 'create' ? 'Preencha os dados abaixo' : (os?.numero_os_samsung || os?.numero_os_interna || 'N/A')}
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleGerarPDFOS}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-green-500/20"
-              style={{
-                background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
-                border: '1px solid #22c55e',
-                color: '#22c55e',
-                boxShadow: '0 0 10px rgba(34,197,94,0.2)'
-              }}
-              title="Gerar PDF da Ordem de Serviço"
-            >
-              <FileDown className="w-4 h-4" />
-              PDF
-            </button>
+            {mode === 'view' && (
+              <>
+                <button
+                  onClick={handleGerarPDFOS}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-green-500/20"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
+                    border: '1px solid #22c55e',
+                    color: '#22c55e',
+                    boxShadow: '0 0 10px rgba(34,197,94,0.2)'
+                  }}
+                  title="Gerar PDF da Ordem de Serviço"
+                >
+                  <FileDown className="w-4 h-4" />
+                  PDF
+                </button>
 
-            <div className="relative">
+                <div className="relative">
               <button
                 onClick={() => setMostrarMoverPara(!mostrarMoverPara)}
                 disabled={movendoOS}
@@ -1933,7 +1980,7 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
               )}
             </div>
 
-            {os.numero_os_samsung && (
+            {os?.numero_os_samsung && (
               <button
                 onClick={syncGSPN}
                 disabled={syncingGSPN || currentJob?.is_running}
@@ -1949,6 +1996,8 @@ export function OSModal({ osId, onClose, onReload }: OSModalProps) {
                 <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
                 SYNC GSPN
               </button>
+            )}
+              </>
             )}
 
             <button

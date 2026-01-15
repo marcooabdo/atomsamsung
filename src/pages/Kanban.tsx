@@ -1729,7 +1729,7 @@ export function Kanban() {
       )}
 
       {criarOSOW && (
-        <OSLPModal
+        <OSModal
           osId={null}
           onClose={() => setCriarOSOW(false)}
           onReload={loadKanbanData}
