@@ -519,7 +519,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             nome: clienteNome,
             telefone: clienteTelefone || null,
             email: clienteEmail || null,
-            endereco: enderecoCompleto || null,
             cep: clienteCEP || null,
             logradouro: clienteLogradouro || null,
             numero: clienteNumero || null,
@@ -536,7 +535,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           nome: clienteNome,
           telefone: clienteTelefone || null,
           email: clienteEmail || null,
-          endereco: enderecoCompleto || null,
           cep: clienteCEP || null,
           logradouro: clienteLogradouro || null,
           numero: clienteNumero || null,
@@ -940,6 +938,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     if (tipoAtendimento === 'IH' && !clienteCidade?.trim()) {
       alert('Para OS do tipo IH (In-Home), a cidade do cliente é obrigatória para roteamento.');
       return;
+    }
+
+    // Verificar se já existe OS com este número Samsung
+    if (numeroOSSamsung) {
+      const { data: osExistente } = await supabase
+        .from('os')
+        .select('id, numero_os_interna, numero_os_samsung')
+        .eq('numero_os_samsung', numeroOSSamsung)
+        .maybeSingle();
+
+      if (osExistente) {
+        alert(`Já existe uma OS cadastrada com o número Samsung ${numeroOSSamsung}.\n\nOS Interna: ${osExistente.numero_os_interna || 'N/A'}`);
+        return;
+      }
     }
 
     try {
