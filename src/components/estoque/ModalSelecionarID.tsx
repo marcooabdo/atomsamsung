@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, QrCode, Package, MapPin, Calendar, DollarSign, CheckCircle } from 'lucide-react';
+import { X, QrCode, Package, MapPin, Calendar, DollarSign, CheckCircle, Layers } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface PecaEstoque {
@@ -17,17 +17,22 @@ interface PecaEstoque {
 interface ModalSelecionarIDProps {
   requisicao: any;
   onConfirm: (pecaId: string) => void;
+  onConfirmMultiple?: (pecaIds: string[]) => void;
   onCancel: () => void;
   onPedirPeca: () => void;
   onRegistrarValor: () => void;
 }
 
-export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca, onRegistrarValor }: ModalSelecionarIDProps) {
+export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, onCancel, onPedirPeca, onRegistrarValor }: ModalSelecionarIDProps) {
   const [pecasDisponiveis, setPecasDisponiveis] = useState<PecaEstoque[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanningQR, setScanningQR] = useState(false);
   const [qrInput, setQrInput] = useState('');
   const [selectedPeca, setSelectedPeca] = useState<PecaEstoque | null>(null);
+  const [selectedPecas, setSelectedPecas] = useState<PecaEstoque[]>([]);
+
+  const quantidadeNecessaria = Number(requisicao.quantidade_requisitada) || 1;
+  const isLote = quantidadeNecessaria > 1;
 
   useEffect(() => {
     loadPecasDisponiveis();
@@ -96,10 +101,24 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
   };
 
   const handleConfirmarSelecao = () => {
-    if (selectedPeca) {
+    if (isLote && selectedPecas.length > 0) {
+      if (onConfirmMultiple) {
+        onConfirmMultiple(selectedPecas.map(p => p.id));
+      }
+    } else if (selectedPeca) {
       onConfirm(selectedPeca.id);
     }
   };
+
+  const togglePecaSelection = (peca: PecaEstoque) => {
+    if (selectedPecas.some(p => p.id === peca.id)) {
+      setSelectedPecas(selectedPecas.filter(p => p.id !== peca.id));
+    } else if (selectedPecas.length < quantidadeNecessaria) {
+      setSelectedPecas([...selectedPecas, peca]);
+    }
+  };
+
+  const isPecaSelected = (peca: PecaEstoque) => selectedPecas.some(p => p.id === peca.id);
 
   if (loading) {
     return (
@@ -118,11 +137,25 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
         <div className="sticky top-0 bg-[#0A0F1E] border-b border-[#00D4FF]/20 p-6 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
-              <Package className="w-6 h-6" />
-              Selecionar ID para Peça
+              {isLote ? <Layers className="w-6 h-6" /> : <Package className="w-6 h-6" />}
+              {isLote ? `Selecionar ${quantidadeNecessaria} IDs (Lote)` : 'Selecionar ID para Peça'}
             </h2>
             <p className="text-sm text-gray-400 mt-1">{requisicao.descricao}</p>
-            <p className="text-xs text-gray-500">PN: {requisicao.codigo_peca}</p>
+            <div className="flex items-center gap-3">
+              <p className="text-xs text-gray-500">PN: {requisicao.codigo_peca}</p>
+              {isLote && (
+                <span
+                  className="px-2 py-0.5 rounded text-xs font-bold"
+                  style={{
+                    backgroundColor: selectedPecas.length === quantidadeNecessaria ? '#39FF1420' : '#FFBF0020',
+                    color: selectedPecas.length === quantidadeNecessaria ? '#39FF14' : '#FFBF00',
+                    border: `1px solid ${selectedPecas.length === quantidadeNecessaria ? '#39FF14' : '#FFBF00'}60`
+                  }}
+                >
+                  {selectedPecas.length}/{quantidadeNecessaria} selecionadas
+                </span>
+              )}
+            </div>
           </div>
           <button onClick={onCancel} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
             <X className="w-5 h-5 text-[#00D4FF]" />
@@ -166,12 +199,63 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
             )}
           </div>
 
-          {/* Peça Selecionada (via QR ou clique) */}
-          {selectedPeca && (
+          {/* Peças Selecionadas (Modo Lote) */}
+          {isLote && selectedPecas.length > 0 && (
+            <div className="bg-[#39FF14]/10 border-2 border-[#39FF14] rounded-lg p-4">
+              <h3 className="text-sm font-bold text-[#39FF14] mb-3 flex items-center gap-2">
+                <Layers className="w-4 h-4" />
+                PECAS SELECIONADAS ({selectedPecas.length}/{quantidadeNecessaria})
+              </h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto cyber-scrollbar">
+                {selectedPecas.map((peca, idx) => (
+                  <div key={peca.id} className="flex items-center justify-between bg-[#0A0F1E]/50 rounded px-3 py-2">
+                    <span className="text-[#39FF14] font-bold">#{peca.id_numerico}</span>
+                    <span className="text-gray-400 text-xs">{peca.delivery || 'N/A'}</span>
+                    <button
+                      onClick={() => togglePecaSelection(peca)}
+                      className="text-[#FF0064] text-xs hover:underline"
+                    >
+                      Remover
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3 mt-4">
+                <button
+                  onClick={handleConfirmarSelecao}
+                  disabled={selectedPecas.length < quantidadeNecessaria}
+                  className="flex-1 neon-button text-sm py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    backgroundColor: '#39FF1420',
+                    color: '#39FF14',
+                    borderColor: '#39FF1460'
+                  }}
+                >
+                  {selectedPecas.length === quantidadeNecessaria
+                    ? `CONFIRMAR ${quantidadeNecessaria} PECAS`
+                    : `Faltam ${quantidadeNecessaria - selectedPecas.length} pecas`}
+                </button>
+                <button
+                  onClick={() => setSelectedPecas([])}
+                  className="neon-button text-sm px-4 py-2"
+                  style={{
+                    backgroundColor: '#FF006420',
+                    color: '#FF0064',
+                    borderColor: '#FF006460'
+                  }}
+                >
+                  LIMPAR
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Peça Selecionada (via QR ou clique - modo único) */}
+          {!isLote && selectedPeca && (
             <div className="bg-[#39FF14]/10 border-2 border-[#39FF14] rounded-lg p-4 animate-pulse">
               <h3 className="text-sm font-bold text-[#39FF14] mb-3 flex items-center gap-2">
                 <CheckCircle className="w-4 h-4" />
-                PEÇA SELECIONADA
+                PECA SELECIONADA
               </h3>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -183,7 +267,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
                   <p className="text-gray-200">{selectedPeca.delivery || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 text-xs">Localização</p>
+                  <p className="text-gray-500 text-xs">Localizacao</p>
                   <p className="text-gray-200">{selectedPeca.localizacao || 'N/A'}</p>
                 </div>
                 <div>
@@ -201,7 +285,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
                     borderColor: '#39FF1460'
                   }}
                 >
-                  CONFIRMAR TRANSFERÊNCIA
+                  CONFIRMAR TRANSFERENCIA
                 </button>
                 <button
                   onClick={() => setSelectedPeca(null)}
@@ -219,7 +303,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
           )}
 
           {/* Lista de IDs Disponíveis */}
-          {!selectedPeca && (
+          {(!selectedPeca || isLote) && (
             <>
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-[#00D4FF] uppercase">
@@ -250,48 +334,72 @@ export function ModalSelecionarID({ requisicao, onConfirm, onCancel, onPedirPeca
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {pecasDisponiveis.map((peca) => (
-                    <div
-                      key={peca.id}
-                      className="premium-card p-4 cursor-pointer transition-all hover:border-[#00D4FF] hover:-translate-y-1"
-                      onClick={() => setSelectedPeca(peca)}
-                    >
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <p className="font-bold text-[#39FF14] text-lg mb-1">ID: #{peca.id_numerico}</p>
-                          <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
-                            <div className="flex items-center gap-1">
-                              <Package className="w-3 h-3" />
-                              Delivery: {peca.delivery || 'N/A'}
+                  {pecasDisponiveis.map((peca) => {
+                    const isSelected = isPecaSelected(peca);
+                    const canSelect = !isSelected && selectedPecas.length < quantidadeNecessaria;
+                    return (
+                      <div
+                        key={peca.id}
+                        className={`premium-card p-4 cursor-pointer transition-all hover:-translate-y-1 ${
+                          isSelected
+                            ? 'border-2 border-[#39FF14] bg-[#39FF14]/5'
+                            : 'hover:border-[#00D4FF]'
+                        } ${!canSelect && !isSelected ? 'opacity-50' : ''}`}
+                        onClick={() => isLote ? togglePecaSelection(peca) : setSelectedPeca(peca)}
+                      >
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <p className={`font-bold text-lg mb-1 ${isSelected ? 'text-[#39FF14]' : 'text-[#00D4FF]'}`}>
+                                ID: #{peca.id_numerico}
+                              </p>
+                              {isSelected && (
+                                <CheckCircle className="w-5 h-5 text-[#39FF14]" />
+                              )}
                             </div>
-                            <div className="flex items-center gap-1">
-                              <MapPin className="w-3 h-3" />
-                              {peca.localizacao || 'Sem localização'}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3" />
-                              Entrada: {new Date(peca.data_entrada).toLocaleDateString('pt-BR')}
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              <span className="text-[#39FF14] font-bold">
-                                R$ {Number(peca.valor_com_impostos).toFixed(2)}
-                              </span>
+                            <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
+                              <div className="flex items-center gap-1">
+                                <Package className="w-3 h-3" />
+                                Delivery: {peca.delivery || 'N/A'}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                {peca.localizacao || 'Sem localizacao'}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3" />
+                                Entrada: {new Date(peca.data_entrada).toLocaleDateString('pt-BR')}
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <DollarSign className="w-3 h-3" />
+                                <span className="text-[#39FF14] font-bold">
+                                  R$ {Number(peca.valor_com_impostos).toFixed(2)}
+                                </span>
+                              </div>
                             </div>
                           </div>
+                          <button
+                            className={`neon-button text-xs px-4 py-2 ${isSelected ? '' : ''}`}
+                            style={isSelected ? {
+                              backgroundColor: '#39FF1420',
+                              color: '#39FF14',
+                              borderColor: '#39FF1460'
+                            } : undefined}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isLote) {
+                                togglePecaSelection(peca);
+                              } else {
+                                setSelectedPeca(peca);
+                              }
+                            }}
+                          >
+                            {isSelected ? 'SELECIONADA' : 'SELECIONAR'}
+                          </button>
                         </div>
-                        <button
-                          className="neon-button text-xs px-4 py-2"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedPeca(peca);
-                          }}
-                        >
-                          SELECIONAR
-                        </button>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 

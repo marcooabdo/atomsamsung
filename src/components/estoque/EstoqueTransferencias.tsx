@@ -420,6 +420,88 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     }
   };
 
+  const handleConfirmarTransferenciaMultipla = async (requisicaoId: string, pecaIds: string[]) => {
+    try {
+      const requisicao = modalSelecionarID;
+
+      for (const pecaId of pecaIds) {
+        const { data: requisicaoExistente } = await supabase
+          .from('requisicoes_pecas')
+          .select('id')
+          .eq('peca_estoque_id', pecaId)
+          .not('status', 'in', '(reprovada,devolvida)')
+          .maybeSingle();
+
+        if (requisicaoExistente && requisicaoExistente.id !== requisicao.id) {
+          alert(`Uma das pecas selecionadas ja esta vinculada a outra requisicao.`);
+          return;
+        }
+      }
+
+      const primeiroId = pecaIds[0];
+      const { error: reqError } = await supabase
+        .from('requisicoes_pecas')
+        .update({
+          status: 'atendida',
+          peca_estoque_id: primeiroId,
+          pecas_estoque_ids: pecaIds,
+          quantidade_atendida: pecaIds.length,
+          is_lote: true,
+          atendido_por: user.id,
+          aprovado_em: new Date().toISOString()
+        })
+        .eq('id', requisicao.id);
+
+      if (reqError) throw reqError;
+
+      for (const pecaId of pecaIds) {
+        await supabase
+          .from('estoque_pecas')
+          .update({
+            status: 'vinculada_tecnico',
+            os_id: requisicao.os_id,
+            tecnico_id: requisicao.tecnico_id
+          })
+          .eq('id', pecaId);
+
+        await supabase.from('estoque_historico').insert({
+          peca_id: pecaId,
+          usuario_id: user.id,
+          acao: 'transferencia',
+          status_anterior: 'disponivel',
+          status_novo: 'vinculada_tecnico',
+          origem: 'Estoque Central',
+          destino: `OS ${requisicao.os?.numero_os_samsung || requisicao.os?.numero_os_interna}`,
+          observacao: `ID vinculado (lote ${pecaIds.length} un.) - ${requisicao.descricao}`
+        });
+      }
+
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single();
+
+      const idsNumericos = await Promise.all(pecaIds.map(async (id) => {
+        const { data } = await supabase.from('estoque_pecas').select('id_numerico').eq('id', id).single();
+        return data?.id_numerico || '?';
+      }));
+
+      await supabase.from('os_comentarios').insert({
+        os_id: requisicao.os_id,
+        usuario_id: user.id,
+        comentario: `Requisicao em LOTE atendida por ${userData?.nome || 'Estoque'}\nPeca: ${requisicao.descricao} (${requisicao.codigo_peca})\nQuantidade: ${pecaIds.length}\nIDs: #${idsNumericos.join(', #')}`,
+        is_system: true
+      });
+
+      alert(`${pecaIds.length} pecas vinculadas com sucesso!`);
+      setModalSelecionarID(null);
+      await loadData();
+    } catch (error) {
+      alert('Erro ao confirmar transferencia em lote');
+    }
+  };
+
   const handleRegistrarValor = (requisicao: any) => {
     setModalRegistrarValor(requisicao);
   };
@@ -1357,6 +1439,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         <ModalSelecionarID
           requisicao={modalSelecionarID}
           onConfirm={(pecaId) => handleConfirmarTransferencia(modalSelecionarID.id, pecaId)}
+          onConfirmMultiple={(pecaIds) => handleConfirmarTransferenciaMultipla(modalSelecionarID.id, pecaIds)}
           onCancel={() => setModalSelecionarID(null)}
           onRegistrarValor={() => {
             handleRegistrarValor(modalSelecionarID);

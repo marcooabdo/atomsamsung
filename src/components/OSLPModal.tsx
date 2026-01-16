@@ -57,11 +57,12 @@ interface OSLPModalProps {
   onReload?: () => void;
   mode?: 'create' | 'view';
   tipoOS?: 'LP' | 'OW';
+  modoSCACC?: boolean;
 }
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP' }: OSLPModalProps) {
+export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false }: OSLPModalProps) {
   const { usuario } = useAuth();
   const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
   const [currentMode, setCurrentMode] = useState<'create' | 'view'>(mode);
@@ -89,7 +90,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [unidadeId, setUnidadeId] = useState('');
   const [tipoAtendimento, setTipoAtendimento] = useState<'IH' | 'CI'>('CI');
-  const [tipoOrcamento, setTipoOrcamento] = useState<'normal' | 'garantia' | 'cortesia'>('normal');
+  const [tipoOrcamento, setTipoOrcamento] = useState<'normal' | 'garantia' | 'cortesia' | 'samsung_contigo' | 'acessorios'>(modoSCACC ? 'samsung_contigo' : 'normal');
   const [numeroOSSamsung, setNumeroOSSamsung] = useState('');
   const [clienteNome, setClienteNome] = useState('');
   const [clienteCPF, setClienteCPF] = useState('');
@@ -122,6 +123,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     codigo: string;
     descricao: string;
     valor: number;
+    quantidade: number;
+    valor_gspn?: number;
     requisitada: boolean;
   }>>([]);
   const [servicosAdicionados, setServicosAdicionados] = useState<Array<{
@@ -827,7 +830,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const calcularMarkup = async () => {
       const valorGSPN = parseFloat(novaPecaValor);
 
-      if (!valorGSPN || valorGSPN <= 0 || tipoOS !== 'OW' || !unidadeId) {
+      if (!valorGSPN || valorGSPN <= 0 || (!modoSCACC && tipoOS !== 'OW') || !unidadeId) {
         setNovaPecaValorComMarkup(null);
         return;
       }
@@ -851,7 +854,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     };
 
     calcularMarkup();
-  }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento]);
+  }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento, modoSCACC]);
 
   const loadComentarios = async () => {
     if (!currentOsId) return;
@@ -1739,8 +1742,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
           <div>
-            <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
-              {tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia'}
+            <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF') }}>
+              {modoSCACC ? 'SC / ACC - Samsung Contigo / Acessorio' : (tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia')}
               {currentMode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
             </h2>
             {os && (
@@ -2055,7 +2058,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       <option value="IH">IH - In Home</option>
                     </select>
                   </div>
-                  <div className="col-span-2">
+                  {modoSCACC && (
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Tipo de Orcamento *
+                      </label>
+                      <select
+                        value={tipoOrcamento}
+                        onChange={(e) => setTipoOrcamento(e.target.value as 'samsung_contigo' | 'acessorios')}
+                        className="neon-input w-full"
+                        style={{
+                          borderColor: tipoOrcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14',
+                          boxShadow: `0 0 8px ${tipoOrcamento === 'samsung_contigo' ? 'rgba(255,165,0,0.3)' : 'rgba(57,255,20,0.3)'}`
+                        }}
+                      >
+                        <option value="samsung_contigo">SAMSUNG CONTIGO</option>
+                        <option value="acessorios">ACESSORIO</option>
+                      </select>
+                    </div>
+                  )}
+                  <div className={modoSCACC ? '' : 'col-span-2'}>
                     <label className="text-xs text-gray-400 uppercase block mb-2">
                       Número OS Samsung
                     </label>
@@ -2414,59 +2436,87 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         placeholder="Ex: Display LCD"
                       />
                     </div>
-                    <div>
-                      <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Valor GSPN (R$)
-                      </label>
-                      <div className="flex gap-2">
-                        <div className="flex-1">
+                    <div className={modoSCACC ? 'grid grid-cols-2 gap-3' : ''}>
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Valor GSPN (R$)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          value={novaPecaValor}
+                          onChange={(e) => setNovaPecaValor(e.target.value)}
+                          className="neon-input w-full"
+                          placeholder="0.00"
+                        />
+                        {(tipoOS === 'OW' || modoSCACC) && novaPecaValorComMarkup !== null && (
+                          <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
+                            Valor c/ Markup: R$ {novaPecaValorComMarkup.toFixed(2)}
+                          </p>
+                        )}
+                      </div>
+                      {modoSCACC && (
+                        <div>
+                          <label className="text-xs text-gray-400 uppercase block mb-2">
+                            Quantidade
+                          </label>
                           <input
                             type="number"
-                            step="0.01"
-                            value={novaPecaValor}
-                            onChange={(e) => setNovaPecaValor(e.target.value)}
+                            min="1"
+                            value={novaPecaQuantidade}
+                            onChange={(e) => setNovaPecaQuantidade(Math.max(1, parseInt(e.target.value) || 1))}
                             className="neon-input w-full"
-                            placeholder="0.00"
+                            placeholder="1"
                           />
-                          {tipoOS === 'OW' && novaPecaValorComMarkup !== null && (
-                            <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
-                              Valor c/ Markup: R$ {novaPecaValorComMarkup.toFixed(2)}
+                          {novaPecaQuantidade > 1 && (
+                            <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                              Requisicao em lote ({novaPecaQuantidade} un.)
                             </p>
                           )}
                         </div>
-                        <button
-                          onClick={() => {
-                            if (!novaPecaCodigo || !novaPecaDescricao) {
-                              alert('Preencha código e descrição');
-                              return;
-                            }
-                            const valorPeca = parseFloat(novaPecaValor) || 0;
-                            setPecasAdicionadas([...pecasAdicionadas, {
-                              codigo: novaPecaCodigo,
-                              descricao: novaPecaDescricao,
-                              valor: valorPeca,
-                              requisitada: false
-                            }]);
-                            setNovaPecaCodigo('');
-                            setNovaPecaDescricao('');
-                            setNovaPecaValor('');
-                          }}
-                          className="neon-button px-4 py-2 flex-1 text-xs"
-                          style={{
-                            backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
-                            borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
-                            color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
-                          }}
-                        >
-                          ADICIONAR
-                        </button>
-                      </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <button
+                        onClick={() => {
+                          if (!novaPecaCodigo || !novaPecaDescricao) {
+                            alert('Preencha código e descrição');
+                            return;
+                          }
+                          const valorPeca = parseFloat(novaPecaValor) || 0;
+                          const valorComMarkup = novaPecaValorComMarkup || valorPeca;
+                          const quantidade = modoSCACC ? novaPecaQuantidade : 1;
+                          setPecasAdicionadas([...pecasAdicionadas, {
+                            codigo: novaPecaCodigo,
+                            descricao: novaPecaDescricao,
+                            valor: modoSCACC ? valorComMarkup : valorPeca,
+                            valor_gspn: valorPeca,
+                            quantidade: quantidade,
+                            requisitada: false
+                          }]);
+                          setNovaPecaCodigo('');
+                          setNovaPecaDescricao('');
+                          setNovaPecaValor('');
+                          setNovaPecaQuantidade(1);
+                          setNovaPecaValorComMarkup(null);
+                        }}
+                        className="neon-button px-4 py-2 flex-1 text-xs"
+                        style={{
+                          backgroundColor: modoSCACC ? '#39FF1420' : (tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20'),
+                          borderColor: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF'),
+                          color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF')
+                        }}
+                      >
+                        ADICIONAR
+                      </button>
                     </div>
                   </div>
-                  <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
-                    <AlertCircle className="w-4 h-4" />
-                    <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
-                  </div>
+                  {!modoSCACC && (
+                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+                      <AlertCircle className="w-4 h-4" />
+                      <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2478,8 +2528,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         <div key={index} className="premium-card p-4">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
+                              <div className="flex items-center gap-2 mb-2 flex-wrap">
                                 <p className="text-sm font-bold text-gray-300">{peca.descricao}</p>
+                                {peca.quantidade > 1 && (
+                                  <span
+                                    className="px-2 py-0.5 rounded text-xs font-bold"
+                                    style={{
+                                      backgroundColor: '#39FF1420',
+                                      color: '#39FF14',
+                                      border: '1px solid #39FF1460'
+                                    }}
+                                  >
+                                    QTD: {peca.quantidade}
+                                  </span>
+                                )}
                                 {peca.requisitada && (
                                   <span
                                     className="px-2 py-1 rounded text-xs font-bold uppercase"
@@ -2494,7 +2556,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 )}
                               </div>
                               <p className="text-xs text-gray-500">Código: {peca.codigo}</p>
-                              <p className="text-xs text-gray-500 mt-1">Valor GSPN: R$ {peca.valor.toFixed(2)}</p>
+                              <div className="flex items-center gap-3 mt-1">
+                                {peca.valor_gspn && peca.valor_gspn !== peca.valor && (
+                                  <p className="text-xs text-gray-500">GSPN: R$ {peca.valor_gspn.toFixed(2)}</p>
+                                )}
+                                <p className="text-xs" style={{ color: modoSCACC ? '#39FF14' : '#00D4FF' }}>
+                                  Valor Venda: R$ {peca.valor.toFixed(2)} {peca.quantidade > 1 && `(Total: R$ ${(peca.valor * peca.quantidade).toFixed(2)})`}
+                                </p>
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               {!peca.requisitada && (
@@ -2506,7 +2575,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                     setRequisicoesTemporarias([...requisicoesTemporarias, {
                                       codigo: peca.codigo,
                                       descricao: peca.descricao,
-                                      quantidade: 1
+                                      quantidade: peca.quantidade || 1
                                     }]);
                                   }}
                                   className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -2517,7 +2586,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   }}
                                 >
                                   <Package className="w-3 h-3" />
-                                  REQUISITAR
+                                  REQUISITAR {peca.quantidade > 1 ? `(${peca.quantidade})` : ''}
                                 </button>
                               )}
                               <button
@@ -2828,7 +2897,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             {abaAtiva === 'pagamento' && tipoOS === 'OW' && currentMode === 'create' && (
               <div className="space-y-4">
                 {(() => {
-                  const valorPecas = pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0);
+                  const valorPecas = pecasAdicionadas.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0);
                   const valorServicos = servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0);
                   const subtotal = valorPecas + valorServicos;
                   const descontoNum = parseFloat(descontoValorCreate.replace(',', '.')) || 0;
@@ -4960,13 +5029,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Valor Total</p>
                     <p className="text-[#00D4FF] font-bold text-2xl">
-                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0)).toFixed(2)}
+                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0)).toFixed(2)}
                     </p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Saldo Restante</p>
                     <p className="text-[#FFBF00] font-bold text-2xl">
-                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + p.valor, 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0) - pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0)).toFixed(2)}
+                      R$ {(pecasAdicionadas.reduce((sum, p) => sum + (p.valor * (p.quantidade || 1)), 0) + servicosAdicionados.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0) - pagamentosTemporarios.reduce((sum, p) => sum + p.valor, 0)).toFixed(2)}
                     </p>
                   </div>
                 </div>
