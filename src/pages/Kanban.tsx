@@ -192,8 +192,8 @@ export function Kanban() {
 
   useEffect(() => {
     if (usuario) {
-      const canSelectAllUnits = usuario.tipo === 'master' || usuario.tipo === 'diretoria';
-      if (!canSelectAllUnits && usuario.unidade_id && !selectedUnidade) {
+      const canSeeAllUnits = (usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id;
+      if (!canSeeAllUnits && usuario.unidade_id && !selectedUnidade) {
         setSelectedUnidade(usuario.unidade_id);
       } else {
         loadKanbanData();
@@ -202,7 +202,7 @@ export function Kanban() {
   }, [usuario]);
 
   useEffect(() => {
-    if (usuario && selectedUnidade) {
+    if (usuario) {
       loadKanbanData();
     }
   }, [selectedUnidade]);
