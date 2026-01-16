@@ -373,13 +373,17 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const loadServicosCadastrados = async () => {
-    if (!os?.unidade_id) return;
+    if (!os?.unidade_id || !os?.aparelho_linha) {
+      setServicosCadastrados([]);
+      return;
+    }
 
     const { data } = await supabase
       .from('servicos')
       .select('*')
       .or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`)
       .eq('ativo', true)
+      .eq('linha', os.aparelho_linha)
       .order('codigo', { ascending: true });
 
     setServicosCadastrados(data || []);
@@ -3686,15 +3690,27 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   servico.descricao?.toLowerCase().includes(buscaServico.toLowerCase())
                 );
 
+                if (!os?.aparelho_linha) {
+                  return (
+                    <div className="text-center py-12">
+                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">Selecione a Linha do Aparelho</p>
+                      <p className="text-gray-600 text-xs mt-2">
+                        Na aba DADOS, selecione a linha do aparelho para ver os servicos disponiveis
+                      </p>
+                    </div>
+                  );
+                }
+
                 if (servicosFiltrados.length === 0) {
                   return (
                     <div className="text-center py-12">
                       <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                       <p className="text-gray-500 text-sm">
-                        {buscaServico ? 'Nenhum servico encontrado' : 'Nenhum servico cadastrado'}
+                        {buscaServico ? 'Nenhum servico encontrado' : `Nenhum servico cadastrado para ${os.aparelho_linha}`}
                       </p>
                       <p className="text-gray-600 text-xs mt-2">
-                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos em Configuracoes'}
+                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos para esta linha em Configuracoes'}
                       </p>
                     </div>
                   );

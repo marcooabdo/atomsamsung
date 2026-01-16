@@ -36,6 +36,7 @@ interface Servico {
   nome: string;
   descricao: string | null;
   valor_base: number;
+  linha: string | null;
   unidade_id: string | null;
   ativo: boolean;
   created_at: string;
@@ -119,7 +120,7 @@ export function Configuracoes() {
 
   const [formUnidade, setFormUnidade] = useState({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
-  const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
+  const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
   const [formChecklist, setFormChecklist] = useState({ nome: '', descricao: '', tipo_servico: 'geral' as const, tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM' as const, unidade_id: '', itens: [] as ChecklistItem[], ativo: true });
@@ -222,7 +223,7 @@ export function Configuracoes() {
           break;
         case 'servicos':
           const servico = servicos.find(s => s.id === id);
-          if (servico) setFormServico({ nome: servico.nome, descricao: servico.descricao || '', valor_base: servico.valor_base.toString(), unidade_id: servico.unidade_id || '', ativo: servico.ativo });
+          if (servico) setFormServico({ nome: servico.nome, descricao: servico.descricao || '', valor_base: servico.valor_base.toString(), linha: servico.linha || '', unidade_id: servico.unidade_id || '', ativo: servico.ativo });
           break;
         case 'markup':
           const markup = markups.find(m => m.id === id);
@@ -242,7 +243,7 @@ export function Configuracoes() {
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
-      setFormServico({ nome: '', descricao: '', valor_base: '0', unidade_id: '', ativo: true });
+      setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
       setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist, itens: [], ativo: true });
@@ -391,10 +392,12 @@ export function Configuracoes() {
           break;
         case 'servicos':
           if (!formServico.nome.trim()) return alert('Nome é obrigatório');
+          if (!formServico.linha) return alert('Linha do produto é obrigatória');
           const servicoData = {
             nome: formServico.nome,
             descricao: formServico.descricao || null,
             valor_base: parseFloat(formServico.valor_base) || 0,
+            linha: formServico.linha || null,
             unidade_id: formServico.unidade_id || null,
             ativo: formServico.ativo
           };
@@ -753,6 +756,21 @@ export function Configuracoes() {
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Descrição</label>
                     <textarea value={formServico.descricao} onChange={(e) => setFormServico({...formServico, descricao: e.target.value})} rows={2} placeholder="Descrição detalhada do serviço" className="neon-input" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Linha do Produto *</label>
+                    <select value={formServico.linha} onChange={(e) => setFormServico({...formServico, linha: e.target.value})} className="neon-input">
+                      <option value="">Selecione a linha...</option>
+                      <option value="DA - WSM / Kitchen">DA - WSM / Kitchen</option>
+                      <option value="DA - REF / Ar Condicionado">DA - REF / Ar Condicionado</option>
+                      <option value="DTV - TV">DTV - TV</option>
+                      <option value="DTV - Monitor / SoundBar">DTV - Monitor / SoundBar</option>
+                      <option value="MX - Celular">MX - Celular</option>
+                      <option value="MX - Notebook">MX - Notebook</option>
+                      <option value="MX - Watch / Wearables">MX - Watch / Wearables</option>
+                      <option value="MX - Tablet">MX - Tablet</option>
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">Este servico so aparecera em OS com esta linha selecionada</p>
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Valor Base (R$)</label>
@@ -1431,8 +1449,13 @@ export function Configuracoes() {
                         <div key={servico.id} className="premium-card p-4 hover-lift">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
+                              <div className="flex items-center gap-3 mb-2 flex-wrap">
                                 <h4 className="text-base font-bold text-[#00D4FF]">{servico.nome}</h4>
+                                {servico.linha && (
+                                  <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-blue-500/20 text-blue-400 border border-blue-500/40">
+                                    {servico.linha}
+                                  </span>
+                                )}
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
                                   style={{

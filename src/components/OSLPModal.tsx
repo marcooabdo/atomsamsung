@@ -259,7 +259,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     if (currentMode === 'create' && abaAtiva === 'servicos' && tipoOS === 'OW' && unidadeId) {
       loadServicosCadastrados();
     }
-  }, [currentMode, abaAtiva, tipoOS, unidadeId]);
+  }, [currentMode, abaAtiva, tipoOS, unidadeId, aparelhoLinha]);
 
   // Carregar checklists quando a aba de checklist é aberta no modo criar
   useEffect(() => {
@@ -659,13 +659,19 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const loadServicosCadastrados = async () => {
     const unidadeParaBusca = currentMode === 'create' ? unidadeId : (os?.unidade_id || usuario?.unidade_id);
-    if (!unidadeParaBusca) return;
+    const linhaParaBusca = currentMode === 'create' ? aparelhoLinha : os?.aparelho_linha;
+
+    if (!unidadeParaBusca || !linhaParaBusca) {
+      setServicosCadastrados([]);
+      return;
+    }
 
     const { data } = await supabase
       .from('servicos')
       .select('*')
       .or(`unidade_id.eq.${unidadeParaBusca},unidade_id.is.null`)
       .eq('ativo', true)
+      .eq('linha', linhaParaBusca)
       .order('codigo', { ascending: true });
 
     setServicosCadastrados(data || []);
@@ -4777,15 +4783,29 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   servico.descricao?.toLowerCase().includes(buscaServico.toLowerCase())
                 );
 
+                const linhaAtual = currentMode === 'create' ? aparelhoLinha : os?.aparelho_linha;
+
+                if (!linhaAtual) {
+                  return (
+                    <div className="text-center py-12">
+                      <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                      <p className="text-gray-500 text-sm">Selecione a Linha do Aparelho</p>
+                      <p className="text-gray-600 text-xs mt-2">
+                        Na aba DADOS, selecione a linha do aparelho para ver os servicos disponiveis
+                      </p>
+                    </div>
+                  );
+                }
+
                 if (servicosFiltrados.length === 0) {
                   return (
                     <div className="text-center py-12">
                       <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                       <p className="text-gray-500 text-sm">
-                        {buscaServico ? 'Nenhum servico encontrado' : 'Nenhum servico cadastrado'}
+                        {buscaServico ? 'Nenhum servico encontrado' : `Nenhum servico cadastrado para ${linhaAtual}`}
                       </p>
                       <p className="text-gray-600 text-xs mt-2">
-                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos em Configuracoes'}
+                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos para esta linha em Configuracoes'}
                       </p>
                     </div>
                   );
