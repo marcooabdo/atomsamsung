@@ -2460,8 +2460,34 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="text-xs text-gray-500 uppercase">Linha</label>
-                    <p className="text-sm text-gray-300 mt-1">{os.aparelho_linha || '-'}</p>
+                    <label className={`text-xs uppercase ${!os.aparelho_linha ? 'text-red-400' : 'text-gray-500'}`}>
+                      Linha {!os.aparelho_linha && <span className="text-red-500">*</span>}
+                    </label>
+                    <select
+                      value={os.aparelho_linha || ''}
+                      onChange={async (e) => {
+                        const novaLinha = e.target.value;
+                        const { error } = await supabase
+                          .from('os')
+                          .update({ aparelho_linha: novaLinha || null })
+                          .eq('id', os.id);
+                        if (!error && onReload) onReload();
+                      }}
+                      className={`neon-input w-full mt-1 text-sm ${!os.aparelho_linha ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                    >
+                      <option value="">Selecione a linha...</option>
+                      <option value="DA - WSM / Kitchen">DA - WSM / Kitchen</option>
+                      <option value="DA - REF / Ar Condicionado">DA - REF / Ar Condicionado</option>
+                      <option value="DTV - TV">DTV - TV</option>
+                      <option value="DTV - Monitor / SoundBar">DTV - Monitor / SoundBar</option>
+                      <option value="MX - Celular">MX - Celular</option>
+                      <option value="MX - Notebook">MX - Notebook</option>
+                      <option value="MX - Watch / Wearables">MX - Watch / Wearables</option>
+                      <option value="MX - Tablet">MX - Tablet</option>
+                    </select>
+                    {!os.aparelho_linha && (
+                      <p className="text-xs text-red-400 mt-1">Selecione a linha do aparelho</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Modelo</label>
