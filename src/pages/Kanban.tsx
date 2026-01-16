@@ -45,7 +45,7 @@ export function Kanban() {
   const [draggedCard, setDraggedCard] = useState<OS | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
-  const [selectedUnidade, setSelectedUnidade] = useState('1b9ff2d1-474e-4783-aa39-80c89a6a48cf');
+  const [selectedUnidade, setSelectedUnidade] = useState('');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | 'NA' | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
@@ -192,9 +192,20 @@ export function Kanban() {
 
   useEffect(() => {
     if (usuario) {
+      const canSelectAllUnits = usuario.tipo === 'master' || usuario.tipo === 'diretoria';
+      if (!canSelectAllUnits && usuario.unidade_id && !selectedUnidade) {
+        setSelectedUnidade(usuario.unidade_id);
+      } else {
+        loadKanbanData();
+      }
+    }
+  }, [usuario]);
+
+  useEffect(() => {
+    if (usuario && selectedUnidade) {
       loadKanbanData();
     }
-  }, [usuario, selectedUnidade]);
+  }, [selectedUnidade]);
 
   useEffect(() => {
     return () => {
@@ -338,16 +349,20 @@ export function Kanban() {
           tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome)
         `);
 
-      // Verificar se o usuário pode ver todas as unidades
-      const canSelectAllUnits = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+      // Verificar se o usuario pode ver todas as unidades (master/diretoria SEM unidade vinculada)
+      const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
 
-      // Se o usuário selecionou uma unidade específica no filtro, use essa
-      if (selectedUnidade) {
+      // Usuarios comuns SEMPRE devem filtrar pela sua unidade - SEGURANCA CRITICA
+      if (!canSeeAllUnits) {
+        const unidadeObrigatoria = usuario?.unidade_id;
+        if (!unidadeObrigatoria) {
+          setOsData({});
+          setLoading(false);
+          return;
+        }
+        query = query.eq('unidade_id', unidadeObrigatoria);
+      } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
-      }
-      // Se não selecionou e não pode ver todas, usa a unidade do usuário
-      else if (!canSelectAllUnits && usuario?.unidade_id) {
-        query = query.eq('unidade_id', usuario.unidade_id);
       }
       const { data, error } = await query.order('created_at', { ascending: false });
 

@@ -15,10 +15,25 @@ interface UnitFilterProps {
 export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitFilterProps) {
   const { usuario } = useAuth();
 
-  const canSelectAllUnits = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+  // SEGURANCA: Apenas master/diretoria SEM unidade vinculada podem ver todas
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const userUnidade = usuario?.unidade_id;
 
-  if (!canSelectAllUnits && userUnidade) {
+  // Usuario comum OU master/diretoria COM unidade vinculada: mostrar apenas sua unidade
+  if (!canSeeAllUnits) {
+    if (!userUnidade) {
+      return (
+        <div className="premium-card p-4 bg-red-500/10 border border-red-500/30">
+          <div className="flex items-center gap-3">
+            <Building2 className="w-5 h-5 text-red-400" />
+            <div>
+              <p className="text-xs text-red-400 uppercase tracking-wider">Erro de Configuracao</p>
+              <p className="text-sm font-semibold text-red-300">Usuario sem unidade vinculada</p>
+            </div>
+          </div>
+        </div>
+      );
+    }
     const unidade = unidades.find(u => u.id === userUnidade);
     return (
       <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">

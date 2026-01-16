@@ -52,7 +52,7 @@ interface PerformanceOS {
 }
 
 export function Dashboard() {
-  const { user } = useAuth();
+  const { usuario } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalOS: 0,
     osAbertas: 0,
@@ -84,13 +84,13 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
-    if (user) {
-      if (user.unidade_id) {
-        setSelectedUnidade(user.unidade_id);
+    if (usuario) {
+      if (usuario.unidade_id && !selectedUnidade) {
+        setSelectedUnidade(usuario.unidade_id);
       }
       loadDashboardData();
     }
-  }, [user, selectedUnidade, dataInicio, dataFim]);
+  }, [usuario, selectedUnidade, dataInicio, dataFim]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
@@ -100,8 +100,8 @@ export function Dashboard() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
-      const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
+      const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : usuario?.unidade_id);
 
       let osQuery = supabase
         .from('os')
@@ -262,8 +262,8 @@ export function Dashboard() {
 
   const loadPerformanceDetails = async (type: 'eficiencia' | 'aprovacao') => {
     try {
-      const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
-      const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
+      const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : usuario?.unidade_id);
 
       if (type === 'aprovacao') {
         let cotacoesQuery = supabase
@@ -746,7 +746,7 @@ export function Dashboard() {
       <GoalsConfigModal
         isOpen={showGoalsModal}
         onClose={() => setShowGoalsModal(false)}
-        unidadeId={selectedUnidade || user?.unidade_id || ''}
+        unidadeId={selectedUnidade || usuario?.unidade_id || ''}
         onSaved={() => {
           loadDashboardData();
         }}

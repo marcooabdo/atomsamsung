@@ -95,11 +95,12 @@ export function Cotacoes() {
       // Calcular valor total de cada cotação e filtrar as que já possuem OS
       const cotacoesComValor = await Promise.all(
         (data || []).map(async (cotacao) => {
-          // Verificar se já existe uma OS para esta cotação
+          // Verificar se já existe uma OS para esta cotação (filtro de unidade para seguranca)
           const { data: osExistente } = await supabase
             .from('os')
             .select('id')
             .eq('cotacao_id', cotacao.id)
+            .eq('unidade_id', cotacao.unidade_id)
             .maybeSingle();
 
           // Se já existe OS vinculada, não mostrar na aba Cotações (ela deve estar no Kanban)
@@ -232,21 +233,22 @@ export function Cotacoes() {
         return;
       }
 
-      // Verifica se já existe uma OS com este número Samsung
+      // Verifica se já existe uma OS com este número Samsung NA MESMA UNIDADE
       if (cotacao.numero_os_samsung?.trim()) {
         const { data: osComMesmoNumero, error: checkError } = await supabase
           .from('os')
           .select('id, numero_os_samsung, cliente_nome, coluna_kanban')
           .eq('numero_os_samsung', cotacao.numero_os_samsung)
+          .eq('unidade_id', cotacao.unidade_id)
           .maybeSingle();
 
         if (checkError) {
-          alert(`Erro ao verificar número Samsung: ${checkError.message}`);
+          alert(`Erro ao verificar numero Samsung: ${checkError.message}`);
           return;
         }
 
         if (osComMesmoNumero) {
-          alert(`❌ Já existe uma OS com o número Samsung "${cotacao.numero_os_samsung}"!\n\n📋 OS ID: ${osComMesmoNumero.id}\n👤 Cliente: ${osComMesmoNumero.cliente_nome}\n📍 Status: ${osComMesmoNumero.coluna_kanban}\n\n⚠️ AÇÃO NECESSÁRIA:\nEdite a cotação e altere o número da OS Samsung antes de aprovar, ou delete a OS duplicada no Kanban.`);
+          alert(`Ja existe uma OS com o numero Samsung "${cotacao.numero_os_samsung}"!\n\nOS ID: ${osComMesmoNumero.id}\nCliente: ${osComMesmoNumero.cliente_nome}\nStatus: ${osComMesmoNumero.coluna_kanban}\n\nEdite a cotacao e altere o numero da OS Samsung antes de aprovar, ou delete a OS duplicada no Kanban.`);
           return;
         }
       }
@@ -623,16 +625,19 @@ export function Cotacoes() {
 
       if (fetchError) throw fetchError;
 
-      // Verifica se já existe uma OS com este número Samsung
-      const { data: osComMesmoNumero } = await supabase
-        .from('os')
-        .select('id, numero_os_samsung, cliente_nome')
-        .eq('numero_os_samsung', cotacao.numero_os_samsung)
-        .maybeSingle();
+      // Verifica se já existe uma OS com este número Samsung NA MESMA UNIDADE
+      if (cotacao.numero_os_samsung) {
+        const { data: osComMesmoNumero } = await supabase
+          .from('os')
+          .select('id, numero_os_samsung, cliente_nome')
+          .eq('numero_os_samsung', cotacao.numero_os_samsung)
+          .eq('unidade_id', cotacao.unidade_id)
+          .maybeSingle();
 
-      if (osComMesmoNumero) {
-        alert(`Já existe uma OS com o número Samsung "${cotacao.numero_os_samsung}"!\n\nOS ID: ${osComMesmoNumero.id}\nCliente: ${osComMesmoNumero.cliente_nome}\n\nEdite a cotação e altere o número da OS Samsung antes de rejeitar.`);
-        return;
+        if (osComMesmoNumero) {
+          alert(`Ja existe uma OS com o numero Samsung "${cotacao.numero_os_samsung}"!\n\nOS ID: ${osComMesmoNumero.id}\nCliente: ${osComMesmoNumero.cliente_nome}\n\nEdite a cotacao e altere o numero da OS Samsung antes de rejeitar.`);
+          return;
+        }
       }
 
       // Calcula valor total da cotação
