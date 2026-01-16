@@ -3731,12 +3731,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         <select
                           value={os.aparelho_linha || ''}
                           onChange={async (e) => {
-                            const novaLinha = e.target.value;
+                            const novaLinha = e.target.value || null;
+                            setOS({ ...os, aparelho_linha: novaLinha });
                             const { error } = await supabase
                               .from('os')
-                              .update({ aparelho_linha: novaLinha || null })
+                              .update({ aparelho_linha: novaLinha })
                               .eq('id', os.id);
-                            if (!error) onUpdate();
+                            if (!error && onReload) onReload();
                           }}
                           className={`neon-input w-full mt-1 text-sm ${!os.aparelho_linha ? 'border-red-500 ring-1 ring-red-500' : ''}`}
                         >

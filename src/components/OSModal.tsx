@@ -2466,10 +2466,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                     <select
                       value={os.aparelho_linha || ''}
                       onChange={async (e) => {
-                        const novaLinha = e.target.value;
+                        const novaLinha = e.target.value || null;
+                        setOS({ ...os, aparelho_linha: novaLinha });
                         const { error } = await supabase
                           .from('os')
-                          .update({ aparelho_linha: novaLinha || null })
+                          .update({ aparelho_linha: novaLinha })
                           .eq('id', os.id);
                         if (!error && onReload) onReload();
                       }}
