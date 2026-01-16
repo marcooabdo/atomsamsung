@@ -797,7 +797,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             });
 
             if (markupData && markupData.length > 0 && markupData[0].valor) {
-              valorComMarkup = valorComMarkup * (1 + markupData[0].valor / 100);
+              const markup = markupData[0];
+              switch (markup.tipo) {
+                case 'percentual':
+                  valorComMarkup = valorComMarkup * (1 + markup.valor / 100);
+                  break;
+                case 'multiplicador':
+                  valorComMarkup = valorComMarkup * markup.valor;
+                  break;
+                case 'valor_fixo':
+                  valorComMarkup = valorComMarkup + markup.valor;
+                  break;
+              }
             }
           }
 
@@ -843,7 +854,19 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         });
 
         if (markupData && markupData.length > 0 && markupData[0].valor) {
-          const valorComMarkup = valorGSPN * (1 + markupData[0].valor / 100);
+          const markup = markupData[0];
+          let valorComMarkup = valorGSPN;
+          switch (markup.tipo) {
+            case 'percentual':
+              valorComMarkup = valorGSPN * (1 + markup.valor / 100);
+              break;
+            case 'multiplicador':
+              valorComMarkup = valorGSPN * markup.valor;
+              break;
+            case 'valor_fixo':
+              valorComMarkup = valorGSPN + markup.valor;
+              break;
+          }
           setNovaPecaValorComMarkup(valorComMarkup);
         } else {
           setNovaPecaValorComMarkup(null);

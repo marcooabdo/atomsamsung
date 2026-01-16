@@ -471,7 +471,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
     const { data } = await supabase
       .rpc('get_markup_for_unidade_and_tipo', {
         p_unidade_id: unidadeId,
-        p_tipo_orcamento: 'normal'
+        p_tipo_orcamento: tipoOrcamento || 'normal'
       });
     setMarkups(data || []);
   };
