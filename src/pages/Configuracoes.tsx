@@ -555,9 +555,20 @@ export function Configuracoes() {
       await supabase.from('taxas_maquina').update({ taxa, debito }).eq('id', id);
       setEditingTaxa(null);
       loadData();
+      alert('Taxa salva com sucesso!');
     } catch (error) {
       alert('Erro ao salvar taxa');
     }
+  };
+
+  const saveTaxaFromInputs = (taxaId: string) => {
+    const inputCredito = document.getElementById(`taxa-${taxaId}`) as HTMLInputElement;
+    const inputDebito = document.getElementById(`debito-${taxaId}`) as HTMLInputElement;
+    handleSaveTaxa(
+      taxaId,
+      parseFloat(inputCredito.value) || 0,
+      parseFloat(inputDebito?.value || '0') || 0
+    );
   };
 
   const criarTaxasPadrao = async (unidadeId: string) => {
@@ -1677,14 +1688,12 @@ export function Configuracoes() {
                               </span>
                               {editingTaxa === taxa.id ? (
                                 <button
-                                  onClick={() => {
-                                    const inputCredito = document.getElementById(`taxa-${taxa.id}`) as HTMLInputElement;
-                                    const inputDebito = document.getElementById(`debito-${taxa.id}`) as HTMLInputElement;
-                                    handleSaveTaxa(taxa.id, parseFloat(inputCredito.value) || 0, parseFloat(inputDebito.value) || 0);
-                                  }}
-                                  className="p-1 hover:bg-[#39FF14]/10 rounded"
+                                  onClick={() => saveTaxaFromInputs(taxa.id)}
+                                  className="flex items-center gap-1 px-2 py-1 bg-[#39FF14]/20 hover:bg-[#39FF14]/30 rounded border border-[#39FF14]"
+                                  title="Clique para salvar ou pressione Enter"
                                 >
                                   <Save className="w-3 h-3 text-[#39FF14]" />
+                                  <span className="text-xs text-[#39FF14] font-medium">Salvar</span>
                                 </button>
                               ) : (
                                 <button
@@ -1696,7 +1705,7 @@ export function Configuracoes() {
                               )}
                             </div>
                             {editingTaxa === taxa.id ? (
-                              <div className="space-y-2">
+                              <div className="space-y-3">
                                 <div>
                                   <label className="text-xs text-gray-500 block mb-1">Crédito (%)</label>
                                   <input
@@ -1707,6 +1716,14 @@ export function Configuracoes() {
                                     defaultValue={taxa.taxa}
                                     className="neon-input text-sm"
                                     autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        saveTaxaFromInputs(taxa.id);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      setTimeout(() => saveTaxaFromInputs(taxa.id), 200);
+                                    }}
                                   />
                                 </div>
                                 {taxa.parcelamento === 1 && (
@@ -1719,9 +1736,20 @@ export function Configuracoes() {
                                     step="0.01"
                                     defaultValue={taxa.debito}
                                     className="neon-input text-sm"
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        saveTaxaFromInputs(taxa.id);
+                                      }
+                                    }}
+                                    onBlur={() => {
+                                      setTimeout(() => saveTaxaFromInputs(taxa.id), 200);
+                                    }}
                                   />
                                 </div>
                                 )}
+                                <p className="text-xs text-gray-500 italic">
+                                  Pressione Enter ou clique em Salvar
+                                </p>
                               </div>
                             ) : (
                               <div className="space-y-1">
