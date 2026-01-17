@@ -560,6 +560,29 @@ export function Configuracoes() {
     }
   };
 
+  const criarTaxasPadrao = async (unidadeId: string) => {
+    try {
+      const taxasPadrao = [];
+      for (let i = 1; i <= 12; i++) {
+        taxasPadrao.push({
+          parcelamento: i,
+          taxa: 0,
+          debito: i === 1 ? 0 : null,
+          unidade_id: unidadeId,
+          ativo: true
+        });
+      }
+
+      const { error } = await supabase.from('taxas_maquina').insert(taxasPadrao);
+      if (error) throw error;
+
+      alert('Taxas criadas com sucesso! Agora configure os valores para cada parcelamento.');
+      loadData();
+    } catch (error: any) {
+      alert(`Erro ao criar taxas: ${error.message || 'Erro desconhecido'}`);
+    }
+  };
+
   const allTabs = [
     { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: '#00D4FF' },
     { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14', onlyFor: ['master', 'diretoria', 'gerente'] },
@@ -1604,31 +1627,49 @@ export function Configuracoes() {
                         onChange={(e) => setSelectedUnidadeTaxa(e.target.value)}
                         className="neon-input"
                       >
-                        <option value="">Global (Todas as unidades)</option>
+                        <option value="" disabled>Selecione uma unidade...</option>
                         {unidades.map(u => (
                           <option key={u.id} value={u.id}>{u.nome}</option>
                         ))}
                       </select>
                       <p className="text-xs text-gray-500 mt-2">
-                        {selectedUnidadeTaxa ? `Configurando taxas para ${unidades.find(u => u.id === selectedUnidadeTaxa)?.nome}` : 'Configurando taxas globais (aplicadas a todas as unidades)'}
+                        {selectedUnidadeTaxa ? `Configurando taxas para ${unidades.find(u => u.id === selectedUnidadeTaxa)?.nome}` : 'Selecione uma unidade para configurar suas taxas'}
                       </p>
                     </div>
 
-                    <div className="premium-card p-4 bg-[#9D4EDD]/5 border border-[#9D4EDD]/20">
-                      <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Informação</p>
-                      <p className="text-sm text-gray-300">
-                        Configure as taxas de cartão para cada parcelamento. Débito está disponível apenas para pagamento à vista (1x).
-                      </p>
-                    </div>
-
-                    {taxas.filter(t => t.unidade_id === (selectedUnidadeTaxa || null)).length === 0 ? (
+                    {!selectedUnidadeTaxa ? (
                       <div className="text-center py-12">
                         <CreditCard className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-500 text-sm">Nenhuma taxa cadastrada</p>
+                        <p className="text-gray-500 text-sm">Selecione uma unidade para configurar as taxas</p>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-                        {taxas.filter(t => t.unidade_id === (selectedUnidadeTaxa || null)).map((taxa) => (
+                      <>
+                        <div className="premium-card p-4 bg-[#9D4EDD]/5 border border-[#9D4EDD]/20">
+                          <p className="text-xs text-gray-400 uppercase tracking-wider mb-2">Informacao</p>
+                          <p className="text-sm text-gray-300">
+                            Configure as taxas de cartao para cada parcelamento (1x a 12x). Debito esta disponivel apenas para pagamento a vista (1x).
+                          </p>
+                        </div>
+
+                        {taxas.filter(t => t.unidade_id === selectedUnidadeTaxa).length === 0 ? (
+                          <div className="text-center py-12">
+                            <CreditCard className="w-12 h-12 text-gray-600 mx-auto mb-3" />
+                            <p className="text-gray-500 text-sm mb-4">Nenhuma taxa cadastrada para esta unidade</p>
+                            <button
+                              onClick={() => criarTaxasPadrao(selectedUnidadeTaxa)}
+                              className="px-4 py-2 rounded-lg font-bold text-sm transition-all"
+                              style={{
+                                background: 'linear-gradient(135deg, rgba(157,78,221,0.2) 0%, rgba(157,78,221,0.05) 100%)',
+                                border: '1px solid #9D4EDD',
+                                color: '#9D4EDD'
+                              }}
+                            >
+                              Criar Taxas Padrao (1x a 12x)
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                            {taxas.filter(t => t.unidade_id === selectedUnidadeTaxa).map((taxa) => (
                           <div key={taxa.id} className="premium-card p-4">
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-xs text-gray-500 uppercase tracking-wider">
@@ -1702,7 +1743,9 @@ export function Configuracoes() {
                             )}
                           </div>
                         ))}
-                      </div>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 )}
