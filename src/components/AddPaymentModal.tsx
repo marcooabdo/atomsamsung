@@ -44,17 +44,40 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
 
   useEffect(() => {
     const loadTaxasMaquina = async () => {
-      if (!os.unidade_id) return;
+      if (!os.unidade_id) {
+        return;
+      }
 
-      const { data } = await supabase
+      const { data: taxasUnidade, error: errorUnidade } = await supabase
         .from('taxas_maquina')
         .select('*')
-        .or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`)
+        .eq('unidade_id', os.unidade_id)
         .eq('ativo', true)
         .order('parcelamento');
 
-      if (data) {
-        setTaxasMaquina(data);
+      if (errorUnidade) {
+        console.error('Erro ao carregar taxas da unidade:', errorUnidade);
+      }
+
+      if (taxasUnidade && taxasUnidade.length > 0) {
+        setTaxasMaquina(taxasUnidade);
+        return;
+      }
+
+      const { data: taxasGlobais, error: errorGlobais } = await supabase
+        .from('taxas_maquina')
+        .select('*')
+        .is('unidade_id', null)
+        .eq('ativo', true)
+        .order('parcelamento');
+
+      if (errorGlobais) {
+        console.error('Erro ao carregar taxas globais:', errorGlobais);
+        return;
+      }
+
+      if (taxasGlobais) {
+        setTaxasMaquina(taxasGlobais);
       }
     };
 
@@ -62,17 +85,29 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   }, [os.unidade_id]);
 
   useEffect(() => {
-    if (isCartao && taxasMaquina.length > 0) {
-      const taxa = taxasMaquina.find(t => t.parcelamento === parseInt(parcelamento));
-      if (taxa) {
-        if (formaPagamento === 'cartao_credito') {
-          setTaxaPercentual(taxa.taxa?.toString() || '0');
-        } else if (formaPagamento === 'cartao_debito') {
-          setTaxaPercentual(taxa.debito?.toString() || '0');
-        }
-      }
-    } else if (!isCartao) {
+    if (!isCartao) {
       setTaxaPercentual('0');
+      return;
+    }
+
+    if (taxasMaquina.length === 0) {
+      return;
+    }
+
+    const parcelaNum = parseInt(parcelamento);
+    const taxa = taxasMaquina.find(t => t.parcelamento === parcelaNum);
+
+    if (!taxa) {
+      setTaxaPercentual('0');
+      return;
+    }
+
+    if (formaPagamento === 'cartao_credito') {
+      const taxaValor = Number(taxa.taxa || 0);
+      setTaxaPercentual(taxaValor.toString());
+    } else if (formaPagamento === 'cartao_debito') {
+      const taxaValor = Number(taxa.debito || 0);
+      setTaxaPercentual(taxaValor.toString());
     }
   }, [isCartao, taxasMaquina, parcelamento, formaPagamento]);
 
