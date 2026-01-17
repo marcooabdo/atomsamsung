@@ -45,8 +45,11 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   useEffect(() => {
     const loadTaxasMaquina = async () => {
       if (!os.unidade_id) {
+        console.warn('⚠️ OS sem unidade_id');
         return;
       }
+
+      console.log('🔍 Carregando taxas para unidade:', os.unidade_id);
 
       const { data: taxasUnidade, error: errorUnidade } = await supabase
         .from('taxas_maquina')
@@ -56,13 +59,16 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
         .order('parcelamento');
 
       if (errorUnidade) {
-        console.error('Erro ao carregar taxas da unidade:', errorUnidade);
+        console.error('❌ Erro ao carregar taxas da unidade:', errorUnidade);
       }
 
       if (taxasUnidade && taxasUnidade.length > 0) {
+        console.log('✅ Taxas da unidade carregadas:', taxasUnidade);
         setTaxasMaquina(taxasUnidade);
         return;
       }
+
+      console.log('⚠️ Nenhuma taxa específica da unidade, buscando taxas globais');
 
       const { data: taxasGlobais, error: errorGlobais } = await supabase
         .from('taxas_maquina')
@@ -72,11 +78,12 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
         .order('parcelamento');
 
       if (errorGlobais) {
-        console.error('Erro ao carregar taxas globais:', errorGlobais);
+        console.error('❌ Erro ao carregar taxas globais:', errorGlobais);
         return;
       }
 
       if (taxasGlobais) {
+        console.log('✅ Taxas globais carregadas:', taxasGlobais);
         setTaxasMaquina(taxasGlobais);
       }
     };
@@ -85,28 +92,39 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   }, [os.unidade_id]);
 
   useEffect(() => {
+    console.log('🔄 Atualizando taxa - isCartao:', isCartao, 'parcelamento:', parcelamento, 'formaPagamento:', formaPagamento);
+
     if (!isCartao) {
+      console.log('ℹ️ Não é cartão, zerando taxa');
       setTaxaPercentual('0');
       return;
     }
 
     if (taxasMaquina.length === 0) {
+      console.log('⚠️ Nenhuma taxa carregada ainda');
       return;
     }
 
     const parcelaNum = parseInt(parcelamento);
+    console.log('🔍 Buscando taxa para', parcelaNum, 'parcelas');
+    console.log('📋 Taxas disponíveis:', taxasMaquina.map(t => ({ parc: t.parcelamento, credito: t.taxa, debito: t.debito })));
+
     const taxa = taxasMaquina.find(t => t.parcelamento === parcelaNum);
+    console.log('📌 Taxa encontrada:', taxa);
 
     if (!taxa) {
+      console.log('❌ Taxa não encontrada para', parcelaNum, 'parcelas');
       setTaxaPercentual('0');
       return;
     }
 
     if (formaPagamento === 'cartao_credito') {
       const taxaValor = Number(taxa.taxa || 0);
+      console.log('💳 Aplicando taxa CRÉDITO:', taxaValor, '%');
       setTaxaPercentual(taxaValor.toString());
     } else if (formaPagamento === 'cartao_debito') {
       const taxaValor = Number(taxa.debito || 0);
+      console.log('💳 Aplicando taxa DÉBITO:', taxaValor, '%');
       setTaxaPercentual(taxaValor.toString());
     }
   }, [isCartao, taxasMaquina, parcelamento, formaPagamento]);
@@ -408,66 +426,81 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
                   </p>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
-                      Taxa de Cartão (%) {taxasMaquina.length > 0 && '- Automático'}
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      max="100"
-                      value={taxaPercentual}
-                      onChange={(e) => setTaxaPercentual(e.target.value)}
-                      readOnly={taxasMaquina.length > 0}
-                      className={`neon-input ${taxasMaquina.length > 0 ? 'bg-gray-900/50 cursor-not-allowed' : ''}`}
-                    />
-                  </div>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        Taxa de Cartão (%) {taxasMaquina.length > 0 && '- Automático'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max="100"
+                          value={taxaPercentual}
+                          onChange={(e) => setTaxaPercentual(e.target.value)}
+                          readOnly={taxasMaquina.length > 0}
+                          className={`neon-input ${taxasMaquina.length > 0 ? 'bg-gray-900/50 cursor-not-allowed' : ''}`}
+                        />
+                        {parseFloat(taxaPercentual) > 0 && (
+                          <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[#FFBF00] font-bold">
+                            {taxaPercentual}%
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                  <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
-                      Quem Paga a Taxa?
-                    </label>
-                    <select
-                      value={taxaPagaPor}
-                      onChange={(e) => setTaxaPagaPor(e.target.value as 'cliente' | 'empresa')}
-                      className="neon-input"
-                    >
-                      <option value="empresa">🏢 Empresa absorve</option>
-                      <option value="cliente">👤 Cliente paga</option>
-                    </select>
-                  </div>
-                </div>
-
-                {parseFloat(taxaPercentual) > 0 && parseFloat(valor) > 0 && (
-                  <div className="premium-card p-4 bg-black/50 border border-[#FFBF00]/30">
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Valor Bruto:</span>
-                        <span className="text-white font-mono text-lg font-bold">R$ {parseFloat(valor).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Taxa ({taxaPercentual}%):</span>
-                        <span className="text-[#FFBF00] font-mono text-lg font-bold">R$ {calcularTaxaValor().toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between items-center border-t border-gray-700 pt-3">
-                        <span className="text-[#39FF14] font-bold text-lg">VALOR LÍQUIDO:</span>
-                        <span className="text-[#39FF14] font-bold font-mono text-2xl" style={{ textShadow: '0 0 20px rgba(57, 255, 20, 0.5)' }}>
-                          R$ {calcularValorLiquido().toFixed(2)}
-                        </span>
-                      </div>
-                      {taxaPagaPor === 'empresa' && (
-                        <div className="flex items-start gap-2 mt-3 p-3 rounded-lg bg-[#FFBF00]/10">
-                          <AlertCircle className="w-4 h-4 text-[#FFBF00] flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-[#FFBF00]">
-                            A empresa absorverá R$ {calcularTaxaValor().toFixed(2)} de taxa, reduzindo o lucro desta OS
-                          </p>
-                        </div>
-                      )}
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2 tracking-wider">
+                        Quem Paga a Taxa?
+                      </label>
+                      <select
+                        value={taxaPagaPor}
+                        onChange={(e) => setTaxaPagaPor(e.target.value as 'cliente' | 'empresa')}
+                        className="neon-input"
+                        disabled={parseFloat(taxaPercentual) === 0}
+                      >
+                        <option value="empresa">🏢 Empresa absorve</option>
+                        <option value="cliente">👤 Cliente paga</option>
+                      </select>
                     </div>
                   </div>
-                )}
+
+                  {parseFloat(taxaPercentual) > 0 && parseFloat(valor) > 0 && (
+                    <div className="premium-card p-4 bg-gradient-to-br from-[#FFBF00]/20 to-transparent border-2 border-[#FFBF00]/40">
+                      <div className="grid grid-cols-3 gap-4 text-center">
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Taxa (%)</p>
+                          <p className="text-[#FFBF00] font-bold text-xl" style={{ textShadow: '0 0 10px rgba(255, 191, 0, 0.5)' }}>
+                            {taxaPercentual}%
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Desconto (R$)</p>
+                          <p className="text-[#FF0064] font-bold text-xl" style={{ textShadow: '0 0 10px rgba(255, 0, 100, 0.5)' }}>
+                            - R$ {calcularTaxaValor().toFixed(2)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400 uppercase mb-1">Você Recebe</p>
+                          <p className="text-[#39FF14] font-bold text-xl" style={{ textShadow: '0 0 10px rgba(57, 255, 20, 0.5)' }}>
+                            R$ {calcularValorLiquido().toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {parseFloat(taxaPercentual) > 0 && taxaPagaPor === 'empresa' && parseFloat(valor) > 0 && (
+                    <div className="flex items-start gap-2 p-3 rounded-lg bg-[#FFBF00]/10 border border-[#FFBF00]/30">
+                      <AlertCircle className="w-4 h-4 text-[#FFBF00] flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-[#FFBF00]">
+                        A empresa absorverá R$ {calcularTaxaValor().toFixed(2)} de taxa, reduzindo o lucro desta OS
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
