@@ -37,6 +37,61 @@ const COLUNAS_KANBAN = [
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados', color: '#EF4444', icon: AlertCircle }
 ];
 
+const COLUNAS_SC_ACC = [
+  'os_nova',
+  'negociacao_em_andamento',
+  'aguardando_aprovacao',
+  'orcamento_aprovado',
+  'aguardando_peca',
+  'peca_em_transito',
+  'peca_disponivel',
+  'aguardando_fechamento',
+  'fechar_os',
+  'os_fechada',
+  'orcamentos_rejeitados'
+];
+
+const COLUNAS_CI = [
+  'os_nova',
+  'negociacao_em_andamento',
+  'aguardando_aprovacao',
+  'orcamento_aprovado',
+  'aguardando_peca',
+  'peca_em_transito',
+  'peca_disponivel',
+  'aguardando_fechamento',
+  'fechar_os',
+  'os_fechada',
+  'orcamentos_rejeitados',
+  'diagnostico',
+  'em_reparo_ci',
+  'reparo_concluido'
+];
+
+const COLUNAS_IH = [
+  'os_nova',
+  'negociacao_em_andamento',
+  'aguardando_aprovacao',
+  'orcamento_aprovado',
+  'aguardando_peca',
+  'peca_em_transito',
+  'peca_disponivel',
+  'aguardando_fechamento',
+  'fechar_os',
+  'os_fechada',
+  'orcamentos_rejeitados',
+  'diagnostico',
+  'rota_preta',
+  'rota_vermelha',
+  'rota_azul',
+  'rota_verde',
+  'rota_rosa',
+  'rota_amarela',
+  'rota_laranja',
+  'em_rota_ih',
+  'reparo_concluido'
+];
+
 export function Kanban() {
   const { user, usuario } = useAuth();
   const [osData, setOsData] = useState<Record<string, OS[]>>({});
@@ -676,13 +731,36 @@ export function Kanban() {
     return acc;
   }, {} as Record<string, OS[]>);
 
-  const availableTipoOS = Array.from(new Set(
-    Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean)
-  )).sort() as string[];
+  const availableTipoOS = Array.from(new Set([
+    ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
+    'SC / ACC'
+  ])).sort() as string[];
 
   const availableTipoAtendimento = Array.from(new Set(
     Object.values(osData).flat().map(os => os.tipo_atendimento).filter(Boolean)
   )).sort() as string[];
+
+  const getVisibleColumns = () => {
+    const hasSCACCFilter = tipoOSFilters.includes('SC / ACC') || tipoOSFilters.includes('SC') || tipoOSFilters.includes('ACC');
+    const hasCIFilter = tipoAtendimentoFilters.includes('CI');
+    const hasIHFilter = tipoAtendimentoFilters.includes('IH');
+
+    if (hasSCACCFilter && tipoOSFilters.length === 1 && tipoAtendimentoFilters.length === 0) {
+      return COLUNAS_KANBAN.filter(col => COLUNAS_SC_ACC.includes(col.id));
+    }
+
+    if (hasCIFilter && tipoAtendimentoFilters.length === 1 && !hasSCACCFilter && tipoOSFilters.length === 0) {
+      return COLUNAS_KANBAN.filter(col => COLUNAS_CI.includes(col.id));
+    }
+
+    if (hasIHFilter && tipoAtendimentoFilters.length === 1 && !hasSCACCFilter && tipoOSFilters.length === 0) {
+      return COLUNAS_KANBAN.filter(col => COLUNAS_IH.includes(col.id));
+    }
+
+    return COLUNAS_KANBAN;
+  };
+
+  const visibleColumns = getVisibleColumns();
 
   if (loading) {
     return (
@@ -1088,7 +1166,7 @@ export function Kanban() {
           onDragLeave={handleContainerDragLeave}
         >
           <div className="flex gap-3 h-full pb-3" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
-            {COLUNAS_KANBAN.map((coluna) => {
+            {visibleColumns.map((coluna) => {
               const ColumnIcon = coluna.icon;
               const isOver = dragOverColumn === coluna.id;
 
