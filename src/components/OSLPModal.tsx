@@ -1443,56 +1443,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         console.log('✅ Comentários criados');
       }
 
-      // Vincular automaticamente checklists ADM baseado no tipo de OS e atendimento
-      const { data: checklistsAdm } = await supabase
-        .from('checklist_templates')
-        .select('*')
-        .eq('tipo_checklist', 'ADM')
-        .eq('ativo', true)
-        .or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
-
-      if (checklistsAdm && checklistsAdm.length > 0) {
-        const checklistsParaVincular = checklistsAdm.filter(template => {
-          // Se tem filtros de tipo_os, verificar se a OS atual está incluída
-          if (template.tipo_os && Array.isArray(template.tipo_os) && template.tipo_os.length > 0) {
-            if (!template.tipo_os.includes(tipoOS)) {
-              return false;
-            }
-          }
-
-          // Se tem filtros de tipos_atendimento, verificar se o atendimento atual está incluído
-          if (template.tipos_atendimento && Array.isArray(template.tipos_atendimento) && template.tipos_atendimento.length > 0) {
-            if (!template.tipos_atendimento.includes(tipoAtendimento)) {
-              return false;
-            }
-          }
-
-          return true;
-        });
-
-        if (checklistsParaVincular.length > 0) {
-          const vinculos = checklistsParaVincular.map(template => ({
-            os_id: novaOS.id,
-            checklist_template_id: template.id,
-            vinculado_automaticamente: true,
-            vinculado_por: usuario?.id,
-            respostas: []
-          }));
-
-          await supabase.from('os_checklist_vinculados').insert(vinculos);
-
-          // Adicionar comentário informando sobre checklists vinculados
-          if (checklistsParaVincular.length > 0) {
-            await supabase.from('os_comentarios').insert({
-              os_id: novaOS.id,
-              usuario_id: usuario?.id,
-              comentario: `Sistema vinculou automaticamente ${checklistsParaVincular.length} checklist(s) ADM: ${checklistsParaVincular.map(c => c.nome).join(', ')}`,
-              is_system: true
-            });
-          }
-        }
-      }
-
       const osInfo = novaOS.numero_os_interna
         ? `OS Interna ${novaOS.numero_os_interna} criada`
         : `OS ${tipoOS} criada`;
