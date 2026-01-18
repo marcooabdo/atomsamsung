@@ -128,6 +128,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     requisitada: boolean;
   }>>([]);
   const [servicosAdicionados, setServicosAdicionados] = useState<Array<{
+    id?: string;
     codigo: string;
     descricao: string;
     valor_unitario: number;
@@ -1165,12 +1166,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         console.log(`🔧 Salvando ${pecasAdicionadas.length} peça(s)...`);
         const pecasInsert = pecasAdicionadas.map(peca => ({
           cotacao_id: cotacaoId,
+          os_id: novaOS.id,
           pn: peca.codigo,
           descricao: peca.descricao,
-          quantidade: 1,
+          quantidade: peca.quantidade || 1,
           valor_base_gspn: peca.valor,
           valor_final_unitario: peca.valor,
-          valor_total: peca.valor,
+          valor_total: peca.valor * (peca.quantidade || 1),
           markup_aplicado: 0
         }));
 
@@ -1185,12 +1187,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }
       }
 
-      // Salvar serviços adicionados
-      if (servicosAdicionados.length > 0 && cotacaoId) {
+      // Salvar serviços adicionados diretamente na OS (independente de cotação)
+      if (servicosAdicionados.length > 0) {
         console.log(`⚙️ Salvando ${servicosAdicionados.length} serviço(s)...`);
         const servicosInsert = servicosAdicionados.map(servico => ({
-          cotacao_id: cotacaoId,
-          servico_id: servico.id,
+          os_id: novaOS.id,
+          servico_id: servico.id || null,
+          codigo_servico: servico.codigo || null,
           descricao: servico.descricao,
           quantidade: servico.quantidade,
           valor_unitario: servico.valor_unitario,
@@ -1198,7 +1201,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }));
 
         const { error: servicosError } = await supabase
-          .from('cotacoes_servicos')
+          .from('os_servicos')
           .insert(servicosInsert);
 
         if (servicosError) {
@@ -5262,9 +5265,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 ));
                               } else {
                                 setServicosAdicionados([...servicosAdicionados, {
+                                  id: servico.id,
                                   codigo: servico.codigo,
-                                  nome: servico.nome,
-                                  descricao: servico.descricao,
+                                  descricao: servico.descricao || servico.nome,
                                   valor_unitario: Number(servico.valor_base) || 0,
                                   quantidade: 1
                                 }]);
