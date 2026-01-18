@@ -558,14 +558,17 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     if (!os?.unidade_id || !os?.tipo_orcamento) {
       console.log('⚠️ Markups não carregados - faltam dados:', {
         unidade_id: os?.unidade_id,
-        tipo_orcamento: os?.tipo_orcamento
+        tipo_orcamento: os?.tipo_orcamento,
+        os_completa: os
       });
+      setMarkups([]);
       return;
     }
 
     console.log('🔍 Carregando markups para:', {
       unidade_id: os.unidade_id,
-      tipo_orcamento: os.tipo_orcamento
+      tipo_orcamento: os.tipo_orcamento,
+      tipo_os: os.tipo_os
     });
 
     const { data, error } = await supabase
@@ -576,8 +579,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
     if (error) {
       console.error('❌ Erro ao carregar markups:', error);
+      setMarkups([]);
     } else {
-      console.log('✅ Markups carregados:', data);
+      console.log('✅ Markups carregados para tipo_orcamento "' + os.tipo_orcamento + '":', data);
       setMarkups(data || []);
     }
   };
@@ -621,14 +625,30 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       return valorGSPN;
     }
 
-    // A RPC retorna o campo como 'valor', não 'percentual_markup'
-    const percentual = markupAplicavel.valor || 0;
-    const valorFinal = valorGSPN * (1 + percentual / 100);
+    // Aplicar markup baseado no tipo
+    let valorFinal = valorGSPN;
+
+    switch (markupAplicavel.tipo) {
+      case 'percentual':
+        valorFinal = valorGSPN * (1 + markupAplicavel.valor / 100);
+        break;
+      case 'multiplicador':
+        valorFinal = valorGSPN * markupAplicavel.valor;
+        break;
+      case 'valor_fixo':
+        valorFinal = valorGSPN + markupAplicavel.valor;
+        break;
+      default:
+        console.warn('⚠️ Tipo de markup desconhecido:', markupAplicavel.tipo);
+        valorFinal = valorGSPN;
+    }
+
     console.log('✅ Markup aplicado:', {
       valorGSPN,
-      percentual,
+      tipo: markupAplicavel.tipo,
+      valorMarkup: markupAplicavel.valor,
       valorFinal,
-      markupObj: markupAplicavel
+      markup: markupAplicavel
     });
 
     return valorFinal;
