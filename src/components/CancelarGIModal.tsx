@@ -15,6 +15,9 @@ interface CancelarGIModalProps {
     id_numerico: number;
     valor_com_impostos: string;
     delivery: string | null;
+    gi_postada_em?: string | null;
+    gi_postada_por?: string | null;
+    usuario_gi_postado?: { nome: string } | null;
   }>;
 }
 
@@ -22,7 +25,7 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
   const [motivo, setMotivo] = useState('');
   const [loading, setLoading] = useState(false);
   const [pecasSelecionadas, setPecasSelecionadas] = useState<string[]>(
-    isLote && pecasLote ? pecasLote.map(p => p.id) : []
+    isLote && pecasLote ? pecasLote.filter(p => p.gi_postada_em).map(p => p.id) : []
   );
 
   if (!isOpen) return null;
@@ -126,16 +129,21 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
                 {pecasLote.map((peca) => (
                   <label
                     key={peca.id}
-                    className="flex items-center gap-3 p-3 rounded bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer transition-colors"
+                    className={`flex items-center gap-3 p-3 rounded transition-colors ${
+                      peca.gi_postada_em
+                        ? 'bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer'
+                        : 'bg-gray-800/30 border border-gray-700 cursor-not-allowed opacity-60'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={pecasSelecionadas.includes(peca.id)}
                       onChange={() => handleTogglePeca(peca.id)}
-                      className="w-4 h-4 rounded border-[#00D4FF]/40 text-[#00D4FF] focus:ring-[#00D4FF] focus:ring-offset-0"
+                      disabled={!peca.gi_postada_em}
+                      className="w-4 h-4 rounded border-[#00D4FF]/40 text-[#00D4FF] focus:ring-[#00D4FF] focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono text-[#00D4FF] font-bold">ID #{peca.id_numerico}</span>
                         {peca.delivery && (
                           <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
@@ -143,6 +151,20 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
                         <span className="text-xs text-gray-300">
                           R$ {Number(peca.valor_com_impostos).toFixed(2)}
                         </span>
+                        {peca.gi_postada_em ? (
+                          <span className="text-[10px] px-2 py-1 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                            GI postada em {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })} por {peca.usuario_gi_postado?.nome || 'N/A'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] px-2 py-1 rounded bg-gray-700/50 text-gray-400">
+                            GI não postada
+                          </span>
+                        )}
                       </div>
                     </div>
                   </label>

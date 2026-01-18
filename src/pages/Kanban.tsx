@@ -476,7 +476,16 @@ export function Kanban() {
 
         const { data: pecasLoteData } = await supabase
           .from('estoque_pecas')
-          .select('id, estoque_etiquetas(id_sequencial, delivery)')
+          .select(`
+            id,
+            gi_postada_em,
+            gi_postada_por,
+            gi_cancelada_em,
+            gi_cancelada_por,
+            estoque_etiquetas(id_sequencial, delivery),
+            usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome),
+            usuario_gi_cancelado:usuarios!estoque_pecas_gi_cancelada_por_fkey(nome)
+          `)
           .in('id', todosPecaIds);
 
         // Mapear peças por ID
@@ -2034,36 +2043,39 @@ export function Kanban() {
                                     </span>
                                     <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
                                     <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                    <div className="flex flex-col gap-1 mt-0.5">
                                       {req.is_lote && req.pecas_lote?.length > 0 ? (
                                         <>
-                                          {req.pecas_lote.map((peca: any, index: number) => (
-                                            <div key={peca.id} className="flex items-center gap-1">
+                                          {req.pecas_lote.map((peca: any) => (
+                                            <div key={peca.id} className="flex items-center gap-1.5 flex-wrap">
                                               {peca.estoque_etiquetas?.[0]?.id_sequencial && (
-                                                <span className="text-[8px] text-cyan-400">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
+                                                <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
                                               )}
                                               {peca.estoque_etiquetas?.[0]?.delivery && (
-                                                <>
-                                                  <span className="text-gray-600">•</span>
-                                                  <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
-                                                </>
+                                                <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
                                               )}
-                                              {index < req.pecas_lote.length - 1 && <span className="text-gray-600">|</span>}
+                                              {peca.gi_postada_em && (
+                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                                                  GI {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} por {peca.usuario_gi_postado?.nome || 'N/A'}
+                                                </span>
+                                              )}
+                                              {!peca.gi_postada_em && req.status === 'gi_postada' && (
+                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                                  GI Pendente
+                                                </span>
+                                              )}
                                             </div>
                                           ))}
                                         </>
                                       ) : (
-                                        <>
+                                        <div className="flex items-center gap-1.5">
                                           {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
-                                            <>
-                                              <span className="text-[8px] text-cyan-400">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
-                                              <span className="text-gray-600">•</span>
-                                            </>
+                                            <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
                                           )}
                                           {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
                                             <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
                                           )}
-                                        </>
+                                        </div>
                                       )}
                                     </div>
                                   </div>
@@ -2095,36 +2107,39 @@ export function Kanban() {
                                     </span>
                                     <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
                                     <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
-                                    <div className="flex items-center flex-wrap gap-1.5 mt-0.5">
+                                    <div className="flex flex-col gap-1 mt-0.5">
                                       {req.is_lote && req.pecas_lote?.length > 0 ? (
                                         <>
-                                          {req.pecas_lote.map((peca: any, index: number) => (
-                                            <div key={peca.id} className="flex items-center gap-1">
+                                          {req.pecas_lote.map((peca: any) => (
+                                            <div key={peca.id} className="flex items-center gap-1.5 flex-wrap">
                                               {peca.estoque_etiquetas?.[0]?.id_sequencial && (
-                                                <span className="text-[8px] text-cyan-400">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
+                                                <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
                                               )}
                                               {peca.estoque_etiquetas?.[0]?.delivery && (
-                                                <>
-                                                  <span className="text-gray-600">•</span>
-                                                  <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
-                                                </>
+                                                <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
                                               )}
-                                              {index < req.pecas_lote.length - 1 && <span className="text-gray-600">|</span>}
+                                              {peca.gi_postada_em && (
+                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                                                  GI {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} por {peca.usuario_gi_postado?.nome || 'N/A'}
+                                                </span>
+                                              )}
+                                              {!peca.gi_postada_em && req.status === 'gi_postada' && (
+                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                                                  GI Pendente
+                                                </span>
+                                              )}
                                             </div>
                                           ))}
                                         </>
                                       ) : (
-                                        <>
+                                        <div className="flex items-center gap-1.5">
                                           {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
-                                            <>
-                                              <span className="text-[8px] text-cyan-400">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
-                                              <span className="text-gray-600">•</span>
-                                            </>
+                                            <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
                                           )}
                                           {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
                                             <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
                                           )}
-                                        </>
+                                        </div>
                                       )}
                                     </div>
                                   </div>

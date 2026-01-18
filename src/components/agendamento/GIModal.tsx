@@ -13,6 +13,9 @@ interface GIModalProps {
     id_numerico: number;
     valor_com_impostos: string;
     delivery: string | null;
+    gi_postada_em?: string | null;
+    gi_postada_por?: string | null;
+    usuario_gi_postado?: { nome: string } | null;
   }>;
   onClose: () => void;
   onSuccess: () => void;
@@ -22,7 +25,7 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
   const { usuario } = useAuth();
   const [loading, setLoading] = useState(false);
   const [pecasSelecionadas, setPecasSelecionadas] = useState<string[]>(
-    isLote && pecasLote ? pecasLote.map(p => p.id) : []
+    isLote && pecasLote ? pecasLote.filter(p => !p.gi_postada_em).map(p => p.id) : []
   );
 
   const handleTogglePeca = (pecaId: string) => {
@@ -35,10 +38,11 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
 
   const handleToggleTodas = () => {
     if (!pecasLote) return;
-    if (pecasSelecionadas.length === pecasLote.length) {
+    const pecasDisponiveis = pecasLote.filter(p => !p.gi_postada_em);
+    if (pecasSelecionadas.length === pecasDisponiveis.length) {
       setPecasSelecionadas([]);
     } else {
-      setPecasSelecionadas(pecasLote.map(p => p.id));
+      setPecasSelecionadas(pecasDisponiveis.map(p => p.id));
     }
   };
 
@@ -70,7 +74,9 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
         const { error: estoquePecasError } = await supabase
           .from('estoque_pecas')
           .update({
-            status: 'usada'
+            status: 'usada',
+            gi_postada_em: new Date().toISOString(),
+            gi_postada_por: usuario?.id
           })
           .in('id', pecasSelecionadas);
 
@@ -161,16 +167,21 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
                 {pecasLote.map((peca) => (
                   <label
                     key={peca.id}
-                    className="flex items-center gap-3 p-3 rounded bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer transition-colors"
+                    className={`flex items-center gap-3 p-3 rounded transition-colors ${
+                      peca.gi_postada_em
+                        ? 'bg-[#39FF14]/10 border border-[#39FF14]/40 cursor-not-allowed'
+                        : 'bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer'
+                    }`}
                   >
                     <input
                       type="checkbox"
                       checked={pecasSelecionadas.includes(peca.id)}
                       onChange={() => handleTogglePeca(peca.id)}
-                      className="w-4 h-4 rounded border-[#39FF14]/40 text-[#39FF14] focus:ring-[#39FF14] focus:ring-offset-0"
+                      disabled={!!peca.gi_postada_em}
+                      className="w-4 h-4 rounded border-[#39FF14]/40 text-[#39FF14] focus:ring-[#39FF14] focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <div className="flex-1">
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono text-[#39FF14] font-bold">ID #{peca.id_numerico}</span>
                         {peca.delivery && (
                           <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
@@ -178,6 +189,16 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
                         <span className="text-xs text-gray-300">
                           R$ {Number(peca.valor_com_impostos).toFixed(2)}
                         </span>
+                        {peca.gi_postada_em && (
+                          <span className="text-[10px] px-2 py-1 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                            GI postada em {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })} por {peca.usuario_gi_postado?.nome || 'N/A'}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </label>

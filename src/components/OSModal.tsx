@@ -1971,7 +1971,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         await supabase
           .from('estoque_pecas')
           .update({
-            gi_postada: false
+            gi_postada_em: null,
+            gi_postada_por: null,
+            gi_cancelada_em: new Date().toISOString(),
+            gi_cancelada_por: usuario?.id
           })
           .in('id', pecasSelecionadas);
 
