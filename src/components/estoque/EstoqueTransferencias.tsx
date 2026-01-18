@@ -106,7 +106,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             };
           }
           pedidosAtivosAgrupado[req.os_id].requisicoes.push(req);
-          pedidosAtivosAgrupado[req.os_id].totalPecas += 1;
+          const qtdPedido = req.quantidade_atendida || Number(req.quantidade_requisitada) || 1;
+          pedidosAtivosAgrupado[req.os_id].totalPecas += qtdPedido;
 
           // Se tem ID disponível, TAMBÉM aparece na lista de transferências (mantendo info do pedido)
           if (temIDDisponivel) {
@@ -124,7 +125,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               };
             }
             agrupado[req.os_id].requisicoes.push(req);
-            agrupado[req.os_id].totalPecas += 1;
+            const qtdDisponivel = req.quantidade_atendida || Number(req.quantidade_requisitada) || 1;
+            agrupado[req.os_id].totalPecas += qtdDisponivel;
             agrupado[req.os_id].todasAtendidas = false;
           }
           return;
@@ -146,7 +148,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         }
 
         agrupado[req.os_id].requisicoes.push(req);
-        agrupado[req.os_id].totalPecas += 1;
+        // Conta a quantidade real de peças atendidas (para lotes ou peças individuais)
+        const qtdPecas = req.quantidade_atendida || Number(req.quantidade_requisitada) || 1;
+        agrupado[req.os_id].totalPecas += qtdPecas;
 
         if (req.status !== 'atendida' && req.status !== 'gi_postada') {
           agrupado[req.os_id].todasAtendidas = false;
