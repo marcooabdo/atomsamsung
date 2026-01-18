@@ -77,10 +77,16 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
             const { data: pecasData } = await supabase
               .from('estoque_pecas')
-              .select('id, id_numerico')
+              .select('id, id_numerico, gi_postada_em')
               .in('id', req.pecas_estoque_ids)
               .order('id_numerico');
-            pecasLote = pecasData;
+
+            // Para devolução de peça usada, filtrar apenas peças com GI postada
+            if (activeSubTab === 'usada' && pecasData) {
+              pecasLote = pecasData.filter(p => p.gi_postada_em !== null);
+            } else {
+              pecasLote = pecasData;
+            }
           }
           return {
             ...req,
@@ -90,6 +96,11 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       );
 
       requisicoesEnriquecidas.forEach((req: any) => {
+        // Para peças usadas em lote, só adicionar se tiver pelo menos uma peça com GI postada
+        if (activeSubTab === 'usada' && req.is_lote && req.pecas_lote && req.pecas_lote.length === 0) {
+          return; // Pular esta requisição se não tem peças com GI
+        }
+
         // Usar os_id se existir, caso contrário usar o próprio ID da requisição como chave
         const chave = req.os_id || req.id;
 
@@ -107,7 +118,12 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           };
         }
         agrupado[chave].requisicoes.push(req);
-        agrupado[chave].totalPecas += 1;
+        // Contar apenas peças com GI postada para peças usadas em lote
+        if (activeSubTab === 'usada' && req.is_lote && req.pecas_lote) {
+          agrupado[chave].totalPecas += req.pecas_lote.length;
+        } else {
+          agrupado[chave].totalPecas += 1;
+        }
       });
 
       setDevolucoesPendentes(Object.values(agrupado));
@@ -475,7 +491,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                                   </span>
                                 </div>
                                 <div className="text-xs text-gray-400 mb-2 flex items-center gap-2 flex-wrap">
-                                  {req.is_lote && req.pecas_lote && req.pecas_lote.length > 1 ? (
+                                  {req.is_lote && req.pecas_lote && req.pecas_lote.length > 0 ? (
                                     <>
                                       <span>IDs:</span>
                                       {req.pecas_lote.map((peca: any, index: number) => (
@@ -483,6 +499,11 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                                           #{peca.id_numerico}{index < req.pecas_lote.length - 1 ? ',' : ''}
                                         </span>
                                       ))}
+                                      {activeSubTab === 'usada' && (
+                                        <span className="text-[10px] px-2 py-1 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30 ml-1">
+                                          c/ GI
+                                        </span>
+                                      )}
                                       <span>•</span>
                                     </>
                                   ) : (

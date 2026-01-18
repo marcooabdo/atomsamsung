@@ -3356,49 +3356,72 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               </button>
                             )}
 
-                            {(requisicao?.status === 'atendida' || requisicao?.status === 'em_uso') && (
-                              <>
-                                <button
-                                  onClick={() => handlePostarGI(requisicao)}
-                                  className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                  style={{
-                                    backgroundColor: '#39FF1410',
-                                    borderColor: '#39FF14',
-                                    color: '#39FF14'
-                                  }}
-                                >
-                                  <Send className="w-3 h-3" />
-                                  POSTAR GI
-                                </button>
-                                <button
-                                  onClick={() => handleRemoverPeca(requisicao)}
-                                  className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                  style={{
-                                    backgroundColor: '#FF006410',
-                                    borderColor: '#FF0064',
-                                    color: '#FF0064'
-                                  }}
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                  DEVOLVER
-                                </button>
-                              </>
-                            )}
+                            {(() => {
+                              // Para lotes, verificar se há peças sem GI
+                              const temPecasSemGI = requisicao?.is_lote && requisicao?.pecas_lote?.some((p: any) => !p.gi_postada_em);
+                              const temPecasComGI = requisicao?.is_lote && requisicao?.pecas_lote?.some((p: any) => p.gi_postada_em);
 
-                            {requisicao?.status === 'gi_postada' && (
-                              <button
-                                onClick={() => handleCancelarGI(requisicao)}
-                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                style={{
-                                  backgroundColor: '#FF006410',
-                                  borderColor: '#FF0064',
-                                  color: '#FF0064'
-                                }}
-                              >
-                                <X className="w-3 h-3" />
-                                CANCELAR GI
-                              </button>
-                            )}
+                              // Mostrar botões POSTAR GI e DEVOLVER se:
+                              // 1. Status é 'atendida' ou 'em_uso' OU
+                              // 2. É lote com status 'gi_postada' mas tem peças sem GI
+                              const mostrarBotoesPostareDevolver = (
+                                requisicao?.status === 'atendida' ||
+                                requisicao?.status === 'em_uso' ||
+                                (requisicao?.status === 'gi_postada' && temPecasSemGI)
+                              );
+
+                              // Mostrar botão CANCELAR GI se:
+                              // 1. Status é 'gi_postada' E tem peças com GI
+                              const mostrarBotaoCancelar = requisicao?.status === 'gi_postada' && (temPecasComGI || !requisicao?.is_lote);
+
+                              return (
+                                <>
+                                  {mostrarBotoesPostareDevolver && (
+                                    <>
+                                      <button
+                                        onClick={() => handlePostarGI(requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#39FF1410',
+                                          borderColor: '#39FF14',
+                                          color: '#39FF14'
+                                        }}
+                                      >
+                                        <Send className="w-3 h-3" />
+                                        POSTAR GI
+                                      </button>
+                                      <button
+                                        onClick={() => handleRemoverPeca(requisicao)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#FF006410',
+                                          borderColor: '#FF0064',
+                                          color: '#FF0064'
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        DEVOLVER
+                                      </button>
+                                    </>
+                                  )}
+
+                                  {mostrarBotaoCancelar && (
+                                    <button
+                                      onClick={() => handleCancelarGI(requisicao)}
+                                      className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                      style={{
+                                        backgroundColor: '#FF006410',
+                                        borderColor: '#FF0064',
+                                        color: '#FF0064'
+                                      }}
+                                    >
+                                      <X className="w-3 h-3" />
+                                      CANCELAR GI
+                                    </button>
+                                  )}
+                                </>
+                              );
+                            })()}
 
                             {criandoRequisicao && (requisicaoDevolvida?.status === 'reprovada' || requisicaoDevolvida?.status === 'devolvida') && !requisicao && (
                               <button
