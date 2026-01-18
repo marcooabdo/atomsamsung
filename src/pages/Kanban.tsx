@@ -99,6 +99,8 @@ export function Kanban() {
   const [searchTerm, setSearchTerm] = useState('');
   const [draggedCard, setDraggedCard] = useState<OS | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
+  const [columnSortOrder, setColumnSortOrder] = useState<Record<string, 'tat' | 'numero' | 'tempo_etapa' | 'sequencia'>>({});
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
@@ -433,7 +435,7 @@ export function Kanban() {
       } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
       }
-      const { data, error } = await query.order('created_at', { ascending: false });
+      const { data, error } = await query.order('sequencia_coluna', { ascending: true });
 
       if (error) throw error;
 
@@ -459,10 +461,13 @@ export function Kanban() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, columnId: string) => {
+  const handleDragOver = (e: React.DragEvent, columnId: string, position?: number) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverColumn(columnId);
+    if (position !== undefined) {
+      setDragOverPosition(position);
+    }
   };
 
   const handleContainerDragOver = (e: React.DragEvent) => {
@@ -504,6 +509,7 @@ export function Kanban() {
 
   const handleDragLeave = () => {
     setDragOverColumn(null);
+    setDragOverPosition(null);
   };
 
   const handleContainerDragLeave = () => {
@@ -593,22 +599,109 @@ export function Kanban() {
     }
   };
 
-  const handleDrop = async (e: React.DragEvent, targetColumn: string) => {
+  const handleDrop = async (e: React.DragEvent, targetColumn: string, targetPosition?: number) => {
     e.preventDefault();
+    const finalPosition = targetPosition ?? dragOverPosition;
     setDragOverColumn(null);
+    setDragOverPosition(null);
 
     if (autoScrollInterval.current) {
       clearInterval(autoScrollInterval.current);
       autoScrollInterval.current = null;
     }
 
-    if (!draggedCard || draggedCard.coluna_kanban === targetColumn) {
+    if (!draggedCard) {
+      return;
+    }
+
+    // Se for a mesma coluna e mesma posição, não faz nada
+    const isSameColumn = draggedCard.coluna_kanban === targetColumn;
+    if (isSameColumn && finalPosition === undefined) {
       setDraggedCard(null);
       return;
     }
 
     const colunaOrigem = COLUNAS_KANBAN.find(c => c.id === draggedCard.coluna_kanban);
     const colunaDestino = COLUNAS_KANBAN.find(c => c.id === targetColumn);
+
+    // Se for reordenação na mesma coluna
+    if (isSameColumn && finalPosition !== undefined) {
+      try {
+        const cardsColuna = filteredData[targetColumn] || [];
+        const currentIndex = cardsColuna.findIndex(os => os.id === draggedCard.id);
+
+        if (currentIndex === finalPosition) {
+          setDraggedCard(null);
+          return;
+        }
+
+        // Calcular nova sequência
+        let novaSequencia: number;
+
+        if (finalPosition === 0) {
+          // Mover para o início
+          const primeiroCard = cardsColuna[0];
+          novaSequencia = primeiroCard.id === draggedCard.id
+            ? (cardsColuna[1]?.sequencia_coluna || 0) - 1
+            : (primeiroCard?.sequencia_coluna || 0) - 1;
+        } else if (finalPosition >= cardsColuna.length - 1) {
+          // Mover para o final
+          const ultimoCard = cardsColuna[cardsColuna.length - 1];
+          novaSequencia = ultimoCard.id === draggedCard.id
+            ? (cardsColuna[cardsColuna.length - 2]?.sequencia_coluna || 0) + 1
+            : (ultimoCard?.sequencia_coluna || 0) + 1;
+        } else {
+          // Mover entre dois cards
+          const cardAntes = cardsColuna[finalPosition - 1];
+          const cardDepois = cardsColuna[finalPosition];
+          novaSequencia = Math.floor((cardAntes.sequencia_coluna + cardDepois.sequencia_coluna) / 2);
+
+          // Se não houver espaço, renumerar
+          if (novaSequencia === cardAntes.sequencia_coluna || novaSequencia === cardDepois.sequencia_coluna) {
+            await supabase.rpc('renumerar_sequencias_coluna', {
+              p_coluna_kanban: targetColumn,
+              p_unidade_id: draggedCard.unidade_id
+            });
+
+            // Recarregar dados após renumeração
+            await loadKanbanData();
+            setDraggedCard(null);
+            return;
+          }
+        }
+
+        // Atualizar a sequência do card arrastado
+        const { error } = await supabase
+          .from('os')
+          .update({
+            sequencia_coluna: novaSequencia,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', draggedCard.id);
+
+        if (error) throw error;
+
+        // Atualizar localmente
+        setOsData(prevData => {
+          const newData = { ...prevData };
+          const cards = [...(newData[targetColumn] || [])];
+          const cardIndex = cards.findIndex(c => c.id === draggedCard.id);
+          if (cardIndex !== -1) {
+            cards[cardIndex] = { ...cards[cardIndex], sequencia_coluna: novaSequencia };
+            cards.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+            newData[targetColumn] = cards;
+          }
+          return newData;
+        });
+
+        setDraggedCard(null);
+        return;
+      } catch (error: any) {
+        alert(`❌ Erro ao reordenar OS: ${error?.message || 'Erro desconhecido'}`);
+        setDraggedCard(null);
+        return;
+      }
+    }
 
     const rotasIds = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
     const isOrigemAguardandoPeca = draggedCard.coluna_kanban === 'aguardando_peca';
@@ -693,10 +786,43 @@ export function Kanban() {
         return;
       }
 
+      // Calcular sequência para a nova coluna
+      let novaSequencia: number;
+      const cardsDestino = filteredData[targetColumn] || [];
+
+      if (finalPosition === undefined || finalPosition >= cardsDestino.length) {
+        // Adicionar no final
+        const ultimoCard = cardsDestino[cardsDestino.length - 1];
+        novaSequencia = ultimoCard ? ultimoCard.sequencia_coluna + 1 : 0;
+      } else if (finalPosition === 0) {
+        // Adicionar no início
+        const primeiroCard = cardsDestino[0];
+        novaSequencia = primeiroCard ? primeiroCard.sequencia_coluna - 1 : 0;
+      } else {
+        // Adicionar entre dois cards
+        const cardAntes = cardsDestino[finalPosition - 1];
+        const cardDepois = cardsDestino[finalPosition];
+        novaSequencia = Math.floor((cardAntes.sequencia_coluna + cardDepois.sequencia_coluna) / 2);
+
+        // Se não houver espaço, renumerar
+        if (novaSequencia === cardAntes.sequencia_coluna || novaSequencia === cardDepois.sequencia_coluna) {
+          await supabase.rpc('renumerar_sequencias_coluna', {
+            p_coluna_kanban: targetColumn,
+            p_unidade_id: draggedCard.unidade_id
+          });
+
+          // Recarregar dados após renumeração
+          await loadKanbanData();
+          setDraggedCard(null);
+          return;
+        }
+      }
+
       const { error, data } = await supabase
         .from('os')
         .update({
           coluna_kanban: targetColumn,
+          sequencia_coluna: novaSequencia,
           updated_at: new Date().toISOString()
         })
         .eq('id', draggedCard.id)
@@ -715,7 +841,10 @@ export function Kanban() {
       setOsData(prevData => {
         const newData = { ...prevData };
         newData[draggedCard.coluna_kanban] = newData[draggedCard.coluna_kanban].filter(os => os.id !== draggedCard.id);
-        newData[targetColumn] = [...(newData[targetColumn] || []), { ...draggedCard, coluna_kanban: targetColumn }];
+        const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
+        const newCards = [...(newData[targetColumn] || []), updatedCard];
+        newCards.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+        newData[targetColumn] = newCards;
         return newData;
       });
     } catch (error: any) {
@@ -727,7 +856,7 @@ export function Kanban() {
   };
 
   const filteredData = Object.keys(osData).reduce((acc, coluna) => {
-    acc[coluna] = osData[coluna].filter(os => {
+    let filtered = osData[coluna].filter(os => {
       const matchesSearch = os.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (os.numero_os_samsung && os.numero_os_samsung.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (os.numero_os_interna && os.numero_os_interna.toLowerCase().includes(searchTerm.toLowerCase()));
@@ -747,6 +876,26 @@ export function Kanban() {
 
       return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTAT;
     });
+
+    // Aplicar ordenação específica da coluna
+    const sortOrder = columnSortOrder[coluna] || 'sequencia';
+
+    if (sortOrder === 'tat') {
+      filtered = filtered.sort((a, b) => calcularTAT(a.created_at) - calcularTAT(b.created_at));
+    } else if (sortOrder === 'numero') {
+      filtered = filtered.sort((a, b) => {
+        const numA = a.numero_os_interna || a.numero_os_samsung || '';
+        const numB = b.numero_os_interna || b.numero_os_samsung || '';
+        return numA.localeCompare(numB);
+      });
+    } else if (sortOrder === 'tempo_etapa') {
+      filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+    } else {
+      // Ordenar por sequencia_coluna (padrão)
+      filtered = filtered.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+    }
+
+    acc[coluna] = filtered;
     return acc;
   }, {} as Record<string, OS[]>);
 
@@ -1207,54 +1356,117 @@ export function Kanban() {
                   onDrop={(e) => handleDrop(e, coluna.id)}
                 >
                   <div className="flex flex-col h-full min-h-0">
-                    <div className="sticky top-0 z-10 flex items-center justify-between mb-3 pb-2 border-b flex-shrink-0 px-3 pt-3"
-                      style={{
-                        borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
-                        background: `linear-gradient(180deg, ${coluna.color}15 0%, ${coluna.color}08 100%)`,
-                        backdropFilter: 'blur(10px)'
-                      }}
-                    >
-                      <div className="flex items-center gap-2">
-                        <div className="p-1 rounded-lg" style={{
-                          backgroundColor: `${coluna.color}15`,
-                          border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
-                          boxShadow: `0 0 10px ${coluna.color}20`
-                        }}>
-                          <ColumnIcon
-                            className="w-3.5 h-3.5"
-                            style={{
-                              color: getTextColor(coluna.id, coluna.color),
-                              filter: `drop-shadow(0 0 6px ${getTextColor(coluna.id, coluna.color)})`
-                            }}
-                          />
-                        </div>
-                        <h4 className="font-bold text-xs uppercase tracking-wider"
-                          style={{
-                            color: getTextColor(coluna.id, coluna.color),
-                            textShadow: `0 0 10px ${getTextColor(coluna.id, coluna.color)}60`
-                          }}
-                        >
-                          {coluna.label}
-                        </h4>
-                      </div>
-                      <div
-                        className="px-2 py-0.5 rounded-md text-xs font-bold min-w-[28px] text-center"
+                    <div className="sticky top-0 z-10 flex-shrink-0 px-3 pt-3">
+                      <div className="flex items-center justify-between mb-2 pb-2 border-b"
                         style={{
-                          background: `linear-gradient(135deg, ${coluna.color}25 0%, ${coluna.color}10 100%)`,
-                          color: getTextColor(coluna.id, coluna.color),
-                          border: `1px solid ${getTextColor(coluna.id, coluna.color)}50`,
-                          boxShadow: `0 0 15px ${coluna.color}25, inset 0 1px 1px ${coluna.color}20`
+                          borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
+                          background: `linear-gradient(180deg, ${coluna.color}15 0%, ${coluna.color}08 100%)`,
+                          backdropFilter: 'blur(10px)'
                         }}
                       >
-                        {filteredData[coluna.id]?.length || 0}
+                        <div className="flex items-center gap-2">
+                          <div className="p-1 rounded-lg" style={{
+                            backgroundColor: `${coluna.color}15`,
+                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
+                            boxShadow: `0 0 10px ${coluna.color}20`
+                          }}>
+                            <ColumnIcon
+                              className="w-3.5 h-3.5"
+                              style={{
+                                color: getTextColor(coluna.id, coluna.color),
+                                filter: `drop-shadow(0 0 6px ${getTextColor(coluna.id, coluna.color)})`
+                              }}
+                            />
+                          </div>
+                          <h4 className="font-bold text-xs uppercase tracking-wider"
+                            style={{
+                              color: getTextColor(coluna.id, coluna.color),
+                              textShadow: `0 0 10px ${getTextColor(coluna.id, coluna.color)}60`
+                            }}
+                          >
+                            {coluna.label}
+                          </h4>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <div className="relative">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setColumnSortOrder(prev => {
+                                  const current = prev[coluna.id] || 'sequencia';
+                                  const options: ('sequencia' | 'tat' | 'numero' | 'tempo_etapa')[] = ['sequencia', 'tat', 'numero', 'tempo_etapa'];
+                                  const currentIndex = options.indexOf(current);
+                                  const nextIndex = (currentIndex + 1) % options.length;
+                                  return { ...prev, [coluna.id]: options[nextIndex] };
+                                });
+                              }}
+                              className="p-1 rounded-md transition-all hover:scale-110"
+                              style={{
+                                background: `linear-gradient(135deg, ${coluna.color}20 0%, ${coluna.color}10 100%)`,
+                                border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
+                                color: getTextColor(coluna.id, coluna.color)
+                              }}
+                              title={`Ordenar por: ${
+                                columnSortOrder[coluna.id] === 'tat' ? 'TAT' :
+                                columnSortOrder[coluna.id] === 'numero' ? 'Número OS' :
+                                columnSortOrder[coluna.id] === 'tempo_etapa' ? 'Tempo na Etapa' :
+                                'Sequência Manual'
+                              }`}
+                            >
+                              <Filter className="w-3 h-3" />
+                            </button>
+                          </div>
+                          <div
+                            className="px-2 py-0.5 rounded-md text-xs font-bold min-w-[28px] text-center"
+                            style={{
+                              background: `linear-gradient(135deg, ${coluna.color}25 0%, ${coluna.color}10 100%)`,
+                              color: getTextColor(coluna.id, coluna.color),
+                              border: `1px solid ${getTextColor(coluna.id, coluna.color)}50`,
+                              boxShadow: `0 0 15px ${coluna.color}25, inset 0 1px 1px ${coluna.color}20`
+                            }}
+                          >
+                            {filteredData[coluna.id]?.length || 0}
+                          </div>
+                        </div>
                       </div>
+                      {columnSortOrder[coluna.id] && columnSortOrder[coluna.id] !== 'sequencia' && (
+                        <div className="text-[9px] px-2 py-0.5 rounded mb-1" style={{
+                          background: `${coluna.color}10`,
+                          color: getTextColor(coluna.id, coluna.color),
+                          border: `1px solid ${getTextColor(coluna.id, coluna.color)}30`
+                        }}>
+                          Ordenado por: {
+                            columnSortOrder[coluna.id] === 'tat' ? 'TAT ↑' :
+                            columnSortOrder[coluna.id] === 'numero' ? 'Número ↑' :
+                            'Tempo na Etapa ↑'
+                          }
+                        </div>
+                      )}
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto space-y-2 cyber-scrollbar px-3 pb-3">
-                      {filteredData[coluna.id]?.map((os) => (
-                        coluna.id === 'os_fechada' ? (
+                    <div className="flex-1 min-h-0 overflow-y-auto cyber-scrollbar px-3 pb-3">
+                      {/* Drop zone no início da coluna */}
+                      {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleDragOver(e, coluna.id, 0);
+                          }}
+                          onDrop={(e) => {
+                            e.stopPropagation();
+                            handleDrop(e, coluna.id, 0);
+                          }}
+                          className={`h-2 mb-2 rounded transition-all ${
+                            dragOverPosition === 0 && dragOverColumn === coluna.id ? 'bg-white/20' : 'bg-transparent'
+                          }`}
+                        />
+                      )}
+
+                      {filteredData[coluna.id]?.map((os, index) => (
+                        <div key={os.id} className="mb-0">
+                        {coluna.id === 'os_fechada' ? (
                           <div
-                            key={os.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, os)}
                             onDragEnd={handleDragEnd}
@@ -1787,7 +1999,26 @@ export function Kanban() {
                             )}
                           </div>
                         </div>
-                        )
+                        )}
+
+                        {/* Drop zone após o card */}
+                        {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && (
+                            <div
+                              onDragOver={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                handleDragOver(e, coluna.id, index + 1);
+                              }}
+                              onDrop={(e) => {
+                                e.stopPropagation();
+                                handleDrop(e, coluna.id, index + 1);
+                              }}
+                              className={`h-2 my-2 rounded transition-all ${
+                                dragOverPosition === index + 1 && dragOverColumn === coluna.id ? 'bg-white/20' : 'bg-transparent'
+                              }`}
+                            />
+                          )}
+                        </div>
                       ))}
 
                       {(!filteredData[coluna.id] || filteredData[coluna.id].length === 0) && (
