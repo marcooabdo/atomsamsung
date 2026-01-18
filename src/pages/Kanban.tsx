@@ -101,6 +101,7 @@ export function Kanban() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [columnSortOrder, setColumnSortOrder] = useState<Record<string, 'tat' | 'numero' | 'tempo_etapa' | 'sequencia'>>({});
+  const [openSortDropdown, setOpenSortDropdown] = useState<string | null>(null);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
@@ -278,6 +279,7 @@ export function Kanban() {
       if (!target.closest('.relative')) {
         setShowBadgeFilter(false);
         setShowTipoFilter(false);
+        setOpenSortDropdown(null);
       }
     };
 
@@ -1405,13 +1407,7 @@ export function Kanban() {
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setColumnSortOrder(prev => {
-                                  const current = prev[coluna.id] || 'sequencia';
-                                  const options: ('sequencia' | 'tat' | 'numero' | 'tempo_etapa')[] = ['sequencia', 'tat', 'numero', 'tempo_etapa'];
-                                  const currentIndex = options.indexOf(current);
-                                  const nextIndex = (currentIndex + 1) % options.length;
-                                  return { ...prev, [coluna.id]: options[nextIndex] };
-                                });
+                                setOpenSortDropdown(openSortDropdown === coluna.id ? null : coluna.id);
                               }}
                               className="p-1 rounded-md transition-all hover:scale-110"
                               style={{
@@ -1419,15 +1415,55 @@ export function Kanban() {
                                 border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
                                 color: getTextColor(coluna.id, coluna.color)
                               }}
-                              title={`Ordenar por: ${
-                                columnSortOrder[coluna.id] === 'tat' ? 'TAT' :
-                                columnSortOrder[coluna.id] === 'numero' ? 'Número OS' :
-                                columnSortOrder[coluna.id] === 'tempo_etapa' ? 'Tempo na Etapa' :
-                                'Sequência Manual'
-                              }`}
+                              title="Escolher ordenação"
                             >
                               <Filter className="w-3 h-3" />
                             </button>
+
+                            {openSortDropdown === coluna.id && (
+                              <div
+                                className="absolute top-full mt-1 right-0 z-50 rounded-lg shadow-2xl min-w-[180px] overflow-hidden"
+                                style={{
+                                  background: 'rgba(0, 0, 0, 0.95)',
+                                  border: `1px solid ${coluna.color}60`,
+                                  boxShadow: `0 0 20px ${coluna.color}40`
+                                }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {[
+                                  { value: 'sequencia', label: 'Sequência Manual', icon: '✋' },
+                                  { value: 'tat', label: 'TAT (Tempo)', icon: '⏱️' },
+                                  { value: 'numero', label: 'Número OS', icon: '#️⃣' },
+                                  { value: 'tempo_etapa', label: 'Tempo na Etapa', icon: '📊' }
+                                ].map((option) => (
+                                  <button
+                                    key={option.value}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setColumnSortOrder(prev => ({
+                                        ...prev,
+                                        [coluna.id]: option.value as any
+                                      }));
+                                      setOpenSortDropdown(null);
+                                    }}
+                                    className="w-full px-3 py-2 text-left text-xs font-medium transition-all flex items-center gap-2 hover:scale-[1.02]"
+                                    style={{
+                                      background: columnSortOrder[coluna.id] === option.value
+                                        ? `linear-gradient(90deg, ${coluna.color}30 0%, ${coluna.color}10 100%)`
+                                        : 'transparent',
+                                      color: columnSortOrder[coluna.id] === option.value ? coluna.color : '#888',
+                                      borderBottom: '1px solid rgba(255,255,255,0.05)'
+                                    }}
+                                  >
+                                    <span>{option.icon}</span>
+                                    <span>{option.label}</span>
+                                    {columnSortOrder[coluna.id] === option.value && (
+                                      <span className="ml-auto" style={{ color: coluna.color }}>✓</span>
+                                    )}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
                           </div>
                           <div
                             className="px-2 py-0.5 rounded-md text-xs font-bold min-w-[28px] text-center"
