@@ -37,8 +37,13 @@ export function Financeiro() {
   }, []);
 
   useEffect(() => {
-    if (usuario && usuario.tipo !== 'master' && usuario.tipo !== 'diretoria' && usuario.unidade_id) {
-      setSelectedUnidade(usuario.unidade_id);
+    if (usuario) {
+      if (usuario.tipo === 'master' || usuario.tipo === 'diretoria') {
+        return;
+      }
+      if (usuario.unidade_id) {
+        setSelectedUnidade(usuario.unidade_id);
+      }
     }
   }, [usuario]);
 
@@ -48,6 +53,13 @@ export function Financeiro() {
   };
 
   const canSelectUnit = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+
+  const getUnidadeIdForQuery = () => {
+    if (canSelectUnit) {
+      return selectedUnidade || null;
+    }
+    return usuario?.unidade_id || null;
+  };
 
   return (
     <div className="space-y-6">
@@ -116,17 +128,17 @@ export function Financeiro() {
       <div className="min-h-[500px]">
         {activeTab === 'dashboard' && (
           <FinanceDashboard
-            unidadeId={selectedUnidade || null}
+            unidadeId={getUnidadeIdForQuery()}
             dataInicio={dataInicio}
             dataFim={dataFim}
           />
         )}
 
-        {activeTab === 'caixa' && selectedUnidade && (
-          <CaixaModule unidadeId={selectedUnidade} />
+        {activeTab === 'caixa' && getUnidadeIdForQuery() && (
+          <CaixaModule unidadeId={getUnidadeIdForQuery()!} />
         )}
 
-        {activeTab === 'caixa' && !selectedUnidade && (
+        {activeTab === 'caixa' && !getUnidadeIdForQuery() && (
           <div className="premium-card p-12 text-center">
             <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">Selecione uma Unidade</h3>
@@ -134,11 +146,11 @@ export function Financeiro() {
           </div>
         )}
 
-        {activeTab === 'lancamentos' && selectedUnidade && (
-          <LancamentosModule unidadeId={selectedUnidade} />
+        {activeTab === 'lancamentos' && getUnidadeIdForQuery() && (
+          <LancamentosModule unidadeId={getUnidadeIdForQuery()!} />
         )}
 
-        {activeTab === 'lancamentos' && !selectedUnidade && (
+        {activeTab === 'lancamentos' && !getUnidadeIdForQuery() && (
           <div className="premium-card p-12 text-center">
             <Building2 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
             <h3 className="text-xl font-bold text-white mb-2">Selecione uma Unidade</h3>
@@ -148,7 +160,7 @@ export function Financeiro() {
 
         {activeTab === 'consumo' && (
           <ConsumoPecasModule
-            unidadeId={selectedUnidade || null}
+            unidadeId={getUnidadeIdForQuery()}
             dataInicio={dataInicio}
             dataFim={dataFim}
           />
@@ -156,7 +168,7 @@ export function Financeiro() {
 
         {activeTab === 'pendencias' && (
           <PendenciasSamsungModule
-            unidadeId={selectedUnidade || null}
+            unidadeId={getUnidadeIdForQuery()}
             dataInicio={dataInicio}
             dataFim={dataFim}
           />
