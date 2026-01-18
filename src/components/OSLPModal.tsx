@@ -1119,33 +1119,70 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (osError) throw osError;
 
+      console.log('✅ OS criada com sucesso:', novaOS.id);
+
+      // Criar cotação automaticamente se houver peças ou serviços
+      let cotacaoId = null;
+      if (pecasAdicionadas.length > 0 || servicosAdicionados.length > 0) {
+        console.log('📋 Criando cotação automática...');
+        const { data: novaCotacao, error: cotacaoError } = await supabase
+          .from('cotacoes')
+          .insert({
+            os_id: novaOS.id,
+            tipo_orcamento: tipoOrcamento,
+            taxa_para_cliente: false,
+            criado_por: usuario?.id,
+            status: 'rascunho',
+            versao: 1
+          })
+          .select()
+          .single();
+
+        if (cotacaoError) {
+          console.error('❌ Erro ao criar cotação:', cotacaoError);
+        } else {
+          cotacaoId = novaCotacao.id;
+          console.log('✅ Cotação criada:', cotacaoId);
+
+          // Vincular cotação à OS
+          await supabase
+            .from('os')
+            .update({ cotacao_id: cotacaoId })
+            .eq('id', novaOS.id);
+        }
+      }
+
       // Salvar peças adicionadas
-      if (pecasAdicionadas.length > 0) {
+      if (pecasAdicionadas.length > 0 && cotacaoId) {
+        console.log(`🔧 Salvando ${pecasAdicionadas.length} peça(s)...`);
         const pecasInsert = pecasAdicionadas.map(peca => ({
-          os_id: novaOS.id,
+          cotacao_id: cotacaoId,
           pn: peca.codigo,
           descricao: peca.descricao,
           quantidade: 1,
-          valor_gspn: peca.valor,
-          status_gspn: 'pendente',
-          requisitada_por: usuario?.id,
-          numero_os_samsung: numeroOSSamsung || null
+          valor_base_gspn: peca.valor,
+          valor_final_unitario: peca.valor,
+          valor_total: peca.valor,
+          markup_aplicado: 0
         }));
 
         const { error: pecasError } = await supabase
-          .from('os_pecas')
+          .from('cotacoes_pecas')
           .insert(pecasInsert);
 
         if (pecasError) {
-          console.error('Erro ao salvar peças:', pecasError);
+          console.error('❌ Erro ao salvar peças:', pecasError);
+        } else {
+          console.log('✅ Peças salvas com sucesso');
         }
       }
 
       // Salvar serviços adicionados
-      if (servicosAdicionados.length > 0) {
+      if (servicosAdicionados.length > 0 && cotacaoId) {
+        console.log(`⚙️ Salvando ${servicosAdicionados.length} serviço(s)...`);
         const servicosInsert = servicosAdicionados.map(servico => ({
-          os_id: novaOS.id,
-          codigo_servico: servico.codigo,
+          cotacao_id: cotacaoId,
+          servico_id: servico.id,
           descricao: servico.descricao,
           quantidade: servico.quantidade,
           valor_unitario: servico.valor_unitario,
@@ -1153,16 +1190,19 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }));
 
         const { error: servicosError } = await supabase
-          .from('os_servicos')
+          .from('cotacoes_servicos')
           .insert(servicosInsert);
 
         if (servicosError) {
-          console.error('Erro ao salvar serviços:', servicosError);
+          console.error('❌ Erro ao salvar serviços:', servicosError);
+        } else {
+          console.log('✅ Serviços salvos com sucesso');
         }
       }
 
       // Salvar checklists selecionados
       if (checklistsSelecionados.length > 0) {
+        console.log(`📋 Vinculando ${checklistsSelecionados.length} checklist(s)...`);
         const checklistsInsert = checklistsSelecionados.map(checklistId => ({
           os_id: novaOS.id,
           checklist_template_id: checklistId,
@@ -1176,12 +1216,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           .insert(checklistsInsert);
 
         if (checklistsError) {
-          console.error('Erro ao salvar checklists:', checklistsError);
+          console.error('❌ Erro ao vincular checklists:', checklistsError);
+        } else {
+          console.log('✅ Checklists vinculados');
         }
       }
 
       // Salvar requisições (apenas das peças que foram marcadas para requisitar)
       if (requisicoesTemporarias.length > 0) {
+        console.log(`📦 Criando ${requisicoesTemporarias.length} requisição(ões)...`);
         const requisicoesInsert = requisicoesTemporarias.map(req => ({
           os_id: novaOS.id,
           cotacao_id: null,
@@ -1197,11 +1240,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           .from('requisicoes_pecas')
           .insert(requisicoesInsert);
 
-        if (requisicoesError) throw requisicoesError;
+        if (requisicoesError) {
+          console.error('❌ Erro ao criar requisições:', requisicoesError);
+          throw requisicoesError;
+        } else {
+          console.log('✅ Requisições criadas');
+        }
       }
 
       // Salvar pagamentos temporários
       if (pagamentosTemporarios.length > 0 && tipoOS === 'OW') {
+        console.log(`💰 Registrando ${pagamentosTemporarios.length} pagamento(s)...`);
         for (const pag of pagamentosTemporarios) {
           let comprovanteUrl = null;
 
@@ -1249,12 +1298,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             });
 
           if (pagamentoError) {
-            console.error('Erro ao salvar pagamento:', pagamentoError);
+            console.error('❌ Erro ao salvar pagamento:', pagamentoError);
           }
         }
+        console.log('✅ Pagamentos registrados');
       }
 
       if (anexosTemporarios.length > 0) {
+        console.log(`📎 Enviando ${anexosTemporarios.length} anexo(s)...`);
         for (const anexo of anexosTemporarios) {
           const fileExt = anexo.file.name.split('.').pop();
           const fileName = `${Math.random()}.${fileExt}`;
@@ -1265,20 +1316,35 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             .upload(filePath, anexo.file);
 
           if (uploadError) {
+            console.error('Erro ao fazer upload do anexo:', uploadError);
             continue;
           }
 
-          await supabase.from('os_anexos').insert({
+          const { data: { publicUrl } } = supabase.storage
+            .from('os-anexos')
+            .getPublicUrl(filePath);
+
+          const tipoArquivo = anexo.file.type.startsWith('image/') ? 'foto' :
+                              anexo.file.type.startsWith('video/') ? 'video' : 'documento';
+
+          const { error: insertError } = await supabase.from('os_anexos').insert({
             os_id: novaOS.id,
             nome_arquivo: anexo.nome,
-            caminho_arquivo: filePath,
-            tipo_arquivo: anexo.file.type,
-            tamanho: anexo.file.size,
-            usuario_id: usuario?.id
+            url: publicUrl,
+            tamanho_bytes: anexo.file.size,
+            usuario_id: usuario?.id,
+            tipo: tipoArquivo,
+            origem: 'manual'
           });
+
+          if (insertError) {
+            console.error('❌ Erro ao salvar anexo no banco:', insertError);
+          }
         }
+        console.log('✅ Anexos enviados');
       }
 
+      console.log('💬 Criando comentários...');
       const comentariosInsert = [
         {
           os_id: novaOS.id,
@@ -1287,6 +1353,64 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           is_system: true
         }
       ];
+
+      // Adicionar comentários de cotação criada
+      if (cotacaoId) {
+        comentariosInsert.push({
+          os_id: novaOS.id,
+          usuario_id: usuario?.id,
+          comentario: `Cotação criada automaticamente durante a criação da OS`,
+          is_system: true
+        });
+      }
+
+      // Adicionar comentários de serviços adicionados
+      if (servicosAdicionados.length > 0) {
+        servicosAdicionados.forEach(servico => {
+          comentariosInsert.push({
+            os_id: novaOS.id,
+            usuario_id: usuario?.id,
+            comentario: `Serviço adicionado: ${servico.descricao} - Qtd: ${servico.quantidade} - R$ ${servico.valor_unitario.toFixed(2)}`,
+            is_system: true
+          });
+        });
+      }
+
+      // Adicionar comentários de peças adicionadas
+      if (pecasAdicionadas.length > 0) {
+        pecasAdicionadas.forEach(peca => {
+          comentariosInsert.push({
+            os_id: novaOS.id,
+            usuario_id: usuario?.id,
+            comentario: `Peça adicionada: ${peca.descricao} (${peca.codigo}) - R$ ${peca.valor.toFixed(2)}`,
+            is_system: true
+          });
+        });
+      }
+
+      // Adicionar comentários de anexos
+      if (anexosTemporarios.length > 0) {
+        anexosTemporarios.forEach(anexo => {
+          comentariosInsert.push({
+            os_id: novaOS.id,
+            usuario_id: usuario?.id,
+            comentario: `Anexo adicionado: ${anexo.nome}`,
+            is_system: true
+          });
+        });
+      }
+
+      // Adicionar comentários de pagamentos
+      if (pagamentosTemporarios.length > 0) {
+        pagamentosTemporarios.forEach(pag => {
+          comentariosInsert.push({
+            os_id: novaOS.id,
+            usuario_id: usuario?.id,
+            comentario: `Pagamento registrado: ${pag.forma_pagamento} - R$ ${pag.valor.toFixed(2)}`,
+            is_system: true
+          });
+        });
+      }
 
       if (comentariosTemporarios.length > 0) {
         comentariosInsert.push(...comentariosTemporarios.map(comentario => ({
@@ -1312,7 +1436,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .from('os_comentarios')
         .insert(comentariosInsert);
 
-      if (comentariosError) throw comentariosError;
+      if (comentariosError) {
+        console.error('❌ Erro ao criar comentários:', comentariosError);
+        throw comentariosError;
+      } else {
+        console.log('✅ Comentários criados');
+      }
 
       // Vincular automaticamente checklists ADM baseado no tipo de OS e atendimento
       const { data: checklistsAdm } = await supabase
