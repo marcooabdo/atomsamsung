@@ -118,9 +118,12 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           };
         }
         agrupado[chave].requisicoes.push(req);
-        // Contar apenas peças com GI postada para peças usadas em lote
-        if (activeSubTab === 'usada' && req.is_lote && req.pecas_lote) {
+        // Contar corretamente as peças em lote (para todos os tipos de devolução)
+        if (req.is_lote && req.pecas_lote && req.pecas_lote.length > 0) {
           agrupado[chave].totalPecas += req.pecas_lote.length;
+        } else if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
+          // Se é lote mas pecas_lote não foi carregado, usar o tamanho do array de IDs
+          agrupado[chave].totalPecas += req.pecas_estoque_ids.length;
         } else {
           agrupado[chave].totalPecas += 1;
         }
