@@ -136,7 +136,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
         .from('estoque_devolucoes')
         .select(`
           *,
-          peca_id(id, id_numerico, pn, descricao, status, os_id),
+          peca_id(id, id_numerico, pn, descricao, status, os_id, unidade_id),
           solicitada_usuario:solicitada_por(nome),
           aprovada_usuario:aprovada_por(nome)
         `)
@@ -146,27 +146,75 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       const { data: dataAprovadas, error: errorAprovadas } = await queryAprovadas;
       if (errorAprovadas) throw errorAprovadas;
 
+      console.log('📊 Total de devoluções aprovadas encontradas:', dataAprovadas?.length);
+      console.log('📊 Devoluções aprovadas:', dataAprovadas?.map((d: any) => ({
+        id: d.id,
+        peca_id_numerico: d.peca_id?.id_numerico,
+        tipo: d.tipo_devolucao
+      })));
+
+      // Filtrar por unidade APÓS buscar (já que o filtro direto não funciona em relacionamento)
+      let devolucoesFiltradasPorUnidade = dataAprovadas || [];
+      if (selectedUnidade && selectedUnidade !== 'todas') {
+        devolucoesFiltradasPorUnidade = devolucoesFiltradasPorUnidade.filter(
+          (dev: any) => dev.peca_id?.unidade_id === selectedUnidade
+        );
+      }
+
+      console.log('📊 Devoluções após filtro de unidade:', devolucoesFiltradasPorUnidade.length);
+
       // Buscar informações de OS e Cotação para cada devolução aprovada
       const devolucoesEnriquecidas = await Promise.all(
-        (dataAprovadas || []).map(async (dev: any) => {
+        devolucoesFiltradasPorUnidade.map(async (dev: any) => {
           let numero_os_samsung = null;
           let numero_os_interna = null;
           let numero_cotacao = null;
 
           const pecaId = typeof dev.peca_id === 'object' ? dev.peca_id?.id : dev.peca_id;
 
-          // Buscar requisição original para pegar numero_os_samsung e cotacao_id
-          const { data: requisicao } = await supabase
+          // Buscar QUALQUER requisição dessa peça que tenha sido devolvida para pegar as informações
+          // Primeiro tentar buscar por peca_estoque_id
+          let { data: requisicoes } = await supabase
             .from('requisicoes_pecas')
-            .select('numero_os_samsung, os_id, cotacao_id, cotacao:cotacao_id(numero_cotacao), os:os_id(numero_os_interna)')
+            .select(`
+              numero_os_samsung,
+              os_id,
+              cotacao_id,
+              cotacao:cotacao_id(numero_cotacao),
+              os:os_id(numero_os_interna)
+            `)
             .eq('peca_estoque_id', pecaId)
             .eq('status', 'devolvida')
-            .maybeSingle();
+            .order('created_at', { ascending: false })
+            .limit(1);
 
-          if (requisicao) {
+          // Se não encontrou, tentar buscar no array pecas_estoque_ids
+          if (!requisicoes || requisicoes.length === 0) {
+            const result = await supabase
+              .from('requisicoes_pecas')
+              .select(`
+                numero_os_samsung,
+                os_id,
+                cotacao_id,
+                cotacao:cotacao_id(numero_cotacao),
+                os:os_id(numero_os_interna)
+              `)
+              .contains('pecas_estoque_ids', [pecaId])
+              .eq('status', 'devolvida')
+              .order('created_at', { ascending: false })
+              .limit(1);
+            requisicoes = result.data;
+          }
+
+          if (requisicoes && requisicoes.length > 0) {
+            const requisicao = requisicoes[0];
             numero_os_samsung = requisicao.numero_os_samsung;
             numero_os_interna = requisicao.os?.numero_os_interna;
             numero_cotacao = requisicao.cotacao?.numero_cotacao;
+
+            console.log(`📋 OS encontrada para peça ${dev.peca_id?.id_numerico}: Samsung=${numero_os_samsung}, Interna=${numero_os_interna}, Cotação=${numero_cotacao}`);
+          } else {
+            console.warn(`⚠️ Nenhuma requisição devolvida encontrada para peça ${dev.peca_id?.id_numerico} (ID: ${pecaId})`);
           }
 
           return {
@@ -225,6 +273,9 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
         ? [requisicao.peca_estoque_id]
         : [];
 
+      console.log('🔍 IDs das peças a serem aprovadas:', pecasIds);
+      console.log('🔍 Requisição completa:', requisicao);
+
       if (pecasIds.length > 0) {
         const novoStatus =
           requisicao.tipo_devolucao === 'nova' ? 'devolvida_nova' :
@@ -246,12 +297,18 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
 
         // Processar CADA peça individualmente
         for (const pecaId of pecasIds) {
-          await supabase
+          console.log(`✅ Processando peça ID: ${pecaId}`);
+
+          const { error: updateError } = await supabase
             .from('estoque_pecas')
             .update(updateData)
             .eq('id', pecaId);
 
-          await supabase
+          if (updateError) {
+            console.error('❌ Erro ao atualizar estoque_pecas:', updateError);
+          }
+
+          const { error: insertDevError } = await supabase
             .from('estoque_devolucoes')
             .insert({
               peca_id: pecaId,
@@ -260,6 +317,12 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
               aprovada_por: user.id,
               observacao: observacaoCompleta
             });
+
+          if (insertDevError) {
+            console.error('❌ Erro ao inserir estoque_devolucoes:', insertDevError);
+          } else {
+            console.log(`✅ Registro criado em estoque_devolucoes para peça ${pecaId}`);
+          }
 
           await supabase.from('estoque_historico').insert({
             peca_id: pecaId,
@@ -270,6 +333,8 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
             observacao: `Devolução APROVADA por ${userData?.nome || 'Estoque'} - Tipo: ${requisicao.tipo_devolucao === 'nova' ? 'Nova' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada'}${requisicao.tipo_devolucao === 'nova_com_defeito' ? ` - ⚠️ DEFEITO: ${requisicao.motivo_devolucao}` : ''}`
           });
         }
+
+        console.log(`✅ Total de ${pecasIds.length} peças processadas com sucesso`);
       }
 
       const { data: userData } = await supabase
