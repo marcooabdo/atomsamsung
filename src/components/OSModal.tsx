@@ -3303,16 +3303,25 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                           throw uploadError;
                         }
 
-                        console.log('✅ Arquivo enviado, salvando no banco...');
+                        console.log('✅ Arquivo enviado, obtendo URL pública...');
+
+                        const { data: { publicUrl } } = supabase.storage
+                          .from('os-anexos')
+                          .getPublicUrl(fileName);
+
+                        console.log('✅ URL pública obtida, salvando no banco...');
+
+                        const tipoArquivo = file.type.startsWith('image/') ? 'foto' :
+                                            file.type.startsWith('video/') ? 'video' : 'documento';
 
                         const { error: insertError } = await supabase.from('os_anexos').insert({
                           os_id: osId,
                           nome_arquivo: file.name,
-                          caminho_arquivo: fileName,
-                          tipo_arquivo: file.type,
+                          url: publicUrl,
                           tamanho_bytes: file.size,
                           usuario_id: usuario?.id,
-                          tipo: 'outros'
+                          tipo: tipoArquivo,
+                          origem: 'manual'
                         });
 
                         if (insertError) {
@@ -3348,7 +3357,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   <p className="text-center text-gray-500 py-8">Nenhum anexo</p>
                 ) : (
                   anexos.map((anexo: any) => {
-                    const isGSPN = anexo.gspn_id || anexo.gspn_tipo;
+                    const isGSPN = anexo.origem === 'gspn_sync' || !!anexo.gspn_fileobjkey;
 
                     return (
                       <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
@@ -3396,13 +3405,17 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                 if (!confirm('Deseja realmente excluir este anexo?')) return;
 
                                 try {
-                                  if (anexo.caminho_arquivo) {
-                                    const { error: storageError } = await supabase.storage
-                                      .from('os-anexos')
-                                      .remove([anexo.caminho_arquivo]);
+                                  if (anexo.url) {
+                                    const urlParts = anexo.url.split('/os-anexos/');
+                                    if (urlParts.length > 1) {
+                                      const filePath = urlParts[1];
+                                      const { error: storageError } = await supabase.storage
+                                        .from('os-anexos')
+                                        .remove([filePath]);
 
-                                    if (storageError) {
-                                      console.error('❌ Erro ao remover arquivo do storage:', storageError);
+                                      if (storageError) {
+                                        console.error('❌ Erro ao remover arquivo do storage:', storageError);
+                                      }
                                     }
                                   }
 

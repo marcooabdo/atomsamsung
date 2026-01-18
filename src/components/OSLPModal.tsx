@@ -1744,16 +1744,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         throw uploadError;
       }
 
-      console.log('✅ Arquivo enviado, salvando no banco...');
+      console.log('✅ Arquivo enviado, obtendo URL pública...');
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('os-anexos')
+        .getPublicUrl(filePath);
+
+      console.log('✅ URL pública obtida, salvando no banco...');
+
+      const tipoArquivo = file.type.startsWith('image/') ? 'foto' :
+                          file.type.startsWith('video/') ? 'video' : 'documento';
 
       const { error: insertError } = await supabase.from('os_anexos').insert({
         os_id: currentOsId,
         nome_arquivo: file.name,
-        caminho_arquivo: filePath,
-        tipo_arquivo: file.type,
+        url: publicUrl,
         tamanho_bytes: file.size,
         usuario_id: usuario?.id,
-        tipo: 'outros'
+        tipo: tipoArquivo,
+        origem: 'manual'
       });
 
       if (insertError) {
@@ -1773,13 +1782,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const handleAbrirAnexo = async (anexo: OSAnexo) => {
     try {
-      const { data, error } = await supabase.storage
-        .from('os-anexos')
-        .createSignedUrl(anexo.caminho_arquivo, 60);
+      if (!anexo || !anexo.url) {
+        console.error('❌ Anexo inválido ou sem URL:', anexo);
+        alert('Erro: Anexo não possui URL válida');
+        return;
+      }
 
-      if (error) throw error;
-
-      window.open(data.signedUrl, '_blank');
+      window.open(anexo.url, '_blank');
     } catch (error) {
       console.error('❌ Erro ao abrir anexo:', error);
       alert('Erro ao abrir anexo');
@@ -1792,12 +1801,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
 
     try {
-      const { error: storageError } = await supabase.storage
-        .from('os-anexos')
-        .remove([anexo.caminho_arquivo]);
+      if (anexo.url) {
+        const urlParts = anexo.url.split('/os-anexos/');
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          const { error: storageError } = await supabase.storage
+            .from('os-anexos')
+            .remove([filePath]);
 
-      if (storageError) {
-        console.error('❌ Erro ao remover arquivo do storage:', storageError);
+          if (storageError) {
+            console.error('❌ Erro ao remover arquivo do storage:', storageError);
+          }
+        }
       }
 
       const { error: dbError } = await supabase
@@ -4750,7 +4765,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   ) : (
                     <div className="space-y-2">
                       {anexos.map((anexo) => {
-                        const isGSPN = anexo.gspn_id || anexo.gspn_tipo;
+                        const isGSPN = anexo.origem === 'gspn_sync' || !!anexo.gspn_fileobjkey;
 
                         return (
                           <div key={anexo.id} className="premium-card p-4">
