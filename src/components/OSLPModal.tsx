@@ -6,6 +6,7 @@ import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
+import { CancelarGIModal } from './CancelarGIModal';
 import { OSChecklistTab } from './OSChecklistTab';
 import type { Database } from '../lib/database.types';
 
@@ -85,6 +86,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [movendoOS, setMovendoOS] = useState(false);
   const [mostrarModalDevolucao, setMostrarModalDevolucao] = useState(false);
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
+  const [mostrarModalCancelarGI, setMostrarModalCancelarGI] = useState(false);
+  const [requisicaoCancelarGI, setRequisicaoCancelarGI] = useState<RequisicaoPeca | null>(null);
 
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -1714,51 +1717,99 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
-  const handleCancelarGI = async (requisicao: RequisicaoPeca) => {
-    const motivo = prompt('Digite o motivo do cancelamento da GI:');
-    if (!motivo || !motivo.trim()) {
-      alert('É necessário informar o motivo do cancelamento');
-      return;
-    }
+  const handleCancelarGI = (requisicao: RequisicaoPeca) => {
+    setRequisicaoCancelarGI(requisicao);
+    setMostrarModalCancelarGI(true);
+  };
 
-    const confirmacao = confirm(
-      `Confirma o cancelamento da GI desta peça?\n\n` +
-      `Peça: ${requisicao.descricao}\n` +
-      `Código: ${requisicao.codigo_peca}\n` +
-      `Motivo: ${motivo}\n\n` +
-      `A peça voltará para o status "ATENDIDA" e poderá ser devolvida ou ter a GI postada novamente.`
-    );
-    if (!confirmacao) return;
+  const handleConfirmarCancelarGI = async (motivo: string, pecasSelecionadas?: string[]) => {
+    if (!requisicaoCancelarGI) return;
 
     try {
-      await supabase
-        .from('requisicoes_pecas')
-        .update({
-          status: 'atendida',
-          gi_postada_em: null
-        })
-        .eq('id', requisicao.id);
+      // Se for lote e tem peças selecionadas, processar apenas as selecionadas
+      if (requisicaoCancelarGI.is_lote && pecasSelecionadas && pecasSelecionadas.length > 0) {
+        // Atualizar status das peças selecionadas
+        await supabase
+          .from('estoque_pecas')
+          .update({
+            gi_postada: false
+          })
+          .in('id', pecasSelecionadas);
 
-      await supabase
-        .from('os_comentarios')
-        .insert({
-          os_id: osId,
-          usuario_id: usuario?.id,
-          comentario: `GI cancelada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})\nRequisição ID: ${requisicao.id.slice(0, 8)}\nMotivo: ${motivo}`,
-          is_system: true
-        });
+        // Verificar se ainda há peças com GI postada
+        const pecasRestantes = requisicaoCancelarGI.pecas_estoque_ids?.filter(id => !pecasSelecionadas.includes(id)) || [];
 
-      // Log no histórico da peça
-      if (requisicao.peca_estoque_id) {
-        await supabase.from('estoque_historico').insert({
-          peca_id: requisicao.peca_estoque_id,
-          usuario_id: usuario?.id,
-          acao: 'gi_cancelada',
-          status_anterior: 'vinculada_tecnico',
-          status_novo: 'vinculada_tecnico',
-          observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
-        });
+        if (pecasRestantes.length === 0) {
+          // Se todas as peças tiveram GI cancelada, atualizar requisição
+          await supabase
+            .from('requisicoes_pecas')
+            .update({
+              status: 'atendida',
+              gi_postada_em: null
+            })
+            .eq('id', requisicaoCancelarGI.id);
+        }
+
+        const idsNumericos = requisicaoCancelarGI.pecas_lote
+          ?.filter(p => pecasSelecionadas.includes(p.id))
+          .map(p => `#${p.id_numerico}`)
+          .join(', ');
+
+        // Log com nome do usuário e motivo
+        await supabase
+          .from('os_comentarios')
+          .insert({
+            os_id: osId,
+            usuario_id: usuario?.id,
+            comentario: `GI cancelada por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca}) - Lote IDs: ${idsNumericos}\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}`,
+            is_system: true
+          });
+
+        // Log no histórico das peças
+        for (const pecaId of pecasSelecionadas) {
+          await supabase.from('estoque_historico').insert({
+            peca_id: pecaId,
+            usuario_id: usuario?.id,
+            acao: 'gi_cancelada',
+            status_anterior: 'vinculada_tecnico',
+            status_novo: 'vinculada_tecnico',
+            observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
+          });
+        }
+      } else {
+        // Processo normal para peça única
+        await supabase
+          .from('requisicoes_pecas')
+          .update({
+            status: 'atendida',
+            gi_postada_em: null
+          })
+          .eq('id', requisicaoCancelarGI.id);
+
+        // Log com nome do usuário e motivo
+        await supabase
+          .from('os_comentarios')
+          .insert({
+            os_id: osId,
+            usuario_id: usuario?.id,
+            comentario: `GI cancelada por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca})\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}`,
+            is_system: true
+          });
+
+        // Log no histórico da peça
+        if (requisicaoCancelarGI.peca_estoque_id) {
+          await supabase.from('estoque_historico').insert({
+            peca_id: requisicaoCancelarGI.peca_estoque_id,
+            usuario_id: usuario?.id,
+            acao: 'gi_cancelada',
+            status_anterior: 'vinculada_tecnico',
+            status_novo: 'vinculada_tecnico',
+            observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
+          });
+        }
       }
+
+      alert('GI cancelada com sucesso!');
 
       await loadPecas();
       await loadRequisicoes();
@@ -1767,8 +1818,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       if (onReload) {
         onReload();
       }
+
+      setMostrarModalCancelarGI(false);
+      setRequisicaoCancelarGI(null);
     } catch (error) {
       alert('Erro ao cancelar GI');
+      throw error;
     }
   };
 
@@ -5169,6 +5224,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           tipoOS={os?.tipo_os || 'LP'}
           isLote={requisicaoSelecionada.is_lote}
           pecasLote={requisicaoSelecionada.pecas_lote}
+        />
+      )}
+
+      {mostrarModalCancelarGI && requisicaoCancelarGI && (
+        <CancelarGIModal
+          isOpen={mostrarModalCancelarGI}
+          onClose={() => {
+            setMostrarModalCancelarGI(false);
+            setRequisicaoCancelarGI(null);
+          }}
+          onConfirm={handleConfirmarCancelarGI}
+          requisicao={{
+            codigo_peca: requisicaoCancelarGI.codigo_peca,
+            descricao: requisicaoCancelarGI.descricao
+          }}
+          isLote={requisicaoCancelarGI.is_lote}
+          pecasLote={requisicaoCancelarGI.pecas_lote}
         />
       )}
 
