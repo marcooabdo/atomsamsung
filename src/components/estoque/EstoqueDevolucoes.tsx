@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { RotateCcw, AlertTriangle, CheckCircle, Clock, XCircle, ChevronDown, ChevronRight, DollarSign, Eye } from 'lucide-react';
 import { BadgeTipoOS } from './BadgeTipoOS';
+import { AprovarDevolucaoModal } from './AprovarDevolucaoModal';
 
 type SubTab = 'nova' | 'defeito' | 'usada';
 
@@ -28,6 +29,8 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
   const [loading, setLoading] = useState(true);
   const [osExpandida, setOsExpandida] = useState<string | null>(null);
   const [showAprovadas, setShowAprovadas] = useState(false);
+  const [requisicaoParaAprovar, setRequisicaoParaAprovar] = useState<any>(null);
+  const [mostrarModalAprovar, setMostrarModalAprovar] = useState(false);
 
   useEffect(() => {
     loadDevolucoes();
@@ -67,7 +70,26 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       // Agrupar por OS (ou por requisição se não tiver OS)
       const agrupado: Record<string, RequisicaoAgrupada> = {};
 
-      (dataPendentes || []).forEach((req: any) => {
+      // Enriquecer cada requisição com dados das peças do lote
+      const requisicoesEnriquecidas = await Promise.all(
+        (dataPendentes || []).map(async (req: any) => {
+          let pecasLote = null;
+          if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
+            const { data: pecasData } = await supabase
+              .from('estoque_pecas')
+              .select('id, id_numerico')
+              .in('id', req.pecas_estoque_ids)
+              .order('id_numerico');
+            pecasLote = pecasData;
+          }
+          return {
+            ...req,
+            pecas_lote: pecasLote
+          };
+        })
+      );
+
+      requisicoesEnriquecidas.forEach((req: any) => {
         // Usar os_id se existir, caso contrário usar o próprio ID da requisição como chave
         const chave = req.os_id || req.id;
 
@@ -141,18 +163,34 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
     }
   };
 
-  const handleAprovarDevolucao = async (requisicao: any) => {
-    const confirmacao = confirm(
-      `Confirma a APROVAÇÃO desta devolução?\n\n` +
-      `Peça: ${requisicao.descricao}\n` +
-      `Código: ${requisicao.codigo_peca}\n` +
-      `Tipo: ${requisicao.tipo_devolucao === 'nova' ? 'Nova' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada'}\n` +
-      `Motivo: ${requisicao.motivo_devolucao}`
-    );
-
-    if (!confirmacao) return;
-
+  const handleAprovarDevolucao = async (requisicao: any, foto?: File, qrCode?: string) => {
     try {
+      // Upload da foto se existir
+      let fotoUrl = null;
+      if (foto) {
+        const fileExt = foto.name.split('.').pop();
+        const fileName = `${requisicao.id}_${Date.now()}.${fileExt}`;
+        const { error: uploadError } = await supabase.storage
+          .from('os-anexos')
+          .upload(`devolucoes/${fileName}`, foto);
+
+        if (uploadError) throw uploadError;
+
+        const { data: publicData } = supabase.storage
+          .from('os-anexos')
+          .getPublicUrl(`devolucoes/${fileName}`);
+
+        fotoUrl = publicData.publicUrl;
+      }
+
+      // Salvar QR code e foto na observação se existirem
+      let observacaoCompleta = requisicao.motivo_devolucao;
+      if (qrCode) {
+        observacaoCompleta += `\n\nQR CODE: ${qrCode}`;
+      }
+      if (fotoUrl) {
+        observacaoCompleta += `\n\nFOTO: ${fotoUrl}`;
+      }
       await supabase
         .from('requisicoes_pecas')
         .update({ status: 'devolvida' })
@@ -183,7 +221,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
             tipo_devolucao: requisicao.tipo_devolucao,
             solicitada_por: requisicao.requisitado_por,
             aprovada_por: user.id,
-            observacao: requisicao.motivo_devolucao
+            observacao: observacaoCompleta
           });
 
         const { data: userData } = await supabase
@@ -436,9 +474,24 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                                     {req.status === 'gi_postada' ? 'GI POSTADA' : 'DEVOLUÇÃO PENDENTE'}
                                   </span>
                                 </div>
-                                <p className="text-xs text-gray-400 mb-2">
-                                  ID: <span className="font-mono font-bold text-[#00D4FF]">#{req.peca_estoque?.id_numerico || 'N/A'}</span> • PN: <span className="font-mono font-bold">{req.codigo_peca}</span>
-                                </p>
+                                <div className="text-xs text-gray-400 mb-2 flex items-center gap-2 flex-wrap">
+                                  {req.is_lote && req.pecas_lote && req.pecas_lote.length > 1 ? (
+                                    <>
+                                      <span>IDs:</span>
+                                      {req.pecas_lote.map((peca: any, index: number) => (
+                                        <span key={peca.id} className="font-mono font-bold text-[#00D4FF]">
+                                          #{peca.id_numerico}{index < req.pecas_lote.length - 1 ? ',' : ''}
+                                        </span>
+                                      ))}
+                                      <span>•</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <span>ID: <span className="font-mono font-bold text-[#00D4FF]">#{req.peca_estoque?.id_numerico || 'N/A'}</span> •</span>
+                                    </>
+                                  )}
+                                  <span>PN: <span className="font-mono font-bold">{req.codigo_peca}</span></span>
+                                </div>
                                 {req.valor_peca && (
                                   <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
                                     <DollarSign className="w-3 h-3 text-[#39FF14]" />
@@ -457,7 +510,10 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
 
                             <div className="flex gap-3">
                               <button
-                                onClick={() => handleAprovarDevolucao(req)}
+                                onClick={() => {
+                                  setRequisicaoParaAprovar(req);
+                                  setMostrarModalAprovar(true);
+                                }}
                                 className="flex-1 neon-button flex items-center justify-center gap-2 text-xs px-4 py-2"
                                 style={{
                                   backgroundColor: '#39FF1410',
@@ -571,6 +627,20 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           </div>
         )}
       </div>
+
+      {mostrarModalAprovar && requisicaoParaAprovar && (
+        <AprovarDevolucaoModal
+          isOpen={mostrarModalAprovar}
+          onClose={() => {
+            setMostrarModalAprovar(false);
+            setRequisicaoParaAprovar(null);
+          }}
+          onConfirm={async (foto, qrCode) => {
+            await handleAprovarDevolucao(requisicaoParaAprovar, foto, qrCode);
+          }}
+          requisicao={requisicaoParaAprovar}
+        />
+      )}
     </div>
   );
 }
