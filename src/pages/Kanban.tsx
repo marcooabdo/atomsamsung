@@ -1312,41 +1312,15 @@ export function Kanban() {
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <span
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.15) 100%)',
-                                    color: '#00D4FF',
-                                    border: '1px solid rgba(0,212,255,0.5)',
-                                    boxShadow: '0 0 8px rgba(0,212,255,0.3)'
-                                  }}
-                                  title={`OS ${os.tipo_os}`}
-                                >
-                                  {os.tipo_os}
-                                </span>
-                                {os.numero_os_samsung && (
-                                  <span
-                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0"
-                                    style={{
-                                      background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.15) 100%)',
-                                      color: '#FFA500',
-                                      border: '1px solid rgba(255,165,0,0.5)',
-                                      boxShadow: '0 0 8px rgba(255,165,0,0.3)'
-                                    }}
-                                    title="Samsung Contigo"
-                                  >
-                                    SC
-                                  </span>
-                                )}
                                 <h5 className="font-bold text-xs text-white truncate" style={{
                                   textShadow: '0 0 8px rgba(0,212,255,0.5)'
                                 }}>
-                                  {os.numero_os_interna || 'S/N'}
+                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
                                 </h5>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    const textToCopy = os.numero_os_interna || '';
+                                    const textToCopy = os.numero_os_samsung || os.numero_os_interna || '';
                                     navigator.clipboard.writeText(textToCopy);
                                     const btn = e.currentTarget;
                                     const originalHTML = btn.innerHTML;
@@ -1404,6 +1378,20 @@ export function Kanban() {
                               >
                                 {os.tipo_os}
                               </span>
+                              {os.numero_os_samsung && (
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(255,165,0,0.25) 0%, rgba(255,165,0,0.1) 100%)',
+                                    color: '#FFA500',
+                                    border: '1px solid rgba(255,165,0,0.5)',
+                                    boxShadow: '0 0 8px rgba(255,165,0,0.2)'
+                                  }}
+                                  title="Samsung Contigo"
+                                >
+                                  SC
+                                </span>
+                              )}
                               <span
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold ml-auto"
                                 style={getTATColor(os.created_at, os.tipo_os, os.tipo_atendimento)}
