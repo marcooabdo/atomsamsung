@@ -5,6 +5,7 @@ import { ChatWindow } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
 import { supabase } from '../lib/supabase';
 import { Building2, MessageCircle } from 'lucide-react';
+import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
   const { usuario } = useAuth();
@@ -12,6 +13,8 @@ export function Chat() {
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+
+  useUserPresence(usuario?.id);
 
   useEffect(() => {
     const checkMobile = () => {
@@ -32,11 +35,12 @@ export function Chat() {
   const loadOnlineCount = async () => {
     try {
       const { count } = await supabase
-        .from('usuarios')
+        .from('user_presence')
         .select('*', { count: 'exact', head: true })
-        .eq('ativo', true);
+        .eq('status', 'online');
       setOnlineCount(count || 0);
     } catch (err) {
+      console.error('Erro ao carregar usuários online:', err);
     }
   };
 

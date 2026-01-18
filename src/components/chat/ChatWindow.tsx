@@ -108,11 +108,12 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
 
   const markMessagesAsRead = async () => {
     try {
-      await supabase.rpc('mark_messages_as_read', {
+      await supabase.rpc('mark_conversation_as_read', {
         p_conversation_id: conversationId,
         p_user_id: userId
       });
     } catch (err) {
+      console.error('Erro ao marcar mensagens como lidas:', err);
     }
   };
 
