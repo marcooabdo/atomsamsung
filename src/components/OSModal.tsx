@@ -118,6 +118,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
   const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
   const [novaPecaValorGSPN, setNovaPecaValorGSPN] = useState('');
+  const [novaPecaQuantidadeOW, setNovaPecaQuantidadeOW] = useState(1);
   const [markups, setMarkups] = useState<any[]>([]);
   const [adicionandoPecaOW, setAdicionandoPecaOW] = useState(false);
   const [sugestoesPecasOW, setSugestoesPecasOW] = useState<Array<{
@@ -654,20 +655,22 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
   const handleAdicionarPecaOW = async () => {
     if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || !novaPecaValorGSPN) {
-      alert('Preencha todos os campos obrigatórios');
+      alert('Preencha todos os campos obrigatorios');
       return;
     }
 
     const valorGSPNNum = parseFloat(novaPecaValorGSPN);
     if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
-      alert('Valor inválido');
+      alert('Valor invalido');
       return;
     }
+
+    const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
 
     setAdicionandoPecaOW(true);
     try {
       const valorComMarkup = calcularValorComMarkup(valorGSPNNum);
-      const quantidade = 1;
+      const quantidade = isSCACC ? novaPecaQuantidadeOW : 1;
       const valorTotal = valorComMarkup * quantidade;
 
       const { error: insertError } = await supabase
@@ -689,20 +692,21 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Peça adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        comentario: `Peca adicionada${isSCACC ? ' em lote' : ' manualmente'}: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${quantidade} - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
         is_system: true
       });
 
       setNovaPecaCodigoOW('');
       setNovaPecaDescricaoOW('');
       setNovaPecaValorGSPN('');
+      setNovaPecaQuantidadeOW(1);
       setSugestoesPecasOW([]);
 
       await loadPecas();
       await loadComentarios();
-      alert('Peça adicionada com sucesso!');
+      alert(`Peca adicionada com sucesso!${isSCACC && quantidade > 1 ? ` (${quantidade} unidades)` : ''}`);
     } catch (error: any) {
-      alert(`Erro ao adicionar peça: ${error.message}`);
+      alert(`Erro ao adicionar peca: ${error.message}`);
     } finally {
       setAdicionandoPecaOW(false);
     }
@@ -2633,16 +2637,19 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                 </div>
               )}
 
-              {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (
-                <div className="premium-card p-4 bg-[#00D4FF]/10 border border-[#00D4FF]/30 mb-4">
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios' ? '#39FF14' : '#00D4FF' }}>
+              {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (() => {
+                const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+                const accentColor = isSCACC ? '#39FF14' : '#00D4FF';
+                return (
+                <div className="premium-card p-4 mb-4" style={{ backgroundColor: `${accentColor}10`, border: `1px solid ${accentColor}30` }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: accentColor }}>
                     <Package className="w-4 h-4" />
-                    Adicionar Peca Manualmente
+                    Adicionar Peca {isSCACC ? '(Requisicao em Lote)' : 'Manualmente'}
                   </h3>
-                  <div className="grid grid-cols-4 gap-3">
+                  <div className={`grid gap-3 ${isSCACC ? 'grid-cols-5' : 'grid-cols-4'}`}>
                     <div className="relative">
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Código/PN *
+                        Codigo/PN *
                       </label>
                       <input
                         type="text"
@@ -2656,7 +2663,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                         placeholder="Ex: GH82-12345A"
                       />
                       {mostrarSugestoesOW && sugestoesPecasOW.length > 0 && (
-                        <div className="absolute z-50 mt-1 w-full max-w-md bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-lg shadow-xl max-h-64 overflow-y-auto">
+                        <div className="absolute z-50 mt-1 w-full max-w-md bg-[#0A0F1E] rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{ border: `1px solid ${accentColor}30` }}>
                           {sugestoesPecasOW.map((sugestao, idx) => (
                             <div
                               key={idx}
@@ -2666,11 +2673,14 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                 setNovaPecaValorGSPN((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
                                 setMostrarSugestoesOW(false);
                               }}
-                              className="p-3 hover:bg-[#00D4FF]/10 cursor-pointer border-b border-gray-800 last:border-0"
+                              className="p-3 cursor-pointer border-b border-gray-800 last:border-0"
+                              style={{ ':hover': { backgroundColor: `${accentColor}10` } }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = `${accentColor}10`}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                             >
                               <div className="flex items-start justify-between gap-2">
                                 <div className="flex-1">
-                                  <p className="text-sm font-bold text-[#00D4FF]">{sugestao.pn}</p>
+                                  <p className="text-sm font-bold" style={{ color: accentColor }}>{sugestao.pn}</p>
                                   <p className="text-xs text-gray-400 mt-1">{sugestao.descricao}</p>
                                   <div className="flex items-center gap-3 mt-2">
                                     <span className="text-[10px] text-gray-500">
@@ -2678,13 +2688,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     </span>
                                     {sugestao.valor_corrigido && (
                                       <span className="text-[10px] text-[#39FF14]">
-                                        Último Pedido: R$ {sugestao.valor_corrigido.toFixed(2)}
+                                        Ultimo Pedido: R$ {sugestao.valor_corrigido.toFixed(2)}
                                       </span>
                                     )}
                                   </div>
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
-                                  <span className="text-[10px] px-2 py-1 bg-[#00D4FF]/20 text-[#00D4FF] rounded">
+                                  <span className="text-[10px] px-2 py-1 rounded" style={{ backgroundColor: `${accentColor}20`, color: accentColor }}>
                                     {sugestao.count}x em estoque
                                   </span>
                                 </div>
@@ -2696,7 +2706,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Descrição *
+                        Descricao *
                       </label>
                       <input
                         type="text"
@@ -2728,33 +2738,56 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                       )}
                       {markups.length === 0 && (
                         <p className="text-[10px] text-red-400 mt-1">
-                          ⚠️ Nenhum markup configurado
+                          Nenhum markup configurado
                         </p>
                       )}
                     </div>
+                    {isSCACC && (
+                      <div>
+                        <label className="text-xs text-gray-400 uppercase block mb-2">
+                          Quantidade *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={novaPecaQuantidadeOW}
+                          onChange={(e) => setNovaPecaQuantidadeOW(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="neon-input w-full"
+                          placeholder="1"
+                        />
+                        {novaPecaQuantidadeOW > 1 && (
+                          <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                            Requisicao em lote ({novaPecaQuantidadeOW} un.)
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Ações
+                        Acoes
                       </label>
                       <button
                         onClick={handleAdicionarPecaOW}
                         disabled={adicionandoPecaOW || !novaPecaCodigoOW || !novaPecaDescricaoOW || !novaPecaValorGSPN}
                         className="neon-button px-4 py-2 w-full text-xs disabled:opacity-50"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          borderColor: '#00D4FF',
-                          color: '#00D4FF'
+                          backgroundColor: `${accentColor}20`,
+                          borderColor: accentColor,
+                          color: accentColor
                         }}
                       >
-                        {adicionandoPecaOW ? 'ADICIONANDO...' : 'ADICIONAR PEÇA'}
+                        {adicionandoPecaOW ? 'ADICIONANDO...' : isSCACC ? `ADICIONAR (${novaPecaQuantidadeOW}x)` : 'ADICIONAR PECA'}
                       </button>
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-500 mt-3">
-                    * Peças adicionadas manualmente seguem o fluxo de requisição padrão. Cada peça é adicionada com quantidade 1. O valor final é calculado automaticamente com markup configurado.
+                    {isSCACC
+                      ? '* Pecas adicionadas serao requisitadas em lote. Informe a quantidade desejada. O valor final e calculado automaticamente com markup configurado.'
+                      : '* Pecas adicionadas manualmente seguem o fluxo de requisicao padrao. Cada peca e adicionada com quantidade 1. O valor final e calculado automaticamente com markup configurado.'}
                   </p>
                 </div>
-              )}
+                );
+              })()}
 
               {pecas.length === 0 ? (
                 <p className="text-center text-gray-500 py-8">Nenhuma peça cadastrada na cotação</p>
