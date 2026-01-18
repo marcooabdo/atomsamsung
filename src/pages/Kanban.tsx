@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, formatTipoAtendimentoShort } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
@@ -1377,10 +1377,7 @@ export function Kanban() {
                                   boxShadow: `0 0 8px ${os.tipo_atendimento === 'IH' ? 'rgba(16,185,129,0.2)' : 'rgba(249,115,22,0.2)'}`
                                 }}
                               >
-                                {os.tipo_atendimento === 'IH' ? 'IH' :
-                                 os.tipo_atendimento === 'CI' ? 'CI' :
-                                 os.tipo_atendimento === 'II' ? 'II' :
-                                 os.tipo_atendimento || 'N/A'}
+                                {formatTipoAtendimentoShort(os.tipo_atendimento)}
                               </span>
                               <span
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold"

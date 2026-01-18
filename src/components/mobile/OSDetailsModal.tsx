@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle, ClipboardList, Calendar } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, formatTipoAtendimento } from '../../lib/supabase';
 import { CheckinModal } from '../agendamento/CheckinModal';
 import { CheckoutModal } from '../agendamento/CheckoutModal';
 import { AgendamentoChecklistSection } from '../AgendamentoChecklistSection';
@@ -156,7 +156,7 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
               <div>
                 <p className="text-gray-400 text-sm">Tipo de Atendimento</p>
                 <p className="text-white font-medium">
-                  {os.tipo_atendimento === 'IH' ? 'In-Home (IH)' : os.tipo_atendimento || 'Não especificado'}
+                  {formatTipoAtendimento(os.tipo_atendimento)}
                 </p>
               </div>
               {os.tipo_reparo && (

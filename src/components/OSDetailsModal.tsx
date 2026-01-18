@@ -1,6 +1,6 @@
 import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 
@@ -484,10 +484,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               {osDetails.rota}
             </span>
             <span className="px-3 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded-full text-sm font-medium">
-              {osDetails.tipo_atendimento === 'IH' ? 'IH - In Home' :
-               osDetails.tipo_atendimento === 'CI' ? 'CI - Carry In' :
-               osDetails.tipo_atendimento === 'II' ? 'II - In/In' :
-               osDetails.tipo_atendimento || 'N/A'}
+              {formatTipoAtendimento(osDetails.tipo_atendimento)}
             </span>
             <span className="px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded-full text-sm font-medium">
               {osDetails.tipo_os}
