@@ -357,12 +357,27 @@ export function Kanban() {
   };
 
   const calcularValorGSPN = (os: any) => {
-    if (!os.cotacao_pecas || os.cotacao_pecas.length === 0) return 0;
-    return os.cotacao_pecas.reduce((total: number, peca: any) => {
-      const valorBase = peca.valor_base_gspn || 0;
-      const quantidade = peca.quantidade || 1;
-      return total + (valorBase * quantidade);
-    }, 0);
+    let totalGSPN = 0;
+
+    // Somar valor_base_gspn de cotacoes_pecas
+    if (os.cotacao_pecas && os.cotacao_pecas.length > 0) {
+      totalGSPN += os.cotacao_pecas.reduce((total: number, peca: any) => {
+        const valorBase = peca.valor_base_gspn || 0;
+        const quantidade = peca.quantidade || 1;
+        return total + (valorBase * quantidade);
+      }, 0);
+    }
+
+    // Somar valor_gspn de os_pecas
+    if (os.os_pecas && os.os_pecas.length > 0) {
+      totalGSPN += os.os_pecas.reduce((total: number, peca: any) => {
+        const valorGSPN = peca.valor_gspn || 0;
+        const quantidade = peca.quantidade || 1;
+        return total + (valorGSPN * quantidade);
+      }, 0);
+    }
+
+    return totalGSPN;
   };
 
   const calcularSubtotal = (os: any) => {
@@ -374,13 +389,18 @@ export function Kanban() {
 
   const calcularLucro = (os: any) => {
     if (os.tipo_os !== 'OW') return null;
-    const valorFinal = os.valor_total || 0;
-    const valorDesconto = os.valor_desconto_calculado || 0;
-    const valorPecas = calcularValorPecas(os);
-    const valorGSPN = calcularValorGSPN(os);
-    const taxasPagamentos = (os.pagamentos || []).reduce((sum: number, pag: any) => sum + (pag.taxa_valor || 0), 0);
-    const custoTotal = valorPecas + valorGSPN + taxasPagamentos + valorDesconto;
-    return valorFinal - custoTotal;
+
+    // Receita líquida (valor_total já tem o desconto aplicado)
+    const receitaLiquida = os.valor_total || 0;
+
+    // Custo das peças GSPN (valor base sem markup)
+    const custoPecasGSPN = calcularValorGSPN(os);
+
+    // Taxas de cartão dos pagamentos
+    const taxasCartao = (os.pagamentos || []).reduce((sum: number, pag: any) => sum + (pag.taxa_valor || 0), 0);
+
+    // Lucro = Receita Líquida - Custo Peças GSPN - Taxas Cartão
+    return receitaLiquida - custoPecasGSPN - taxasCartao;
   };
 
   const loadKanbanData = async () => {
@@ -395,6 +415,10 @@ export function Kanban() {
           ),
           cotacao_pecas:cotacoes_pecas(
             valor_base_gspn,
+            quantidade
+          ),
+          os_pecas:os_pecas(
+            valor_gspn,
             quantidade
           ),
           requisicoes:requisicoes_pecas(
