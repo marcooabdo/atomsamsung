@@ -589,6 +589,19 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       return 0;
     }
 
+    console.log('🔍 Calculando markup:', {
+      valorGSPN,
+      tipo_orcamento: os?.tipo_orcamento,
+      markupsDisponiveis: markups.length,
+      markups: markups.map(m => ({
+        nome: m.nome,
+        tipo_orcamento: m.tipo_orcamento,
+        tipo: m.tipo,
+        valor: m.valor,
+        faixa: `${m.valor_minimo || 0} - ${m.valor_maximo || '∞'}`
+      }))
+    });
+
     // Se não há markups, retorna o valor original
     if (markups.length === 0) {
       console.log('ℹ️ Nenhum markup disponível, retornando valor original:', valorGSPN);
@@ -704,6 +717,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
           pn: novaPecaCodigoOW.trim(),
           descricao: novaPecaDescricaoOW.trim(),
           quantidade: quantidade,
+          valor_gspn: valorGSPNNum,
           valor_unitario: valorComMarkup,
           valor_total: valorTotal,
           status: 'manual',
