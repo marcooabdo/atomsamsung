@@ -65,7 +65,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       const { data, error } = await query;
       if (error) throw error;
 
-      // Para cada requisição, buscar contagem de IDs disponíveis
+      // Para cada requisição, buscar contagem de IDs disponíveis e detalhes do lote
       const requisicoesComContagem = await Promise.all(
         (data || []).map(async (req: any) => {
           const { count } = await supabase
@@ -75,9 +75,21 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             .eq('status', 'disponivel')
             .eq('unidade_id', req.unidade_id);
 
+          // Se é um lote, buscar detalhes de todas as peças
+          let pecasDoLote = null;
+          if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
+            const { data: pecasData } = await supabase
+              .from('estoque_pecas')
+              .select('id, id_numerico, valor_com_impostos, delivery, pn, descricao')
+              .in('id', req.pecas_estoque_ids)
+              .order('id_numerico');
+            pecasDoLote = pecasData;
+          }
+
           return {
             ...req,
-            ids_disponiveis_count: count || 0
+            ids_disponiveis_count: count || 0,
+            pecas_lote: pecasDoLote
           };
         })
       );
@@ -1123,13 +1135,33 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                               <p>Código: <span className="font-mono text-gray-300">{req.codigo_peca}</span></p>
                               <p>Quantidade: <span className="text-[#39FF14]">{req.quantidade_requisitada}</span></p>
                               {req.peca_estoque && (
-                                <p>
-                                  ID Vinculado: <span className="font-mono text-[#39FF14]">#{req.peca_estoque.id_numerico}</span>
-                                  {req.peca_estoque.delivery && (
-                                    <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{req.peca_estoque.delivery}</span></span>
+                                <div>
+                                  {req.is_lote && req.pecas_lote && req.pecas_lote.length > 0 ? (
+                                    <div className="space-y-1">
+                                      <p className="font-semibold text-[#39FF14]">Lote com {req.pecas_lote.length} peça(s):</p>
+                                      {req.pecas_lote.map((peca: any, idx: number) => (
+                                        <p key={peca.id} className="text-xs ml-2">
+                                          #{idx + 1} - ID: <span className="font-mono text-[#39FF14]">#{peca.id_numerico}</span>
+                                          {peca.delivery && (
+                                            <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{peca.delivery}</span></span>
+                                          )}
+                                          {' - '}R$ {Number(peca.valor_com_impostos).toFixed(2)}
+                                        </p>
+                                      ))}
+                                      <p className="font-semibold text-[#39FF14] mt-1">
+                                        Total: R$ {req.pecas_lote.reduce((sum: number, p: any) => sum + Number(p.valor_com_impostos), 0).toFixed(2)}
+                                      </p>
+                                    </div>
+                                  ) : (
+                                    <p>
+                                      ID Vinculado: <span className="font-mono text-[#39FF14]">#{req.peca_estoque.id_numerico}</span>
+                                      {req.peca_estoque.delivery && (
+                                        <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{req.peca_estoque.delivery}</span></span>
+                                      )}
+                                      {' - '}R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
+                                    </p>
                                   )}
-                                  {' - '}R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
-                                </p>
+                                </div>
                               )}
                               {req.valor_peca && (
                                 <p className="flex items-center gap-1">
@@ -1380,33 +1412,77 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                               </div>
                               {req.peca_estoque && (
                                 <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-3 mt-2">
-                                  <p className="text-xs text-[#39FF14] font-bold uppercase mb-2">Peça Vinculada</p>
-                                  <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-gray-400 text-xs">ID da Peça:</span>
-                                      <span className="font-mono text-[#39FF14] font-bold">#{req.peca_estoque.id_numerico}</span>
+                                  <p className="text-xs text-[#39FF14] font-bold uppercase mb-2">
+                                    {req.is_lote && req.pecas_lote && req.pecas_lote.length > 0 ? `Lote com ${req.pecas_lote.length} Peça(s)` : 'Peça Vinculada'}
+                                  </p>
+                                  {req.is_lote && req.pecas_lote && req.pecas_lote.length > 0 ? (
+                                    <div className="space-y-3">
+                                      {req.pecas_lote.map((peca: any, idx: number) => (
+                                        <div key={peca.id} className="border-l-2 border-[#39FF14]/50 pl-3 space-y-1">
+                                          <p className="text-xs text-[#39FF14] font-semibold">Peça #{idx + 1}</p>
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-gray-400 text-xs">ID:</span>
+                                            <span className="font-mono text-[#39FF14] font-bold">#{peca.id_numerico}</span>
+                                          </div>
+                                          {peca.pn && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-gray-400 text-xs">PN:</span>
+                                              <span className="font-mono text-gray-300 text-xs">{peca.pn}</span>
+                                            </div>
+                                          )}
+                                          {peca.delivery && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-gray-400 text-xs">Delivery:</span>
+                                              <span className="text-gray-300 text-xs">{peca.delivery}</span>
+                                            </div>
+                                          )}
+                                          {peca.valor_com_impostos && (
+                                            <div className="flex items-center gap-2">
+                                              <span className="text-gray-400 text-xs">Valor:</span>
+                                              <span className="text-[#39FF14] font-bold text-xs">
+                                                R$ {Number(peca.valor_com_impostos).toFixed(2)}
+                                              </span>
+                                            </div>
+                                          )}
+                                        </div>
+                                      ))}
+                                      <div className="pt-2 border-t border-[#39FF14]/30">
+                                        <div className="flex items-center justify-between">
+                                          <span className="text-gray-400 text-xs font-semibold">VALOR TOTAL:</span>
+                                          <span className="text-[#39FF14] font-bold text-sm">
+                                            R$ {req.pecas_lote.reduce((sum: number, p: any) => sum + Number(p.valor_com_impostos), 0).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      </div>
                                     </div>
-                                    {req.peca_estoque.pn && (
+                                  ) : (
+                                    <div className="space-y-1">
                                       <div className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-xs">PN:</span>
-                                        <span className="font-mono text-gray-300 text-xs">{req.peca_estoque.pn}</span>
+                                        <span className="text-gray-400 text-xs">ID da Peça:</span>
+                                        <span className="font-mono text-[#39FF14] font-bold">#{req.peca_estoque.id_numerico}</span>
                                       </div>
-                                    )}
-                                    {req.peca_estoque.delivery && (
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-xs">Delivery:</span>
-                                        <span className="text-gray-300 text-xs">{req.peca_estoque.delivery}</span>
-                                      </div>
-                                    )}
-                                    {req.peca_estoque.valor_com_impostos && (
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-gray-400 text-xs">Valor:</span>
-                                        <span className="text-[#39FF14] font-bold text-xs">
-                                          R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
-                                        </span>
-                                      </div>
-                                    )}
-                                  </div>
+                                      {req.peca_estoque.pn && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-gray-400 text-xs">PN:</span>
+                                          <span className="font-mono text-gray-300 text-xs">{req.peca_estoque.pn}</span>
+                                        </div>
+                                      )}
+                                      {req.peca_estoque.delivery && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-gray-400 text-xs">Delivery:</span>
+                                          <span className="text-gray-300 text-xs">{req.peca_estoque.delivery}</span>
+                                        </div>
+                                      )}
+                                      {req.peca_estoque.valor_com_impostos && (
+                                        <div className="flex items-center gap-2">
+                                          <span className="text-gray-400 text-xs">Valor:</span>
+                                          <span className="text-[#39FF14] font-bold text-xs">
+                                            R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               )}
                               {req.numero_pedido_samsung && req.numero_pedido_samsung !== 'N/A' && !req.numero_pedido_samsung.startsWith('PENDENTE-') && (
