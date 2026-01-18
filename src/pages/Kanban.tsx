@@ -1312,30 +1312,19 @@ export function Kanban() {
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <h5 className="font-bold text-xs text-white truncate" style={{
-                                  textShadow: '0 0 8px rgba(0,212,255,0.5)'
-                                }}>
-                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
-                                </h5>
+                                <span
+                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.15) 100%)',
+                                    color: '#00D4FF',
+                                    border: '1px solid rgba(0,212,255,0.5)',
+                                    boxShadow: '0 0 8px rgba(0,212,255,0.3)'
+                                  }}
+                                  title={`OS ${os.tipo_os}`}
+                                >
+                                  {os.tipo_os}
+                                </span>
                                 {os.numero_os_samsung && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      navigator.clipboard.writeText(os.numero_os_samsung);
-                                      const btn = e.currentTarget;
-                                      const originalHTML = btn.innerHTML;
-                                      btn.innerHTML = '<span style="color: #39FF14;">✓</span>';
-                                      setTimeout(() => {
-                                        btn.innerHTML = originalHTML;
-                                      }, 1000);
-                                    }}
-                                    className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
-                                    title="Copiar número da OS"
-                                  >
-                                    <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
-                                  </button>
-                                )}
-                                {os.tipo_os === 'OW' && os.tipo_orcamento === 'samsung_contigo' && (
                                   <span
                                     className="px-1.5 py-0.5 rounded text-[9px] font-bold flex-shrink-0"
                                     style={{
@@ -1349,6 +1338,28 @@ export function Kanban() {
                                     SC
                                   </span>
                                 )}
+                                <h5 className="font-bold text-xs text-white truncate" style={{
+                                  textShadow: '0 0 8px rgba(0,212,255,0.5)'
+                                }}>
+                                  {os.numero_os_interna || 'S/N'}
+                                </h5>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const textToCopy = os.numero_os_interna || '';
+                                    navigator.clipboard.writeText(textToCopy);
+                                    const btn = e.currentTarget;
+                                    const originalHTML = btn.innerHTML;
+                                    btn.innerHTML = '<span style="color: #39FF14;">✓</span>';
+                                    setTimeout(() => {
+                                      btn.innerHTML = originalHTML;
+                                    }, 1000);
+                                  }}
+                                  className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
+                                  title="Copiar número da OS"
+                                >
+                                  <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                </button>
                               </div>
                               <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
                             </div>
