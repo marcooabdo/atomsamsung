@@ -150,6 +150,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
       const devolucoesEnriquecidas = await Promise.all(
         (dataAprovadas || []).map(async (dev: any) => {
           let numero_os_samsung = null;
+          let numero_os_interna = null;
           let numero_cotacao = null;
 
           const pecaId = typeof dev.peca_id === 'object' ? dev.peca_id?.id : dev.peca_id;
@@ -157,19 +158,21 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           // Buscar requisição original para pegar numero_os_samsung e cotacao_id
           const { data: requisicao } = await supabase
             .from('requisicoes_pecas')
-            .select('numero_os_samsung, cotacao_id, cotacao:cotacao_id(numero_cotacao)')
+            .select('numero_os_samsung, os_id, cotacao_id, cotacao:cotacao_id(numero_cotacao), os:os_id(numero_os_interna)')
             .eq('peca_estoque_id', pecaId)
             .eq('status', 'devolvida')
             .maybeSingle();
 
           if (requisicao) {
             numero_os_samsung = requisicao.numero_os_samsung;
+            numero_os_interna = requisicao.os?.numero_os_interna;
             numero_cotacao = requisicao.cotacao?.numero_cotacao;
           }
 
           return {
             ...dev,
             numero_os_samsung,
+            numero_os_interna,
             numero_cotacao
           };
         })
@@ -215,7 +218,14 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
         .update({ status: 'devolvida' })
         .eq('id', requisicao.id);
 
-      if (requisicao.peca_estoque_id) {
+      // Determinar os IDs das peças a serem processadas
+      const pecasIds = requisicao.is_lote && requisicao.pecas_estoque_ids && requisicao.pecas_estoque_ids.length > 0
+        ? requisicao.pecas_estoque_ids
+        : requisicao.peca_estoque_id
+        ? [requisicao.peca_estoque_id]
+        : [];
+
+      if (pecasIds.length > 0) {
         const novoStatus =
           requisicao.tipo_devolucao === 'nova' ? 'devolvida_nova' :
           requisicao.tipo_devolucao === 'nova_com_defeito' ? 'devolvida_defeito' :
@@ -228,35 +238,38 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           updateData.tecnico_id = null;
         }
 
-        await supabase
-          .from('estoque_pecas')
-          .update(updateData)
-          .eq('id', requisicao.peca_estoque_id);
-
-        await supabase
-          .from('estoque_devolucoes')
-          .insert({
-            peca_id: requisicao.peca_estoque_id,
-            tipo_devolucao: requisicao.tipo_devolucao,
-            solicitada_por: requisicao.requisitado_por,
-            aprovada_por: user.id,
-            observacao: observacaoCompleta
-          });
-
         const { data: userData } = await supabase
           .from('usuarios')
           .select('nome')
           .eq('id', user.id)
           .single();
 
-        await supabase.from('estoque_historico').insert({
-          peca_id: requisicao.peca_estoque_id,
-          usuario_id: user.id,
-          acao: 'devolucao',
-          status_anterior: 'vinculada_tecnico',
-          status_novo: novoStatus,
-          observacao: `Devolução APROVADA por ${userData?.nome || 'Estoque'} - Tipo: ${requisicao.tipo_devolucao === 'nova' ? 'Nova' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada'}${requisicao.tipo_devolucao === 'nova_com_defeito' ? ` - ⚠️ DEFEITO: ${requisicao.motivo_devolucao}` : ''}`
-        });
+        // Processar CADA peça individualmente
+        for (const pecaId of pecasIds) {
+          await supabase
+            .from('estoque_pecas')
+            .update(updateData)
+            .eq('id', pecaId);
+
+          await supabase
+            .from('estoque_devolucoes')
+            .insert({
+              peca_id: pecaId,
+              tipo_devolucao: requisicao.tipo_devolucao,
+              solicitada_por: requisicao.requisitado_por,
+              aprovada_por: user.id,
+              observacao: observacaoCompleta
+            });
+
+          await supabase.from('estoque_historico').insert({
+            peca_id: pecaId,
+            usuario_id: user.id,
+            acao: 'devolucao',
+            status_anterior: 'vinculada_tecnico',
+            status_novo: novoStatus,
+            observacao: `Devolução APROVADA por ${userData?.nome || 'Estoque'} - Tipo: ${requisicao.tipo_devolucao === 'nova' ? 'Nova' : requisicao.tipo_devolucao === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada'}${requisicao.tipo_devolucao === 'nova_com_defeito' ? ` - ⚠️ DEFEITO: ${requisicao.motivo_devolucao}` : ''}`
+          });
+        }
       }
 
       const { data: userData } = await supabase
@@ -592,14 +605,17 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                         </span>
                       </div>
 
-                      {(dev.numero_os_samsung || dev.numero_cotacao) && (
+                      {(dev.numero_os_samsung || dev.numero_os_interna || dev.numero_cotacao) && (
                         <div className="mb-2">
+                          <p className="text-xs text-gray-500 uppercase font-semibold">OS:</p>
                           <p className="text-sm font-bold text-white">
                             {dev.numero_os_samsung
-                              ? `OS ${dev.numero_os_samsung}`
-                              : dev.numero_cotacao
-                                ? `Cotação #${dev.numero_cotacao}`
-                                : ''}
+                              ? dev.numero_os_samsung
+                              : dev.numero_os_interna
+                                ? dev.numero_os_interna
+                                : dev.numero_cotacao
+                                  ? `Cotação #${dev.numero_cotacao}`
+                                  : ''}
                           </p>
                         </div>
                       )}
