@@ -1140,6 +1140,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           quantidade: peca.quantidade || 1,
           valor_unitario: peca.valor,
           valor_total: peca.valor * (peca.quantidade || 1),
+          valor_base_gspn: peca.valor_gspn || null,
           status: 'requisitada',
           requisitada_por: usuario?.id
         }));

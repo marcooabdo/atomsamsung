@@ -2884,6 +2884,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                             </div>
                             <div className="flex items-center gap-4 mt-2">
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                              {peca.valor_base_gspn && peca.valor_base_gspn > 0 && (
+                                <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                  GSPN: R$ {Number(peca.valor_base_gspn || 0).toFixed(2)}
+                                </p>
+                              )}
                               <p className="text-xs text-gray-500">
                                 Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
                               </p>
