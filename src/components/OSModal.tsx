@@ -2987,19 +2987,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
 
                               {/* Campo de edição do valor GSPN se não estiver definido */}
-                              {(!peca.valor_gspn || peca.valor_gspn === 0) && !editandoValorGSPN[peca.id] ? (
-                                <button
-                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
-                                  className="px-2 py-1 rounded text-xs font-bold transition-all"
-                                  style={{
-                                    backgroundColor: '#9333EA20',
-                                    border: '1px solid #9333EA60',
-                                    color: '#9333EA'
-                                  }}
-                                >
-                                  Definir Valor GSPN
-                                </button>
-                              ) : editandoValorGSPN[peca.id] !== undefined ? (
+                              {editandoValorGSPN[peca.id] !== undefined ? (
                                 <div className="flex items-center gap-2">
                                   <input
                                     type="number"
@@ -3013,6 +3001,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     }))}
                                     className="neon-input w-32 text-xs py-1"
                                     disabled={salvandoValorGSPN[peca.id]}
+                                    autoFocus
                                   />
                                   <button
                                     onClick={() => handleSalvarValorGSPN(peca.id)}
@@ -3046,20 +3035,34 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                   </button>
                                 </div>
                               ) : (
-                                <div className="flex flex-col gap-1">
-                                  <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                    GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
-                                  </p>
-                                  {os?.tipo_os === 'OW' && peca.valor_gspn && peca.valor_gspn > 0 && (
-                                    <p className="text-xs font-bold" style={{ color: '#00D4FF' }}>
-                                      c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {(peca.valor_gspn && peca.valor_gspn > 0) || editandoValorGSPN[peca.id] === undefined ? (
                                 <>
+                                  {(!peca.valor_gspn || peca.valor_gspn === 0) && (
+                                    <button
+                                      onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
+                                      className="px-2 py-1 rounded text-xs font-bold transition-all"
+                                      style={{
+                                        backgroundColor: '#9333EA20',
+                                        border: '1px solid #9333EA60',
+                                        color: '#9333EA'
+                                      }}
+                                    >
+                                      Definir Valor GSPN
+                                    </button>
+                                  )}
+
+                                  {(peca.valor_gspn && peca.valor_gspn > 0) && (
+                                    <div className="flex flex-col gap-1">
+                                      <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                        GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
+                                      </p>
+                                      {os?.tipo_os === 'OW' && (
+                                        <p className="text-xs font-bold" style={{ color: '#00D4FF' }}>
+                                          c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                        </p>
+                                      )}
+                                    </div>
+                                  )}
+
                                   <p className="text-xs text-gray-500">
                                     Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
                                   </p>
@@ -3067,7 +3070,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                   </p>
                                 </>
-                              ) : null}
+                              )}
                             </div>
                             {(requisicao || requisicaoDevolvida) && (
                               <p className="text-xs text-gray-500 mt-2">
@@ -3321,50 +3324,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                       </div>
                     );
                   })}
-
-                  {/* Resumo de valores das peças */}
-                  {pecas.length > 0 && (
-                    <div className="premium-card p-4 mt-4">
-                      <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-3">
-                        Resumo de Peças
-                      </h4>
-                      <div className="space-y-2">
-                        {os?.tipo_os === 'OW' && (
-                          <>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-400">Total GSPN (Base):</span>
-                              <span className="text-sm font-bold" style={{ color: '#9333EA' }}>
-                                R$ {pecas.reduce((sum, p) => sum + (Number(p.valor_gspn || p.valor_base_gspn || 0) * p.quantidade), 0).toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs text-gray-400">Total c/ Markup:</span>
-                              <span className="text-sm font-bold text-[#00D4FF]">
-                                R$ {pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0).toFixed(2)}
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between pt-2 border-t border-gray-700">
-                              <span className="text-xs font-bold text-gray-300">Diferença (Markup):</span>
-                              <span className="text-sm font-bold text-[#39FF14]">
-                                R$ {(
-                                  pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0) -
-                                  pecas.reduce((sum, p) => sum + (Number(p.valor_gspn || p.valor_base_gspn || 0) * p.quantidade), 0)
-                                ).toFixed(2)}
-                              </span>
-                            </div>
-                          </>
-                        )}
-                        {os?.tipo_os === 'LP' && (
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs text-gray-400">Total de Peças:</span>
-                            <span className="text-sm font-bold text-[#39FF14]">
-                              R$ {pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0).toFixed(2)}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
