@@ -1069,6 +1069,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     try {
       setLoading(true);
 
+      // Debug: Verificar o que está sendo criado
+      console.log('🔍 DIAGNÓSTICO - Criando OS com:');
+      console.log('  📦 Peças adicionadas:', pecasAdicionadas.length, pecasAdicionadas);
+      console.log('  ⚙️ Serviços adicionados:', servicosAdicionados.length, servicosAdicionados);
+      console.log('  💰 Pagamentos temporários:', pagamentosTemporarios.length);
+      console.log('  📎 Anexos temporários:', anexosTemporarios.length);
+      console.log('  📋 Requisições temporárias:', requisicoesTemporarias.length);
+
       await salvarOuAtualizarCliente();
 
       const enderecoCompleto = [
