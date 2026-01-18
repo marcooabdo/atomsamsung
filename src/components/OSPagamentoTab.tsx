@@ -34,8 +34,13 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
   useEffect(() => {
     loadPagamentos();
-    loadPecasServicos();
   }, [osId]);
+
+  useEffect(() => {
+    if (os) {
+      loadPecasServicos();
+    }
+  }, [osId, os?.tipo_orcamento]);
 
   useEffect(() => {
     setDescontoTipo(os.desconto_tipo || 'valor');
@@ -64,12 +69,46 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   };
 
   const loadPecasServicos = async () => {
-    const [pecasRes, servicosRes] = await Promise.all([
+    const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+
+    // Carregar peças de ambas as tabelas
+    const [pecasCotacaoRes, pecasOSRes] = await Promise.all([
       supabase.from('cotacoes_pecas').select('pn, descricao, quantidade, valor_final_unitario, valor_total').eq('os_id', osId),
-      supabase.from('cotacoes_servicos').select('descricao, quantidade, valor_unitario, valor_total').eq('os_id', osId)
+      supabase.from('os_pecas').select('pn, descricao, quantidade, valor_unitario, valor_total').eq('os_id', osId)
     ]);
-    setPecas(pecasRes.data || []);
-    setServicos(servicosRes.data || []);
+
+    // Combinar peças normalizando os campos
+    const pecasCotacao = (pecasCotacaoRes.data || []).map(p => ({
+      ...p,
+      valor_unitario: p.valor_final_unitario,
+      valor_total: p.valor_total
+    }));
+
+    const pecasOS = (pecasOSRes.data || []).map(p => ({
+      ...p,
+      valor_total: p.valor_total
+    }));
+
+    const todasPecas = [...pecasCotacao, ...pecasOS];
+
+    // Carregar serviços da tabela correta baseado no tipo de OS
+    let servicosData: any[] = [];
+    if (isSCACC) {
+      const { data } = await supabase
+        .from('os_servicos')
+        .select('descricao, quantidade, valor_unitario, valor_total')
+        .eq('os_id', osId);
+      servicosData = data || [];
+    } else {
+      const { data } = await supabase
+        .from('cotacoes_servicos')
+        .select('descricao, quantidade, valor_unitario, valor_total')
+        .eq('os_id', osId);
+      servicosData = data || [];
+    }
+
+    setPecas(todasPecas);
+    setServicos(servicosData);
   };
 
   const getFormaPagamentoLabel = (forma: string) => {
