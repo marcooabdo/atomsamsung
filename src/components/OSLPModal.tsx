@@ -1133,12 +1133,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       // Criar cotação automaticamente se houver peças ou serviços
       let cotacaoId = null;
       if (pecasAdicionadas.length > 0 || servicosAdicionados.length > 0) {
-        console.log('📋 Criando cotação automática...');
+        console.log('Criando cotacao automatica...');
         const { data: novaCotacao, error: cotacaoError } = await supabase
           .from('cotacoes')
           .insert({
             unidade_id: unidadeId,
+            tipo_os: tipoOS,
+            tipo_atendimento: tipoAtendimento,
             tipo_orcamento: tipoOrcamento,
+            cliente_nome: clienteNome,
             taxa_para_cliente: false,
             criado_por: usuario?.id,
             status: 'rascunho',
@@ -1148,10 +1151,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           .single();
 
         if (cotacaoError) {
-          console.error('❌ Erro ao criar cotação:', cotacaoError);
+          console.error('Erro ao criar cotacao:', cotacaoError);
         } else {
           cotacaoId = novaCotacao.id;
-          console.log('✅ Cotação criada:', cotacaoId);
+          console.log('Cotacao criada:', cotacaoId);
 
           // Vincular cotação à OS
           await supabase
@@ -1465,7 +1468,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       // Mudar para modo de visualização e carregar a OS criada
       setCurrentOsId(novaOS.id);
       setCurrentMode('view');
-      setAbaAtiva('checklist');
+      setAbaAtiva('dados');
 
       onReload?.();
     } catch (error) {
