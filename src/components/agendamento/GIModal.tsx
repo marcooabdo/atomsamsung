@@ -55,20 +55,6 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
     setLoading(true);
 
     try {
-      // Atualizar requisição confirmando o consumo (GI postada)
-      const { error: updateError } = await supabase
-        .from('requisicoes_pecas')
-        .update({
-          status: 'gi_postada',
-          gi_postada_em: new Date().toISOString(),
-          tipo_devolucao: 'usada',
-          motivo_devolucao: 'Peça consumida - GI postada',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', requisicaoId);
-
-      if (updateError) throw updateError;
-
       // Se for lote, atualizar as peças específicas selecionadas no estoque
       if (isLote && pecasSelecionadas.length > 0) {
         const { error: estoquePecasError } = await supabase
@@ -82,6 +68,30 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
 
         if (estoquePecasError) throw estoquePecasError;
 
+        // Verificar quantas peças do lote ainda não têm GI postada
+        const pecasSemGI = pecasLote?.filter(p =>
+          !pecasSelecionadas.includes(p.id) && !p.gi_postada_em
+        ) || [];
+
+        // Se TODAS as peças do lote têm GI, mudar status da requisição para "gi_postada"
+        // Se ainda existem peças sem GI, manter como "atendida"
+        const todasPecasComGI = pecasSemGI.length === 0;
+
+        if (todasPecasComGI) {
+          const { error: updateError } = await supabase
+            .from('requisicoes_pecas')
+            .update({
+              status: 'gi_postada',
+              gi_postada_em: new Date().toISOString(),
+              tipo_devolucao: 'usada',
+              motivo_devolucao: 'Peça consumida - GI postada',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', requisicaoId);
+
+          if (updateError) throw updateError;
+        }
+
         // Comentário específico com IDs do lote
         const idsNumericos = pecasLote
           ?.filter(p => pecasSelecionadas.includes(p.id))
@@ -91,10 +101,24 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
-          comentario: `GI postada por ${usuario?.nome}: ${pecaNome} (Lote - IDs: ${idsNumericos}) - Peças consumidas`,
+          comentario: `GI postada por ${usuario?.nome}: ${pecaNome} (Lote - IDs: ${idsNumericos}) - Peças consumidas${todasPecasComGI ? '' : ' (ainda existem peças sem GI neste lote)'}`,
           is_system: true
         });
       } else {
+        // Peça única - mudar status da requisição
+        const { error: updateError } = await supabase
+          .from('requisicoes_pecas')
+          .update({
+            status: 'gi_postada',
+            gi_postada_em: new Date().toISOString(),
+            tipo_devolucao: 'usada',
+            motivo_devolucao: 'Peça consumida - GI postada',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', requisicaoId);
+
+        if (updateError) throw updateError;
+
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,

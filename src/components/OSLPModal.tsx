@@ -1766,11 +1766,15 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           })
           .in('id', pecasSelecionadas);
 
-        // Verificar se ainda há peças com GI postada
-        const pecasRestantes = requisicaoCancelarGI.pecas_estoque_ids?.filter(id => !pecasSelecionadas.includes(id)) || [];
+        // Verificar quantas peças do lote ainda TÊM GI postada (após o cancelamento)
+        const pecasComGI = requisicaoCancelarGI.pecas_lote?.filter(p =>
+          !pecasSelecionadas.includes(p.id) && p.gi_postada_em
+        ) || [];
 
-        if (pecasRestantes.length === 0) {
-          // Se todas as peças tiveram GI cancelada, atualizar requisição
+        // Se NENHUMA peça tem GI postada, mudar status da requisição para "atendida"
+        // Se ainda existem peças com GI, manter como "gi_postada"
+        if (pecasComGI.length === 0) {
+          // Todas as peças tiveram GI cancelada, atualizar requisição
           await supabase
             .from('requisicoes_pecas')
             .update({
