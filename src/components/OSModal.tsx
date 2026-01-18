@@ -3282,6 +3282,29 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               const reqComDevolucao = (requisicao?.status === 'devolucao_pendente' || requisicao?.status === 'devolvida') ? requisicao :
                                                       (requisicaoDevolvida?.status === 'devolucao_pendente' || requisicaoDevolvida?.status === 'devolvida') ? requisicaoDevolvida : null;
 
+                              // Construir texto do título com IDs das peças
+                              const getTituloDevolucao = () => {
+                                if (!reqComDevolucao) return '';
+
+                                const statusText = reqComDevolucao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'DEVOLVIDA';
+                                const tipoText = reqComDevolucao.tipo_devolucao === 'nova' ? 'NOVA' :
+                                                 reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA';
+
+                                // Se for lote, construir texto com IDs
+                                if (reqComDevolucao.is_lote && reqComDevolucao.pecas_lote && reqComDevolucao.pecas_lote.length > 0) {
+                                  const ids = reqComDevolucao.pecas_lote.map((p: any) => `#${p.id_numerico}`).join(' e ID ');
+                                  const pecaOuPecas = reqComDevolucao.pecas_lote.length > 1 ? 'PEÇAS' : 'PEÇA';
+                                  return `${pecaOuPecas} ID ${ids} ${reqComDevolucao.pecas_lote.length > 1 ? statusText.replace('SOLICITADA', 'SOLICITADAS').replace('DEVOLVIDA', 'DEVOLVIDAS') : statusText} - ${tipoText}`;
+                                } else if (reqComDevolucao.is_lote && reqComDevolucao.pecas_estoque_ids && reqComDevolucao.pecas_estoque_ids.length > 0) {
+                                  const pecaOuPecas = reqComDevolucao.pecas_estoque_ids.length > 1 ? 'PEÇAS' : 'PEÇA';
+                                  return `${pecaOuPecas} (${reqComDevolucao.pecas_estoque_ids.length} IDs) ${reqComDevolucao.pecas_estoque_ids.length > 1 ? statusText.replace('SOLICITADA', 'SOLICITADAS').replace('DEVOLVIDA', 'DEVOLVIDAS') : statusText} - ${tipoText}`;
+                                } else if (reqComDevolucao.peca_estoque?.id_numerico) {
+                                  return `PEÇA ID #${reqComDevolucao.peca_estoque.id_numerico} ${statusText} - ${tipoText}`;
+                                }
+
+                                return `PEÇA ${statusText} - ${tipoText}`;
+                              };
+
                               return reqComDevolucao && reqComDevolucao.motivo_devolucao && (
                                 <div className="mt-3 p-3 rounded-lg" style={{
                                   backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF1410' : '#FFBF0010',
@@ -3295,7 +3318,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                       <p className="text-xs font-bold mb-1" style={{
                                         color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
                                       }}>
-                                        {reqComDevolucao.status === 'devolucao_pendente' ? 'DEVOLUÇÃO SOLICITADA' : 'PEÇA DEVOLVIDA'} - {reqComDevolucao.tipo_devolucao === 'nova' ? 'NOVA' : reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? 'COM DEFEITO' : 'USADA'}
+                                        {getTituloDevolucao()}
                                       </p>
                                       <p className="text-xs text-gray-300">
                                         {reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '⚠️ DEFEITO: ' : 'Motivo: '}
