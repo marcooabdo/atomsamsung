@@ -73,9 +73,11 @@ interface OSDetails {
     pn: string;
     quantidade: number;
     valor_unitario: number;
+    valor_gspn?: number;
     status: string;
     id_sequencial?: string;
     delivery?: string;
+    tipo_peca?: 'gspn' | 'estoque';
   }>;
   anexos?: Array<{
     id: string;
@@ -255,12 +257,17 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         `)
         .eq('os_id', osId);
 
+      const { data: osPecas } = await supabase
+        .from('os_pecas')
+        .select('*')
+        .eq('os_id', osId);
+
       const { data: anexos } = await supabase
         .from('os_anexos')
         .select('id, nome_arquivo, url, tipo, tamanho_bytes, created_at')
         .eq('os_id', osId);
 
-      const pecasFormatted = pecas?.map((p: any) => ({
+      const pecasRequisicao = pecas?.map((p: any) => ({
         codigo_peca: p.codigo_peca,
         descricao: p.descricao,
         pn: p.estoque_pecas?.pn || p.codigo_peca,
@@ -268,8 +275,22 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         valor_unitario: p.estoque_pecas?.valor_gspn || 0,
         status: p.status,
         id_sequencial: p.estoque_pecas?.estoque_etiquetas?.[0]?.id_sequencial,
-        delivery: p.estoque_pecas?.estoque_etiquetas?.[0]?.delivery
+        delivery: p.estoque_pecas?.estoque_etiquetas?.[0]?.delivery,
+        tipo_peca: 'estoque' as const
       })) || [];
+
+      const pecasGSPN = osPecas?.map((p: any) => ({
+        codigo_peca: p.codigo || p.pn,
+        descricao: p.descricao,
+        pn: p.pn,
+        quantidade: p.quantidade || 1,
+        valor_unitario: p.valor_unitario || 0,
+        valor_gspn: p.valor_gspn || 0,
+        status: p.status || 'pendente',
+        tipo_peca: 'gspn' as const
+      })) || [];
+
+      const pecasFormatted = [...pecasRequisicao, ...pecasGSPN];
 
       const osFormatted: OSDetails = {
         ...os,
@@ -713,7 +734,14 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
-                        <p className="font-bold text-gray-900 text-lg">{peca.pn}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-bold text-gray-900 text-lg">{peca.pn}</p>
+                          {peca.tipo_peca === 'gspn' && (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded border border-blue-300">
+                              GSPN
+                            </span>
+                          )}
+                        </div>
                         <p className="text-sm text-gray-700 mt-1">{peca.descricao}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {peca.id_sequencial && (
@@ -744,12 +772,34 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                         </div>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-gray-900">
-                          R$ {peca.valor_unitario.toFixed(2)}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
-                        </p>
+                        {peca.tipo_peca === 'gspn' && peca.valor_gspn && peca.valor_gspn > 0 ? (
+                          <>
+                            <div className="mb-1">
+                              <p className="text-xs text-gray-500">Valor GSPN:</p>
+                              <p className="text-sm text-gray-600 line-through">
+                                R$ {peca.valor_gspn.toFixed(2)}
+                              </p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Valor Cobrado:</p>
+                              <p className="font-medium text-green-600">
+                                R$ {peca.valor_unitario.toFixed(2)}
+                              </p>
+                            </div>
+                            <p className="text-sm text-gray-600 mt-1">
+                              Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
+                            </p>
+                          </>
+                        ) : (
+                          <>
+                            <p className="font-medium text-gray-900">
+                              R$ {peca.valor_unitario.toFixed(2)}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
