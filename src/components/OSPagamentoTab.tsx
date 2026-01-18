@@ -677,7 +677,7 @@ Assistencia Tecnica Samsung`;
                       </div>
                       <div>
                         <p className="text-lg font-bold text-white">
-                          R$ {(pagamento.valor_liquido || pagamento.valor).toFixed(2)}
+                          R$ {(pagamento.valor || 0).toFixed(2)}
                         </p>
                         <p
                           className="text-xs font-semibold"

@@ -361,11 +361,22 @@ export function Kanban() {
     }, 0);
   };
 
-  const calcularLucro = (os: any) => {
+  const calcularSubtotal = (os: any) => {
     if (os.tipo_os !== 'OW') return null;
     const valorTotal = os.valor_total || 0;
+    const valorDesconto = os.valor_desconto_calculado || 0;
+    return valorTotal + valorDesconto;
+  };
+
+  const calcularLucro = (os: any) => {
+    if (os.tipo_os !== 'OW') return null;
+    const valorFinal = os.valor_total || 0;
+    const valorDesconto = os.valor_desconto_calculado || 0;
+    const valorPecas = calcularValorPecas(os);
     const valorGSPN = calcularValorGSPN(os);
-    return valorTotal - valorGSPN;
+    const taxasPagamentos = (os.pagamentos || []).reduce((sum: number, pag: any) => sum + (pag.taxa_valor || 0), 0);
+    const custoTotal = valorPecas + valorGSPN + taxasPagamentos + valorDesconto;
+    return valorFinal - custoTotal;
   };
 
   const loadKanbanData = async () => {
@@ -399,6 +410,9 @@ export function Kanban() {
                 delivery
               )
             )
+          ),
+          pagamentos:pagamentos(
+            taxa_valor
           ),
           unidade:unidades!os_unidade_id_fkey(nome),
           tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome)
@@ -1602,9 +1616,9 @@ export function Kanban() {
                               const valorPecas = calcularValorPecas(os);
                               const valorGSPN = calcularValorGSPN(os);
                               const lucro = calcularLucro(os);
-                              const valorTotal = os.valor_total;
+                              const subtotal = calcularSubtotal(os);
 
-                              if (!valorPecas && !valorGSPN && !valorTotal) return null;
+                              if (!valorPecas && !valorGSPN && !subtotal) return null;
 
                               return (
                                 <div className="space-y-1 mt-1.5 pt-1.5 border-t" style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}>
@@ -1630,18 +1644,18 @@ export function Kanban() {
                                       </span>
                                     </div>
                                   )}
-                                  {os.tipo_os === 'OW' && valorTotal && (
+                                  {os.tipo_os === 'OW' && subtotal && subtotal > 0 && (
                                     <div className="flex items-center justify-between gap-1.5">
                                       <span className="text-[10px] font-bold" style={{
                                         color: '#00F5FF',
                                         textShadow: '0 0 6px rgba(0,245,255,0.5)'
                                       }}>ORÇAM:</span>
                                       <span className="font-mono text-[#00F5FF] text-[10px] font-bold">
-                                        R$ {valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                       </span>
                                     </div>
                                   )}
-                                  {os.tipo_os === 'OW' && lucro !== null && valorTotal > 0 && (
+                                  {os.tipo_os === 'OW' && lucro !== null && subtotal && subtotal > 0 && (
                                     <div className="flex items-center justify-between gap-1.5">
                                       <span className="text-[10px] font-bold" style={{
                                         color: lucro >= 0 ? '#39FF14' : '#FF0064',
