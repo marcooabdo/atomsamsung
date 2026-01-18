@@ -468,13 +468,31 @@ export function Kanban() {
     e.dataTransfer.effectAllowed = 'move';
   };
 
-  const handleDragOver = (e: React.DragEvent, columnId: string, position?: number) => {
+  const handleDragOver = (e: React.DragEvent, columnId: string) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     setDragOverColumn(columnId);
-    if (position !== undefined) {
-      setDragOverPosition(position);
+  };
+
+  const handleCardDragOver = (e: React.DragEvent, columnId: string, index: number) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedCard || draggedCard.coluna_kanban !== columnId || columnSortOrder[columnId] !== 'sequencia') {
+      return;
     }
+
+    const card = e.currentTarget as HTMLElement;
+    const rect = card.getBoundingClientRect();
+    const mouseY = e.clientY - rect.top;
+    const cardHeight = rect.height;
+
+    // Se o mouse está na metade superior do card, insere antes (index)
+    // Se está na metade inferior, insere depois (index + 1)
+    const newPosition = mouseY < cardHeight / 2 ? index : index + 1;
+
+    setDragOverColumn(columnId);
+    setDragOverPosition(newPosition);
   };
 
   const handleContainerDragOver = (e: React.DragEvent) => {
@@ -606,9 +624,10 @@ export function Kanban() {
     }
   };
 
-  const handleDrop = async (e: React.DragEvent, targetColumn: string, targetPosition?: number) => {
+  const handleDrop = async (e: React.DragEvent, targetColumn: string) => {
     e.preventDefault();
-    const finalPosition = targetPosition ?? dragOverPosition;
+    e.stopPropagation();
+    const finalPosition = dragOverPosition;
     setDragOverColumn(null);
     setDragOverPosition(null);
 
@@ -1494,31 +1513,28 @@ export function Kanban() {
                     </div>
 
                     <div className="flex-1 min-h-0 overflow-y-auto cyber-scrollbar px-3 pb-3">
-                      {/* Drop zone no início da coluna */}
-                      {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && (
-                        <div
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            handleDragOver(e, coluna.id, 0);
-                          }}
-                          onDrop={(e) => {
-                            e.stopPropagation();
-                            handleDrop(e, coluna.id, 0);
-                          }}
-                          className={`h-2 mb-2 rounded transition-all ${
-                            dragOverPosition === 0 && dragOverColumn === coluna.id ? 'bg-white/20' : 'bg-transparent'
-                          }`}
-                        />
-                      )}
-
                       {filteredData[coluna.id]?.map((os, index) => (
-                        <div key={os.id} className="mb-0">
+                        <div key={os.id} className="relative mb-2">
+                          {/* Linha indicadora de drop */}
+                          {draggedCard &&
+                           draggedCard.coluna_kanban === coluna.id &&
+                           columnSortOrder[coluna.id] === 'sequencia' &&
+                           dragOverPosition === index &&
+                           dragOverColumn === coluna.id && (
+                            <div
+                              className="absolute -top-1 left-0 right-0 h-0.5 z-10"
+                              style={{
+                                background: `linear-gradient(90deg, transparent 0%, ${coluna.color} 50%, transparent 100%)`,
+                                boxShadow: `0 0 8px ${coluna.color}`
+                              }}
+                            />
+                          )}
                         {coluna.id === 'os_fechada' ? (
                           <div
                             draggable
                             onDragStart={(e) => handleDragStart(e, os)}
                             onDragEnd={handleDragEnd}
+                            onDragOver={(e) => handleCardDragOver(e, coluna.id, index)}
                             onClick={() => {
                               setSelectedOSId(os.id);
                               setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
@@ -1528,7 +1544,8 @@ export function Kanban() {
                               background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.2) 100%)',
                               border: `1px solid ${getTextColor(coluna.id, coluna.color)}20`,
                               boxShadow: `0 1px 4px rgba(0,0,0,0.2)`,
-                              transition: 'all 0.3s ease'
+                              transition: 'all 0.3s ease',
+                              opacity: draggedCard?.id === os.id ? 0.4 : 1
                             }}
                             onMouseEnter={(e) => {
                               e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}50`;
@@ -1557,6 +1574,7 @@ export function Kanban() {
                           draggable
                           onDragStart={(e) => handleDragStart(e, os)}
                           onDragEnd={handleDragEnd}
+                          onDragOver={(e) => handleCardDragOver(e, coluna.id, index)}
                           onClick={() => {
                             setSelectedOSId(os.id);
                             setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
@@ -1566,7 +1584,8 @@ export function Kanban() {
                             background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.3) 100%)',
                             border: `1px solid ${getTextColor(coluna.id, coluna.color)}25`,
                             boxShadow: `0 2px 8px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)`,
-                            transition: 'all 0.3s ease'
+                            transition: 'all 0.3s ease',
+                            opacity: draggedCard?.id === os.id ? 0.4 : 1
                           }}
                           onMouseEnter={(e) => {
                             e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}60`;
@@ -2050,25 +2069,41 @@ export function Kanban() {
                         </div>
                         )}
 
-                        {/* Drop zone após o card */}
-                        {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && (
+                          {/* Linha indicadora após este card (para o caso de ser o último ou drop no final) */}
+                          {draggedCard &&
+                           draggedCard.coluna_kanban === coluna.id &&
+                           columnSortOrder[coluna.id] === 'sequencia' &&
+                           dragOverPosition === index + 1 &&
+                           dragOverColumn === coluna.id && (
                             <div
-                              onDragOver={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                handleDragOver(e, coluna.id, index + 1);
+                              className="absolute -bottom-1 left-0 right-0 h-0.5 z-10"
+                              style={{
+                                background: `linear-gradient(90deg, transparent 0%, ${coluna.color} 50%, transparent 100%)`,
+                                boxShadow: `0 0 8px ${coluna.color}`
                               }}
-                              onDrop={(e) => {
-                                e.stopPropagation();
-                                handleDrop(e, coluna.id, index + 1);
-                              }}
-                              className={`h-2 my-2 rounded transition-all ${
-                                dragOverPosition === index + 1 && dragOverColumn === coluna.id ? 'bg-white/20' : 'bg-transparent'
-                              }`}
                             />
                           )}
                         </div>
                       ))}
+
+                      {/* Área de drop no final da lista */}
+                      {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && filteredData[coluna.id]?.length > 0 && (
+                        <div
+                          onDragOver={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setDragOverColumn(coluna.id);
+                            setDragOverPosition(filteredData[coluna.id].length);
+                          }}
+                          onDrop={(e) => handleDrop(e, coluna.id)}
+                          className="h-8 rounded transition-all"
+                          style={{
+                            border: dragOverPosition === filteredData[coluna.id].length && dragOverColumn === coluna.id
+                              ? `2px dashed ${coluna.color}`
+                              : '2px dashed transparent'
+                          }}
+                        />
+                      )}
 
                       {(!filteredData[coluna.id] || filteredData[coluna.id].length === 0) && (
                         <div className="flex flex-col items-center justify-center py-8 text-center">
