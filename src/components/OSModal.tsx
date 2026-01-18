@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -129,6 +129,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     count: number;
   }>>([]);
   const [mostrarSugestoesOW, setMostrarSugestoesOW] = useState(false);
+
+  // Estados para edição de valores GSPN
+  const [editandoValorGSPN, setEditandoValorGSPN] = useState<Record<string, string>>({});
+  const [salvandoValorGSPN, setSalvandoValorGSPN] = useState<Record<string, boolean>>({});
 
   // Estados temporários para modo de criação
   const [dadosTemporarios, setDadosTemporarios] = useState({
@@ -706,6 +710,69 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     } catch (error) {
       console.error('Erro ao buscar sugestões:', error);
       setSugestoesPecasOW([]);
+    }
+  };
+
+  const handleSalvarValorGSPN = async (pecaId: string) => {
+    const valorEditado = editandoValorGSPN[pecaId];
+    if (!valorEditado) {
+      alert('Digite um valor válido');
+      return;
+    }
+
+    const valorNum = parseFloat(valorEditado);
+    if (isNaN(valorNum) || valorNum <= 0) {
+      alert('Valor inválido');
+      return;
+    }
+
+    setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: true }));
+
+    try {
+      const peca = pecas.find(p => p.id === pecaId);
+      if (!peca) {
+        throw new Error('Peça não encontrada');
+      }
+
+      // Calcula valores
+      const valorGSPN = valorNum;
+      const valorComMarkup = os?.tipo_os === 'OW' ? calcularValorComMarkup(valorGSPN) : valorGSPN;
+      const valorTotal = valorComMarkup * (peca.quantidade || 1);
+
+      // Atualiza a peça
+      const { error: updateError } = await supabase
+        .from('os_pecas')
+        .update({
+          valor_gspn: valorGSPN,
+          valor_unitario: valorComMarkup,
+          valor_total: valorTotal
+        })
+        .eq('id', pecaId);
+
+      if (updateError) throw updateError;
+
+      // Registra no log
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `💰 Valor GSPN definido para ${peca.descricao}: R$ ${valorGSPN.toFixed(2)} → Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        is_system: true
+      });
+
+      // Remove do estado de edição
+      setEditandoValorGSPN(prev => {
+        const novo = { ...prev };
+        delete novo[pecaId];
+        return novo;
+      });
+
+      await loadPecas();
+      await loadComentarios();
+    } catch (error) {
+      console.error('Erro ao salvar valor GSPN:', error);
+      alert('Erro ao salvar valor GSPN');
+    } finally {
+      setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: false }));
     }
   };
 
@@ -2916,19 +2983,91 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                 </p>
                               )}
                             </div>
-                            <div className="flex items-center gap-4 mt-2">
+                            <div className="flex items-center gap-4 mt-2 flex-wrap">
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
-                              {peca.valor_base_gspn && peca.valor_base_gspn > 0 && (
-                                <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                  GSPN: R$ {Number(peca.valor_base_gspn || 0).toFixed(2)}
-                                </p>
+
+                              {/* Campo de edição do valor GSPN se não estiver definido */}
+                              {(!peca.valor_gspn || peca.valor_gspn === 0) && !editandoValorGSPN[peca.id] ? (
+                                <button
+                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
+                                  className="px-2 py-1 rounded text-xs font-bold transition-all"
+                                  style={{
+                                    backgroundColor: '#9333EA20',
+                                    border: '1px solid #9333EA60',
+                                    color: '#9333EA'
+                                  }}
+                                >
+                                  Definir Valor GSPN
+                                </button>
+                              ) : editandoValorGSPN[peca.id] !== undefined ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="Valor GSPN"
+                                    value={editandoValorGSPN[peca.id]}
+                                    onChange={(e) => setEditandoValorGSPN(prev => ({
+                                      ...prev,
+                                      [peca.id]: e.target.value
+                                    }))}
+                                    className="neon-input w-32 text-xs py-1"
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                  />
+                                  <button
+                                    onClick={() => handleSalvarValorGSPN(peca.id)}
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                    className="p-1.5 rounded transition-all disabled:opacity-50"
+                                    style={{
+                                      backgroundColor: '#39FF1420',
+                                      border: '1px solid #39FF1460',
+                                      color: '#39FF14'
+                                    }}
+                                    title="Salvar valor"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditandoValorGSPN(prev => {
+                                      const novo = { ...prev };
+                                      delete novo[peca.id];
+                                      return novo;
+                                    })}
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                    className="p-1.5 rounded transition-all disabled:opacity-50"
+                                    style={{
+                                      backgroundColor: '#FF006420',
+                                      border: '1px solid #FF006460',
+                                      color: '#FF0064'
+                                    }}
+                                    title="Cancelar"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col gap-1">
+                                  <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                    GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
+                                  </p>
+                                  {os?.tipo_os === 'OW' && peca.valor_gspn && peca.valor_gspn > 0 && (
+                                    <p className="text-xs font-bold" style={{ color: '#00D4FF' }}>
+                                      c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                    </p>
+                                  )}
+                                </div>
                               )}
-                              <p className="text-xs text-gray-500">
-                                Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                              </p>
-                              <p className="text-xs font-bold text-[#39FF14]">
-                                Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
-                              </p>
+
+                              {(peca.valor_gspn && peca.valor_gspn > 0) || editandoValorGSPN[peca.id] === undefined ? (
+                                <>
+                                  <p className="text-xs text-gray-500">
+                                    Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                  </p>
+                                  <p className="text-xs font-bold text-[#39FF14]">
+                                    Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                  </p>
+                                </>
+                              ) : null}
                             </div>
                             {(requisicao || requisicaoDevolvida) && (
                               <p className="text-xs text-gray-500 mt-2">
@@ -3182,6 +3321,50 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                       </div>
                     );
                   })}
+
+                  {/* Resumo de valores das peças */}
+                  {pecas.length > 0 && (
+                    <div className="premium-card p-4 mt-4">
+                      <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-3">
+                        Resumo de Peças
+                      </h4>
+                      <div className="space-y-2">
+                        {os?.tipo_os === 'OW' && (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400">Total GSPN (Base):</span>
+                              <span className="text-sm font-bold" style={{ color: '#9333EA' }}>
+                                R$ {pecas.reduce((sum, p) => sum + (Number(p.valor_gspn || p.valor_base_gspn || 0) * p.quantidade), 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-gray-400">Total c/ Markup:</span>
+                              <span className="text-sm font-bold text-[#00D4FF]">
+                                R$ {pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0).toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between pt-2 border-t border-gray-700">
+                              <span className="text-xs font-bold text-gray-300">Diferença (Markup):</span>
+                              <span className="text-sm font-bold text-[#39FF14]">
+                                R$ {(
+                                  pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0) -
+                                  pecas.reduce((sum, p) => sum + (Number(p.valor_gspn || p.valor_base_gspn || 0) * p.quantidade), 0)
+                                ).toFixed(2)}
+                              </span>
+                            </div>
+                          </>
+                        )}
+                        {os?.tipo_os === 'LP' && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs text-gray-400">Total de Peças:</span>
+                            <span className="text-sm font-bold text-[#39FF14]">
+                              R$ {pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0).toFixed(2)}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
