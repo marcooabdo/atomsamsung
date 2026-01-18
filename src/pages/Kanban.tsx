@@ -719,7 +719,12 @@ export function Kanban() {
         (os.numero_os_interna && os.numero_os_interna.toLowerCase().includes(searchTerm.toLowerCase()));
 
       const matchesTipoOS = tipoOSFilters.length === 0 ||
-        (os.tipo_os && tipoOSFilters.includes(os.tipo_os));
+        tipoOSFilters.some(filter => {
+          if (filter === 'SC / ACC') {
+            return os.tipo_orcamento === 'samsung_contigo' || os.tipo_orcamento === 'acessorios';
+          }
+          return os.tipo_os === filter;
+        });
 
       const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
         (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
