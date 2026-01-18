@@ -484,7 +484,10 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               {osDetails.rota}
             </span>
             <span className="px-3 py-1 bg-blue-100 text-blue-700 border border-blue-300 rounded-full text-sm font-medium">
-              {osDetails.tipo_atendimento}
+              {osDetails.tipo_atendimento === 'IH' ? 'IH - In Home' :
+               osDetails.tipo_atendimento === 'CI' ? 'CI - Carry In' :
+               osDetails.tipo_atendimento === 'II' ? 'II - In/In' :
+               osDetails.tipo_atendimento || 'N/A'}
             </span>
             <span className="px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded-full text-sm font-medium">
               {osDetails.tipo_os}

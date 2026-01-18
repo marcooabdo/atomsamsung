@@ -1377,7 +1377,10 @@ export function Kanban() {
                                   boxShadow: `0 0 8px ${os.tipo_atendimento === 'IH' ? 'rgba(16,185,129,0.2)' : 'rgba(249,115,22,0.2)'}`
                                 }}
                               >
-                                {os.tipo_atendimento}
+                                {os.tipo_atendimento === 'IH' ? 'IH' :
+                                 os.tipo_atendimento === 'CI' ? 'CI' :
+                                 os.tipo_atendimento === 'II' ? 'II' :
+                                 os.tipo_atendimento || 'N/A'}
                               </span>
                               <span
                                 className="px-1.5 py-0.5 rounded text-[9px] font-bold"
