@@ -440,7 +440,12 @@ export function Kanban() {
       if (error) throw error;
 
       const grouped = COLUNAS_KANBAN.reduce((acc, coluna) => {
-        acc[coluna.id] = (data || []).filter(os => os.coluna_kanban === coluna.id);
+        acc[coluna.id] = (data || [])
+          .filter(os => os.coluna_kanban === coluna.id)
+          .map(os => ({
+            ...os,
+            sequencia_coluna: os.sequencia_coluna ?? 0
+          }));
         return acc;
       }, {} as Record<string, OS[]>);
 
@@ -641,23 +646,29 @@ export function Kanban() {
         if (finalPosition === 0) {
           // Mover para o início
           const primeiroCard = cardsColuna[0];
+          const primeiroSeq = primeiroCard?.sequencia_coluna ?? 0;
+          const segundoSeq = cardsColuna[1]?.sequencia_coluna ?? 0;
           novaSequencia = primeiroCard.id === draggedCard.id
-            ? (cardsColuna[1]?.sequencia_coluna || 0) - 1
-            : (primeiroCard?.sequencia_coluna || 0) - 1;
+            ? segundoSeq - 1
+            : primeiroSeq - 1;
         } else if (finalPosition >= cardsColuna.length - 1) {
           // Mover para o final
           const ultimoCard = cardsColuna[cardsColuna.length - 1];
+          const ultimoSeq = ultimoCard?.sequencia_coluna ?? 0;
+          const penultimoSeq = cardsColuna[cardsColuna.length - 2]?.sequencia_coluna ?? 0;
           novaSequencia = ultimoCard.id === draggedCard.id
-            ? (cardsColuna[cardsColuna.length - 2]?.sequencia_coluna || 0) + 1
-            : (ultimoCard?.sequencia_coluna || 0) + 1;
+            ? penultimoSeq + 1
+            : ultimoSeq + 1;
         } else {
           // Mover entre dois cards
           const cardAntes = cardsColuna[finalPosition - 1];
           const cardDepois = cardsColuna[finalPosition];
-          novaSequencia = Math.floor((cardAntes.sequencia_coluna + cardDepois.sequencia_coluna) / 2);
+          const seqAntes = cardAntes?.sequencia_coluna ?? 0;
+          const seqDepois = cardDepois?.sequencia_coluna ?? 0;
+          novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
 
           // Se não houver espaço, renumerar
-          if (novaSequencia === cardAntes.sequencia_coluna || novaSequencia === cardDepois.sequencia_coluna) {
+          if (novaSequencia === seqAntes || novaSequencia === seqDepois) {
             await supabase.rpc('renumerar_sequencias_coluna', {
               p_coluna_kanban: targetColumn,
               p_unidade_id: draggedCard.unidade_id
@@ -688,7 +699,7 @@ export function Kanban() {
           const cardIndex = cards.findIndex(c => c.id === draggedCard.id);
           if (cardIndex !== -1) {
             cards[cardIndex] = { ...cards[cardIndex], sequencia_coluna: novaSequencia };
-            cards.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+            cards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
             newData[targetColumn] = cards;
           }
           return newData;
@@ -793,19 +804,21 @@ export function Kanban() {
       if (finalPosition === undefined || finalPosition >= cardsDestino.length) {
         // Adicionar no final
         const ultimoCard = cardsDestino[cardsDestino.length - 1];
-        novaSequencia = ultimoCard ? ultimoCard.sequencia_coluna + 1 : 0;
+        novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
       } else if (finalPosition === 0) {
         // Adicionar no início
         const primeiroCard = cardsDestino[0];
-        novaSequencia = primeiroCard ? primeiroCard.sequencia_coluna - 1 : 0;
+        novaSequencia = primeiroCard ? (primeiroCard.sequencia_coluna ?? 0) - 1 : 0;
       } else {
         // Adicionar entre dois cards
         const cardAntes = cardsDestino[finalPosition - 1];
         const cardDepois = cardsDestino[finalPosition];
-        novaSequencia = Math.floor((cardAntes.sequencia_coluna + cardDepois.sequencia_coluna) / 2);
+        const seqAntes = cardAntes?.sequencia_coluna ?? 0;
+        const seqDepois = cardDepois?.sequencia_coluna ?? 0;
+        novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
 
         // Se não houver espaço, renumerar
-        if (novaSequencia === cardAntes.sequencia_coluna || novaSequencia === cardDepois.sequencia_coluna) {
+        if (novaSequencia === seqAntes || novaSequencia === seqDepois) {
           await supabase.rpc('renumerar_sequencias_coluna', {
             p_coluna_kanban: targetColumn,
             p_unidade_id: draggedCard.unidade_id
@@ -843,7 +856,7 @@ export function Kanban() {
         newData[draggedCard.coluna_kanban] = newData[draggedCard.coluna_kanban].filter(os => os.id !== draggedCard.id);
         const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
         const newCards = [...(newData[targetColumn] || []), updatedCard];
-        newCards.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+        newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
         newData[targetColumn] = newCards;
         return newData;
       });
@@ -892,7 +905,7 @@ export function Kanban() {
       filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
     } else {
       // Ordenar por sequencia_coluna (padrão)
-      filtered = filtered.sort((a, b) => a.sequencia_coluna - b.sequencia_coluna);
+      filtered = filtered.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
     }
 
     acc[coluna] = filtered;
