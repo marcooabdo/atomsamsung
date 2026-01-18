@@ -355,21 +355,44 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const loadServicos = async (resetSaved = false) => {
-    const { data } = await supabase
-      .from('cotacoes_servicos')
-      .select(`
-        *,
-        servico:servicos(codigo, nome)
-      `)
-      .eq('os_id', osId)
-      .order('created_at', { ascending: true });
+    const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
 
-    const servicosFormatados = (data || []).map(s => ({
-      ...s,
-      codigo_servico: s.servico?.codigo || 'N/A'
-    }));
+    if (isSCACC) {
+      const { data } = await supabase
+        .from('os_servicos')
+        .select(`
+          *,
+          servico:servicos(codigo, nome)
+        `)
+        .eq('os_id', osId)
+        .order('created_at', { ascending: true });
 
-    setServicos(servicosFormatados);
+      const servicosFormatados = (data || []).map(s => ({
+        ...s,
+        codigo_servico: s.servico?.codigo || s.codigo_servico || 'N/A',
+        _table: 'os_servicos'
+      }));
+
+      setServicos(servicosFormatados);
+    } else {
+      const { data } = await supabase
+        .from('cotacoes_servicos')
+        .select(`
+          *,
+          servico:servicos(codigo, nome)
+        `)
+        .eq('os_id', osId)
+        .order('created_at', { ascending: true });
+
+      const servicosFormatados = (data || []).map(s => ({
+        ...s,
+        codigo_servico: s.servico?.codigo || 'N/A',
+        _table: 'cotacoes_servicos'
+      }));
+
+      setServicos(servicosFormatados);
+    }
+
     if (resetSaved) setServicosSalvos(false);
   };
 
@@ -3198,8 +3221,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               <button
                                 onClick={async () => {
                                   if (servico.quantidade > 1) {
+                                    const table = servico._table || 'cotacoes_servicos';
                                     await supabase
-                                      .from('cotacoes_servicos')
+                                      .from(table)
                                       .update({ quantidade: servico.quantidade - 1, valor_total: servico.valor_unitario * (servico.quantidade - 1) })
                                       .eq('id', servico.id);
                                     loadServicos(true);
@@ -3212,8 +3236,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                               <span className="text-sm font-bold text-white w-8 text-center">{servico.quantidade}</span>
                               <button
                                 onClick={async () => {
+                                  const table = servico._table || 'cotacoes_servicos';
                                   await supabase
-                                    .from('cotacoes_servicos')
+                                    .from(table)
                                     .update({ quantidade: servico.quantidade + 1, valor_total: servico.valor_unitario * (servico.quantidade + 1) })
                                     .eq('id', servico.id);
                                   loadServicos(true);
@@ -3230,8 +3255,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                 defaultValue={servico.valor_unitario}
                                 onBlur={async (e) => {
                                   const novoValor = parseFloat(e.target.value) || 0;
+                                  const table = servico._table || 'cotacoes_servicos';
                                   await supabase
-                                    .from('cotacoes_servicos')
+                                    .from(table)
                                     .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
                                     .eq('id', servico.id);
                                   loadServicos(true);
@@ -3246,7 +3272,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                             <button
                               onClick={async () => {
                                 if (confirm('Remover este servico?')) {
-                                  await supabase.from('cotacoes_servicos').delete().eq('id', servico.id);
+                                  const table = servico._table || 'cotacoes_servicos';
+                                  await supabase.from(table).delete().eq('id', servico.id);
                                   loadServicos(true);
                                 }
                               }}
@@ -3820,10 +3847,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                           key={servico.id}
                           onClick={async () => {
                             try {
+                              const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+                              const table = isSCACC ? 'os_servicos' : 'cotacoes_servicos';
+
                               const servicoExistente = servicos.find(s => s.servico_id === servico.id);
                               if (servicoExistente) {
                                 const { error } = await supabase
-                                  .from('cotacoes_servicos')
+                                  .from(table)
                                   .update({
                                     quantidade: servicoExistente.quantidade + 1,
                                     valor_total: servicoExistente.valor_unitario * (servicoExistente.quantidade + 1)
@@ -3837,16 +3867,22 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                 }
                               } else {
                                 const valorBase = Number(servico.valor_base) || 0;
+                                const dataToInsert: any = {
+                                  os_id: osId,
+                                  servico_id: servico.id,
+                                  descricao: servico.nome || servico.descricao,
+                                  valor_unitario: valorBase,
+                                  quantidade: 1,
+                                  valor_total: valorBase
+                                };
+
+                                if (table === 'os_servicos') {
+                                  dataToInsert.codigo_servico = servico.codigo;
+                                }
+
                                 const { error } = await supabase
-                                  .from('cotacoes_servicos')
-                                  .insert({
-                                    os_id: osId,
-                                    servico_id: servico.id,
-                                    descricao: servico.nome || servico.descricao,
-                                    valor_unitario: valorBase,
-                                    quantidade: 1,
-                                    valor_total: valorBase
-                                  });
+                                  .from(table)
+                                  .insert(dataToInsert);
 
                                 if (error) {
                                   console.error('Erro ao adicionar servico:', error);
