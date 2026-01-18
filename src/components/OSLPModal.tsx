@@ -1850,8 +1850,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         url: publicUrl,
         tamanho_bytes: file.size,
         usuario_id: usuario?.id,
-        tipo: tipoArquivo,
-        origem: 'manual'
+        tipo: tipoArquivo
       });
 
       if (insertError) {
@@ -2053,10 +2052,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
           <div>
-            <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF') }}>
-              {modoSCACC ? 'SC / ACC - Samsung Contigo / Acessorio' : (tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia')}
-              {currentMode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
-            </h2>
+            {(() => {
+              const isSCACC = modoSCACC || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+              const headerColor = isSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF');
+              const headerText = isSCACC ? 'SC / ACC - Samsung Contigo / Acessorio' : (tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia');
+              return (
+                <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: headerColor }}>
+                  {headerText}
+                  {currentMode === 'create' && <span className="text-sm text-gray-400">(NOVA)</span>}
+                </h2>
+              );
+            })()}
             {os && (
               <p className="text-sm text-gray-400 mt-1">
                 {os.numero_os_samsung || os.numero_os_interna || 'N/A'}

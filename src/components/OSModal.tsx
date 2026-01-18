@@ -1970,9 +1970,20 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-[#00D4FF]/20">
           <div>
-            <h2 className="tech-heading text-xl text-[#00D4FF]">
-              {mode === 'create' ? `NOVA ORDEM DE SERVIÇO - ${tipoOS}` : 'ORDEM DE SERVIÇO'}
-            </h2>
+            {(() => {
+              const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+              const headerColor = isSCACC ? '#39FF14' : '#00D4FF';
+              const headerText = mode === 'create'
+                ? `NOVA ORDEM DE SERVICO - ${tipoOS}`
+                : isSCACC
+                  ? 'SC / ACC - Samsung Contigo / Acessorio'
+                  : 'ORDEM DE SERVICO';
+              return (
+                <h2 className="tech-heading text-xl" style={{ color: headerColor }}>
+                  {headerText}
+                </h2>
+              );
+            })()}
             <p className="text-sm text-gray-400 mt-1">
               {mode === 'create' ? 'Preencha os dados abaixo' : (os?.numero_os_samsung || os?.numero_os_interna || 'N/A')}
             </p>
@@ -2622,11 +2633,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                 </div>
               )}
 
-              {os?.tipo_os === 'OW' && os?.coluna_kanban === 'diagnostico' && (
+              {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (
                 <div className="premium-card p-4 bg-[#00D4FF]/10 border border-[#00D4FF]/30 mb-4">
-                  <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4 flex items-center gap-2">
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios' ? '#39FF14' : '#00D4FF' }}>
                     <Package className="w-4 h-4" />
-                    Adicionar Peça Manualmente
+                    Adicionar Peca Manualmente
                   </h3>
                   <div className="grid grid-cols-4 gap-3">
                     <div className="relative">
@@ -3320,8 +3331,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                           url: publicUrl,
                           tamanho_bytes: file.size,
                           usuario_id: usuario?.id,
-                          tipo: tipoArquivo,
-                          origem: 'manual'
+                          tipo: tipoArquivo
                         });
 
                         if (insertError) {
