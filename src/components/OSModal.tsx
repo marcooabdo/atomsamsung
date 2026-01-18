@@ -8,6 +8,7 @@ import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
+import { GIModal } from './agendamento/GIModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import type { Database } from '../lib/database.types';
@@ -55,10 +56,18 @@ interface RequisicaoPeca {
   peca_estoque_id: string | null;
   created_at: string;
   numero_pedido_samsung?: string | null;
+  is_lote?: boolean;
+  pecas_estoque_ids?: string[];
   peca_estoque?: {
     id_numerico: number;
     delivery?: string | null;
   };
+  pecas_lote?: Array<{
+    id: string;
+    id_numerico: number;
+    valor_com_impostos: string;
+    delivery: string | null;
+  }>;
 }
 
 interface OSModalProps {
@@ -97,6 +106,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [mostrarModalDevolucao, setMostrarModalDevolucao] = useState(false);
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalAnalise, setMostrarModalAnalise] = useState(false);
+  const [mostrarModalGI, setMostrarModalGI] = useState(false);
+  const [requisicaoGI, setRequisicaoGI] = useState<RequisicaoPeca | null>(null);
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
   const [pecaRequisitandoId, setPecaRequisitandoId] = useState<string | null>(null);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
@@ -480,7 +491,26 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       return;
     }
 
-    setRequisicoes(data || []);
+    // Para cada requisição, buscar detalhes de todas as peças do lote
+    const requisicoesComLote = await Promise.all(
+      (data || []).map(async (req: any) => {
+        let pecasDoLote = null;
+        if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
+          const { data: pecasData } = await supabase
+            .from('estoque_pecas')
+            .select('id, id_numerico, valor_com_impostos, delivery')
+            .in('id', req.pecas_estoque_ids)
+            .order('id_numerico');
+          pecasDoLote = pecasData;
+        }
+        return {
+          ...req,
+          pecas_lote: pecasDoLote
+        };
+      })
+    );
+
+    setRequisicoes(requisicoesComLote || []);
   };
 
   const loadChecklist = async () => {
@@ -1678,6 +1708,14 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const handlePostarGI = async (requisicao: RequisicaoPeca) => {
+    // Se for lote ou se tiver mais de uma peça, abre o modal para selecionar
+    if (requisicao.is_lote && requisicao.pecas_lote && requisicao.pecas_lote.length > 0) {
+      setRequisicaoGI(requisicao);
+      setMostrarModalGI(true);
+      return;
+    }
+
+    // Se não for lote, faz o processo antigo (simples confirm)
     const confirmacao = confirm('Confirma o consumo (GI) desta peça?');
     if (!confirmacao) return;
 
@@ -2978,9 +3016,20 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                             <div className="flex items-center gap-4">
                               <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
                               {requisicao?.peca_estoque?.id_numerico && (
-                                <p className="text-xs font-bold mt-1" style={{ color: '#39FF14' }}>
-                                  ID Atendido: #{requisicao.peca_estoque.id_numerico}
-                                </p>
+                                <div className="text-xs font-bold mt-1" style={{ color: '#39FF14' }}>
+                                  {requisicao.is_lote && requisicao.pecas_lote && requisicao.pecas_lote.length > 0 ? (
+                                    <div className="flex flex-wrap gap-1 items-center">
+                                      <span>IDs Atendidos:</span>
+                                      {requisicao.pecas_lote.map((peca: any, idx: number) => (
+                                        <span key={peca.id} className="px-2 py-0.5 bg-[#39FF14]/20 border border-[#39FF14]/40 rounded">
+                                          #{peca.id_numerico}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p>ID Atendido: #{requisicao.peca_estoque.id_numerico}</p>
+                                  )}
+                                </div>
                               )}
                             </div>
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
@@ -4130,6 +4179,25 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de GI */}
+      {mostrarModalGI && requisicaoGI && osId && (
+        <GIModal
+          requisicaoId={requisicaoGI.id}
+          osId={osId}
+          pecaNome={`${requisicaoGI.descricao} (${requisicaoGI.codigo_peca})`}
+          isLote={requisicaoGI.is_lote}
+          pecasLote={requisicaoGI.pecas_lote}
+          onClose={() => {
+            setMostrarModalGI(false);
+            setRequisicaoGI(null);
+          }}
+          onSuccess={() => {
+            loadRequisicoes();
+            loadComentarios();
+          }}
+        />
       )}
     </div>
   );

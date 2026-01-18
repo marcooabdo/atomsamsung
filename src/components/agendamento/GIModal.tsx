@@ -7,22 +7,49 @@ interface GIModalProps {
   requisicaoId: string;
   osId: string;
   pecaNome: string;
+  isLote?: boolean;
+  pecasLote?: Array<{
+    id: string;
+    id_numerico: number;
+    valor_com_impostos: string;
+    delivery: string | null;
+  }>;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GIModalProps) {
+export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClose, onSuccess }: GIModalProps) {
   const { usuario } = useAuth();
   const [loading, setLoading] = useState(false);
   const [foto, setFoto] = useState<File | null>(null);
   const [fotoPreview, setFotoPreview] = useState<string>('');
   const [descricao, setDescricao] = useState('');
+  const [pecasSelecionadas, setPecasSelecionadas] = useState<string[]>(
+    isLote && pecasLote ? pecasLote.map(p => p.id) : []
+  );
 
   const handleFotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setFoto(file);
       setFotoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleTogglePeca = (pecaId: string) => {
+    setPecasSelecionadas(prev =>
+      prev.includes(pecaId)
+        ? prev.filter(id => id !== pecaId)
+        : [...prev, pecaId]
+    );
+  };
+
+  const handleToggleTodas = () => {
+    if (!pecasLote) return;
+    if (pecasSelecionadas.length === pecasLote.length) {
+      setPecasSelecionadas([]);
+    } else {
+      setPecasSelecionadas(pecasLote.map(p => p.id));
     }
   };
 
@@ -34,6 +61,11 @@ export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GI
 
     if (!descricao.trim()) {
       alert('Por favor, descreva o problema encontrado');
+      return;
+    }
+
+    if (isLote && pecasSelecionadas.length === 0) {
+      alert('Por favor, selecione pelo menos uma peça do lote');
       return;
     }
 
@@ -51,6 +83,7 @@ export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GI
         .from('os-anexos')
         .getPublicUrl(fileName);
 
+      // Atualizar requisição com os dados do GI
       const { error: updateError } = await supabase
         .from('requisicoes_pecas')
         .update({
@@ -64,12 +97,38 @@ export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GI
 
       if (updateError) throw updateError;
 
-      await supabase.from('os_comentarios').insert({
-        os_id: osId,
-        usuario_id: usuario?.id,
-        comentario: `GI postado para peça ${pecaNome}. Problema: ${descricao}`,
-        is_system: true
-      });
+      // Se for lote, atualizar as peças específicas selecionadas no estoque
+      if (isLote && pecasSelecionadas.length > 0) {
+        const { error: estoquePecasError } = await supabase
+          .from('estoque_pecas')
+          .update({
+            status: 'gi_postada',
+            gi_postada_em: new Date().toISOString()
+          })
+          .in('id', pecasSelecionadas);
+
+        if (estoquePecasError) throw estoquePecasError;
+
+        // Comentário específico com IDs do lote
+        const idsNumericos = pecasLote
+          ?.filter(p => pecasSelecionadas.includes(p.id))
+          .map(p => `#${p.id_numerico}`)
+          .join(', ');
+
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `GI postado para peça ${pecaNome} (Lote - IDs: ${idsNumericos}). Problema: ${descricao}`,
+          is_system: true
+        });
+      } else {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `GI postado para peça ${pecaNome}. Problema: ${descricao}`,
+          is_system: true
+        });
+      }
 
       await supabase.from('os_anexos').insert({
         os_id: osId,
@@ -124,6 +183,51 @@ export function GIModal({ requisicaoId, osId, pecaNome, onClose, onSuccess }: GI
               </div>
             </div>
           </div>
+
+          {isLote && pecasLote && pecasLote.length > 1 && (
+            <div className="premium-card p-4 bg-[#FFBF00]/5 border border-[#FFBF00]/30">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-[#FFBF00]">
+                  Selecione as peças com defeito
+                </h3>
+                <button
+                  onClick={handleToggleTodas}
+                  className="text-xs px-3 py-1 rounded border border-[#FFBF00]/40 text-[#FFBF00] hover:bg-[#FFBF00]/10 transition-colors"
+                >
+                  {pecasSelecionadas.length === pecasLote.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {pecasLote.map((peca) => (
+                  <label
+                    key={peca.id}
+                    className="flex items-center gap-3 p-3 rounded bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pecasSelecionadas.includes(peca.id)}
+                      onChange={() => handleTogglePeca(peca.id)}
+                      className="w-4 h-4 rounded border-[#FFBF00]/40 text-[#FFBF00] focus:ring-[#FFBF00] focus:ring-offset-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-[#39FF14] font-bold">ID #{peca.id_numerico}</span>
+                        {peca.delivery && (
+                          <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
+                        )}
+                        <span className="text-xs text-gray-300">
+                          R$ {Number(peca.valor_com_impostos).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                {pecasSelecionadas.length} de {pecasLote.length} peça(s) selecionada(s)
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-[#FFBF00] mb-3 flex items-center gap-2">
