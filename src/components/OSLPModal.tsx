@@ -1137,7 +1137,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         const { data: novaCotacao, error: cotacaoError } = await supabase
           .from('cotacoes')
           .insert({
-            os_id: novaOS.id,
+            unidade_id: unidadeId,
             tipo_orcamento: tipoOrcamento,
             taxa_para_cliente: false,
             criado_por: usuario?.id,
@@ -1344,8 +1344,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             url: publicUrl,
             tamanho_bytes: anexo.file.size,
             usuario_id: usuario?.id,
-            tipo: tipoArquivo,
-            origem: 'manual'
+            tipo: tipoArquivo
           });
 
           if (insertError) {
