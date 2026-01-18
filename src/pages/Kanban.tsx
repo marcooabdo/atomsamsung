@@ -1378,7 +1378,7 @@ export function Kanban() {
                               >
                                 {os.tipo_os}
                               </span>
-                              {os.numero_os_samsung && (
+                              {os.tipo_orcamento === 'samsung_contigo' && (
                                 <span
                                   className="px-1.5 py-0.5 rounded text-[9px] font-bold"
                                   style={{
