@@ -1130,63 +1130,28 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       console.log('✅ OS criada com sucesso:', novaOS.id);
 
-      // Criar cotação automaticamente se houver peças ou serviços
-      let cotacaoId = null;
-      if (pecasAdicionadas.length > 0 || servicosAdicionados.length > 0) {
-        console.log('Criando cotacao automatica...');
-        const { data: novaCotacao, error: cotacaoError } = await supabase
-          .from('cotacoes')
-          .insert({
-            unidade_id: unidadeId,
-            tipo_os: tipoOS,
-            tipo_atendimento: tipoAtendimento,
-            tipo_orcamento: tipoOrcamento,
-            cliente_nome: clienteNome,
-            taxa_para_cliente: false,
-            criado_por: usuario?.id,
-            status: 'rascunho',
-            versao: 1
-          })
-          .select()
-          .single();
-
-        if (cotacaoError) {
-          console.error('Erro ao criar cotacao:', cotacaoError);
-        } else {
-          cotacaoId = novaCotacao.id;
-          console.log('Cotacao criada:', cotacaoId);
-
-          // Vincular cotação à OS
-          await supabase
-            .from('os')
-            .update({ cotacao_id: cotacaoId })
-            .eq('id', novaOS.id);
-        }
-      }
-
-      // Salvar peças adicionadas
-      if (pecasAdicionadas.length > 0 && cotacaoId) {
-        console.log(`🔧 Salvando ${pecasAdicionadas.length} peça(s)...`);
+      // Salvar peças adicionadas diretamente na OS
+      if (pecasAdicionadas.length > 0) {
+        console.log(`Salvando ${pecasAdicionadas.length} peca(s) na os_pecas...`);
         const pecasInsert = pecasAdicionadas.map(peca => ({
-          cotacao_id: cotacaoId,
           os_id: novaOS.id,
           pn: peca.codigo,
           descricao: peca.descricao,
           quantidade: peca.quantidade || 1,
-          valor_base_gspn: peca.valor,
-          valor_final_unitario: peca.valor,
+          valor_unitario: peca.valor,
           valor_total: peca.valor * (peca.quantidade || 1),
-          markup_aplicado: 0
+          status: 'requisitada',
+          requisitada_por: usuario?.id
         }));
 
         const { error: pecasError } = await supabase
-          .from('cotacoes_pecas')
+          .from('os_pecas')
           .insert(pecasInsert);
 
         if (pecasError) {
-          console.error('❌ Erro ao salvar peças:', pecasError);
+          console.error('Erro ao salvar pecas:', pecasError);
         } else {
-          console.log('✅ Peças salvas com sucesso');
+          console.log('Pecas salvas com sucesso na os_pecas');
         }
       }
 
