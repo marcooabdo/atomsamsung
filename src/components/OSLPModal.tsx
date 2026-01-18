@@ -1036,6 +1036,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       .eq('os_id', currentOsId)
       .order('created_at', { ascending: false });
 
+    console.log('📎 Anexos carregados:', data);
     setAnexos(data || []);
   };
 
@@ -1729,28 +1730,88 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const file = e.target.files[0];
     const fileExt = file.name.split('.').pop();
     const fileName = `${Math.random()}.${fileExt}`;
-    const filePath = `${osId}/${fileName}`;
+    const filePath = `${currentOsId}/${fileName}`;
 
     try {
+      console.log('📤 Fazendo upload do anexo:', { fileName, osId: currentOsId });
+
       const { error: uploadError } = await supabase.storage
         .from('os-anexos')
         .upload(filePath, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error('❌ Erro no upload:', uploadError);
+        throw uploadError;
+      }
 
-      await supabase.from('os_anexos').insert({
-        os_id: osId,
+      console.log('✅ Arquivo enviado, salvando no banco...');
+
+      const { error: insertError } = await supabase.from('os_anexos').insert({
+        os_id: currentOsId,
         nome_arquivo: file.name,
         caminho_arquivo: filePath,
         tipo_arquivo: file.type,
-        tamanho: file.size,
-        usuario_id: usuario?.id
+        tamanho_bytes: file.size,
+        usuario_id: usuario?.id,
+        tipo: 'outros'
       });
 
+      if (insertError) {
+        console.error('❌ Erro ao salvar no banco:', insertError);
+        throw insertError;
+      }
+
+      console.log('✅ Anexo salvo com sucesso!');
       alert('Anexo enviado com sucesso!');
       loadAnexos();
+      e.target.value = '';
     } catch (error) {
+      console.error('❌ Erro geral:', error);
       alert('Erro ao fazer upload do anexo');
+    }
+  };
+
+  const handleAbrirAnexo = async (anexo: OSAnexo) => {
+    try {
+      const { data, error } = await supabase.storage
+        .from('os-anexos')
+        .createSignedUrl(anexo.caminho_arquivo, 60);
+
+      if (error) throw error;
+
+      window.open(data.signedUrl, '_blank');
+    } catch (error) {
+      console.error('❌ Erro ao abrir anexo:', error);
+      alert('Erro ao abrir anexo');
+    }
+  };
+
+  const handleExcluirAnexo = async (anexo: OSAnexo) => {
+    if (!confirm(`Tem certeza que deseja excluir o anexo "${anexo.nome_arquivo}"?`)) {
+      return;
+    }
+
+    try {
+      const { error: storageError } = await supabase.storage
+        .from('os-anexos')
+        .remove([anexo.caminho_arquivo]);
+
+      if (storageError) {
+        console.error('❌ Erro ao remover arquivo do storage:', storageError);
+      }
+
+      const { error: dbError } = await supabase
+        .from('os_anexos')
+        .delete()
+        .eq('id', anexo.id);
+
+      if (dbError) throw dbError;
+
+      alert('Anexo excluído com sucesso!');
+      loadAnexos();
+    } catch (error) {
+      console.error('❌ Erro ao excluir anexo:', error);
+      alert('Erro ao excluir anexo');
     }
   };
 
@@ -4688,19 +4749,73 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     <p className="text-gray-500 text-sm">Nenhum anexo</p>
                   ) : (
                     <div className="space-y-2">
-                      {anexos.map((anexo) => (
-                        <div key={anexo.id} className="premium-card p-4">
-                          <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-1">
-                            <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
-                            <span className="text-gray-600">|</span>
-                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
-                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                            <span className="text-gray-600">|</span>
-                            <span>{anexo.usuario?.nome || 'Sistema'}</span>
+                      {anexos.map((anexo) => {
+                        const isGSPN = anexo.gspn_id || anexo.gspn_tipo;
+
+                        return (
+                          <div key={anexo.id} className="premium-card p-4">
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
+                                  {isGSPN && (
+                                    <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded" style={{
+                                      backgroundColor: '#9D4EDD20',
+                                      color: '#9D4EDD',
+                                      border: '1px solid #9D4EDD'
+                                    }}>
+                                      GSPN
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                                  <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
+                                  <span className="text-gray-600">|</span>
+                                  <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                                  <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                                  <span className="text-gray-600">|</span>
+                                  <span>{anexo.usuario?.nome || 'Sistema'}</span>
+                                  {anexo.descricao && (
+                                    <>
+                                      <span className="text-gray-600">|</span>
+                                      <span className="text-gray-400">{anexo.descricao}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <button
+                                  onClick={() => handleAbrirAnexo(anexo)}
+                                  className="neon-button flex items-center gap-2 text-xs px-3 py-1.5"
+                                  style={{
+                                    backgroundColor: '#00D4FF10',
+                                    borderColor: '#00D4FF',
+                                    color: '#00D4FF'
+                                  }}
+                                  title="Abrir anexo"
+                                >
+                                  <Upload className="w-3 h-3 rotate-180" />
+                                  Abrir
+                                </button>
+                                {!isGSPN && (
+                                  <button
+                                    onClick={() => handleExcluirAnexo(anexo)}
+                                    className="neon-button flex items-center gap-2 text-xs px-3 py-1.5"
+                                    style={{
+                                      backgroundColor: '#FF006410',
+                                      borderColor: '#FF0064',
+                                      color: '#FF0064'
+                                    }}
+                                    title="Excluir anexo"
+                                  >
+                                    <Trash2 className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>

@@ -3290,25 +3290,35 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                       }
 
                       try {
+                        console.log('📤 Fazendo upload do anexo:', { fileName: file.name, osId });
+
                         const fileName = `${osId}/${Date.now()}_${file.name}`;
 
                         const { error: uploadError } = await supabase.storage
                           .from('os-anexos')
                           .upload(fileName, file);
 
-                        if (uploadError) throw uploadError;
+                        if (uploadError) {
+                          console.error('❌ Erro no upload:', uploadError);
+                          throw uploadError;
+                        }
 
-                        const { data: { publicUrl } } = supabase.storage
-                          .from('os-anexos')
-                          .getPublicUrl(fileName);
+                        console.log('✅ Arquivo enviado, salvando no banco...');
 
-                        await supabase.from('os_anexos').insert({
+                        const { error: insertError } = await supabase.from('os_anexos').insert({
                           os_id: osId,
                           nome_arquivo: file.name,
-                          url: publicUrl,
+                          caminho_arquivo: fileName,
+                          tipo_arquivo: file.type,
                           tamanho_bytes: file.size,
-                          tipo_arquivo: file.type
+                          usuario_id: usuario?.id,
+                          tipo: 'outros'
                         });
+
+                        if (insertError) {
+                          console.error('❌ Erro ao salvar no banco:', insertError);
+                          throw insertError;
+                        }
 
                         await supabase.from('os_comentarios').insert({
                           os_id: osId,
@@ -3317,10 +3327,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                           is_system: true
                         });
 
+                        console.log('✅ Anexo salvo com sucesso!');
                         loadAnexos();
                         loadComentarios();
                         alert('Anexo adicionado com sucesso!');
                       } catch (error) {
+                        console.error('❌ Erro geral:', error);
                         alert('Erro ao adicionar anexo');
                       }
 
@@ -3335,69 +3347,96 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                 {anexos.length === 0 ? (
                   <p className="text-center text-gray-500 py-8">Nenhum anexo</p>
                 ) : (
-                  anexos.map((anexo: any) => (
-                    <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <Paperclip className="w-4 h-4 text-[#00D4FF]" />
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                            <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
-                            <span className="text-gray-600">|</span>
-                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
-                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                            <span className="text-gray-600">|</span>
-                            <span>{anexo.usuario?.nome || 'Sistema'}</span>
+                  anexos.map((anexo: any) => {
+                    const isGSPN = anexo.gspn_id || anexo.gspn_tipo;
+
+                    return (
+                      <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Paperclip className="w-4 h-4 text-[#00D4FF]" />
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
+                              {isGSPN && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded" style={{
+                                  backgroundColor: '#9D4EDD20',
+                                  color: '#9D4EDD',
+                                  border: '1px solid #9D4EDD'
+                                }}>
+                                  GSPN
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                              <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
+                              <span className="text-gray-600">|</span>
+                              <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                              <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                              <span className="text-gray-600">|</span>
+                              <span>{anexo.usuario?.nome || 'Sistema'}</span>
+                              {anexo.descricao && (
+                                <>
+                                  <span className="text-gray-600">|</span>
+                                  <span className="text-gray-400">{anexo.descricao}</span>
+                                </>
+                              )}
+                            </div>
                           </div>
                         </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => setAnexoPreview(anexo)}
+                            className="neon-button text-xs px-4 py-2"
+                          >
+                            Abrir
+                          </button>
+                          {!isGSPN && (
+                            <button
+                              onClick={async () => {
+                                if (!confirm('Deseja realmente excluir este anexo?')) return;
+
+                                try {
+                                  if (anexo.caminho_arquivo) {
+                                    const { error: storageError } = await supabase.storage
+                                      .from('os-anexos')
+                                      .remove([anexo.caminho_arquivo]);
+
+                                    if (storageError) {
+                                      console.error('❌ Erro ao remover arquivo do storage:', storageError);
+                                    }
+                                  }
+
+                                  await supabase.from('os_anexos').delete().eq('id', anexo.id);
+
+                                  await supabase.from('os_comentarios').insert({
+                                    os_id: osId,
+                                    usuario_id: usuario?.id,
+                                    comentario: `🗑️ Anexo removido: ${anexo.nome_arquivo}`,
+                                    is_system: true
+                                  });
+
+                                  loadAnexos();
+                                  loadComentarios();
+                                  alert('Anexo excluído com sucesso!');
+                                } catch (error) {
+                                  console.error('❌ Erro ao excluir anexo:', error);
+                                  alert('Erro ao excluir anexo');
+                                }
+                              }}
+                              className="neon-button text-xs px-4 py-2"
+                              style={{
+                                backgroundColor: '#FF006410',
+                                borderColor: '#FF0064',
+                                color: '#FF0064'
+                              }}
+                            >
+                              Excluir
+                            </button>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => setAnexoPreview(anexo)}
-                          className="neon-button text-xs px-4 py-2"
-                        >
-                          Abrir
-                        </button>
-                        <button
-                          onClick={async () => {
-                            if (!confirm('Deseja realmente excluir este anexo?')) return;
-
-                            try {
-                              const fileName = anexo.url.split('/').pop();
-                              if (fileName) {
-                                await supabase.storage.from('os-anexos').remove([`${osId}/${fileName}`]);
-                              }
-
-                              await supabase.from('os_anexos').delete().eq('id', anexo.id);
-
-                              await supabase.from('os_comentarios').insert({
-                                os_id: osId,
-                                usuario_id: usuario?.id,
-                                comentario: `🗑️ Anexo removido: ${anexo.nome_arquivo}`,
-                                is_system: true
-                              });
-
-                              loadAnexos();
-                              loadComentarios();
-                              alert('Anexo excluído com sucesso!');
-                            } catch (error) {
-                              alert('Erro ao excluir anexo');
-                            }
-                          }}
-                          className="neon-button text-xs px-4 py-2"
-                          style={{
-                            backgroundColor: '#FF006410',
-                            borderColor: '#FF0064',
-                            color: '#FF0064'
-                          }}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </div>
-                  ))
+                    );
+                  })
                 )}
               </div>
             </div>
