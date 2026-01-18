@@ -747,7 +747,34 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       codigo: r.codigo_peca
     })));
 
-    setRequisicoes(data || []);
+    // Para cada requisição, buscar detalhes de todas as peças do lote
+    const requisicoesComLote = await Promise.all(
+      (data || []).map(async (req: any) => {
+        let pecasDoLote = null;
+        if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
+          const { data: pecasData } = await supabase
+            .from('estoque_pecas')
+            .select(`
+              id,
+              id_numerico,
+              valor_com_impostos,
+              delivery,
+              gi_postada_em,
+              gi_postada_por,
+              usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome)
+            `)
+            .in('id', req.pecas_estoque_ids)
+            .order('id_numerico');
+          pecasDoLote = pecasData;
+        }
+        return {
+          ...req,
+          pecas_lote: pecasDoLote
+        };
+      })
+    );
+
+    setRequisicoes(requisicoesComLote || []);
   };
 
   const loadServicos = async () => {
