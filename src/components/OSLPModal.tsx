@@ -4662,49 +4662,65 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                       </button>
                                     )}
 
-                                    {(requisicao?.status === 'atendida' || requisicao?.status === 'em_uso') && (
-                                      <>
-                                        <button
-                                          onClick={() => handlePostarGI(requisicao)}
-                                          className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                          style={{
-                                            backgroundColor: '#39FF1410',
-                                            borderColor: '#39FF14',
-                                            color: '#39FF14'
-                                          }}
-                                        >
-                                          <Send className="w-3 h-3" />
-                                          POSTAR GI
-                                        </button>
-                                        <button
-                                          onClick={() => handleRemoverPeca(requisicao)}
-                                          className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                          style={{
-                                            backgroundColor: '#FF006410',
-                                            borderColor: '#FF0064',
-                                            color: '#FF0064'
-                                          }}
-                                        >
-                                          <Trash2 className="w-3 h-3" />
-                                          DEVOLVER
-                                        </button>
-                                      </>
-                                    )}
+                                    {(() => {
+                                      // Verificar se há peças sem GI (para lotes) ou se o status indica sem GI
+                                      const temPecasSemGI = requisicao?.is_lote
+                                        ? requisicao?.pecas_lote?.some((p: any) => !p.gi_postada_em)
+                                        : (requisicao?.status === 'atendida' || requisicao?.status === 'em_uso');
 
-                                    {requisicao?.status === 'gi_postada' && (
-                                      <button
-                                        onClick={() => handleCancelarGI(requisicao)}
-                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
-                                        style={{
-                                          backgroundColor: '#FF006410',
-                                          borderColor: '#FF0064',
-                                          color: '#FF0064'
-                                        }}
-                                      >
-                                        <X className="w-3 h-3" />
-                                        CANCELAR GI
-                                      </button>
-                                    )}
+                                      // Verificar se há peças com GI (para lotes) ou se o status indica com GI
+                                      const temPecasComGI = requisicao?.is_lote
+                                        ? requisicao?.pecas_lote?.some((p: any) => p.gi_postada_em)
+                                        : requisicao?.status === 'gi_postada';
+
+                                      return (
+                                        <>
+                                          {temPecasSemGI && (
+                                            <>
+                                              <button
+                                                onClick={() => handlePostarGI(requisicao)}
+                                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                                style={{
+                                                  backgroundColor: '#39FF1410',
+                                                  borderColor: '#39FF14',
+                                                  color: '#39FF14'
+                                                }}
+                                              >
+                                                <Send className="w-3 h-3" />
+                                                POSTAR GI
+                                              </button>
+                                              <button
+                                                onClick={() => handleRemoverPeca(requisicao)}
+                                                className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                                style={{
+                                                  backgroundColor: '#FF006410',
+                                                  borderColor: '#FF0064',
+                                                  color: '#FF0064'
+                                                }}
+                                              >
+                                                <Trash2 className="w-3 h-3" />
+                                                DEVOLVER
+                                              </button>
+                                            </>
+                                          )}
+
+                                          {temPecasComGI && (
+                                            <button
+                                              onClick={() => handleCancelarGI(requisicao)}
+                                              className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                              style={{
+                                                backgroundColor: '#FF006410',
+                                                borderColor: '#FF0064',
+                                                color: '#FF0064'
+                                              }}
+                                            >
+                                              <X className="w-3 h-3" />
+                                              CANCELAR GI
+                                            </button>
+                                          )}
+                                        </>
+                                      );
+                                    })()}
 
                                     {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
