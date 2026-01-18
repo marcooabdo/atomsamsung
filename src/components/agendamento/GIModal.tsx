@@ -70,7 +70,7 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
         const { error: estoquePecasError } = await supabase
           .from('estoque_pecas')
           .update({
-            status: 'consumida'
+            status: 'usada'
           })
           .in('id', pecasSelecionadas);
 
