@@ -4,22 +4,49 @@ import { X, AlertTriangle, CheckCircle, Package } from 'lucide-react';
 interface DevolucaoModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onConfirm: (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada') => void;
+  onConfirm: (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada', pecasSelecionadas?: string[]) => void;
   requisicao: {
     codigo_peca: string;
     descricao: string;
   };
   tipoOS: string;
+  isLote?: boolean;
+  pecasLote?: Array<{
+    id: string;
+    id_numerico: number;
+    valor_com_impostos: string;
+    delivery: string | null;
+  }>;
 }
 
-export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS }: DevolucaoModalProps) {
+export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS, isLote, pecasLote }: DevolucaoModalProps) {
   const [motivo, setMotivo] = useState('');
   const [tipo, setTipo] = useState<'nova' | 'nova_com_defeito' | 'usada'>('nova');
   const [loading, setLoading] = useState(false);
+  const [pecasSelecionadas, setPecasSelecionadas] = useState<string[]>(
+    isLote && pecasLote ? pecasLote.map(p => p.id) : []
+  );
 
   if (!isOpen) return null;
 
   const isOWouLP = tipoOS === 'OW' || tipoOS === 'LP';
+
+  const handleTogglePeca = (pecaId: string) => {
+    setPecasSelecionadas(prev =>
+      prev.includes(pecaId)
+        ? prev.filter(id => id !== pecaId)
+        : [...prev, pecaId]
+    );
+  };
+
+  const handleToggleTodas = () => {
+    if (!pecasLote) return;
+    if (pecasSelecionadas.length === pecasLote.length) {
+      setPecasSelecionadas([]);
+    } else {
+      setPecasSelecionadas(pecasLote.map(p => p.id));
+    }
+  };
 
   const handleSubmit = async () => {
     if (!motivo.trim() || motivo.trim().length < 10) {
@@ -27,9 +54,14 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS 
       return;
     }
 
+    if (isLote && pecasSelecionadas.length === 0) {
+      alert('Por favor, selecione pelo menos uma peça para devolver');
+      return;
+    }
+
     setLoading(true);
     try {
-      await onConfirm(motivo, tipo);
+      await onConfirm(motivo, tipo, isLote ? pecasSelecionadas : undefined);
       setMotivo('');
       setTipo('nova');
       onClose();
@@ -80,6 +112,52 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS 
               </div>
             </div>
           </div>
+
+          {isLote && pecasLote && pecasLote.length > 1 && (
+            <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-[#00D4FF] uppercase tracking-wider">
+                  Selecione as peças para devolução
+                </h3>
+                <button
+                  onClick={handleToggleTodas}
+                  type="button"
+                  className="text-xs px-3 py-1 rounded border border-[#00D4FF]/40 text-[#00D4FF] hover:bg-[#00D4FF]/10 transition-colors"
+                >
+                  {pecasSelecionadas.length === pecasLote.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
+                </button>
+              </div>
+              <div className="space-y-2">
+                {pecasLote.map((peca) => (
+                  <label
+                    key={peca.id}
+                    className="flex items-center gap-3 p-3 rounded bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer transition-colors"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pecasSelecionadas.includes(peca.id)}
+                      onChange={() => handleTogglePeca(peca.id)}
+                      className="w-4 h-4 rounded border-[#00D4FF]/40 text-[#00D4FF] focus:ring-[#00D4FF] focus:ring-offset-0"
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-[#00D4FF] font-bold">ID #{peca.id_numerico}</span>
+                        {peca.delivery && (
+                          <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
+                        )}
+                        <span className="text-xs text-gray-300">
+                          R$ {Number(peca.valor_com_impostos).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+                  </label>
+                ))}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                {pecasSelecionadas.length} de {pecasLote.length} peça(s) selecionada(s)
+              </p>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">
@@ -198,7 +276,7 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS 
           </button>
           <button
             onClick={handleSubmit}
-            disabled={loading || !motivo.trim() || motivo.trim().length < 10}
+            disabled={loading || !motivo.trim() || motivo.trim().length < 10 || (isLote && pecasSelecionadas.length === 0)}
             className="flex-1 neon-button px-6 py-3 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Processando...' : 'Confirmar Devolução'}

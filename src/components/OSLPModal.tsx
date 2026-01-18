@@ -1656,7 +1656,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     setMostrarModalDevolucao(true);
   };
 
-  const handleConfirmarDevolucao = async (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada') => {
+  const handleConfirmarDevolucao = async (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada', pecasSelecionadas?: string[]) => {
     if (!requisicaoSelecionada) return;
 
     try {
@@ -1671,12 +1671,35 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       const tipoLabel = tipo === 'nova' ? 'Nova' : tipo === 'nova_com_defeito' ? 'Nova com Defeito' : 'Usada';
 
-      await supabase.from('os_comentarios').insert({
-        os_id: osId,
-        usuario_id: usuario?.id,
-        comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao}\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
-        is_system: true
-      });
+      if (requisicaoSelecionada.is_lote && pecasSelecionadas && pecasSelecionadas.length > 0) {
+        const statusDevolucao = tipo === 'nova' ? 'devolvida_nova' : tipo === 'nova_com_defeito' ? 'devolvida_defeito' : 'usada';
+
+        await supabase
+          .from('estoque_pecas')
+          .update({
+            status: statusDevolucao
+          })
+          .in('id', pecasSelecionadas);
+
+        const idsNumericos = requisicaoSelecionada.pecas_lote
+          ?.filter(p => pecasSelecionadas.includes(p.id))
+          .map(p => `#${p.id_numerico}`)
+          .join(', ');
+
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao} (Lote - IDs: ${idsNumericos})\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
+          is_system: true
+        });
+      } else {
+        await supabase.from('os_comentarios').insert({
+          os_id: osId,
+          usuario_id: usuario?.id,
+          comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao}\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
+          is_system: true
+        });
+      }
 
       alert('Devolução solicitada com sucesso! Aguardando aprovação do estoque.');
       await loadPecas();
@@ -5144,6 +5167,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             descricao: requisicaoSelecionada.descricao
           }}
           tipoOS={os?.tipo_os || 'LP'}
+          isLote={requisicaoSelecionada.is_lote}
+          pecasLote={requisicaoSelecionada.pecas_lote}
         />
       )}
 
