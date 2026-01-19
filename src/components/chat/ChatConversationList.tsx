@@ -7,7 +7,9 @@ interface Conversation {
   id: string;
   tipo: string;
   nome: string | null;
+  foto_url?: string | null;
   unread_count: number;
+  participants_count?: number;
   last_message: {
     content: string;
     message_type: string;
@@ -160,6 +162,16 @@ export function ChatConversationList({
                 other_user: otherUser
               };
             }
+          } else if (conv.tipo === 'group') {
+            const { count } = await supabase
+              .from('chat_participants')
+              .select('*', { count: 'exact', head: true })
+              .eq('conversation_id', conv.id);
+
+            return {
+              ...conv,
+              participants_count: count || 0
+            };
           }
           return conv;
         })
@@ -367,9 +379,17 @@ export function ChatConversationList({
                   >
                     <div className="flex-shrink-0">
                       {conv.tipo === 'group' ? (
-                        <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
-                          <Users className="w-5 h-5 text-[#00D4FF]" />
-                        </div>
+                        conv.foto_url ? (
+                          <img
+                            src={conv.foto_url}
+                            alt={displayName || 'Grupo'}
+                            className="w-12 h-12 rounded-full object-cover border-2 border-[#1a3a4a]"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
+                            <Users className="w-5 h-5 text-[#00D4FF]" />
+                          </div>
+                        )
                       ) : (
                         <ProfilePhotoUpload
                           userId={conv.other_user?.id || ''}
@@ -388,7 +408,11 @@ export function ChatConversationList({
                           <h3 className="font-semibold text-white truncate">
                             {displayName}
                           </h3>
-                          {userType !== 'MASTER' && conv.tipo === 'direct' && conv.other_user && (
+                          {conv.tipo === 'group' && conv.participants_count !== undefined ? (
+                            <p className="text-xs text-gray-500 uppercase mt-0.5">
+                              {conv.participants_count} {conv.participants_count === 1 ? 'participante' : 'participantes'}
+                            </p>
+                          ) : userType !== 'MASTER' && conv.tipo === 'direct' && conv.other_user && (
                             <p className="text-xs text-gray-500 uppercase mt-0.5">
                               {conv.other_user.tipo}{conv.other_user.unidade?.cidade ? ` - ${conv.other_user.unidade.cidade}` : ''}
                             </p>

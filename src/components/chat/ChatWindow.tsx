@@ -15,6 +15,7 @@ interface ConversationInfo {
   tipo: string;
   nome: string | null;
   descricao: string | null;
+  foto_url?: string | null;
   other_user?: {
     id: string;
     nome: string;

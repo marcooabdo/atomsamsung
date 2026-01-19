@@ -10,6 +10,7 @@ interface ChatDetailsModalProps {
   conversationType: 'direct' | 'group';
   otherUserId?: string;
   conversationName?: string;
+  groupPhotoUrl?: string | null;
 }
 
 interface UserDetails {
@@ -38,7 +39,8 @@ export function ChatDetailsModal({
   conversationId,
   conversationType,
   otherUserId,
-  conversationName
+  conversationName,
+  groupPhotoUrl
 }: ChatDetailsModalProps) {
   const [userDetails, setUserDetails] = useState<UserDetails | null>(null);
   const [sharedFiles, setSharedFiles] = useState<SharedFile[]>([]);
@@ -241,9 +243,17 @@ export function ChatDetailsModal({
           {conversationType === 'group' && (
             <div className="p-6 border-b border-[#1a3a4a]/50">
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-20 h-20 rounded-full bg-[#00D4FF]/20 border-2 border-[#00D4FF]/60 flex items-center justify-center">
-                  <Users className="w-10 h-10 text-[#00D4FF]" />
-                </div>
+                {groupPhotoUrl ? (
+                  <img
+                    src={groupPhotoUrl}
+                    alt={conversationName || 'Grupo'}
+                    className="w-20 h-20 rounded-full object-cover border-2 border-[#00D4FF]/60"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-[#00D4FF]/20 border-2 border-[#00D4FF]/60 flex items-center justify-center">
+                    <Users className="w-10 h-10 text-[#00D4FF]" />
+                  </div>
+                )}
                 <div>
                   <h3 className="text-xl font-bold text-gray-200">{conversationName || 'Grupo'}</h3>
                   <p className="text-sm text-gray-400">{participants.length} participantes</p>

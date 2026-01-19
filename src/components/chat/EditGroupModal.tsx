@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { X, Users, Search, Check, Trash2, Shield, UserMinus } from 'lucide-react';
+import { X, Users, Search, Check, Trash2, Shield, UserMinus, Camera } from 'lucide-react';
 
 interface Participant {
   id: string;
@@ -21,6 +21,8 @@ interface EditGroupModalProps {
 export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: EditGroupModalProps) {
   const [groupName, setGroupName] = useState('');
   const [groupDescription, setGroupDescription] = useState('');
+  const [groupPhotoUrl, setGroupPhotoUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -38,13 +40,14 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     try {
       const { data, error } = await supabase
         .from('chat_conversations')
-        .select('nome, descricao')
+        .select('nome, descricao, foto_url')
         .eq('id', conversationId)
         .single();
 
       if (error) throw error;
       setGroupName(data.nome || '');
       setGroupDescription(data.descricao || '');
+      setGroupPhotoUrl(data.foto_url || null);
     } catch (err) {
     }
   };
@@ -105,6 +108,62 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
     }
   };
 
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+
+    if (file.size > 2 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 2MB');
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${conversationId}-${Date.now()}.${fileExt}`;
+      const filePath = `group_photos/${fileName}`;
+
+      if (groupPhotoUrl) {
+        const oldPath = groupPhotoUrl.split('/').slice(-2).join('/');
+        await supabase.storage.from('chat').remove([oldPath]);
+      }
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('chat')
+        .getPublicUrl(filePath);
+
+      setGroupPhotoUrl(publicUrl);
+    } catch (err: any) {
+      alert(`Erro ao fazer upload da foto: ${err.message}`);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!groupPhotoUrl) return;
+    if (!confirm('Remover foto do grupo?')) return;
+
+    try {
+      const oldPath = groupPhotoUrl.split('/').slice(-2).join('/');
+      await supabase.storage.from('chat').remove([oldPath]);
+      setGroupPhotoUrl(null);
+    } catch (err) {
+      console.error('Erro ao remover foto:', err);
+    }
+  };
+
   const handleSave = async () => {
     if (!groupName.trim()) {
       alert('O nome do grupo é obrigatório');
@@ -117,7 +176,8 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
         .from('chat_conversations')
         .update({
           nome: groupName.trim(),
-          descricao: groupDescription.trim() || null
+          descricao: groupDescription.trim() || null,
+          foto_url: groupPhotoUrl
         })
         .eq('id', conversationId);
 
@@ -211,6 +271,54 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
         </div>
 
         <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 space-y-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-300 mb-3">
+              Foto do Grupo
+            </label>
+            <div className="flex items-center gap-4">
+              <div className="relative">
+                {groupPhotoUrl ? (
+                  <img
+                    src={groupPhotoUrl}
+                    alt="Foto do grupo"
+                    className="w-20 h-20 rounded-full object-cover border-2 border-[#00D4FF]/30"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-[#1a3a4a] flex items-center justify-center border-2 border-[#00D4FF]/30">
+                    <Users className="w-8 h-8 text-[#00D4FF]" />
+                  </div>
+                )}
+                {uploading && (
+                  <div className="absolute inset-0 bg-black/60 rounded-full flex items-center justify-center">
+                    <div className="w-5 h-5 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <label className="px-4 py-2 bg-[#00D4FF]/20 hover:bg-[#00D4FF]/30 border border-[#00D4FF]/30 text-[#00D4FF] rounded-lg cursor-pointer transition-all text-sm font-semibold flex items-center gap-2">
+                  <Camera className="w-4 h-4" />
+                  {groupPhotoUrl ? 'Trocar Foto' : 'Adicionar Foto'}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                    disabled={uploading}
+                  />
+                </label>
+                {groupPhotoUrl && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    disabled={uploading}
+                    className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-red-400 rounded-lg transition-all text-sm font-semibold disabled:opacity-50"
+                  >
+                    Remover
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-semibold text-gray-300 mb-2">
               Nome do Grupo

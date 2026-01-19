@@ -10,6 +10,7 @@ interface ConversationInfo {
   tipo: string;
   nome: string | null;
   descricao: string | null;
+  foto_url?: string | null;
   other_user?: {
     id: string;
     nome: string;
@@ -82,7 +83,15 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
           className="w-11 h-11 rounded-full bg-[#1a3a4a] flex items-center justify-center overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-all"
         >
           {conversation.tipo === 'group' ? (
-            <Users className="w-5 h-5 text-[#00D4FF]" />
+            conversation.foto_url ? (
+              <img
+                src={conversation.foto_url}
+                alt={displayName || 'Grupo'}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <Users className="w-5 h-5 text-[#00D4FF]" />
+            )
           ) : (
             <span className="text-[#00D4FF] font-semibold text-lg">
               {displayName?.charAt(0).toUpperCase()}
@@ -143,6 +152,7 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
         conversationType={conversation.tipo as 'direct' | 'group'}
         otherUserId={otherUserId}
         conversationName={displayName || undefined}
+        groupPhotoUrl={conversation.tipo === 'group' ? conversation.foto_url : undefined}
       />
     </>
   );
