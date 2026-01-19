@@ -57,8 +57,9 @@ export function ChatConversationList({
     loadConversations();
     loadUsers();
 
+    const channelName = `conversations-${userId}`;
     const channel = supabase
-      .channel('conversations-changes')
+      .channel(channelName)
       .on(
         'postgres_changes',
         {
@@ -73,9 +74,20 @@ export function ChatConversationList({
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chat_messages'
+        },
+        () => {
+          loadConversations();
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'chat_message_reads'
         },
         () => {
           loadConversations();

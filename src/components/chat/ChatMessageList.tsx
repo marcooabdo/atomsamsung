@@ -41,10 +41,12 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
 
   useEffect(() => {
     loadMessages();
-    subscribeToMessages();
+    const channel = subscribeToMessages();
 
     return () => {
-      supabase.removeAllChannels();
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
   }, [conversationId]);
 
@@ -188,12 +190,21 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'INSERT',
           schema: 'public',
           table: 'chat_message_reads'
         },
-        () => {
-          loadMessages();
+        (payload) => {
+          const newRead = payload.new as { message_id: string; user_id: string };
+          setMessages(prev => prev.map(msg => {
+            if (msg.id === newRead.message_id && msg.sender_id === userId) {
+              const currentReadBy = msg.read_by || [];
+              if (!currentReadBy.includes(newRead.user_id)) {
+                return { ...msg, read_by: [...currentReadBy, newRead.user_id] };
+              }
+            }
+            return msg;
+          }));
         }
       )
       .subscribe();

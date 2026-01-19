@@ -76,11 +76,9 @@ export function Layout({ children }: LayoutProps) {
 
     window.addEventListener('chat:messages-read', handleMessagesRead);
 
-    const channelName = `layout-unread-${usuario.id}`;
+    const channelName = `layout-unread-${usuario.id}-${Date.now()}`;
 
-    const channel = supabase.channel(channelName, {
-      config: { broadcast: { self: false } }
-    });
+    const channel = supabase.channel(channelName);
 
     channel
       .on('postgres_changes',
@@ -93,8 +91,10 @@ export function Layout({ children }: LayoutProps) {
       )
       .on('postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'chat_message_reads' },
-        () => {
-          fetchUnreadConversations();
+        (payload) => {
+          if (payload.new && payload.new.user_id === usuario.id) {
+            fetchUnreadConversations();
+          }
         }
       )
       .on('postgres_changes',
