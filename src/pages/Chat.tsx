@@ -80,6 +80,7 @@ export function Chat() {
           >
             <ChatConversationList
               userId={usuario.id}
+              userType={usuario.tipo}
               selectedConversationId={selectedConversationId}
               onSelectConversation={setSelectedConversationId}
               onCreateGroup={() => setShowCreateGroupModal(true)}

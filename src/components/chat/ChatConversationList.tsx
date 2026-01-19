@@ -18,6 +18,10 @@ interface Conversation {
     id: string;
     nome: string;
     foto_url?: string | null;
+    tipo?: string;
+    unidade?: {
+      cidade: string | null;
+    } | null;
   };
 }
 
@@ -34,6 +38,7 @@ interface User {
 
 interface ChatConversationListProps {
   userId: string;
+  userType: string;
   selectedConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onCreateGroup: () => void;
@@ -41,6 +46,7 @@ interface ChatConversationListProps {
 
 export function ChatConversationList({
   userId,
+  userType,
   selectedConversationId,
   onSelectConversation,
   onCreateGroup
@@ -139,7 +145,7 @@ export function ChatConversationList({
           if (conv.tipo === 'direct') {
             const { data: participants } = await supabase
               .from('chat_participants')
-              .select('user_id, usuarios(id, nome, foto_url)')
+              .select('user_id, usuarios(id, nome, foto_url, tipo, unidade:unidades(cidade))')
               .eq('conversation_id', conv.id)
               .neq('user_id', userId)
               .single();
@@ -378,9 +384,16 @@ export function ChatConversationList({
 
                     <div className="flex-1 min-w-0 text-left">
                       <div className="flex items-center justify-between">
-                        <h3 className="font-semibold text-white truncate">
-                          {displayName}
-                        </h3>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-semibold text-white truncate">
+                            {displayName}
+                          </h3>
+                          {userType !== 'MASTER' && conv.tipo === 'direct' && conv.other_user && (
+                            <p className="text-xs text-gray-500 uppercase mt-0.5">
+                              {conv.other_user.tipo}{conv.other_user.unidade?.cidade ? ` - ${conv.other_user.unidade.cidade}` : ''}
+                            </p>
+                          )}
+                        </div>
                         {conv.last_message && (
                           <span className="text-xs text-gray-500 flex-shrink-0 ml-2">
                             {formatTime(conv.last_message.created_at)}
