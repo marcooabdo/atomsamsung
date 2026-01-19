@@ -161,7 +161,9 @@ export function ChatConversationList({
                 ? participants.usuarios[0]
                 : participants.usuarios;
 
-              console.log('Raw otherUser data:', otherUser);
+              console.log('===== CONVERSA DIRETA =====');
+              console.log('Raw otherUser data:', JSON.stringify(otherUser, null, 2));
+              console.log('Tipo de unidade:', typeof otherUser.unidade, 'É array?', Array.isArray(otherUser.unidade));
 
               const unidadeData = Array.isArray(otherUser.unidade)
                 ? otherUser.unidade[0]
@@ -172,7 +174,8 @@ export function ChatConversationList({
                 unidade: unidadeData
               };
 
-              console.log('Processed otherUser:', otherUser);
+              console.log('Processed otherUser:', JSON.stringify(otherUser, null, 2));
+              console.log('===========================');
 
               return {
                 ...conv,
@@ -180,10 +183,12 @@ export function ChatConversationList({
               };
             }
           } else if (conv.tipo === 'group') {
-            const { count } = await supabase
+            const { data, count, error } = await supabase
               .from('chat_participants')
               .select('*', { count: 'exact', head: true })
               .eq('conversation_id', conv.id);
+
+            console.log(`Contagem participantes grupo ${conv.name}:`, { count, error, conv_id: conv.id });
 
             return {
               ...conv,
@@ -213,7 +218,12 @@ export function ChatConversationList({
 
       if (error) throw error;
 
-      console.log('Raw users data:', data);
+      console.log('===== LISTA DE CONTATOS =====');
+      console.log('Raw users data (primeiro usuário):', JSON.stringify(data?.[0], null, 2));
+
+      if (data && data[0]) {
+        console.log('Tipo de unidade no primeiro usuário:', typeof data[0].unidade, 'É array?', Array.isArray(data[0].unidade));
+      }
 
       const processedUsers = (data || []).map(user => {
         const unidadeData = Array.isArray(user.unidade)
@@ -226,7 +236,8 @@ export function ChatConversationList({
         };
       });
 
-      console.log('Processed users:', processedUsers);
+      console.log('Processed users (primeiro):', JSON.stringify(processedUsers[0], null, 2));
+      console.log('=============================');
       setUsers(processedUsers);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);
