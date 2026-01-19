@@ -552,6 +552,8 @@ export type Database = {
           tecnico_agendado_id: string | null
           confirmado_com_cliente: boolean
           periodo_agendamento: 'manha' | 'tarde' | null
+          tecnico_designado_id: string | null
+          tecnico_designado_em: string | null
           fechada_em: string | null
           fechada_por: string | null
           valor_total: number
@@ -609,6 +611,8 @@ export type Database = {
           tecnico_agendado_id?: string | null
           confirmado_com_cliente?: boolean
           periodo_agendamento?: 'manha' | 'tarde' | null
+          tecnico_designado_id?: string | null
+          tecnico_designado_em?: string | null
           fechada_em?: string | null
           fechada_por?: string | null
           valor_total?: number
@@ -666,6 +670,8 @@ export type Database = {
           tecnico_agendado_id?: string | null
           confirmado_com_cliente?: boolean
           periodo_agendamento?: 'manha' | 'tarde' | null
+          tecnico_designado_id?: string | null
+          tecnico_designado_em?: string | null
           fechada_em?: string | null
           fechada_por?: string | null
           valor_total?: number
