@@ -140,9 +140,7 @@ export function ChatConversationList({
         })
       );
 
-      const conversationsWithMessages = enrichedConversations.filter(conv => conv.last_message !== null);
-
-      setConversations(conversationsWithMessages);
+      setConversations(enrichedConversations);
     } catch (err) {
     } finally {
       setLoading(false);
