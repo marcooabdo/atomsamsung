@@ -122,13 +122,20 @@ export function ChatConversationList({
       const { data, error } = await supabase
         .from('chat_conversations_with_info')
         .select('*')
-        .eq('user_id', userId)
-        .order('updated_at', { ascending: false });
+        .eq('user_id', userId);
 
       if (error) throw error;
 
+      const conversationsWithMessages = (data || []).filter(conv => conv.last_message !== null);
+
+      const sortedConversations = conversationsWithMessages.sort((a, b) => {
+        const dateA = a.last_message?.created_at ? new Date(a.last_message.created_at).getTime() : 0;
+        const dateB = b.last_message?.created_at ? new Date(b.last_message.created_at).getTime() : 0;
+        return dateB - dateA;
+      });
+
       const enrichedConversations = await Promise.all(
-        (data || []).map(async (conv) => {
+        sortedConversations.map(async (conv) => {
           if (conv.tipo === 'direct') {
             const { data: participants } = await supabase
               .from('chat_participants')

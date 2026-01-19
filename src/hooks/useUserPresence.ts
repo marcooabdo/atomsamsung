@@ -94,11 +94,7 @@ export function useOtherUserPresence(userId: string | undefined) {
       if (data) {
         setPresence(data);
       } else {
-        setPresence({
-          user_id: userId,
-          status: 'offline',
-          last_seen_at: new Date().toISOString()
-        });
+        setPresence(null);
       }
     };
 

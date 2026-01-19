@@ -43,11 +43,15 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
       return `${conversation.participants_count} participantes`;
     }
 
-    if (presence?.status === 'online') {
+    if (!presence) {
+      return 'offline';
+    }
+
+    if (presence.status === 'online') {
       return 'online';
     }
 
-    if (presence?.last_seen_at) {
+    if (presence.last_seen_at) {
       return `visto ${formatLastSeen(presence.last_seen_at)}`;
     }
 
