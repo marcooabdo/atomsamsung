@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Search, Users, MessageSquare, AtSign } from 'lucide-react';
+import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
 interface Conversation {
   id: string;
@@ -16,6 +17,7 @@ interface Conversation {
   other_user?: {
     id: string;
     nome: string;
+    foto_url?: string | null;
   };
 }
 
@@ -24,6 +26,7 @@ interface User {
   nome: string;
   tipo: string;
   ativo: boolean;
+  foto_url?: string | null;
   unidade?: {
     cidade: string | null;
   } | null;
@@ -116,7 +119,7 @@ export function ChatConversationList({
           if (conv.tipo === 'direct') {
             const { data: participants } = await supabase
               .from('chat_participants')
-              .select('user_id, usuarios(id, nome)')
+              .select('user_id, usuarios(id, nome, foto_url)')
               .eq('conversation_id', conv.id)
               .neq('user_id', userId)
               .single();
@@ -150,7 +153,7 @@ export function ChatConversationList({
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo, ativo, unidade:unidades(cidade)')
+        .select('id, nome, tipo, ativo, foto_url, unidade:unidades(cidade)')
         .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
@@ -339,15 +342,20 @@ export function ChatConversationList({
                     }`}
                   >
                     <div className="flex-shrink-0">
-                      <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
-                        {conv.tipo === 'group' ? (
+                      {conv.tipo === 'group' ? (
+                        <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
                           <Users className="w-5 h-5 text-[#00D4FF]" />
-                        ) : (
-                          <span className="text-[#00D4FF] font-semibold text-lg">
-                            {displayName?.charAt(0).toUpperCase()}
-                          </span>
-                        )}
-                      </div>
+                        </div>
+                      ) : (
+                        <ProfilePhotoUpload
+                          userId={conv.other_user?.id || ''}
+                          currentPhotoUrl={conv.other_user?.foto_url || undefined}
+                          userName={displayName || 'U'}
+                          onPhotoUpdated={() => {}}
+                          size="small"
+                          editable={false}
+                        />
+                      )}
                     </div>
 
                     <div className="flex-1 min-w-0 text-left">
@@ -403,11 +411,14 @@ export function ChatConversationList({
                   className="w-full flex items-center gap-3 px-3 py-3 rounded-lg transition-all mb-1 hover:bg-[#1a3a4a]/30 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="flex-shrink-0">
-                    <div className="w-12 h-12 rounded-full bg-[#1a3a4a] flex items-center justify-center">
-                      <span className="text-[#00D4FF] font-semibold text-lg">
-                        {user.nome.charAt(0).toUpperCase()}
-                      </span>
-                    </div>
+                    <ProfilePhotoUpload
+                      userId={user.id}
+                      currentPhotoUrl={user.foto_url || undefined}
+                      userName={user.nome}
+                      onPhotoUpdated={() => {}}
+                      size="small"
+                      editable={false}
+                    />
                   </div>
 
                   <div className="flex-1 min-w-0 text-left">

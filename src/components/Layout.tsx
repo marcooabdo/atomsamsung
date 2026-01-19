@@ -2,6 +2,7 @@ import { ReactNode, useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import {
   LayoutDashboard,
   Layers,
@@ -34,7 +35,7 @@ const allMenuItems = [
 ];
 
 export function Layout({ children }: LayoutProps) {
-  const { usuario, signOut } = useAuth();
+  const { usuario, signOut, updateUsuario } = useAuth();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [unreadConversations, setUnreadConversations] = useState(0);
@@ -229,17 +230,52 @@ export function Layout({ children }: LayoutProps) {
         </nav>
 
         <div className="flex-shrink-0 p-5 border-t" style={{ borderColor: 'var(--border-primary)', background: 'linear-gradient(180deg, transparent, var(--bg-secondary))' }}>
-          {sidebarOpen && usuario && (
-            <div className="mb-3 p-3 premium-card slide-in">
-              <p className="text-xs font-semibold truncate tracking-wide break-words" style={{ color: 'var(--text-accent)' }}>{usuario.nome}</p>
-              <p className="text-[10px] uppercase tracking-wider mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>{usuario.tipo}</p>
-              {usuario.unidade_id && (
-                <div className="flex items-center gap-1 mt-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#10b981]" style={{ boxShadow: '0 0 4px rgba(16, 185, 129, 0.4)' }} />
-                  <p className="text-[10px] text-[#10b981]">ONLINE</p>
+          {usuario && (
+            <>
+              {sidebarOpen ? (
+                <div className="mb-3 p-3 premium-card slide-in">
+                  <div className="flex items-center gap-3">
+                    <ProfilePhotoUpload
+                      userId={usuario.id}
+                      currentPhotoUrl={usuario.foto_url || undefined}
+                      userName={usuario.nome}
+                      onPhotoUpdated={(url) => {
+                        if (updateUsuario) {
+                          updateUsuario({ ...usuario, foto_url: url });
+                        }
+                      }}
+                      size="medium"
+                      editable={true}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold truncate tracking-wide break-words" style={{ color: 'var(--text-accent)' }}>{usuario.nome}</p>
+                      <p className="text-[10px] uppercase tracking-wider mt-1 font-medium" style={{ color: 'var(--text-secondary)' }}>{usuario.tipo}</p>
+                      {usuario.unidade_id && (
+                        <div className="flex items-center gap-1 mt-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#10b981]" style={{ boxShadow: '0 0 4px rgba(16, 185, 129, 0.4)' }} />
+                          <p className="text-[10px] text-[#10b981]">ONLINE</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="mb-3 flex justify-center">
+                  <ProfilePhotoUpload
+                    userId={usuario.id}
+                    currentPhotoUrl={usuario.foto_url || undefined}
+                    userName={usuario.nome}
+                    onPhotoUpdated={(url) => {
+                      if (updateUsuario) {
+                        updateUsuario({ ...usuario, foto_url: url });
+                      }
+                    }}
+                    size="small"
+                    editable={true}
+                  />
                 </div>
               )}
-            </div>
+            </>
           )}
 
           <button

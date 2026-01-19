@@ -97,7 +97,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         (data || []).map(async (msg) => {
           const sender = Array.isArray(msg.usuarios) ? msg.usuarios[0] : msg.usuarios;
 
-          if (conversationType === 'group' && msg.sender_id !== userId) {
+          if (msg.sender_id === userId) {
             const { data: reads } = await supabase
               .from('chat_message_reads')
               .select('user_id')
@@ -112,7 +112,8 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
 
           return {
             ...msg,
-            sender_name: sender?.nome || 'Usuário'
+            sender_name: sender?.nome || 'Usuário',
+            read_by: []
           };
         })
       );

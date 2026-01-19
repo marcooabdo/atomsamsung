@@ -93,10 +93,18 @@ export function useOtherUserPresence(userId: string | undefined) {
 
       if (data) {
         setPresence(data);
+      } else {
+        setPresence({
+          user_id: userId,
+          status: 'offline',
+          last_seen_at: new Date().toISOString()
+        });
       }
     };
 
     fetchPresence();
+
+    const interval = setInterval(fetchPresence, 10000);
 
     const subscription = supabase
       .channel(`presence:${userId}`)
@@ -109,12 +117,15 @@ export function useOtherUserPresence(userId: string | undefined) {
           filter: `user_id=eq.${userId}`
         },
         (payload) => {
-          setPresence(payload.new as UserPresence);
+          if (payload.new) {
+            setPresence(payload.new as UserPresence);
+          }
         }
       )
       .subscribe();
 
     return () => {
+      clearInterval(interval);
       subscription.unsubscribe();
     };
   }, [userId]);

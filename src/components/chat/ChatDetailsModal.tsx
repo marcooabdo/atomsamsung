@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
-import { X, Image, FileText, Download, Calendar, User, Users, Phone, Mail } from 'lucide-react';
+import { X, Image, FileText, Download, Calendar, User, Users, Phone, Mail, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
+import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
 interface ChatDetailsModalProps {
   isOpen: boolean;
@@ -64,15 +65,19 @@ export function ChatDetailsModal({
             telefone,
             cargo,
             foto_url,
-            unidades(nome)
+            unidades!inner(nome)
           `)
           .eq('id', otherUserId)
           .maybeSingle();
 
         if (userData) {
+          const unidades = Array.isArray((userData as any).unidades)
+            ? (userData as any).unidades[0]
+            : (userData as any).unidades;
+
           setUserDetails({
             ...userData,
-            unidade_nome: (userData as any).unidades?.nome
+            unidade_nome: unidades?.nome || 'Sem unidade'
           });
         }
       } else if (conversationType === 'group') {
@@ -93,10 +98,16 @@ export function ChatDetailsModal({
 
         if (participantsData) {
           setParticipants(
-            participantsData.map((p: any) => ({
-              ...p.user,
-              unidade_nome: p.user?.unidades?.nome
-            }))
+            participantsData.map((p: any) => {
+              const unidades = Array.isArray(p.user?.unidades)
+                ? p.user.unidades[0]
+                : p.user?.unidades;
+
+              return {
+                ...p.user,
+                unidade_nome: unidades?.nome || 'Sem unidade'
+              };
+            })
           );
         }
       }
@@ -174,59 +185,55 @@ export function ChatDetailsModal({
         <div className="overflow-y-auto max-h-[calc(90vh-5rem)]">
           {conversationType === 'direct' && userDetails && (
             <div className="p-6 border-b border-[#1a3a4a]/50">
-              <div className="flex flex-col items-center gap-4">
-                <div
-                  className="w-32 h-32 rounded-full flex items-center justify-center"
-                  style={{
-                    backgroundColor: `${getUserColor(userDetails.nome)}20`,
-                    border: `3px solid ${getUserColor(userDetails.nome)}60`
-                  }}
-                >
-                  {userDetails.foto_url ? (
-                    <img
-                      src={userDetails.foto_url}
-                      alt={userDetails.nome}
-                      className="w-full h-full rounded-full object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="text-5xl font-bold"
-                      style={{ color: getUserColor(userDetails.nome) }}
-                    >
-                      {userDetails.nome.charAt(0).toUpperCase()}
-                    </span>
-                  )}
+              <div className="flex gap-6">
+                <div className="flex-shrink-0">
+                  <ProfilePhotoUpload
+                    userId={userDetails.id}
+                    currentPhotoUrl={userDetails.foto_url || undefined}
+                    userName={userDetails.nome}
+                    onPhotoUpdated={() => {}}
+                    size="large"
+                    editable={false}
+                  />
                 </div>
-                <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-200">{userDetails.nome}</h3>
-                  {userDetails.cargo && (
-                    <p className="text-sm text-gray-400 mt-1">{userDetails.cargo}</p>
-                  )}
-                  {userDetails.unidade_nome && (
-                    <p className="text-sm text-[#00D4FF] mt-1">{userDetails.unidade_nome}</p>
-                  )}
-                </div>
-              </div>
+                <div className="flex-1 min-w-0 space-y-4">
+                  <div>
+                    <h3 className="text-2xl font-bold text-gray-200 truncate">{userDetails.nome}</h3>
+                    {userDetails.cargo && (
+                      <p className="text-sm text-gray-400 mt-1">{userDetails.cargo}</p>
+                    )}
+                  </div>
 
-              <div className="mt-6 space-y-3">
-                {userDetails.telefone && (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
-                    <Phone className="w-5 h-5 text-[#00D4FF]" />
-                    <div>
-                      <p className="text-xs text-gray-500">Telefone</p>
-                      <p className="text-sm text-gray-200">{userDetails.telefone}</p>
-                    </div>
+                  <div className="space-y-3">
+                    {userDetails.unidade_nome && (
+                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
+                        <Building2 className="w-5 h-5 text-[#00D4FF]" />
+                        <div>
+                          <p className="text-xs text-gray-500">Unidade</p>
+                          <p className="text-sm text-gray-200">{userDetails.unidade_nome}</p>
+                        </div>
+                      </div>
+                    )}
+                    {userDetails.email && (
+                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
+                        <Mail className="w-5 h-5 text-[#00D4FF]" />
+                        <div>
+                          <p className="text-xs text-gray-500">Email</p>
+                          <p className="text-sm text-gray-200 truncate">{userDetails.email}</p>
+                        </div>
+                      </div>
+                    )}
+                    {userDetails.telefone && (
+                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
+                        <Phone className="w-5 h-5 text-[#00D4FF]" />
+                        <div>
+                          <p className="text-xs text-gray-500">Telefone</p>
+                          <p className="text-sm text-gray-200">{userDetails.telefone}</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
-                )}
-                {userDetails.email && (
-                  <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
-                    <Mail className="w-5 h-5 text-[#00D4FF]" />
-                    <div>
-                      <p className="text-xs text-gray-500">Email</p>
-                      <p className="text-sm text-gray-200">{userDetails.email}</p>
-                    </div>
-                  </div>
-                )}
+                </div>
               </div>
             </div>
           )}
@@ -250,32 +257,21 @@ export function ChatDetailsModal({
                     key={participant.id}
                     className="flex items-center gap-3 px-3 py-2 hover:bg-[#151f26] rounded-lg transition-all"
                   >
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{
-                        backgroundColor: `${getUserColor(participant.nome)}20`,
-                        border: `2px solid ${getUserColor(participant.nome)}60`
-                      }}
-                    >
-                      {participant.foto_url ? (
-                        <img
-                          src={participant.foto_url}
-                          alt={participant.nome}
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <span
-                          className="text-sm font-bold"
-                          style={{ color: getUserColor(participant.nome) }}
-                        >
-                          {participant.nome.charAt(0).toUpperCase()}
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-200">{participant.nome}</p>
+                    <ProfilePhotoUpload
+                      userId={participant.id}
+                      currentPhotoUrl={participant.foto_url || undefined}
+                      userName={participant.nome}
+                      onPhotoUpdated={() => {}}
+                      size="small"
+                      editable={false}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-200 truncate">{participant.nome}</p>
                       {participant.cargo && (
                         <p className="text-xs text-gray-500">{participant.cargo}</p>
+                      )}
+                      {participant.unidade_nome && (
+                        <p className="text-xs text-[#00D4FF]/70">{participant.unidade_nome}</p>
                       )}
                     </div>
                   </div>
