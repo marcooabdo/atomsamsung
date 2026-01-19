@@ -53,7 +53,13 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .select(`
           *,
           os:os(numero_os_samsung, numero_os_interna, coluna_kanban, tipo_os),
-          peca_estoque:estoque_pecas(id_numerico, valor_com_impostos, delivery, pn, descricao),
+          peca_estoque:estoque_pecas(
+            id_numerico,
+            valor_com_impostos,
+            pn,
+            descricao,
+            estoque_etiquetas(delivery)
+          ),
           reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome)
         `)
         .order('created_at', { ascending: false });
@@ -80,7 +86,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
             const { data: pecasData } = await supabase
               .from('estoque_pecas')
-              .select('id, id_numerico, valor_com_impostos, delivery, pn, descricao')
+              .select(`
+                id,
+                id_numerico,
+                valor_com_impostos,
+                pn,
+                descricao,
+                estoque_etiquetas(delivery)
+              `)
               .in('id', req.pecas_estoque_ids)
               .order('id_numerico');
             pecasDoLote = pecasData;
@@ -1142,8 +1155,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                       {req.pecas_lote.map((peca: any, idx: number) => (
                                         <p key={peca.id} className="text-xs ml-2">
                                           #{idx + 1} - ID: <span className="font-mono text-[#39FF14]">#{peca.id_numerico}</span>
-                                          {peca.delivery && (
-                                            <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{peca.delivery}</span></span>
+                                          {peca.estoque_etiquetas?.[0]?.delivery && (
+                                            <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{peca.estoque_etiquetas[0].delivery}</span></span>
                                           )}
                                           {' - '}R$ {Number(peca.valor_com_impostos).toFixed(2)}
                                         </p>
@@ -1155,8 +1168,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                   ) : (
                                     <p>
                                       ID Vinculado: <span className="font-mono text-[#39FF14]">#{req.peca_estoque.id_numerico}</span>
-                                      {req.peca_estoque.delivery && (
-                                        <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{req.peca_estoque.delivery}</span></span>
+                                      {req.peca_estoque.estoque_etiquetas?.[0]?.delivery && (
+                                        <span className="text-gray-400"> • Delivery: <span className="text-gray-300">{req.peca_estoque.estoque_etiquetas[0].delivery}</span></span>
                                       )}
                                       {' - '}R$ {Number(req.peca_estoque.valor_com_impostos).toFixed(2)}
                                     </p>
@@ -1430,10 +1443,10 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                               <span className="font-mono text-gray-300 text-xs">{peca.pn}</span>
                                             </div>
                                           )}
-                                          {peca.delivery && (
+                                          {peca.estoque_etiquetas?.[0]?.delivery && (
                                             <div className="flex items-center gap-2">
                                               <span className="text-gray-400 text-xs">Delivery:</span>
-                                              <span className="text-gray-300 text-xs">{peca.delivery}</span>
+                                              <span className="text-gray-300 text-xs">{peca.estoque_etiquetas[0].delivery}</span>
                                             </div>
                                           )}
                                           {peca.valor_com_impostos && (
@@ -1467,10 +1480,10 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                           <span className="font-mono text-gray-300 text-xs">{req.peca_estoque.pn}</span>
                                         </div>
                                       )}
-                                      {req.peca_estoque.delivery && (
+                                      {req.peca_estoque.estoque_etiquetas?.[0]?.delivery && (
                                         <div className="flex items-center gap-2">
                                           <span className="text-gray-400 text-xs">Delivery:</span>
-                                          <span className="text-gray-300 text-xs">{req.peca_estoque.delivery}</span>
+                                          <span className="text-gray-300 text-xs">{req.peca_estoque.estoque_etiquetas[0].delivery}</span>
                                         </div>
                                       )}
                                       {req.peca_estoque.valor_com_impostos && (
