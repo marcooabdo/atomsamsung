@@ -57,6 +57,10 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             data_emissao,
             delivery
           ),
+          estoque_etiquetas(
+            id_sequencial,
+            delivery
+          ),
           requisicoes_pecas!peca_estoque_id(
             id,
             status,
@@ -95,7 +99,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       const enrichedPecas = (data || []).map((peca: any) => ({
         ...peca,
         nf_data_emissao: peca.estoque_nfs?.data_emissao,
-        nf_delivery: peca.delivery || peca.estoque_nfs?.delivery
+        nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery
       }));
 
       enrichedPecas.sort((a, b) => {

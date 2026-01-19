@@ -475,7 +475,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       .select(`
         *,
         reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome),
-        peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(id_numerico, delivery)
+        peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(
+          id_numerico,
+          estoque_etiquetas(delivery)
+        )
       `);
 
     if (osData?.cotacao_id) {
@@ -505,10 +508,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
               id,
               id_numerico,
               valor_com_impostos,
-              delivery,
               gi_postada_em,
               gi_postada_por,
-              usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome)
+              usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome),
+              estoque_etiquetas(delivery)
             `)
             .in('id', req.pecas_estoque_ids)
             .order('id_numerico');
@@ -3112,13 +3115,25 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                                     <div className="flex flex-wrap gap-1 items-center">
                                       <span>IDs Atendidos:</span>
                                       {requisicao.pecas_lote.map((peca: any, idx: number) => (
-                                        <span key={peca.id} className="px-2 py-0.5 bg-[#39FF14]/20 border border-[#39FF14]/40 rounded">
-                                          #{peca.id_numerico}
+                                        <span key={peca.id} className="px-2 py-0.5 bg-[#39FF14]/20 border border-[#39FF14]/40 rounded flex items-center gap-1.5">
+                                          <span>#{peca.id_numerico}</span>
+                                          {peca.estoque_etiquetas?.[0]?.delivery && (
+                                            <span className="text-[10px] text-gray-400">
+                                              ({peca.estoque_etiquetas[0].delivery})
+                                            </span>
+                                          )}
                                         </span>
                                       ))}
                                     </div>
                                   ) : (
-                                    <p>ID Atendido: #{requisicao.peca_estoque.id_numerico}</p>
+                                    <div className="flex items-center gap-2">
+                                      <p>ID Atendido: #{requisicao.peca_estoque.id_numerico}</p>
+                                      {requisicao.peca_estoque.estoque_etiquetas?.[0]?.delivery && (
+                                        <span className="text-[10px] text-gray-400">
+                                          Delivery: {requisicao.peca_estoque.estoque_etiquetas[0].delivery}
+                                        </span>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               )}

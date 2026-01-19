@@ -12,6 +12,10 @@ interface PecaEstoque {
   valor_com_impostos: number;
   data_entrada: string;
   status: string;
+  estoque_etiquetas?: Array<{
+    delivery: string | null;
+    id_sequencial: string | null;
+  }>;
 }
 
 interface ModalSelecionarIDProps {
@@ -42,7 +46,13 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
     try {
       const { data, error } = await supabase
         .from('estoque_pecas')
-        .select('*')
+        .select(`
+          *,
+          estoque_etiquetas(
+            id_sequencial,
+            delivery
+          )
+        `)
         .eq('pn', requisicao.codigo_peca)
         .eq('status', 'disponivel')
         .eq('unidade_id', requisicao.unidade_id)
@@ -65,7 +75,13 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
     try {
       const { data: peca, error } = await supabase
         .from('estoque_pecas')
-        .select('*')
+        .select(`
+          *,
+          estoque_etiquetas(
+            id_sequencial,
+            delivery
+          )
+        `)
         .eq('id_numerico', parseInt(qrInput.trim()))
         .maybeSingle();
 
@@ -210,7 +226,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                 {selectedPecas.map((peca, idx) => (
                   <div key={peca.id} className="flex items-center justify-between bg-[#0A0F1E]/50 rounded px-3 py-2">
                     <span className="text-[#39FF14] font-bold">#{peca.id_numerico}</span>
-                    <span className="text-gray-400 text-xs">{peca.delivery || 'N/A'}</span>
+                    <span className="text-gray-400 text-xs">{peca.estoque_etiquetas?.[0]?.delivery || 'N/A'}</span>
                     <button
                       onClick={() => togglePecaSelection(peca)}
                       className="text-[#FF0064] text-xs hover:underline"
@@ -264,7 +280,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Delivery</p>
-                  <p className="text-gray-200">{selectedPeca.delivery || 'N/A'}</p>
+                  <p className="text-gray-200">{selectedPeca.estoque_etiquetas?.[0]?.delivery || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Localizacao</p>
@@ -360,7 +376,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                             <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
                               <div className="flex items-center gap-1">
                                 <Package className="w-3 h-3" />
-                                Delivery: {peca.delivery || 'N/A'}
+                                Delivery: {peca.estoque_etiquetas?.[0]?.delivery || 'N/A'}
                               </div>
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />

@@ -12,7 +12,8 @@ interface GIModalProps {
     id: string;
     id_numerico: number;
     valor_com_impostos: string;
-    delivery: string | null;
+    delivery?: string | null;
+    estoque_etiquetas?: Array<{ delivery: string | null }>;
     gi_postada_em?: string | null;
     gi_postada_por?: string | null;
     usuario_gi_postado?: { nome: string } | null;
@@ -207,8 +208,8 @@ export function GIModal({ requisicaoId, osId, pecaNome, isLote, pecasLote, onClo
                     <div className="flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         <span className="font-mono text-[#39FF14] font-bold">ID #{peca.id_numerico}</span>
-                        {peca.delivery && (
-                          <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
+                        {(peca.estoque_etiquetas?.[0]?.delivery || peca.delivery) && (
+                          <span className="text-xs text-gray-400">Delivery: {peca.estoque_etiquetas?.[0]?.delivery || peca.delivery}</span>
                         )}
                         <span className="text-xs text-gray-300">
                           R$ {Number(peca.valor_com_impostos).toFixed(2)}

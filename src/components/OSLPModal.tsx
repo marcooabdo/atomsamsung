@@ -758,10 +758,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               id,
               id_numerico,
               valor_com_impostos,
-              delivery,
               gi_postada_em,
               gi_postada_por,
-              usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome)
+              usuario_gi_postado:usuarios!estoque_pecas_gi_postada_por_fkey(nome),
+              estoque_etiquetas(delivery)
             `)
             .in('id', req.pecas_estoque_ids)
             .order('id_numerico');
