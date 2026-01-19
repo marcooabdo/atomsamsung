@@ -43,6 +43,8 @@ export function GroupDetailsModal({
   const fetchParticipants = async () => {
     setLoading(true);
     try {
+      console.log('Buscando participantes para conversação:', conversationId);
+
       const { data, error } = await supabase
         .from('chat_participants')
         .select(`
@@ -55,13 +57,27 @@ export function GroupDetailsModal({
         .order('role', { ascending: true })
         .order('joined_at', { ascending: true });
 
+      console.log('Resposta dos participantes:', { data, error });
+
       if (error) throw error;
 
-      const formattedData = (data || []).map(p => ({
-        ...p,
-        user: Array.isArray(p.user) ? p.user[0] : p.user
-      }));
+      const formattedData = (data || []).map(p => {
+        let user = Array.isArray(p.user) ? p.user[0] : p.user;
 
+        const unidadeData = Array.isArray(user?.unidade)
+          ? user.unidade[0]
+          : user?.unidade;
+
+        return {
+          ...p,
+          user: {
+            ...user,
+            unidade: unidadeData
+          }
+        };
+      });
+
+      console.log('Participantes formatados:', formattedData);
       setParticipants(formattedData);
     } catch (err) {
       console.error('Erro ao buscar participantes:', err);

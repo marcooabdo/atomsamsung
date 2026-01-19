@@ -145,17 +145,34 @@ export function ChatConversationList({
       const enrichedConversations = await Promise.all(
         sortedConversations.map(async (conv) => {
           if (conv.tipo === 'direct') {
-            const { data: participants } = await supabase
+            const { data: participants, error } = await supabase
               .from('chat_participants')
               .select('user_id, usuarios(id, nome, foto_url, tipo, unidade:unidades(cidade))')
               .eq('conversation_id', conv.id)
               .neq('user_id', userId)
               .single();
 
+            if (error) {
+              console.error('Erro ao buscar participante:', error);
+            }
+
             if (participants && participants.usuarios) {
-              const otherUser = Array.isArray(participants.usuarios)
+              let otherUser = Array.isArray(participants.usuarios)
                 ? participants.usuarios[0]
                 : participants.usuarios;
+
+              console.log('Raw otherUser data:', otherUser);
+
+              const unidadeData = Array.isArray(otherUser.unidade)
+                ? otherUser.unidade[0]
+                : otherUser.unidade;
+
+              otherUser = {
+                ...otherUser,
+                unidade: unidadeData
+              };
+
+              console.log('Processed otherUser:', otherUser);
 
               return {
                 ...conv,
@@ -195,8 +212,24 @@ export function ChatConversationList({
         .order('nome');
 
       if (error) throw error;
-      setUsers(data || []);
+
+      console.log('Raw users data:', data);
+
+      const processedUsers = (data || []).map(user => {
+        const unidadeData = Array.isArray(user.unidade)
+          ? user.unidade[0]
+          : user.unidade;
+
+        return {
+          ...user,
+          unidade: unidadeData
+        };
+      });
+
+      console.log('Processed users:', processedUsers);
+      setUsers(processedUsers);
     } catch (err) {
+      console.error('Erro ao carregar usuários:', err);
     } finally {
       setLoadingUsers(false);
     }

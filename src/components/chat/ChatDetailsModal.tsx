@@ -83,7 +83,9 @@ export function ChatDetailsModal({
           });
         }
       } else if (conversationType === 'group') {
-        const { data: participantsData } = await supabase
+        console.log('Buscando participantes do grupo:', conversationId);
+
+        const { data: participantsData, error: participantsError } = await supabase
           .from('chat_participants')
           .select(`
             user:usuarios(
@@ -98,19 +100,28 @@ export function ChatDetailsModal({
           `)
           .eq('conversation_id', conversationId);
 
-        if (participantsData) {
-          setParticipants(
-            participantsData.map((p: any) => {
-              const unidades = Array.isArray(p.user?.unidades)
-                ? p.user.unidades[0]
-                : p.user?.unidades;
+        console.log('Dados participantes recebidos:', { participantsData, participantsError });
 
-              return {
-                ...p.user,
-                unidade_nome: unidades?.nome || 'Sem unidade'
-              };
-            })
-          );
+        if (participantsError) {
+          console.error('Erro ao buscar participantes:', participantsError);
+        }
+
+        if (participantsData) {
+          const processedParticipants = participantsData.map((p: any) => {
+            const user = Array.isArray(p.user) ? p.user[0] : p.user;
+
+            const unidades = Array.isArray(user?.unidades)
+              ? user.unidades[0]
+              : user?.unidades;
+
+            return {
+              ...user,
+              unidade_nome: unidades?.nome || 'Sem unidade'
+            };
+          });
+
+          console.log('Participantes processados:', processedParticipants);
+          setParticipants(processedParticipants);
         }
       }
 
