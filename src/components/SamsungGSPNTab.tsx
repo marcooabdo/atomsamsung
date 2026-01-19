@@ -492,7 +492,7 @@ export function SamsungGSPNTab() {
 
             <button
               onClick={handleImport}
-              disabled={importing || !config.ativo}
+              disabled={importing}
               className="neon-button w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {importing ? (
@@ -510,7 +510,7 @@ export function SamsungGSPNTab() {
 
             <button
               onClick={handleUpdateStatus}
-              disabled={updatingStatus || !config.ativo}
+              disabled={updatingStatus}
               className="neon-button-secondary w-full flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {updatingStatus ? (
