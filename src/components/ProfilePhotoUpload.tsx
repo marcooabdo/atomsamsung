@@ -195,25 +195,25 @@ export function ProfilePhotoUpload({
 
       {showModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-[#0d1419] border border-[#1a3a4a] rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-[#0d1419] border-b border-[#1a3a4a] p-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-200">Foto de Perfil</h3>
+          <div className="bg-[#0d1419] border border-[#1a3a4a] rounded-2xl w-full max-w-xs shadow-2xl">
+            <div className="border-b border-[#1a3a4a] p-3 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-200">Foto de Perfil</h3>
               <button
                 onClick={() => {
                   setShowModal(false);
                   setSelectedFile(null);
                   setPreviewUrl(null);
                 }}
-                className="p-2 hover:bg-[#1a3a4a]/50 rounded-lg transition-all"
+                className="p-1.5 hover:bg-[#1a3a4a]/50 rounded-lg transition-all"
               >
-                <X className="w-5 h-5 text-gray-400" />
+                <X className="w-4 h-4 text-gray-400" />
               </button>
             </div>
 
-            <div className="p-6">
+            <div className="p-4">
               {previewUrl && (
-                <div className="mb-6">
-                  <div className="w-40 h-40 mx-auto rounded-full overflow-hidden border-4 border-[#00D4FF]/30">
+                <div className="mb-4">
+                  <div className="w-32 h-32 mx-auto rounded-full overflow-hidden border-4 border-[#00D4FF]/30">
                     <img
                       src={previewUrl}
                       alt="Preview"
@@ -223,12 +223,12 @@ export function ProfilePhotoUpload({
                 </div>
               )}
 
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 {currentPhotoUrl && (
                   <button
                     onClick={handleRemovePhoto}
                     disabled={uploading}
-                    className="flex-1 px-4 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg hover:bg-red-900/30 transition-all disabled:opacity-50 text-sm"
+                    className="flex-1 px-3 py-2.5 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg hover:bg-red-900/30 transition-all disabled:opacity-50 text-sm"
                   >
                     Remover
                   </button>
@@ -236,7 +236,7 @@ export function ProfilePhotoUpload({
                 <button
                   onClick={handleUpload}
                   disabled={uploading}
-                  className="flex-1 px-4 py-3 bg-[#00D4FF] text-white rounded-lg hover:bg-[#00B8E6] transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                  className="flex-1 px-3 py-2.5 bg-[#00D4FF] text-white rounded-lg hover:bg-[#00B8E6] transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
                 >
                   {uploading ? (
                     <>
@@ -246,7 +246,7 @@ export function ProfilePhotoUpload({
                   ) : (
                     <>
                       <Upload className="w-4 h-4" />
-                      Confirmar
+                      Salvar
                     </>
                   )}
                 </button>
