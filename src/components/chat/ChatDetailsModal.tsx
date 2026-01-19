@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Image, FileText, Download, Calendar, User, Users, Phone, Mail, Building2 } from 'lucide-react';
+import { X, FileText, Download, Users, Mail, Building2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
@@ -17,8 +17,7 @@ interface UserDetails {
   id: string;
   nome: string;
   email: string;
-  telefone?: string;
-  cargo?: string;
+  tipo?: string;
   foto_url?: string;
   unidade_nome?: string;
 }
@@ -60,67 +59,75 @@ export function ChatDetailsModal({
       if (conversationType === 'direct' && otherUserId) {
         const { data: userData } = await supabase
           .from('usuarios')
-          .select(`
-            id,
-            nome,
-            email,
-            telefone,
-            cargo,
-            foto_url,
-            unidades!inner(nome)
-          `)
+          .select('id, nome, email, tipo, foto_url, unidade_id')
           .eq('id', otherUserId)
           .maybeSingle();
 
         if (userData) {
-          const unidades = Array.isArray((userData as any).unidades)
-            ? (userData as any).unidades[0]
-            : (userData as any).unidades;
+          let unidadeNome = 'Sem unidade';
+          if (userData.unidade_id) {
+            const { data: unidadeData } = await supabase
+              .from('unidades')
+              .select('cidade')
+              .eq('id', userData.unidade_id)
+              .single();
+            unidadeNome = unidadeData?.cidade || 'Sem unidade';
+          }
 
           setUserDetails({
-            ...userData,
-            unidade_nome: unidades?.nome || 'Sem unidade'
+            id: userData.id,
+            nome: userData.nome,
+            email: userData.email,
+            tipo: userData.tipo,
+            foto_url: userData.foto_url,
+            unidade_nome: unidadeNome
           });
         }
       } else if (conversationType === 'group') {
-        console.log('Buscando participantes do grupo:', conversationId);
-
         const { data: participantsData, error: participantsError } = await supabase
           .from('chat_participants')
-          .select(`
-            user:usuarios(
-              id,
-              nome,
-              email,
-              telefone,
-              cargo,
-              foto_url,
-              unidades(nome)
-            )
-          `)
+          .select('user:usuarios(id, nome, email, tipo, foto_url, unidade_id)')
           .eq('conversation_id', conversationId);
-
-        console.log('Dados participantes recebidos:', { participantsData, participantsError });
 
         if (participantsError) {
           console.error('Erro ao buscar participantes:', participantsError);
         }
 
         if (participantsData) {
+          const unidadeIds = [...new Set(
+            participantsData
+              .map((p: any) => {
+                const user = Array.isArray(p.user) ? p.user[0] : p.user;
+                return user?.unidade_id;
+              })
+              .filter(Boolean)
+          )];
+
+          let unidadesMap: Record<string, string> = {};
+          if (unidadeIds.length > 0) {
+            const { data: unidadesData } = await supabase
+              .from('unidades')
+              .select('id, cidade')
+              .in('id', unidadeIds);
+
+            unidadesMap = (unidadesData || []).reduce((acc: Record<string, string>, u: any) => {
+              acc[u.id] = u.cidade;
+              return acc;
+            }, {});
+          }
+
           const processedParticipants = participantsData.map((p: any) => {
             const user = Array.isArray(p.user) ? p.user[0] : p.user;
-
-            const unidades = Array.isArray(user?.unidades)
-              ? user.unidades[0]
-              : user?.unidades;
-
             return {
-              ...user,
-              unidade_nome: unidades?.nome || 'Sem unidade'
+              id: user?.id,
+              nome: user?.nome,
+              email: user?.email,
+              tipo: user?.tipo,
+              foto_url: user?.foto_url,
+              unidade_nome: user?.unidade_id ? unidadesMap[user.unidade_id] || 'Sem unidade' : 'Sem unidade'
             };
           });
 
-          console.log('Participantes processados:', processedParticipants);
           setParticipants(processedParticipants);
         }
       }
@@ -212,8 +219,8 @@ export function ChatDetailsModal({
                 <div className="flex-1 min-w-0 space-y-4">
                   <div>
                     <h3 className="text-2xl font-bold text-gray-200 truncate">{userDetails.nome}</h3>
-                    {userDetails.cargo && (
-                      <p className="text-sm text-gray-400 mt-1">{userDetails.cargo}</p>
+                    {userDetails.tipo && (
+                      <p className="text-sm text-gray-400 mt-1 uppercase">{userDetails.tipo}</p>
                     )}
                   </div>
 
@@ -233,15 +240,6 @@ export function ChatDetailsModal({
                         <div>
                           <p className="text-xs text-gray-500">Email</p>
                           <p className="text-sm text-gray-200 truncate">{userDetails.email}</p>
-                        </div>
-                      </div>
-                    )}
-                    {userDetails.telefone && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
-                        <Phone className="w-5 h-5 text-[#00D4FF]" />
-                        <div>
-                          <p className="text-xs text-gray-500">Telefone</p>
-                          <p className="text-sm text-gray-200">{userDetails.telefone}</p>
                         </div>
                       </div>
                     )}
@@ -288,12 +286,9 @@ export function ChatDetailsModal({
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-200 truncate">{participant.nome}</p>
-                      {participant.cargo && (
-                        <p className="text-xs text-gray-500">{participant.cargo}</p>
-                      )}
-                      {participant.unidade_nome && (
-                        <p className="text-xs text-[#00D4FF]/70">{participant.unidade_nome}</p>
-                      )}
+                      <p className="text-xs text-gray-500 uppercase">
+                        {participant.tipo}{participant.unidade_nome && participant.unidade_nome !== 'Sem unidade' ? ` - ${participant.unidade_nome}` : ''}
+                      </p>
                     </div>
                   </div>
                 ))}
