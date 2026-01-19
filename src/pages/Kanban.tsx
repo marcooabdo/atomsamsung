@@ -111,7 +111,6 @@ export function Kanban() {
   const [criarOSSCACC, setCriarOSSCACC] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
   const [syncingSamsung, setSyncingSamsung] = useState(false);
-  const [hasJobRunning, setHasJobRunning] = useState(false);
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
   const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const autoScrollInterval = useRef<number | null>(null);
@@ -295,11 +294,6 @@ export function Kanban() {
   const syncSamsungGSPN = async () => {
     if (!selectedUnidade) {
       alert('Selecione uma unidade para atualizar');
-      return;
-    }
-
-    if (hasJobRunning) {
-      alert('Já existe uma sincronização em andamento. Aguarde a conclusão.');
       return;
     }
 
@@ -1045,7 +1039,6 @@ export function Kanban() {
       {selectedUnidade && (
         <JobStatusCard
           unidadeId={selectedUnidade}
-          onJobRunningChange={setHasJobRunning}
         />
       )}
 
@@ -1398,7 +1391,7 @@ export function Kanban() {
 
             <button
               onClick={syncSamsungGSPN}
-              disabled={syncingSamsung || !selectedUnidade || hasJobRunning}
+              disabled={syncingSamsung || !selectedUnidade}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,245,255,0.05) 100%)',
@@ -1407,9 +1400,7 @@ export function Kanban() {
                 boxShadow: '0 0 10px rgba(0,212,255,0.2)'
               }}
               title={
-                hasJobRunning
-                  ? 'Aguarde a sincronização em andamento'
-                  : !selectedUnidade
+                !selectedUnidade
                   ? 'Selecione uma unidade para sincronizar'
                   : 'Sincronizar novas OS da Samsung'
               }

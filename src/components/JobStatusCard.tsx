@@ -17,10 +17,9 @@ interface Job {
 
 interface JobStatusCardProps {
   unidadeId: string;
-  onJobRunningChange?: (isRunning: boolean) => void;
 }
 
-export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardProps) {
+export function JobStatusCard({ unidadeId }: JobStatusCardProps) {
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
@@ -53,12 +52,6 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
       clearInterval(interval);
     };
   }, [unidadeId]);
-
-  useEffect(() => {
-    if (onJobRunningChange) {
-      onJobRunningChange(currentJob?.is_running || false);
-    }
-  }, [currentJob?.is_running, onJobRunningChange]);
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -100,6 +93,36 @@ export function JobStatusCard({ unidadeId, onJobRunningChange }: JobStatusCardPr
 
     if (error) {
       return;
+    }
+
+    // Verifica se o job está rodando há mais de 2 horas (timeout)
+    if (data && data.is_running) {
+      const startTime = new Date(data.created_at).getTime();
+      const currentTime = Date.now();
+      const elapsedHours = (currentTime - startTime) / (1000 * 60 * 60);
+
+      // Se passou de 2 horas, marca como timeout
+      if (elapsedHours >= 2) {
+        await supabase
+          .from('jobs')
+          .update({
+            is_running: false,
+            status: 'erro',
+            finished_at: new Date().toISOString(),
+            error_message: 'Timeout - Job excedeu 2 horas de execução'
+          })
+          .eq('id', data.id);
+
+        // Recarrega o job atualizado
+        const { data: updatedData } = await supabase
+          .from('jobs')
+          .select('*')
+          .eq('id', data.id)
+          .maybeSingle();
+
+        setCurrentJob(updatedData);
+        return;
+      }
     }
 
     setCurrentJob(data);
