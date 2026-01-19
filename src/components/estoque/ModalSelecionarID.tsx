@@ -51,7 +51,8 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
           estoque_etiquetas(
             id_sequencial,
             delivery
-          )
+          ),
+          estoque_nfs(delivery)
         `)
         .eq('pn', requisicao.codigo_peca)
         .eq('status', 'disponivel')
@@ -59,7 +60,14 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
         .order('data_entrada', { ascending: true });
 
       if (error) throw error;
-      setPecasDisponiveis(data || []);
+
+      // Enriquecer com delivery da NF como fallback
+      const enrichedData = (data || []).map((peca: any) => ({
+        ...peca,
+        delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery
+      }));
+
+      setPecasDisponiveis(enrichedData);
     } catch (error) {
     } finally {
       setLoading(false);
@@ -80,7 +88,8 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
           estoque_etiquetas(
             id_sequencial,
             delivery
-          )
+          ),
+          estoque_nfs(delivery)
         `)
         .eq('id_numerico', parseInt(qrInput.trim()))
         .maybeSingle();
@@ -91,6 +100,9 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
         alert('Peça não encontrada com este código!');
         return;
       }
+
+      // Enriquecer com delivery da NF como fallback
+      peca.delivery = peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery;
 
       if (peca.status !== 'disponivel') {
         alert(`Esta peça não está disponível! Status atual: ${peca.status}`);
@@ -226,7 +238,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                 {selectedPecas.map((peca, idx) => (
                   <div key={peca.id} className="flex items-center justify-between bg-[#0A0F1E]/50 rounded px-3 py-2">
                     <span className="text-[#39FF14] font-bold">#{peca.id_numerico}</span>
-                    <span className="text-gray-400 text-xs">{peca.estoque_etiquetas?.[0]?.delivery || 'N/A'}</span>
+                    <span className="text-gray-400 text-xs">{peca.delivery || 'N/A'}</span>
                     <button
                       onClick={() => togglePecaSelection(peca)}
                       className="text-[#FF0064] text-xs hover:underline"
@@ -280,7 +292,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Delivery</p>
-                  <p className="text-gray-200">{selectedPeca.estoque_etiquetas?.[0]?.delivery || 'N/A'}</p>
+                  <p className="text-gray-200">{selectedPeca.delivery || 'N/A'}</p>
                 </div>
                 <div>
                   <p className="text-gray-500 text-xs">Localizacao</p>
@@ -376,7 +388,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                             <div className="grid grid-cols-2 gap-3 text-xs text-gray-400">
                               <div className="flex items-center gap-1">
                                 <Package className="w-3 h-3" />
-                                Delivery: {peca.estoque_etiquetas?.[0]?.delivery || 'N/A'}
+                                Delivery: {peca.delivery || 'N/A'}
                               </div>
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
