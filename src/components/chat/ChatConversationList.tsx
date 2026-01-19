@@ -207,7 +207,7 @@ export function ChatConversationList({
   const loadUsers = async () => {
     setLoadingUsers(true);
     try {
-      const { data, error } = await supabase
+      const { data: usersData, error } = await supabase
         .from('usuarios')
         .select('id, nome, tipo, ativo, foto_url, unidade_id')
         .eq('ativo', true)
@@ -216,29 +216,31 @@ export function ChatConversationList({
 
       if (error) throw error;
 
-      const unidadeIds = [...new Set((data || []).map(u => u.unidade_id).filter(Boolean))];
+      const { data: unidadesData } = await supabase
+        .from('unidades')
+        .select('id, cidade');
 
-      let unidadesMap: Record<string, string> = {};
-      if (unidadeIds.length > 0) {
-        const { data: unidadesData } = await supabase
-          .from('unidades')
-          .select('id, cidade')
-          .in('id', unidadeIds);
+      const unidadesMap: Record<string, string> = {};
+      (unidadesData || []).forEach((u: any) => {
+        if (u.id && u.cidade) {
+          unidadesMap[u.id] = u.cidade;
+        }
+      });
 
-        unidadesMap = (unidadesData || []).reduce((acc, u) => {
-          acc[u.id] = u.cidade;
-          return acc;
-        }, {} as Record<string, string>);
-      }
-
-      const processedUsers = (data || []).map(user => ({
-        ...user,
-        unidade: user.unidade_id ? { cidade: unidadesMap[user.unidade_id] || null } : null
+      const processedUsers: User[] = (usersData || []).map((user: any) => ({
+        id: user.id,
+        nome: user.nome,
+        tipo: user.tipo,
+        ativo: user.ativo,
+        foto_url: user.foto_url,
+        unidade: user.unidade_id && unidadesMap[user.unidade_id]
+          ? { cidade: unidadesMap[user.unidade_id] }
+          : null
       }));
 
       setUsers(processedUsers);
     } catch (err) {
-      console.error('Erro ao carregar usuários:', err);
+      console.error('Erro ao carregar usuarios:', err);
     } finally {
       setLoadingUsers(false);
     }
