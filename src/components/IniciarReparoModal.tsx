@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase';
 interface IniciarReparoModalProps {
   osId: string;
   osNumero: string;
+  unidadeId: string;
   currentTecnicoId: string | null;
   currentTecnicoNome: string | null;
   onClose: () => void;
@@ -14,6 +15,7 @@ interface IniciarReparoModalProps {
 export function IniciarReparoModal({
   osId,
   osNumero,
+  unidadeId,
   currentTecnicoId,
   currentTecnicoNome,
   onClose,
@@ -44,21 +46,31 @@ export function IniciarReparoModal({
     const { data: usuariosData } = await supabase
       .from('usuarios')
       .select('id, nome, cargo')
+      .eq('tipo', 'tecnico')
+      .eq('ativo', true)
+      .eq('unidade_id', unidadeId)
       .order('nome');
 
     setUsuarios(usuariosData || []);
   };
 
   const handleIniciarReparo = async () => {
+    if (!selectedTecnicoId) {
+      alert('Por favor, selecione um técnico');
+      return;
+    }
+
     if (!currentUser) return;
 
     setLoading(true);
     try {
+      const tecnicoSelecionado = usuarios.find(u => u.id === selectedTecnicoId);
+
       // Atualiza a OS com o técnico designado
       const { error: updateError } = await supabase
         .from('os')
         .update({
-          tecnico_designado_id: currentUser.id,
+          tecnico_designado_id: selectedTecnicoId,
           tecnico_designado_em: new Date().toISOString()
         })
         .eq('id', osId);
@@ -71,7 +83,7 @@ export function IniciarReparoModal({
         .insert({
           os_id: osId,
           usuario_id: currentUser.id,
-          comentario: `🔧 **REPARO INICIADO**\n\nTécnico **${currentUser.nome}** iniciou o reparo desta ordem de serviço.`,
+          comentario: `🔧 **REPARO INICIADO**\n\nTécnico **${tecnicoSelecionado?.nome}** foi designado para esta ordem de serviço.\n\n*Iniciado por ${currentUser.nome}*`,
           is_system: true
         });
 
@@ -162,20 +174,34 @@ export function IniciarReparoModal({
               }}>
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-[#00D4FF]" />
-                  <p className="text-sm font-medium text-white">Confirmar Início do Reparo</p>
+                  <p className="text-sm font-medium text-white">Iniciar Reparo</p>
                 </div>
                 <p className="text-sm text-gray-300">
-                  Ao clicar em "Iniciar Reparo", você será designado como o técnico responsável por esta ordem de serviço.
+                  Selecione o técnico que será responsável por esta ordem de serviço.
                 </p>
-                <div className="pt-3 border-t border-[#00D4FF]/20">
-                  <p className="text-xs text-gray-400">Técnico:</p>
-                  <p className="text-sm font-bold text-[#00D4FF]">{currentUser?.nome}</p>
-                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="block text-sm font-medium text-gray-300">
+                  Técnico Responsável *
+                </label>
+                <select
+                  value={selectedTecnicoId}
+                  onChange={(e) => setSelectedTecnicoId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-lg bg-[#0A0F1E] border border-[#00D4FF]/30 text-white focus:outline-none focus:border-[#00D4FF] transition-colors"
+                >
+                  <option value="">Selecione um técnico...</option>
+                  {usuarios.map((usuario) => (
+                    <option key={usuario.id} value={usuario.id}>
+                      {usuario.nome} {usuario.cargo ? `- ${usuario.cargo}` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <button
                 onClick={handleIniciarReparo}
-                disabled={loading}
+                disabled={loading || !selectedTecnicoId}
                 className="w-full py-3 px-4 rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',

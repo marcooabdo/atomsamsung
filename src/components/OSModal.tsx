@@ -9,6 +9,7 @@ import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
+import { IniciarReparoModal } from './IniciarReparoModal';
 import { GIModal } from './agendamento/GIModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
@@ -111,6 +112,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [mostrarModalAnalise, setMostrarModalAnalise] = useState(false);
   const [mostrarModalGI, setMostrarModalGI] = useState(false);
   const [requisicaoGI, setRequisicaoGI] = useState<RequisicaoPeca | null>(null);
+  const [mostrarModalIniciarReparo, setMostrarModalIniciarReparo] = useState(false);
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
   const [pecaRequisitandoId, setPecaRequisitandoId] = useState<string | null>(null);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
@@ -2266,6 +2268,21 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   PDF
                 </button>
 
+                <button
+                  onClick={() => setMostrarModalIniciarReparo(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-[#00D4FF]/30"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
+                    border: '1px solid #00D4FF',
+                    color: '#00D4FF',
+                    boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                  }}
+                  title={os.tecnico_designado_id ? 'Alterar Técnico Responsável' : 'Iniciar Reparo e Designar Técnico'}
+                >
+                  <Wrench className="w-4 h-4" />
+                  {os.tecnico_designado_id ? 'ALTERAR TÉCNICO' : 'INICIAR REPARO'}
+                </button>
+
                 <div className="relative">
               <button
                 onClick={() => setMostrarMoverPara(!mostrarMoverPara)}
@@ -4156,6 +4173,22 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
           osNumero={os.numero_os_samsung || os.numero_os_interna || 'S/N'}
           onClose={() => setMostrarModalAnalise(false)}
           onSuccess={() => {
+            loadOS();
+            onReload?.();
+          }}
+        />
+      )}
+
+      {mostrarModalIniciarReparo && os && (
+        <IniciarReparoModal
+          osId={os.id}
+          osNumero={os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+          unidadeId={os.unidade_id}
+          currentTecnicoId={os.tecnico_designado_id}
+          currentTecnicoNome={os.tecnico_designado_id ? 'Técnico Atual' : null}
+          onClose={() => setMostrarModalIniciarReparo(false)}
+          onSuccess={() => {
+            setMostrarModalIniciarReparo(false);
             loadOS();
             onReload?.();
           }}

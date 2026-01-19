@@ -127,10 +127,14 @@ export function Kanban() {
     financeiro: true,
     lucro: true,
     sla: true,
-    status: true
+    status: true,
+    iniciarReparo: true,
+    analiseConcluida: true
   });
   const [tipoOSFilters, setTipoOSFilters] = useState<string[]>([]);
   const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
+  const [tecnicoFilters, setTecnicoFilters] = useState<string[]>([]);
+  const [tecnicos, setTecnicos] = useState<Array<{id: string; nome: string}>>([]);
   const [minDiasAbertos, setMinDiasAbertos] = useState<number>(0);
   const [showExportModal, setShowExportModal] = useState(false);
 
@@ -236,6 +240,10 @@ export function Kanban() {
     if (savedTipoAtendimentoFilters) {
       setTipoAtendimentoFilters(JSON.parse(savedTipoAtendimentoFilters));
     }
+    const savedTecnicoFilters = localStorage.getItem('kanban_tecnico_filters');
+    if (savedTecnicoFilters) {
+      setTecnicoFilters(JSON.parse(savedTecnicoFilters));
+    }
   }, []);
 
   useEffect(() => {
@@ -249,6 +257,14 @@ export function Kanban() {
   useEffect(() => {
     localStorage.setItem('kanban_tipo_atendimento_filters', JSON.stringify(tipoAtendimentoFilters));
   }, [tipoAtendimentoFilters]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban_tecnico_filters', JSON.stringify(tecnicoFilters));
+  }, [tecnicoFilters]);
+
+  useEffect(() => {
+    loadTecnicos();
+  }, [selectedUnidade]);
 
   useEffect(() => {
     if (usuario) {
@@ -292,6 +308,21 @@ export function Kanban() {
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
     setUnidades(data || []);
+  };
+
+  const loadTecnicos = async () => {
+    if (!selectedUnidade) {
+      setTecnicos([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('usuarios')
+      .select('id, nome')
+      .eq('tipo', 'tecnico')
+      .eq('ativo', true)
+      .eq('unidade_id', selectedUnidade)
+      .order('nome');
+    setTecnicos(data || []);
   };
 
   const syncSamsungGSPN = async () => {
@@ -962,9 +993,12 @@ export function Kanban() {
       const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
         (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
 
+      const matchesTecnico = tecnicoFilters.length === 0 ||
+        (os.tecnico_designado_id && tecnicoFilters.includes(os.tecnico_designado_id));
+
       const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
 
-      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTAT;
+      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
     });
 
     // Aplicar ordenação específica da coluna
@@ -1108,7 +1142,9 @@ export function Kanban() {
                       { key: 'financeiro', label: 'Financeiro' },
                       { key: 'lucro', label: 'Lucro/Prejuízo' },
                       { key: 'sla', label: 'Tempo na Etapa' },
-                      { key: 'status', label: 'Status Samsung' }
+                      { key: 'status', label: 'Status Samsung' },
+                      { key: 'iniciarReparo', label: 'Iniciar Reparo' },
+                      { key: 'analiseConcluida', label: 'Análise Concluída' }
                     ].map(({ key, label }) => (
                       <div
                         key={key}
@@ -1190,16 +1226,16 @@ export function Kanban() {
                 onClick={() => setShowTipoFilter(!showTipoFilter)}
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
                 style={{
-                  background: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0)
+                  background: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0)
                     ? 'linear-gradient(135deg, rgba(255,191,0,0.2) 0%, rgba(255,191,0,0.05) 100%)'
                     : 'rgba(107,114,128,0.1)',
-                  border: `1px solid ${(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280'}`,
-                  color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280',
-                  boxShadow: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) ? '0 0 10px rgba(255,191,0,0.2)' : 'none'
+                  border: `1px solid ${(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280'}`,
+                  color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280',
+                  boxShadow: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) ? '0 0 10px rgba(255,191,0,0.2)' : 'none'
                 }}
               >
                 <Filter className="w-3.5 h-3.5" />
-                TIPO OS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || minDiasAbertos > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length + (minDiasAbertos > 0 ? 1 : 0)})`}
+                FILTROS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length + tecnicoFilters.length + (minDiasAbertos > 0 ? 1 : 0)})`}
                 <ChevronDown className="w-3 h-3" />
               </button>
 
@@ -1282,6 +1318,45 @@ export function Kanban() {
                     ))}
                   </div>
 
+                  {tecnicos.length > 0 && (
+                    <>
+                      <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30 mt-3">
+                        TÉCNICO
+                      </div>
+                      <div className="space-y-1 mb-3">
+                        {tecnicos.map((tecnico) => (
+                          <div
+                            key={tecnico.id}
+                            onClick={() => {
+                              if (tecnicoFilters.includes(tecnico.id)) {
+                                setTecnicoFilters(tecnicoFilters.filter(t => t !== tecnico.id));
+                              } else {
+                                setTecnicoFilters([...tecnicoFilters, tecnico.id]);
+                              }
+                            }}
+                            className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
+                            style={{
+                              background: tecnicoFilters.includes(tecnico.id)
+                                ? 'linear-gradient(135deg, rgba(255,191,0,0.15) 0%, rgba(255,191,0,0.05) 100%)'
+                                : 'transparent',
+                              border: `1px solid ${tecnicoFilters.includes(tecnico.id) ? 'rgba(255,191,0,0.3)' : 'transparent'}`
+                            }}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={tecnicoFilters.includes(tecnico.id)}
+                              onChange={() => {}}
+                              className="w-3.5 h-3.5 rounded accent-[#FFBF00] pointer-events-none"
+                            />
+                            <span className={`text-xs flex-1 ${tecnicoFilters.includes(tecnico.id) ? 'text-[#FFBF00] font-medium' : 'text-gray-300'}`}>
+                              {tecnico.nome}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
                   <div className="pt-3 mt-3 border-t border-[#FFBF00]/30">
                     <label className="text-[10px] text-[#FFBF00] mb-1.5 block font-bold">TAT MÍNIMO (dias abertos)</label>
                     <input
@@ -1306,6 +1381,7 @@ export function Kanban() {
                         e.stopPropagation();
                         setTipoOSFilters([...availableTipoOS]);
                         setTipoAtendimentoFilters([...availableTipoAtendimento]);
+                        setTecnicoFilters(tecnicos.map(t => t.id));
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
                       style={{
@@ -1321,6 +1397,7 @@ export function Kanban() {
                         e.stopPropagation();
                         setTipoOSFilters([]);
                         setTipoAtendimentoFilters([]);
+                        setTecnicoFilters([]);
                         setMinDiasAbertos(0);
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
@@ -2142,7 +2219,7 @@ export function Kanban() {
                               </div>
                             ))}
 
-                            {coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && (
+                            {badgeFilters.iniciarReparo && coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && (
                               <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
                                 {os.tecnico_designado_id && (os as any).tecnico_designado && (
                                   <div className="rounded-lg p-2" style={{
@@ -2206,7 +2283,7 @@ export function Kanban() {
                               </div>
                             )}
 
-                            {coluna.id === 'diagnostico' && (
+                            {badgeFilters.analiseConcluida && coluna.id === 'diagnostico' && (
                               <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
                                 <button
                                   onClick={(e) => {
