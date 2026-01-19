@@ -55,6 +55,7 @@ export function ChatConversationList({
 
   useEffect(() => {
     loadConversations();
+    loadUsers();
 
     const channel = supabase
       .channel('conversations-changes')

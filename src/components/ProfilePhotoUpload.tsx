@@ -194,10 +194,10 @@ export function ProfilePhotoUpload({
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#0d1419] border border-[#1a3a4a] rounded-2xl w-full max-w-md p-6 shadow-2xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-200">Atualizar Foto de Perfil</h3>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-[#0d1419] border border-[#1a3a4a] rounded-2xl w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-[#0d1419] border-b border-[#1a3a4a] p-4 flex items-center justify-between">
+              <h3 className="text-lg font-bold text-gray-200">Foto de Perfil</h3>
               <button
                 onClick={() => {
                   setShowModal(false);
@@ -210,45 +210,47 @@ export function ProfilePhotoUpload({
               </button>
             </div>
 
-            {previewUrl && (
-              <div className="mb-6">
-                <div className="w-48 h-48 mx-auto rounded-full overflow-hidden border-4 border-[#00D4FF]/30">
-                  <img
-                    src={previewUrl}
-                    alt="Preview"
-                    className="w-full h-full object-cover"
-                  />
+            <div className="p-6">
+              {previewUrl && (
+                <div className="mb-6">
+                  <div className="w-40 h-40 mx-auto rounded-full overflow-hidden border-4 border-[#00D4FF]/30">
+                    <img
+                      src={previewUrl}
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <div className="flex gap-3">
-              {currentPhotoUrl && (
-                <button
-                  onClick={handleRemovePhoto}
-                  disabled={uploading}
-                  className="flex-1 px-4 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg hover:bg-red-900/30 transition-all disabled:opacity-50"
-                >
-                  Remover Foto
-                </button>
               )}
-              <button
-                onClick={handleUpload}
-                disabled={uploading}
-                className="flex-1 px-4 py-3 bg-[#00D4FF] text-white rounded-lg hover:bg-[#00B8E6] transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {uploading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="w-5 h-5" />
-                    Confirmar
-                  </>
+
+              <div className="flex gap-3">
+                {currentPhotoUrl && (
+                  <button
+                    onClick={handleRemovePhoto}
+                    disabled={uploading}
+                    className="flex-1 px-4 py-3 bg-red-900/20 text-red-400 border border-red-900/50 rounded-lg hover:bg-red-900/30 transition-all disabled:opacity-50 text-sm"
+                  >
+                    Remover
+                  </button>
                 )}
-              </button>
+                <button
+                  onClick={handleUpload}
+                  disabled={uploading}
+                  className="flex-1 px-4 py-3 bg-[#00D4FF] text-white rounded-lg hover:bg-[#00B8E6] transition-all disabled:opacity-50 flex items-center justify-center gap-2 text-sm"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-4 h-4" />
+                      Confirmar
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
