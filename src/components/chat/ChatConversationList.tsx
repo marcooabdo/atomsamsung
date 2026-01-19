@@ -147,7 +147,7 @@ export function ChatConversationList({
           if (conv.tipo === 'direct') {
             const { data: participants, error } = await supabase
               .from('chat_participants')
-              .select('user_id, usuarios(id, nome, foto_url, tipo, unidade:unidades(cidade))')
+              .select('user_id, usuarios(id, nome, foto_url, tipo, unidade_id)')
               .eq('conversation_id', conv.id)
               .neq('user_id', userId)
               .single();
@@ -161,34 +161,32 @@ export function ChatConversationList({
                 ? participants.usuarios[0]
                 : participants.usuarios;
 
-              console.log('===== CONVERSA DIRETA =====');
-              console.log('Raw otherUser data:', JSON.stringify(otherUser, null, 2));
-              console.log('Tipo de unidade:', typeof otherUser.unidade, 'É array?', Array.isArray(otherUser.unidade));
-
-              const unidadeData = Array.isArray(otherUser.unidade)
-                ? otherUser.unidade[0]
-                : otherUser.unidade;
-
-              otherUser = {
-                ...otherUser,
-                unidade: unidadeData
-              };
-
-              console.log('Processed otherUser:', JSON.stringify(otherUser, null, 2));
-              console.log('===========================');
+              let unidadeData = null;
+              if (otherUser.unidade_id) {
+                const { data: unidadeInfo } = await supabase
+                  .from('unidades')
+                  .select('cidade')
+                  .eq('id', otherUser.unidade_id)
+                  .single();
+                unidadeData = unidadeInfo;
+              }
 
               return {
                 ...conv,
-                other_user: otherUser
+                other_user: {
+                  id: otherUser.id,
+                  nome: otherUser.nome,
+                  foto_url: otherUser.foto_url,
+                  tipo: otherUser.tipo,
+                  unidade: unidadeData
+                }
               };
             }
           } else if (conv.tipo === 'group') {
-            const { data, count, error } = await supabase
+            const { count, error } = await supabase
               .from('chat_participants')
-              .select('*', { count: 'exact', head: true })
+              .select('id', { count: 'exact', head: true })
               .eq('conversation_id', conv.id);
-
-            console.log(`Contagem participantes grupo ${conv.name}:`, { count, error, conv_id: conv.id });
 
             return {
               ...conv,
@@ -211,33 +209,33 @@ export function ChatConversationList({
     try {
       const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo, ativo, foto_url, unidade:unidades(cidade)')
+        .select('id, nome, tipo, ativo, foto_url, unidade_id')
         .eq('ativo', true)
         .neq('id', userId)
         .order('nome');
 
       if (error) throw error;
 
-      console.log('===== LISTA DE CONTATOS =====');
-      console.log('Raw users data (primeiro usuário):', JSON.stringify(data?.[0], null, 2));
+      const unidadeIds = [...new Set((data || []).map(u => u.unidade_id).filter(Boolean))];
 
-      if (data && data[0]) {
-        console.log('Tipo de unidade no primeiro usuário:', typeof data[0].unidade, 'É array?', Array.isArray(data[0].unidade));
+      let unidadesMap: Record<string, string> = {};
+      if (unidadeIds.length > 0) {
+        const { data: unidadesData } = await supabase
+          .from('unidades')
+          .select('id, cidade')
+          .in('id', unidadeIds);
+
+        unidadesMap = (unidadesData || []).reduce((acc, u) => {
+          acc[u.id] = u.cidade;
+          return acc;
+        }, {} as Record<string, string>);
       }
 
-      const processedUsers = (data || []).map(user => {
-        const unidadeData = Array.isArray(user.unidade)
-          ? user.unidade[0]
-          : user.unidade;
+      const processedUsers = (data || []).map(user => ({
+        ...user,
+        unidade: user.unidade_id ? { cidade: unidadesMap[user.unidade_id] || null } : null
+      }));
 
-        return {
-          ...user,
-          unidade: unidadeData
-        };
-      });
-
-      console.log('Processed users (primeiro):', JSON.stringify(processedUsers[0], null, 2));
-      console.log('=============================');
       setUsers(processedUsers);
     } catch (err) {
       console.error('Erro ao carregar usuários:', err);

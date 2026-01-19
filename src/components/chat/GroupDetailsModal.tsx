@@ -43,41 +43,56 @@ export function GroupDetailsModal({
   const fetchParticipants = async () => {
     setLoading(true);
     try {
-      console.log('Buscando participantes para conversação:', conversationId);
-
       const { data, error } = await supabase
         .from('chat_participants')
         .select(`
           user_id,
           role,
           joined_at,
-          user:usuarios!chat_participants_user_id_fkey(id, nome, tipo, unidade:unidades(cidade))
+          user:usuarios!chat_participants_user_id_fkey(id, nome, tipo, unidade_id)
         `)
         .eq('conversation_id', conversationId)
         .order('role', { ascending: true })
         .order('joined_at', { ascending: true });
 
-      console.log('Resposta dos participantes:', { data, error });
-
       if (error) throw error;
 
-      const formattedData = (data || []).map(p => {
-        let user = Array.isArray(p.user) ? p.user[0] : p.user;
+      const unidadeIds = [...new Set(
+        (data || [])
+          .map(p => {
+            const user = Array.isArray(p.user) ? p.user[0] : p.user;
+            return user?.unidade_id;
+          })
+          .filter(Boolean)
+      )];
 
-        const unidadeData = Array.isArray(user?.unidade)
-          ? user.unidade[0]
-          : user?.unidade;
+      let unidadesMap: Record<string, string> = {};
+      if (unidadeIds.length > 0) {
+        const { data: unidadesData } = await supabase
+          .from('unidades')
+          .select('id, cidade')
+          .in('id', unidadeIds);
+
+        unidadesMap = (unidadesData || []).reduce((acc, u) => {
+          acc[u.id] = u.cidade;
+          return acc;
+        }, {} as Record<string, string>);
+      }
+
+      const formattedData = (data || []).map(p => {
+        const user = Array.isArray(p.user) ? p.user[0] : p.user;
 
         return {
           ...p,
           user: {
-            ...user,
-            unidade: unidadeData
+            id: user?.id,
+            nome: user?.nome,
+            tipo: user?.tipo,
+            unidade: user?.unidade_id ? { cidade: unidadesMap[user.unidade_id] || null } : null
           }
         };
       });
 
-      console.log('Participantes formatados:', formattedData);
       setParticipants(formattedData);
     } catch (err) {
       console.error('Erro ao buscar participantes:', err);
