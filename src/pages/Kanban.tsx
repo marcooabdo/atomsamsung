@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase, formatTipoAtendimentoShort } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
@@ -292,6 +292,12 @@ export function Kanban() {
       loadKanbanData();
     }
   }, [selectedUnidade]);
+
+  useEffect(() => {
+    if (searchTerm === '') {
+      setSearchMatchSource({});
+    }
+  }, [searchTerm]);
 
   useEffect(() => {
     return () => {
@@ -1074,63 +1080,79 @@ export function Kanban() {
     return { matches: false, source: 'visible' };
   };
 
-  const filteredData = Object.keys(osData).reduce((acc, coluna) => {
+  const filteredData = useMemo(() => {
     const newMatchSource: Record<string, 'hidden' | 'visible'> = {};
 
-    let filtered = osData[coluna].filter(os => {
-      const searchResult = performUniversalSearch(os, searchTerm);
+    const result = Object.keys(osData).reduce((acc, coluna) => {
+      let filtered = osData[coluna].filter(os => {
+        const searchResult = performUniversalSearch(os, searchTerm);
 
-      if (searchResult.matches && searchResult.source === 'hidden') {
-        newMatchSource[os.id] = 'hidden';
+        if (searchResult.matches && searchResult.source === 'hidden') {
+          newMatchSource[os.id] = 'hidden';
+        }
+
+        const matchesTipoOS = tipoOSFilters.length === 0 ||
+          tipoOSFilters.some(filter => {
+            if (filter === 'SC / ACC') {
+              return os.tipo_orcamento === 'samsung_contigo' || os.tipo_orcamento === 'acessorios';
+            }
+            return os.tipo_os === filter;
+          });
+
+        const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
+          (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
+
+        const matchesTecnico = tecnicoFilters.length === 0 ||
+          (os.tecnico_designado_id && tecnicoFilters.includes(os.tecnico_designado_id));
+
+        const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
+
+        return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
+      });
+
+      // Aplicar ordenação específica da coluna
+      const sortOrder = columnSortOrder[coluna] || 'sequencia';
+
+      if (sortOrder === 'tat') {
+        filtered = filtered.sort((a, b) => calcularTAT(a.created_at) - calcularTAT(b.created_at));
+      } else if (sortOrder === 'numero') {
+        filtered = filtered.sort((a, b) => {
+          const numA = a.numero_os_interna || a.numero_os_samsung || '';
+          const numB = b.numero_os_interna || b.numero_os_samsung || '';
+          return numA.localeCompare(numB);
+        });
+      } else if (sortOrder === 'tempo_etapa') {
+        filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+      } else {
+        // Ordenar por sequencia_coluna (padrão)
+        filtered = filtered.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
       }
 
-      const matchesTipoOS = tipoOSFilters.length === 0 ||
-        tipoOSFilters.some(filter => {
-          if (filter === 'SC / ACC') {
-            return os.tipo_orcamento === 'samsung_contigo' || os.tipo_orcamento === 'acessorios';
-          }
-          return os.tipo_os === filter;
-        });
+      acc[coluna] = filtered;
+      return acc;
+    }, {} as Record<string, OS[]>);
 
-      const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
-        (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
-
-      const matchesTecnico = tecnicoFilters.length === 0 ||
-        (os.tecnico_designado_id && tecnicoFilters.includes(os.tecnico_designado_id));
-
-      const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
-
-      return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
-    });
-
-    // Atualizar o estado de match source
+    // Atualizar searchMatchSource de forma segura
     if (Object.keys(newMatchSource).length > 0) {
-      setSearchMatchSource(prev => ({ ...prev, ...newMatchSource }));
-    } else if (searchTerm === '') {
-      setSearchMatchSource({});
+      setTimeout(() => {
+        setSearchMatchSource(prev => {
+          const updated = { ...prev, ...newMatchSource };
+          // Limpar IDs que não existem mais nos dados filtrados
+          const allCurrentIds = new Set(
+            Object.values(result).flat().map(os => os.id)
+          );
+          Object.keys(updated).forEach(id => {
+            if (!allCurrentIds.has(id)) {
+              delete updated[id];
+            }
+          });
+          return updated;
+        });
+      }, 0);
     }
 
-    // Aplicar ordenação específica da coluna
-    const sortOrder = columnSortOrder[coluna] || 'sequencia';
-
-    if (sortOrder === 'tat') {
-      filtered = filtered.sort((a, b) => calcularTAT(a.created_at) - calcularTAT(b.created_at));
-    } else if (sortOrder === 'numero') {
-      filtered = filtered.sort((a, b) => {
-        const numA = a.numero_os_interna || a.numero_os_samsung || '';
-        const numB = b.numero_os_interna || b.numero_os_samsung || '';
-        return numA.localeCompare(numB);
-      });
-    } else if (sortOrder === 'tempo_etapa') {
-      filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
-    } else {
-      // Ordenar por sequencia_coluna (padrão)
-      filtered = filtered.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
-    }
-
-    acc[coluna] = filtered;
-    return acc;
-  }, {} as Record<string, OS[]>);
+    return result;
+  }, [osData, searchTerm, tipoOSFilters, tipoAtendimentoFilters, tecnicoFilters, minDiasAbertos, columnSortOrder]);
 
   const availableTipoOS = Array.from(new Set([
     ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
