@@ -1,18 +1,22 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatConversationList } from '../components/chat/ChatConversationList';
-import { ChatWindow } from '../components/chat/ChatWindow';
+import { ChatWindow, ChatWindowRef } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
+import { GlobalChatSearch } from '../components/chat/GlobalChatSearch';
 import { supabase } from '../lib/supabase';
-import { Building2, MessageCircle } from 'lucide-react';
+import { Building2, MessageCircle, Search } from 'lucide-react';
 import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
   const { usuario } = useAuth();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
+  const [showGlobalSearch, setShowGlobalSearch] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [onlineCount, setOnlineCount] = useState(0);
+  const [targetMessageId, setTargetMessageId] = useState<string | null>(null);
+  const chatWindowRef = useRef<ChatWindowRef>(null);
 
   useUserPresence(usuario?.id);
 
@@ -32,6 +36,18 @@ export function Chat() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setShowGlobalSearch(true);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const loadOnlineCount = async () => {
     try {
       const { count } = await supabase
@@ -43,6 +59,19 @@ export function Chat() {
       console.error('Erro ao carregar usuários online:', err);
     }
   };
+
+  const handleSelectMessage = (conversationId: string, messageId: string) => {
+    setSelectedConversationId(conversationId);
+    setTargetMessageId(messageId);
+    setShowGlobalSearch(false);
+  };
+
+  useEffect(() => {
+    if (targetMessageId && chatWindowRef.current?.scrollToMessage) {
+      chatWindowRef.current.scrollToMessage(targetMessageId);
+      setTargetMessageId(null);
+    }
+  }, [selectedConversationId, targetMessageId]);
 
   if (!usuario) return null;
 
@@ -64,11 +93,26 @@ export function Chat() {
               <span className="font-medium text-sm">Chat</span>
             </button>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
-            <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
-            <span className="text-sm text-[#00D4FF] font-medium">
-              {onlineCount} online
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowGlobalSearch(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#1a3a4a]/50 bg-[#0d1419] hover:bg-[#151f26] hover:border-[#00D4FF]/30 transition-all group"
+              title="Busca Global (Ctrl+K)"
+            >
+              <Search className="w-4 h-4 text-gray-400 group-hover:text-[#00D4FF]" />
+              <span className="text-sm text-gray-400 group-hover:text-[#00D4FF] font-medium">
+                Buscar
+              </span>
+              <span className="text-xs text-gray-600 bg-[#1a3a4a]/30 px-2 py-0.5 rounded">
+                Ctrl+K
+              </span>
+            </button>
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
+              <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
+              <span className="text-sm text-[#00D4FF] font-medium">
+                {onlineCount} online
+              </span>
+            </div>
           </div>
         </div>
 
@@ -94,6 +138,7 @@ export function Chat() {
           >
             {selectedConversationId ? (
               <ChatWindow
+                ref={chatWindowRef}
                 conversationId={selectedConversationId}
                 userId={usuario.id}
                 onBack={isMobile ? () => setSelectedConversationId(null) : undefined}
@@ -126,6 +171,18 @@ export function Chat() {
           setShowCreateGroupModal(false);
         }}
       />
+
+      {showGlobalSearch && (
+        <GlobalChatSearch
+          userId={usuario.id}
+          onSelectContact={(conversationId) => {
+            setSelectedConversationId(conversationId);
+            setShowGlobalSearch(false);
+          }}
+          onSelectMessage={handleSelectMessage}
+          onClose={() => setShowGlobalSearch(false)}
+        />
+      )}
     </>
   );
 }
