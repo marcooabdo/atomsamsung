@@ -146,6 +146,7 @@ export function Kanban() {
   const [tecnicos, setTecnicos] = useState<Array<{id: string; nome: string}>>([]);
   const [minDiasAbertos, setMinDiasAbertos] = useState<number>(0);
   const [showExportModal, setShowExportModal] = useState(false);
+  const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -452,11 +453,15 @@ export function Kanban() {
           ),
           cotacao_pecas:cotacoes_pecas(
             valor_base_gspn,
-            quantidade
+            quantidade,
+            codigo_peca,
+            descricao
           ),
           os_pecas:os_pecas(
             valor_gspn,
-            quantidade
+            quantidade,
+            codigo_peca,
+            descricao
           ),
           requisicoes:requisicoes_pecas(
             id,
@@ -477,6 +482,9 @@ export function Kanban() {
                 delivery
               )
             )
+          ),
+          comentarios:os_comentarios(
+            comentario
           ),
           pagamentos:pagamentos(
             taxa_valor
@@ -985,11 +993,96 @@ export function Kanban() {
     }
   };
 
+  // Função de busca universal profunda
+  const performUniversalSearch = (os: any, term: string): { matches: boolean; source: 'visible' | 'hidden' } => {
+    if (!term) return { matches: true, source: 'visible' };
+
+    const searchLower = term.toLowerCase();
+
+    // Busca em campos visíveis do card
+    const visibleFields = [
+      os.cliente_nome,
+      os.numero_os_samsung,
+      os.numero_os_interna,
+      os.aparelho_modelo,
+      os.aparelho_marca,
+      os.cliente_telefone,
+      os.cliente_telefone_2,
+      os.cliente_email,
+      os.aparelho_nserie,
+      os.aparelho_imei,
+      os.valor_total?.toString(),
+      os.valor_pago?.toString(),
+      os.saldo_restante?.toString(),
+      os.cliente_logradouro,
+      os.cliente_bairro,
+      os.cliente_cidade,
+      os.cliente_estado,
+      os.cliente_cep,
+      os.defeito_relatado,
+      os.diagnostico,
+      os.observacoes_internas
+    ];
+
+    const matchesVisible = visibleFields.some(field =>
+      field && field.toString().toLowerCase().includes(searchLower)
+    );
+
+    if (matchesVisible) {
+      return { matches: true, source: 'visible' };
+    }
+
+    // Busca em peças (cotacao_pecas e os_pecas)
+    const cotacaoPecas = (os as any).cotacao_pecas || [];
+    const osPecas = (os as any).os_pecas || [];
+    const allPecas = [...cotacaoPecas, ...osPecas];
+
+    const matchesPecas = allPecas.some((peca: any) =>
+      (peca.codigo_peca && peca.codigo_peca.toLowerCase().includes(searchLower)) ||
+      (peca.descricao && peca.descricao.toLowerCase().includes(searchLower))
+    );
+
+    if (matchesPecas) {
+      return { matches: true, source: 'hidden' };
+    }
+
+    // Busca em requisições
+    const requisicoes = (os as any).requisicoes || [];
+    const matchesRequisicoes = requisicoes.some((req: any) =>
+      (req.codigo_peca && req.codigo_peca.toLowerCase().includes(searchLower)) ||
+      (req.descricao && req.descricao.toLowerCase().includes(searchLower)) ||
+      (req.observacoes_pedido && req.observacoes_pedido.toLowerCase().includes(searchLower)) ||
+      (req.numero_pedido_samsung && req.numero_pedido_samsung.toLowerCase().includes(searchLower)) ||
+      (req.peca_estoque?.delivery && req.peca_estoque.delivery.toLowerCase().includes(searchLower)) ||
+      (req.peca_estoque?.pn && req.peca_estoque.pn.toLowerCase().includes(searchLower))
+    );
+
+    if (matchesRequisicoes) {
+      return { matches: true, source: 'hidden' };
+    }
+
+    // Busca em comentários
+    const comentarios = (os as any).comentarios || [];
+    const matchesComentarios = comentarios.some((comentario: any) =>
+      comentario.comentario && comentario.comentario.toLowerCase().includes(searchLower)
+    );
+
+    if (matchesComentarios) {
+      return { matches: true, source: 'hidden' };
+    }
+
+    return { matches: false, source: 'visible' };
+  };
+
   const filteredData = Object.keys(osData).reduce((acc, coluna) => {
+    const newMatchSource: Record<string, 'hidden' | 'visible'> = {};
+
     let filtered = osData[coluna].filter(os => {
-      const matchesSearch = os.cliente_nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (os.numero_os_samsung && os.numero_os_samsung.toLowerCase().includes(searchTerm.toLowerCase())) ||
-        (os.numero_os_interna && os.numero_os_interna.toLowerCase().includes(searchTerm.toLowerCase()));
+      const searchResult = performUniversalSearch(os, searchTerm);
+
+      if (searchResult.matches && searchResult.source === 'hidden') {
+        newMatchSource[os.id] = 'hidden';
+      }
 
       const matchesTipoOS = tipoOSFilters.length === 0 ||
         tipoOSFilters.some(filter => {
@@ -1007,8 +1100,15 @@ export function Kanban() {
 
       const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
 
-      return matchesSearch && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
+      return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
     });
+
+    // Atualizar o estado de match source
+    if (Object.keys(newMatchSource).length > 0) {
+      setSearchMatchSource(prev => ({ ...prev, ...newMatchSource }));
+    } else if (searchTerm === '') {
+      setSearchMatchSource({});
+    }
 
     // Aplicar ordenação específica da coluna
     const sortOrder = columnSortOrder[coluna] || 'sequencia';
@@ -1115,10 +1215,11 @@ export function Kanban() {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#00D4FF]/50" />
             <input
               type="text"
-              placeholder="Buscar OS, Cliente..."
+              placeholder="Busca Universal: OS, Cliente, Peças, Comentários, Endereço, Serial, IMEI..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="neon-input pl-10 text-xs py-2"
+              title="Busca profunda em todos os dados: número da OS, nome, telefone, email, endereço, modelo, serial, IMEI, peças, comentários e histórico"
             />
           </div>
 
@@ -1780,6 +1881,19 @@ export function Kanban() {
                                 }}>
                                   {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
                                 </h5>
+                                {searchMatchSource[os.id] === 'hidden' && (
+                                  <div
+                                    className="p-0.5 rounded flex-shrink-0"
+                                    style={{
+                                      background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.1) 100%)',
+                                      border: '1px solid rgba(57,255,20,0.4)',
+                                      boxShadow: '0 0 8px rgba(57,255,20,0.3)'
+                                    }}
+                                    title="Correspondência encontrada em comentários, peças ou histórico"
+                                  >
+                                    <Search className="w-2.5 h-2.5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 3px #39FF14)' }} />
+                                  </div>
+                                )}
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
