@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
+import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2 } from 'lucide-react';
 import { ModalSelecionarID } from './ModalSelecionarID';
 import { ModalPedirPeca } from './ModalPedirPeca';
 import { ModalRegistrarValorGSPN } from './ModalRegistrarValorGSPN';
@@ -37,6 +37,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const [modalRegistrarValor, setModalRegistrarValor] = useState<any>(null);
   const [modalJustificativa, setModalJustificativa] = useState<any>(null);
   const [modalVerPedido, setModalVerPedido] = useState<any>(null);
+  const [historicoMinimizado, setHistoricoMinimizado] = useState(false);
+  const [buscaHistorico, setBuscaHistorico] = useState('');
 
   useEffect(() => {
     loadData();
@@ -910,6 +912,40 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     return dataB - dataA;
   });
 
+  // Filtrar histórico com base na busca
+  const historicoFiltrado = historicoCompleto.filter(grupo => {
+    if (!buscaHistorico.trim()) return true;
+
+    const termoBusca = buscaHistorico.toLowerCase().trim();
+
+    // Buscar no número da OS
+    if (grupo.numero_os_samsung?.toLowerCase().includes(termoBusca)) return true;
+    if (grupo.numero_os_interna?.toLowerCase().includes(termoBusca)) return true;
+
+    // Buscar nas requisições
+    return grupo.requisicoes.some((req: any) => {
+      // Buscar no código da peça
+      if (req.codigo_peca?.toLowerCase().includes(termoBusca)) return true;
+
+      // Buscar no ID da peça
+      if (req.peca_estoque?.id_numerico?.toString().includes(termoBusca)) return true;
+
+      // Buscar no delivery da peça
+      if (req.peca_estoque?.estoque_etiquetas?.[0]?.delivery?.toLowerCase().includes(termoBusca)) return true;
+
+      // Buscar em lotes
+      if (req.is_lote && req.pecas_lote) {
+        return req.pecas_lote.some((peca: any) => {
+          if (peca.id_numerico?.toString().includes(termoBusca)) return true;
+          if (peca.estoque_etiquetas?.[0]?.delivery?.toLowerCase().includes(termoBusca)) return true;
+          return false;
+        });
+      }
+
+      return false;
+    });
+  });
+
   return (
     <div className="space-y-6">
       <EstoqueDashboard
@@ -1371,26 +1407,82 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
       {/* HISTÓRICO COMPLETO DE TRANSFERÊNCIAS */}
       <div>
-        <h3 className="text-lg font-bold text-[#39FF14] mb-4 flex items-center gap-2">
-          <Check className="w-5 h-5" />
-          HISTÓRICO DE TRANSFERÊNCIAS ({historicoCompleto.length} OSs)
-        </h3>
-        <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4 mb-4">
-          <div className="flex items-start gap-2">
-            <AlertCircle className="w-5 h-5 text-[#39FF14] flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-[#39FF14] font-semibold mb-1">
-                Histórico Completo de Transferências
-              </p>
-              <p className="text-xs text-gray-300">
-                Todas as requisições atendidas, GI postadas e devoluções, ordenadas da mais recente para a mais antiga. Mostrando até 1000 registros mais recentes.
-              </p>
-            </div>
-          </div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#39FF14] flex items-center gap-2">
+            <Check className="w-5 h-5" />
+            HISTÓRICO DE TRANSFERÊNCIAS ({historicoCompleto.length} OSs)
+          </h3>
+          <button
+            onClick={() => setHistoricoMinimizado(!historicoMinimizado)}
+            className="neon-button px-4 py-2 flex items-center gap-2"
+            style={{
+              backgroundColor: '#39FF1410',
+              color: '#39FF14',
+              borderColor: '#39FF1460'
+            }}
+          >
+            {historicoMinimizado ? (
+              <>
+                <Maximize2 className="w-4 h-4" />
+                MAXIMIZAR
+              </>
+            ) : (
+              <>
+                <Minimize2 className="w-4 h-4" />
+                MINIMIZAR
+              </>
+            )}
+          </button>
         </div>
-        {historicoCompleto.length > 0 ? (
+
+        {!historicoMinimizado && (
+          <>
+            <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-[#39FF14] flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-[#39FF14] font-semibold mb-1">
+                    Histórico Completo de Transferências
+                  </p>
+                  <p className="text-xs text-gray-300">
+                    Todas as requisições atendidas, GI postadas e devoluções, ordenadas da mais recente para a mais antiga. Mostrando até 1000 registros mais recentes.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Campo de busca */}
+            <div className="premium-card p-4 mb-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
+                <input
+                  type="text"
+                  value={buscaHistorico}
+                  onChange={(e) => setBuscaHistorico(e.target.value)}
+                  placeholder="Buscar por OS, Delivery, ID, Código..."
+                  className="w-full pl-10 pr-4 py-3 bg-black/30 border border-[#39FF14]/30 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#39FF14] transition-colors"
+                />
+                {buscaHistorico && (
+                  <button
+                    onClick={() => setBuscaHistorico('')}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-[#39FF14] transition-colors"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                )}
+              </div>
+              {buscaHistorico && (
+                <p className="text-xs text-gray-400 mt-2">
+                  Mostrando {historicoFiltrado.length} de {historicoCompleto.length} OSs
+                </p>
+              )}
+            </div>
+          </>
+        )}
+
+        {!historicoMinimizado && historicoCompleto.length > 0 ? (
           <div className="space-y-3">
-            {historicoCompleto.map((grupo) => (
+            {historicoFiltrado.map((grupo) => (
               <div key={grupo.os_id} className="premium-card border-[#39FF14]/30">
                 <div
                   className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
@@ -1557,8 +1649,30 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                 )}
               </div>
             ))}
+            {historicoFiltrado.length === 0 && buscaHistorico && (
+              <div className="premium-card border-[#FFBF00]/30">
+                <div className="p-8 text-center">
+                  <Search className="w-12 h-12 text-[#FFBF00] mx-auto mb-4" />
+                  <p className="text-[#FFBF00] mb-2 font-semibold">Nenhum resultado encontrado</p>
+                  <p className="text-xs text-gray-400">
+                    Não encontramos transferências que correspondam aos critérios "{buscaHistorico}".
+                  </p>
+                  <button
+                    onClick={() => setBuscaHistorico('')}
+                    className="neon-button mt-4 px-4 py-2"
+                    style={{
+                      backgroundColor: '#FFBF0020',
+                      color: '#FFBF00',
+                      borderColor: '#FFBF0060'
+                    }}
+                  >
+                    LIMPAR BUSCA
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        ) : (
+        ) : !historicoMinimizado ? (
           <div className="premium-card border-gray-700">
             <div className="p-8 text-center">
               <AlertTriangle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
@@ -1568,7 +1682,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               </p>
             </div>
           </div>
-        )}
+        ) : null}
       </div>
 
       {/* Modais */}
