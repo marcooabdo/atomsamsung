@@ -1080,18 +1080,21 @@ export function Kanban() {
   };
 
   return (
-    <div className="h-[calc(100vh-56px)] flex flex-col gap-2 overflow-hidden">
-      <UnitFilter
-        unidades={unidades}
-        selectedUnidade={selectedUnidade}
-        onUnidadeChange={handleUnidadeChange}
-      />
-
-      {selectedUnidade && (
-        <JobStatusCard
-          unidadeId={selectedUnidade}
+    <div className="h-[calc(100vh-56px)] flex flex-col gap-1.5 overflow-hidden">
+      {/* Container para UnitFilter e JobStatusCard lado a lado */}
+      <div className={`grid gap-1.5 ${selectedUnidade ? 'grid-cols-[45%_55%]' : 'grid-cols-1'}`}>
+        <UnitFilter
+          unidades={unidades}
+          selectedUnidade={selectedUnidade}
+          onUnidadeChange={handleUnidadeChange}
         />
-      )}
+
+        {selectedUnidade && (
+          <JobStatusCard
+            unidadeId={selectedUnidade}
+          />
+        )}
+      </div>
 
       <div className="premium-card p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">

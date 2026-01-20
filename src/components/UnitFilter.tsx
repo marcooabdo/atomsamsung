@@ -23,7 +23,7 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
   if (!canSeeAllUnits) {
     if (!userUnidade) {
       return (
-        <div className="premium-card p-4 bg-red-500/10 border border-red-500/30">
+        <div className="premium-card p-3 bg-red-500/10 border border-red-500/30">
           <div className="flex items-center gap-3">
             <Building2 className="w-5 h-5 text-red-400" />
             <div>
@@ -36,7 +36,7 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
     }
     const unidade = unidades.find(u => u.id === userUnidade);
     return (
-      <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+      <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
         <div className="flex items-center gap-3">
           <Building2 className="w-5 h-5 text-[#00D4FF]" />
           <div>
@@ -49,7 +49,7 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
   }
 
   return (
-    <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+    <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
       <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
         <Building2 className="w-4 h-4" />
         Filtrar por Unidade
