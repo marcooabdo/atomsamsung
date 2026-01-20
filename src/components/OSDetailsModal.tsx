@@ -212,19 +212,39 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   async function aplicarCortesia() {
     if (!osDetails) return;
 
-    const confirmar = window.confirm(
-      `Tem certeza que deseja aplicar CORTESIA para a OS ${osDetails.numero_os_samsung || osDetails.numero_os_interna}?\n\nEsta ação marcará a OS como cortesia e não haverá cobrança ao cliente.`
+    const motivo = prompt(
+      `Por favor, informe o MOTIVO da cortesia para a OS ${osDetails.numero_os_samsung || osDetails.numero_os_interna}:`
     );
 
-    if (!confirmar) return;
+    if (!motivo || motivo.trim() === '') {
+      alert('É obrigatório informar o motivo da cortesia.');
+      return;
+    }
 
     try {
-      const { error } = await supabase
+      const { error: updateError } = await supabase
         .from('os')
-        .update({ is_cortesia: true })
+        .update({
+          is_cortesia: true,
+          motivo_cortesia: motivo.trim()
+        })
         .eq('id', osId);
 
-      if (error) throw error;
+      if (updateError) throw updateError;
+
+      const { error: logError } = await supabase
+        .from('os_audit_logs')
+        .insert({
+          os_id: osId,
+          tipo_alteracao: 'cortesia_aplicada',
+          descricao: `Cortesia aplicada. Motivo: ${motivo.trim()}`,
+          valores_alterados: {
+            is_cortesia: { old: false, new: true },
+            motivo_cortesia: { old: null, new: motivo.trim() }
+          }
+        });
+
+      if (logError) console.error('Erro ao salvar log:', logError);
 
       alert('Cortesia aplicada com sucesso!');
       await loadOSDetails();
@@ -513,20 +533,42 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
             <span className="px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded-full text-sm font-medium">
               {osDetails.tipo_os}
             </span>
-            {(osDetails as any).is_cortesia && (
-              <span className="px-3 py-1 bg-green-100 text-green-700 border border-green-400 rounded-full text-sm font-bold shadow-lg animate-pulse">
-                CORTESIA
-              </span>
-            )}
-            {osDetails.tipo_os === 'OW' && !(osDetails as any).is_cortesia && (
-              <button
-                onClick={aplicarCortesia}
-                className="px-3 py-1 bg-green-50 text-green-700 border border-green-400 rounded-full text-sm font-medium hover:bg-green-100 transition-colors"
-              >
-                Aplicar Cortesia
-              </button>
-            )}
           </div>
+
+          {osDetails.tipo_os === 'OW' && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                <FileText className="w-5 h-5 text-green-600" />
+                INFORMAÇÃO DA OS
+              </h3>
+              <div className="flex items-center gap-3">
+                <div className="flex-1">
+                  <span className="text-gray-600 text-sm">Tipo de Atendimento:</span>
+                  <p className="font-medium text-gray-900">{formatTipoAtendimento(osDetails.tipo_atendimento)}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(osDetails as any).is_cortesia ? (
+                    <>
+                      <span className="px-3 py-1 bg-green-100 text-green-700 border border-green-400 rounded-full text-sm font-bold shadow-lg">
+                        CORTESIA
+                      </span>
+                      <div className="text-sm text-gray-600">
+                        <p className="font-medium">Motivo:</p>
+                        <p className="text-gray-900">{(osDetails as any).motivo_cortesia || '—'}</p>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      onClick={aplicarCortesia}
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm"
+                    >
+                      Aplicar Cortesia
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
 
           {osDetails.numero_os_samsung && (
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">

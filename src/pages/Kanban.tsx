@@ -718,28 +718,6 @@ export function Kanban() {
     }
   };
 
-  const aplicarCortesia = async (osId: string, osNumero: string) => {
-    const confirmar = window.confirm(
-      `Tem certeza que deseja aplicar CORTESIA para a OS ${osNumero}?\n\nEsta ação marcará a OS como cortesia e não haverá cobrança ao cliente.`
-    );
-
-    if (!confirmar) return;
-
-    try {
-      const { error } = await supabase
-        .from('os')
-        .update({ is_cortesia: true })
-        .eq('id', osId);
-
-      if (error) throw error;
-
-      alert('Cortesia aplicada com sucesso!');
-      loadKanbanData();
-    } catch (error) {
-      alert('Erro ao aplicar cortesia. Tente novamente.');
-    }
-  };
-
   const handleDrop = async (e: React.DragEvent, targetColumn: string) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1861,21 +1839,6 @@ export function Kanban() {
                               >
                                 {os.tipo_os}
                               </span>
-                              {(os as any).is_cortesia && (
-                                <span
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(57,255,20,0.3) 0%, rgba(57,255,20,0.15) 100%)',
-                                    color: '#39FF14',
-                                    border: '1px solid rgba(57,255,20,0.6)',
-                                    boxShadow: '0 0 12px rgba(57,255,20,0.4)',
-                                    animation: 'pulse 2s infinite'
-                                  }}
-                                  title="Esta OS foi marcada como CORTESIA - Sem cobrança"
-                                >
-                                  CORTESIA
-                                </span>
-                              )}
                               {os.tipo_orcamento === 'samsung_contigo' && (
                                 <span
                                   className="px-1.5 py-0.5 rounded text-[9px] font-bold"
@@ -2180,26 +2143,6 @@ export function Kanban() {
                                 </div>
                               );
                             })()}
-                            {os.tipo_os === 'OW' && !(os as any).is_cortesia && (
-                              <div className="mt-1.5 pt-1.5 border-t" style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    aplicarCortesia(os.id, os.numero_os_samsung || os.numero_os_interna || 'S/N');
-                                  }}
-                                  className="w-full px-2 py-1.5 rounded text-[10px] font-bold transition-all duration-200 hover:scale-105"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.1) 100%)',
-                                    color: '#39FF14',
-                                    border: '1px solid rgba(57,255,20,0.5)',
-                                    boxShadow: '0 0 8px rgba(57,255,20,0.2)'
-                                  }}
-                                  title="Marcar esta OS como cortesia (sem cobrança)"
-                                >
-                                  Aplicar Cortesia
-                                </button>
-                              </div>
-                            )}
                             {badgeFilters.sla && (
                               <div
                                 className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t"
