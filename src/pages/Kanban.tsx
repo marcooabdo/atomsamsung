@@ -1272,7 +1272,7 @@ export function Kanban() {
                     maxHeight: 'calc(100vh - 180px)'
                   }}
                 >
-                  <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                  <div className="overflow-y-auto scroll-amber p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
                     <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30">
                       TIPO DE OS
                     </div>
@@ -1343,43 +1343,51 @@ export function Kanban() {
                     ))}
                   </div>
 
-                  {tecnicos.length > 0 && (
-                    <>
-                      <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30 mt-3">
-                        TÉCNICO
-                      </div>
-                      <div className="space-y-1 mb-3">
-                        {tecnicos.map((tecnico) => (
-                          <div
-                            key={tecnico.id}
-                            onClick={() => {
-                              if (tecnicoFilters.includes(tecnico.id)) {
-                                setTecnicoFilters(tecnicoFilters.filter(t => t !== tecnico.id));
-                              } else {
-                                setTecnicoFilters([...tecnicoFilters, tecnico.id]);
-                              }
-                            }}
-                            className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
-                            style={{
-                              background: tecnicoFilters.includes(tecnico.id)
-                                ? 'linear-gradient(135deg, rgba(255,191,0,0.15) 0%, rgba(255,191,0,0.05) 100%)'
-                                : 'transparent',
-                              border: `1px solid ${tecnicoFilters.includes(tecnico.id) ? 'rgba(255,191,0,0.3)' : 'transparent'}`
-                            }}
-                          >
-                            <input
-                              type="checkbox"
-                              checked={tecnicoFilters.includes(tecnico.id)}
-                              onChange={() => {}}
-                              className="w-3.5 h-3.5 rounded accent-[#FFBF00] pointer-events-none"
-                            />
-                            <span className={`text-xs flex-1 ${tecnicoFilters.includes(tecnico.id) ? 'text-[#FFBF00] font-medium' : 'text-gray-300'}`}>
-                              {tecnico.nome}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </>
+                  {/* Seção de Técnicos - sempre visível */}
+                  <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30 mt-3">
+                    TÉCNICO(A)
+                  </div>
+                  {tecnicos.length > 0 ? (
+                    <div className="space-y-1 mb-3">
+                      {tecnicos.map((tecnico) => (
+                        <div
+                          key={tecnico.id}
+                          onClick={() => {
+                            if (tecnicoFilters.includes(tecnico.id)) {
+                              setTecnicoFilters(tecnicoFilters.filter(t => t !== tecnico.id));
+                            } else {
+                              setTecnicoFilters([...tecnicoFilters, tecnico.id]);
+                            }
+                          }}
+                          className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
+                          style={{
+                            background: tecnicoFilters.includes(tecnico.id)
+                              ? 'linear-gradient(135deg, rgba(255,191,0,0.15) 0%, rgba(255,191,0,0.05) 100%)'
+                              : 'transparent',
+                            border: `1px solid ${tecnicoFilters.includes(tecnico.id) ? 'rgba(255,191,0,0.3)' : 'transparent'}`
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={tecnicoFilters.includes(tecnico.id)}
+                            onChange={() => {}}
+                            className="w-3.5 h-3.5 rounded accent-[#FFBF00] pointer-events-none"
+                          />
+                          <span className={`text-xs flex-1 ${tecnicoFilters.includes(tecnico.id) ? 'text-[#FFBF00] font-medium' : 'text-gray-300'}`}>
+                            {tecnico.nome}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-3 rounded mb-3" style={{
+                      background: 'rgba(255,191,0,0.05)',
+                      border: '1px solid rgba(255,191,0,0.2)'
+                    }}>
+                      <p className="text-xs text-gray-400 text-center">
+                        {selectedUnidade ? 'Nenhum técnico cadastrado nesta unidade' : 'Selecione uma unidade para ver os técnicos'}
+                      </p>
+                    </div>
                   )}
 
                   <div className="pt-3 mt-3 border-t border-[#FFBF00]/30">

@@ -22,7 +22,7 @@
     box-shadow: 0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3);
   }
 
-  /* Custom scrollbar styles */
+  /* Custom scrollbar styles - Default (green) */
   .overflow-y-auto::-webkit-scrollbar {
     width: 8px;
   }
@@ -46,5 +46,31 @@
   .overflow-y-auto {
     scrollbar-width: thin;
     scrollbar-color: rgba(57, 255, 20, 0.3) rgba(0, 0, 0, 0.2);
+  }
+
+  /* Custom scrollbar amarelo para filtros */
+  .scroll-amber::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .scroll-amber::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+  }
+
+  .scroll-amber::-webkit-scrollbar-thumb {
+    background: rgba(255, 191, 0, 0.3);
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+
+  .scroll-amber::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 191, 0, 0.5);
+  }
+
+  /* Firefox scrollbar amarelo */
+  .scroll-amber {
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 191, 0, 0.3) rgba(0, 0, 0, 0.2);
   }
 }
