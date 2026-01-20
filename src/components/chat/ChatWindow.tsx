@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, DragEvent, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, DragEvent } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessageList, ChatMessageListRef, Message } from './ChatMessageList';
@@ -9,11 +9,6 @@ interface ChatWindowProps {
   conversationId: string;
   userId: string;
   onBack?: () => void;
-}
-
-export interface ChatWindowRef {
-  scrollToMessage: (messageId: string) => void;
-  scrollToBottom: () => void;
 }
 
 interface ConversationInfo {
@@ -32,7 +27,7 @@ interface ConversationInfo {
   user_role?: string;
 }
 
-export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversationId, userId, onBack }, ref) => {
+export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) {
   const [conversationInfo, setConversationInfo] = useState<ConversationInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,32 +36,11 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
   const dragCounterRef = useRef(0);
   const chatInputRef = useRef<ChatInputRef>(null);
 
-  useImperativeHandle(ref, () => ({
-    scrollToMessage: (messageId: string) => {
-      setTimeout(() => {
-        if (messageListRef.current?.scrollToBottom) {
-          messageListRef.current.scrollToBottom(false);
-        }
-      }, 300);
-    },
-    scrollToBottom: () => {
-      if (messageListRef.current?.scrollToBottom) {
-        messageListRef.current.scrollToBottom(false);
-      }
-    }
-  }));
-
   useEffect(() => {
     setLoading(true);
     setError(null);
     loadConversationInfo();
     markMessagesAsRead();
-
-    setTimeout(() => {
-      if (messageListRef.current?.scrollToBottom) {
-        messageListRef.current.scrollToBottom(false);
-      }
-    }, 300);
   }, [conversationId]);
 
   const loadConversationInfo = async () => {
@@ -261,6 +235,4 @@ export const ChatWindow = forwardRef<ChatWindowRef, ChatWindowProps>(({ conversa
       />
     </div>
   );
-});
-
-ChatWindow.displayName = 'ChatWindow';
+}
