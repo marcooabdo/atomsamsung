@@ -321,7 +321,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .select(`
           *,
           unidade:unidades!os_unidade_id_fkey(nome),
-          cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao)
+          cotacao:cotacoes!os_cotacao_id_fkey(numero_cotacao),
+          tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome)
         `)
         .eq('id', osId)
         .single();
@@ -2268,20 +2269,28 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   PDF
                 </button>
 
-                <button
-                  onClick={() => setMostrarModalIniciarReparo(true)}
-                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-[#00D4FF]/30"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                    border: '1px solid #00D4FF',
-                    color: '#00D4FF',
-                    boxShadow: '0 0 10px rgba(0,212,255,0.2)'
-                  }}
-                  title={os.tecnico_designado_id ? 'Alterar Técnico Responsável' : 'Iniciar Reparo e Designar Técnico'}
-                >
-                  <Wrench className="w-4 h-4" />
-                  {os.tecnico_designado_id ? 'ALTERAR TÉCNICO' : 'INICIAR REPARO'}
-                </button>
+                <div className="flex flex-col gap-1">
+                  <button
+                    onClick={() => setMostrarModalIniciarReparo(true)}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-[#00D4FF]/30"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
+                      border: '1px solid #00D4FF',
+                      color: '#00D4FF',
+                      boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                    }}
+                    title={os.tecnico_designado_id ? 'Alterar Técnico Responsável' : 'Iniciar Reparo e Designar Técnico'}
+                  >
+                    <Wrench className="w-4 h-4" />
+                    {os.tecnico_designado_id ? 'ALTERAR TÉCNICO' : 'INICIAR REPARO'}
+                  </button>
+                  {os.tecnico_designado_id && os.tecnico_designado?.nome && (
+                    <div className="text-xs text-center" style={{ color: '#00D4FF' }}>
+                      <User className="w-3 h-3 inline mr-1" />
+                      {os.tecnico_designado.nome}
+                    </div>
+                  )}
+                </div>
 
                 <div className="relative">
               <button

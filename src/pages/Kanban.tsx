@@ -129,7 +129,8 @@ export function Kanban() {
     sla: true,
     status: true,
     iniciarReparo: true,
-    analiseConcluida: true
+    analiseConcluida: true,
+    tecnico: true
   });
   const [tipoOSFilters, setTipoOSFilters] = useState<string[]>([]);
   const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
@@ -1138,6 +1139,7 @@ export function Kanban() {
                       { key: 'pedidoAtivo', label: 'Pedido Ativo' },
                       { key: 'pecaTransito', label: 'Peça em Trânsito' },
                       { key: 'comTecnico', label: 'Com Técnico / GI' },
+                      { key: 'tecnico', label: 'Técnico Designado' },
                       { key: 'agendamento', label: 'Agendamento' },
                       { key: 'financeiro', label: 'Financeiro' },
                       { key: 'lucro', label: 'Lucro/Prejuízo' },
@@ -1177,11 +1179,14 @@ export function Kanban() {
                           pedidoAtivo: true,
                           pecaTransito: true,
                           comTecnico: true,
+                          tecnico: true,
                           agendamento: true,
                           financeiro: true,
                           lucro: true,
                           sla: true,
-                          status: true
+                          status: true,
+                          iniciarReparo: true,
+                          analiseConcluida: true
                         });
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
@@ -1200,11 +1205,14 @@ export function Kanban() {
                           pedidoAtivo: false,
                           pecaTransito: false,
                           comTecnico: false,
+                          tecnico: false,
                           agendamento: false,
                           financeiro: false,
                           lucro: false,
                           sla: false,
-                          status: false
+                          status: false,
+                          iniciarReparo: false,
+                          analiseConcluida: false
                         });
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
@@ -1961,6 +1969,33 @@ export function Kanban() {
                                     {(os as any).tecnico_agendado?.nome && (
                                       <p className="text-[9px] text-gray-500 truncate">{(os as any).tecnico_agendado.nome}</p>
                                     )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {badgeFilters.tecnico && os.tecnico_designado_id && (os as any).tecnico_designado?.nome && (
+                              <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
+                                style={{
+                                  borderColor: 'rgba(0,212,255,0.3)',
+                                  background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,212,255,0.03) 100%)',
+                                  boxShadow: '0 0 10px rgba(0,212,255,0.1)'
+                                }}
+                              >
+                                <div className="flex items-center gap-1.5">
+                                  <User className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                  <div className="flex-1 min-w-0">
+                                    <span
+                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
+                                      style={{
+                                        background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.15) 100%)',
+                                        color: '#00D4FF',
+                                        border: '1px solid rgba(0,212,255,0.5)'
+                                      }}
+                                    >
+                                      TÉCNICO
+                                    </span>
+                                    <p className="text-[10px] text-gray-300 font-medium truncate">{(os as any).tecnico_designado.nome}</p>
                                   </div>
                                 </div>
                               </div>
