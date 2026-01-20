@@ -455,13 +455,31 @@ export function Kanban() {
             pn,
             descricao,
             valor_base_gspn,
-            quantidade
+            quantidade,
+            estoque_peca_id,
+            estoque_peca:estoque_pecas!cotacoes_pecas_estoque_peca_id_fkey(
+              delivery,
+              pn,
+              estoque_etiquetas(
+                id_sequencial,
+                delivery
+              )
+            )
           ),
           os_pecas:os_pecas(
             pn,
             descricao,
             valor_gspn,
-            quantidade
+            quantidade,
+            estoque_peca_id,
+            estoque_peca:estoque_pecas!os_pecas_estoque_peca_id_fkey(
+              delivery,
+              pn,
+              estoque_etiquetas(
+                id_sequencial,
+                delivery
+              )
+            )
           ),
           requisicoes:requisicoes_pecas(
             id,
@@ -1003,6 +1021,7 @@ export function Kanban() {
     // Busca em campos visíveis do card
     const visibleFields = [
       os.cliente_nome,
+      os.cliente_cpf,
       os.numero_os_samsung,
       os.numero_os_interna,
       os.aparelho_modelo,
@@ -1033,30 +1052,51 @@ export function Kanban() {
       return { matches: true, source: 'visible' };
     }
 
-    // Busca em peças (cotacao_pecas e os_pecas)
+    // Busca em peças (cotacao_pecas e os_pecas) - inclui delivery e ID da etiqueta
     const cotacaoPecas = (os as any).cotacao_pecas || [];
     const osPecas = (os as any).os_pecas || [];
     const allPecas = [...cotacaoPecas, ...osPecas];
 
-    const matchesPecas = allPecas.some((peca: any) =>
-      (peca.pn && peca.pn.toLowerCase().includes(searchLower)) ||
-      (peca.descricao && peca.descricao.toLowerCase().includes(searchLower))
-    );
+    const matchesPecas = allPecas.some((peca: any) => {
+      // Busca básica em código e descrição
+      const basicMatch =
+        (peca.pn && peca.pn.toLowerCase().includes(searchLower)) ||
+        (peca.descricao && peca.descricao.toLowerCase().includes(searchLower));
+
+      // Busca em delivery do estoque vinculado
+      const deliveryMatch = peca.estoque_peca?.delivery &&
+        peca.estoque_peca.delivery.toLowerCase().includes(searchLower);
+
+      // Busca em ID da etiqueta do estoque vinculado
+      const etiquetaMatch = peca.estoque_peca?.estoque_etiquetas?.some((etiq: any) =>
+        etiq.id_sequencial && etiq.id_sequencial.toString().includes(searchLower)
+      );
+
+      return basicMatch || deliveryMatch || etiquetaMatch;
+    });
 
     if (matchesPecas) {
       return { matches: true, source: 'hidden' };
     }
 
-    // Busca em requisições
+    // Busca em requisições - inclui delivery e ID da etiqueta
     const requisicoes = (os as any).requisicoes || [];
-    const matchesRequisicoes = requisicoes.some((req: any) =>
-      (req.codigo_peca && req.codigo_peca.toLowerCase().includes(searchLower)) ||
-      (req.descricao && req.descricao.toLowerCase().includes(searchLower)) ||
-      (req.observacoes_pedido && req.observacoes_pedido.toLowerCase().includes(searchLower)) ||
-      (req.numero_pedido_samsung && req.numero_pedido_samsung.toLowerCase().includes(searchLower)) ||
-      (req.peca_estoque?.delivery && req.peca_estoque.delivery.toLowerCase().includes(searchLower)) ||
-      (req.peca_estoque?.pn && req.peca_estoque.pn.toLowerCase().includes(searchLower))
-    );
+    const matchesRequisicoes = requisicoes.some((req: any) => {
+      const basicMatch =
+        (req.codigo_peca && req.codigo_peca.toLowerCase().includes(searchLower)) ||
+        (req.descricao && req.descricao.toLowerCase().includes(searchLower)) ||
+        (req.observacoes_pedido && req.observacoes_pedido.toLowerCase().includes(searchLower)) ||
+        (req.numero_pedido_samsung && req.numero_pedido_samsung.toLowerCase().includes(searchLower)) ||
+        (req.peca_estoque?.delivery && req.peca_estoque.delivery.toLowerCase().includes(searchLower)) ||
+        (req.peca_estoque?.pn && req.peca_estoque.pn.toLowerCase().includes(searchLower));
+
+      // Busca em ID da etiqueta
+      const etiquetaMatch = req.peca_estoque?.estoque_etiquetas?.some((etiq: any) =>
+        etiq.id_sequencial && etiq.id_sequencial.toString().includes(searchLower)
+      );
+
+      return basicMatch || etiquetaMatch;
+    });
 
     if (matchesRequisicoes) {
       return { matches: true, source: 'hidden' };

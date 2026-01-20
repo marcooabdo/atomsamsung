@@ -677,12 +677,32 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const [osPecasResult, cotacaoPecasResult] = await Promise.all([
       supabase
         .from('os_pecas')
-        .select('*')
+        .select(`
+          *,
+          estoque_peca:estoque_pecas!os_pecas_estoque_peca_id_fkey(
+            delivery,
+            pn,
+            estoque_etiquetas(
+              id_sequencial,
+              delivery
+            )
+          )
+        `)
         .eq('os_id', currentOsId)
         .order('created_at', { ascending: true }),
       supabase
         .from('cotacoes_pecas')
-        .select('*')
+        .select(`
+          *,
+          estoque_peca:estoque_pecas!cotacoes_pecas_estoque_peca_id_fkey(
+            delivery,
+            pn,
+            estoque_etiquetas(
+              id_sequencial,
+              delivery
+            )
+          )
+        `)
         .eq('os_id', currentOsId)
         .order('created_at', { ascending: true })
     ]);
@@ -700,7 +720,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       valor_total: p.valor_total,
       created_at: p.created_at,
       updated_at: p.updated_at,
-      tipo: 'os_peca'
+      tipo: 'os_peca',
+      estoque_peca: p.estoque_peca,
+      estoque_peca_id: p.estoque_peca_id
     }));
 
     const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
@@ -716,7 +738,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       valor_total: p.valor_base_gspn * p.quantidade,
       created_at: p.created_at,
       updated_at: p.updated_at,
-      tipo: 'cotacao'
+      tipo: 'cotacao',
+      estoque_peca: p.estoque_peca,
+      estoque_peca_id: p.estoque_peca_id
     }));
 
     const todasPecas = [...osPecasFormatadas, ...cotacaoPecas];
@@ -4540,6 +4564,28 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                       {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                    {peca.estoque_peca && (
+                                      <div className="flex items-center gap-3 mt-1 flex-wrap">
+                                        {peca.estoque_peca.delivery && (
+                                          <span className="text-xs px-2 py-0.5 rounded font-medium" style={{
+                                            backgroundColor: '#00D4FF15',
+                                            color: '#00D4FF',
+                                            border: '1px solid #00D4FF40'
+                                          }}>
+                                            Delivery: {peca.estoque_peca.delivery}
+                                          </span>
+                                        )}
+                                        {peca.estoque_peca.estoque_etiquetas && peca.estoque_peca.estoque_etiquetas.length > 0 && (
+                                          <span className="text-xs px-2 py-0.5 rounded font-medium" style={{
+                                            backgroundColor: '#9333EA15',
+                                            color: '#9333EA',
+                                            border: '1px solid #9333EA40'
+                                          }}>
+                                            ID: {peca.estoque_peca.estoque_etiquetas[0].id_sequencial}
+                                          </span>
+                                        )}
+                                      </div>
+                                    )}
                                     <div className="flex items-center gap-4 mt-2">
                                       <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
                                       <p className="text-xs text-gray-500">
