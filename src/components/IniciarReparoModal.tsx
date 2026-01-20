@@ -45,7 +45,7 @@ export function IniciarReparoModal({
 
     const { data: usuariosData } = await supabase
       .from('usuarios')
-      .select('id, nome, cargo')
+      .select('id, nome, numero_tecnico')
       .eq('tipo', 'tecnico')
       .eq('ativo', true)
       .eq('unidade_id', unidadeId)
@@ -193,7 +193,7 @@ export function IniciarReparoModal({
                   <option value="">Selecione um técnico...</option>
                   {usuarios.map((usuario) => (
                     <option key={usuario.id} value={usuario.id}>
-                      {usuario.nome} {usuario.cargo ? `- ${usuario.cargo}` : ''}
+                      {usuario.nome}{usuario.numero_tecnico ? ` (Nº ${usuario.numero_tecnico})` : ''}
                     </option>
                   ))}
                 </select>
@@ -236,7 +236,7 @@ export function IniciarReparoModal({
                   <option value="">Selecione um técnico...</option>
                   {usuarios.map((usuario) => (
                     <option key={usuario.id} value={usuario.id}>
-                      {usuario.nome} {usuario.cargo ? `- ${usuario.cargo}` : ''}
+                      {usuario.nome}{usuario.numero_tecnico ? ` (Nº ${usuario.numero_tecnico})` : ''}
                     </option>
                   ))}
                 </select>
