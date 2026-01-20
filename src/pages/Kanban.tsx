@@ -1082,7 +1082,7 @@ export function Kanban() {
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col gap-1.5 overflow-hidden">
       {/* Container para UnitFilter e JobStatusCard lado a lado */}
-      <div className={`grid gap-1.5 ${selectedUnidade ? 'grid-cols-[43%_57.5%]' : 'grid-cols-1'} max-w-full`}>
+      <div className={`grid gap-1.5 ${selectedUnidade ? 'grid-cols-[40%_57.5%]' : 'grid-cols-1'} max-w-full`}>
         <UnitFilter
           unidades={unidades}
           selectedUnidade={selectedUnidade}
