@@ -1080,7 +1080,7 @@ export function Kanban() {
   };
 
   return (
-    <div className="h-[calc(100vh-64px)] flex flex-col gap-3 overflow-hidden">
+    <div className="h-[calc(100vh-56px)] flex flex-col gap-2 overflow-hidden">
       <UnitFilter
         unidades={unidades}
         selectedUnidade={selectedUnidade}
@@ -1141,10 +1141,10 @@ export function Kanban() {
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(57,255,20,0.3)',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)',
-                    maxHeight: '500px'
+                    maxHeight: '350px'
                   }}
                 >
-                  <div className="overflow-y-auto p-3" style={{ maxHeight: '500px' }}>
+                  <div className="overflow-y-auto p-3" style={{ maxHeight: '350px' }}>
                     <div className="text-xs font-bold text-[#39FF14] mb-3 pb-2 border-b border-[#39FF14]/30">
                       EXIBIR NO CARD
                     </div>
@@ -1269,10 +1269,10 @@ export function Kanban() {
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(255,191,0,0.3)',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,191,0,0.1)',
-                    maxHeight: '500px'
+                    maxHeight: '350px'
                   }}
                 >
-                  <div className="overflow-y-auto scroll-amber p-3" style={{ maxHeight: '500px' }}>
+                  <div className="overflow-y-auto scroll-amber p-3" style={{ maxHeight: '350px' }}>
                     <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30">
                       TIPO DE OS
                     </div>
@@ -1531,7 +1531,7 @@ export function Kanban() {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
         >
-          <div className="flex gap-3 h-full pb-3" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
+          <div className="flex gap-3 h-full pb-2" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
             {visibleColumns.map((coluna) => {
               const ColumnIcon = coluna.icon;
               const isOver = dragOverColumn === coluna.id;
