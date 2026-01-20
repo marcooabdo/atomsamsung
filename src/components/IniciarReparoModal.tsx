@@ -66,13 +66,29 @@ export function IniciarReparoModal({
     try {
       const tecnicoSelecionado = usuarios.find(u => u.id === selectedTecnicoId);
 
-      // Atualiza a OS com o técnico designado
+      // Buscar o tipo de atendimento da OS para saber se move para diagnóstico
+      const { data: osData } = await supabase
+        .from('os')
+        .select('tipo_atendimento')
+        .eq('id', osId)
+        .maybeSingle();
+
+      const tipoAtendimento = osData?.tipo_atendimento;
+      const shouldMoveTodiagnostico = tipoAtendimento === 'CI' || tipoAtendimento === 'IH';
+
+      // Atualiza a OS com o técnico designado e move para diagnóstico se aplicável
+      const updateData: any = {
+        tecnico_designado_id: selectedTecnicoId,
+        tecnico_designado_em: new Date().toISOString()
+      };
+
+      if (shouldMoveTodiagnostico) {
+        updateData.coluna_kanban = 'diagnostico';
+      }
+
       const { error: updateError } = await supabase
         .from('os')
-        .update({
-          tecnico_designado_id: selectedTecnicoId,
-          tecnico_designado_em: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', osId);
 
       if (updateError) throw updateError;
@@ -83,7 +99,7 @@ export function IniciarReparoModal({
         .insert({
           os_id: osId,
           usuario_id: currentUser.id,
-          comentario: `🔧 **REPARO INICIADO**\n\nTécnico **${tecnicoSelecionado?.nome}** foi designado para esta ordem de serviço.\n\n*Iniciado por ${currentUser.nome}*`,
+          comentario: `🔧 **REPARO INICIADO**\n\nTécnico **${tecnicoSelecionado?.nome}** foi designado para esta ordem de serviço.${shouldMoveTodiagnostico ? '\n\n📋 **Status:** Movido para DIAGNÓSTICO' : ''}\n\n*Iniciado por ${currentUser.nome}*`,
           is_system: true
         });
 
@@ -111,7 +127,7 @@ export function IniciarReparoModal({
     try {
       const novoTecnico = usuarios.find(u => u.id === selectedTecnicoId);
 
-      // Atualiza a OS com o novo técnico
+      // Atualiza a OS com o novo técnico (não move para diagnóstico na alteração)
       const { error: updateError } = await supabase
         .from('os')
         .update({

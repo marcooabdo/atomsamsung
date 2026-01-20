@@ -115,7 +115,7 @@ export function Kanban() {
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
   const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const [showIniciarReparoModal, setShowIniciarReparoModal] = useState(false);
-  const [selectedOSForReparo, setSelectedOSForReparo] = useState<{ id: string; numero: string; tecnicoId: string | null; tecnicoNome: string | null } | null>(null);
+  const [selectedOSForReparo, setSelectedOSForReparo] = useState<{ id: string; numero: string; tecnicoId: string | null; tecnicoNome: string | null; unidadeId: string } | null>(null);
   const autoScrollInterval = useRef<number | null>(null);
   const [showBadgeFilter, setShowBadgeFilter] = useState(false);
   const [showTipoFilter, setShowTipoFilter] = useState(false);
@@ -2243,7 +2243,8 @@ export function Kanban() {
                                             id: os.id,
                                             numero: os.numero_os_samsung || os.numero_os_interna || 'S/N',
                                             tecnicoId: os.tecnico_designado_id,
-                                            tecnicoNome: (os as any).tecnico_designado?.nome || null
+                                            tecnicoNome: (os as any).tecnico_designado?.nome || null,
+                                            unidadeId: os.unidade_id
                                           });
                                           setShowIniciarReparoModal(true);
                                         }}
@@ -2264,7 +2265,8 @@ export function Kanban() {
                                         id: os.id,
                                         numero: os.numero_os_samsung || os.numero_os_interna || 'S/N',
                                         tecnicoId: null,
-                                        tecnicoNome: null
+                                        tecnicoNome: null,
+                                        unidadeId: os.unidade_id
                                       });
                                       setShowIniciarReparoModal(true);
                                     }}
@@ -2447,6 +2449,7 @@ export function Kanban() {
         <IniciarReparoModal
           osId={selectedOSForReparo.id}
           osNumero={selectedOSForReparo.numero}
+          unidadeId={selectedOSForReparo.unidadeId}
           currentTecnicoId={selectedOSForReparo.tecnicoId}
           currentTecnicoNome={selectedOSForReparo.tecnicoNome}
           onClose={() => {
