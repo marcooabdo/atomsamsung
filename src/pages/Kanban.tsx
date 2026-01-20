@@ -1,3 +1,4 @@
+// v2.0.1 - Fixed cotacoes_pecas query
 import { useEffect, useState, useRef, useMemo } from 'react';
 import { supabase, formatTipoAtendimentoShort } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -443,6 +444,7 @@ export function Kanban() {
 
   const loadKanbanData = async () => {
     try {
+      console.log('Kanban v2.0.1 - Loading data...');
       let query = supabase
         .from('os')
         .select(`
@@ -455,16 +457,7 @@ export function Kanban() {
             pn,
             descricao,
             valor_base_gspn,
-            quantidade,
-            estoque_peca_id,
-            estoque_peca:estoque_pecas!cotacoes_pecas_estoque_peca_id_fkey(
-              delivery,
-              pn,
-              estoque_etiquetas(
-                id_sequencial,
-                delivery
-              )
-            )
+            quantidade
           ),
           os_pecas:os_pecas(
             pn,

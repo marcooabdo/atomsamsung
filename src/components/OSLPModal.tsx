@@ -692,17 +692,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .order('created_at', { ascending: true }),
       supabase
         .from('cotacoes_pecas')
-        .select(`
-          *,
-          estoque_peca:estoque_pecas!cotacoes_pecas_estoque_peca_id_fkey(
-            delivery,
-            pn,
-            estoque_etiquetas(
-              id_sequencial,
-              delivery
-            )
-          )
-        `)
+        .select('*')
         .eq('os_id', currentOsId)
         .order('created_at', { ascending: true })
     ]);
@@ -738,9 +728,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       valor_total: p.valor_base_gspn * p.quantidade,
       created_at: p.created_at,
       updated_at: p.updated_at,
-      tipo: 'cotacao',
-      estoque_peca: p.estoque_peca,
-      estoque_peca_id: p.estoque_peca_id
+      tipo: 'cotacao'
     }));
 
     const todasPecas = [...osPecasFormatadas, ...cotacaoPecas];
