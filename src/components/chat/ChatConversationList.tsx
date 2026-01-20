@@ -44,6 +44,7 @@ interface ChatConversationListProps {
   selectedConversationId: string | null;
   onSelectConversation: (id: string) => void;
   onCreateGroup: () => void;
+  onOpenGlobalSearch?: () => void;
 }
 
 export function ChatConversationList({
@@ -51,12 +52,12 @@ export function ChatConversationList({
   userType,
   selectedConversationId,
   onSelectConversation,
-  onCreateGroup
+  onCreateGroup,
+  onOpenGlobalSearch
 }: ChatConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [users, setUsers] = useState<User[]>([]);
   const [activeTab, setActiveTab] = useState<'conversations' | 'contacts'>('conversations');
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [creatingConversation, setCreatingConversation] = useState(false);
@@ -292,18 +293,6 @@ export function ChatConversationList({
     await loadConversations();
   };
 
-  const filteredConversations = conversations.filter((conv) => {
-    const searchLower = searchQuery.toLowerCase();
-    if (conv.tipo === 'direct' && conv.other_user) {
-      return conv.other_user.nome.toLowerCase().includes(searchLower);
-    }
-    return conv.nome?.toLowerCase().includes(searchLower);
-  });
-
-  const filteredUsers = users.filter((user) =>
-    user.nome.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   const formatTime = (timestamp: string) => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -371,16 +360,18 @@ export function ChatConversationList({
           </button>
         </div>
 
-        <div className="relative mb-4">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-          <input
-            type="text"
-            placeholder={activeTab === 'conversations' ? 'Buscar conversas...' : 'Buscar contatos...'}
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-lg text-sm text-gray-300 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/40"
-          />
-        </div>
+        <button
+          onClick={onOpenGlobalSearch}
+          className="relative mb-4 w-full flex items-center gap-2 px-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-lg text-sm hover:border-[#00D4FF]/40 transition-all group"
+        >
+          <Search className="w-4 h-4 text-gray-500 group-hover:text-[#00D4FF]" />
+          <span className="flex-1 text-left text-gray-500 group-hover:text-gray-400">
+            Buscar conversas e contatos...
+          </span>
+          <span className="text-xs text-gray-600 bg-[#1a3a4a]/30 px-2 py-0.5 rounded">
+            Ctrl+K
+          </span>
+        </button>
 
         {activeTab === 'conversations' && (
           <button
@@ -399,14 +390,14 @@ export function ChatConversationList({
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D4FF]"></div>
             </div>
-          ) : filteredConversations.length === 0 ? (
+          ) : conversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-500">
               <MessageSquare className="w-12 h-12 mb-2 opacity-50" />
               <p className="text-sm">Nenhuma conversa ainda</p>
             </div>
           ) : (
             <div className="px-3">
-              {filteredConversations.map((conv) => {
+              {conversations.map((conv) => {
                 const displayName = conv.tipo === 'direct' && conv.other_user
                   ? conv.other_user.nome
                   : conv.nome;
@@ -489,7 +480,7 @@ export function ChatConversationList({
             <div className="flex items-center justify-center h-32">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D4FF]"></div>
             </div>
-          ) : filteredUsers.length === 0 ? (
+          ) : users.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-32 text-gray-500">
               <AtSign className="w-12 h-12 mb-2 opacity-50" />
               <p className="text-sm">Nenhum contato encontrado</p>
@@ -502,7 +493,7 @@ export function ChatConversationList({
                   <span className="text-sm text-[#00D4FF]">Abrindo conversa...</span>
                 </div>
               )}
-              {filteredUsers.map((user) => (
+              {users.map((user) => (
                 <button
                   key={user.id}
                   onClick={() => handleStartDirectConversation(user.id)}

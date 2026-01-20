@@ -5,7 +5,7 @@ import { ChatWindow, ChatWindowRef } from '../components/chat/ChatWindow';
 import { CreateGroupModal } from '../components/chat/CreateGroupModal';
 import { GlobalChatSearch } from '../components/chat/GlobalChatSearch';
 import { supabase } from '../lib/supabase';
-import { Building2, MessageCircle, Search } from 'lucide-react';
+import { Building2, MessageCircle } from 'lucide-react';
 import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
@@ -93,26 +93,11 @@ export function Chat() {
               <span className="font-medium text-sm">Chat</span>
             </button>
           </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setShowGlobalSearch(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#1a3a4a]/50 bg-[#0d1419] hover:bg-[#151f26] hover:border-[#00D4FF]/30 transition-all group"
-              title="Busca Global (Ctrl+K)"
-            >
-              <Search className="w-4 h-4 text-gray-400 group-hover:text-[#00D4FF]" />
-              <span className="text-sm text-gray-400 group-hover:text-[#00D4FF] font-medium">
-                Buscar
-              </span>
-              <span className="text-xs text-gray-600 bg-[#1a3a4a]/30 px-2 py-0.5 rounded">
-                Ctrl+K
-              </span>
-            </button>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
-              <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
-              <span className="text-sm text-[#00D4FF] font-medium">
-                {onlineCount} online
-              </span>
-            </div>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
+            <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
+            <span className="text-sm text-[#00D4FF] font-medium">
+              {onlineCount} online
+            </span>
           </div>
         </div>
 
@@ -128,6 +113,7 @@ export function Chat() {
               selectedConversationId={selectedConversationId}
               onSelectConversation={setSelectedConversationId}
               onCreateGroup={() => setShowCreateGroupModal(true)}
+              onOpenGlobalSearch={() => setShowGlobalSearch(true)}
             />
           </div>
 
