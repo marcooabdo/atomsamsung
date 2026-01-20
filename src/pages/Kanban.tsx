@@ -2254,7 +2254,7 @@ export function Kanban() {
                               </div>
                             ))}
 
-                            {badgeFilters.iniciarReparo && coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && (
+                            {badgeFilters.iniciarReparo && coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && os.tipo_orcamento !== 'samsung_contigo' && os.tipo_orcamento !== 'acessorios' && (
                               <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
                                 {os.tecnico_designado_id && (os as any).tecnico_designado && (
                                   <div className="rounded-lg p-2" style={{
