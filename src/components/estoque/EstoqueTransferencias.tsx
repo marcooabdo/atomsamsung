@@ -56,11 +56,12 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           *,
           os:os(numero_os_samsung, numero_os_interna, coluna_kanban, tipo_os),
           peca_estoque:estoque_pecas(
+            id,
             id_numerico,
             valor_com_impostos,
             pn,
             descricao,
-            estoque_etiquetas(delivery)
+            estoque_etiquetas!estoque_pecas_etiquetas_peca_id_fkey(delivery)
           ),
           reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome)
         `)
@@ -95,7 +96,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                 valor_com_impostos,
                 pn,
                 descricao,
-                estoque_etiquetas(delivery)
+                estoque_etiquetas!estoque_pecas_etiquetas_peca_id_fkey(delivery)
               `)
               .in('id', req.pecas_estoque_ids)
               .order('id_numerico');
