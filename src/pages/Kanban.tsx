@@ -1044,18 +1044,24 @@ export function Kanban() {
     const hasCIFilter = tipoAtendimentoFilters.includes('CI');
     const hasIHFilter = tipoAtendimentoFilters.includes('IH');
 
+    // CI tem prioridade máxima: mostra apenas colunas CI
+    // Independente de quantos tipos de OS (LP, NA, OW, SC/ACC) estão selecionados
+    if (hasCIFilter && tipoAtendimentoFilters.length === 1) {
+      return COLUNAS_KANBAN.filter(col => COLUNAS_CI.includes(col.id));
+    }
+
+    // IH tem prioridade máxima: mostra apenas colunas IH
+    // Independente de quantos tipos de OS (LP, NA, OW, SC/ACC) estão selecionados
+    if (hasIHFilter && tipoAtendimentoFilters.length === 1) {
+      return COLUNAS_KANBAN.filter(col => COLUNAS_IH.includes(col.id));
+    }
+
+    // SC/ACC só aparece quando não há filtro de tipo de atendimento
     if (hasSCACCFilter && tipoOSFilters.length === 1 && tipoAtendimentoFilters.length === 0) {
       return COLUNAS_KANBAN.filter(col => COLUNAS_SC_ACC.includes(col.id));
     }
 
-    if (hasCIFilter && tipoAtendimentoFilters.length === 1 && !hasSCACCFilter && tipoOSFilters.length === 0) {
-      return COLUNAS_KANBAN.filter(col => COLUNAS_CI.includes(col.id));
-    }
-
-    if (hasIHFilter && tipoAtendimentoFilters.length === 1 && !hasSCACCFilter && tipoOSFilters.length === 0) {
-      return COLUNAS_KANBAN.filter(col => COLUNAS_IH.includes(col.id));
-    }
-
+    // Sem filtros específicos: mostra todas as colunas
     return COLUNAS_KANBAN;
   };
 
