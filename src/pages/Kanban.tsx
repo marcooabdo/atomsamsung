@@ -1141,10 +1141,10 @@ export function Kanban() {
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(57,255,20,0.3)',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)',
-                    maxHeight: 'calc(100vh - 180px)'
+                    maxHeight: '500px'
                   }}
                 >
-                  <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                  <div className="overflow-y-auto p-3" style={{ maxHeight: '500px' }}>
                     <div className="text-xs font-bold text-[#39FF14] mb-3 pb-2 border-b border-[#39FF14]/30">
                       EXIBIR NO CARD
                     </div>
@@ -1269,10 +1269,10 @@ export function Kanban() {
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(255,191,0,0.3)',
                     boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,191,0,0.1)',
-                    maxHeight: 'calc(100vh - 180px)'
+                    maxHeight: '500px'
                   }}
                 >
-                  <div className="overflow-y-auto scroll-amber p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                  <div className="overflow-y-auto scroll-amber p-3" style={{ maxHeight: '500px' }}>
                     <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30">
                       TIPO DE OS
                     </div>
