@@ -48,29 +48,31 @@
     scrollbar-color: rgba(57, 255, 20, 0.3) rgba(0, 0, 0, 0.2);
   }
 
-  /* Custom scrollbar amarelo para filtros */
+  /* Custom scrollbar azul neon para filtros */
   .scroll-amber::-webkit-scrollbar {
     width: 8px;
   }
 
   .scroll-amber::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.3);
     border-radius: 4px;
   }
 
   .scroll-amber::-webkit-scrollbar-thumb {
-    background: rgba(255, 191, 0, 0.3);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.6) 0%, rgba(6, 182, 212, 0.6) 100%);
     border-radius: 4px;
-    transition: background 0.2s;
+    transition: all 0.2s;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
   }
 
   .scroll-amber::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 191, 0, 0.5);
+    background: linear-gradient(135deg, rgba(14, 165, 233, 0.8) 0%, rgba(6, 182, 212, 0.8) 100%);
+    box-shadow: 0 0 15px rgba(14, 165, 233, 0.8);
   }
 
-  /* Firefox scrollbar amarelo */
+  /* Firefox scrollbar azul neon */
   .scroll-amber {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 191, 0, 0.3) rgba(0, 0, 0, 0.2);
+    scrollbar-color: rgba(14, 165, 233, 0.6) rgba(0, 0, 0, 0.3);
   }
 }
