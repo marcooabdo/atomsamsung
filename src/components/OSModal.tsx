@@ -445,21 +445,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const handleSalvarServicos = async () => {
     setSalvandoServicos(true);
     try {
-      const totalServicos = servicos.reduce((sum, s) => sum + Number(s.valor_total || 0), 0);
-      const totalPecas = pecas.reduce((sum, p) => sum + Number(p.valor_total || 0), 0);
-      const novoValorTotal = totalPecas + totalServicos;
-
-      const { error } = await supabase
-        .from('os')
-        .update({
-          valor_total: novoValorTotal,
-          saldo_restante: novoValorTotal - (os?.valor_pago || 0),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', osId);
-
-      if (error) throw error;
-
+      // Os valores são calculados automaticamente pelos triggers do banco
+      // Apenas recarregar a OS para pegar os valores atualizados
       await loadOS();
       onReload?.();
       setServicosSalvos(true);
