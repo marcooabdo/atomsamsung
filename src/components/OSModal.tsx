@@ -1106,6 +1106,55 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     }
   };
 
+  const handleToggleCortesia = async () => {
+    if (!os) return;
+
+    const novoStatus = !(os as any).is_cortesia;
+    const motivo = prompt(
+      novoStatus
+        ? `Por favor, informe o MOTIVO para aplicar CORTESIA na OS ${os.numero_os_samsung || os.numero_os_interna}:`
+        : `Por favor, informe o MOTIVO para REMOVER a CORTESIA da OS ${os.numero_os_samsung || os.numero_os_interna}:`
+    );
+
+    if (!motivo || motivo.trim() === '') {
+      alert('É obrigatório informar o motivo.');
+      return;
+    }
+
+    try {
+      const { error: updateError } = await supabase
+        .from('os')
+        .update({
+          is_cortesia: novoStatus,
+          motivo_cortesia: novoStatus ? motivo.trim() : null
+        })
+        .eq('id', os.id);
+
+      if (updateError) throw updateError;
+
+      const { error: logError } = await supabase
+        .from('os_audit_logs')
+        .insert({
+          os_id: os.id,
+          tipo_alteracao: novoStatus ? 'cortesia_aplicada' : 'cortesia_removida',
+          descricao: novoStatus
+            ? `Cortesia aplicada. Motivo: ${motivo.trim()}`
+            : `Cortesia removida. Motivo: ${motivo.trim()}`,
+          valores_alterados: {
+            is_cortesia: { old: !novoStatus, new: novoStatus },
+            motivo_cortesia: { old: (os as any).motivo_cortesia, new: novoStatus ? motivo.trim() : null }
+          }
+        });
+
+      if (logError) console.error('Erro ao salvar log:', logError);
+
+      alert(novoStatus ? 'Cortesia aplicada com sucesso!' : 'Cortesia removida com sucesso!');
+      await loadOS();
+    } catch (error) {
+      alert('Erro ao processar cortesia. Tente novamente.');
+    }
+  };
+
   const handleGerarPDFOS = async () => {
     try {
       const { data: osData, error: osError } = await supabase
@@ -2751,6 +2800,39 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                            os.tipo_orcamento === 'acessorios' ? 'ACESSÓRIOS' :
                            'SAMSUNG CONTIGO'}
                         </span>
+                      )}
+                      {os.tipo_os === 'OW' && (
+                        <>
+                          <div className="ml-4 flex items-center gap-2">
+                            <span className="text-xs text-gray-500">Cortesia:</span>
+                            <button
+                              onClick={() => handleToggleCortesia()}
+                              className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+                              style={{
+                                backgroundColor: (os as any).is_cortesia ? '#39FF14' : '#4B5563'
+                              }}
+                            >
+                              <span
+                                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                                  (os as any).is_cortesia ? 'translate-x-6' : 'translate-x-1'
+                                }`}
+                              />
+                            </button>
+                          </div>
+                          {(os as any).is_cortesia && (
+                            <span
+                              className="px-3 py-1 rounded text-xs font-bold animate-pulse"
+                              style={{
+                                backgroundColor: '#39FF1430',
+                                color: '#39FF14',
+                                border: '1px solid #39FF1460',
+                                boxShadow: '0 0 10px rgba(57,255,20,0.3)'
+                              }}
+                            >
+                              CORTESIA
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                   </div>
