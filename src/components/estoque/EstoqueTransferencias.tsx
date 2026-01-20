@@ -62,7 +62,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           ),
           reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
+        .limit(1000); // Garantir que pegamos um bom histórico
 
       if (selectedUnidade && selectedUnidade !== 'todas') {
         query = query.eq('unidade_id', selectedUnidade);
@@ -896,6 +897,19 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     g.todasAtendidas && g.requisicoes.length > 0
   );
 
+  // HISTÓRICO COMPLETO - Todas as OSs com requisições atendidas ou GI postada (últimas 30 dias)
+  const historicoCompleto = requisicoesAgrupadas.filter(g => {
+    const temAtendidas = g.requisicoes.some(r =>
+      r.status === 'atendida' || r.status === 'gi_postada' || r.status === 'devolvida'
+    );
+    return temAtendidas;
+  }).sort((a, b) => {
+    // Ordenar pela data mais recente de qualquer requisição
+    const dataA = Math.max(...a.requisicoes.map((r: any) => new Date(r.aprovado_em || r.updated_at || r.created_at).getTime()));
+    const dataB = Math.max(...b.requisicoes.map((r: any) => new Date(r.aprovado_em || r.updated_at || r.created_at).getTime()));
+    return dataB - dataA;
+  });
+
   return (
     <div className="space-y-6">
       <EstoqueDashboard
@@ -914,8 +928,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             <p className="text-xs text-gray-400 uppercase">OSs Aguardando</p>
           </div>
           <div className="bg-[#39FF14]/10 rounded-lg p-3">
-            <p className="text-2xl font-bold text-[#39FF14]">{requisicoesAtendidas.length}</p>
-            <p className="text-xs text-gray-400 uppercase">OSs Atendidas</p>
+            <p className="text-2xl font-bold text-[#39FF14]">{historicoCompleto.length}</p>
+            <p className="text-xs text-gray-400 uppercase">Histórico Total</p>
           </div>
           <div className="bg-[#FF0064]/10 rounded-lg p-3">
             <p className="text-2xl font-bold text-[#FF0064]">
@@ -1355,15 +1369,28 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         </div>
       )}
 
-      {/* REQUISIÇÕES ATENDIDAS */}
-      {requisicoesAtendidas.length > 0 && (
-        <div>
-          <h3 className="text-lg font-bold text-[#39FF14] mb-4 flex items-center gap-2">
-            <Check className="w-5 h-5" />
-            REQUISIÇÕES ATENDIDAS ({requisicoesAtendidas.length} OSs)
-          </h3>
+      {/* HISTÓRICO COMPLETO DE TRANSFERÊNCIAS */}
+      <div>
+        <h3 className="text-lg font-bold text-[#39FF14] mb-4 flex items-center gap-2">
+          <Check className="w-5 h-5" />
+          HISTÓRICO DE TRANSFERÊNCIAS ({historicoCompleto.length} OSs)
+        </h3>
+        <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-4 mb-4">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-5 h-5 text-[#39FF14] flex-shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm text-[#39FF14] font-semibold mb-1">
+                Histórico Completo de Transferências
+              </p>
+              <p className="text-xs text-gray-300">
+                Todas as requisições atendidas, GI postadas e devoluções, ordenadas da mais recente para a mais antiga. Mostrando até 1000 registros mais recentes.
+              </p>
+            </div>
+          </div>
+        </div>
+        {historicoCompleto.length > 0 ? (
           <div className="space-y-3">
-            {requisicoesAtendidas.map((grupo) => (
+            {historicoCompleto.map((grupo) => (
               <div key={grupo.os_id} className="premium-card border-[#39FF14]/30">
                 <div
                   className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
@@ -1385,7 +1412,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <BadgeTipoOS tipo={grupo.tipo_os} />
                         </div>
                         <p className="text-xs text-gray-400">
-                          {grupo.totalPecas} peça(s) atendida(s)
+                          {grupo.requisicoes.filter((r: any) => r.status === 'atendida' || r.status === 'gi_postada' || r.status === 'devolvida').length} peça(s) no histórico
                         </p>
                       </div>
                     </div>
@@ -1402,7 +1429,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
                 {osExpandidaAtendida === grupo.os_id && (
                   <div className="border-t border-[#39FF14]/20 p-4 space-y-3">
-                    {grupo.requisicoes.map((req: any) => (
+                    {grupo.requisicoes
+                      .filter((req: any) => req.status === 'atendida' || req.status === 'gi_postada' || req.status === 'devolvida')
+                      .sort((a: any, b: any) => {
+                        const dataA = new Date(a.aprovado_em || a.updated_at || a.created_at).getTime();
+                        const dataB = new Date(b.aprovado_em || b.updated_at || b.created_at).getTime();
+                        return dataB - dataA;
+                      })
+                      .map((req: any) => (
                       <div key={req.id} className="bg-[#39FF14]/5 border border-[#39FF14]/20 rounded-lg p-4">
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
@@ -1524,8 +1558,18 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               </div>
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="premium-card border-gray-700">
+            <div className="p-8 text-center">
+              <AlertTriangle className="w-12 h-12 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400 mb-2">Nenhuma transferência no histórico</p>
+              <p className="text-xs text-gray-500">
+                As transferências atendidas, GI postadas e devoluções aparecerão aqui.
+              </p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* Modais */}
       {modalSelecionarID && (
