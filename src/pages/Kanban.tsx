@@ -452,16 +452,16 @@ export function Kanban() {
             taxa_para_cliente
           ),
           cotacao_pecas:cotacoes_pecas(
+            pn,
+            descricao,
             valor_base_gspn,
-            quantidade,
-            codigo_peca,
-            descricao
+            quantidade
           ),
           os_pecas:os_pecas(
+            pn,
+            descricao,
             valor_gspn,
-            quantidade,
-            codigo_peca,
-            descricao
+            quantidade
           ),
           requisicoes:requisicoes_pecas(
             id,
@@ -1039,7 +1039,7 @@ export function Kanban() {
     const allPecas = [...cotacaoPecas, ...osPecas];
 
     const matchesPecas = allPecas.some((peca: any) =>
-      (peca.codigo_peca && peca.codigo_peca.toLowerCase().includes(searchLower)) ||
+      (peca.pn && peca.pn.toLowerCase().includes(searchLower)) ||
       (peca.descricao && peca.descricao.toLowerCase().includes(searchLower))
     );
 
