@@ -570,6 +570,7 @@ export type Database = {
           data_abertura_samsung: string | null
           data_requisicao_samsung: string | null
           tipo_reparo: string | null
+          is_cortesia: boolean
           criado_por: string
           created_at: string
           updated_at: string
@@ -629,6 +630,7 @@ export type Database = {
           data_abertura_samsung?: string | null
           data_requisicao_samsung?: string | null
           tipo_reparo?: string | null
+          is_cortesia?: boolean
           criado_por: string
           created_at?: string
           updated_at?: string
@@ -688,6 +690,7 @@ export type Database = {
           data_abertura_samsung?: string | null
           data_requisicao_samsung?: string | null
           tipo_reparo?: string | null
+          is_cortesia?: boolean
           criado_por?: string
           created_at?: string
           updated_at?: string

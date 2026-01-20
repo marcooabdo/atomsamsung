@@ -209,6 +209,30 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     }
   }
 
+  async function aplicarCortesia() {
+    if (!osDetails) return;
+
+    const confirmar = window.confirm(
+      `Tem certeza que deseja aplicar CORTESIA para a OS ${osDetails.numero_os_samsung || osDetails.numero_os_interna}?\n\nEsta ação marcará a OS como cortesia e não haverá cobrança ao cliente.`
+    );
+
+    if (!confirmar) return;
+
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ is_cortesia: true })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      alert('Cortesia aplicada com sucesso!');
+      await loadOSDetails();
+    } catch (error) {
+      alert('Erro ao aplicar cortesia. Tente novamente.');
+    }
+  }
+
   async function loadOSDetails() {
     setLoading(true);
     try {
@@ -479,7 +503,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         )}
 
         <div className="p-6 space-y-6">
-          <div className="flex gap-2 flex-wrap">
+          <div className="flex gap-2 flex-wrap items-center">
             <span className={`px-3 py-1 rounded-full text-sm font-medium border ${ROTA_COLORS[osDetails.rota] || 'bg-gray-100 text-gray-700 border-gray-300'}`}>
               {osDetails.rota}
             </span>
@@ -489,6 +513,19 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
             <span className="px-3 py-1 bg-purple-100 text-purple-700 border border-purple-300 rounded-full text-sm font-medium">
               {osDetails.tipo_os}
             </span>
+            {(osDetails as any).is_cortesia && (
+              <span className="px-3 py-1 bg-green-100 text-green-700 border border-green-400 rounded-full text-sm font-bold shadow-lg animate-pulse">
+                CORTESIA
+              </span>
+            )}
+            {osDetails.tipo_os === 'OW' && !(osDetails as any).is_cortesia && (
+              <button
+                onClick={aplicarCortesia}
+                className="px-3 py-1 bg-green-50 text-green-700 border border-green-400 rounded-full text-sm font-medium hover:bg-green-100 transition-colors"
+              >
+                Aplicar Cortesia
+              </button>
+            )}
           </div>
 
           {osDetails.numero_os_samsung && (
