@@ -294,12 +294,6 @@ export function Kanban() {
   }, [selectedUnidade]);
 
   useEffect(() => {
-    if (searchTerm === '') {
-      setSearchMatchSource({});
-    }
-  }, [searchTerm]);
-
-  useEffect(() => {
     return () => {
       if (autoScrollInterval.current) {
         clearInterval(autoScrollInterval.current);
@@ -563,6 +557,7 @@ export function Kanban() {
 
       setOsData(grouped);
     } catch (error) {
+      console.error('Erro ao carregar dados do Kanban:', error);
     } finally {
       setLoading(false);
     }
@@ -1080,7 +1075,7 @@ export function Kanban() {
     return { matches: false, source: 'visible' };
   };
 
-  const filteredData = useMemo(() => {
+  const { filteredData, computedMatchSource } = useMemo(() => {
     const newMatchSource: Record<string, 'hidden' | 'visible'> = {};
 
     const result = Object.keys(osData).reduce((acc, coluna) => {
@@ -1110,7 +1105,6 @@ export function Kanban() {
         return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
       });
 
-      // Aplicar ordenação específica da coluna
       const sortOrder = columnSortOrder[coluna] || 'sequencia';
 
       if (sortOrder === 'tat') {
@@ -1124,7 +1118,6 @@ export function Kanban() {
       } else if (sortOrder === 'tempo_etapa') {
         filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
       } else {
-        // Ordenar por sequencia_coluna (padrão)
         filtered = filtered.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
       }
 
@@ -1132,27 +1125,16 @@ export function Kanban() {
       return acc;
     }, {} as Record<string, OS[]>);
 
-    // Atualizar searchMatchSource de forma segura
-    if (Object.keys(newMatchSource).length > 0) {
-      setTimeout(() => {
-        setSearchMatchSource(prev => {
-          const updated = { ...prev, ...newMatchSource };
-          // Limpar IDs que não existem mais nos dados filtrados
-          const allCurrentIds = new Set(
-            Object.values(result).flat().map(os => os.id)
-          );
-          Object.keys(updated).forEach(id => {
-            if (!allCurrentIds.has(id)) {
-              delete updated[id];
-            }
-          });
-          return updated;
-        });
-      }, 0);
-    }
-
-    return result;
+    return { filteredData: result, computedMatchSource: newMatchSource };
   }, [osData, searchTerm, tipoOSFilters, tipoAtendimentoFilters, tecnicoFilters, minDiasAbertos, columnSortOrder]);
+
+  useEffect(() => {
+    if (searchTerm && Object.keys(computedMatchSource).length > 0) {
+      setSearchMatchSource(computedMatchSource);
+    } else if (!searchTerm) {
+      setSearchMatchSource({});
+    }
+  }, [computedMatchSource, searchTerm]);
 
   const availableTipoOS = Array.from(new Set([
     ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
