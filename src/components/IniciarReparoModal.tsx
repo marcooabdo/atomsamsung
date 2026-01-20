@@ -38,7 +38,7 @@ export function IniciarReparoModal({
     const { data: userData } = await supabase
       .from('usuarios')
       .select('*')
-      .eq('auth_user_id', user.id)
+      .eq('id', user.id)
       .maybeSingle();
 
     setCurrentUser(userData);
