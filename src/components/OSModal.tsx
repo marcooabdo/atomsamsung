@@ -125,6 +125,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
 
+  // Estado para editar numero_os_samsung
+  const [editandoNumeroSamsung, setEditandoNumeroSamsung] = useState(false);
+  const [numeroSamsungTemp, setNumeroSamsungTemp] = useState('');
+  const [salvandoNumeroSamsung, setSalvandoNumeroSamsung] = useState(false);
+
   // Estados para adicionar serviço
   const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
   const [mostrarModalServico, setMostrarModalServico] = useState(false);
@@ -1063,6 +1068,41 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingGSPN(false);
+    }
+  };
+
+  const salvarNumeroSamsung = async () => {
+    if (!os || !osId) return;
+
+    // Validação: não permitir para SC/ACC
+    if (os.tipo_os === 'SC / ACC') {
+      alert('Não é possível adicionar número Samsung para OS do tipo SC / ACC');
+      return;
+    }
+
+    if (!numeroSamsungTemp.trim()) {
+      alert('Digite um número de OS Samsung válido');
+      return;
+    }
+
+    setSalvandoNumeroSamsung(true);
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ numero_os_samsung: numeroSamsungTemp.trim() })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      alert('Número da OS Samsung atualizado com sucesso!');
+      setEditandoNumeroSamsung(false);
+      await loadOS();
+      if (onReload) onReload();
+    } catch (error) {
+      console.error('Erro ao salvar número Samsung:', error);
+      alert('Erro ao salvar número da OS Samsung');
+    } finally {
+      setSalvandoNumeroSamsung(false);
     }
   };
 
@@ -2527,10 +2567,92 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
                   Informações da OS
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
-                  {os.numero_os_samsung && (
-                    <div>
-                      <label className="text-xs text-gray-500 uppercase">Número OS Samsung</label>
-                      <p className="text-sm text-gray-300 mt-1 font-mono font-bold">{os.numero_os_samsung}</p>
+                  {/* Campo de Número OS Samsung - Editável */}
+                  {os.tipo_os !== 'SC / ACC' && (
+                    <div className="col-span-2">
+                      <label className="text-xs text-gray-500 uppercase flex items-center justify-between">
+                        <span>Número OS Samsung</span>
+                        {os.numero_os_samsung && !editandoNumeroSamsung && (
+                          <button
+                            onClick={() => {
+                              setEditandoNumeroSamsung(true);
+                              setNumeroSamsungTemp(os.numero_os_samsung || '');
+                            }}
+                            className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/80 transition-colors flex items-center gap-1"
+                          >
+                            <Save className="w-3 h-3" />
+                            Editar
+                          </button>
+                        )}
+                      </label>
+                      {editandoNumeroSamsung ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <input
+                            type="text"
+                            value={numeroSamsungTemp}
+                            onChange={(e) => setNumeroSamsungTemp(e.target.value)}
+                            className="flex-1 px-3 py-2 rounded text-sm bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                            placeholder="Digite o número da OS Samsung"
+                          />
+                          <button
+                            onClick={salvarNumeroSamsung}
+                            disabled={salvandoNumeroSamsung}
+                            className="px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.1) 100%)',
+                              border: '1px solid rgba(0,212,255,0.5)',
+                              color: '#00D4FF'
+                            }}
+                          >
+                            {salvandoNumeroSamsung ? (
+                              <>
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                Salvando...
+                              </>
+                            ) : (
+                              <>
+                                <CheckCircle className="w-3 h-3" />
+                                Salvar
+                              </>
+                            )}
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditandoNumeroSamsung(false);
+                              setNumeroSamsungTemp('');
+                            }}
+                            className="px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                            style={{
+                              background: 'rgba(255,0,100,0.1)',
+                              border: '1px solid rgba(255,0,100,0.3)',
+                              color: '#FF0064'
+                            }}
+                          >
+                            <XCircle className="w-3 h-3" />
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : os.numero_os_samsung ? (
+                        <p className="text-sm text-gray-300 mt-1 font-mono font-bold">{os.numero_os_samsung}</p>
+                      ) : (
+                        <div className="mt-1">
+                          <button
+                            onClick={() => {
+                              setEditandoNumeroSamsung(true);
+                              setNumeroSamsungTemp('');
+                            }}
+                            className="px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-1"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.1) 100%)',
+                              border: '1px solid rgba(0,212,255,0.5)',
+                              color: '#00D4FF'
+                            }}
+                          >
+                            <Save className="w-3 h-3" />
+                            Adicionar Número Samsung
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                   {(os as any).cotacao?.numero_cotacao && (
