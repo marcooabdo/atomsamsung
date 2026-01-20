@@ -3,7 +3,7 @@ import { supabase } from '../../lib/supabase';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessageList, ChatMessageListRef, Message } from './ChatMessageList';
 import { ChatInput, ChatInputRef } from './ChatInput';
-import { Image } from 'lucide-react';
+import { Image, FileText, Music } from 'lucide-react';
 
 interface ChatWindowProps {
   conversationId: string;
@@ -152,10 +152,8 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
     dragCounterRef.current = 0;
 
     const files = Array.from(e.dataTransfer.files);
-    const imageFile = files.find(file => file.type.startsWith('image/'));
-
-    if (imageFile && chatInputRef.current?.prepareImagePreview) {
-      chatInputRef.current.prepareImagePreview(imageFile);
+    if (files.length > 0 && chatInputRef.current?.prepareFilePreviews) {
+      chatInputRef.current.prepareFilePreviews(files);
     }
   };
 
@@ -199,13 +197,18 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         <div className="absolute inset-0 bg-[#00D4FF]/10 border-4 border-dashed border-[#00D4FF] backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="text-center bg-[#0d1419]/95 px-12 py-8 rounded-2xl border-2 border-[#00D4FF] shadow-2xl">
             <div className="relative">
-              <Image className="w-24 h-24 text-[#00D4FF] mx-auto mb-4 animate-bounce" />
-              <div className="absolute inset-0 w-24 h-24 mx-auto">
-                <div className="w-full h-full border-4 border-[#00D4FF] rounded-full animate-ping opacity-20"></div>
+              <div className="flex items-center justify-center gap-3">
+                <Image className="w-16 h-16 text-[#00D4FF] animate-bounce" style={{ animationDelay: '0ms' }} />
+                <FileText className="w-16 h-16 text-[#00D4FF] animate-bounce" style={{ animationDelay: '100ms' }} />
+                <Music className="w-16 h-16 text-[#00D4FF] animate-bounce" style={{ animationDelay: '200ms' }} />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-40 h-40 border-4 border-[#00D4FF] rounded-full animate-ping opacity-20"></div>
               </div>
             </div>
-            <p className="text-2xl font-bold text-[#00D4FF] mb-2">Solte a imagem aqui</p>
-            <p className="text-base text-gray-300">Para enviar no chat</p>
+            <p className="text-2xl font-bold text-[#00D4FF] mb-2 mt-4">Solte os arquivos aqui</p>
+            <p className="text-base text-gray-300">Imagens, documentos ou áudios</p>
+            <p className="text-sm text-gray-500 mt-1">Envie múltiplos arquivos de uma vez</p>
           </div>
         </div>
       )}

@@ -1,6 +1,6 @@
 import { useState, useRef, KeyboardEvent, useEffect, DragEvent, ClipboardEvent, forwardRef, useImperativeHandle } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Send, Paperclip, Image, FileText, X } from 'lucide-react';
+import { Send, Paperclip, Image, FileText, X, Music } from 'lucide-react';
 import { Message } from './ChatMessageList';
 
 interface ChatInputProps {
@@ -11,13 +11,15 @@ interface ChatInputProps {
   onMessageAdded?: (message: Message) => void;
 }
 
-interface ImagePreview {
+interface FilePreview {
   file: File;
-  dataUrl: string;
+  dataUrl?: string;
+  type: 'image' | 'document' | 'audio';
 }
 
 export interface ChatInputRef {
   prepareImagePreview: (file: File) => void;
+  prepareFilePreviews: (files: File[]) => void;
 }
 
 export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
@@ -27,13 +29,14 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
   const [uploading, setUploading] = useState(false);
   const [showAttachMenu, setShowAttachMenu] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
-  const [imagePreview, setImagePreview] = useState<ImagePreview | null>(null);
+  const [filePreviews, setFilePreviews] = useState<FilePreview[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragCounterRef = useRef(0);
 
   useImperativeHandle(ref, () => ({
-    prepareImagePreview
+    prepareImagePreview: (file: File) => prepareFilePreviews([file]),
+    prepareFilePreviews
   }));
 
   useEffect(() => {
@@ -57,27 +60,75 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         e.preventDefault();
         const file = item.getAsFile();
         if (file) {
-          prepareImagePreview(file);
+          prepareFilePreviews([file]);
         }
         break;
       }
     }
   };
 
-  const prepareImagePreview = (file: File) => {
-    if (file.size > 5 * 1024 * 1024) {
-      alert('Imagem muito grande. Limite: 5MB');
-      return;
+  const getFileType = (file: File): 'image' | 'document' | 'audio' => {
+    if (file.type.startsWith('image/')) return 'image';
+    if (file.type.startsWith('audio/')) return 'audio';
+    return 'document';
+  };
+
+  const validateFile = (file: File): string | null => {
+    const fileType = getFileType(file);
+
+    if (fileType === 'image' && file.size > 5 * 1024 * 1024) {
+      return `${file.name}: Imagem muito grande. Limite: 5MB`;
     }
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      setImagePreview({
-        file,
-        dataUrl: e.target?.result as string
-      });
-    };
-    reader.readAsDataURL(file);
+    if (fileType === 'document' && file.size > 10 * 1024 * 1024) {
+      return `${file.name}: Documento muito grande. Limite: 10MB`;
+    }
+
+    if (fileType === 'audio' && file.size > 10 * 1024 * 1024) {
+      return `${file.name}: Áudio muito grande. Limite: 10MB`;
+    }
+
+    return null;
+  };
+
+  const prepareFilePreviews = (files: File[]) => {
+    const validFiles: FilePreview[] = [];
+    const errors: string[] = [];
+
+    files.forEach(file => {
+      const error = validateFile(file);
+      if (error) {
+        errors.push(error);
+        return;
+      }
+
+      const fileType = getFileType(file);
+
+      if (fileType === 'image') {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          setFilePreviews(prev => [...prev, {
+            file,
+            dataUrl: e.target?.result as string,
+            type: fileType
+          }]);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        validFiles.push({
+          file,
+          type: fileType
+        });
+      }
+    });
+
+    if (validFiles.length > 0) {
+      setFilePreviews(prev => [...prev, ...validFiles]);
+    }
+
+    if (errors.length > 0) {
+      alert(errors.join('\n'));
+    }
   };
 
   const handleDragEnter = (e: DragEvent) => {
@@ -110,21 +161,23 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     dragCounterRef.current = 0;
 
     const files = Array.from(e.dataTransfer.files);
-    const imageFile = files.find(file => file.type.startsWith('image/'));
-
-    if (imageFile) {
-      prepareImagePreview(imageFile);
+    if (files.length > 0) {
+      prepareFilePreviews(files);
     }
   };
 
-  const cancelImagePreview = () => {
-    setImagePreview(null);
+  const removeFilePreview = (index: number) => {
+    setFilePreviews(prev => prev.filter((_, i) => i !== index));
   };
 
-  const sendImagePreview = async () => {
-    if (!imagePreview) return;
-    await handleFileUpload(imagePreview.file, 'image');
-    setImagePreview(null);
+  const sendAllPreviews = async () => {
+    if (filePreviews.length === 0) return;
+
+    for (const preview of filePreviews) {
+      await handleFileUpload(preview.file, preview.type);
+    }
+
+    setFilePreviews([]);
   };
 
   const handleSendMessage = async () => {
@@ -309,45 +362,68 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       {isDragging && (
         <div className="absolute inset-0 bg-[#00D4FF]/20 border-2 border-dashed border-[#00D4FF] rounded-lg backdrop-blur-sm z-50 flex items-center justify-center">
           <div className="text-center">
-            <Image className="w-16 h-16 text-[#00D4FF] mx-auto mb-3 animate-bounce" />
-            <p className="text-lg font-semibold text-[#00D4FF]">Solte a imagem aqui</p>
-            <p className="text-sm text-gray-300 mt-1">Para enviar no chat</p>
+            <Paperclip className="w-16 h-16 text-[#00D4FF] mx-auto mb-3 animate-bounce" />
+            <p className="text-lg font-semibold text-[#00D4FF]">Solte os arquivos aqui</p>
+            <p className="text-sm text-gray-300 mt-1">Imagens, documentos ou áudios</p>
           </div>
         </div>
       )}
 
-      {imagePreview && (
+      {filePreviews.length > 0 && (
         <div className="mb-3 p-3 bg-[#151f26] border border-[#1a3a4a] rounded-lg">
-          <div className="flex items-start gap-3">
-            <div className="relative flex-shrink-0">
-              <img
-                src={imagePreview.dataUrl}
-                alt="Preview"
-                className="w-20 h-20 object-cover rounded-lg border border-[#1a3a4a]"
-              />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-300 truncate">{imagePreview.file.name}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {(imagePreview.file.size / 1024).toFixed(1)} KB
-              </p>
-              <div className="flex gap-2 mt-2">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-medium text-gray-300">
+              {filePreviews.length} arquivo{filePreviews.length > 1 ? 's' : ''} para enviar
+            </p>
+            <button
+              onClick={sendAllPreviews}
+              disabled={uploading}
+              className="px-3 py-1.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-lg text-xs font-medium text-black transition-all disabled:opacity-50"
+            >
+              Enviar {filePreviews.length > 1 ? 'Todos' : ''}
+            </button>
+          </div>
+
+          <div className="space-y-2 max-h-60 overflow-y-auto">
+            {filePreviews.map((preview, index) => (
+              <div key={index} className="flex items-center gap-3 p-2 bg-[#0d1419] rounded-lg border border-[#1a3a4a]/50">
+                {preview.type === 'image' && preview.dataUrl ? (
+                  <img
+                    src={preview.dataUrl}
+                    alt="Preview"
+                    className="w-12 h-12 object-cover rounded border border-[#1a3a4a] flex-shrink-0"
+                  />
+                ) : preview.type === 'document' ? (
+                  <div className="w-12 h-12 flex items-center justify-center bg-[#1a3a4a]/30 rounded border border-[#1a3a4a] flex-shrink-0">
+                    <FileText className="w-6 h-6 text-[#00D4FF]" />
+                  </div>
+                ) : preview.type === 'audio' ? (
+                  <div className="w-12 h-12 flex items-center justify-center bg-[#1a3a4a]/30 rounded border border-[#1a3a4a] flex-shrink-0">
+                    <Music className="w-6 h-6 text-[#00D4FF]" />
+                  </div>
+                ) : (
+                  <div className="w-12 h-12 flex items-center justify-center bg-[#1a3a4a]/30 rounded border border-[#1a3a4a] flex-shrink-0">
+                    <Image className="w-6 h-6 text-[#00D4FF]" />
+                  </div>
+                )}
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-gray-300 truncate">{preview.file.name}</p>
+                  <p className="text-xs text-gray-500">
+                    {(preview.file.size / 1024).toFixed(1)} KB
+                  </p>
+                </div>
+
                 <button
-                  onClick={sendImagePreview}
+                  onClick={() => removeFilePreview(index)}
                   disabled={uploading}
-                  className="px-3 py-1.5 bg-[#00D4FF] hover:bg-[#00D4FF]/80 rounded-lg text-xs font-medium text-black transition-all disabled:opacity-50"
+                  className="p-1.5 hover:bg-[#1a3a4a]/50 rounded transition-all disabled:opacity-50"
+                  title="Remover"
                 >
-                  Enviar Imagem
-                </button>
-                <button
-                  onClick={cancelImagePreview}
-                  disabled={uploading}
-                  className="px-3 py-1.5 bg-[#1a3a4a]/50 hover:bg-[#1a3a4a] rounded-lg text-xs font-medium text-gray-300 transition-all disabled:opacity-50"
-                >
-                  Cancelar
+                  <X className="w-4 h-4 text-gray-400" />
                 </button>
               </div>
-            </div>
+            ))}
           </div>
         </div>
       )}
@@ -423,7 +499,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
             onChange={handleTextareaChange}
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
-            placeholder="Digite uma mensagem ou cole/arraste uma imagem..."
+            placeholder="Digite uma mensagem ou cole/arraste arquivos..."
             disabled={sending || uploading}
             rows={1}
             className="w-full px-4 py-2.5 bg-[#151f26] border border-[#1a3a4a]/50 rounded-xl text-sm text-gray-200 placeholder-gray-500 focus:outline-none focus:border-[#00D4FF]/40 resize-none disabled:opacity-50 disabled:cursor-not-allowed"
