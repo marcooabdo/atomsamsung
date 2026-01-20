@@ -28,6 +28,7 @@ interface ChatMessageListProps {
 
 export interface ChatMessageListRef {
   addMessage: (message: Message) => void;
+  scrollToBottom: (smooth?: boolean) => void;
 }
 
 export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListProps>(({ conversationId, userId, conversationType }, ref) => {
@@ -52,8 +53,10 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
 
   useEffect(() => {
     if (isInitialLoad && messages.length > 0) {
-      scrollToBottom();
-      setIsInitialLoad(false);
+      setTimeout(() => {
+        scrollToBottom(false);
+        setIsInitialLoad(false);
+      }, 100);
     }
   }, [messages, isInitialLoad]);
 
@@ -65,7 +68,10 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         }
         return [...prev, message];
       });
-      setTimeout(() => scrollToBottom(), 100);
+      setTimeout(() => scrollToBottom(true), 100);
+    },
+    scrollToBottom: (smooth = false) => {
+      scrollToBottom(smooth);
     }
   }));
 
@@ -169,7 +175,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
           });
 
           setTimeout(() => {
-            scrollToBottom();
+            scrollToBottom(true);
           }, 100);
         }
       )
@@ -212,8 +218,10 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
     return channel;
   };
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (smooth = false) => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' });
+    }
   };
 
   const handleScroll = () => {
@@ -291,3 +299,5 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
     </div>
   );
 });
+
+ChatMessageList.displayName = 'ChatMessageList';
