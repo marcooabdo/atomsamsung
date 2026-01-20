@@ -37,7 +37,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const [modalRegistrarValor, setModalRegistrarValor] = useState<any>(null);
   const [modalJustificativa, setModalJustificativa] = useState<any>(null);
   const [modalVerPedido, setModalVerPedido] = useState<any>(null);
-  const [historicoMinimizado, setHistoricoMinimizado] = useState(false);
+  const [historicoMinimizado, setHistoricoMinimizado] = useState(true);
   const [buscaHistorico, setBuscaHistorico] = useState('');
 
   useEffect(() => {
