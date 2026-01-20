@@ -386,6 +386,35 @@ Assistencia Tecnica Samsung`;
   return (
     <>
       <div className="space-y-4">
+        {os.is_cortesia && (
+          <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/20 to-[#10B981]/10 border-2 border-[#39FF14] animate-pulse">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-[#39FF14]/30 flex items-center justify-center border-2 border-[#39FF14]">
+                <DollarSign className="w-6 h-6 text-[#39FF14]" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-xl font-bold text-[#39FF14] uppercase tracking-wider mb-1 flex items-center gap-2">
+                  🎁 CORTESIA APLICADA
+                </h3>
+                <p className="text-sm text-gray-300 font-medium">
+                  Esta OS foi marcada como CORTESIA. Não haverá cobrança ao cliente.
+                </p>
+                {os.motivo_cortesia && (
+                  <div className="mt-3 p-3 rounded-lg bg-[#39FF14]/10 border border-[#39FF14]/30">
+                    <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Motivo da Cortesia:</p>
+                    <p className="text-sm text-gray-200 font-medium">{os.motivo_cortesia}</p>
+                  </div>
+                )}
+              </div>
+              <div className="text-right">
+                <div className="px-4 py-2 rounded-lg bg-[#39FF14]/20 border border-[#39FF14]">
+                  <p className="text-xs text-gray-400 uppercase">Valor Total</p>
+                  <p className="text-2xl font-bold text-[#39FF14]">R$ 0,00</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="premium-card p-6 bg-gradient-to-r from-[#F59E0B]/10 to-[#00D4FF]/10 border border-[#F59E0B]/30">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">

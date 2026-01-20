@@ -1107,7 +1107,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const handleToggleCortesia = async () => {
-    if (!os) return;
+    if (!os || !usuario) return;
 
     const novoStatus = !(os as any).is_cortesia;
     const motivo = prompt(
@@ -1148,8 +1148,48 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       if (logError) console.error('Erro ao salvar log:', logError);
 
+      // Criar comentário automático do sistema
+      const dataHora = new Date().toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      });
+
+      const comentarioTexto = novoStatus
+        ? `🎁 CORTESIA APLICADA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 OS: ${os.numero_os_samsung || os.numero_os_interna}
+👤 Aplicado por: ${usuario.nome}
+📅 Data/Hora: ${dataHora}
+💬 Motivo: ${motivo.trim()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ Esta OS foi marcada como CORTESIA.
+Não haverá cobrança ao cliente.`
+        : `❌ CORTESIA REMOVIDA
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋 OS: ${os.numero_os_samsung || os.numero_os_interna}
+👤 Removido por: ${usuario.nome}
+📅 Data/Hora: ${dataHora}
+💬 Motivo: ${motivo.trim()}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+ℹ️ A cortesia foi removida desta OS.`;
+
+      const { error: comentarioError } = await supabase
+        .from('os_comentarios')
+        .insert({
+          os_id: os.id,
+          usuario_id: usuario.id,
+          comentario: comentarioTexto,
+          is_system: true
+        });
+
+      if (comentarioError) console.error('Erro ao criar comentário:', comentarioError);
+
       alert(novoStatus ? 'Cortesia aplicada com sucesso!' : 'Cortesia removida com sucesso!');
       await loadOS();
+      await loadComentarios();
     } catch (error) {
       alert('Erro ao processar cortesia. Tente novamente.');
     }
