@@ -22,7 +22,7 @@
     box-shadow: 0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3);
   }
 
-  /* Custom scrollbar styles - Azul Neon Global */
+  /* Custom scrollbar styles - Cyber Scrollbar Global */
   .overflow-y-auto::-webkit-scrollbar,
   .overflow-x-auto::-webkit-scrollbar,
   .scroll-amber::-webkit-scrollbar {
@@ -33,38 +33,36 @@
   .overflow-y-auto::-webkit-scrollbar-track,
   .overflow-x-auto::-webkit-scrollbar-track,
   .scroll-amber::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
+    background: #1A1A1F;
     border-radius: 4px;
   }
 
   .overflow-y-auto::-webkit-scrollbar-thumb,
   .overflow-x-auto::-webkit-scrollbar-thumb,
   .scroll-amber::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.6) 0%, rgba(6, 182, 212, 0.6) 100%);
+    background: linear-gradient(180deg, #00D4FF, #1428F0);
     border-radius: 4px;
-    transition: all 0.2s;
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
   }
 
   .overflow-y-auto::-webkit-scrollbar-thumb:hover,
   .overflow-x-auto::-webkit-scrollbar-thumb:hover,
   .scroll-amber::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.8) 0%, rgba(6, 182, 212, 0.8) 100%);
-    box-shadow: 0 0 15px rgba(14, 165, 233, 0.8);
+    background: linear-gradient(180deg, #00F5FF, #00D4FF);
   }
 
-  /* Firefox scrollbar azul neon */
+  /* Firefox scrollbar */
   .overflow-y-auto,
   .overflow-x-auto,
   .scroll-amber {
     scrollbar-width: thin;
-    scrollbar-color: rgba(14, 165, 233, 0.6) rgba(0, 0, 0, 0.3);
+    scrollbar-color: #00D4FF #1A1A1F;
   }
 
   /* Scrollbar customizado para elementos gerais com scroll */
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(14, 165, 233, 0.6) rgba(0, 0, 0, 0.3);
+    scrollbar-color: #00D4FF #1A1A1F;
   }
 
   *::-webkit-scrollbar {
@@ -73,19 +71,17 @@
   }
 
   *::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.3);
+    background: #1A1A1F;
     border-radius: 4px;
   }
 
   *::-webkit-scrollbar-thumb {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.6) 0%, rgba(6, 182, 212, 0.6) 100%);
+    background: linear-gradient(180deg, #00D4FF, #1428F0);
     border-radius: 4px;
-    transition: all 0.2s;
-    box-shadow: 0 0 10px rgba(14, 165, 233, 0.5);
+    box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background: linear-gradient(135deg, rgba(14, 165, 233, 0.8) 0%, rgba(6, 182, 212, 0.8) 100%);
-    box-shadow: 0 0 15px rgba(14, 165, 233, 0.8);
+    background: linear-gradient(180deg, #00F5FF, #00D4FF);
   }
 }
