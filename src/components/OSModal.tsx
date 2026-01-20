@@ -25,6 +25,7 @@ const COLUNAS_KANBAN = [
   { id: 'peca_em_transito', label: 'Peça em Trânsito' },
   { id: 'peca_disponivel', label: 'Peça Disponível' },
   { id: 'em_reparo_ci', label: 'Em Reparo CI' },
+  { id: 'disponivel_ih', label: 'Disponível IH' },
   { id: 'rota_preta', label: 'Rota Preta' },
   { id: 'rota_vermelha', label: 'Rota Vermelha' },
   { id: 'rota_azul', label: 'Rota Azul' },

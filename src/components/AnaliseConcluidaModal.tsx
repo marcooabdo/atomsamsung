@@ -28,6 +28,34 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
 
     setLoading(true);
     try {
+      // Buscar informações da OS para decidir o fluxo
+      const { data: osData, error: fetchError } = await supabase
+        .from('os')
+        .select('tipo_os, tipo_atendimento, is_cortesia')
+        .eq('id', osId)
+        .maybeSingle();
+
+      if (fetchError) throw fetchError;
+
+      // Determinar a próxima coluna baseado nas regras de negócio
+      let proximaColuna = 'negociacao_em_andamento';
+      let mensagemMovimentacao = 'OS movida para "Negociacao em Andamento"';
+
+      // Verifica se deve pular a negociação (LP ou OW com cortesia)
+      const devePularNegociacao = osData?.tipo_os === 'LP' ||
+                                  (osData?.tipo_os === 'OW' && osData?.is_cortesia);
+
+      if (devePularNegociacao) {
+        // Define destino baseado no tipo de atendimento
+        if (osData?.tipo_atendimento === 'CI') {
+          proximaColuna = 'em_reparo_ci';
+          mensagemMovimentacao = '✅ OS movida automaticamente para "EM REPARO CI" (Sem necessidade de negociação)';
+        } else if (osData?.tipo_atendimento === 'IH') {
+          proximaColuna = 'disponivel_ih';
+          mensagemMovimentacao = '✅ OS movida automaticamente para "DISPONÍVEL IH" (Sem necessidade de negociação)';
+        }
+      }
+
       const { error: comentarioError } = await supabase
         .from('os_comentarios')
         .insert({
@@ -42,14 +70,14 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
       const { error: osError } = await supabase
         .from('os')
         .update({
-          coluna_kanban: 'negociacao_em_andamento',
+          coluna_kanban: proximaColuna,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
 
       if (osError) throw osError;
 
-      alert('Analise registrada e OS movida para "Negociacao em Andamento"');
+      alert(`Analise registrada!\n\n${mensagemMovimentacao}`);
       onSuccess();
       handleClose();
     } catch (error: any) {
