@@ -1136,17 +1136,19 @@ export function Kanban() {
 
               {showBadgeFilter && (
                 <div
-                  className="absolute top-full mt-2 right-0 z-50 min-w-[220px] rounded-lg p-3"
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[220px] rounded-lg"
                   style={{
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(57,255,20,0.3)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)'
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)',
+                    maxHeight: 'calc(100vh - 180px)'
                   }}
                 >
-                  <div className="text-xs font-bold text-[#39FF14] mb-3 pb-2 border-b border-[#39FF14]/30">
-                    EXIBIR NO CARD
-                  </div>
-                  <div className="space-y-1 mb-3">
+                  <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                    <div className="text-xs font-bold text-[#39FF14] mb-3 pb-2 border-b border-[#39FF14]/30">
+                      EXIBIR NO CARD
+                    </div>
+                    <div className="space-y-1 mb-3">
                     {[
                       { key: 'pedidoAtivo', label: 'Pedido Ativo' },
                       { key: 'pecaTransito', label: 'Peça em Trânsito' },
@@ -1237,6 +1239,7 @@ export function Kanban() {
                       LIMPAR TUDO
                     </button>
                   </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -1261,16 +1264,18 @@ export function Kanban() {
 
               {showTipoFilter && (
                 <div
-                  className="absolute top-full mt-2 right-0 z-50 min-w-[200px] rounded-lg p-3"
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[200px] rounded-lg"
                   style={{
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
                     border: '1px solid rgba(255,191,0,0.3)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,191,0,0.1)'
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(255,191,0,0.1)',
+                    maxHeight: 'calc(100vh - 180px)'
                   }}
                 >
-                  <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30">
-                    TIPO DE OS
-                  </div>
+                  <div className="overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 180px)' }}>
+                    <div className="text-xs font-bold text-[#FFBF00] mb-2 pb-2 border-b border-[#FFBF00]/30">
+                      TIPO DE OS
+                    </div>
                   <div className="space-y-1 mb-3">
                     {availableTipoOS.map((tipo) => (
                       <div
@@ -1429,6 +1434,7 @@ export function Kanban() {
                     >
                       LIMPAR TUDO
                     </button>
+                  </div>
                   </div>
                 </div>
               )}
