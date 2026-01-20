@@ -31,6 +31,8 @@ const COLUNAS_KANBAN = [
   { id: 'rota_amarela', label: 'Rota Amarela', color: '#EAB308', icon: MapPin },
   { id: 'rota_laranja', label: 'Rota Laranja', color: '#F97316', icon: MapPin },
   { id: 'em_rota_ih', label: 'Em Rota IH', color: '#10B981', icon: Activity },
+  { id: 'saw', label: 'SAW', color: '#14B8A6', icon: Activity },
+  { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
   { id: 'fechar_os', label: 'Fechar OS', color: '#22C55E', icon: Zap },
@@ -66,6 +68,8 @@ const COLUNAS_CI = [
   'orcamentos_rejeitados',
   'diagnostico',
   'em_reparo_ci',
+  'saw',
+  'controle_qualidade',
   'reparo_concluido'
 ];
 
@@ -90,6 +94,8 @@ const COLUNAS_IH = [
   'rota_amarela',
   'rota_laranja',
   'em_rota_ih',
+  'saw',
+  'controle_qualidade',
   'reparo_concluido'
 ];
 
