@@ -108,10 +108,18 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
 
   const handleContactClick = async (contactId: string) => {
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.error('Usuário não autenticado');
+        return;
+      }
+
+      const currentUserId = user.id;
+
       const { data: existingConv } = await supabase
         .from('chat_participants')
         .select('conversation_id, chat_conversations!inner(tipo)')
-        .eq('user_id', userId)
+        .eq('user_id', currentUserId)
         .eq('chat_conversations.tipo', 'direct');
 
       if (existingConv) {
@@ -120,7 +128,7 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
             .from('chat_participants')
             .select('user_id')
             .eq('conversation_id', conv.conversation_id)
-            .neq('user_id', userId)
+            .neq('user_id', currentUserId)
             .maybeSingle();
 
           if (otherParticipant?.user_id === contactId) {
@@ -135,7 +143,7 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
         .from('chat_conversations')
         .insert({
           tipo: 'direct',
-          created_by: userId
+          created_by: currentUserId
         })
         .select()
         .single();
@@ -143,7 +151,7 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
       if (error) throw error;
 
       await supabase.from('chat_participants').insert([
-        { conversation_id: newConv.id, user_id: userId, role: 'member' },
+        { conversation_id: newConv.id, user_id: currentUserId, role: 'member' },
         { conversation_id: newConv.id, user_id: contactId, role: 'member' }
       ]);
 
