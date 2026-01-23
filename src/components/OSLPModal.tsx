@@ -698,6 +698,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       quantidade: p.quantidade,
       valor_unitario: p.valor_unitario,
       valor_total: p.valor_total,
+      valor_gspn: p.valor_gspn,
       created_at: p.created_at,
       updated_at: p.updated_at,
       tipo: 'os_peca',
@@ -713,8 +714,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       pn: p.pn,
       descricao: p.descricao,
       quantidade: p.quantidade,
-      valor_unitario: p.valor_base_gspn,
-      valor_total: p.valor_base_gspn * p.quantidade,
+      valor_unitario: p.valor_final_unitario || p.valor_base_gspn,
+      valor_total: (p.valor_final_unitario || p.valor_base_gspn) * p.quantidade,
+      valor_gspn: p.valor_base_gspn,
+      valor_com_markup: p.valor_final_unitario,
       created_at: p.created_at,
       updated_at: p.updated_at,
       tipo: 'cotacao'
@@ -1171,7 +1174,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           quantidade: peca.quantidade || 1,
           valor_unitario: peca.valor,
           valor_total: peca.valor * (peca.quantidade || 1),
-          valor_base_gspn: peca.valor_gspn || null,
+          valor_gspn: peca.valor_gspn || null,
           status: 'requisitada',
           requisitada_por: usuario?.id
         }));
@@ -4541,8 +4544,18 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                       {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
                                     </div>
                                     <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
-                                    <div className="flex items-center gap-4 mt-2">
+                                    <div className="flex items-center gap-4 mt-2 flex-wrap">
                                       <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                                      {peca.valor_gspn && (
+                                        <p className="text-xs" style={{ color: '#9333EA' }}>
+                                          GSPN: R$ {Number(peca.valor_gspn || 0).toFixed(2)}
+                                        </p>
+                                      )}
+                                      {peca.valor_com_markup && peca.valor_com_markup !== peca.valor_gspn && (
+                                        <p className="text-xs" style={{ color: '#00D4FF' }}>
+                                          c/ Markup: R$ {Number(peca.valor_com_markup || 0).toFixed(2)}
+                                        </p>
+                                      )}
                                       <p className="text-xs text-gray-500">
                                         Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
                                       </p>
