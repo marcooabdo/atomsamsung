@@ -133,7 +133,10 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
 
       const { data: newConv, error } = await supabase
         .from('chat_conversations')
-        .insert({ tipo: 'direct' })
+        .insert({
+          tipo: 'direct',
+          created_by: userId
+        })
         .select()
         .single();
 
