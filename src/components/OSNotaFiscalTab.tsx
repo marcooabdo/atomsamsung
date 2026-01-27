@@ -64,7 +64,9 @@ export function OSNotaFiscalTab({
 
   const [activeSection, setActiveSection] = useState<'nfse' | 'nfe'>('nfse');
   const [selectedConfig, setSelectedConfig] = useState<string>('');
+  const [selectedNFeConfig, setSelectedNFeConfig] = useState<string>('');
   const [showConfigDropdown, setShowConfigDropdown] = useState(false);
+  const [showNFeConfigDropdown, setShowNFeConfigDropdown] = useState(false);
 
   const [formNFSe, setFormNFSe] = useState({
     valorServicos: valorServicos,
@@ -129,6 +131,12 @@ export function OSNotaFiscalTab({
           setSelectedConfig(firstNfse.id);
           applyConfigToForm(firstNfse);
         }
+
+        const firstNfe = configsRes.data.find(c => c.tipo === 'nfe');
+        if (firstNfe) {
+          setSelectedNFeConfig(firstNfe.id);
+          applyConfigToForm(firstNfe);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -167,6 +175,15 @@ export function OSNotaFiscalTab({
       applyConfigToForm(config);
     }
     setShowConfigDropdown(false);
+  };
+
+  const handleSelectNFeConfig = (configId: string) => {
+    setSelectedNFeConfig(configId);
+    const config = nfConfigs.find(c => c.id === configId);
+    if (config) {
+      applyConfigToForm(config);
+    }
+    setShowNFeConfigDropdown(false);
   };
 
   const calcularTotalRetencoes = () => {
@@ -230,7 +247,10 @@ export function OSNotaFiscalTab({
   };
 
   const handleEmitirNFe = async () => {
-    const nfeConfig = nfConfigs.find(c => c.tipo === 'nfe');
+    if (!selectedNFeConfig && nfeConfigs.length > 0) {
+      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrização de NF-e' });
+      return;
+    }
 
     setEmitindo(true);
     setMensagem(null);
@@ -240,7 +260,7 @@ export function OSNotaFiscalTab({
         .from('nf_emitidas')
         .insert({
           os_id: osId,
-          nf_config_id: nfeConfig?.id || null,
+          nf_config_id: selectedNFeConfig || null,
           unidade_id: unidadeId,
           tipo: 'nfe',
           valor_servicos: 0,
@@ -292,6 +312,7 @@ export function OSNotaFiscalTab({
   const nfseConfigs = nfConfigs.filter(c => c.tipo === 'nfse');
   const nfeConfigs = nfConfigs.filter(c => c.tipo === 'nfe');
   const selectedConfigData = nfConfigs.find(c => c.id === selectedConfig);
+  const selectedNFeConfigData = nfConfigs.find(c => c.id === selectedNFeConfig);
 
   if (loading) {
     return (
@@ -615,19 +636,52 @@ export function OSNotaFiscalTab({
       {activeSection === 'nfe' && (
         <div className="space-y-4">
           <div className="premium-card p-4">
-            <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-[#00D4FF]" />
-              Emissao de NF-e (Produtos/Pecas)
-            </h4>
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <FileCheck className="w-4 h-4 text-[#FFA500]" />
+                Emissao de NF-e (Produtos/Pecas)
+              </h4>
 
-            {nfeConfigs.length === 0 && (
-              <div className="mb-4 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 text-sm flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
-                Nenhuma parametrizacao de NF-e cadastrada. Usando valores padrao.
+              {nfeConfigs.length > 0 && (
+                <div className="relative">
+                  <button
+                    onClick={() => setShowNFeConfigDropdown(!showNFeConfigDropdown)}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 hover:border-[#FFA500]/50 transition-colors"
+                  >
+                    <span>{selectedNFeConfigData?.nome || 'Selecionar parametrizacao'}</span>
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showNFeConfigDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showNFeConfigDropdown && (
+                    <div className="absolute right-0 top-full mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
+                      {nfeConfigs.map(config => (
+                        <button
+                          key={config.id}
+                          onClick={() => handleSelectNFeConfig(config.id)}
+                          className={`w-full px-4 py-3 text-left text-sm hover:bg-[#FFA500]/10 transition-colors ${
+                            selectedNFeConfig === config.id ? 'bg-[#FFA500]/20 text-[#FFA500]' : 'text-gray-200'
+                          }`}
+                        >
+                          <div className="font-medium">{config.nome}</div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            CFOP: {config.cfop || '-'} | NCM: {config.ncm || '-'}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {nfeConfigs.length === 0 ? (
+              <div className="text-center py-8 text-gray-400">
+                <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Nenhuma parametrizacao de NF-e cadastrada para esta unidade.</p>
+                <p className="text-sm mt-1">Configure em Atom Core Settings &gt; Nota Fiscal</p>
               </div>
-            )}
-
-            <div className="space-y-4">
+            ) : (
+              <div className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">
@@ -717,7 +771,8 @@ export function OSNotaFiscalTab({
                   )}
                 </button>
               </div>
-            </div>
+              </div>
+            )}
           </div>
         </div>
       )}
