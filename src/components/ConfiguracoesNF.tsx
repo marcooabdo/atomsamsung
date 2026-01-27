@@ -124,7 +124,7 @@ const FORM_INICIAL = {
   cst_pis: '',
   cst_cofins: '',
   natureza_operacao: '',
-  regime_tributario: '',
+  regime_tributario: '1',
   observacoes_padrao: '',
   unidade_id: '',
   numero_inicial: '1',
@@ -699,6 +699,11 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         {config.icms_csosn && (
                           <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
                             CSOSN: {config.icms_csosn}
+                          </span>
+                        )}
+                        {config.icms_cst && (
+                          <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
+                            CST ICMS: {config.icms_cst}
                           </span>
                         )}
                         {config.natureza_operacao && (
@@ -1324,39 +1329,81 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         Nova Excecao
                       </button>
                     </div>
-                    <p className="text-xs text-gray-500 mb-3">No Simples Nacional, utilize o CSOSN. O ICMS e calculado dentro do DAS.</p>
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">CSOSN</label>
-                        <input
-                          type="text"
-                          value={form.icms_csosn}
-                          onChange={(e) => setForm(prev => ({ ...prev, icms_csosn: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
-                          placeholder="Ex: 102"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">CFOP</label>
-                        <input
-                          type="text"
-                          value={form.cfop}
-                          onChange={(e) => setForm(prev => ({ ...prev, cfop: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
-                          placeholder="Ex: 5102"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Aliquota ICMS (%)</label>
-                        <input
-                          type="number"
-                          value={form.icms_aliquota}
-                          onChange={(e) => setForm(prev => ({ ...prev, icms_aliquota: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
-                          step="0.01"
-                        />
-                      </div>
-                    </div>
+
+                    {/* Condicional: CSOSN para Simples Nacional, CST ICMS para os demais */}
+                    {form.regime_tributario === '1' || form.regime_tributario === '2' ? (
+                      <>
+                        <p className="text-xs text-gray-500 mb-3">No Simples Nacional, utilize o CSOSN. O ICMS e calculado dentro do DAS.</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">CSOSN</label>
+                            <input
+                              type="text"
+                              value={form.icms_csosn}
+                              onChange={(e) => setForm(prev => ({ ...prev, icms_csosn: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              placeholder="Ex: 102"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">CFOP</label>
+                            <input
+                              type="text"
+                              value={form.cfop}
+                              onChange={(e) => setForm(prev => ({ ...prev, cfop: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              placeholder="Ex: 5102"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Aliquota ICMS (%)</label>
+                            <input
+                              type="number"
+                              value={form.icms_aliquota}
+                              onChange={(e) => setForm(prev => ({ ...prev, icms_aliquota: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs text-gray-500 mb-3">Para Regime Normal, utilize o CST ICMS - Situação Tributária.</p>
+                        <div className="grid grid-cols-3 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">CST ICMS</label>
+                            <input
+                              type="text"
+                              value={form.icms_cst}
+                              onChange={(e) => setForm(prev => ({ ...prev, icms_cst: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              placeholder="Ex: 00"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">CFOP</label>
+                            <input
+                              type="text"
+                              value={form.cfop}
+                              onChange={(e) => setForm(prev => ({ ...prev, cfop: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              placeholder="Ex: 5102"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Aliquota ICMS (%)</label>
+                            <input
+                              type="number"
+                              value={form.icms_aliquota}
+                              onChange={(e) => setForm(prev => ({ ...prev, icms_aliquota: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
 
                     {excecoes.filter(e => e.tipo_imposto === 'icms').length > 0 && (
                       <div className="mt-3 space-y-2">
