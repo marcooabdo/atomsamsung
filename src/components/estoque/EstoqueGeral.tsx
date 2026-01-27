@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Filter, Package, Eye, History, Printer, MapPin, Clock, AlertCircle } from 'lucide-react';
+import { Search, Filter, Package, Eye, History, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, X } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
 import { LocationSelector } from './LocationSelector';
+import { EmitirNFModal } from './EmitirNFModal';
 
 type EstoquePeca = Database['public']['Tables']['estoque_pecas']['Row'] & {
   nf_data_emissao?: string;
@@ -33,6 +34,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
+
+  const [selectedPecas, setSelectedPecas] = useState<Set<string>>(new Set());
+  const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
 
   useEffect(() => {
     loadPecas();
@@ -218,6 +222,49 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     (peca.nf_delivery && peca.nf_delivery.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
+  const toggleSelectPeca = (pecaId: string) => {
+    setSelectedPecas(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(pecaId)) {
+        newSet.delete(pecaId);
+      } else {
+        newSet.add(pecaId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+    const allSelected = currentPagePecas.every(p => selectedPecas.has(p.id));
+
+    if (allSelected) {
+      setSelectedPecas(prev => {
+        const newSet = new Set(prev);
+        currentPagePecas.forEach(p => newSet.delete(p.id));
+        return newSet;
+      });
+    } else {
+      setSelectedPecas(prev => {
+        const newSet = new Set(prev);
+        currentPagePecas.forEach(p => newSet.add(p.id));
+        return newSet;
+      });
+    }
+  };
+
+  const clearSelection = () => {
+    setSelectedPecas(new Set());
+  };
+
+  const getSelectedPecasData = () => {
+    return pecas.filter(p => selectedPecas.has(p.id));
+  };
+
+  const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const allCurrentPageSelected = currentPagePecas.length > 0 && currentPagePecas.every(p => selectedPecas.has(p.id));
+  const someCurrentPageSelected = currentPagePecas.some(p => selectedPecas.has(p.id));
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -267,7 +314,49 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           />
           <span className="text-sm text-gray-300">Mostrar Arquivadas</span>
         </label>
+
+        {selectedPecas.size > 0 && (
+          <button
+            onClick={() => setShowEmitirNFModal(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
+            style={{
+              background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
+              border: '2px solid rgba(255,165,0,0.7)',
+              color: '#FFA500',
+              boxShadow: '0 0 15px rgba(255,165,0,0.2)'
+            }}
+          >
+            <FileText className="w-4 h-4" />
+            Emitir NF ({selectedPecas.size})
+          </button>
+        )}
       </div>
+
+      {selectedPecas.size > 0 && (
+        <div className="flex items-center justify-between p-3 rounded-lg bg-[#FFA500]/10 border border-[#FFA500]/30">
+          <div className="flex items-center gap-3">
+            <CheckSquare className="w-5 h-5 text-[#FFA500]" />
+            <span className="text-sm text-[#FFA500] font-medium">
+              {selectedPecas.size} {selectedPecas.size === 1 ? 'peca selecionada' : 'pecas selecionadas'}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleSelectAll}
+              className="text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 transition"
+            >
+              {allCurrentPageSelected ? 'Desmarcar pagina' : 'Selecionar pagina'}
+            </button>
+            <button
+              onClick={clearSelection}
+              className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 rounded bg-red-500/10 hover:bg-red-500/20 transition flex items-center gap-1"
+            >
+              <X className="w-3 h-3" />
+              Limpar selecao
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-gray-400">
@@ -300,9 +389,28 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((peca) => (
             <div
               key={peca.id}
-              className="premium-card p-4 hover-lift"
+              className={`premium-card p-4 hover-lift relative transition-all ${
+                selectedPecas.has(peca.id)
+                  ? 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
+                  : ''
+              }`}
             >
-              <div className="flex items-start justify-between mb-3">
+              <button
+                onClick={() => toggleSelectPeca(peca.id)}
+                className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
+                  selectedPecas.has(peca.id)
+                    ? 'bg-[#FFA500] text-black'
+                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                }`}
+              >
+                {selectedPecas.has(peca.id) ? (
+                  <CheckSquare className="w-5 h-5" />
+                ) : (
+                  <Square className="w-5 h-5" />
+                )}
+              </button>
+
+              <div className="flex items-start justify-between mb-3 pr-10">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="px-2.5 py-1 bg-[#39FF14]/20 text-[#39FF14] rounded font-bold text-sm">
@@ -816,6 +924,18 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {showEmitirNFModal && selectedPecas.size > 0 && (
+        <EmitirNFModal
+          pecas={getSelectedPecasData()}
+          unidadeId={selectedUnidade || user?.unidade_id || ''}
+          onClose={() => setShowEmitirNFModal(false)}
+          onSuccess={() => {
+            clearSelection();
+            loadPecas();
+          }}
+        />
       )}
     </div>
   );

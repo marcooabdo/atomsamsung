@@ -23,6 +23,9 @@ interface NFConfig {
   natureza_operacao: string | null;
   regime_tributario: string | null;
   observacoes_padrao: string | null;
+  numero_inicial: number;
+  serie: string | null;
+  ultimo_numero: number;
   ativo: boolean;
   created_at: string;
 }
@@ -56,6 +59,8 @@ const FORM_INICIAL = {
   regime_tributario: '',
   observacoes_padrao: '',
   unidade_id: '',
+  numero_inicial: '1',
+  serie: '1',
   ativo: true
 };
 
@@ -113,6 +118,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         regime_tributario: config.regime_tributario || '',
         observacoes_padrao: config.observacoes_padrao || '',
         unidade_id: config.unidade_id,
+        numero_inicial: String(config.numero_inicial || 1),
+        serie: config.serie || '1',
         ativo: config.ativo
       });
     } else {
@@ -163,6 +170,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         natureza_operacao: form.natureza_operacao || null,
         regime_tributario: form.regime_tributario || null,
         observacoes_padrao: form.observacoes_padrao || null,
+        numero_inicial: parseInt(form.numero_inicial) || 1,
+        serie: form.serie || '1',
         ativo: form.ativo
       };
 
@@ -484,6 +493,32 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                     />
                     <span className="text-sm text-gray-300">Ativo</span>
                   </label>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-800 pt-4">
+                <h4 className="text-sm font-bold text-gray-400 uppercase mb-3">Numeracao da Nota</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1">Numero Inicial</label>
+                    <input
+                      type="number"
+                      value={form.numero_inicial}
+                      onChange={(e) => setForm(prev => ({ ...prev, numero_inicial: e.target.value }))}
+                      className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                      min="1"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[10px] text-gray-500 mb-1">Serie</label>
+                    <input
+                      type="text"
+                      value={form.serie}
+                      onChange={(e) => setForm(prev => ({ ...prev, serie: e.target.value }))}
+                      className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                      placeholder="Ex: 1"
+                    />
+                  </div>
                 </div>
               </div>
 
