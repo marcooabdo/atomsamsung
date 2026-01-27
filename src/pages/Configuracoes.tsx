@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
+import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf';
 
 interface Unidade {
   id: string;
@@ -602,7 +603,8 @@ export function Configuracoes() {
     { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD' },
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981' },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' },
-    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6' }
+    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6' },
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b' }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2034,6 +2036,10 @@ export function Configuracoes() {
 
                 {activeTab === 'pdf_os' && (
                   <ConfiguracoesPDFOS />
+                )}
+
+                {activeTab === 'nf' && (
+                  <ConfiguracoesNF unidades={unidades} />
                 )}
               </>
             )}

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -7,6 +7,7 @@ import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
+import { OSNotaFiscalTab } from './OSNotaFiscalTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
 import { IniciarReparoModal } from './IniciarReparoModal';
@@ -83,7 +84,7 @@ interface OSModalProps {
   tipoOS?: 'OW' | 'NA';
 }
 
-type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'anexos' | 'comentarios' | 'agendamento';
+type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
 export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' }: OSModalProps) {
   const { usuario } = useAuth();
@@ -2616,6 +2617,7 @@ Não haverá cobrança ao cliente.`
             { id: 'checklist', label: 'Checklist', icon: CheckSquare },
             { id: 'servicos', label: 'Serviços', icon: Wrench },
             { id: 'pagamento', label: 'Pagamento', icon: DollarSign },
+            ...(os.tipo_os === 'OW' ? [{ id: 'nf', label: 'Nota Fiscal', icon: Receipt }] : []),
             ...(os.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
             { id: 'anexos', label: 'Anexos', icon: Paperclip },
             { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
@@ -3973,6 +3975,32 @@ Não haverá cobrança ao cliente.`
               osId={osId}
               os={os}
               onUpdate={async () => {
+                await loadOS();
+                onReload?.();
+              }}
+            />
+          )}
+
+          {abaAtiva === 'nf' && os.tipo_os === 'OW' && (
+            <OSNotaFiscalTab
+              osId={osId}
+              clienteNome={os.cliente_nome || ''}
+              clienteDocumento={os.cliente_cpf_cnpj}
+              clienteTelefone={os.cliente_telefone}
+              clienteEmail={os.cliente_email}
+              clienteEndereco={[
+                os.cliente_logradouro,
+                os.cliente_numero,
+                os.cliente_bairro,
+                os.cliente_cidade,
+                os.cliente_estado,
+                os.cliente_cep
+              ].filter(Boolean).join(', ')}
+              unidadeId={os.unidade_id}
+              valorServicos={os.valor_servicos || 0}
+              valorPecas={os.valor_pecas || 0}
+              valorTotal={os.valor_bruto || 0}
+              onReload={async () => {
                 await loadOS();
                 onReload?.();
               }}
