@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Plus, Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle, Calculator, Globe, Landmark, Filter, Code, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -729,8 +730,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         </div>
       </div>
 
-      {showModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      {showModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1944,12 +1945,13 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal de Variáveis */}
-      {showVariaveisModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      {showVariaveisModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -1994,12 +1996,13 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
               ))}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal de Exceção (placeholder - será implementado no próximo passo) */}
-      {showExcecaoModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[60] p-4">
+      {showExcecaoModal && createPortal(
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
           <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-3xl">
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
@@ -2031,7 +2034,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
