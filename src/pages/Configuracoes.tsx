@@ -10,14 +10,27 @@ type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' |
 interface Unidade {
   id: string;
   nome: string;
-  endereco: string | null;
-  numero: string | null;
-  cidade: string | null;
-  estado: string | null;
-  cep: string | null;
+  cnpj: string | null;
+  razao_social: string | null;
+  nome_fantasia: string | null;
+  inscricao_estadual: string | null;
+  ie_isento: boolean;
+  inscricao_municipal: string | null;
+  cnae: string | null;
   telefone: string | null;
+  cep: string | null;
+  cidade: string | null;
+  uf: string | null;
+  bairro: string | null;
+  rua: string | null;
+  numero: string | null;
+  complemento: string | null;
+  endereco: string | null;
+  estado: string | null;
   samsung_asccode: string | null;
   samsung_token: string | null;
+  latitude: number | null;
+  longitude: number | null;
   created_at: string;
 }
 
@@ -119,7 +132,28 @@ export function Configuracoes() {
   const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>('');
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>('');
 
-  const [formUnidade, setFormUnidade] = useState({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
+  const [formUnidade, setFormUnidade] = useState({
+    nome: '',
+    cnpj: '',
+    razao_social: '',
+    nome_fantasia: '',
+    inscricao_estadual: '',
+    ie_isento: false,
+    inscricao_municipal: '',
+    cnae: '',
+    telefone: '',
+    cep: '',
+    cidade: '',
+    uf: '',
+    bairro: '',
+    rua: '',
+    numero: '',
+    complemento: '',
+    endereco: '',
+    estado: '',
+    samsung_asccode: '',
+    samsung_token: ''
+  });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
@@ -216,7 +250,28 @@ export function Configuracoes() {
       switch (activeTab) {
         case 'unidades':
           const unidade = unidades.find(u => u.id === id);
-          if (unidade) setFormUnidade({ nome: unidade.nome, endereco: unidade.endereco || '', numero: unidade.numero || '', cidade: unidade.cidade || '', estado: unidade.estado || '', cep: unidade.cep || '', telefone: unidade.telefone || '', samsung_asccode: unidade.samsung_asccode || '', samsung_token: unidade.samsung_token || '' });
+          if (unidade) setFormUnidade({
+            nome: unidade.nome,
+            cnpj: unidade.cnpj || '',
+            razao_social: unidade.razao_social || '',
+            nome_fantasia: unidade.nome_fantasia || '',
+            inscricao_estadual: unidade.inscricao_estadual || '',
+            ie_isento: unidade.ie_isento || false,
+            inscricao_municipal: unidade.inscricao_municipal || '',
+            cnae: unidade.cnae || '',
+            telefone: unidade.telefone || '',
+            cep: unidade.cep || '',
+            cidade: unidade.cidade || '',
+            uf: unidade.uf || '',
+            bairro: unidade.bairro || '',
+            rua: unidade.rua || '',
+            numero: unidade.numero || '',
+            complemento: unidade.complemento || '',
+            endereco: unidade.endereco || '',
+            estado: unidade.estado || '',
+            samsung_asccode: unidade.samsung_asccode || '',
+            samsung_token: unidade.samsung_token || ''
+          });
           break;
         case 'usuarios':
           const usuario = usuarios.find(u => u.id === id);
@@ -240,7 +295,28 @@ export function Configuracoes() {
           break;
       }
     } else {
-      setFormUnidade({ nome: '', endereco: '', numero: '', cidade: '', estado: '', cep: '', telefone: '', samsung_asccode: '', samsung_token: '' });
+      setFormUnidade({
+        nome: '',
+        cnpj: '',
+        razao_social: '',
+        nome_fantasia: '',
+        inscricao_estadual: '',
+        ie_isento: false,
+        inscricao_municipal: '',
+        cnae: '',
+        telefone: '',
+        cep: '',
+        cidade: '',
+        uf: '',
+        bairro: '',
+        rua: '',
+        numero: '',
+        complemento: '',
+        endereco: '',
+        estado: '',
+        samsung_asccode: '',
+        samsung_token: ''
+      });
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
@@ -264,9 +340,11 @@ export function Configuracoes() {
         setFormUnidade({
           ...formUnidade,
           cep: cep,
-          endereco: data.logradouro || '',
+          rua: data.logradouro || '',
+          bairro: data.bairro || '',
           cidade: data.localidade || '',
-          estado: data.uf || ''
+          uf: data.uf || '',
+          complemento: data.complemento || ''
         });
       }
     } catch (error) {
@@ -280,12 +358,23 @@ export function Configuracoes() {
           if (!formUnidade.nome.trim()) return alert('Nome é obrigatório');
           const unidadeData = {
             nome: formUnidade.nome,
-            endereco: formUnidade.endereco || null,
-            numero: formUnidade.numero || null,
-            cidade: formUnidade.cidade || null,
-            estado: formUnidade.estado || null,
-            cep: formUnidade.cep || null,
+            cnpj: formUnidade.cnpj || null,
+            razao_social: formUnidade.razao_social || null,
+            nome_fantasia: formUnidade.nome_fantasia || null,
+            inscricao_estadual: formUnidade.ie_isento ? null : (formUnidade.inscricao_estadual || null),
+            ie_isento: formUnidade.ie_isento,
+            inscricao_municipal: formUnidade.inscricao_municipal || null,
+            cnae: formUnidade.cnae || null,
             telefone: formUnidade.telefone || null,
+            cep: formUnidade.cep || null,
+            cidade: formUnidade.cidade || null,
+            uf: formUnidade.uf || null,
+            bairro: formUnidade.bairro || null,
+            rua: formUnidade.rua || null,
+            numero: formUnidade.numero || null,
+            complemento: formUnidade.complemento || null,
+            endereco: formUnidade.endereco || null,
+            estado: formUnidade.estado || null,
             samsung_asccode: formUnidade.samsung_asccode || null,
             samsung_token: formUnidade.samsung_token || null
           };
@@ -630,44 +719,189 @@ export function Configuracoes() {
               {activeTab === 'unidades' && (
                 <>
                   <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2">Nome *</label>
-                    <input type="text" value={formUnidade.nome} onChange={(e) => setFormUnidade({...formUnidade, nome: e.target.value})} className="neon-input" />
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Nome da Unidade *</label>
+                    <input type="text" value={formUnidade.nome} onChange={(e) => setFormUnidade({...formUnidade, nome: e.target.value})} placeholder="Ex: Matriz, Filial Centro" className="neon-input" />
                   </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="col-span-2">
-                      <label className="block text-xs text-gray-400 uppercase mb-2">Endereço</label>
-                      <input type="text" value={formUnidade.endereco} onChange={(e) => setFormUnidade({...formUnidade, endereco: e.target.value})} placeholder="Rua, Av, etc" className="neon-input" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 uppercase mb-2">Número</label>
-                      <input type="text" value={formUnidade.numero} onChange={(e) => setFormUnidade({...formUnidade, numero: e.target.value})} placeholder="123" className="neon-input" />
+
+                  <div className="border-t border-gray-700 pt-4 mt-4">
+                    <h3 className="text-sm font-semibold text-[#00D4FF] mb-4 uppercase flex items-center gap-2">
+                      <Building className="w-4 h-4" />
+                      Dados Fiscais
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">CNPJ</label>
+                        <input
+                          type="text"
+                          value={formUnidade.cnpj}
+                          onChange={(e) => setFormUnidade({...formUnidade, cnpj: e.target.value})}
+                          placeholder="00.000.000/0000-00"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Razão Social</label>
+                        <input
+                          type="text"
+                          value={formUnidade.razao_social}
+                          onChange={(e) => setFormUnidade({...formUnidade, razao_social: e.target.value})}
+                          placeholder="Razão Social da Empresa"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Nome Fantasia</label>
+                        <input
+                          type="text"
+                          value={formUnidade.nome_fantasia}
+                          onChange={(e) => setFormUnidade({...formUnidade, nome_fantasia: e.target.value})}
+                          placeholder="Nome Fantasia"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Inscrição Estadual</label>
+                          <input
+                            type="text"
+                            value={formUnidade.inscricao_estadual}
+                            onChange={(e) => setFormUnidade({...formUnidade, inscricao_estadual: e.target.value})}
+                            placeholder="000.000.000.000"
+                            disabled={formUnidade.ie_isento}
+                            className="neon-input disabled:opacity-50 disabled:bg-gray-800"
+                          />
+                        </div>
+                        <div className="flex items-end pb-2">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={formUnidade.ie_isento}
+                              onChange={(e) => setFormUnidade({...formUnidade, ie_isento: e.target.checked, inscricao_estadual: e.target.checked ? '' : formUnidade.inscricao_estadual})}
+                              className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]"
+                            />
+                            <span className="text-sm text-gray-300">IE Isento</span>
+                          </label>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Inscrição Municipal</label>
+                          <input
+                            type="text"
+                            value={formUnidade.inscricao_municipal}
+                            onChange={(e) => setFormUnidade({...formUnidade, inscricao_municipal: e.target.value})}
+                            placeholder="0000000"
+                            className="neon-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">CNAE</label>
+                          <input
+                            type="text"
+                            value={formUnidade.cnae}
+                            onChange={(e) => setFormUnidade({...formUnidade, cnae: e.target.value})}
+                            placeholder="0000-0/00"
+                            className="neon-input"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Telefone</label>
+                        <input
+                          type="text"
+                          value={formUnidade.telefone}
+                          onChange={(e) => setFormUnidade({...formUnidade, telefone: e.target.value})}
+                          placeholder="(00) 00000-0000"
+                          className="neon-input"
+                        />
+                      </div>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-400 uppercase mb-2">Cidade</label>
-                      <input type="text" value={formUnidade.cidade} onChange={(e) => setFormUnidade({...formUnidade, cidade: e.target.value})} className="neon-input" />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 uppercase mb-2">Estado</label>
-                      <input type="text" value={formUnidade.estado} onChange={(e) => setFormUnidade({...formUnidade, estado: e.target.value.toUpperCase()})} maxLength={2} className="neon-input uppercase" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs text-gray-400 uppercase mb-2">CEP</label>
-                      <input
-                        type="text"
-                        value={formUnidade.cep}
-                        onChange={(e) => setFormUnidade({...formUnidade, cep: e.target.value})}
-                        onBlur={(e) => buscarCEPUnidade(e.target.value)}
-                        placeholder="00000-000"
-                        className="neon-input"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-400 uppercase mb-2">Telefone</label>
-                      <input type="text" value={formUnidade.telefone} onChange={(e) => setFormUnidade({...formUnidade, telefone: e.target.value})} placeholder="(00) 00000-0000" className="neon-input" />
+
+                  <div className="border-t border-gray-700 pt-4 mt-4">
+                    <h3 className="text-sm font-semibold text-[#00D4FF] mb-4 uppercase flex items-center gap-2">
+                      <MapPin className="w-4 h-4" />
+                      Endereço
+                    </h3>
+                    <div className="grid grid-cols-1 gap-4">
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-400 uppercase mb-2">CEP</label>
+                          <input
+                            type="text"
+                            value={formUnidade.cep}
+                            onChange={(e) => setFormUnidade({...formUnidade, cep: e.target.value})}
+                            onBlur={(e) => buscarCEPUnidade(e.target.value)}
+                            placeholder="00000-000"
+                            className="neon-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Rua/Logradouro</label>
+                          <input
+                            type="text"
+                            value={formUnidade.rua}
+                            onChange={(e) => setFormUnidade({...formUnidade, rua: e.target.value})}
+                            placeholder="Rua, Avenida, etc"
+                            className="neon-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Número</label>
+                          <input
+                            type="text"
+                            value={formUnidade.numero}
+                            onChange={(e) => setFormUnidade({...formUnidade, numero: e.target.value})}
+                            placeholder="123"
+                            className="neon-input"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Complemento</label>
+                        <input
+                          type="text"
+                          value={formUnidade.complemento}
+                          onChange={(e) => setFormUnidade({...formUnidade, complemento: e.target.value})}
+                          placeholder="Sala, Andar, Bloco, etc"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">Bairro</label>
+                        <input
+                          type="text"
+                          value={formUnidade.bairro}
+                          onChange={(e) => setFormUnidade({...formUnidade, bairro: e.target.value})}
+                          placeholder="Nome do bairro"
+                          className="neon-input"
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="col-span-2">
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Cidade</label>
+                          <input
+                            type="text"
+                            value={formUnidade.cidade}
+                            onChange={(e) => setFormUnidade({...formUnidade, cidade: e.target.value})}
+                            placeholder="Nome da cidade"
+                            className="neon-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">UF</label>
+                          <input
+                            type="text"
+                            value={formUnidade.uf}
+                            onChange={(e) => setFormUnidade({...formUnidade, uf: e.target.value.toUpperCase()})}
+                            maxLength={2}
+                            placeholder="SP"
+                            className="neon-input uppercase"
+                          />
+                        </div>
+                      </div>
                     </div>
                   </div>
 
