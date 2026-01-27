@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle, Calculator, Globe, Landmark } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface NFConfig {
@@ -26,6 +26,22 @@ interface NFConfig {
   numero_inicial: number;
   serie: string | null;
   ultimo_numero: number;
+  tipo_emissao: string | null;
+  regime_especial_tributacao: string | null;
+  codigo_tributario_municipal: string | null;
+  codigo_nbs: string | null;
+  iss_aliquota: number;
+  iss_retido: boolean;
+  iss_retencao_percentual: number;
+  cst_ibs_cbs: string | null;
+  classificacao_tributaria: string | null;
+  base_calculo_percentual: number;
+  ibs_estadual_aliquota: number;
+  ibs_estadual_diferimento: number;
+  ibs_municipal_aliquota: number;
+  ibs_municipal_diferimento: number;
+  cbs_federal_aliquota: number;
+  cbs_federal_diferimento: number;
   ativo: boolean;
   created_at: string;
 }
@@ -61,6 +77,22 @@ const FORM_INICIAL = {
   unidade_id: '',
   numero_inicial: '1',
   serie: '1',
+  tipo_emissao: 'simples_nacional',
+  regime_especial_tributacao: '',
+  codigo_tributario_municipal: '',
+  codigo_nbs: '',
+  iss_aliquota: '5',
+  iss_retido: false,
+  iss_retencao_percentual: '0',
+  cst_ibs_cbs: '',
+  classificacao_tributaria: '',
+  base_calculo_percentual: '100',
+  ibs_estadual_aliquota: '0',
+  ibs_estadual_diferimento: '0',
+  ibs_municipal_aliquota: '0',
+  ibs_municipal_diferimento: '0',
+  cbs_federal_aliquota: '0',
+  cbs_federal_diferimento: '0',
   ativo: true
 };
 
@@ -120,6 +152,22 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         unidade_id: config.unidade_id,
         numero_inicial: String(config.numero_inicial || 1),
         serie: config.serie || '1',
+        tipo_emissao: config.tipo_emissao || 'simples_nacional',
+        regime_especial_tributacao: config.regime_especial_tributacao || '',
+        codigo_tributario_municipal: config.codigo_tributario_municipal || '',
+        codigo_nbs: config.codigo_nbs || '',
+        iss_aliquota: String(config.iss_aliquota || 0),
+        iss_retido: config.iss_retido || false,
+        iss_retencao_percentual: String(config.iss_retencao_percentual || 0),
+        cst_ibs_cbs: config.cst_ibs_cbs || '',
+        classificacao_tributaria: config.classificacao_tributaria || '',
+        base_calculo_percentual: String(config.base_calculo_percentual || 100),
+        ibs_estadual_aliquota: String(config.ibs_estadual_aliquota || 0),
+        ibs_estadual_diferimento: String(config.ibs_estadual_diferimento || 0),
+        ibs_municipal_aliquota: String(config.ibs_municipal_aliquota || 0),
+        ibs_municipal_diferimento: String(config.ibs_municipal_diferimento || 0),
+        cbs_federal_aliquota: String(config.cbs_federal_aliquota || 0),
+        cbs_federal_diferimento: String(config.cbs_federal_diferimento || 0),
         ativo: config.ativo
       });
     } else {
@@ -172,6 +220,22 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         observacoes_padrao: form.observacoes_padrao || null,
         numero_inicial: parseInt(form.numero_inicial) || 1,
         serie: form.serie || '1',
+        tipo_emissao: form.tipo_emissao || null,
+        regime_especial_tributacao: form.regime_especial_tributacao || null,
+        codigo_tributario_municipal: form.codigo_tributario_municipal || null,
+        codigo_nbs: form.codigo_nbs || null,
+        iss_aliquota: parseFloat(form.iss_aliquota) || 0,
+        iss_retido: form.iss_retido,
+        iss_retencao_percentual: parseFloat(form.iss_retencao_percentual) || 0,
+        cst_ibs_cbs: form.cst_ibs_cbs || null,
+        classificacao_tributaria: form.classificacao_tributaria || null,
+        base_calculo_percentual: parseFloat(form.base_calculo_percentual) || 100,
+        ibs_estadual_aliquota: parseFloat(form.ibs_estadual_aliquota) || 0,
+        ibs_estadual_diferimento: parseFloat(form.ibs_estadual_diferimento) || 0,
+        ibs_municipal_aliquota: parseFloat(form.ibs_municipal_aliquota) || 0,
+        ibs_municipal_diferimento: parseFloat(form.ibs_municipal_diferimento) || 0,
+        cbs_federal_aliquota: parseFloat(form.cbs_federal_aliquota) || 0,
+        cbs_federal_diferimento: parseFloat(form.cbs_federal_diferimento) || 0,
         ativo: form.ativo
       };
 
@@ -300,7 +364,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-bold text-white flex items-center gap-2">
                         {config.nome}
                         {!config.ativo && (
@@ -313,11 +377,16 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                       </p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <span className="text-xs px-2 py-1 rounded bg-[#00D4FF]/10 text-[#00D4FF]">
-                          ISS: {config.aliquota_iss}%
+                          ISS: {config.iss_aliquota || config.aliquota_iss}%
                         </span>
+                        {config.tipo_emissao && (
+                          <span className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-400">
+                            {config.tipo_emissao === 'simples_nacional' ? 'Simples Nacional' : 'NFSe Nacional'}
+                          </span>
+                        )}
                         {config.codigo_servico && (
                           <span className="text-xs px-2 py-1 rounded bg-gray-700 text-gray-300">
-                            Cod: {config.codigo_servico}
+                            LC 116: {config.codigo_servico}
                           </span>
                         )}
                         {config.cnae && (
@@ -327,7 +396,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 ml-2">
                       <button
                         onClick={() => handleOpenModal(config)}
                         className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-[#00D4FF] transition-colors"
@@ -371,7 +440,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <div>
+                    <div className="flex-1">
                       <h4 className="font-bold text-white flex items-center gap-2">
                         {config.nome}
                         {!config.ativo && (
@@ -400,7 +469,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 ml-2">
                       <button
                         onClick={() => handleOpenModal(config)}
                         className="p-2 rounded-lg hover:bg-gray-700 text-gray-400 hover:text-[#FFA500] transition-colors"
@@ -424,7 +493,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
 
       {showModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+          <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
             <div className="flex items-center justify-between p-4 border-b border-gray-800">
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
                 {form.tipo === 'nfse' ? <Receipt className="w-5 h-5 text-[#00D4FF]" /> : <FileText className="w-5 h-5 text-[#FFA500]" />}
@@ -439,10 +508,10 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
             </div>
 
             <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Nome da Parametrizacao *
+                    Titulo/Nome da Parametrizacao *
                   </label>
                   <input
                     type="text"
@@ -482,8 +551,30 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                     ))}
                   </select>
                 </div>
+              </div>
 
-                <div className="flex items-center gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Numero Inicial</label>
+                  <input
+                    type="number"
+                    value={form.numero_inicial}
+                    onChange={(e) => setForm(prev => ({ ...prev, numero_inicial: e.target.value }))}
+                    className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                    min="1"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Serie</label>
+                  <input
+                    type="text"
+                    value={form.serie}
+                    onChange={(e) => setForm(prev => ({ ...prev, serie: e.target.value }))}
+                    className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                    placeholder="Ex: 1"
+                  />
+                </div>
+                <div className="flex items-end pb-1">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
@@ -491,34 +582,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                       onChange={(e) => setForm(prev => ({ ...prev, ativo: e.target.checked }))}
                       className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]"
                     />
-                    <span className="text-sm text-gray-300">Ativo</span>
+                    <span className="text-sm text-gray-300">Parametrizacao Ativa</span>
                   </label>
-                </div>
-              </div>
-
-              <div className="border-t border-gray-800 pt-4">
-                <h4 className="text-sm font-bold text-gray-400 uppercase mb-3">Numeracao da Nota</h4>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Numero Inicial</label>
-                    <input
-                      type="number"
-                      value={form.numero_inicial}
-                      onChange={(e) => setForm(prev => ({ ...prev, numero_inicial: e.target.value }))}
-                      className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                      min="1"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Serie</label>
-                    <input
-                      type="text"
-                      value={form.serie}
-                      onChange={(e) => setForm(prev => ({ ...prev, serie: e.target.value }))}
-                      className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                      placeholder="Ex: 1"
-                    />
-                  </div>
                 </div>
               </div>
 
@@ -526,10 +591,47 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                 <>
                   <div className="border-t border-gray-800 pt-4">
                     <h4 className="text-sm font-bold text-[#00D4FF] uppercase mb-3 flex items-center gap-2">
-                      <Percent className="w-4 h-4" />
-                      Aliquotas e Retencoes
+                      <Receipt className="w-4 h-4" />
+                      Dados Fiscais NFS-e
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Tipo de Emissao</label>
+                        <select
+                          value={form.tipo_emissao}
+                          onChange={(e) => setForm(prev => ({ ...prev, tipo_emissao: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                        >
+                          <option value="simples_nacional">Optante Simples Nacional</option>
+                          <option value="nfse_nacional">NFSe Nacional</option>
+                        </select>
+                      </div>
+                      <div className="md:col-span-2">
+                        <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operacao</label>
+                        <input
+                          type="text"
+                          value={form.natureza_operacao}
+                          onChange={(e) => setForm(prev => ({ ...prev, natureza_operacao: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          placeholder="Ex: Prestacao de Servicos"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Regime Especial Tributacao</label>
+                        <select
+                          value={form.regime_especial_tributacao}
+                          onChange={(e) => setForm(prev => ({ ...prev, regime_especial_tributacao: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                        >
+                          <option value="">Nenhum</option>
+                          <option value="1">Microempresa Municipal</option>
+                          <option value="2">Estimativa</option>
+                          <option value="3">Sociedade de Profissionais</option>
+                          <option value="4">Cooperativa</option>
+                          <option value="5">MEI</option>
+                          <option value="6">ME/EPP Simples Nacional</option>
+                        </select>
+                      </div>
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Codigo Servico (LC 116)</label>
                         <input
@@ -551,64 +653,254 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Codigo Tributario Municipal</label>
+                        <input
+                          type="text"
+                          value={form.codigo_tributario_municipal}
+                          onChange={(e) => setForm(prev => ({ ...prev, codigo_tributario_municipal: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          placeholder="Ex: 1401"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Codigo NBS</label>
+                        <input
+                          type="text"
+                          value={form.codigo_nbs}
+                          onChange={(e) => setForm(prev => ({ ...prev, codigo_nbs: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          placeholder="Ex: 1.1401.00.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-800 pt-4">
+                    <h4 className="text-sm font-bold text-[#39FF14] uppercase mb-3 flex items-center gap-2">
+                      <Calculator className="w-4 h-4" />
+                      ISS - Imposto Sobre Servicos
+                    </h4>
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Aliquota ISS (%)</label>
                         <input
                           type="number"
-                          value={form.aliquota_iss}
-                          onChange={(e) => setForm(prev => ({ ...prev, aliquota_iss: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          value={form.iss_aliquota}
+                          onChange={(e) => setForm(prev => ({ ...prev, iss_aliquota: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#39FF14]"
                           step="0.01"
                         />
                       </div>
+                      <div className="flex items-end pb-1">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={form.iss_retido}
+                            onChange={(e) => setForm(prev => ({ ...prev, iss_retido: e.target.checked }))}
+                            className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#39FF14] focus:ring-[#39FF14]"
+                          />
+                          <span className="text-sm text-gray-300">ISS Retido na Fonte</span>
+                        </label>
+                      </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Retencao IR (%)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">% Retencao ISS</label>
                         <input
                           type="number"
-                          value={form.retencao_ir}
-                          onChange={(e) => setForm(prev => ({ ...prev, retencao_ir: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          value={form.iss_retencao_percentual}
+                          onChange={(e) => setForm(prev => ({ ...prev, iss_retencao_percentual: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#39FF14]"
                           step="0.01"
+                          disabled={!form.iss_retido}
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-800 pt-4">
+                    <h4 className="text-sm font-bold text-[#FFA500] uppercase mb-3 flex items-center gap-2">
+                      <Percent className="w-4 h-4" />
+                      Aliquotas Federais
+                    </h4>
+                    <div className="grid grid-cols-5 gap-3">
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Retencao PIS (%)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">PIS (%)</label>
                         <input
                           type="number"
                           value={form.retencao_pis}
                           onChange={(e) => setForm(prev => ({ ...prev, retencao_pis: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           step="0.01"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Retencao COFINS (%)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">COFINS (%)</label>
                         <input
                           type="number"
                           value={form.retencao_cofins}
                           onChange={(e) => setForm(prev => ({ ...prev, retencao_cofins: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           step="0.01"
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Retencao CSLL (%)</label>
-                        <input
-                          type="number"
-                          value={form.retencao_csll}
-                          onChange={(e) => setForm(prev => ({ ...prev, retencao_csll: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                          step="0.01"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Retencao INSS (%)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">INSS (%)</label>
                         <input
                           type="number"
                           value={form.retencao_inss}
                           onChange={(e) => setForm(prev => ({ ...prev, retencao_inss: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           step="0.01"
                         />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">IR (%)</label>
+                        <input
+                          type="number"
+                          value={form.retencao_ir}
+                          onChange={(e) => setForm(prev => ({ ...prev, retencao_ir: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                          step="0.01"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">CSLL (%)</label>
+                        <input
+                          type="number"
+                          value={form.retencao_csll}
+                          onChange={(e) => setForm(prev => ({ ...prev, retencao_csll: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-gray-800 pt-4">
+                    <h4 className="text-sm font-bold uppercase mb-3 flex items-center gap-2" style={{ color: '#FF6B6B' }}>
+                      <Globe className="w-4 h-4" />
+                      IBS/CBS - Reforma Tributaria
+                    </h4>
+                    <p className="text-xs text-gray-500 mb-4">Impostos da nova reforma tributaria (aplicacao futura)</p>
+
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">CST IBS/CBS</label>
+                        <input
+                          type="text"
+                          value={form.cst_ibs_cbs}
+                          onChange={(e) => setForm(prev => ({ ...prev, cst_ibs_cbs: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FF6B6B]"
+                          placeholder="Ex: 00"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Classificacao Tributaria (cClassTrib)</label>
+                        <input
+                          type="text"
+                          value={form.classificacao_tributaria}
+                          onChange={(e) => setForm(prev => ({ ...prev, classificacao_tributaria: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FF6B6B]"
+                          placeholder="Ex: 01"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Base Calculo (%)</label>
+                        <input
+                          type="number"
+                          value={form.base_calculo_percentual}
+                          onChange={(e) => setForm(prev => ({ ...prev, base_calculo_percentual: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FF6B6B]"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="p-3 rounded-lg bg-blue-500/5 border border-blue-500/20">
+                        <h5 className="text-xs font-bold text-blue-400 mb-2 flex items-center gap-1">
+                          <Landmark className="w-3 h-3" />
+                          IBS Estadual (UF)
+                        </h5>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Aliquota (%)</label>
+                            <input
+                              type="number"
+                              value={form.ibs_estadual_aliquota}
+                              onChange={(e) => setForm(prev => ({ ...prev, ibs_estadual_aliquota: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              step="0.01"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Diferimento (%)</label>
+                            <input
+                              type="number"
+                              value={form.ibs_estadual_diferimento}
+                              onChange={(e) => setForm(prev => ({ ...prev, ibs_estadual_diferimento: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-blue-500"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-green-500/5 border border-green-500/20">
+                        <h5 className="text-xs font-bold text-green-400 mb-2 flex items-center gap-1">
+                          <Building2 className="w-3 h-3" />
+                          IBS Municipal
+                        </h5>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Aliquota (%)</label>
+                            <input
+                              type="number"
+                              value={form.ibs_municipal_aliquota}
+                              onChange={(e) => setForm(prev => ({ ...prev, ibs_municipal_aliquota: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-green-500"
+                              step="0.01"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Diferimento (%)</label>
+                            <input
+                              type="number"
+                              value={form.ibs_municipal_diferimento}
+                              onChange={(e) => setForm(prev => ({ ...prev, ibs_municipal_diferimento: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-green-500"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="p-3 rounded-lg bg-yellow-500/5 border border-yellow-500/20">
+                        <h5 className="text-xs font-bold text-yellow-400 mb-2 flex items-center gap-1">
+                          <Globe className="w-3 h-3" />
+                          CBS Federal
+                        </h5>
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Aliquota (%)</label>
+                            <input
+                              type="number"
+                              value={form.cbs_federal_aliquota}
+                              onChange={(e) => setForm(prev => ({ ...prev, cbs_federal_aliquota: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-yellow-500"
+                              step="0.01"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">Diferimento (%)</label>
+                            <input
+                              type="number"
+                              value={form.cbs_federal_diferimento}
+                              onChange={(e) => setForm(prev => ({ ...prev, cbs_federal_diferimento: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-yellow-500"
+                              step="0.01"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -629,7 +921,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.cfop}
                           onChange={(e) => setForm(prev => ({ ...prev, cfop: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: 5102"
                         />
                       </div>
@@ -639,7 +931,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.ncm}
                           onChange={(e) => setForm(prev => ({ ...prev, ncm: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: 85171210"
                         />
                       </div>
@@ -649,7 +941,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.cst_icms}
                           onChange={(e) => setForm(prev => ({ ...prev, cst_icms: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: 00"
                         />
                       </div>
@@ -659,7 +951,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.cst_pis}
                           onChange={(e) => setForm(prev => ({ ...prev, cst_pis: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: 01"
                         />
                       </div>
@@ -669,7 +961,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.cst_cofins}
                           onChange={(e) => setForm(prev => ({ ...prev, cst_cofins: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: 01"
                         />
                       </div>
@@ -678,7 +970,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         <select
                           value={form.regime_tributario}
                           onChange={(e) => setForm(prev => ({ ...prev, regime_tributario: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                         >
                           <option value="">Selecione...</option>
                           <option value="1">1 - Simples Nacional</option>
@@ -692,7 +984,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           type="text"
                           value={form.natureza_operacao}
                           onChange={(e) => setForm(prev => ({ ...prev, natureza_operacao: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                           placeholder="Ex: Venda de Mercadorias"
                         />
                       </div>
