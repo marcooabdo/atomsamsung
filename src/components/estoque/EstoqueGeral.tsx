@@ -6,6 +6,7 @@ import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
 import { LocationSelector } from './LocationSelector';
 import { EmitirNFModal } from './EmitirNFModal';
+import { PecaDetailsModal } from './PecaDetailsModal';
 
 type EstoquePeca = Database['public']['Tables']['estoque_pecas']['Row'] & {
   nf_data_emissao?: string;
@@ -603,113 +604,15 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       {/* Modal de Detalhes */}
       {selectedPeca && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="premium-card w-full max-w-2xl p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-[#00D4FF]">Detalhes da Peça</h2>
-              <button
-                onClick={() => setSelectedPeca(null)}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
-              >
-                <span className="text-2xl text-gray-400">×</span>
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-sm text-gray-500">ID</label>
-                  <p className="text-[#39FF14] font-bold text-2xl">#{selectedPeca.id_numerico || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Part Number</label>
-                  <p className="text-white font-mono">{selectedPeca.pn}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Descrição</label>
-                  <p className="text-white">{selectedPeca.descricao || 'N/A'}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Status</label>
-                  <p className="text-white capitalize">{selectedPeca.status}</p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Valor com Impostos</label>
-                  <p className="text-[#39FF14] font-bold">
-                    R$ {selectedPeca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-                <div>
-                  <label className="text-sm text-gray-500">Condição</label>
-                  <p className="text-white capitalize">{selectedPeca.condicao}</p>
-                </div>
-                {selectedPeca.nf_delivery && (
-                  <div className="col-span-2">
-                    <label className="text-sm text-gray-500">Delivery</label>
-                    <p className="text-[#00D4FF] font-bold text-lg">{selectedPeca.nf_delivery}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Localização */}
-              <div className="pt-4 border-t border-gray-700">
-                <h3 className="text-sm font-bold text-gray-400 uppercase mb-3">Localização Física</h3>
-                {selectedPeca.localizacao ? (
-                  <div className="p-3 bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg">
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-center gap-2 text-white">
-                        <MapPin className="w-5 h-5 text-[#00D4FF]" />
-                        <span>{selectedPeca.localizacao}</span>
-                      </div>
-                      <button
-                        onClick={async () => {
-                          const { data } = await supabase
-                            .rpc('listar_localizacoes_pn', { pn_busca: selectedPeca.pn });
-                          setPecaLocalizacoes(data || []);
-                          setShowLocationSelector(true);
-                        }}
-                        className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/80"
-                      >
-                        Alterar
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={async () => {
-                      const { data } = await supabase
-                        .rpc('listar_localizacoes_pn', { pn_busca: selectedPeca.pn });
-                      setPecaLocalizacoes(data || []);
-                      setShowLocationSelector(true);
-                    }}
-                    className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-sm transition-colors"
-                  >
-                    <MapPin className="w-4 h-4 inline mr-2" />
-                    Definir localização no mapa
-                  </button>
-                )}
-              </div>
-
-              <div className="pt-4 border-t border-gray-700 space-y-2">
-                <button
-                  onClick={() => {
-                    setShowLabelSelector(true);
-                  }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors border border-[#39FF14]/30"
-                >
-                  <Printer className="w-4 h-4" />
-                  Gerar Etiquetas
-                </button>
-                <button
-                  onClick={() => setSelectedPeca(null)}
-                  className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                >
-                  Fechar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PecaDetailsModal
+          peca={selectedPeca}
+          onClose={() => setSelectedPeca(null)}
+          onShowLabelSelector={() => setShowLabelSelector(true)}
+          onShowLocationSelector={(localizacoes) => {
+            setPecaLocalizacoes(localizacoes);
+            setShowLocationSelector(true);
+          }}
+        />
       )}
 
       {/* Label Selector for Single Piece */}

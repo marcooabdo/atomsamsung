@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, FileText, Building2, User, Package, ChevronDown, Plus, Save, Send, Eye, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -309,16 +310,12 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
 
   const selectedConfigData = nfConfigs.find(c => c.id === selectedConfig);
 
-  if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center">
-        <div className="animate-spin w-8 h-8 border-2 border-[#00D4FF] border-t-transparent rounded-full" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+  const modalContent = loading ? (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center">
+      <div className="animate-spin w-8 h-8 border-2 border-[#00D4FF] border-t-transparent rounded-full" />
+    </div>
+  ) : (
+    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4 overflow-y-auto">
       <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-gradient-to-r from-[#FFA500]/10 to-transparent">
           <div className="flex items-center gap-3">
@@ -733,4 +730,6 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
