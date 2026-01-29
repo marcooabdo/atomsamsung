@@ -3482,9 +3482,51 @@ Não haverá cobrança ao cliente.`
                                     </div>
                                   )}
 
-                                  <p className="text-xs text-gray-500">
-                                    Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                  </p>
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-500">Unit: R$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
+                                      onBlur={async (e) => {
+                                        const novoValor = parseFloat(e.target.value) || 0;
+                                        if (novoValor === peca.valor_unitario) return;
+
+                                        try {
+                                          // Se for de uma requisição, atualiza o valor_peca na tabela requisicoes_pecas
+                                          if (requisicao) {
+                                            await supabase
+                                              .from('requisicoes_pecas')
+                                              .update({ valor_peca: novoValor })
+                                              .eq('id', requisicao.id);
+                                          }
+                                          // Se for de os_pecas, atualiza o valor_unitario
+                                          else if (tipo === 'os_peca') {
+                                            await supabase
+                                              .from('os_pecas')
+                                              .update({
+                                                valor_unitario: novoValor,
+                                                valor_total: novoValor * peca.quantidade
+                                              })
+                                              .eq('id', peca.id);
+                                          }
+                                          // Se for de cotação, atualiza o valor_final_unitario
+                                          else if (tipo === 'cotacao') {
+                                            await supabase
+                                              .from('cotacoes_pecas')
+                                              .update({ valor_final_unitario: novoValor })
+                                              .eq('id', peca.id);
+                                          }
+
+                                          // Recarrega dados
+                                          await loadOSData();
+                                        } catch (error) {
+                                          alert('Erro ao atualizar valor da peça');
+                                        }
+                                      }}
+                                      className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                    />
+                                  </div>
                                   <p className="text-xs font-bold text-[#39FF14]">
                                     Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                   </p>
