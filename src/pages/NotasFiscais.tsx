@@ -447,7 +447,7 @@ export function NotasFiscais() {
           <h3 className="text-lg font-bold text-[#00D4FF]">Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Busca */}
           <div className="lg:col-span-2">
             <label className="block text-xs text-gray-400 mb-2">Buscar</label>
@@ -508,23 +508,24 @@ export function NotasFiscais() {
               <option value="todos">Todos</option>
             </select>
           </div>
-        </div>
 
-        {unidades.length > 1 && (
-          <div className="mt-4">
-            <label className="block text-xs text-gray-400 mb-2">Unidade</label>
-            <select
-              value={unidadeFiltro}
-              onChange={(e) => setUnidadeFiltro(e.target.value)}
-              className="neon-input w-full max-w-xs"
-            >
-              <option value="todas">Todas as unidades</option>
-              {unidades.map(u => (
-                <option key={u.id} value={u.nome}>{u.nome}</option>
-              ))}
-            </select>
-          </div>
-        )}
+          {/* Unidade */}
+          {unidades.length > 1 && (
+            <div>
+              <label className="block text-xs text-gray-400 mb-2">Unidade</label>
+              <select
+                value={unidadeFiltro}
+                onChange={(e) => setUnidadeFiltro(e.target.value)}
+                className="neon-input w-full"
+              >
+                <option value="todas">Todas</option>
+                {unidades.map(u => (
+                  <option key={u.id} value={u.nome}>{u.nome}</option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
         <div className="mt-4 text-sm text-gray-400">
           Exibindo {filteredNotas.length} de {notasFiscais.length} notas fiscais
