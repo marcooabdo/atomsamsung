@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { UnitFilter } from '../components/UnitFilter';
 import {
   FileText,
   CheckCircle,
@@ -43,6 +44,7 @@ interface NotaFiscal {
     numero_os_interna: string | null;
   };
   unidade?: {
+    id: string;
     nome: string;
   };
   emitido_por_usuario?: {
@@ -69,7 +71,7 @@ export function NotasFiscais() {
   // Filtros
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'nfse' | 'nfe'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
-  const [unidadeFiltro, setUnidadeFiltro] = useState<string>('todas');
+  const [selectedUnidade, setSelectedUnidade] = useState<string>('');
   const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('mes');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -102,8 +104,14 @@ export function NotasFiscais() {
   }, [user]);
 
   useEffect(() => {
+    if (user?.unidade_id) {
+      setSelectedUnidade(user.unidade_id);
+    }
+  }, [user]);
+
+  useEffect(() => {
     aplicarFiltros();
-  }, [notasFiscais, tipoFiltro, statusFiltro, unidadeFiltro, periodoFiltro, searchTerm]);
+  }, [notasFiscais, tipoFiltro, statusFiltro, selectedUnidade, periodoFiltro, searchTerm]);
 
   const loadData = async () => {
     if (!user) return;
@@ -125,7 +133,7 @@ export function NotasFiscais() {
         .select(`
           *,
           os(numero_os_samsung, numero_os_interna),
-          unidade:unidades(nome),
+          unidade:unidades(id, nome),
           emitido_por_usuario:usuarios!nf_emitidas_emitido_por_fkey(nome)
         `)
         .order('created_at', { ascending: false });
@@ -203,8 +211,8 @@ export function NotasFiscais() {
     }
 
     // Filtro de unidade
-    if (unidadeFiltro !== 'todas') {
-      filtered = filtered.filter(nf => nf.unidade?.nome === unidadeFiltro);
+    if (selectedUnidade) {
+      filtered = filtered.filter(nf => nf.unidade?.id === selectedUnidade);
     }
 
     // Filtro de período
@@ -330,6 +338,13 @@ export function NotasFiscais() {
 
   return (
     <div className="min-h-screen p-6 space-y-6">
+      {/* Filtro de Unidade */}
+      <UnitFilter
+        unidades={unidades}
+        selectedUnidade={selectedUnidade}
+        onUnidadeChange={setSelectedUnidade}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -447,7 +462,7 @@ export function NotasFiscais() {
           <h3 className="text-lg font-bold text-[#00D4FF]">Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           {/* Busca */}
           <div className="lg:col-span-2">
             <label className="block text-xs text-gray-400 mb-2">Buscar</label>
@@ -508,23 +523,6 @@ export function NotasFiscais() {
               <option value="todos">Todos</option>
             </select>
           </div>
-
-          {/* Unidade */}
-          {unidades.length > 1 && (
-            <div>
-              <label className="block text-xs text-gray-400 mb-2">Unidade</label>
-              <select
-                value={unidadeFiltro}
-                onChange={(e) => setUnidadeFiltro(e.target.value)}
-                className="neon-input w-full"
-              >
-                <option value="todas">Todas</option>
-                {unidades.map(u => (
-                  <option key={u.id} value={u.nome}>{u.nome}</option>
-                ))}
-              </select>
-            </div>
-          )}
         </div>
 
         <div className="mt-4 text-sm text-gray-400">
