@@ -13,6 +13,7 @@ import { OFS } from './pages/OFS';
 import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
 import { Skywalker } from './pages/Skywalker';
+import { NotasFiscais } from './pages/NotasFiscais';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
@@ -202,6 +203,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <Skywalker />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/notas-fiscais"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <NotasFiscais />
               </Layout>
             </ProtectedRoute>
           }

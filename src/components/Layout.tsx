@@ -15,7 +15,8 @@ import {
   X,
   ClipboardList,
   Zap,
-  Rocket
+  Rocket,
+  FileText
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -29,6 +30,7 @@ const allMenuItems = [
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
   { id: 'chat', label: 'QG de Comunicação', icon: MessageSquare, path: '/chat' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
+  { id: 'notas-fiscais', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
   { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
   { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
   { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes', onlyFor: ['master', 'diretoria', 'gerente'] },

@@ -1,0 +1,925 @@
+import { useState, useEffect } from 'react';
+import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
+import {
+  FileText,
+  CheckCircle,
+  XCircle,
+  Clock,
+  AlertCircle,
+  DollarSign,
+  Package,
+  Filter,
+  Download,
+  Eye,
+  Calendar,
+  TrendingUp,
+  Building2,
+  Search
+} from 'lucide-react';
+
+interface NotaFiscal {
+  id: string;
+  tipo: 'nfse' | 'nfe';
+  numero: string | null;
+  serie: string | null;
+  chave_acesso: string | null;
+  valor_servicos: number;
+  valor_produtos: number;
+  valor_total: number;
+  valor_retencoes: number;
+  status: 'pendente' | 'processando' | 'emitida' | 'cancelada' | 'erro';
+  data_emissao: string | null;
+  tomador_nome: string | null;
+  tomador_documento: string | null;
+  protocolo: string | null;
+  pdf_url: string | null;
+  xml_url: string | null;
+  erro_mensagem: string | null;
+  observacoes: string | null;
+  created_at: string;
+  os?: {
+    numero_os_samsung: string | null;
+    numero_os_interna: string | null;
+  };
+  unidade?: {
+    nome: string;
+  };
+  emitido_por_usuario?: {
+    nome: string;
+  };
+}
+
+interface Stats {
+  total_emitidas: number;
+  total_pendentes: number;
+  total_erro: number;
+  total_canceladas: number;
+  valor_total_emitidas: number;
+  valor_total_mes: number;
+  quantidade_mes: number;
+}
+
+export function NotasFiscais() {
+  const { user } = useAuth();
+  const [loading, setLoading] = useState(true);
+  const [notasFiscais, setNotasFiscais] = useState<NotaFiscal[]>([]);
+  const [filteredNotas, setFilteredNotas] = useState<NotaFiscal[]>([]);
+
+  // Filtros
+  const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'nfse' | 'nfe'>('todos');
+  const [statusFiltro, setStatusFiltro] = useState<string>('todos');
+  const [unidadeFiltro, setUnidadeFiltro] = useState<string>('todas');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('mes');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  // Estatísticas
+  const [statsNFSe, setStatsNFSe] = useState<Stats>({
+    total_emitidas: 0,
+    total_pendentes: 0,
+    total_erro: 0,
+    total_canceladas: 0,
+    valor_total_emitidas: 0,
+    valor_total_mes: 0,
+    quantidade_mes: 0
+  });
+
+  const [statsNFe, setStatsNFe] = useState<Stats>({
+    total_emitidas: 0,
+    total_pendentes: 0,
+    total_erro: 0,
+    total_canceladas: 0,
+    valor_total_emitidas: 0,
+    valor_total_mes: 0,
+    quantidade_mes: 0
+  });
+
+  const [unidades, setUnidades] = useState<any[]>([]);
+  const [notaDetalhes, setNotaDetalhes] = useState<NotaFiscal | null>(null);
+
+  useEffect(() => {
+    loadData();
+  }, [user]);
+
+  useEffect(() => {
+    aplicarFiltros();
+  }, [notasFiscais, tipoFiltro, statusFiltro, unidadeFiltro, periodoFiltro, searchTerm]);
+
+  const loadData = async () => {
+    if (!user) return;
+
+    try {
+      setLoading(true);
+
+      // Carregar unidades
+      const { data: unidadesData } = await supabase
+        .from('unidades')
+        .select('id, nome')
+        .order('nome');
+
+      setUnidades(unidadesData || []);
+
+      // Carregar notas fiscais
+      const { data: nfsData, error } = await supabase
+        .from('nf_emitidas')
+        .select(`
+          *,
+          os(numero_os_samsung, numero_os_interna),
+          unidade:unidades(nome),
+          emitido_por_usuario:usuarios!nf_emitidas_emitido_por_fkey(nome)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      setNotasFiscais(nfsData || []);
+      calcularEstatisticas(nfsData || []);
+    } catch (error) {
+      console.error('Erro ao carregar dados:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const calcularEstatisticas = (notas: NotaFiscal[]) => {
+    const hoje = new Date();
+    const inicioMes = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+
+    const nfseStats: Stats = {
+      total_emitidas: 0,
+      total_pendentes: 0,
+      total_erro: 0,
+      total_canceladas: 0,
+      valor_total_emitidas: 0,
+      valor_total_mes: 0,
+      quantidade_mes: 0
+    };
+
+    const nfeStats: Stats = {
+      total_emitidas: 0,
+      total_pendentes: 0,
+      total_erro: 0,
+      total_canceladas: 0,
+      valor_total_emitidas: 0,
+      valor_total_mes: 0,
+      quantidade_mes: 0
+    };
+
+    notas.forEach(nota => {
+      const stats = nota.tipo === 'nfse' ? nfseStats : nfeStats;
+
+      if (nota.status === 'emitida') {
+        stats.total_emitidas++;
+        stats.valor_total_emitidas += nota.valor_total;
+
+        if (nota.data_emissao && new Date(nota.data_emissao) >= inicioMes) {
+          stats.valor_total_mes += nota.valor_total;
+          stats.quantidade_mes++;
+        }
+      } else if (nota.status === 'pendente' || nota.status === 'processando') {
+        stats.total_pendentes++;
+      } else if (nota.status === 'erro') {
+        stats.total_erro++;
+      } else if (nota.status === 'cancelada') {
+        stats.total_canceladas++;
+      }
+    });
+
+    setStatsNFSe(nfseStats);
+    setStatsNFe(nfeStats);
+  };
+
+  const aplicarFiltros = () => {
+    let filtered = [...notasFiscais];
+
+    // Filtro de tipo
+    if (tipoFiltro !== 'todos') {
+      filtered = filtered.filter(nf => nf.tipo === tipoFiltro);
+    }
+
+    // Filtro de status
+    if (statusFiltro !== 'todos') {
+      filtered = filtered.filter(nf => nf.status === statusFiltro);
+    }
+
+    // Filtro de unidade
+    if (unidadeFiltro !== 'todas') {
+      filtered = filtered.filter(nf => nf.unidade?.nome === unidadeFiltro);
+    }
+
+    // Filtro de período
+    if (periodoFiltro !== 'todos') {
+      const hoje = new Date();
+      let dataInicio: Date;
+
+      switch (periodoFiltro) {
+        case 'mes':
+          dataInicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
+          break;
+        case 'trimestre':
+          dataInicio = new Date(hoje.getFullYear(), hoje.getMonth() - 3, 1);
+          break;
+        case 'ano':
+          dataInicio = new Date(hoje.getFullYear(), 0, 1);
+          break;
+        default:
+          dataInicio = new Date(0);
+      }
+
+      filtered = filtered.filter(nf => new Date(nf.created_at) >= dataInicio);
+    }
+
+    // Busca por termo
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      filtered = filtered.filter(nf =>
+        nf.numero?.toLowerCase().includes(term) ||
+        nf.chave_acesso?.toLowerCase().includes(term) ||
+        nf.tomador_nome?.toLowerCase().includes(term) ||
+        nf.tomador_documento?.toLowerCase().includes(term) ||
+        nf.os?.numero_os_samsung?.toLowerCase().includes(term) ||
+        nf.os?.numero_os_interna?.toLowerCase().includes(term)
+      );
+    }
+
+    setFilteredNotas(filtered);
+  };
+
+  const getStatusBadge = (status: string) => {
+    const configs = {
+      emitida: {
+        bg: '#39FF1410',
+        border: '#39FF1460',
+        color: '#39FF14',
+        icon: CheckCircle,
+        label: 'EMITIDA'
+      },
+      pendente: {
+        bg: '#FFBF0010',
+        border: '#FFBF0060',
+        color: '#FFBF00',
+        icon: Clock,
+        label: 'PENDENTE'
+      },
+      processando: {
+        bg: '#00D4FF10',
+        border: '#00D4FF60',
+        color: '#00D4FF',
+        icon: Clock,
+        label: 'PROCESSANDO'
+      },
+      erro: {
+        bg: '#FF006410',
+        border: '#FF006460',
+        color: '#FF0064',
+        icon: XCircle,
+        label: 'ERRO'
+      },
+      cancelada: {
+        bg: '#71717A10',
+        border: '#71717A60',
+        color: '#71717A',
+        icon: XCircle,
+        label: 'CANCELADA'
+      }
+    };
+
+    const config = configs[status as keyof typeof configs] || configs.pendente;
+    const Icon = config.icon;
+
+    return (
+      <span
+        className="px-2 py-1 rounded-full text-xs font-bold flex items-center gap-1 w-fit"
+        style={{
+          backgroundColor: config.bg,
+          border: `1px solid ${config.border}`,
+          color: config.color
+        }}
+      >
+        <Icon className="w-3 h-3" />
+        {config.label}
+      </span>
+    );
+  };
+
+  const getTipoBadge = (tipo: string) => {
+    return (
+      <span
+        className="px-2 py-1 rounded text-xs font-bold"
+        style={{
+          backgroundColor: tipo === 'nfse' ? '#9333EA20' : '#3B82F620',
+          border: `1px solid ${tipo === 'nfse' ? '#9333EA' : '#3B82F6'}`,
+          color: tipo === 'nfse' ? '#9333EA' : '#3B82F6'
+        }}
+      >
+        {tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
+      </span>
+    );
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D4FF] mx-auto mb-4"></div>
+          <p className="text-gray-400">Carregando notas fiscais...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-[#00D4FF] flex items-center gap-3">
+            <FileText className="w-8 h-8" />
+            Gerenciamento de Notas Fiscais
+          </h1>
+          <p className="text-gray-400 mt-1">
+            Visualize e gerencie todas as NFS-e e NF-e emitidas
+          </p>
+        </div>
+      </div>
+
+      {/* Dashboard de Estatísticas */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Estatísticas NFS-e */}
+        <div className="premium-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-[#9333EA] flex items-center gap-2">
+              <FileText className="w-5 h-5" />
+              NFS-e - Notas de Serviço
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[#39FF1410] border border-[#39FF1460] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Emitidas</p>
+              <p className="text-2xl font-bold text-[#39FF14]">{statsNFSe.total_emitidas}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                R$ {statsNFSe.valor_total_emitidas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="bg-[#FFBF0010] border border-[#FFBF0060] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Pendentes</p>
+              <p className="text-2xl font-bold text-[#FFBF00]">{statsNFSe.total_pendentes}</p>
+            </div>
+
+            <div className="bg-[#FF006410] border border-[#FF006460] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Erro</p>
+              <p className="text-2xl font-bold text-[#FF0064]">{statsNFSe.total_erro}</p>
+            </div>
+
+            <div className="bg-[#71717A10] border border-[#71717A60] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Canceladas</p>
+              <p className="text-2xl font-bold text-[#71717A]">{statsNFSe.total_canceladas}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-[#9333EA]/20">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Total no mês:</span>
+              <div className="text-right">
+                <p className="text-lg font-bold text-[#9333EA]">
+                  R$ {statsNFSe.valor_total_mes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500">{statsNFSe.quantidade_mes} notas</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Estatísticas NF-e */}
+        <div className="premium-card p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-[#3B82F6] flex items-center gap-2">
+              <Package className="w-5 h-5" />
+              NF-e - Notas de Produto
+            </h2>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-[#39FF1410] border border-[#39FF1460] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Emitidas</p>
+              <p className="text-2xl font-bold text-[#39FF14]">{statsNFe.total_emitidas}</p>
+              <p className="text-xs text-gray-500 mt-1">
+                R$ {statsNFe.valor_total_emitidas.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </p>
+            </div>
+
+            <div className="bg-[#FFBF0010] border border-[#FFBF0060] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Pendentes</p>
+              <p className="text-2xl font-bold text-[#FFBF00]">{statsNFe.total_pendentes}</p>
+            </div>
+
+            <div className="bg-[#FF006410] border border-[#FF006460] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Erro</p>
+              <p className="text-2xl font-bold text-[#FF0064]">{statsNFe.total_erro}</p>
+            </div>
+
+            <div className="bg-[#71717A10] border border-[#71717A60] rounded-lg p-4">
+              <p className="text-xs text-gray-400 uppercase mb-1">Canceladas</p>
+              <p className="text-2xl font-bold text-[#71717A]">{statsNFe.total_canceladas}</p>
+            </div>
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-[#3B82F6]/20">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-gray-400">Total no mês:</span>
+              <div className="text-right">
+                <p className="text-lg font-bold text-[#3B82F6]">
+                  R$ {statsNFe.valor_total_mes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-gray-500">{statsNFe.quantidade_mes} notas</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filtros */}
+      <div className="premium-card p-6">
+        <div className="flex items-center gap-2 mb-4">
+          <Filter className="w-5 h-5 text-[#00D4FF]" />
+          <h3 className="text-lg font-bold text-[#00D4FF]">Filtros</h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Busca */}
+          <div className="lg:col-span-2">
+            <label className="block text-xs text-gray-400 mb-2">Buscar</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Número, chave, tomador, OS..."
+                className="neon-input w-full pl-10"
+              />
+            </div>
+          </div>
+
+          {/* Tipo */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Tipo de NF</label>
+            <select
+              value={tipoFiltro}
+              onChange={(e) => setTipoFiltro(e.target.value as any)}
+              className="neon-input w-full"
+            >
+              <option value="todos">Todas</option>
+              <option value="nfse">NFS-e</option>
+              <option value="nfe">NF-e</option>
+            </select>
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Status</label>
+            <select
+              value={statusFiltro}
+              onChange={(e) => setStatusFiltro(e.target.value)}
+              className="neon-input w-full"
+            >
+              <option value="todos">Todos</option>
+              <option value="emitida">Emitida</option>
+              <option value="pendente">Pendente</option>
+              <option value="processando">Processando</option>
+              <option value="erro">Erro</option>
+              <option value="cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          {/* Período */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Período</label>
+            <select
+              value={periodoFiltro}
+              onChange={(e) => setPeriodoFiltro(e.target.value as any)}
+              className="neon-input w-full"
+            >
+              <option value="mes">Este mês</option>
+              <option value="trimestre">Último trimestre</option>
+              <option value="ano">Este ano</option>
+              <option value="todos">Todos</option>
+            </select>
+          </div>
+        </div>
+
+        {unidades.length > 1 && (
+          <div className="mt-4">
+            <label className="block text-xs text-gray-400 mb-2">Unidade</label>
+            <select
+              value={unidadeFiltro}
+              onChange={(e) => setUnidadeFiltro(e.target.value)}
+              className="neon-input w-full max-w-xs"
+            >
+              <option value="todas">Todas as unidades</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.nome}>{u.nome}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        <div className="mt-4 text-sm text-gray-400">
+          Exibindo {filteredNotas.length} de {notasFiscais.length} notas fiscais
+        </div>
+      </div>
+
+      {/* Lista de Notas Fiscais */}
+      <div className="premium-card p-6">
+        <h3 className="text-lg font-bold text-[#00D4FF] mb-4 flex items-center gap-2">
+          <FileText className="w-5 h-5" />
+          Notas Fiscais ({filteredNotas.length})
+        </h3>
+
+        <div className="space-y-3">
+          {filteredNotas.length === 0 ? (
+            <div className="text-center py-12">
+              <FileText className="w-16 h-16 text-gray-600 mx-auto mb-4" />
+              <p className="text-gray-400">Nenhuma nota fiscal encontrada</p>
+            </div>
+          ) : (
+            filteredNotas.map(nf => (
+              <div key={nf.id} className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 hover:border-[#00D4FF]/50 transition-colors">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      {getTipoBadge(nf.tipo)}
+                      {getStatusBadge(nf.status)}
+
+                      {nf.numero && (
+                        <span className="text-sm font-mono text-[#00D4FF]">
+                          #{nf.numero}{nf.serie ? `-${nf.serie}` : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-3">
+                      {/* Tomador */}
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase">Tomador</p>
+                        <p className="text-sm text-gray-200 font-medium">{nf.tomador_nome || 'N/A'}</p>
+                        {nf.tomador_documento && (
+                          <p className="text-xs text-gray-500 font-mono">{nf.tomador_documento}</p>
+                        )}
+                      </div>
+
+                      {/* OS Vinculada */}
+                      {nf.os && (
+                        <div>
+                          <p className="text-xs text-gray-500 uppercase">OS Vinculada</p>
+                          <p className="text-sm text-gray-200 font-mono">
+                            {nf.os.numero_os_samsung || nf.os.numero_os_interna || 'N/A'}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Valores */}
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase">Valores</p>
+                        {nf.tipo === 'nfse' && nf.valor_servicos > 0 && (
+                          <p className="text-sm text-gray-200">
+                            Serviços: <span className="text-[#39FF14] font-bold">
+                              R$ {nf.valor_servicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </p>
+                        )}
+                        {nf.tipo === 'nfe' && nf.valor_produtos > 0 && (
+                          <p className="text-sm text-gray-200">
+                            Produtos: <span className="text-[#39FF14] font-bold">
+                              R$ {nf.valor_produtos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            </span>
+                          </p>
+                        )}
+                        <p className="text-sm text-gray-200">
+                          Total: <span className="text-[#00D4FF] font-bold">
+                            R$ {nf.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                        </p>
+                        {nf.valor_retencoes > 0 && (
+                          <p className="text-xs text-gray-500">
+                            Retenções: R$ {nf.valor_retencoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Data e Emitido por */}
+                      <div>
+                        <p className="text-xs text-gray-500 uppercase">Emissão</p>
+                        {nf.data_emissao ? (
+                          <p className="text-sm text-gray-200">
+                            {new Date(nf.data_emissao).toLocaleDateString('pt-BR')}
+                          </p>
+                        ) : (
+                          <p className="text-sm text-gray-500">Aguardando</p>
+                        )}
+                        {nf.emitido_por_usuario && (
+                          <p className="text-xs text-gray-500">por {nf.emitido_por_usuario.nome}</p>
+                        )}
+                        {nf.unidade && (
+                          <p className="text-xs text-gray-500">{nf.unidade.nome}</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Protocolo e Chave de Acesso */}
+                    {(nf.protocolo || nf.chave_acesso) && (
+                      <div className="mt-3 pt-3 border-t border-gray-700 grid grid-cols-1 md:grid-cols-2 gap-3">
+                        {nf.protocolo && (
+                          <div>
+                            <p className="text-xs text-gray-500">Protocolo:</p>
+                            <p className="text-xs text-gray-300 font-mono">{nf.protocolo}</p>
+                          </div>
+                        )}
+                        {nf.chave_acesso && (
+                          <div>
+                            <p className="text-xs text-gray-500">Chave de Acesso:</p>
+                            <p className="text-xs text-gray-300 font-mono break-all">{nf.chave_acesso}</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Mensagem de erro */}
+                    {nf.status === 'erro' && nf.erro_mensagem && (
+                      <div className="mt-3 p-3 bg-[#FF006410] border border-[#FF006460] rounded-lg">
+                        <div className="flex items-start gap-2">
+                          <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-xs font-bold text-[#FF0064] mb-1">Erro na emissão:</p>
+                            <p className="text-xs text-gray-300">{nf.erro_mensagem}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Observações */}
+                    {nf.observacoes && (
+                      <div className="mt-3 text-xs text-gray-400">
+                        <span className="font-bold">Obs:</span> {nf.observacoes}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ações */}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setNotaDetalhes(nf)}
+                      className="neon-button p-2"
+                      style={{
+                        backgroundColor: '#00D4FF20',
+                        borderColor: '#00D4FF',
+                        color: '#00D4FF'
+                      }}
+                      title="Ver detalhes"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+
+                    {nf.pdf_url && (
+                      <a
+                        href={nf.pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="neon-button p-2"
+                        style={{
+                          backgroundColor: '#39FF1420',
+                          borderColor: '#39FF14',
+                          color: '#39FF14'
+                        }}
+                        title="Download PDF"
+                      >
+                        <Download className="w-4 h-4" />
+                      </a>
+                    )}
+
+                    {nf.xml_url && (
+                      <a
+                        href={nf.xml_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="neon-button p-2"
+                        style={{
+                          backgroundColor: '#FFBF0020',
+                          borderColor: '#FFBF00',
+                          color: '#FFBF00'
+                        }}
+                        title="Download XML"
+                      >
+                        <FileText className="w-4 h-4" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
+
+      {/* Modal de Detalhes */}
+      {notaDetalhes && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="premium-card max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-[#00D4FF]/20 p-6 flex items-center justify-between sticky top-0 bg-gray-900 z-10">
+              <div>
+                <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
+                  <FileText className="w-6 h-6" />
+                  Detalhes da Nota Fiscal
+                </h2>
+                <div className="flex items-center gap-2 mt-2">
+                  {getTipoBadge(notaDetalhes.tipo)}
+                  {getStatusBadge(notaDetalhes.status)}
+                </div>
+              </div>
+              <button
+                onClick={() => setNotaDetalhes(null)}
+                className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors"
+              >
+                <XCircle className="w-5 h-5 text-[#00D4FF]" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Informações Básicas */}
+              <div>
+                <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Informações Básicas</h3>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-xs text-gray-500">Número</p>
+                    <p className="text-sm text-gray-200 font-mono">{notaDetalhes.numero || 'N/A'}</p>
+                  </div>
+                  {notaDetalhes.serie && (
+                    <div>
+                      <p className="text-xs text-gray-500">Série</p>
+                      <p className="text-sm text-gray-200 font-mono">{notaDetalhes.serie}</p>
+                    </div>
+                  )}
+                  <div>
+                    <p className="text-xs text-gray-500">Data de Emissão</p>
+                    <p className="text-sm text-gray-200">
+                      {notaDetalhes.data_emissao
+                        ? new Date(notaDetalhes.data_emissao).toLocaleString('pt-BR')
+                        : 'Aguardando'
+                      }
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Data de Criação</p>
+                    <p className="text-sm text-gray-200">
+                      {new Date(notaDetalhes.created_at).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Tomador */}
+              <div>
+                <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Tomador</h3>
+                <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                  <p className="text-sm text-gray-200 font-medium mb-1">
+                    {notaDetalhes.tomador_nome || 'N/A'}
+                  </p>
+                  {notaDetalhes.tomador_documento && (
+                    <p className="text-xs text-gray-400 font-mono">{notaDetalhes.tomador_documento}</p>
+                  )}
+                  {notaDetalhes.tomador_endereco && (
+                    <p className="text-xs text-gray-400 mt-2">{notaDetalhes.tomador_endereco}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Valores */}
+              <div>
+                <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Valores</h3>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  {notaDetalhes.valor_servicos > 0 && (
+                    <div className="bg-[#9333EA10] border border-[#9333EA60] rounded-lg p-4">
+                      <p className="text-xs text-gray-400 mb-1">Serviços</p>
+                      <p className="text-lg font-bold text-[#9333EA]">
+                        R$ {notaDetalhes.valor_servicos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                  {notaDetalhes.valor_produtos > 0 && (
+                    <div className="bg-[#3B82F610] border border-[#3B82F660] rounded-lg p-4">
+                      <p className="text-xs text-gray-400 mb-1">Produtos</p>
+                      <p className="text-lg font-bold text-[#3B82F6]">
+                        R$ {notaDetalhes.valor_produtos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                  {notaDetalhes.valor_retencoes > 0 && (
+                    <div className="bg-[#FF006410] border border-[#FF006460] rounded-lg p-4">
+                      <p className="text-xs text-gray-400 mb-1">Retenções</p>
+                      <p className="text-lg font-bold text-[#FF0064]">
+                        R$ {notaDetalhes.valor_retencoes.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </p>
+                    </div>
+                  )}
+                  <div className="bg-[#39FF1410] border border-[#39FF1460] rounded-lg p-4">
+                    <p className="text-xs text-gray-400 mb-1">Total</p>
+                    <p className="text-lg font-bold text-[#39FF14]">
+                      R$ {notaDetalhes.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Protocolo e Chave */}
+              {(notaDetalhes.protocolo || notaDetalhes.chave_acesso) && (
+                <div>
+                  <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Autenticação</h3>
+                  <div className="space-y-3">
+                    {notaDetalhes.protocolo && (
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                        <p className="text-xs text-gray-500 mb-1">Protocolo</p>
+                        <p className="text-sm text-gray-200 font-mono">{notaDetalhes.protocolo}</p>
+                      </div>
+                    )}
+                    {notaDetalhes.chave_acesso && (
+                      <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4">
+                        <p className="text-xs text-gray-500 mb-1">Chave de Acesso</p>
+                        <p className="text-sm text-gray-200 font-mono break-all">{notaDetalhes.chave_acesso}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Observações e Erro */}
+              {(notaDetalhes.observacoes || notaDetalhes.erro_mensagem) && (
+                <div>
+                  <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Observações</h3>
+                  {notaDetalhes.observacoes && (
+                    <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-3">
+                      <p className="text-sm text-gray-300">{notaDetalhes.observacoes}</p>
+                    </div>
+                  )}
+                  {notaDetalhes.erro_mensagem && (
+                    <div className="bg-[#FF006410] border border-[#FF006460] rounded-lg p-4">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-5 h-5 text-[#FF0064] flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-[#FF0064] mb-1">Mensagem de Erro:</p>
+                          <p className="text-sm text-gray-300">{notaDetalhes.erro_mensagem}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Downloads */}
+              {(notaDetalhes.pdf_url || notaDetalhes.xml_url) && (
+                <div>
+                  <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Downloads</h3>
+                  <div className="flex gap-3">
+                    {notaDetalhes.pdf_url && (
+                      <a
+                        href={notaDetalhes.pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="neon-button px-4 py-2 flex items-center gap-2"
+                        style={{
+                          backgroundColor: '#39FF1420',
+                          borderColor: '#39FF14',
+                          color: '#39FF14'
+                        }}
+                      >
+                        <Download className="w-4 h-4" />
+                        Download PDF
+                      </a>
+                    )}
+                    {notaDetalhes.xml_url && (
+                      <a
+                        href={notaDetalhes.xml_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="neon-button px-4 py-2 flex items-center gap-2"
+                        style={{
+                          backgroundColor: '#FFBF0020',
+                          borderColor: '#FFBF00',
+                          color: '#FFBF00'
+                        }}
+                      >
+                        <FileText className="w-4 h-4" />
+                        Download XML
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
