@@ -8,6 +8,7 @@ interface OSPeca {
   descricao: string;
   quantidade: number;
   valor_unitario?: number;
+  valor_final_unitario?: number;
   valor_total?: number;
 }
 
@@ -101,8 +102,6 @@ export function OSPrintView() {
 
   const loadData = async () => {
     try {
-      console.log('Carregando OS com ID:', osId);
-
       const { data: osData, error: osError } = await supabase
         .from('os')
         .select(`
@@ -110,14 +109,12 @@ export function OSPrintView() {
           unidade:unidades(nome, samsung_asccode, telefone, endereco, cidade, estado),
           os_pecas(pn, descricao, quantidade, valor_unitario, valor_total),
           os_servicos(descricao, quantidade, valor_unitario, valor_total),
-          cotacoes_pecas(pn, descricao, quantidade, valor_unitario, valor_total),
+          cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total),
           cotacoes_servicos(descricao, quantidade, valor_unitario, valor_total),
           pagamentos(valor, forma_pagamento, data_pagamento, observacoes)
         `)
         .eq('id', osId)
         .maybeSingle();
-
-      console.log('Resultado da query:', { osData, osError });
 
       if (osError) {
         setError(`Erro ao buscar OS: ${osError.message}`);
@@ -138,14 +135,10 @@ export function OSPrintView() {
         .limit(1)
         .maybeSingle();
 
-      if (configError) {
-        console.error('Erro ao buscar config:', configError);
-      }
 
       setOS(osData as any);
       setConfig(pdfConfig);
     } catch (error: any) {
-      console.error('Erro ao carregar dados:', error);
       setError(error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);
@@ -383,10 +376,10 @@ export function OSPrintView() {
                       <td className="border border-gray-300 px-3 py-2">{peca.descricao}</td>
                       <td className="border border-gray-300 px-3 py-2 text-center">{peca.quantidade}</td>
                       <td className="border border-gray-300 px-3 py-2 text-right">
-                        {formatCurrency(peca.valor_unitario)}
+                        {formatCurrency(peca.valor_unitario || peca.valor_final_unitario)}
                       </td>
                       <td className="border border-gray-300 px-3 py-2 text-right">
-                        {formatCurrency(peca.valor_total || (peca.quantidade * (peca.valor_unitario || 0)))}
+                        {formatCurrency(peca.valor_total || (peca.quantidade * (peca.valor_unitario || peca.valor_final_unitario || 0)))}
                       </td>
                     </tr>
                   ))}
