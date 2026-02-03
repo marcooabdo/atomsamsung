@@ -1,7 +1,8 @@
 import { useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useReactToPrint } from 'react-to-print';
 import JsBarcode from 'jsbarcode';
-import { Printer, Download } from 'lucide-react';
+import { Printer, X } from 'lucide-react';
 
 interface LabelData {
   id_sequencial: string;
@@ -45,8 +46,8 @@ export function LabelGenerator({ labels, onClose }: LabelGeneratorProps) {
     });
   }, [labels]);
 
-  return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
       <div className="bg-gray-900 rounded-xl border border-gray-700 w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-700">
@@ -70,7 +71,7 @@ export function LabelGenerator({ labels, onClose }: LabelGeneratorProps) {
               onClick={onClose}
               className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
             >
-              <span className="text-2xl text-gray-400">×</span>
+              <X className="w-6 h-6 text-gray-400" />
             </button>
           </div>
         </div>
@@ -224,14 +225,16 @@ export function LabelGenerator({ labels, onClose }: LabelGeneratorProps) {
         <div className="p-4 border-t border-gray-700 bg-gray-900">
           <div className="flex items-center justify-between text-sm text-gray-400">
             <div>
-              Tamanho: 5cm × 5cm | Formato: Código de Barras CODE128
+              Tamanho: 5cm x 5cm | Formato: Codigo de Barras CODE128
             </div>
             <div>
-              Impressão em papel adesivo recomendada
+              Impressao em papel adesivo recomendada
             </div>
           </div>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

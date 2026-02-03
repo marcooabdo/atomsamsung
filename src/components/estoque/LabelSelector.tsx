@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Printer, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Printer, Check, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Item {
@@ -133,8 +134,8 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
     .filter(item => selectedItems[item.id])
     .reduce((sum, item) => sum + item.quantidade, 0);
 
-  return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
       <div className="premium-card w-full max-w-3xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -149,7 +150,7 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
             onClick={onClose}
             className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <span className="text-2xl text-gray-400">×</span>
+            <X className="w-6 h-6 text-gray-400" />
           </button>
         </div>
 
@@ -225,10 +226,12 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
 
         <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
           <p className="text-xs text-blue-300">
-            💡 <strong>Dica:</strong> Cada unidade de peça receberá uma etiqueta única com código de barras individual para controle de estoque.
+            <strong>Dica:</strong> Cada unidade de peça receberá uma etiqueta única com código de barras individual para controle de estoque.
           </p>
         </div>
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }

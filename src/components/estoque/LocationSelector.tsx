@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { MapPin, Check, ChevronRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { MapPin, Check, ChevronRight, X } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 interface Location {
@@ -148,14 +149,14 @@ export function LocationSelector({ partNumber, currentUnidadeId, onSelect, onClo
     }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
       <div className="premium-card w-full max-w-2xl p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-2xl font-bold text-[#00D4FF] flex items-center gap-2">
               <MapPin className="w-6 h-6" />
-              Definir Localização
+              Definir Localizacao
             </h2>
             <p className="text-sm text-gray-400 mt-1">
               PN: <span className="font-mono text-white">{partNumber}</span>
@@ -165,7 +166,7 @@ export function LocationSelector({ partNumber, currentUnidadeId, onSelect, onClo
             onClick={onClose}
             className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
           >
-            <span className="text-2xl text-gray-400">×</span>
+            <X className="w-6 h-6 text-gray-400" />
           </button>
         </div>
 
@@ -337,11 +338,13 @@ export function LocationSelector({ partNumber, currentUnidadeId, onSelect, onClo
               onClick={() => onSelect('', '')}
               className="w-full px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-colors text-sm"
             >
-              Pular (Definir localização depois)
+              Pular (Definir localizacao depois)
             </button>
           </div>
         )}
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 }
