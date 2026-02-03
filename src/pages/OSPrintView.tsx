@@ -88,15 +88,21 @@ export function OSPrintView() {
   const [os, setOS] = useState<OSData | null>(null);
   const [config, setConfig] = useState<PDFConfig | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (osId) {
       loadData();
+    } else {
+      setLoading(false);
+      setError('ID da OS não fornecido');
     }
   }, [osId]);
 
   const loadData = async () => {
     try {
+      console.log('Carregando OS com ID:', osId);
+
       const { data: osData, error: osError } = await supabase
         .from('os')
         .select(`
@@ -111,20 +117,36 @@ export function OSPrintView() {
         .eq('id', osId)
         .maybeSingle();
 
-      if (osError) throw osError;
+      console.log('Resultado da query:', { osData, osError });
+
+      if (osError) {
+        setError(`Erro ao buscar OS: ${osError.message}`);
+        throw osError;
+      }
+
+      if (!osData) {
+        setError('Ordem de serviço não encontrada');
+        setLoading(false);
+        return;
+      }
 
       const { data: pdfConfig, error: configError } = await supabase
         .from('configuracoes_pdf_os')
         .select('*')
-        .eq('unidade_id', osData?.unidade_id)
+        .or(`unidade_id.eq.${osData.unidade_id},unidade_id.is.null`)
+        .order('unidade_id', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (configError) throw configError;
+      if (configError) {
+        console.error('Erro ao buscar config:', configError);
+      }
 
       setOS(osData as any);
       setConfig(pdfConfig);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Erro ao carregar dados:', error);
+      setError(error.message || 'Erro desconhecido');
     } finally {
       setLoading(false);
     }
@@ -155,10 +177,13 @@ export function OSPrintView() {
     );
   }
 
-  if (!os) {
+  if (!os || error) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
-        <p className="text-gray-600">Ordem de serviço não encontrada</p>
+        <div className="text-center">
+          <p className="text-red-600 font-medium mb-2">{error || 'Ordem de serviço não encontrada'}</p>
+          <p className="text-gray-500 text-sm">OS ID: {osId || 'não fornecido'}</p>
+        </div>
       </div>
     );
   }

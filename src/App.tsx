@@ -79,7 +79,14 @@ function AppContent() {
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
 
-        <Route path="/os/print" element={<OSPrintView />} />
+        <Route
+          path="/os/print"
+          element={
+            <ProtectedRoute>
+              <OSPrintView />
+            </ProtectedRoute>
+          }
+        />
 
         <Route
           path="/mobile/agenda"
