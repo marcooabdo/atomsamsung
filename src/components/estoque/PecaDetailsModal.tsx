@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom';
+import { useState } from 'react';
 import { X, MapPin, Printer } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -24,10 +25,171 @@ interface PecaDetailsModalProps {
 }
 
 export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLocationSelector }: PecaDetailsModalProps) {
+  const [generatingLabel, setGeneratingLabel] = useState(false);
+
   const handleAlterarLocalizacao = async () => {
     const { data } = await supabase
       .rpc('listar_localizacoes_pn', { pn_busca: peca.pn });
     onShowLocationSelector(data || []);
+  };
+
+  const handleGerarEtiqueta = async () => {
+    setGeneratingLabel(true);
+    try {
+      // Buscar informações completas da peça
+      const { data: pecaCompleta, error } = await supabase
+        .from('estoque_pecas')
+        .select(`
+          *,
+          nf:estoque_nfs(numero, data_emissao),
+          requisicoes:requisicoes_pecas(os:os(numero_os_interna))
+        `)
+        .eq('id', peca.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      // Pegar a primeira OS associada (se houver)
+      const osNumero = pecaCompleta?.requisicoes?.[0]?.os?.numero_os_interna || null;
+
+      // Gerar código de barras com o ID numérico
+      const barcodeValue = peca.id_numerico?.toString().padStart(8, '0') || peca.id.substring(0, 8);
+
+      // Criar janela com a etiqueta
+      const printWindow = window.open('', '_blank', 'width=300,height=300');
+      if (!printWindow) {
+        alert('Bloqueador de pop-ups ativo. Permita pop-ups para imprimir.');
+        return;
+      }
+
+      // HTML da etiqueta
+      const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Etiqueta #${peca.id_numerico || 'N/A'}</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    @page {
+      size: 3cm 3cm;
+      margin: 0;
+    }
+
+    body {
+      width: 3cm;
+      height: 3cm;
+      padding: 2mm;
+      font-family: Arial, sans-serif;
+      font-size: 6pt;
+      line-height: 1.1;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .id {
+      font-weight: bold;
+      font-size: 8pt;
+      text-align: center;
+      margin-bottom: 1mm;
+    }
+
+    .barcode {
+      text-align: center;
+      margin: 1mm 0;
+    }
+
+    .barcode canvas {
+      width: 100%;
+      height: auto;
+      max-height: 8mm;
+    }
+
+    .info {
+      font-size: 5pt;
+      line-height: 1.2;
+    }
+
+    .info div {
+      margin: 0.3mm 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .label {
+      font-weight: bold;
+    }
+
+    @media print {
+      body {
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+</head>
+<body>
+  <div class="id">ID #${peca.id_numerico || 'N/A'}</div>
+
+  <div class="barcode">
+    <canvas id="barcode"></canvas>
+  </div>
+
+  <div class="info">
+    <div><span class="label">PN:</span> ${peca.pn}</div>
+    ${peca.nf_delivery ? `<div><span class="label">DEL:</span> ${peca.nf_delivery}</div>` : ''}
+    ${pecaCompleta?.nf?.numero ? `<div><span class="label">NF:</span> ${pecaCompleta.nf.numero}</div>` : ''}
+    ${pecaCompleta?.nf?.data_emissao ? `<div><span class="label">DATA:</span> ${new Date(pecaCompleta.nf.data_emissao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>` : ''}
+    ${osNumero ? `<div><span class="label">OS:</span> ${osNumero}</div>` : ''}
+  </div>
+
+  <script>
+    try {
+      JsBarcode("#barcode", "${barcodeValue}", {
+        format: "CODE128",
+        width: 1,
+        height: 25,
+        displayValue: false,
+        margin: 0
+      });
+    } catch (e) {
+      console.error('Erro ao gerar código de barras:', e);
+    }
+
+    // Aguardar carregamento e imprimir
+    window.onload = function() {
+      setTimeout(function() {
+        window.print();
+      }, 500);
+    };
+
+    // Fechar após impressão ou cancelamento
+    window.onafterprint = function() {
+      setTimeout(function() {
+        window.close();
+      }, 100);
+    };
+  </script>
+</body>
+</html>
+      `;
+
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (error: any) {
+      console.error('Erro ao gerar etiqueta:', error);
+      alert(`Erro ao gerar etiqueta: ${error.message}`);
+    } finally {
+      setGeneratingLabel(false);
+    }
   };
 
   const modalContent = (
@@ -109,11 +271,12 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
           <div className="pt-4 border-t border-gray-700 space-y-2">
             <button
-              onClick={onShowLabelSelector}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors border border-[#39FF14]/30"
+              onClick={handleGerarEtiqueta}
+              disabled={generatingLabel}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors border border-[#39FF14]/30 disabled:opacity-50"
             >
               <Printer className="w-4 h-4" />
-              Gerar Etiquetas
+              {generatingLabel ? 'Gerando...' : 'Gerar Etiqueta'}
             </button>
             <button
               onClick={onClose}
