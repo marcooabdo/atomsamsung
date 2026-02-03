@@ -49,8 +49,19 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
       if (error) throw error;
 
-      // Pegar a primeira OS associada (se houver)
-      const osNumero = pecaCompleta?.requisicoes?.[0]?.os?.numero_os_interna || null;
+      // Pegar a primeira OS associada (se houver) através de requisições
+      let osNumero = pecaCompleta?.requisicoes?.[0]?.os?.numero_os_interna || null;
+
+      // Se não encontrou OS nas requisições, buscar em os_pecas (peças GSPN ou vinculadas diretamente)
+      if (!osNumero) {
+        const { data: osPeca } = await supabase
+          .from('os_pecas')
+          .select('os:os(numero_os_interna)')
+          .eq('estoque_peca_id', peca.id)
+          .maybeSingle();
+
+        osNumero = osPeca?.os?.numero_os_interna || null;
+      }
 
       // Gerar código de barras com o ID numérico
       const barcodeValue = peca.id_numerico?.toString().padStart(8, '0') || peca.id.substring(0, 8);
@@ -84,10 +95,10 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     body {
       width: 10cm;
       height: 5cm;
-      padding: 4mm;
+      padding: 3mm;
       font-family: Arial, sans-serif;
-      font-size: 14pt;
-      line-height: 1.3;
+      font-size: 16pt;
+      line-height: 1.1;
       display: flex;
       flex-direction: column;
       justify-content: center;
@@ -96,32 +107,32 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
     .id {
       font-weight: bold;
-      font-size: 24pt;
+      font-size: 28pt;
       text-align: center;
-      margin-bottom: 3mm;
+      margin-bottom: 2mm;
     }
 
     .barcode {
       text-align: center;
-      margin: 3mm 0;
+      margin: 1mm 0;
       width: 100%;
     }
 
     .barcode canvas {
       width: 90%;
       height: auto;
-      max-height: 20mm;
+      max-height: 22mm;
     }
 
     .info {
-      font-size: 11pt;
-      line-height: 1.4;
+      font-size: 13pt;
+      line-height: 1.1;
       text-align: center;
       width: 100%;
     }
 
     .info div {
-      margin: 1mm 0;
+      margin: 0.5mm 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -161,7 +172,9 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         format: "CODE128",
         width: 3,
         height: 60,
-        displayValue: false,
+        displayValue: true,
+        fontSize: 16,
+        textMargin: 2,
         margin: 0
       });
     } catch (e) {
