@@ -41,7 +41,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         .from('estoque_pecas')
         .select(`
           *,
-          nf:estoque_nfs(numero, data_emissao),
+          nf:estoque_nfs(numero_nf, data_emissao),
           requisicoes:requisicoes_pecas(os:os(numero_os_interna))
         `)
         .eq('id', peca.id)
@@ -146,7 +146,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   <div class="info">
     <div><span class="label">PN:</span> ${peca.pn}</div>
     ${peca.nf_delivery ? `<div><span class="label">DEL:</span> ${peca.nf_delivery}</div>` : ''}
-    ${pecaCompleta?.nf?.numero ? `<div><span class="label">NF:</span> ${pecaCompleta.nf.numero}</div>` : ''}
+    ${pecaCompleta?.nf?.numero_nf ? `<div><span class="label">NF:</span> ${pecaCompleta.nf.numero_nf}</div>` : ''}
     ${pecaCompleta?.nf?.data_emissao ? `<div><span class="label">DATA:</span> ${new Date(pecaCompleta.nf.data_emissao).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })}</div>` : ''}
     ${osNumero ? `<div><span class="label">OS:</span> ${osNumero}</div>` : ''}
   </div>
