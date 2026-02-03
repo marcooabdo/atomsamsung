@@ -432,19 +432,56 @@ export function OSPrintView() {
             </div>
           )}
 
+          {/* Pagamentos */}
+          {os.pagamentos && os.pagamentos.length > 0 && (
+            <div className="mb-6">
+              <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-300">
+                Pagamentos Registrados
+              </h2>
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">Data</th>
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">Forma de Pagamento</th>
+                    <th className="border border-gray-400 px-3 py-2 text-right font-bold text-gray-900">Valor</th>
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">Observacoes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {os.pagamentos.map((pagamento, idx) => (
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900">
+                        {formatDate(pagamento.data_lancamento)}
+                      </td>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900">
+                        {pagamento.forma_pagamento.replace(/_/g, ' ')}
+                      </td>
+                      <td className="border border-gray-400 px-3 py-2 text-right text-gray-900 font-medium">
+                        {formatCurrency(pagamento.valor)}
+                      </td>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900">
+                        {pagamento.observacoes || '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
           {/* Valores */}
-          <div className="mb-6 bg-gray-50 p-4 rounded-lg">
+          <div className="mb-6 bg-gray-100 p-4 rounded-lg border border-gray-300">
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-600">Valor Total:</span>
-              <span className="text-xl font-bold text-gray-800">{formatCurrency(os.valor_total)}</span>
+              <span className="text-sm font-bold text-gray-800">Valor Total:</span>
+              <span className="text-xl font-bold text-gray-900">{formatCurrency(os.valor_total)}</span>
             </div>
             <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-medium text-gray-600">Valor Pago:</span>
-              <span className="text-lg font-semibold text-green-600">{formatCurrency(os.valor_pago)}</span>
+              <span className="text-sm font-bold text-gray-800">Valor Pago:</span>
+              <span className="text-lg font-bold text-green-700">{formatCurrency(os.valor_pago)}</span>
             </div>
-            <div className="flex justify-between items-center pt-2 border-t border-gray-300">
-              <span className="text-sm font-medium text-gray-600">Saldo Restante:</span>
-              <span className="text-lg font-bold text-red-600">{formatCurrency(os.saldo_restante)}</span>
+            <div className="flex justify-between items-center pt-2 border-t border-gray-400">
+              <span className="text-sm font-bold text-gray-800">Saldo Restante:</span>
+              <span className="text-lg font-bold text-red-700">{formatCurrency(os.saldo_restante)}</span>
             </div>
           </div>
 
