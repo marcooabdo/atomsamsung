@@ -77,47 +77,51 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     }
 
     @page {
-      size: 3cm 3cm;
+      size: 10cm 5cm landscape;
       margin: 0;
     }
 
     body {
-      width: 3cm;
-      height: 3cm;
-      padding: 2mm;
+      width: 10cm;
+      height: 5cm;
+      padding: 4mm;
       font-family: Arial, sans-serif;
-      font-size: 6pt;
-      line-height: 1.1;
+      font-size: 14pt;
+      line-height: 1.3;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center;
+      align-items: center;
     }
 
     .id {
       font-weight: bold;
-      font-size: 8pt;
+      font-size: 24pt;
       text-align: center;
-      margin-bottom: 1mm;
+      margin-bottom: 3mm;
     }
 
     .barcode {
       text-align: center;
-      margin: 1mm 0;
+      margin: 3mm 0;
+      width: 100%;
     }
 
     .barcode canvas {
-      width: 100%;
+      width: 90%;
       height: auto;
-      max-height: 8mm;
+      max-height: 20mm;
     }
 
     .info {
-      font-size: 5pt;
-      line-height: 1.2;
+      font-size: 11pt;
+      line-height: 1.4;
+      text-align: center;
+      width: 100%;
     }
 
     .info div {
-      margin: 0.3mm 0;
+      margin: 1mm 0;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
@@ -155,8 +159,8 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     try {
       JsBarcode("#barcode", "${barcodeValue}", {
         format: "CODE128",
-        width: 1,
-        height: 25,
+        width: 3,
+        height: 60,
         displayValue: false,
         margin: 0
       });
