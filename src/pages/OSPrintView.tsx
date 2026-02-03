@@ -72,6 +72,9 @@ interface OSData {
   valor_pago: number | null;
   saldo_restante: number | null;
   status_pagamento: string | null;
+  desconto_tipo: 'valor' | 'percentual' | null;
+  desconto_valor: number | null;
+  valor_desconto_calculado: number | null;
 }
 
 interface PDFConfig {
@@ -471,18 +474,40 @@ export function OSPrintView() {
 
           {/* Valores */}
           <div className="mb-6 bg-gray-100 p-4 rounded-lg border border-gray-300">
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-bold text-gray-800">Valor Total:</span>
-              <span className="text-xl font-bold text-gray-900">{formatCurrency(os.valor_total)}</span>
-            </div>
-            <div className="flex justify-between items-center mb-2">
-              <span className="text-sm font-bold text-gray-800">Valor Pago:</span>
-              <span className="text-lg font-bold text-green-700">{formatCurrency(os.valor_pago)}</span>
-            </div>
-            <div className="flex justify-between items-center pt-2 border-t border-gray-400">
-              <span className="text-sm font-bold text-gray-800">Saldo Restante:</span>
-              <span className="text-lg font-bold text-red-700">{formatCurrency(os.saldo_restante)}</span>
-            </div>
+            {(() => {
+              const subtotal = (os.valor_total || 0) + (os.valor_desconto_calculado || 0);
+              const temDesconto = os.valor_desconto_calculado && os.valor_desconto_calculado > 0;
+              return (
+                <>
+                  {temDesconto && (
+                    <>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-gray-800">Subtotal:</span>
+                        <span className="text-lg font-bold text-gray-700">{formatCurrency(subtotal)}</span>
+                      </div>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-sm font-bold text-gray-800">
+                          Desconto {os.desconto_tipo === 'percentual' ? `(${os.desconto_valor}%)` : ''}:
+                        </span>
+                        <span className="text-lg font-bold text-red-600">- {formatCurrency(os.valor_desconto_calculado)}</span>
+                      </div>
+                    </>
+                  )}
+                  <div className={`flex justify-between items-center ${temDesconto ? 'pt-2 border-t border-gray-400' : ''} mb-2`}>
+                    <span className="text-sm font-bold text-gray-800">Valor Total:</span>
+                    <span className="text-xl font-bold text-gray-900">{formatCurrency(os.valor_total)}</span>
+                  </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-bold text-gray-800">Valor Pago:</span>
+                    <span className="text-lg font-bold text-green-700">{formatCurrency(os.valor_pago)}</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-400">
+                    <span className="text-sm font-bold text-gray-800">Saldo Restante:</span>
+                    <span className="text-lg font-bold text-red-700">{formatCurrency(os.saldo_restante)}</span>
+                  </div>
+                </>
+              );
+            })()}
           </div>
 
           {/* Termos e Condições */}
