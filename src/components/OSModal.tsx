@@ -1184,78 +1184,8 @@ Não haverá cobrança ao cliente.`
     }
   };
 
-  const handleGerarPDFOS = async () => {
-    try {
-      const { data: osData, error: osError } = await supabase
-        .from('os')
-        .select(`
-          *,
-          unidade:unidades!os_unidade_id_fkey(nome, samsung_asccode, telefone)
-        `)
-        .eq('id', osId)
-        .maybeSingle();
-
-      if (osError || !osData) {
-        console.error('Erro ao buscar OS:', osError);
-        alert(`Erro ao buscar dados da OS: ${osError?.message || 'Desconhecido'}`);
-        return;
-      }
-
-      const [osPecasResult, cotacaoPecasResult, cotacaoServicosResult, pagamentosResult] = await Promise.all([
-        supabase
-          .from('os_pecas')
-          .select('pn, descricao, quantidade, valor_unitario, valor_total')
-          .eq('os_id', osId),
-        supabase
-          .from('cotacoes_pecas')
-          .select('pn, descricao, quantidade, valor_final_unitario, valor_total')
-          .eq('os_id', osId),
-        supabase
-          .from('cotacoes_servicos')
-          .select('descricao, quantidade, valor_unitario, valor_total')
-          .eq('os_id', osId),
-        supabase
-          .from('pagamentos')
-          .select('valor, forma_pagamento, data_pagamento, observacoes')
-          .eq('os_id', osId)
-      ]);
-
-      (osData as any).os_pecas = osPecasResult.data || [];
-      (osData as any).cotacoes_pecas = cotacaoPecasResult.data || [];
-      (osData as any).cotacoes_servicos = cotacaoServicosResult.data || [];
-      (osData as any).pagamentos = pagamentosResult.data || [];
-
-      const { data: pdfConfig, error: configError } = await supabase
-        .from('configuracoes_pdf_os')
-        .select('*')
-        .or(`unidade_id.eq.${osData.unidade_id},unidade_id.is.null`)
-        .order('unidade_id', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (configError) {
-        alert('Erro ao buscar configuracoes do PDF');
-        return;
-      }
-
-      if (!pdfConfig) {
-        alert('Nenhuma configuracao de PDF encontrada. Configure em ATOM CORE SETTINGS -> PDF da OS');
-        return;
-      }
-
-      const pdfBlob = await gerarPDFOrdemServico(osData as any, pdfConfig as any);
-
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `OS_${osData.numero_os_samsung || osData.numero_os_interna || osData.id}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } catch (error: any) {
-      alert(`Erro ao gerar PDF: ${error.message}`);
-    }
+  const handleGerarPDFOS = () => {
+    window.open(`/os/print?osId=${osId}`, '_blank');
   };
 
   const handleRefazerOrcamento = async () => {

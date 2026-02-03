@@ -14,6 +14,7 @@ import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
 import { Skywalker } from './pages/Skywalker';
 import { NotasFiscais } from './pages/NotasFiscais';
+import { OSPrintView } from './pages/OSPrintView';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
@@ -77,6 +78,8 @@ function AppContent() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+
+        <Route path="/os/print" element={<OSPrintView />} />
 
         <Route
           path="/mobile/agenda"
