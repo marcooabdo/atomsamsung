@@ -22,7 +22,7 @@ interface OSServico {
 interface Pagamento {
   valor: number;
   forma_pagamento: string;
-  data_pagamento: string | null;
+  data_lancamento: string | null;
   observacoes?: string | null;
 }
 
@@ -111,7 +111,7 @@ export function OSPrintView() {
           os_servicos(descricao, quantidade, valor_unitario, valor_total),
           cotacoes_pecas(pn, descricao, quantidade, valor_final_unitario, valor_total),
           cotacoes_servicos(descricao, quantidade, valor_unitario, valor_total),
-          pagamentos(valor, forma_pagamento, data_pagamento, observacoes)
+          pagamentos(valor, forma_pagamento, data_lancamento, observacoes)
         `)
         .eq('id', osId)
         .maybeSingle();
