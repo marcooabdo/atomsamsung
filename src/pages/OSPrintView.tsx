@@ -194,19 +194,31 @@ export function OSPrintView() {
           body {
             print-color-adjust: exact;
             -webkit-print-color-adjust: exact;
+            margin: 0;
+            padding: 0;
           }
           .page-break {
             page-break-before: always;
+          }
+          .print-content {
+            margin: 0 !important;
+            padding: 0 !important;
+            box-shadow: none !important;
           }
         }
         @page {
           margin: 1cm;
           size: A4;
         }
+        @media screen {
+          .print-content {
+            margin-top: 0;
+          }
+        }
       `}</style>
 
-      <div className="min-h-screen bg-gray-100 py-8 no-print">
-        <div className="max-w-4xl mx-auto px-4 mb-4">
+      <div className="min-h-screen bg-gray-100">
+        <div className="no-print py-4 px-4 max-w-4xl mx-auto">
           <button
             onClick={handlePrint}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
@@ -215,9 +227,8 @@ export function OSPrintView() {
             Imprimir
           </button>
         </div>
-      </div>
 
-      <div className="max-w-4xl mx-auto bg-white shadow-lg" style={{ fontFamily: 'Arial, sans-serif' }}>
+        <div className="max-w-4xl mx-auto bg-white shadow-lg print-content" style={{ fontFamily: 'Arial, sans-serif' }}>
         <div className="p-8">
           {/* Header com Logo */}
           <div className="flex items-start justify-between mb-8 pb-6 border-b-2 border-gray-300">
@@ -357,28 +368,28 @@ export function OSPrintView() {
           {pecas.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-300">
-                Peças Utilizadas
+                Pecas Utilizadas
               </h2>
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-3 py-2 text-left">PN</th>
-                    <th className="border border-gray-300 px-3 py-2 text-left">Descrição</th>
-                    <th className="border border-gray-300 px-3 py-2 text-center">Qtd</th>
-                    <th className="border border-gray-300 px-3 py-2 text-right">Valor Unit.</th>
-                    <th className="border border-gray-300 px-3 py-2 text-right">Total</th>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">PN</th>
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">Descricao</th>
+                    <th className="border border-gray-400 px-3 py-2 text-center font-bold text-gray-900">Qtd</th>
+                    <th className="border border-gray-400 px-3 py-2 text-right font-bold text-gray-900">Valor Unit.</th>
+                    <th className="border border-gray-400 px-3 py-2 text-right font-bold text-gray-900">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {pecas.map((peca, idx) => (
-                    <tr key={idx}>
-                      <td className="border border-gray-300 px-3 py-2">{peca.pn}</td>
-                      <td className="border border-gray-300 px-3 py-2">{peca.descricao}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{peca.quantidade}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-right">
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900 font-medium">{peca.pn}</td>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900">{peca.descricao}</td>
+                      <td className="border border-gray-400 px-3 py-2 text-center text-gray-900">{peca.quantidade}</td>
+                      <td className="border border-gray-400 px-3 py-2 text-right text-gray-900">
                         {formatCurrency(peca.valor_unitario || peca.valor_final_unitario)}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-right">
+                      <td className="border border-gray-400 px-3 py-2 text-right text-gray-900 font-medium">
                         {formatCurrency(peca.valor_total || (peca.quantidade * (peca.valor_unitario || peca.valor_final_unitario || 0)))}
                       </td>
                     </tr>
@@ -388,30 +399,30 @@ export function OSPrintView() {
             </div>
           )}
 
-          {/* Serviços */}
+          {/* Servicos */}
           {servicos.length > 0 && (
             <div className="mb-6">
               <h2 className="text-lg font-bold text-gray-800 mb-3 pb-2 border-b border-gray-300">
-                Serviços Realizados
+                Servicos Realizados
               </h2>
               <table className="w-full text-sm border-collapse">
                 <thead>
-                  <tr className="bg-gray-100">
-                    <th className="border border-gray-300 px-3 py-2 text-left">Descrição</th>
-                    <th className="border border-gray-300 px-3 py-2 text-center">Qtd</th>
-                    <th className="border border-gray-300 px-3 py-2 text-right">Valor Unit.</th>
-                    <th className="border border-gray-300 px-3 py-2 text-right">Total</th>
+                  <tr className="bg-gray-200">
+                    <th className="border border-gray-400 px-3 py-2 text-left font-bold text-gray-900">Descricao</th>
+                    <th className="border border-gray-400 px-3 py-2 text-center font-bold text-gray-900">Qtd</th>
+                    <th className="border border-gray-400 px-3 py-2 text-right font-bold text-gray-900">Valor Unit.</th>
+                    <th className="border border-gray-400 px-3 py-2 text-right font-bold text-gray-900">Total</th>
                   </tr>
                 </thead>
                 <tbody>
                   {servicos.map((servico, idx) => (
-                    <tr key={idx}>
-                      <td className="border border-gray-300 px-3 py-2">{servico.descricao}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-center">{servico.quantidade}</td>
-                      <td className="border border-gray-300 px-3 py-2 text-right">
+                    <tr key={idx} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                      <td className="border border-gray-400 px-3 py-2 text-gray-900">{servico.descricao}</td>
+                      <td className="border border-gray-400 px-3 py-2 text-center text-gray-900">{servico.quantidade}</td>
+                      <td className="border border-gray-400 px-3 py-2 text-right text-gray-900">
                         {formatCurrency(servico.valor_unitario)}
                       </td>
-                      <td className="border border-gray-300 px-3 py-2 text-right">
+                      <td className="border border-gray-400 px-3 py-2 text-right text-gray-900 font-medium">
                         {formatCurrency(servico.valor_total)}
                       </td>
                     </tr>
@@ -486,12 +497,13 @@ export function OSPrintView() {
             </div>
           </div>
 
-          {/* Rodapé */}
+          {/* Rodape */}
           {config?.rodape_personalizado && (
             <div className="mt-8 pt-4 border-t border-gray-200 text-center text-xs text-gray-500">
               <div dangerouslySetInnerHTML={{ __html: config.rodape_personalizado.replace(/\n/g, '<br/>') }} />
             </div>
           )}
+        </div>
         </div>
       </div>
     </>
