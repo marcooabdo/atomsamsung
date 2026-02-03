@@ -55,10 +55,10 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
       // Gerar código de barras com o ID numérico
       const barcodeValue = peca.id_numerico?.toString().padStart(8, '0') || peca.id.substring(0, 8);
 
-      // Criar janela com a etiqueta
-      const printWindow = window.open('', '_blank', 'width=300,height=300');
+      // Criar nova aba com a etiqueta
+      const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        alert('Bloqueador de pop-ups ativo. Permita pop-ups para imprimir.');
+        alert('Bloqueador de pop-ups ativo. Permita abrir nova aba para imprimir.');
         return;
       }
 
