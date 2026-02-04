@@ -373,8 +373,8 @@ export function Configuracoes() {
             rua: formUnidade.rua || null,
             numero: formUnidade.numero || null,
             complemento: formUnidade.complemento || null,
-            endereco: formUnidade.endereco || null,
-            estado: formUnidade.estado || null,
+            endereco: formUnidade.rua || null,
+            estado: formUnidade.uf || null,
             samsung_asccode: formUnidade.samsung_asccode || null,
             samsung_token: formUnidade.samsung_token || null
           };
