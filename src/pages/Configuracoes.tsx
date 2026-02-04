@@ -1574,10 +1574,19 @@ export function Configuracoes() {
               </div>
             ) : (
               <>
-                <div className="mb-6">
+                <div className="mb-6 flex items-center justify-between">
                   <h3 className="tech-heading text-base text-[#00D4FF]">
                     {tabs.find(t => t.id === activeTab)?.label.toUpperCase()}
                   </h3>
+                  {activeTab === 'unidades' && (
+                    <button
+                      onClick={() => handleOpenModal()}
+                      className="neon-button flex items-center gap-2 px-4 py-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar Unidade
+                    </button>
+                  )}
                 </div>
 
                 {activeTab === 'unidades' && (
