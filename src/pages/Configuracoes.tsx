@@ -326,7 +326,7 @@ export function Configuracoes() {
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
       setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
-      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: selectedUnidadeMarkup, tipo_orcamento: 'normal', ativo: true });
+      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
       setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist, itens: [], ativo: true });
     }
@@ -1157,10 +1157,20 @@ export function Configuracoes() {
                     <label className="block text-xs text-gray-400 uppercase mb-2">Descrição</label>
                     <textarea value={formMarkup.descricao} onChange={(e) => setFormMarkup({...formMarkup, descricao: e.target.value})} rows={2} placeholder="Descrição opcional da regra" className="neon-input" />
                   </div>
-                  <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
-                    <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Unidade</p>
-                    <p className="text-sm text-[#00D4FF] font-semibold">
-                      {formMarkup.unidade_id ? unidades.find(u => u.id === formMarkup.unidade_id)?.nome : 'Global (Todas as unidades)'}
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Unidade</label>
+                    <select
+                      value={formMarkup.unidade_id || ''}
+                      onChange={(e) => setFormMarkup({...formMarkup, unidade_id: e.target.value || ''})}
+                      className="neon-input"
+                    >
+                      <option value="">Global (Todas as unidades)</option>
+                      {unidades.map(u => (
+                        <option key={u.id} value={u.id}>{u.nome}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      {formMarkup.unidade_id ? 'Markup será aplicado apenas para esta unidade' : 'Markup global será aplicado para todas as unidades'}
                     </p>
                   </div>
                   <div>
