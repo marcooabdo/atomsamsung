@@ -132,6 +132,11 @@ export function Configuracoes() {
   const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>('');
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>('');
 
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [deleteMessage, setDeleteMessage] = useState('');
+
   const [formUnidade, setFormUnidade] = useState({
     nome: '',
     cnpj: '',
@@ -593,7 +598,14 @@ export function Configuracoes() {
   };
 
   const handleDeleteUser = async (userId: string) => {
-    if (!confirm('Tem certeza que deseja excluir este usuário?')) return;
+    setUserToDelete(userId);
+    setShowDeleteConfirmModal(true);
+  };
+
+  const confirmDeleteUser = async () => {
+    if (!userToDelete) return;
+
+    setShowDeleteConfirmModal(false);
 
     try {
       let session = (await supabase.auth.getSession()).data.session;
@@ -604,7 +616,8 @@ export function Configuracoes() {
       }
 
       if (!session || !session.access_token) {
-        alert('Sessão expirada. Faça login novamente.');
+        setDeleteMessage('Sessão expirada. Faça login novamente.');
+        setShowDeleteSuccessModal(true);
         return;
       }
 
@@ -618,7 +631,7 @@ export function Configuracoes() {
         },
         body: JSON.stringify({
           action: 'delete',
-          user_id: userId
+          user_id: userToDelete
         })
       });
 
@@ -633,10 +646,14 @@ export function Configuracoes() {
         throw new Error(result.error || 'Erro ao excluir usuário');
       }
 
-      alert('Usuário excluído com sucesso!');
+      setDeleteMessage('Usuário excluído com sucesso!');
+      setShowDeleteSuccessModal(true);
       loadData();
     } catch (error: any) {
-      alert(`Erro ao excluir usuário: ${error.message || 'Erro desconhecido'}`);
+      setDeleteMessage(`Erro ao excluir usuário: ${error.message || 'Erro desconhecido'}`);
+      setShowDeleteSuccessModal(true);
+    } finally {
+      setUserToDelete(null);
     }
   };
 
@@ -2303,6 +2320,56 @@ export function Configuracoes() {
           </div>
         </div>
       </div>
+
+      {showDeleteConfirmModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="premium-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-4">Confirmar Exclusão</h3>
+            <p className="text-gray-300 mb-6">
+              Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteConfirmModal(false);
+                  setUserToDelete(null);
+                }}
+                className="px-6 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                Não
+              </button>
+              <button
+                onClick={confirmDeleteUser}
+                className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteSuccessModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="premium-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-4">
+              {deleteMessage.includes('sucesso') ? 'Sucesso!' : 'Atenção'}
+            </h3>
+            <p className="text-gray-300 mb-6">{deleteMessage}</p>
+            <div className="flex justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteSuccessModal(false);
+                  setDeleteMessage('');
+                }}
+                className="px-6 py-2.5 rounded-lg bg-[#00D4FF] hover:bg-[#00D4FF]/80 text-black font-medium transition-colors"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 }
