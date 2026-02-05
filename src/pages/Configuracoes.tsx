@@ -1817,24 +1817,24 @@ export function Configuracoes() {
                         ))}
                       </select>
                       <p className="text-xs text-gray-500 mt-2">
-                        {selectedUnidadeMarkup ? `Configurando markups para ${unidades.find(u => u.id === selectedUnidadeMarkup)?.nome}` : 'Configurando markups globais (aplicados a todas as unidades)'}
+                        {selectedUnidadeMarkup ? `Visualizando markups de ${unidades.find(u => u.id === selectedUnidadeMarkup)?.nome}` : 'Visualizando todos os markups (globais e de todas as unidades)'}
                       </p>
                     </div>
 
                     {markups.filter(m => {
                       if (selectedUnidadeMarkup === '') {
-                        return m.unidade_id === null;
+                        return true; // Mostra todos os markups
                       }
                       return m.unidade_id === selectedUnidadeMarkup;
                     }).length === 0 ? (
                       <div className="text-center py-12">
                         <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-500 text-sm">Nenhuma regra de markup cadastrada para esta unidade</p>
+                        <p className="text-gray-500 text-sm">Nenhuma regra de markup cadastrada</p>
                       </div>
                     ) : (
                       markups.filter(m => {
                         if (selectedUnidadeMarkup === '') {
-                          return m.unidade_id === null;
+                          return true; // Mostra todos os markups
                         }
                         return m.unidade_id === selectedUnidadeMarkup;
                       }).map((markup) => (
@@ -1868,6 +1868,18 @@ export function Configuracoes() {
                                 >
                                   {markup.ativo ? 'Ativo' : 'Inativo'}
                                 </span>
+                                {!selectedUnidadeMarkup && (
+                                  <span
+                                    className="px-2 py-0.5 rounded text-[10px] font-bold"
+                                    style={{
+                                      backgroundColor: markup.unidade_id ? '#00D4FF20' : '#9D4EDD20',
+                                      color: markup.unidade_id ? '#00D4FF' : '#9D4EDD',
+                                      border: `1px solid ${markup.unidade_id ? '#00D4FF' : '#9D4EDD'}60`
+                                    }}
+                                  >
+                                    {markup.unidade_id ? unidades.find(u => u.id === markup.unidade_id)?.nome || 'Unidade' : 'GLOBAL'}
+                                  </span>
+                                )}
                               </div>
                               {markup.descricao && (
                                 <p className="text-sm text-gray-400 mb-2">{markup.descricao}</p>
