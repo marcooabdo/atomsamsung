@@ -586,8 +586,6 @@ export function Configuracoes() {
   };
 
   const handleDelete = async (id: string, table: string) => {
-    if (!confirm('Tem certeza que deseja excluir?')) return;
-
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
@@ -2192,14 +2190,7 @@ export function Configuracoes() {
                                 <Edit className="w-4 h-4 text-[#00D4FF]" />
                               </button>
                               <button
-                                onClick={() => {
-                                  if (rota.cidades && rota.cidades.length > 0) {
-                                    if (!confirm(`Esta rota possui ${rota.cidades.length} cidade(s) cadastrada(s). Tem certeza que deseja excluir?`)) {
-                                      return;
-                                    }
-                                  }
-                                  handleDelete(rota.id, 'rotas');
-                                }}
+                                onClick={() => handleDelete(rota.id, 'rotas')}
                                 className="p-2 hover:bg-red-500/10 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4 text-red-400" />
