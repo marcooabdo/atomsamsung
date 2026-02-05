@@ -1598,6 +1598,15 @@ export function Configuracoes() {
                       Adicionar Usuário
                     </button>
                   )}
+                  {activeTab === 'servicos' && (
+                    <button
+                      onClick={() => handleOpenModal()}
+                      className="neon-button flex items-center gap-2 px-4 py-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar Serviço
+                    </button>
+                  )}
                 </div>
 
                 {activeTab === 'unidades' && (
