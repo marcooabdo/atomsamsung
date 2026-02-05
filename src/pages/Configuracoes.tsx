@@ -1821,13 +1821,23 @@ export function Configuracoes() {
                       </p>
                     </div>
 
-                    {markups.filter(m => m.unidade_id === (selectedUnidadeMarkup || null)).length === 0 ? (
+                    {markups.filter(m => {
+                      if (selectedUnidadeMarkup === '') {
+                        return m.unidade_id === null;
+                      }
+                      return m.unidade_id === selectedUnidadeMarkup;
+                    }).length === 0 ? (
                       <div className="text-center py-12">
                         <DollarSign className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                         <p className="text-gray-500 text-sm">Nenhuma regra de markup cadastrada para esta unidade</p>
                       </div>
                     ) : (
-                      markups.filter(m => m.unidade_id === (selectedUnidadeMarkup || null)).map((markup) => (
+                      markups.filter(m => {
+                        if (selectedUnidadeMarkup === '') {
+                          return m.unidade_id === null;
+                        }
+                        return m.unidade_id === selectedUnidadeMarkup;
+                      }).map((markup) => (
                         <div key={markup.id} className="premium-card p-4 hover-lift">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
