@@ -440,11 +440,11 @@ export function Dashboard() {
           const Icon = stat.icon;
 
           const calculateProgress = () => {
-            if (!stat.hasGoal || !stat.goal) {
-              return typeof stat.value === 'number' ? Math.min(100, stat.value) : 50;
+            if (!stat.hasGoal || !stat.goal || stat.goal === 0) {
+              return 0;
             }
             const numValue = typeof stat.value === 'string'
-              ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.'))
+              ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0
               : stat.value;
             return Math.min(100, (numValue / stat.goal) * 100);
           };
@@ -718,9 +718,9 @@ export function Dashboard() {
               </div>
               <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000" style={{
-                  width: stats.metaEficiencia
-                    ? `${Math.min(100, (stats.metaEficiencia / Math.max(stats.eficienciaOperacional, 1)) * 100)}%`
-                    : `${Math.min(100, 100 - (stats.eficienciaOperacional * 10))}%`,
+                  width: !stats.metaEficiencia || stats.eficienciaOperacional === 0
+                    ? '0%'
+                    : `${Math.min(100, (stats.metaEficiencia / Math.max(stats.eficienciaOperacional, 0.1)) * 100)}%`,
                   background: 'linear-gradient(90deg, #0EA5E9 0%, #3B82F6 100%)',
                   boxShadow: '0 0 8px rgba(14,165,233,0.4)'
                 }} />
