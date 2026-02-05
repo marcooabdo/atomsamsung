@@ -586,12 +586,27 @@ export function Configuracoes() {
   };
 
   const handleDelete = async (id: string, table: string) => {
+    if (!confirm('Tem certeza que deseja excluir este item?')) {
+      return;
+    }
+
     try {
       const { error } = await supabase.from(table).delete().eq('id', id);
       if (error) throw error;
       loadData();
     } catch (error) {
       alert('Erro ao excluir item');
+    }
+  };
+
+  // Função específica para excluir MARKUP sem confirmação
+  const handleDeleteMarkup = async (id: string) => {
+    try {
+      const { error } = await supabase.from('markup_regras').delete().eq('id', id);
+      if (error) throw error;
+      loadData();
+    } catch (error) {
+      alert('Erro ao excluir markup');
     }
   };
 
@@ -1933,7 +1948,7 @@ export function Configuracoes() {
                               <button onClick={() => handleOpenModal(markup.id)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
                                 <Edit className="w-4 h-4 text-[#00D4FF]" />
                               </button>
-                              <button onClick={() => handleDelete(markup.id, 'markup_regras')} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
+                              <button onClick={() => handleDeleteMarkup(markup.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
                                 <Trash2 className="w-4 h-4 text-red-400" />
                               </button>
                             </div>
