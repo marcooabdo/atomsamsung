@@ -440,13 +440,23 @@ export function Dashboard() {
           const Icon = stat.icon;
 
           const calculateProgress = () => {
-            if (!stat.hasGoal || !stat.goal || stat.goal === 0) {
-              return 0;
+            // Se tem meta, calcular baseado na meta
+            if (stat.hasGoal && stat.goal && stat.goal > 0) {
+              const numValue = typeof stat.value === 'string'
+                ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0
+                : stat.value;
+              return Math.min(100, (numValue / stat.goal) * 100);
             }
-            const numValue = typeof stat.value === 'string'
-              ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0
-              : stat.value;
-            return Math.min(100, (numValue / stat.goal) * 100);
+
+            // Se NÃO tem meta, mostrar progresso visual baseado no valor
+            if (!stat.hasGoal) {
+              const numValue = typeof stat.value === 'number' ? stat.value : 0;
+              // Para valores sem meta, usar uma escala visual (ex: até 50 = 100%)
+              return Math.min(100, (numValue / 50) * 100);
+            }
+
+            // Se tem hasGoal mas não tem meta configurada, retornar 0
+            return 0;
           };
 
           return (
