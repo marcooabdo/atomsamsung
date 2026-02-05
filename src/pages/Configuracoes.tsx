@@ -137,6 +137,16 @@ export function Configuracoes() {
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   const [deleteMessage, setDeleteMessage] = useState('');
 
+  // Estados para modais de exclusão de Unidade, Serviço e Markup
+  const [showDeleteUnidadeModal, setShowDeleteUnidadeModal] = useState(false);
+  const [unidadeToDelete, setUnidadeToDelete] = useState<string | null>(null);
+
+  const [showDeleteServicoModal, setShowDeleteServicoModal] = useState(false);
+  const [servicoToDelete, setServicoToDelete] = useState<string | null>(null);
+
+  const [showDeleteMarkupModal, setShowDeleteMarkupModal] = useState(false);
+  const [markupToDelete, setMarkupToDelete] = useState<string | null>(null);
+
   const [formUnidade, setFormUnidade] = useState({
     nome: '',
     cnpj: '',
@@ -599,14 +609,66 @@ export function Configuracoes() {
     }
   };
 
-  // Função específica para excluir MARKUP sem confirmação
-  const handleDeleteMarkup = async (id: string) => {
+  // Funções de exclusão com modais para Unidade
+  const handleDeleteUnidade = async (id: string) => {
+    setUnidadeToDelete(id);
+    setShowDeleteUnidadeModal(true);
+  };
+
+  const confirmDeleteUnidade = async () => {
+    if (!unidadeToDelete) return;
+    setShowDeleteUnidadeModal(false);
+
     try {
-      const { error } = await supabase.from('markup_regras').delete().eq('id', id);
+      const { error } = await supabase.from('unidades').delete().eq('id', unidadeToDelete);
+      if (error) throw error;
+      loadData();
+    } catch (error) {
+      alert('Erro ao excluir unidade');
+    } finally {
+      setUnidadeToDelete(null);
+    }
+  };
+
+  // Funções de exclusão com modais para Serviço
+  const handleDeleteServico = async (id: string) => {
+    setServicoToDelete(id);
+    setShowDeleteServicoModal(true);
+  };
+
+  const confirmDeleteServico = async () => {
+    if (!servicoToDelete) return;
+    setShowDeleteServicoModal(false);
+
+    try {
+      const { error } = await supabase.from('servicos').delete().eq('id', servicoToDelete);
+      if (error) throw error;
+      loadData();
+    } catch (error) {
+      alert('Erro ao excluir serviço');
+    } finally {
+      setServicoToDelete(null);
+    }
+  };
+
+  // Funções de exclusão com modais para Markup
+  const handleDeleteMarkup = async (id: string) => {
+    setMarkupToDelete(id);
+    setShowDeleteMarkupModal(true);
+  };
+
+  const confirmDeleteMarkup = async () => {
+    if (!markupToDelete) return;
+    setShowDeleteMarkupModal(false);
+
+    try {
+      const { error } = await supabase.from('markup_regras').delete().eq('id', markupToDelete);
       if (error) throw error;
       loadData();
     } catch (error) {
       alert('Erro ao excluir markup');
+    } finally {
+      setMarkupToDelete(null);
     }
   };
 
@@ -1704,7 +1766,7 @@ export function Configuracoes() {
                               <button onClick={() => handleOpenModal(unidade.id)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
                                 <Edit className="w-4 h-4 text-[#00D4FF]" />
                               </button>
-                              <button onClick={() => handleDelete(unidade.id, 'unidades')} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
+                              <button onClick={() => handleDeleteUnidade(unidade.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
                                 <Trash2 className="w-4 h-4 text-red-400" />
                               </button>
                             </div>
@@ -1823,7 +1885,7 @@ export function Configuracoes() {
                               <button onClick={() => handleOpenModal(servico.id)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
                                 <Edit className="w-4 h-4 text-[#00D4FF]" />
                               </button>
-                              <button onClick={() => handleDelete(servico.id, 'servicos')} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
+                              <button onClick={() => handleDeleteServico(servico.id)} className="p-2 hover:bg-red-500/10 rounded-lg transition-colors">
                                 <Trash2 className="w-4 h-4 text-red-400" />
                               </button>
                             </div>
@@ -2412,6 +2474,90 @@ export function Configuracoes() {
                 className="px-6 py-2.5 rounded-lg bg-[#00D4FF] hover:bg-[#00D4FF]/80 text-black font-medium transition-colors"
               >
                 OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteUnidadeModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="premium-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-4">Confirmar Exclusão</h3>
+            <p className="text-gray-300 mb-6">
+              Tem certeza que deseja excluir esta unidade? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteUnidadeModal(false);
+                  setUnidadeToDelete(null);
+                }}
+                className="px-6 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteUnidade}
+                className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteServicoModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="premium-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-4">Confirmar Exclusão</h3>
+            <p className="text-gray-300 mb-6">
+              Tem certeza que deseja excluir este serviço? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteServicoModal(false);
+                  setServicoToDelete(null);
+                }}
+                className="px-6 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteServico}
+                className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDeleteMarkupModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+          <div className="premium-card p-8 max-w-md w-full">
+            <h3 className="text-2xl font-bold text-white mb-4">Confirmar Exclusão</h3>
+            <p className="text-gray-300 mb-6">
+              Tem certeza que deseja excluir esta regra de markup? Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => {
+                  setShowDeleteMarkupModal(false);
+                  setMarkupToDelete(null);
+                }}
+                className="px-6 py-2.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDeleteMarkup}
+                className="px-6 py-2.5 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
+              >
+                Sim, Excluir
               </button>
             </div>
           </div>
