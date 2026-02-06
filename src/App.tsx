@@ -13,6 +13,7 @@ import { OFS } from './pages/OFS';
 import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
 import { Skywalker } from './pages/Skywalker';
+import { SkywalkerProvider } from './contexts/SkywalkerContext';
 import { NotasFiscais } from './pages/NotasFiscais';
 import { GIA } from './pages/GIA';
 import { OSPrintView } from './pages/OSPrintView';
@@ -224,7 +225,9 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <Layout>
-                <Skywalker />
+                <SkywalkerProvider>
+                  <Skywalker />
+                </SkywalkerProvider>
               </Layout>
             </ProtectedRoute>
           }
