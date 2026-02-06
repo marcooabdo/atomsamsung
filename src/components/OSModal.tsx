@@ -2547,7 +2547,7 @@ Não haverá cobrança ao cliente.`
             { id: 'checklist', label: 'Checklist', icon: CheckSquare },
             { id: 'servicos', label: 'Serviços', icon: Wrench },
             { id: 'pagamento', label: 'Pagamento', icon: DollarSign },
-            ...(os.tipo_os === 'OW' ? [{ id: 'nf', label: 'Nota Fiscal', icon: Receipt }] : []),
+            ...(os.tipo_os === 'OW' || os.tipo_os === 'LP' ? [{ id: 'nf', label: 'Nota Fiscal', icon: Receipt }] : []),
             ...(os.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
             { id: 'anexos', label: 'Anexos', icon: Paperclip },
             { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
@@ -3953,7 +3953,7 @@ Não haverá cobrança ao cliente.`
             />
           )}
 
-          {abaAtiva === 'nf' && os.tipo_os === 'OW' && (
+          {abaAtiva === 'nf' && (os.tipo_os === 'OW' || os.tipo_os === 'LP') && (
             <OSNotaFiscalTab
               osId={osId}
               clienteNome={os.cliente_nome || ''}
@@ -3974,6 +3974,8 @@ Não haverá cobrança ao cliente.`
               valorTotal={os.valor_bruto || 0}
               valorPago={os.valor_pago || 0}
               valorDesconto={os.valor_desconto || 0}
+              tipoOs={os.tipo_os}
+              isCortesia={(os as any).is_cortesia === true}
               onReload={async () => {
                 await loadOS();
                 onReload?.();

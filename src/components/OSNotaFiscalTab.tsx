@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import {
-  FileText, Building2, User, DollarSign, Percent, Receipt, Send,
-  AlertCircle, CheckCircle, Clock, X, ChevronDown, FileCheck, RefreshCw,
-  Download, Package, Wrench, Edit3, Save, RotateCcw, Truck, Box, Ban
+  FileText, Building2, User, DollarSign, Receipt, Send,
+  AlertCircle, CheckCircle, Clock, X, ChevronDown, RefreshCw,
+  Download, Package, Wrench, Edit3, Save, RotateCcw, Truck, Box, Ban, Trash2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EmitirNFSeModal } from './EmitirNFSeModal';
@@ -56,6 +56,22 @@ interface PecaItem {
   source: 'os_pecas' | 'cotacoes_pecas';
 }
 
+interface ServicoItem {
+  id: string;
+  descricao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  codigo_servico?: string | null;
+  source: 'os_servicos' | 'cotacoes_servicos';
+}
+
+interface EditValues {
+  descricao: string;
+  quantidade: number;
+  valor_unitario: number;
+}
+
 interface OSNotaFiscalTabProps {
   osId: string;
   clienteNome: string;
@@ -69,6 +85,8 @@ interface OSNotaFiscalTabProps {
   valorTotal: number;
   valorPago: number;
   valorDesconto: number;
+  tipoOs?: string;
+  isCortesia?: boolean;
   onReload?: () => void;
 }
 
@@ -80,24 +98,35 @@ export function OSNotaFiscalTab({
   clienteEmail,
   clienteEndereco,
   unidadeId,
-  valorServicos,
-  valorPecas,
-  valorTotal,
-  valorPago,
-  valorDesconto,
+  valorServicos: valorServicosProp,
+  valorPecas: valorPecasProp,
+  valorTotal: valorTotalProp,
+  valorPago: valorPagoProp,
+  valorDesconto: valorDescontoProp,
+  tipoOs,
+  isCortesia,
   onReload
 }: OSNotaFiscalTabProps) {
   const [nfConfigs, setNfConfigs] = useState<NFConfig[]>([]);
   const [nfsEmitidas, setNfsEmitidas] = useState<NFEmitida[]>([]);
   const [unidade, setUnidade] = useState<any>(null);
   const [pecas, setPecas] = useState<PecaItem[]>([]);
+  const [servicos, setServicos] = useState<ServicoItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const [osValues, setOsValues] = useState({
+    valor_servicos: valorServicosProp,
+    valor_pecas: valorPecasProp,
+    valor_bruto: valorTotalProp,
+    valor_pago: valorPagoProp,
+    valor_desconto: valorDescontoProp,
+  });
 
   const [selectedNFeConfig, setSelectedNFeConfig] = useState<string>('');
   const [showNFeConfigDropdown, setShowNFeConfigDropdown] = useState(false);
 
   const [formNFe, setFormNFe] = useState({
-    valorProdutos: valorPecas,
+    valorProdutos: valorPecasProp,
     cfop: '5102',
     ncm: '',
     observacoes: ''
@@ -107,22 +136,22 @@ export function OSNotaFiscalTab({
   const [mensagem, setMensagem] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [showNFSeModal, setShowNFSeModal] = useState(false);
   const [retryNfId, setRetryNfId] = useState<string | null>(null);
-  const [editingPecaId, setEditingPecaId] = useState<string | null>(null);
-  const [editPecaValues, setEditPecaValues] = useState<{ valor_unitario: number; quantidade: number }>({ valor_unitario: 0, quantidade: 1 });
-  const [savingPeca, setSavingPeca] = useState(false);
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingType, setEditingType] = useState<'peca' | 'servico' | null>(null);
+  const [editValues, setEditValues] = useState<EditValues>({ descricao: '', quantidade: 1, valor_unitario: 0 });
+  const [saving, setSaving] = useState(false);
+
+  const isLpOrCortesia = tipoOs === 'LP' || isCortesia === true;
 
   useEffect(() => {
     loadData();
   }, [unidadeId, osId]);
 
-  useEffect(() => {
-    setFormNFe(prev => ({ ...prev, valorProdutos: valorPecasRestante }));
-  }, [valorPecas, nfsEmitidas]);
-
   const loadData = async () => {
     setLoading(true);
     try {
-      const [configsRes, unidadeRes, nfsRes, osPecasRes, cotPecasRes] = await Promise.all([
+      const [configsRes, unidadeRes, nfsRes, osPecasRes, cotPecasRes, osServicosRes, cotServicosRes, osRes] = await Promise.all([
         supabase
           .from('nf_configuracoes')
           .select('*')
@@ -148,12 +177,37 @@ export function OSNotaFiscalTab({
           .from('cotacoes_pecas')
           .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
           .eq('os_id', osId)
-          .order('created_at', { ascending: true })
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('os_servicos')
+          .select('id, descricao, quantidade, valor_unitario, valor_total, codigo_servico')
+          .eq('os_id', osId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('cotacoes_servicos')
+          .select('id, descricao, quantidade, valor_unitario, valor_total, servico:servicos(codigo)')
+          .eq('os_id', osId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('os')
+          .select('valor_servicos, valor_pecas, valor_bruto, valor_pago, valor_desconto')
+          .eq('id', osId)
+          .maybeSingle()
       ]);
 
       setNfConfigs(configsRes.data || []);
       setUnidade(unidadeRes.data);
       setNfsEmitidas(nfsRes.data || []);
+
+      if (osRes.data) {
+        setOsValues({
+          valor_servicos: osRes.data.valor_servicos || 0,
+          valor_pecas: osRes.data.valor_pecas || 0,
+          valor_bruto: osRes.data.valor_bruto || 0,
+          valor_pago: osRes.data.valor_pago || 0,
+          valor_desconto: osRes.data.valor_desconto || 0,
+        });
+      }
 
       const osPecasIds = new Set((osPecasRes.data || []).map((p: any) => p.pn));
       const osPecasMapped: PecaItem[] = (osPecasRes.data || []).map((p: any) => ({
@@ -178,6 +232,29 @@ export function OSNotaFiscalTab({
           source: 'cotacoes_pecas' as const
         }));
       setPecas([...osPecasMapped, ...cotPecasMapped]);
+
+      const osServIds = new Set((osServicosRes.data || []).map((s: any) => s.descricao));
+      const osServMapped: ServicoItem[] = (osServicosRes.data || []).map((s: any) => ({
+        id: s.id,
+        descricao: s.descricao,
+        quantidade: s.quantidade,
+        valor_unitario: s.valor_unitario || 0,
+        valor_total: s.valor_total || 0,
+        codigo_servico: s.codigo_servico,
+        source: 'os_servicos' as const
+      }));
+      const cotServMapped: ServicoItem[] = (cotServicosRes.data || [])
+        .filter((s: any) => !osServIds.has(s.descricao))
+        .map((s: any) => ({
+          id: s.id,
+          descricao: s.descricao,
+          quantidade: s.quantidade,
+          valor_unitario: s.valor_unitario || 0,
+          valor_total: s.valor_total || 0,
+          codigo_servico: (s.servico as any)?.codigo || null,
+          source: 'cotacoes_servicos' as const
+        }));
+      setServicos([...osServMapped, ...cotServMapped]);
 
       const nfeConfigs = (configsRes.data || []).filter((c: NFConfig) => c.tipo === 'nfe');
       if (nfeConfigs.length > 0 && !selectedNFeConfig) {
@@ -207,30 +284,71 @@ export function OSNotaFiscalTab({
     setShowNFeConfigDropdown(false);
   };
 
-  const startEditPeca = (peca: PecaItem) => {
-    setEditingPecaId(peca.id);
-    setEditPecaValues({ valor_unitario: peca.valor_unitario, quantidade: peca.quantidade });
+  const startEdit = (type: 'peca' | 'servico', item: PecaItem | ServicoItem) => {
+    setEditingId(item.id);
+    setEditingType(type);
+    setEditValues({
+      descricao: item.descricao,
+      quantidade: item.quantidade,
+      valor_unitario: item.valor_unitario,
+    });
   };
 
-  const handleSavePeca = async (peca: PecaItem) => {
-    setSavingPeca(true);
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditingType(null);
+  };
+
+  const handleSave = async () => {
+    if (!editingId || !editingType) return;
+    setSaving(true);
     try {
-      const newTotal = editPecaValues.valor_unitario * editPecaValues.quantidade;
-      const table = peca.source === 'os_pecas' ? 'os_pecas' : 'cotacoes_pecas';
-      const updateData = peca.source === 'os_pecas'
-        ? { valor_unitario: editPecaValues.valor_unitario, quantidade: editPecaValues.quantidade, valor_total: newTotal }
-        : { valor_final_unitario: editPecaValues.valor_unitario, quantidade: editPecaValues.quantidade, valor_total: newTotal };
+      const newTotal = editValues.valor_unitario * editValues.quantidade;
 
-      const { error } = await supabase.from(table).update(updateData).eq('id', peca.id);
-      if (error) throw error;
+      if (editingType === 'peca') {
+        const peca = pecas.find(p => p.id === editingId);
+        if (!peca) return;
+        const table = peca.source;
+        const updateData = peca.source === 'os_pecas'
+          ? { descricao: editValues.descricao, valor_unitario: editValues.valor_unitario, quantidade: editValues.quantidade, valor_total: newTotal }
+          : { descricao: editValues.descricao, valor_final_unitario: editValues.valor_unitario, quantidade: editValues.quantidade, valor_total: newTotal };
+        const { error } = await supabase.from(table).update(updateData).eq('id', editingId);
+        if (error) throw error;
+      } else {
+        const servico = servicos.find(s => s.id === editingId);
+        if (!servico) return;
+        const { error } = await supabase
+          .from(servico.source)
+          .update({
+            descricao: editValues.descricao,
+            valor_unitario: editValues.valor_unitario,
+            quantidade: editValues.quantidade,
+            valor_total: newTotal,
+          })
+          .eq('id', editingId);
+        if (error) throw error;
+      }
 
-      setEditingPecaId(null);
-      loadData();
+      cancelEdit();
+      await loadData();
       onReload?.();
     } catch (error: any) {
-      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar peca' });
+      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar' });
     } finally {
-      setSavingPeca(false);
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (type: 'peca' | 'servico', item: PecaItem | ServicoItem) => {
+    if (!confirm('Remover este item?')) return;
+    try {
+      const table = type === 'peca' ? (item as PecaItem).source : (item as ServicoItem).source;
+      const { error } = await supabase.from(table).delete().eq('id', item.id);
+      if (error) throw error;
+      await loadData();
+      onReload?.();
+    } catch (error: any) {
+      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao excluir' });
     }
   };
 
@@ -255,6 +373,11 @@ export function OSNotaFiscalTab({
     return statusMap[peca.status] || { label: peca.status, color: '#71717A', bg: '#71717A20', icon: Box };
   };
 
+  const valorServicos = osValues.valor_servicos;
+  const valorPecas = osValues.valor_pecas;
+  const valorPago = osValues.valor_pago;
+  const valorDesconto = osValues.valor_desconto;
+
   const activeNfse = nfsEmitidas.filter(nf => nf.tipo === 'nfse' && nf.status !== 'cancelada');
   const activeNfe = nfsEmitidas.filter(nf => nf.tipo === 'nfe' && nf.status !== 'cancelada');
 
@@ -268,11 +391,15 @@ export function OSNotaFiscalTab({
   const valorServicosRestante = Math.max(valorServicos - valorServicosInvoiced, 0);
   const valorPecasRestante = Math.max(valorPecas - valorPecasInvoiced, 0);
 
+  useEffect(() => {
+    setFormNFe(prev => ({ ...prev, valorProdutos: valorPecasRestante }));
+  }, [valorPecas, nfsEmitidas, osValues]);
+
   const servicosPctInvoiced = valorServicos > 0 ? Math.min((valorServicosInvoiced / valorServicos) * 100, 100) : 0;
   const pecasPctInvoiced = valorPecas > 0 ? Math.min((valorPecasInvoiced / valorPecas) * 100, 100) : 0;
 
-  const canEmitNfse = valorPago > 0 && valorServicosRestante > 0.01 && valorServicos > 0;
-  const canEmitNfe = valorPago > 0 && valorPecasRestante > 0.01 && valorPecas > 0;
+  const canEmitNfse = !isLpOrCortesia && valorPago > 0 && valorServicosRestante > 0.01 && valorServicos > 0;
+  const canEmitNfe = (isLpOrCortesia || valorPago > 0) && valorPecasRestante > 0.01 && valorPecas > 0;
 
   const handleEmitirNFe = async () => {
     if (!selectedNFeConfig && nfeConfigs.length > 0) {
@@ -354,6 +481,87 @@ export function OSNotaFiscalTab({
     );
   }
 
+  const renderEditableRow = (
+    type: 'peca' | 'servico',
+    item: PecaItem | ServicoItem,
+    extraCols?: React.ReactNode
+  ) => {
+    const isEditing = editingId === item.id && editingType === type;
+
+    return (
+      <tr key={item.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
+        {extraCols}
+        <td className="py-2 px-3">
+          {isEditing ? (
+            <input
+              type="text"
+              value={editValues.descricao}
+              onChange={(e) => setEditValues(prev => ({ ...prev, descricao: e.target.value }))}
+              className="w-full px-1.5 py-1 rounded bg-gray-700 border border-[#00D4FF]/50 text-gray-200 text-xs focus:outline-none"
+            />
+          ) : (
+            <span className="text-gray-300 text-xs">{item.descricao}</span>
+          )}
+        </td>
+        <td className="py-2 px-3 text-center">
+          {isEditing ? (
+            <input
+              type="number"
+              value={editValues.quantidade}
+              onChange={(e) => setEditValues(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 1 }))}
+              className="w-14 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-center focus:outline-none"
+              min={1}
+            />
+          ) : (
+            <span className="text-gray-300 text-xs">{item.quantidade}</span>
+          )}
+        </td>
+        <td className="py-2 px-3 text-right">
+          {isEditing ? (
+            <input
+              type="number"
+              value={editValues.valor_unitario}
+              onChange={(e) => setEditValues(prev => ({ ...prev, valor_unitario: parseFloat(e.target.value) || 0 }))}
+              className="w-24 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-right focus:outline-none"
+              step="0.01"
+            />
+          ) : (
+            <span className="text-gray-300 text-xs">{formatCurrency(item.valor_unitario)}</span>
+          )}
+        </td>
+        <td className="py-2 px-3 text-right">
+          <span className="text-white font-medium text-xs">
+            {isEditing
+              ? formatCurrency(editValues.valor_unitario * editValues.quantidade)
+              : formatCurrency(item.valor_total)
+            }
+          </span>
+        </td>
+        <td className="py-2 px-3 text-center">
+          {isEditing ? (
+            <div className="flex items-center gap-1 justify-center">
+              <button onClick={handleSave} disabled={saving} className="p-1 rounded hover:bg-[#39FF14]/20 transition-colors" title="Salvar">
+                <Save className="w-3.5 h-3.5 text-[#39FF14]" />
+              </button>
+              <button onClick={cancelEdit} className="p-1 rounded hover:bg-[#FF0064]/20 transition-colors" title="Cancelar">
+                <X className="w-3.5 h-3.5 text-[#FF0064]" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-0.5 justify-center">
+              <button onClick={() => startEdit(type, item)} className="p-1 rounded hover:bg-[#FFA500]/20 transition-colors" title="Editar">
+                <Edit3 className="w-3.5 h-3.5 text-gray-500 hover:text-[#FFA500]" />
+              </button>
+              <button onClick={() => handleDelete(type, item)} className="p-1 rounded hover:bg-[#FF0064]/20 transition-colors" title="Excluir">
+                <Trash2 className="w-3.5 h-3.5 text-gray-500 hover:text-[#FF0064]" />
+              </button>
+            </div>
+          )}
+        </td>
+      </tr>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {mensagem && (
@@ -370,7 +578,7 @@ export function OSNotaFiscalTab({
         </div>
       )}
 
-      {valorPago <= 0 && (
+      {!isLpOrCortesia && valorPago <= 0 && (
         <div className="premium-card p-6 bg-[#FFBF00]/10 border-2 border-[#FFBF00]/40">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 rounded-full bg-[#FFBF00]/20 flex items-center justify-center border border-[#FFBF00]/40">
@@ -440,84 +648,118 @@ export function OSNotaFiscalTab({
         </div>
       </div>
 
-      <div className="premium-card p-5 border border-[#00D4FF]/20">
-        <div className="flex items-center justify-between mb-4">
-          <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
-            <Wrench className="w-4 h-4" />
-            NFS-e -- Servicos
-          </h4>
-          {servicosPctInvoiced >= 100 && valorServicos > 0 && (
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
-              100% FATURADO
-            </span>
+      {!isLpOrCortesia && (
+        <div className="premium-card p-5 border border-[#00D4FF]/20">
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+              <Wrench className="w-4 h-4" />
+              NFS-e -- Servicos
+            </h4>
+            {servicosPctInvoiced >= 100 && valorServicos > 0 && (
+              <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+                100% FATURADO
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-4">
+            <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Servicos</p>
+              <p className="text-lg font-bold text-white">{formatCurrency(valorServicos)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
+              <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorServicosInvoiced)}</p>
+            </div>
+            <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
+              <p className={`text-lg font-bold ${valorServicosRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
+                {formatCurrency(valorServicosRestante)}
+              </p>
+            </div>
+          </div>
+
+          {valorServicos > 0 && (
+            <div className="mb-4">
+              <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+                <span>Progresso de faturamento</span>
+                <span>{servicosPctInvoiced.toFixed(0)}%</span>
+              </div>
+              <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${servicosPctInvoiced}%`,
+                    background: servicosPctInvoiced >= 100
+                      ? 'linear-gradient(90deg, #39FF14, #10B981)'
+                      : 'linear-gradient(90deg, #00D4FF, #39FF14)'
+                  }}
+                />
+              </div>
+            </div>
+          )}
+
+          {servicos.length > 0 && (
+            <div className="mb-4">
+              <div className="overflow-x-auto rounded-lg border border-gray-700">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-800/80">
+                      <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Descricao</th>
+                      <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Qtd</th>
+                      <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Unit.</th>
+                      <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Total</th>
+                      <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-20"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {servicos.map(servico => renderEditableRow('servico', servico))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-gray-700 bg-gray-800/50">
+                      <td colSpan={3} className="py-2.5 px-3 text-right text-xs font-bold text-gray-300 uppercase">
+                        Total Servicos ({servicos.length})
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-sm font-bold text-[#00D4FF]">
+                        {formatCurrency(servicos.reduce((sum, s) => sum + s.valor_total, 0))}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {canEmitNfse ? (
+            <button
+              onClick={() => {
+                setRetryNfId(null);
+                setShowNFSeModal(true);
+              }}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
+              style={{
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.25) 0%, rgba(0,212,255,0.08) 100%)',
+                border: '2px solid rgba(0,212,255,0.6)',
+                color: '#00D4FF',
+                boxShadow: '0 0 15px rgba(0,212,255,0.15)'
+              }}
+            >
+              <Send className="w-4 h-4" />
+              Emitir NFS-e -- {formatCurrency(valorServicosRestante)}
+            </button>
+          ) : valorServicos <= 0 ? (
+            <p className="text-center text-sm text-gray-500 py-2">Nenhum servico cadastrado nesta OS</p>
+          ) : servicosPctInvoiced >= 100 ? (
+            <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              Todos os servicos ja foram faturados
+            </p>
+          ) : (
+            <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
           )}
         </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Servicos</p>
-            <p className="text-lg font-bold text-white">{formatCurrency(valorServicos)}</p>
-          </div>
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
-            <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorServicosInvoiced)}</p>
-          </div>
-          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
-            <p className={`text-lg font-bold ${valorServicosRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
-              {formatCurrency(valorServicosRestante)}
-            </p>
-          </div>
-        </div>
-
-        {valorServicos > 0 && (
-          <div className="mb-4">
-            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
-              <span>Progresso de faturamento</span>
-              <span>{servicosPctInvoiced.toFixed(0)}%</span>
-            </div>
-            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${servicosPctInvoiced}%`,
-                  background: servicosPctInvoiced >= 100
-                    ? 'linear-gradient(90deg, #39FF14, #10B981)'
-                    : 'linear-gradient(90deg, #00D4FF, #39FF14)'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {canEmitNfse ? (
-          <button
-            onClick={() => {
-              setRetryNfId(null);
-              setShowNFSeModal(true);
-            }}
-            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
-            style={{
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.25) 0%, rgba(0,212,255,0.08) 100%)',
-              border: '2px solid rgba(0,212,255,0.6)',
-              color: '#00D4FF',
-              boxShadow: '0 0 15px rgba(0,212,255,0.15)'
-            }}
-          >
-            <Send className="w-4 h-4" />
-            Emitir NFS-e -- {formatCurrency(valorServicosRestante)}
-          </button>
-        ) : valorServicos <= 0 ? (
-          <p className="text-center text-sm text-gray-500 py-2">Nenhum servico cadastrado nesta OS</p>
-        ) : servicosPctInvoiced >= 100 ? (
-          <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
-            <CheckCircle className="w-4 h-4" />
-            Todos os servicos ja foram faturados
-          </p>
-        ) : (
-          <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
-        )}
-      </div>
+      )}
 
       <div className="premium-card p-5 border border-[#FFA500]/20">
         <div className="flex items-center justify-between mb-4">
@@ -576,27 +818,24 @@ export function OSNotaFiscalTab({
                 <thead>
                   <tr className="bg-gray-800/80">
                     <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">PN</th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-20">Status</th>
                     <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Descricao</th>
-                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Status</th>
                     <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Qtd</th>
                     <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Unit.</th>
                     <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Total</th>
-                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-16"></th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-20"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {pecas.map(peca => {
                     const sc = getPecaStatusConfig(peca);
                     const StatusIcon = sc.icon;
-                    const isEditing = editingPecaId === peca.id;
-
-                    return (
-                      <tr key={peca.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
+                    return renderEditableRow(
+                      'peca',
+                      peca,
+                      <>
                         <td className="py-2 px-3">
                           <span className="font-mono text-xs text-[#00D4FF]">{peca.pn}</span>
-                        </td>
-                        <td className="py-2 px-3">
-                          <span className="text-gray-300 text-xs">{peca.descricao}</span>
                         </td>
                         <td className="py-2 px-3 text-center">
                           <span
@@ -607,70 +846,7 @@ export function OSNotaFiscalTab({
                             {sc.label}
                           </span>
                         </td>
-                        <td className="py-2 px-3 text-center">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editPecaValues.quantidade}
-                              onChange={(e) => setEditPecaValues(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 1 }))}
-                              className="w-14 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-center focus:outline-none"
-                              min={1}
-                            />
-                          ) : (
-                            <span className="text-gray-300 text-xs">{peca.quantidade}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          {isEditing ? (
-                            <input
-                              type="number"
-                              value={editPecaValues.valor_unitario}
-                              onChange={(e) => setEditPecaValues(prev => ({ ...prev, valor_unitario: parseFloat(e.target.value) || 0 }))}
-                              className="w-24 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-right focus:outline-none"
-                              step="0.01"
-                            />
-                          ) : (
-                            <span className="text-gray-300 text-xs">{formatCurrency(peca.valor_unitario)}</span>
-                          )}
-                        </td>
-                        <td className="py-2 px-3 text-right">
-                          <span className="text-white font-medium text-xs">
-                            {isEditing
-                              ? formatCurrency(editPecaValues.valor_unitario * editPecaValues.quantidade)
-                              : formatCurrency(peca.valor_total)
-                            }
-                          </span>
-                        </td>
-                        <td className="py-2 px-3 text-center">
-                          {isEditing ? (
-                            <div className="flex items-center gap-1 justify-center">
-                              <button
-                                onClick={() => handleSavePeca(peca)}
-                                disabled={savingPeca}
-                                className="p-1 rounded hover:bg-[#39FF14]/20 transition-colors"
-                                title="Salvar"
-                              >
-                                <Save className="w-3.5 h-3.5 text-[#39FF14]" />
-                              </button>
-                              <button
-                                onClick={() => setEditingPecaId(null)}
-                                className="p-1 rounded hover:bg-[#FF0064]/20 transition-colors"
-                                title="Cancelar"
-                              >
-                                <X className="w-3.5 h-3.5 text-[#FF0064]" />
-                              </button>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => startEditPeca(peca)}
-                              className="p-1 rounded hover:bg-[#FFA500]/20 transition-colors"
-                              title="Editar valores"
-                            >
-                              <Edit3 className="w-3.5 h-3.5 text-gray-500 hover:text-[#FFA500]" />
-                            </button>
-                          )}
-                        </td>
-                      </tr>
+                      </>
                     );
                   })}
                 </tbody>
@@ -801,9 +977,9 @@ export function OSNotaFiscalTab({
             <CheckCircle className="w-4 h-4" />
             Todas as pecas ja foram faturadas
           </p>
-        ) : (
+        ) : !isLpOrCortesia ? (
           <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
-        )}
+        ) : null}
       </div>
 
       {nfsEmitidas.length > 0 && (
