@@ -125,7 +125,8 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         .select(`
           *,
           os:os!agendamentos_os_id_fkey(
-            numero_os,
+            numero_os_interna,
+            numero_os_samsung,
             cliente_nome,
             cliente_telefone,
             aparelho_marca,
