@@ -11,6 +11,7 @@ import { OSNotaFiscalTab } from './OSNotaFiscalTab';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
 import { IniciarReparoModal } from './IniciarReparoModal';
+import { ReparoEfetuadoModal } from './ReparoEfetuadoModal';
 import { GIModal } from './agendamento/GIModal';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
@@ -117,6 +118,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [mostrarModalGI, setMostrarModalGI] = useState(false);
   const [requisicaoGI, setRequisicaoGI] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalIniciarReparo, setMostrarModalIniciarReparo] = useState(false);
+  const [mostrarModalReparoEfetuado, setMostrarModalReparoEfetuado] = useState(false);
+  const [editandoDiagnostico, setEditandoDiagnostico] = useState(false);
+  const [diagnosticoTemp, setDiagnosticoTemp] = useState('');
+  const [salvandoDiagnostico, setSalvandoDiagnostico] = useState(false);
+  const [editandoReparo, setEditandoReparo] = useState(false);
+  const [reparoTemp, setReparoTemp] = useState('');
+  const [salvandoReparo, setSalvandoReparo] = useState(false);
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
   const [pecaRequisitandoId, setPecaRequisitandoId] = useState<string | null>(null);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
@@ -2211,8 +2219,72 @@ Não haverá cobrança ao cliente.`
     }
   };
 
+  const salvarDiagnostico = async () => {
+    if (!os || salvandoDiagnostico) return;
+    const texto = diagnosticoTemp.trim();
+    if (!texto) return;
+
+    setSalvandoDiagnostico(true);
+    try {
+      const { error: osError } = await supabase
+        .from('os')
+        .update({ diagnostico_tecnico: texto, updated_at: new Date().toISOString() })
+        .eq('id', os.id);
+      if (osError) throw osError;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: os.id,
+        usuario_id: usuario?.id,
+        comentario: `**DIAGNOSTICO TECNICO (editado manualmente):**\n\n${texto}`,
+        is_system: true
+      });
+
+      setOs({ ...os, diagnostico_tecnico: texto });
+      setEditandoDiagnostico(false);
+    } catch (error: any) {
+      alert(`Erro ao salvar: ${error.message}`);
+    } finally {
+      setSalvandoDiagnostico(false);
+    }
+  };
+
+  const salvarReparo = async () => {
+    if (!os || salvandoReparo) return;
+    const texto = reparoTemp.trim();
+    if (!texto) return;
+
+    setSalvandoReparo(true);
+    try {
+      const { error: osError } = await supabase
+        .from('os')
+        .update({ reparo_efetuado: texto, updated_at: new Date().toISOString() })
+        .eq('id', os.id);
+      if (osError) throw osError;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: os.id,
+        usuario_id: usuario?.id,
+        comentario: `**REPARO EFETUADO (editado manualmente):**\n\n${texto}`,
+        is_system: true
+      });
+
+      setOs({ ...os, reparo_efetuado: texto });
+      setEditandoReparo(false);
+    } catch (error: any) {
+      alert(`Erro ao salvar: ${error.message}`);
+    } finally {
+      setSalvandoReparo(false);
+    }
+  };
+
   const moverOS = async (targetColumn: string) => {
     if (!os || movendoOS) return;
+
+    if (targetColumn === 'controle_qualidade' && os.coluna_kanban !== 'controle_qualidade') {
+      setMostrarMoverPara(false);
+      setMostrarModalReparoEfetuado(true);
+      return;
+    }
 
     setMovendoOS(true);
     try {
@@ -3004,22 +3076,76 @@ Não haverá cobrança ao cliente.`
                     <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.defeito_relatado || '-'}</p>
                   </div>
                   <div>
-                    <label className={`text-xs uppercase ${os.diagnostico_tecnico ? 'text-gray-500' : 'text-amber-500/70'}`}>
-                      Diagnostico Tecnico
-                      {!os.diagnostico_tecnico && <span className="text-amber-500 ml-1">(pendente)</span>}
-                    </label>
-                    <p className={`text-sm mt-1 whitespace-pre-wrap ${os.diagnostico_tecnico ? 'text-gray-300' : 'text-gray-600 italic'}`}>
-                      {os.diagnostico_tecnico || 'Preenchido automaticamente ao concluir analise tecnica'}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs uppercase ${os.diagnostico_tecnico ? 'text-gray-500' : 'text-amber-500/70'}`}>
+                        Diagnostico Tecnico
+                        {!os.diagnostico_tecnico && <span className="text-amber-500 ml-1">(pendente)</span>}
+                      </label>
+                      {!editandoDiagnostico && (
+                        <button
+                          onClick={() => { setDiagnosticoTemp(os.diagnostico_tecnico || ''); setEditandoDiagnostico(true); }}
+                          className="text-xs text-[#00D4FF] hover:underline flex items-center gap-1"
+                        >
+                          <Wrench className="w-3 h-3" /> Editar
+                        </button>
+                      )}
+                    </div>
+                    {editandoDiagnostico ? (
+                      <div className="mt-1 space-y-2">
+                        <textarea
+                          value={diagnosticoTemp}
+                          onChange={(e) => setDiagnosticoTemp(e.target.value)}
+                          className="neon-input w-full h-24 resize-none text-sm"
+                          placeholder="Descreva o diagnostico tecnico..."
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditandoDiagnostico(false)} className="px-3 py-1 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5">Cancelar</button>
+                          <button onClick={salvarDiagnostico} disabled={salvandoDiagnostico || !diagnosticoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}>
+                            <Save className="w-3 h-3" /> {salvandoDiagnostico ? 'Salvando...' : 'Salvar'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className={`text-sm mt-1 whitespace-pre-wrap ${os.diagnostico_tecnico ? 'text-gray-300' : 'text-gray-600 italic'}`}>
+                        {os.diagnostico_tecnico || 'Preenchido automaticamente ao concluir analise tecnica'}
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <label className={`text-xs uppercase ${os.reparo_efetuado ? 'text-gray-500' : 'text-amber-500/70'}`}>
-                      Reparo Efetuado
-                      {!os.reparo_efetuado && <span className="text-amber-500 ml-1">(pendente)</span>}
-                    </label>
-                    <p className={`text-sm mt-1 whitespace-pre-wrap ${os.reparo_efetuado ? 'text-gray-300' : 'text-gray-600 italic'}`}>
-                      {os.reparo_efetuado || 'Preenchido automaticamente ao mover para OQC'}
-                    </p>
+                    <div className="flex items-center justify-between">
+                      <label className={`text-xs uppercase ${os.reparo_efetuado ? 'text-gray-500' : 'text-amber-500/70'}`}>
+                        Reparo Efetuado
+                        {!os.reparo_efetuado && <span className="text-amber-500 ml-1">(pendente)</span>}
+                      </label>
+                      {!editandoReparo && (
+                        <button
+                          onClick={() => { setReparoTemp(os.reparo_efetuado || ''); setEditandoReparo(true); }}
+                          className="text-xs text-[#00D4FF] hover:underline flex items-center gap-1"
+                        >
+                          <Wrench className="w-3 h-3" /> Editar
+                        </button>
+                      )}
+                    </div>
+                    {editandoReparo ? (
+                      <div className="mt-1 space-y-2">
+                        <textarea
+                          value={reparoTemp}
+                          onChange={(e) => setReparoTemp(e.target.value)}
+                          className="neon-input w-full h-24 resize-none text-sm"
+                          placeholder="Descreva o reparo efetuado..."
+                        />
+                        <div className="flex gap-2 justify-end">
+                          <button onClick={() => setEditandoReparo(false)} className="px-3 py-1 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5">Cancelar</button>
+                          <button onClick={salvarReparo} disabled={salvandoReparo || !reparoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}>
+                            <Save className="w-3 h-3" /> {salvandoReparo ? 'Salvando...' : 'Salvar'}
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className={`text-sm mt-1 whitespace-pre-wrap ${os.reparo_efetuado ? 'text-gray-300' : 'text-gray-600 italic'}`}>
+                        {os.reparo_efetuado || 'Preenchido automaticamente ao mover para OQC'}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Observacoes</label>
@@ -4507,6 +4633,20 @@ Não haverá cobrança ao cliente.`
           onClose={() => setMostrarModalIniciarReparo(false)}
           onSuccess={() => {
             setMostrarModalIniciarReparo(false);
+            loadOS();
+            onReload?.();
+          }}
+        />
+      )}
+
+      {mostrarModalReparoEfetuado && os && (
+        <ReparoEfetuadoModal
+          isOpen={mostrarModalReparoEfetuado}
+          osId={os.id}
+          osNumero={os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+          onClose={() => setMostrarModalReparoEfetuado(false)}
+          onSuccess={() => {
+            setMostrarModalReparoEfetuado(false);
             loadOS();
             onReload?.();
           }}
