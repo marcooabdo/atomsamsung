@@ -88,6 +88,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalCancelarGI, setMostrarModalCancelarGI] = useState(false);
   const [requisicaoCancelarGI, setRequisicaoCancelarGI] = useState<RequisicaoPeca | null>(null);
+  const [mostrarModalSucesso, setMostrarModalSucesso] = useState(false);
+  const [dadosOSCriada, setDadosOSCriada] = useState<{ numeroInterna?: string; numeroSamsung?: string } | null>(null);
 
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -1444,14 +1446,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         console.log('✅ Comentários criados');
       }
 
-      const osInfo = novaOS.numero_os_interna
-        ? `OS Interna ${novaOS.numero_os_interna} criada`
-        : `OS ${tipoOS} criada`;
-      const samsungInfo = novaOS.numero_os_samsung
-        ? ` (OS Samsung: ${novaOS.numero_os_samsung})`
-        : '';
-
-      alert(`${osInfo}${samsungInfo}`);
+      // Mostrar modal de sucesso
+      setDadosOSCriada({
+        numeroInterna: novaOS.numero_os_interna,
+        numeroSamsung: novaOS.numero_os_samsung || undefined
+      });
+      setMostrarModalSucesso(true);
 
       // Mudar para modo de visualização e carregar a OS criada
       setCurrentOsId(novaOS.id);
@@ -5939,6 +5939,57 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               >
                 <Save className="w-5 h-5" />
                 REGISTRAR PAGAMENTO
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarModalSucesso && dadosOSCriada && (
+        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-[100]">
+          <div className="bg-[#0a0a0a] border border-[#39FF1440] rounded-lg p-8 max-w-md w-full mx-4 relative animate-fade-in">
+            <div className="flex flex-col items-center text-center">
+              <div className="w-20 h-20 rounded-full bg-[#39FF1420] border-2 border-[#39FF14] flex items-center justify-center mb-6">
+                <CheckCircle className="w-12 h-12 text-[#39FF14]" />
+              </div>
+
+              <h2 className="text-2xl font-bold text-[#39FF14] mb-2">
+                OS Criada com Sucesso!
+              </h2>
+
+              <div className="space-y-3 my-6 w-full">
+                {dadosOSCriada.numeroInterna && (
+                  <div className="bg-[#39FF1410] border border-[#39FF1430] rounded-lg p-4">
+                    <p className="text-gray-400 text-sm mb-1">OS Interna</p>
+                    <p className="text-[#39FF14] text-xl font-bold">
+                      {dadosOSCriada.numeroInterna}
+                    </p>
+                  </div>
+                )}
+
+                {dadosOSCriada.numeroSamsung && (
+                  <div className="bg-[#39FF1410] border border-[#39FF1430] rounded-lg p-4">
+                    <p className="text-gray-400 text-sm mb-1">OS Samsung</p>
+                    <p className="text-[#39FF14] text-xl font-bold">
+                      {dadosOSCriada.numeroSamsung}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={() => {
+                  setMostrarModalSucesso(false);
+                  setDadosOSCriada(null);
+                }}
+                className="w-full py-3 px-6 rounded-lg font-bold transition-all duration-200 hover:scale-105"
+                style={{
+                  backgroundColor: '#39FF1420',
+                  color: '#39FF14',
+                  border: '1px solid #39FF14'
+                }}
+              >
+                FECHAR
               </button>
             </div>
           </div>
