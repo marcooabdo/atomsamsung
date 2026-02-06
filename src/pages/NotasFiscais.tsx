@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
+import { EmitirNFSeModal } from '../components/EmitirNFSeModal';
 import {
   FileText,
   CheckCircle,
@@ -16,12 +17,16 @@ import {
   Calendar,
   TrendingUp,
   Building2,
-  Search
+  Search,
+  RefreshCw,
+  Loader2,
+  Receipt
 } from 'lucide-react';
 
 interface NotaFiscal {
   id: string;
   tipo: 'nfse' | 'nfe';
+  provedor: string | null;
   numero: string | null;
   serie: string | null;
   chave_acesso: string | null;
@@ -33,11 +38,14 @@ interface NotaFiscal {
   data_emissao: string | null;
   tomador_nome: string | null;
   tomador_documento: string | null;
+  tomador_endereco: string | null;
   protocolo: string | null;
   pdf_url: string | null;
   xml_url: string | null;
   erro_mensagem: string | null;
   observacoes: string | null;
+  tentativas: number | null;
+  payload_json: any;
   created_at: string;
   os?: {
     numero_os_samsung: string | null;
@@ -98,6 +106,8 @@ export function NotasFiscais() {
 
   const [unidades, setUnidades] = useState<any[]>([]);
   const [notaDetalhes, setNotaDetalhes] = useState<NotaFiscal | null>(null);
+  const [showRetryModal, setShowRetryModal] = useState(false);
+  const [retryNota, setRetryNota] = useState<NotaFiscal | null>(null);
 
   useEffect(() => {
     loadData();
@@ -666,7 +676,6 @@ export function NotasFiscais() {
                     )}
                   </div>
 
-                  {/* Ações */}
                   <div className="flex flex-col gap-2">
                     <button
                       onClick={() => setNotaDetalhes(nf)}
@@ -680,6 +689,25 @@ export function NotasFiscais() {
                     >
                       <Eye className="w-4 h-4" />
                     </button>
+
+                    {nf.status === 'erro' && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setRetryNota(nf);
+                          setShowRetryModal(true);
+                        }}
+                        className="neon-button p-2"
+                        style={{
+                          backgroundColor: '#FFBF0020',
+                          borderColor: '#FFBF00',
+                          color: '#FFBF00'
+                        }}
+                        title="Tentar novamente"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                      </button>
+                    )}
 
                     {nf.pdf_url && (
                       <a
@@ -915,9 +943,59 @@ export function NotasFiscais() {
                   </div>
                 </div>
               )}
+
+              {notaDetalhes.tentativas && notaDetalhes.tentativas > 0 && (
+                <div className="text-xs text-gray-500">
+                  Tentativas de emissao: {notaDetalhes.tentativas}
+                </div>
+              )}
+
+              {notaDetalhes.status === 'erro' && (
+                <div className="pt-4 border-t border-gray-700">
+                  <button
+                    onClick={() => {
+                      setRetryNota(notaDetalhes);
+                      setShowRetryModal(true);
+                      setNotaDetalhes(null);
+                    }}
+                    className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
+                    style={{
+                      backgroundColor: '#FFBF0020',
+                      border: '2px solid #FFBF00',
+                      color: '#FFBF00',
+                      boxShadow: '0 0 15px rgba(255,191,0,0.2)'
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Tentar Novamente
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {showRetryModal && retryNota && retryNota.unidade && (
+        <EmitirNFSeModal
+          isOpen={showRetryModal}
+          onClose={() => {
+            setShowRetryModal(false);
+            setRetryNota(null);
+          }}
+          onSuccess={() => {
+            loadData();
+            setShowRetryModal(false);
+            setRetryNota(null);
+          }}
+          osId={retryNota.os ? undefined : undefined}
+          unidadeId={retryNota.unidade.id}
+          clienteNome={retryNota.tomador_nome || ''}
+          clienteDocumento={retryNota.tomador_documento}
+          clienteEndereco={retryNota.tomador_endereco}
+          valorServicos={retryNota.valor_servicos || retryNota.valor_total}
+          existingNfId={retryNota.id}
+        />
       )}
     </div>
   );

@@ -133,6 +133,14 @@ const FORM_INICIAL = {
   regime_especial_tributacao: '',
   codigo_tributario_municipal: '',
   codigo_nbs: '',
+  provedor: 'nacional',
+  nfse_tipo_ambiente: '2',
+  nfse_codigo_tributacao_nacional: '',
+  nfse_codigo_nbs: '',
+  nfse_codigo_municipio_prestacao: '',
+  nfse_descricao_servico: '',
+  nfse_trib_issqn: '1',
+  nfse_codigo_municipio_ibge: '',
   iss_aliquota: '5',
   iss_retido: false,
   iss_retencao_percentual: '0',
@@ -281,6 +289,14 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         regime_especial_tributacao: config.regime_especial_tributacao || '',
         codigo_tributario_municipal: config.codigo_tributario_municipal || '',
         codigo_nbs: config.codigo_nbs || '',
+        provedor: (config as any).provedor || 'nacional',
+        nfse_tipo_ambiente: String((config as any).nfse_tipo_ambiente || 2),
+        nfse_codigo_tributacao_nacional: (config as any).nfse_codigo_tributacao_nacional || '',
+        nfse_codigo_nbs: (config as any).nfse_codigo_nbs || '',
+        nfse_codigo_municipio_prestacao: (config as any).nfse_codigo_municipio_prestacao || '',
+        nfse_descricao_servico: (config as any).nfse_descricao_servico || '',
+        nfse_trib_issqn: String((config as any).nfse_trib_issqn || 1),
+        nfse_codigo_municipio_ibge: (config as any).nfse_codigo_municipio_ibge || '',
         iss_aliquota: String(config.iss_aliquota || 0),
         iss_retido: config.iss_retido || false,
         iss_retencao_percentual: String(config.iss_retencao_percentual || 0),
@@ -352,10 +368,18 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
     setMensagem(null);
 
     try {
-      const payload = {
+      const payload: any = {
         nome: form.nome.trim(),
         tipo: form.tipo,
         unidade_id: form.unidade_id,
+        provedor: form.provedor || 'nacional',
+        nfse_tipo_ambiente: parseInt(form.nfse_tipo_ambiente) || 2,
+        nfse_codigo_tributacao_nacional: form.nfse_codigo_tributacao_nacional || null,
+        nfse_codigo_nbs: form.nfse_codigo_nbs || null,
+        nfse_codigo_municipio_prestacao: form.nfse_codigo_municipio_prestacao || null,
+        nfse_descricao_servico: form.nfse_descricao_servico || null,
+        nfse_trib_issqn: parseInt(form.nfse_trib_issqn) || 1,
+        nfse_codigo_municipio_ibge: form.nfse_codigo_municipio_ibge || null,
         codigo_servico: form.codigo_servico || null,
         cnae: form.cnae || null,
         aliquota_iss: parseFloat(form.aliquota_iss) || 0,
@@ -623,9 +647,13 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         <span className="text-xs px-2 py-1 rounded bg-[#00D4FF]/10 text-[#00D4FF]">
                           ISS: {config.iss_aliquota || config.aliquota_iss}%
                         </span>
-                        {config.tipo_emissao && (
-                          <span className="text-xs px-2 py-1 rounded bg-green-500/10 text-green-400">
-                            {config.tipo_emissao === 'simples_nacional' ? 'Simples Nacional' : 'NFSe Nacional'}
+                        {(config as any).provedor && (
+                          <span className={`text-xs px-2 py-1 rounded ${
+                            (config as any).provedor === 'nacional'
+                              ? 'bg-[#FBB024]/10 text-[#FBB024]'
+                              : 'bg-blue-500/10 text-blue-400'
+                          }`}>
+                            {(config as any).provedor === 'nacional' ? 'Nacional' : 'Municipal'}
                           </span>
                         )}
                         {config.codigo_servico && (
@@ -840,6 +868,17 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Provedor NFS-e</label>
+                        <select
+                          value={form.provedor}
+                          onChange={(e) => setForm(prev => ({ ...prev, provedor: e.target.value }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                        >
+                          <option value="nacional">NFS-e Nacional</option>
+                          <option value="municipal">NFS-e Municipal</option>
+                        </select>
+                      </div>
+                      <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Tipo de Emissao</label>
                         <select
                           value={form.tipo_emissao}
@@ -918,6 +957,91 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                       </div>
                     </div>
                   </div>
+
+                  {form.provedor === 'nacional' && (
+                    <div className="border-t border-gray-800 pt-4">
+                      <h4 className="text-sm font-bold text-[#FBB024] uppercase mb-3 flex items-center gap-2">
+                        <Globe className="w-4 h-4" />
+                        NFS-e Nacional - Campos DPS
+                      </h4>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">Ambiente</label>
+                          <select
+                            value={form.nfse_tipo_ambiente}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_tipo_ambiente: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024]"
+                          >
+                            <option value="2">2 - Homologacao</option>
+                            <option value="1">1 - Producao</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">cTribNac (Cod. Tributacao Nacional)</label>
+                          <input
+                            type="text"
+                            value={form.nfse_codigo_tributacao_nacional}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_codigo_tributacao_nacional: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024] font-mono"
+                            placeholder="Ex: 140101"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">cNBS (Cod. NBS)</label>
+                          <input
+                            type="text"
+                            value={form.nfse_codigo_nbs}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_codigo_nbs: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024] font-mono"
+                            placeholder="Ex: 120018100"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">cLocPrestacao (Municipio Prestacao)</label>
+                          <input
+                            type="text"
+                            value={form.nfse_codigo_municipio_prestacao}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_codigo_municipio_prestacao: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024] font-mono"
+                            placeholder="Ex: 3170206"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">tribISSQN</label>
+                          <select
+                            value={form.nfse_trib_issqn}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_trib_issqn: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024]"
+                          >
+                            <option value="1">1 - Exigivel</option>
+                            <option value="2">2 - Nao Incidencia</option>
+                            <option value="3">3 - Isencao</option>
+                            <option value="4">4 - Imunidade</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">cMun IBGE (Tomador Padrao)</label>
+                          <input
+                            type="text"
+                            value={form.nfse_codigo_municipio_ibge}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_codigo_municipio_ibge: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024] font-mono"
+                            placeholder="Ex: 3550308"
+                          />
+                        </div>
+                        <div className="md:col-span-3">
+                          <label className="block text-[10px] text-gray-500 mb-1">xDescServ (Descricao Padrao do Servico)</label>
+                          <input
+                            type="text"
+                            value={form.nfse_descricao_servico}
+                            onChange={(e) => setForm(prev => ({ ...prev, nfse_descricao_servico: e.target.value }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024]"
+                            placeholder="Ex: Lubrificacao, limpeza, lustração, revisão, carga e recarga..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border-t border-gray-800 pt-4">
                     <h4 className="text-sm font-bold text-[#39FF14] uppercase mb-3 flex items-center gap-2">

@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
   DollarSign, Search, Download, Eye, Calendar,
-  CreditCard, User, FileText, ExternalLink, AlertTriangle, CheckCircle
+  CreditCard, User, FileText, ExternalLink, AlertTriangle, CheckCircle, Receipt
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { EmitirNFSeModal } from '../EmitirNFSeModal';
 
 interface LancamentosModuleProps {
   unidadeId: string;
@@ -46,6 +47,15 @@ interface Pagamento {
   unidade?: { nome: string };
 }
 
+interface NFEmitida {
+  id: string;
+  os_id: string | null;
+  pagamento_id: string | null;
+  status: string;
+  numero: string | null;
+  erro_mensagem: string | null;
+}
+
 export default function LancamentosModule({ unidadeId }: LancamentosModuleProps) {
   const [loading, setLoading] = useState(true);
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
@@ -54,6 +64,9 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
   const [dataFim, setDataFim] = useState('');
   const [busca, setBusca] = useState('');
   const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
+  const [nfMap, setNfMap] = useState<Record<string, NFEmitida>>({});
+  const [showNFSeModal, setShowNFSeModal] = useState(false);
+  const [nfseTarget, setNfseTarget] = useState<Pagamento | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -98,10 +111,59 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
 
       if (error) throw error;
       setPagamentos(data || []);
+
+      const osIds = (data || []).filter(p => p.os_id).map(p => p.os_id!);
+      const pagIds = (data || []).map(p => p.id);
+      if (osIds.length > 0 || pagIds.length > 0) {
+        const { data: nfs } = await supabase
+          .from('nf_emitidas')
+          .select('id, os_id, pagamento_id, status, numero, erro_mensagem')
+          .eq('tipo', 'nfse')
+          .or(`os_id.in.(${osIds.join(',')}),pagamento_id.in.(${pagIds.join(',')})`);
+
+        const map: Record<string, NFEmitida> = {};
+        (nfs || []).forEach(nf => {
+          if (nf.pagamento_id) map[`pag_${nf.pagamento_id}`] = nf;
+          else if (nf.os_id) map[`os_${nf.os_id}`] = nf;
+        });
+        setNfMap(map);
+      }
     } catch (error) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getNfForPagamento = (pagamento: Pagamento): NFEmitida | null => {
+    return nfMap[`pag_${pagamento.id}`] || (pagamento.os_id ? nfMap[`os_${pagamento.os_id}`] : null) || null;
+  };
+
+  const getNfStatusBadge = (nf: NFEmitida | null) => {
+    if (!nf) {
+      return (
+        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-700/50 text-gray-500 border border-gray-600">
+          SEM NF
+        </span>
+      );
+    }
+    const configs: Record<string, { bg: string; border: string; color: string; label: string }> = {
+      emitida: { bg: '#39FF1415', border: '#39FF1460', color: '#39FF14', label: 'NF EMITIDA' },
+      pendente: { bg: '#FFBF0015', border: '#FFBF0060', color: '#FFBF00', label: 'NF PENDENTE' },
+      processando: { bg: '#00D4FF15', border: '#00D4FF60', color: '#00D4FF', label: 'PROCESSANDO' },
+      erro: { bg: '#FF006415', border: '#FF006460', color: '#FF0064', label: 'NF ERRO' },
+      cancelada: { bg: '#71717A15', border: '#71717A60', color: '#71717A', label: 'NF CANCELADA' }
+    };
+    const c = configs[nf.status] || configs.pendente;
+    return (
+      <span className="px-2 py-0.5 rounded text-[10px] font-bold" style={{ backgroundColor: c.bg, border: `1px solid ${c.border}`, color: c.color }}>
+        {c.label}{nf.numero ? ` #${nf.numero}` : ''}
+      </span>
+    );
+  };
+
+  const handleEmitirNFSe = (pagamento: Pagamento) => {
+    setNfseTarget(pagamento);
+    setShowNFSeModal(true);
   };
 
   const handleExportar = () => {
@@ -340,6 +402,7 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
                       {pagamento.parcelamento && pagamento.parcelamento > 1 && (
                         <span className="text-xs text-gray-400">{pagamento.parcelamento}x</span>
                       )}
+                      {getNfStatusBadge(getNfForPagamento(pagamento))}
                     </div>
                     <div className="flex items-center gap-4 text-xs text-gray-400">
                       <span className="text-white">{pagamento.os?.cliente_nome || pagamento.cotacao?.cliente_nome}</span>
@@ -577,7 +640,64 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
               )}
             </div>
 
-            <div className="mt-6 flex justify-end">
+            <div className="mt-6 flex items-center justify-between">
+              {(() => {
+                const nf = getNfForPagamento(selectedPagamento);
+                if (nf && nf.status === 'emitida') {
+                  return (
+                    <div className="flex items-center gap-2 text-sm text-green-400">
+                      <CheckCircle className="w-4 h-4" />
+                      NFS-e Emitida{nf.numero ? ` #${nf.numero}` : ''}
+                    </div>
+                  );
+                }
+                if (nf && nf.status === 'erro') {
+                  return (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 text-sm text-red-400">
+                        <AlertTriangle className="w-4 h-4" />
+                        Erro: {nf.erro_mensagem || 'Falha na emissao'}
+                      </div>
+                      <button
+                        onClick={() => {
+                          setSelectedPagamento(null);
+                          handleEmitirNFSe(selectedPagamento);
+                        }}
+                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                        style={{ background: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                      >
+                        <Receipt className="w-3.5 h-3.5" />
+                        Tentar Novamente
+                      </button>
+                    </div>
+                  );
+                }
+                if (nf && (nf.status === 'pendente' || nf.status === 'processando')) {
+                  return (
+                    <div className="flex items-center gap-2 text-sm text-yellow-400">
+                      <Receipt className="w-4 h-4" />
+                      NFS-e {nf.status === 'processando' ? 'Processando' : 'Na Fila'}...
+                    </div>
+                  );
+                }
+                return (
+                  <button
+                    onClick={() => {
+                      setSelectedPagamento(null);
+                      handleEmitirNFSe(selectedPagamento);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
+                      border: '1px solid rgba(0,212,255,0.5)',
+                      color: '#00D4FF'
+                    }}
+                  >
+                    <Receipt className="w-4 h-4" />
+                    Emitir NFS-e
+                  </button>
+                );
+              })()}
               <button
                 onClick={() => setSelectedPagamento(null)}
                 className="px-4 py-2 rounded-lg bg-gray-700 text-gray-300 hover:bg-gray-600 transition-colors"
@@ -587,6 +707,19 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
             </div>
           </div>
         </div>
+      )}
+
+      {showNFSeModal && nfseTarget && (
+        <EmitirNFSeModal
+          isOpen={showNFSeModal}
+          onClose={() => { setShowNFSeModal(false); setNfseTarget(null); }}
+          onSuccess={() => loadPagamentos()}
+          osId={nfseTarget.os_id}
+          pagamentoId={nfseTarget.id}
+          unidadeId={unidadeId}
+          clienteNome={nfseTarget.os?.cliente_nome || nfseTarget.cotacao?.cliente_nome || ''}
+          valorServicos={nfseTarget.valor}
+        />
       )}
     </div>
   );
