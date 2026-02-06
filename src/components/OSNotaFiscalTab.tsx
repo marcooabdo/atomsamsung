@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import {
   FileText, Building2, User, DollarSign, Percent, Receipt, Send,
   AlertCircle, CheckCircle, Clock, X, ChevronDown, FileCheck, RefreshCw,
-  Download, Package, Wrench
+  Download, Package, Wrench, Edit3, Save, RotateCcw, Truck, Box, Ban
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EmitirNFSeModal } from './EmitirNFSeModal';
@@ -42,6 +42,20 @@ interface NFEmitida {
   nf_config: { nome: string } | null;
 }
 
+interface PecaItem {
+  id: string;
+  pn: string;
+  descricao: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  status: string | null;
+  gi_postado_em: string | null;
+  devolvida_em: string | null;
+  usada_em: string | null;
+  source: 'os_pecas' | 'cotacoes_pecas';
+}
+
 interface OSNotaFiscalTabProps {
   osId: string;
   clienteNome: string;
@@ -76,6 +90,7 @@ export function OSNotaFiscalTab({
   const [nfConfigs, setNfConfigs] = useState<NFConfig[]>([]);
   const [nfsEmitidas, setNfsEmitidas] = useState<NFEmitida[]>([]);
   const [unidade, setUnidade] = useState<any>(null);
+  const [pecas, setPecas] = useState<PecaItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [selectedNFeConfig, setSelectedNFeConfig] = useState<string>('');
@@ -92,6 +107,9 @@ export function OSNotaFiscalTab({
   const [mensagem, setMensagem] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [showNFSeModal, setShowNFSeModal] = useState(false);
   const [retryNfId, setRetryNfId] = useState<string | null>(null);
+  const [editingPecaId, setEditingPecaId] = useState<string | null>(null);
+  const [editPecaValues, setEditPecaValues] = useState<{ valor_unitario: number; quantidade: number }>({ valor_unitario: 0, quantidade: 1 });
+  const [savingPeca, setSavingPeca] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -104,7 +122,7 @@ export function OSNotaFiscalTab({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [configsRes, unidadeRes, nfsRes] = await Promise.all([
+      const [configsRes, unidadeRes, nfsRes, osPecasRes, cotPecasRes] = await Promise.all([
         supabase
           .from('nf_configuracoes')
           .select('*')
@@ -120,12 +138,46 @@ export function OSNotaFiscalTab({
           .from('nf_emitidas')
           .select('*, nf_config:nf_configuracoes(nome)')
           .eq('os_id', osId)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('os_pecas')
+          .select('id, pn, descricao, quantidade, valor_unitario, valor_total, status, gi_postado_em, devolvida_em, usada_em')
+          .eq('os_id', osId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('cotacoes_pecas')
+          .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
+          .eq('os_id', osId)
+          .order('created_at', { ascending: true })
       ]);
 
       setNfConfigs(configsRes.data || []);
       setUnidade(unidadeRes.data);
       setNfsEmitidas(nfsRes.data || []);
+
+      const osPecasIds = new Set((osPecasRes.data || []).map((p: any) => p.pn));
+      const osPecasMapped: PecaItem[] = (osPecasRes.data || []).map((p: any) => ({
+        ...p,
+        valor_unitario: p.valor_unitario || 0,
+        valor_total: p.valor_total || 0,
+        source: 'os_pecas' as const
+      }));
+      const cotPecasMapped: PecaItem[] = (cotPecasRes.data || [])
+        .filter((p: any) => !osPecasIds.has(p.pn))
+        .map((p: any) => ({
+          id: p.id,
+          pn: p.pn,
+          descricao: p.descricao,
+          quantidade: p.quantidade,
+          valor_unitario: p.valor_final_unitario || 0,
+          valor_total: p.valor_total || 0,
+          status: null,
+          gi_postado_em: null,
+          devolvida_em: null,
+          usada_em: null,
+          source: 'cotacoes_pecas' as const
+        }));
+      setPecas([...osPecasMapped, ...cotPecasMapped]);
 
       const nfeConfigs = (configsRes.data || []).filter((c: NFConfig) => c.tipo === 'nfe');
       if (nfeConfigs.length > 0 && !selectedNFeConfig) {
@@ -153,6 +205,54 @@ export function OSNotaFiscalTab({
     const config = nfConfigs.find(c => c.id === configId);
     if (config) applyNFeConfig(config);
     setShowNFeConfigDropdown(false);
+  };
+
+  const startEditPeca = (peca: PecaItem) => {
+    setEditingPecaId(peca.id);
+    setEditPecaValues({ valor_unitario: peca.valor_unitario, quantidade: peca.quantidade });
+  };
+
+  const handleSavePeca = async (peca: PecaItem) => {
+    setSavingPeca(true);
+    try {
+      const newTotal = editPecaValues.valor_unitario * editPecaValues.quantidade;
+      const table = peca.source === 'os_pecas' ? 'os_pecas' : 'cotacoes_pecas';
+      const updateData = peca.source === 'os_pecas'
+        ? { valor_unitario: editPecaValues.valor_unitario, quantidade: editPecaValues.quantidade, valor_total: newTotal }
+        : { valor_final_unitario: editPecaValues.valor_unitario, quantidade: editPecaValues.quantidade, valor_total: newTotal };
+
+      const { error } = await supabase.from(table).update(updateData).eq('id', peca.id);
+      if (error) throw error;
+
+      setEditingPecaId(null);
+      loadData();
+      onReload?.();
+    } catch (error: any) {
+      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar peca' });
+    } finally {
+      setSavingPeca(false);
+    }
+  };
+
+  const getPecaStatusConfig = (peca: PecaItem) => {
+    if (peca.gi_postado_em) return { label: 'GI Postado', color: '#3b82f6', bg: '#3b82f620', icon: Truck };
+    if (peca.devolvida_em) return { label: 'Devolvida', color: '#FFA500', bg: '#FFA50020', icon: RotateCcw };
+    if (peca.usada_em) return { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle };
+    if (!peca.status || peca.status === 'manual') return { label: 'Manual', color: '#71717A', bg: '#71717A20', icon: Box };
+
+    const statusMap: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+      requisitada: { label: 'Requisitada', color: '#FFBF00', bg: '#FFBF0020', icon: Clock },
+      aprovada: { label: 'Aprovada', color: '#00D4FF', bg: '#00D4FF20', icon: CheckCircle },
+      em_transito: { label: 'Em Transito', color: '#FFA500', bg: '#FFA50020', icon: Truck },
+      disponivel: { label: 'Disponivel', color: '#10b981', bg: '#10b98120', icon: Box },
+      vinculada_tecnico: { label: 'Com Tecnico', color: '#3b82f6', bg: '#3b82f620', icon: User },
+      em_uso: { label: 'Em Uso', color: '#00D4FF', bg: '#00D4FF20', icon: Wrench },
+      usada: { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle },
+      devolvida: { label: 'Devolvida', color: '#FFA500', bg: '#FFA50020', icon: RotateCcw },
+      cancelada: { label: 'Cancelada', color: '#FF0064', bg: '#FF006420', icon: Ban },
+      gspn: { label: 'GSPN', color: '#9333ea', bg: '#9333ea20', icon: Package },
+    };
+    return statusMap[peca.status] || { label: peca.status, color: '#71717A', bg: '#71717A20', icon: Box };
   };
 
   const activeNfse = nfsEmitidas.filter(nf => nf.tipo === 'nfse' && nf.status !== 'cancelada');
@@ -465,6 +565,127 @@ export function OSNotaFiscalTab({
                     : 'linear-gradient(90deg, #FFA500, #39FF14)'
                 }}
               />
+            </div>
+          </div>
+        )}
+
+        {pecas.length > 0 && (
+          <div className="mb-4">
+            <div className="overflow-x-auto rounded-lg border border-gray-700">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-800/80">
+                    <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">PN</th>
+                    <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Descricao</th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Status</th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Qtd</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Unit.</th>
+                    <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Total</th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-16"></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {pecas.map(peca => {
+                    const sc = getPecaStatusConfig(peca);
+                    const StatusIcon = sc.icon;
+                    const isEditing = editingPecaId === peca.id;
+
+                    return (
+                      <tr key={peca.id} className="border-t border-gray-800 hover:bg-gray-800/30 transition-colors">
+                        <td className="py-2 px-3">
+                          <span className="font-mono text-xs text-[#00D4FF]">{peca.pn}</span>
+                        </td>
+                        <td className="py-2 px-3">
+                          <span className="text-gray-300 text-xs">{peca.descricao}</span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          <span
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap"
+                            style={{ backgroundColor: sc.bg, border: `1px solid ${sc.color}40`, color: sc.color }}
+                          >
+                            <StatusIcon className="w-2.5 h-2.5" />
+                            {sc.label}
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editPecaValues.quantidade}
+                              onChange={(e) => setEditPecaValues(prev => ({ ...prev, quantidade: parseInt(e.target.value) || 1 }))}
+                              className="w-14 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-center focus:outline-none"
+                              min={1}
+                            />
+                          ) : (
+                            <span className="text-gray-300 text-xs">{peca.quantidade}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          {isEditing ? (
+                            <input
+                              type="number"
+                              value={editPecaValues.valor_unitario}
+                              onChange={(e) => setEditPecaValues(prev => ({ ...prev, valor_unitario: parseFloat(e.target.value) || 0 }))}
+                              className="w-24 px-1.5 py-1 rounded bg-gray-700 border border-[#FFA500]/50 text-gray-200 text-xs text-right focus:outline-none"
+                              step="0.01"
+                            />
+                          ) : (
+                            <span className="text-gray-300 text-xs">{formatCurrency(peca.valor_unitario)}</span>
+                          )}
+                        </td>
+                        <td className="py-2 px-3 text-right">
+                          <span className="text-white font-medium text-xs">
+                            {isEditing
+                              ? formatCurrency(editPecaValues.valor_unitario * editPecaValues.quantidade)
+                              : formatCurrency(peca.valor_total)
+                            }
+                          </span>
+                        </td>
+                        <td className="py-2 px-3 text-center">
+                          {isEditing ? (
+                            <div className="flex items-center gap-1 justify-center">
+                              <button
+                                onClick={() => handleSavePeca(peca)}
+                                disabled={savingPeca}
+                                className="p-1 rounded hover:bg-[#39FF14]/20 transition-colors"
+                                title="Salvar"
+                              >
+                                <Save className="w-3.5 h-3.5 text-[#39FF14]" />
+                              </button>
+                              <button
+                                onClick={() => setEditingPecaId(null)}
+                                className="p-1 rounded hover:bg-[#FF0064]/20 transition-colors"
+                                title="Cancelar"
+                              >
+                                <X className="w-3.5 h-3.5 text-[#FF0064]" />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => startEditPeca(peca)}
+                              className="p-1 rounded hover:bg-[#FFA500]/20 transition-colors"
+                              title="Editar valores"
+                            >
+                              <Edit3 className="w-3.5 h-3.5 text-gray-500 hover:text-[#FFA500]" />
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                <tfoot>
+                  <tr className="border-t-2 border-gray-700 bg-gray-800/50">
+                    <td colSpan={5} className="py-2.5 px-3 text-right text-xs font-bold text-gray-300 uppercase">
+                      Total Pecas ({pecas.length})
+                    </td>
+                    <td className="py-2.5 px-3 text-right text-sm font-bold text-[#FFA500]">
+                      {formatCurrency(pecas.reduce((sum, p) => sum + p.valor_total, 0))}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
           </div>
         )}
