@@ -3788,6 +3788,24 @@ Não haverá cobrança ao cliente.`
                             )}
                           </div>
                         </div>
+                        <div className="mt-3 pt-3 border-t border-gray-800/50 flex items-center justify-between">
+                          <label className="flex items-center gap-2 cursor-pointer select-none group">
+                            <div
+                              onClick={async () => {
+                                const novoValor = !peca.exibir_no_pdf;
+                                const tabela = peca.status === 'gspn' || peca.status === 'manual' ? 'os_pecas' : (peca.cotacao_peca_id ? 'cotacoes_pecas' : 'os_pecas');
+                                await supabase.from(tabela).update({ exibir_no_pdf: novoValor }).eq('id', peca.id);
+                                setPecas(prev => prev.map(p => p.id === peca.id ? { ...p, exibir_no_pdf: novoValor } : p));
+                              }}
+                              className={`w-8 h-4 rounded-full transition-all duration-200 relative cursor-pointer ${peca.exibir_no_pdf !== false ? 'bg-[#00D4FF]' : 'bg-gray-700'}`}
+                            >
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200 ${peca.exibir_no_pdf !== false ? 'left-4' : 'left-0.5'}`} />
+                            </div>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider group-hover:text-gray-400 transition-colors">
+                              Exibir no PDF
+                            </span>
+                          </label>
+                        </div>
                       </div>
                     );
                   })}
@@ -4140,7 +4158,22 @@ Não haverá cobrança ao cliente.`
                             </div>
                           </div>
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-3">
+                          <label className="flex items-center gap-1.5 cursor-pointer select-none group">
+                            <div
+                              onClick={async () => {
+                                const novoValor = !anexo.exibir_no_pdf;
+                                await supabase.from('os_anexos').update({ exibir_no_pdf: novoValor }).eq('id', anexo.id);
+                                setAnexos((prev: any[]) => prev.map((a: any) => a.id === anexo.id ? { ...a, exibir_no_pdf: novoValor } : a));
+                              }}
+                              className={`w-8 h-4 rounded-full transition-all duration-200 relative cursor-pointer ${anexo.exibir_no_pdf ? 'bg-[#00D4FF]' : 'bg-gray-700'}`}
+                            >
+                              <div className={`absolute top-0.5 w-3 h-3 rounded-full bg-white transition-all duration-200 ${anexo.exibir_no_pdf ? 'left-4' : 'left-0.5'}`} />
+                            </div>
+                            <span className="text-[10px] text-gray-500 uppercase tracking-wider group-hover:text-gray-400 transition-colors whitespace-nowrap">
+                              PDF
+                            </span>
+                          </label>
                           <button
                             onClick={() => setAnexoPreview(anexo)}
                             className="neon-button text-xs px-4 py-2"
@@ -4162,7 +4195,7 @@ Não haverá cobrança ao cliente.`
                                         .remove([filePath]);
 
                                       if (storageError) {
-                                        console.error('❌ Erro ao remover arquivo do storage:', storageError);
+                                        console.error('Erro ao remover arquivo do storage:', storageError);
                                       }
                                     }
                                   }
@@ -4172,15 +4205,14 @@ Não haverá cobrança ao cliente.`
                                   await supabase.from('os_comentarios').insert({
                                     os_id: osId,
                                     usuario_id: usuario?.id,
-                                    comentario: `🗑️ Anexo removido: ${anexo.nome_arquivo}`,
+                                    comentario: `Anexo removido: ${anexo.nome_arquivo}`,
                                     is_system: true
                                   });
 
                                   loadAnexos();
                                   loadComentarios();
-                                  alert('Anexo excluído com sucesso!');
+                                  alert('Anexo excluido com sucesso!');
                                 } catch (error) {
-                                  console.error('❌ Erro ao excluir anexo:', error);
                                   alert('Erro ao excluir anexo');
                                 }
                               }}
