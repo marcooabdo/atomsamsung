@@ -1,7 +1,61 @@
 @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root,
-:root.theme-original,
+:root.theme-original {
+  --deep-graphite: #0A0A0D;
+  --absolute-black: #000000;
+  --carbon-gray: #1A1A1F;
+  --slate-dark: #252530;
+  --steel-gray: #35353F;
+
+  --samsung-blue: #1428F0;
+  --electric-blue: #00D4FF;
+  --neon-cyan: #00F5FF;
+  --lime-neon: #39FF14;
+
+  --neon-glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
+  --neon-glow-cyan: 0 0 10px rgba(0, 245, 255, 0.5), 0 0 20px rgba(0, 245, 255, 0.3);
+  --neon-glow-lime: 0 0 10px rgba(57, 255, 20, 0.5), 0 0 20px rgba(57, 255, 20, 0.3);
+  --neon-glow-accent: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3);
+
+  --font-tech: 'Orbitron', sans-serif;
+  --font-body: 'Inter', sans-serif;
+
+  --border-radius-sm: 6px;
+  --border-radius-md: 8px;
+  --border-radius-lg: 10px;
+  --border-radius-xl: 12px;
+
+  --transition-fast: 0.15s ease;
+  --transition-normal: 0.3s ease;
+  --transition-slow: 0.5s ease;
+
+  --bg-primary: #0A0A0D;
+  --bg-secondary: #111114;
+  --bg-card: rgba(20, 20, 24, 0.95);
+  --bg-hover: rgba(0, 212, 255, 0.06);
+  --bg-sidebar: linear-gradient(180deg, #0e0e12, #08080b);
+  --text-primary: #E0E0E0;
+  --text-secondary: #8899AA;
+  --text-accent: #00D4FF;
+  --text-on-accent: #000000;
+  --border-primary: rgba(0, 212, 255, 0.12);
+  --border-accent: rgba(0, 212, 255, 0.3);
+  --shadow-primary: rgba(0, 0, 0, 0.6);
+  --grid-color: rgba(0, 212, 255, 0.025);
+  --scrollbar-track: #141418;
+  --scrollbar-thumb: linear-gradient(180deg, #00D4FF, #0066FF);
+  --scrollbar-thumb-hover: linear-gradient(180deg, #00F5FF, #00D4FF);
+  --glass-bg: rgba(20, 20, 24, 0.6);
+  --glass-border: rgba(0, 212, 255, 0.1);
+  --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --accent-rgb: 0, 212, 255;
+  --card-gradient-end: rgba(0,0,0,0.4);
+  --card-inset-glow: rgba(255,255,255,0.05);
+  --progress-track: rgba(0,0,0,0.6);
+  --subtle-border: rgba(255,255,255,0.1);
+}
+
 :root.theme-dark-blue {
   --deep-graphite: #0A0A0D;
   --absolute-black: #000000;
