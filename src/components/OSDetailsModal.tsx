@@ -1,7 +1,8 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
+import { WhatsAppSendModal } from './WhatsAppSendModal';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 
 interface OSDetailsModalProps {
@@ -105,6 +106,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [anexoPreview, setAnexoPreview] = useState<any>(null);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
+  const [showWhatsApp, setShowWhatsApp] = useState(false);
 
   useEffect(() => {
     loadOSDetails();
@@ -396,6 +398,15 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   <p className="text-sm text-gray-600 mt-1">Samsung: {osDetails.numero_os_samsung}</p>
                 )}
               </div>
+              {osDetails.cliente_telefone && (
+                <button
+                  onClick={() => setShowWhatsApp(true)}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                >
+                  <MessageCircle className="w-4 h-4" />
+                  WhatsApp
+                </button>
+              )}
               {osDetails.numero_os_samsung && (
                 <button
                   onClick={syncGSPN}
@@ -843,6 +854,21 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           onClose={() => setAnexoPreview(null)}
         />
       )}
+
+      <WhatsAppSendModal
+        isOpen={showWhatsApp}
+        onClose={() => setShowWhatsApp(false)}
+        osData={{
+          id: osDetails.id,
+          numero_os: osDetails.numero_os_interna,
+          cliente_nome: osDetails.cliente_nome,
+          cliente_telefone: osDetails.cliente_telefone || undefined,
+          aparelho_modelo: osDetails.aparelho_modelo || undefined,
+          valor_total: osDetails.valor_total,
+          data_agendamento: osDetails.agendamento?.data_agendamento,
+          unidade_id: osDetails.unidade_id,
+        }}
+      />
     </div>
   );
 }
