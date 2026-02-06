@@ -98,11 +98,6 @@ export function OSNotaFiscalTab({
   clienteEmail,
   clienteEndereco,
   unidadeId,
-  valorServicos: valorServicosProp,
-  valorPecas: valorPecasProp,
-  valorTotal: valorTotalProp,
-  valorPago: valorPagoProp,
-  valorDesconto: valorDescontoProp,
   tipoOs,
   isCortesia,
   onReload
@@ -113,20 +108,14 @@ export function OSNotaFiscalTab({
   const [pecas, setPecas] = useState<PecaItem[]>([]);
   const [servicos, setServicos] = useState<ServicoItem[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [osValues, setOsValues] = useState({
-    valor_servicos: valorServicosProp,
-    valor_pecas: valorPecasProp,
-    valor_bruto: valorTotalProp,
-    valor_pago: valorPagoProp,
-    valor_desconto: valorDescontoProp,
-  });
+  const [valorPago, setValorPago] = useState(0);
+  const [valorDesconto, setValorDesconto] = useState(0);
 
   const [selectedNFeConfig, setSelectedNFeConfig] = useState<string>('');
   const [showNFeConfigDropdown, setShowNFeConfigDropdown] = useState(false);
 
   const [formNFe, setFormNFe] = useState({
-    valorProdutos: valorPecasProp,
+    valorProdutos: 0,
     cfop: '5102',
     ncm: '',
     observacoes: ''
@@ -190,7 +179,7 @@ export function OSNotaFiscalTab({
           .order('created_at', { ascending: true }),
         supabase
           .from('os')
-          .select('valor_servicos, valor_pecas, valor_bruto, valor_pago, valor_desconto')
+          .select('valor_pago, valor_desconto')
           .eq('id', osId)
           .maybeSingle()
       ]);
@@ -200,13 +189,8 @@ export function OSNotaFiscalTab({
       setNfsEmitidas(nfsRes.data || []);
 
       if (osRes.data) {
-        setOsValues({
-          valor_servicos: osRes.data.valor_servicos || 0,
-          valor_pecas: osRes.data.valor_pecas || 0,
-          valor_bruto: osRes.data.valor_bruto || 0,
-          valor_pago: osRes.data.valor_pago || 0,
-          valor_desconto: osRes.data.valor_desconto || 0,
-        });
+        setValorPago(osRes.data.valor_pago || 0);
+        setValorDesconto(osRes.data.valor_desconto || 0);
       }
 
       const osPecasIds = new Set((osPecasRes.data || []).map((p: any) => p.pn));
@@ -231,7 +215,13 @@ export function OSNotaFiscalTab({
           usada_em: null,
           source: 'cotacoes_pecas' as const
         }));
-      setPecas([...osPecasMapped, ...cotPecasMapped]);
+
+      const allPecas = [...osPecasMapped, ...cotPecasMapped].filter(p =>
+        !p.devolvida_em &&
+        p.status !== 'devolvida' &&
+        p.status !== 'cancelada'
+      );
+      setPecas(allPecas);
 
       const osServIds = new Set((osServicosRes.data || []).map((s: any) => s.descricao));
       const osServMapped: ServicoItem[] = (osServicosRes.data || []).map((s: any) => ({
@@ -310,8 +300,19 @@ export function OSNotaFiscalTab({
         if (!peca) return;
         const table = peca.source;
         const updateData = peca.source === 'os_pecas'
-          ? { descricao: editValues.descricao, valor_unitario: editValues.valor_unitario, quantidade: editValues.quantidade, valor_total: newTotal }
-          : { descricao: editValues.descricao, valor_final_unitario: editValues.valor_unitario, quantidade: editValues.quantidade, valor_total: newTotal };
+          ? {
+              descricao: editValues.descricao,
+              valor_unitario: editValues.valor_unitario,
+              quantidade: editValues.quantidade,
+              valor_total: newTotal,
+              valor_gspn: editValues.valor_unitario
+            }
+          : {
+              descricao: editValues.descricao,
+              valor_final_unitario: editValues.valor_unitario,
+              quantidade: editValues.quantidade,
+              valor_total: newTotal
+            };
         const { error } = await supabase.from(table).update(updateData).eq('id', editingId);
         if (error) throw error;
       } else {
@@ -340,7 +341,7 @@ export function OSNotaFiscalTab({
   };
 
   const handleDelete = async (type: 'peca' | 'servico', item: PecaItem | ServicoItem) => {
-    if (!confirm('Remover este item?')) return;
+    if (!confirm('Remover este item da nota fiscal?')) return;
     try {
       const table = type === 'peca' ? (item as PecaItem).source : (item as ServicoItem).source;
       const { error } = await supabase.from(table).delete().eq('id', item.id);
@@ -354,11 +355,9 @@ export function OSNotaFiscalTab({
 
   const getPecaStatusConfig = (peca: PecaItem) => {
     if (peca.gi_postado_em) return { label: 'GI Postado', color: '#3b82f6', bg: '#3b82f620', icon: Truck };
-    if (peca.devolvida_em) return { label: 'Devolvida', color: '#FFA500', bg: '#FFA50020', icon: RotateCcw };
     if (peca.usada_em) return { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle };
-    if (!peca.status || peca.status === 'manual') return { label: 'Manual', color: '#71717A', bg: '#71717A20', icon: Box };
 
-    const statusMap: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+    const workflowMap: Record<string, { label: string; color: string; bg: string; icon: any }> = {
       requisitada: { label: 'Requisitada', color: '#FFBF00', bg: '#FFBF0020', icon: Clock },
       aprovada: { label: 'Aprovada', color: '#00D4FF', bg: '#00D4FF20', icon: CheckCircle },
       em_transito: { label: 'Em Transito', color: '#FFA500', bg: '#FFA50020', icon: Truck },
@@ -366,17 +365,21 @@ export function OSNotaFiscalTab({
       vinculada_tecnico: { label: 'Com Tecnico', color: '#3b82f6', bg: '#3b82f620', icon: User },
       em_uso: { label: 'Em Uso', color: '#00D4FF', bg: '#00D4FF20', icon: Wrench },
       usada: { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle },
-      devolvida: { label: 'Devolvida', color: '#FFA500', bg: '#FFA50020', icon: RotateCcw },
-      cancelada: { label: 'Cancelada', color: '#FF0064', bg: '#FF006420', icon: Ban },
-      gspn: { label: 'GSPN', color: '#9333ea', bg: '#9333ea20', icon: Package },
     };
-    return statusMap[peca.status] || { label: peca.status, color: '#71717A', bg: '#71717A20', icon: Box };
+
+    if (peca.status && workflowMap[peca.status]) {
+      return workflowMap[peca.status];
+    }
+
+    return { label: 'Pendente', color: '#FFBF00', bg: '#FFBF0020', icon: Clock };
   };
 
-  const valorServicos = osValues.valor_servicos;
-  const valorPecas = osValues.valor_pecas;
-  const valorPago = osValues.valor_pago;
-  const valorDesconto = osValues.valor_desconto;
+  const totalServicos = servicos.reduce((sum, s) => sum + s.valor_total, 0);
+  const totalPecas = pecas.reduce((sum, p) => sum + p.valor_total, 0);
+  const totalBruto = totalServicos + totalPecas;
+  const totalComDesconto = Math.max(totalBruto - valorDesconto, 0);
+  const pagamentoIntegral = valorPago >= totalComDesconto && totalComDesconto > 0;
+  const faltaPagar = Math.max(totalComDesconto - valorPago, 0);
 
   const activeNfse = nfsEmitidas.filter(nf => nf.tipo === 'nfse' && nf.status !== 'cancelada');
   const activeNfe = nfsEmitidas.filter(nf => nf.tipo === 'nfe' && nf.status !== 'cancelada');
@@ -388,18 +391,20 @@ export function OSNotaFiscalTab({
     .filter(nf => nf.status !== 'erro')
     .reduce((sum, nf) => sum + (nf.valor_produtos || nf.valor_total || 0), 0);
 
-  const valorServicosRestante = Math.max(valorServicos - valorServicosInvoiced, 0);
-  const valorPecasRestante = Math.max(valorPecas - valorPecasInvoiced, 0);
+  const valorServicosRestante = Math.max(totalServicos - valorServicosInvoiced, 0);
+  const valorPecasRestante = Math.max(totalPecas - valorPecasInvoiced, 0);
 
   useEffect(() => {
     setFormNFe(prev => ({ ...prev, valorProdutos: valorPecasRestante }));
-  }, [valorPecas, nfsEmitidas, osValues]);
+  }, [totalPecas, nfsEmitidas]);
 
-  const servicosPctInvoiced = valorServicos > 0 ? Math.min((valorServicosInvoiced / valorServicos) * 100, 100) : 0;
-  const pecasPctInvoiced = valorPecas > 0 ? Math.min((valorPecasInvoiced / valorPecas) * 100, 100) : 0;
+  const servicosPctInvoiced = totalServicos > 0 ? Math.min((valorServicosInvoiced / totalServicos) * 100, 100) : 0;
+  const pecasPctInvoiced = totalPecas > 0 ? Math.min((valorPecasInvoiced / totalPecas) * 100, 100) : 0;
 
-  const canEmitNfse = !isLpOrCortesia && valorPago > 0 && valorServicosRestante > 0.01 && valorServicos > 0;
-  const canEmitNfe = (isLpOrCortesia || valorPago > 0) && valorPecasRestante > 0.01 && valorPecas > 0;
+  const canEmitNfse = !isLpOrCortesia && pagamentoIntegral && valorServicosRestante > 0.01 && totalServicos > 0;
+  const canEmitNfe = (isLpOrCortesia || pagamentoIntegral) && valorPecasRestante > 0.01 && totalPecas > 0;
+
+  const showPaymentWarning = !isLpOrCortesia && !pagamentoIntegral && totalComDesconto > 0;
 
   const handleEmitirNFe = async () => {
     if (!selectedNFeConfig && nfeConfigs.length > 0) {
@@ -578,17 +583,31 @@ export function OSNotaFiscalTab({
         </div>
       )}
 
-      {!isLpOrCortesia && valorPago <= 0 && (
-        <div className="premium-card p-6 bg-[#FFBF00]/10 border-2 border-[#FFBF00]/40">
+      {showPaymentWarning && (
+        <div className="premium-card p-6 bg-[#FF0064]/10 border-2 border-[#FF0064]/40">
           <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-full bg-[#FFBF00]/20 flex items-center justify-center border border-[#FFBF00]/40">
-              <AlertCircle className="w-6 h-6 text-[#FFBF00]" />
+            <div className="w-12 h-12 rounded-full bg-[#FF0064]/20 flex items-center justify-center border border-[#FF0064]/40">
+              <AlertCircle className="w-6 h-6 text-[#FF0064]" />
             </div>
-            <div>
-              <h3 className="text-lg font-bold text-[#FFBF00]">PAGAMENTO NECESSARIO</h3>
-              <p className="text-sm text-gray-300">
-                A emissao de notas fiscais so fica disponivel apos o registro de pagamento na OS.
+            <div className="flex-1">
+              <h3 className="text-lg font-bold text-[#FF0064]">PAGAMENTO INTEGRAL NECESSARIO</h3>
+              <p className="text-sm text-gray-300 mt-1">
+                A emissao de notas fiscais so e liberada apos o pagamento integral da OS.
               </p>
+              <div className="flex gap-6 mt-3">
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Valor Total OS</p>
+                  <p className="text-sm font-bold text-white">{formatCurrency(totalComDesconto)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Valor Pago</p>
+                  <p className="text-sm font-bold text-[#FFBF00]">{formatCurrency(valorPago)}</p>
+                </div>
+                <div>
+                  <p className="text-[10px] text-gray-500 uppercase">Falta Pagar</p>
+                  <p className="text-sm font-bold text-[#FF0064]">{formatCurrency(faltaPagar)}</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -655,7 +674,7 @@ export function OSNotaFiscalTab({
               <Wrench className="w-4 h-4" />
               NFS-e -- Servicos
             </h4>
-            {servicosPctInvoiced >= 100 && valorServicos > 0 && (
+            {servicosPctInvoiced >= 100 && totalServicos > 0 && (
               <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
                 100% FATURADO
               </span>
@@ -665,7 +684,7 @@ export function OSNotaFiscalTab({
           <div className="grid grid-cols-3 gap-4 mb-4">
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
               <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Servicos</p>
-              <p className="text-lg font-bold text-white">{formatCurrency(valorServicos)}</p>
+              <p className="text-lg font-bold text-white">{formatCurrency(totalServicos)}</p>
             </div>
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
               <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
@@ -679,7 +698,7 @@ export function OSNotaFiscalTab({
             </div>
           </div>
 
-          {valorServicos > 0 && (
+          {totalServicos > 0 && (
             <div className="mb-4">
               <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
                 <span>Progresso de faturamento</span>
@@ -721,7 +740,7 @@ export function OSNotaFiscalTab({
                         Total Servicos ({servicos.length})
                       </td>
                       <td className="py-2.5 px-3 text-right text-sm font-bold text-[#00D4FF]">
-                        {formatCurrency(servicos.reduce((sum, s) => sum + s.valor_total, 0))}
+                        {formatCurrency(totalServicos)}
                       </td>
                       <td></td>
                     </tr>
@@ -748,16 +767,16 @@ export function OSNotaFiscalTab({
               <Send className="w-4 h-4" />
               Emitir NFS-e -- {formatCurrency(valorServicosRestante)}
             </button>
-          ) : valorServicos <= 0 ? (
+          ) : servicos.length === 0 ? (
             <p className="text-center text-sm text-gray-500 py-2">Nenhum servico cadastrado nesta OS</p>
           ) : servicosPctInvoiced >= 100 ? (
             <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
               <CheckCircle className="w-4 h-4" />
               Todos os servicos ja foram faturados
             </p>
-          ) : (
-            <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
-          )}
+          ) : !pagamentoIntegral ? (
+            <p className="text-center text-sm text-[#FF0064] py-2">Pagamento integral necessario para emitir NFS-e</p>
+          ) : null}
         </div>
       )}
 
@@ -767,7 +786,7 @@ export function OSNotaFiscalTab({
             <Package className="w-4 h-4" />
             NF-e -- Produtos / Pecas
           </h4>
-          {pecasPctInvoiced >= 100 && valorPecas > 0 && (
+          {pecasPctInvoiced >= 100 && totalPecas > 0 && (
             <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
               100% FATURADO
             </span>
@@ -777,7 +796,7 @@ export function OSNotaFiscalTab({
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
             <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Pecas</p>
-            <p className="text-lg font-bold text-white">{formatCurrency(valorPecas)}</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(totalPecas)}</p>
           </div>
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
             <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
@@ -791,7 +810,7 @@ export function OSNotaFiscalTab({
           </div>
         </div>
 
-        {valorPecas > 0 && (
+        {totalPecas > 0 && (
           <div className="mb-4">
             <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
               <span>Progresso de faturamento</span>
@@ -818,7 +837,7 @@ export function OSNotaFiscalTab({
                 <thead>
                   <tr className="bg-gray-800/80">
                     <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">PN</th>
-                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-20">Status</th>
+                    <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold w-24">Status</th>
                     <th className="text-left py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Descricao</th>
                     <th className="text-center py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Qtd</th>
                     <th className="text-right py-2.5 px-3 text-[10px] text-gray-400 uppercase font-bold">Unit.</th>
@@ -856,7 +875,7 @@ export function OSNotaFiscalTab({
                       Total Pecas ({pecas.length})
                     </td>
                     <td className="py-2.5 px-3 text-right text-sm font-bold text-[#FFA500]">
-                      {formatCurrency(pecas.reduce((sum, p) => sum + p.valor_total, 0))}
+                      {formatCurrency(totalPecas)}
                     </td>
                     <td></td>
                   </tr>
@@ -970,15 +989,15 @@ export function OSNotaFiscalTab({
               )}
             </button>
           </div>
-        ) : valorPecas <= 0 ? (
+        ) : pecas.length === 0 ? (
           <p className="text-center text-sm text-gray-500 py-2">Nenhuma peca cadastrada nesta OS</p>
         ) : pecasPctInvoiced >= 100 ? (
           <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
             <CheckCircle className="w-4 h-4" />
             Todas as pecas ja foram faturadas
           </p>
-        ) : !isLpOrCortesia ? (
-          <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
+        ) : !isLpOrCortesia && !pagamentoIntegral ? (
+          <p className="text-center text-sm text-[#FF0064] py-2">Pagamento integral necessario para emitir NF-e</p>
         ) : null}
       </div>
 
