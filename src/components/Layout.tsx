@@ -20,7 +20,8 @@ import {
   Rocket,
   FileText,
   ChevronRight,
-  Palette
+  Palette,
+  Sparkles
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -31,6 +32,7 @@ const allMenuItems = [
   { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
+  { id: 'gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
@@ -146,6 +148,13 @@ export function Layout({ children }: LayoutProps) {
           {menuItems.map((item, index) => {
             const Icon = item.icon;
             const isActive = location.pathname === item.path;
+            const hasGlow = 'glow' in item && item.glow;
+
+            const glowBg = hasGlow
+              ? isActive
+                ? 'linear-gradient(135deg, rgba(0, 210, 255, 0.18), rgba(0, 255, 200, 0.08))'
+                : 'linear-gradient(135deg, rgba(0, 210, 255, 0.06), rgba(0, 255, 200, 0.02))'
+              : undefined;
 
             return (
               <Link
@@ -154,20 +163,31 @@ export function Layout({ children }: LayoutProps) {
                 className="group relative w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200"
                 style={{
                   animationDelay: `${index * 40}ms`,
-                  background: isActive ? `rgba(var(--accent-rgb), 0.1)` : 'transparent',
-                  color: isActive ? 'var(--text-accent)' : 'var(--text-secondary)',
-                  border: isActive ? '1px solid var(--border-primary)' : '1px solid transparent',
+                  background: hasGlow ? glowBg : (isActive ? `rgba(var(--accent-rgb), 0.1)` : 'transparent'),
+                  color: hasGlow ? '#00d2ff' : (isActive ? 'var(--text-accent)' : 'var(--text-secondary)'),
+                  border: hasGlow
+                    ? `1px solid rgba(0, 210, 255, ${isActive ? '0.4' : '0.15'})`
+                    : (isActive ? '1px solid var(--border-primary)' : '1px solid transparent'),
+                  boxShadow: hasGlow && isActive ? '0 0 20px rgba(0, 210, 255, 0.15), inset 0 0 20px rgba(0, 210, 255, 0.05)' : 'none',
                 }}
                 onMouseEnter={(e) => {
-                  if (!isActive) {
+                  if (!isActive && !hasGlow) {
                     e.currentTarget.style.background = 'var(--bg-hover)';
                     e.currentTarget.style.color = 'var(--text-accent)';
+                  } else if (hasGlow && !isActive) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(0, 255, 200, 0.05))';
+                    e.currentTarget.style.borderColor = 'rgba(0, 210, 255, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 210, 255, 0.1)';
                   }
                 }}
                 onMouseLeave={(e) => {
-                  if (!isActive) {
+                  if (!isActive && !hasGlow) {
                     e.currentTarget.style.background = 'transparent';
                     e.currentTarget.style.color = 'var(--text-secondary)';
+                  } else if (hasGlow && !isActive) {
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 210, 255, 0.06), rgba(0, 255, 200, 0.02))';
+                    e.currentTarget.style.borderColor = 'rgba(0, 210, 255, 0.15)';
+                    e.currentTarget.style.boxShadow = 'none';
                   }
                 }}
                 title={!sidebarOpen ? item.label : ''}

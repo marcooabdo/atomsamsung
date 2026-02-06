@@ -14,6 +14,7 @@ import { Configuracoes } from './pages/Configuracoes';
 import Otimizador from './pages/Otimizador';
 import { Skywalker } from './pages/Skywalker';
 import { NotasFiscais } from './pages/NotasFiscais';
+import { GIA } from './pages/GIA';
 import { OSPrintView } from './pages/OSPrintView';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
@@ -147,6 +148,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <Estoque />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/gia"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <GIA />
               </Layout>
             </ProtectedRoute>
           }
