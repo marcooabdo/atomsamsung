@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { PerformanceDetailsModal } from '../components/PerformanceDetailsModal';
 import { GoalsConfigModal } from '../components/GoalsConfigModal';
+import { InfoModal } from '../components/InfoModal';
 import {
   TrendingUp,
   Package,
@@ -70,6 +71,7 @@ export function Dashboard() {
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [showGoalsModal, setShowGoalsModal] = useState(false);
+  const [showInfoModal, setShowInfoModal] = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceModalType, setPerformanceModalType] = useState<'eficiencia' | 'aprovacao'>('eficiencia');
   const [performanceOSList, setPerformanceOSList] = useState<PerformanceOS[]>([]);
@@ -383,7 +385,7 @@ export function Dashboard() {
     { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#A855F7', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
-        alert('Selecione uma unidade para configurar metas.');
+        setShowInfoModal(true);
         return;
       }
       setShowGoalsModal(true);
@@ -391,7 +393,7 @@ export function Dashboard() {
     { title: 'Receita OW', value: formatCurrency(stats.receitaOW), icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
-        alert('Selecione uma unidade para configurar metas.');
+        setShowInfoModal(true);
         return;
       }
       setShowGoalsModal(true);
@@ -518,7 +520,7 @@ export function Dashboard() {
                       e.stopPropagation();
                       const unidadeId = selectedUnidade || usuario?.unidade_id;
                       if (!unidadeId) {
-                        alert('Selecione uma unidade para configurar metas.');
+                        setShowInfoModal(true);
                         return;
                       }
                       setShowGoalsModal(true);
@@ -688,7 +690,7 @@ export function Dashboard() {
               onClick={() => {
                 const unidadeId = selectedUnidade || usuario?.unidade_id;
                 if (!unidadeId) {
-                  alert('Selecione uma unidade para configurar metas.');
+                  setShowInfoModal(true);
                   return;
                 }
                 setShowGoalsModal(true);
@@ -789,6 +791,13 @@ export function Dashboard() {
           }}
         />
       )}
+
+      <InfoModal
+        isOpen={showInfoModal}
+        onClose={() => setShowInfoModal(false)}
+        title="Selecione uma Unidade"
+        message="Para configurar as metas de performance, é necessário selecionar uma unidade específica. Por favor, utilize o filtro de unidades no topo da página."
+      />
     </div>
   );
 }
