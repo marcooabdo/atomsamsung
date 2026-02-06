@@ -205,6 +205,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     nome: string;
   }>>([]);
   const [criandoOS, setCriandoOS] = useState(false);
+  const [pendingUploadFile, setPendingUploadFile] = useState<File | null>(null);
+  const [pendingUploadNome, setPendingUploadNome] = useState('');
+  const [uploadingAnexo, setUploadingAnexo] = useState(false);
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -905,6 +908,56 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
 
     setAnexos(data || []);
+  };
+
+  const confirmarUploadAnexo = async () => {
+    if (!pendingUploadFile || uploadingAnexo) return;
+    setUploadingAnexo(true);
+    try {
+      const file = pendingUploadFile;
+      const nomeExibicao = pendingUploadNome.trim() || file.name;
+      const ext = file.name.split('.').pop() || '';
+      const storageFileName = `${osId}/${Date.now()}_${nomeExibicao}${nomeExibicao.endsWith(`.${ext}`) ? '' : `.${ext}`}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('os-anexos')
+        .upload(storageFileName, file);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('os-anexos')
+        .getPublicUrl(storageFileName);
+
+      const tipoArquivo = file.type.startsWith('image/') ? 'foto' :
+                          file.type.startsWith('video/') ? 'video' : 'documento';
+
+      const { error: insertError } = await supabase.from('os_anexos').insert({
+        os_id: osId,
+        nome_arquivo: nomeExibicao.endsWith(`.${ext}`) ? nomeExibicao : `${nomeExibicao}.${ext}`,
+        url: publicUrl,
+        tamanho_bytes: file.size,
+        usuario_id: usuario?.id,
+        tipo: tipoArquivo,
+        descricao: pendingUploadNome.trim() || null
+      });
+      if (insertError) throw insertError;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `Anexo adicionado: ${nomeExibicao}`,
+        is_system: true
+      });
+
+      setPendingUploadFile(null);
+      setPendingUploadNome('');
+      loadAnexos();
+      loadComentarios();
+    } catch (error: any) {
+      alert(`Erro ao adicionar anexo: ${error.message}`);
+    } finally {
+      setUploadingAnexo(false);
+    }
   };
 
   const loadPagamento = async () => {
@@ -2239,7 +2292,7 @@ Não haverá cobrança ao cliente.`
         is_system: true
       });
 
-      setOs({ ...os, diagnostico_tecnico: texto });
+      setOS({ ...os, diagnostico_tecnico: texto });
       setEditandoDiagnostico(false);
     } catch (error: any) {
       alert(`Erro ao salvar: ${error.message}`);
@@ -2268,7 +2321,7 @@ Não haverá cobrança ao cliente.`
         is_system: true
       });
 
-      setOs({ ...os, reparo_efetuado: texto });
+      setOS({ ...os, reparo_efetuado: texto });
       setEditandoReparo(false);
     } catch (error: any) {
       alert(`Erro ao salvar: ${error.message}`);
@@ -4173,76 +4226,65 @@ Não haverá cobrança ao cliente.`
                   <input
                     type="file"
                     className="hidden"
-                    onChange={async (e) => {
+                    onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (!file) return;
-
                       if (file.size > 10 * 1024 * 1024) {
                         alert('Arquivo muito grande! Maximo 10MB');
+                        e.target.value = '';
                         return;
                       }
-
-                      try {
-                        console.log('📤 Fazendo upload do anexo:', { fileName: file.name, osId });
-
-                        const fileName = `${osId}/${Date.now()}_${file.name}`;
-
-                        const { error: uploadError } = await supabase.storage
-                          .from('os-anexos')
-                          .upload(fileName, file);
-
-                        if (uploadError) {
-                          console.error('❌ Erro no upload:', uploadError);
-                          throw uploadError;
-                        }
-
-                        console.log('✅ Arquivo enviado, obtendo URL pública...');
-
-                        const { data: { publicUrl } } = supabase.storage
-                          .from('os-anexos')
-                          .getPublicUrl(fileName);
-
-                        console.log('✅ URL pública obtida, salvando no banco...');
-
-                        const tipoArquivo = file.type.startsWith('image/') ? 'foto' :
-                                            file.type.startsWith('video/') ? 'video' : 'documento';
-
-                        const { error: insertError } = await supabase.from('os_anexos').insert({
-                          os_id: osId,
-                          nome_arquivo: file.name,
-                          url: publicUrl,
-                          tamanho_bytes: file.size,
-                          usuario_id: usuario?.id,
-                          tipo: tipoArquivo
-                        });
-
-                        if (insertError) {
-                          console.error('❌ Erro ao salvar no banco:', insertError);
-                          throw insertError;
-                        }
-
-                        await supabase.from('os_comentarios').insert({
-                          os_id: osId,
-                          usuario_id: usuario?.id,
-                          comentario: `Anexo adicionado: ${file.name}`,
-                          is_system: true
-                        });
-
-                        console.log('✅ Anexo salvo com sucesso!');
-                        loadAnexos();
-                        loadComentarios();
-                        alert('Anexo adicionado com sucesso!');
-                      } catch (error) {
-                        console.error('❌ Erro geral:', error);
-                        alert('Erro ao adicionar anexo');
-                      }
-
+                      const nameWithoutExt = file.name.replace(/\.[^/.]+$/, '');
+                      setPendingUploadNome(nameWithoutExt);
+                      setPendingUploadFile(file);
                       e.target.value = '';
                     }}
                   />
                 </label>
-
               </div>
+
+              {pendingUploadFile && (
+                <div className="premium-card p-4 border border-[#00D4FF]/40 space-y-3">
+                  <div className="flex items-center gap-3">
+                    {pendingUploadFile.type.startsWith('image/') && (
+                      <img
+                        src={URL.createObjectURL(pendingUploadFile)}
+                        alt="Preview"
+                        className="w-16 h-16 object-cover rounded-lg border border-[#00D4FF]/30"
+                      />
+                    )}
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-400 mb-1">Arquivo: {pendingUploadFile.name} ({(pendingUploadFile.size / 1024).toFixed(0)} KB)</p>
+                      <input
+                        type="text"
+                        value={pendingUploadNome}
+                        onChange={(e) => setPendingUploadNome(e.target.value)}
+                        className="neon-input w-full text-sm py-2"
+                        placeholder="Nome do arquivo..."
+                        autoFocus
+                        onKeyDown={(e) => { if (e.key === 'Enter') confirmarUploadAnexo(); }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <button
+                      onClick={() => { setPendingUploadFile(null); setPendingUploadNome(''); }}
+                      className="px-4 py-2 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmarUploadAnexo}
+                      disabled={uploadingAnexo}
+                      className="px-4 py-2 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50"
+                      style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}
+                    >
+                      <Save className="w-3 h-3" />
+                      {uploadingAnexo ? 'Enviando...' : 'Enviar'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3">
                 {anexos.length === 0 ? (
@@ -4250,41 +4292,46 @@ Não haverá cobrança ao cliente.`
                 ) : (
                   anexos.map((anexo: any) => {
                     const isGSPN = anexo.origem === 'gspn_sync' || !!anexo.gspn_fileobjkey;
+                    const isImage = anexo.tipo === 'foto' || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(anexo.nome_arquivo || '');
+                    const isPDF = /\.pdf$/i.test(anexo.nome_arquivo || '');
 
                     return (
-                      <div key={anexo.id} className="premium-card p-4 flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Paperclip className="w-4 h-4 text-[#00D4FF]" />
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <p className="text-sm text-gray-300">{anexo.nome_arquivo}</p>
-                              {isGSPN && (
-                                <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded" style={{
-                                  backgroundColor: '#9D4EDD20',
-                                  color: '#9D4EDD',
-                                  border: '1px solid #9D4EDD'
-                                }}>
-                                  GSPN
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                              <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(2)} KB</span>
-                              <span className="text-gray-600">|</span>
-                              <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
-                              <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
-                              <span className="text-gray-600">|</span>
-                              <span>{anexo.usuario?.nome || 'Sistema'}</span>
-                              {anexo.descricao && (
-                                <>
-                                  <span className="text-gray-600">|</span>
-                                  <span className="text-gray-400">{anexo.descricao}</span>
-                                </>
-                              )}
-                            </div>
+                      <div key={anexo.id} className="premium-card p-3 flex items-center gap-3">
+                        <div
+                          className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-white/10 bg-[#0A0F1E] flex items-center justify-center cursor-pointer hover:border-[#00D4FF]/50 transition-colors"
+                          onClick={() => setAnexoPreview(anexo)}
+                        >
+                          {isImage && anexo.url ? (
+                            <img src={anexo.url} alt={anexo.nome_arquivo} className="w-full h-full object-cover" />
+                          ) : isPDF ? (
+                            <FileDown className="w-6 h-6 text-red-400" />
+                          ) : (
+                            <FileText className="w-6 h-6 text-[#00D4FF]/60" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-300 truncate">{anexo.descricao || anexo.nome_arquivo}</p>
+                            {isGSPN && (
+                              <span className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded flex-shrink-0" style={{
+                                backgroundColor: '#9D4EDD20',
+                                color: '#9D4EDD',
+                                border: '1px solid #9D4EDD'
+                              }}>
+                                GSPN
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-0.5">
+                            <span>{((anexo.tamanho_bytes || 0) / 1024).toFixed(0)} KB</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleDateString('pt-BR') : '-'}</span>
+                            <span>{anexo.created_at ? new Date(anexo.created_at).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : ''}</span>
+                            <span className="text-gray-600">|</span>
+                            <span>{anexo.usuario?.nome || 'Sistema'}</span>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 flex-shrink-0">
                           <label className="flex items-center gap-1.5 cursor-pointer select-none group">
                             <div
                               onClick={async () => {
@@ -4302,7 +4349,7 @@ Não haverá cobrança ao cliente.`
                           </label>
                           <button
                             onClick={() => setAnexoPreview(anexo)}
-                            className="neon-button text-xs px-4 py-2"
+                            className="neon-button text-xs px-3 py-1.5"
                           >
                             Abrir
                           </button>
@@ -4310,46 +4357,30 @@ Não haverá cobrança ao cliente.`
                             <button
                               onClick={async () => {
                                 if (!confirm('Deseja realmente excluir este anexo?')) return;
-
                                 try {
                                   if (anexo.url) {
                                     const urlParts = anexo.url.split('/os-anexos/');
                                     if (urlParts.length > 1) {
-                                      const filePath = urlParts[1];
-                                      const { error: storageError } = await supabase.storage
-                                        .from('os-anexos')
-                                        .remove([filePath]);
-
-                                      if (storageError) {
-                                        console.error('Erro ao remover arquivo do storage:', storageError);
-                                      }
+                                      await supabase.storage.from('os-anexos').remove([urlParts[1]]);
                                     }
                                   }
-
                                   await supabase.from('os_anexos').delete().eq('id', anexo.id);
-
                                   await supabase.from('os_comentarios').insert({
                                     os_id: osId,
                                     usuario_id: usuario?.id,
                                     comentario: `Anexo removido: ${anexo.nome_arquivo}`,
                                     is_system: true
                                   });
-
                                   loadAnexos();
                                   loadComentarios();
-                                  alert('Anexo excluido com sucesso!');
                                 } catch (error) {
                                   alert('Erro ao excluir anexo');
                                 }
                               }}
-                              className="neon-button text-xs px-4 py-2"
-                              style={{
-                                backgroundColor: '#FF006410',
-                                borderColor: '#FF0064',
-                                color: '#FF0064'
-                              }}
+                              className="neon-button text-xs px-3 py-1.5"
+                              style={{ backgroundColor: '#FF006410', borderColor: '#FF0064', color: '#FF0064' }}
                             >
-                              Excluir
+                              <Trash2 className="w-3 h-3" />
                             </button>
                           )}
                         </div>
