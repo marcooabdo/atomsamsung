@@ -1,412 +1,161 @@
 import { useState, useEffect } from 'react';
-import { Award, Plus, Pencil, Trash2, Star, Save, X, TrendingUp } from 'lucide-react';
+import { Award, Plus, Pencil, Trash2, Star, Save, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { useSkywalker, type Nivel } from '../../contexts/SkywalkerContext';
 import { supabase } from '../../lib/supabase';
 
-interface Nivel {
-  id: string;
-  nome: string;
-  ordem: number;
-  estrelas_necessarias: number;
-  meses_consecutivos: number;
-  cor: string;
-  descricao: string | null;
-  bonus_valor: number;
-  ativo: boolean;
-}
+const CORES = [
+  { nome: 'Blue', hex: '#3B82F6' }, { nome: 'Green', hex: '#10B981' },
+  { nome: 'Yellow', hex: '#F59E0B' }, { nome: 'Red', hex: '#EF4444' },
+  { nome: 'Cyan', hex: '#06B6D4' }, { nome: 'Orange', hex: '#F97316' },
+  { nome: 'Teal', hex: '#14B8A6' }, { nome: 'Rose', hex: '#F43F5E' },
+  { nome: 'Gold', hex: '#D4A017' }, { nome: 'Bronze', hex: '#CD7F32' },
+  { nome: 'Platinum', hex: '#A0AEC0' }, { nome: 'Diamond', hex: '#60A5FA' },
+];
 
 export function NiveisBonusTab() {
-  const [niveis, setNiveis] = useState<Nivel[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingNivel, setEditingNivel] = useState<Nivel | null>(null);
-  const [showNovoNivel, setShowNovoNivel] = useState(false);
+  const { niveis, loadNiveis } = useSkywalker();
+  const [showNovo, setShowNovo] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' });
 
-  const [novoNivel, setNovoNivel] = useState({
-    nome: '',
-    estrelas_necessarias: 6,
-    meses_consecutivos: 2,
-    cor: '#3B82F6',
-    descricao: '',
-    bonus_valor: 0
-  });
-
-  const cores = [
-    { nome: 'Azul', valor: '#3B82F6' },
-    { nome: 'Verde', valor: '#10B981' },
-    { nome: 'Amarelo', valor: '#F59E0B' },
-    { nome: 'Vermelho', valor: '#EF4444' },
-    { nome: 'Roxo', valor: '#8B5CF6' },
-    { nome: 'Rosa', valor: '#EC4899' },
-    { nome: 'Ciano', valor: '#06B6D4' },
-    { nome: 'Prata', valor: '#9CA3AF' },
-    { nome: 'Ouro', valor: '#FFD700' },
-    { nome: 'Bronze', valor: '#CD7F32' },
-    { nome: 'Platina', valor: '#E5E4E2' },
-    { nome: 'Diamante', valor: '#00D4FF' }
-  ];
-
-  useEffect(() => {
-    loadNiveis();
-  }, []);
-
-  const loadNiveis = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('skywalker_niveis')
-      .select('*')
-      .order('ordem');
-
-    if (data) setNiveis(data);
-    setLoading(false);
-  };
-
-  const handleSaveNivel = async () => {
-    if (!novoNivel.nome.trim()) return;
-
-    const ordem = niveis.length + 1;
-    const { error } = await supabase.from('skywalker_niveis').insert({
-      ...novoNivel,
-      ordem,
-      ativo: true
-    });
-
-    if (!error) {
-      setShowNovoNivel(false);
-      setNovoNivel({
-        nome: '',
-        estrelas_necessarias: 6,
-        meses_consecutivos: 2,
-        cor: '#3B82F6',
-        descricao: '',
-        bonus_valor: 0
-      });
-      loadNiveis();
+  const handleSave = async () => {
+    if (!form.nome) return;
+    const maxOrdem = niveis.reduce((m, n) => Math.max(m, n.ordem), 0);
+    if (editingId) {
+      await supabase.from('skywalker_niveis').update({ nome: form.nome, cor: form.cor, estrelas_necessarias: form.estrelas_necessarias, meses_consecutivos: form.meses_consecutivos, bonus_valor: form.bonus_valor, descricao: form.descricao }).eq('id', editingId);
+    } else {
+      await supabase.from('skywalker_niveis').insert({ ...form, ordem: maxOrdem + 1, ativo: true });
     }
-  };
-
-  const handleUpdateNivel = async () => {
-    if (!editingNivel) return;
-
-    const { error } = await supabase
-      .from('skywalker_niveis')
-      .update({
-        nome: editingNivel.nome,
-        estrelas_necessarias: editingNivel.estrelas_necessarias,
-        meses_consecutivos: editingNivel.meses_consecutivos,
-        cor: editingNivel.cor,
-        descricao: editingNivel.descricao,
-        bonus_valor: editingNivel.bonus_valor
-      })
-      .eq('id', editingNivel.id);
-
-    if (!error) {
-      setEditingNivel(null);
-      loadNiveis();
-    }
-  };
-
-  const handleDeleteNivel = async (id: string) => {
-    if (!confirm('Excluir este nivel? Profissionais neste nivel serao afetados.')) return;
-    await supabase.from('skywalker_niveis').delete().eq('id', id);
+    setShowNovo(false);
+    setEditingId(null);
+    setForm({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' });
     loadNiveis();
   };
 
-  const handleMoveNivel = async (id: string, direction: 'up' | 'down') => {
+  const handleEdit = (nivel: Nivel) => {
+    setForm({ nome: nivel.nome, cor: nivel.cor, estrelas_necessarias: nivel.estrelas_necessarias, meses_consecutivos: nivel.meses_consecutivos, bonus_valor: nivel.bonus_valor || 0, descricao: nivel.descricao || '' });
+    setEditingId(nivel.id);
+    setShowNovo(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Excluir este nivel?')) return;
+    await supabase.from('skywalker_niveis').update({ ativo: false }).eq('id', id);
+    loadNiveis();
+  };
+
+  const handleMove = async (id: string, direction: 'up' | 'down') => {
     const idx = niveis.findIndex(n => n.id === id);
-    if (direction === 'up' && idx > 0) {
-      const prevNivel = niveis[idx - 1];
-      const currentNivel = niveis[idx];
-      await supabase.from('skywalker_niveis').update({ ordem: currentNivel.ordem }).eq('id', prevNivel.id);
-      await supabase.from('skywalker_niveis').update({ ordem: prevNivel.ordem }).eq('id', currentNivel.id);
-    } else if (direction === 'down' && idx < niveis.length - 1) {
-      const nextNivel = niveis[idx + 1];
-      const currentNivel = niveis[idx];
-      await supabase.from('skywalker_niveis').update({ ordem: currentNivel.ordem }).eq('id', nextNivel.id);
-      await supabase.from('skywalker_niveis').update({ ordem: nextNivel.ordem }).eq('id', currentNivel.id);
-    }
+    if (idx < 0) return;
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= niveis.length) return;
+    await Promise.all([
+      supabase.from('skywalker_niveis').update({ ordem: niveis[swapIdx].ordem }).eq('id', niveis[idx].id),
+      supabase.from('skywalker_niveis').update({ ordem: niveis[idx].ordem }).eq('id', niveis[swapIdx].id),
+    ]);
     loadNiveis();
   };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Award className="w-6 h-6 text-yellow-400" />
-          Niveis e Bonus
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <Award className="w-5 h-5" style={{ color: '#FBBF24' }} />
+          Niveis e Bonus ({niveis.length})
         </h2>
-        <button
-          onClick={() => setShowNovoNivel(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-yellow-600 to-orange-600 text-white rounded-lg hover:opacity-90"
-        >
+        <button onClick={() => { setShowNovo(true); setEditingId(null); setForm({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' }); }} className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
           <Plus className="w-4 h-4" />
           Novo Nivel
         </button>
       </div>
 
-      <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-xl p-4">
-        <h4 className="text-cyan-400 font-bold mb-2">Como funciona a progressao?</h4>
-        <p className="text-gray-400 text-sm">
-          Profissionais sobem de nivel ao atingir o numero minimo de estrelas por uma quantidade de meses consecutivos.
-          Cada nivel oferece um bonus mensal fixo alem de outros beneficios.
-        </p>
-      </div>
-
-      {showNovoNivel && (
-        <div className="bg-gray-800/80 rounded-xl p-6 border border-yellow-500/50">
-          <h4 className="text-lg font-bold text-white mb-4">Criar Novo Nivel</h4>
+      {showNovo && (
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{editingId ? 'Editar Nivel' : 'Criar Nivel'}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Nome do Nivel</label>
-              <input
-                type="text"
-                value={novoNivel.nome}
-                onChange={(e) => setNovoNivel({ ...novoNivel, nome: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                placeholder="Ex: Gold, Platinum, Diamond..."
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
+              <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Starter" />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Cor do Nivel</label>
-              <div className="flex gap-2 flex-wrap">
-                {cores.map((cor) => (
-                  <button
-                    key={cor.valor}
-                    onClick={() => setNovoNivel({ ...novoNivel, cor: cor.valor })}
-                    className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      novoNivel.cor === cor.valor ? 'border-white scale-110' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: cor.valor }}
-                    title={cor.nome}
-                  />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CORES.map(c => (
+                  <button key={c.hex} onClick={() => setForm({ ...form, cor: c.hex })} className="w-7 h-7 rounded-full border-2 transition-all" style={{ backgroundColor: c.hex, borderColor: form.cor === c.hex ? 'white' : 'transparent', transform: form.cor === c.hex ? 'scale(1.2)' : 'scale(1)' }} title={c.nome} />
                 ))}
               </div>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Estrelas Necessarias</label>
-              <input
-                type="number"
-                value={novoNivel.estrelas_necessarias}
-                onChange={(e) => setNovoNivel({ ...novoNivel, estrelas_necessarias: Number(e.target.value) })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                min={0}
-                max={20}
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
+              <input type="text" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Meses Consecutivos</label>
-              <input
-                type="number"
-                value={novoNivel.meses_consecutivos}
-                onChange={(e) => setNovoNivel({ ...novoNivel, meses_consecutivos: Number(e.target.value) })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                min={0}
-                max={12}
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Estrelas Necessarias</label>
+              <input type="number" value={form.estrelas_necessarias} onChange={(e) => setForm({ ...form, estrelas_necessarias: Number(e.target.value) })} min={0} max={20} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Bonus Mensal (R$)</label>
-              <input
-                type="number"
-                value={novoNivel.bonus_valor}
-                onChange={(e) => setNovoNivel({ ...novoNivel, bonus_valor: Number(e.target.value) })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                min={0}
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Meses Consecutivos</label>
+              <input type="number" value={form.meses_consecutivos} onChange={(e) => setForm({ ...form, meses_consecutivos: Number(e.target.value) })} min={0} max={12} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Descricao</label>
-              <input
-                type="text"
-                value={novoNivel.descricao}
-                onChange={(e) => setNovoNivel({ ...novoNivel, descricao: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                placeholder="Descricao opcional..."
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Bonus Mensal (R$)</label>
+              <input type="number" value={form.bonus_valor} onChange={(e) => setForm({ ...form, bonus_valor: Number(e.target.value) })} min={0} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
             </div>
           </div>
-          <div className="flex justify-end gap-3 mt-6">
-            <button
-              onClick={() => setShowNovoNivel(false)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveNivel}
-              className="flex items-center gap-2 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700"
-            >
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => { setShowNovo(false); setEditingId(null); }} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>Cancelar</button>
+            <button onClick={handleSave} className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
               <Save className="w-4 h-4" />
-              Salvar Nivel
+              Salvar
             </button>
           </div>
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-3">
         {niveis.map((nivel, idx) => (
-          <div
-            key={nivel.id}
-            className="rounded-xl p-6 border-2 transition-all hover:shadow-lg"
-            style={{
-              backgroundColor: nivel.cor + '10',
-              borderColor: nivel.cor + '50'
-            }}
-          >
-            {editingNivel?.id === nivel.id ? (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <input
-                    type="text"
-                    value={editingNivel.nome}
-                    onChange={(e) => setEditingNivel({ ...editingNivel, nome: e.target.value })}
-                    className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                    placeholder="Nome"
-                  />
-                  <input
-                    type="number"
-                    value={editingNivel.estrelas_necessarias}
-                    onChange={(e) => setEditingNivel({ ...editingNivel, estrelas_necessarias: Number(e.target.value) })}
-                    className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                    placeholder="Estrelas"
-                  />
-                  <input
-                    type="number"
-                    value={editingNivel.meses_consecutivos}
-                    onChange={(e) => setEditingNivel({ ...editingNivel, meses_consecutivos: Number(e.target.value) })}
-                    className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                    placeholder="Meses"
-                  />
-                  <input
-                    type="number"
-                    value={editingNivel.bonus_valor}
-                    onChange={(e) => setEditingNivel({ ...editingNivel, bonus_valor: Number(e.target.value) })}
-                    className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                    placeholder="Bonus R$"
-                  />
-                  <input
-                    type="text"
-                    value={editingNivel.descricao || ''}
-                    onChange={(e) => setEditingNivel({ ...editingNivel, descricao: e.target.value })}
-                    className="bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                    placeholder="Descricao"
-                  />
-                  <div className="flex gap-2 flex-wrap items-center">
-                    {cores.map((cor) => (
-                      <button
-                        key={cor.valor}
-                        onClick={() => setEditingNivel({ ...editingNivel, cor: cor.valor })}
-                        className={`w-6 h-6 rounded-full border-2 ${
-                          editingNivel.cor === cor.valor ? 'border-white' : 'border-transparent'
-                        }`}
-                        style={{ backgroundColor: cor.valor }}
-                      />
-                    ))}
+          <div key={nivel.id} className="rounded-xl p-5 transition-all" style={{ backgroundColor: 'var(--bg-card)', border: `1px solid ${nivel.cor}30` }}>
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold" style={{ backgroundColor: nivel.cor + '20', color: nivel.cor }}>
+                {nivel.ordem}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h4 className="text-lg font-bold" style={{ color: nivel.cor }}>{nivel.nome}</h4>
+                {nivel.descricao && <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{nivel.descricao}</p>}
+                <div className="flex items-center gap-4 mt-2">
+                  <div className="flex items-center gap-1">
+                    <Star className="w-3.5 h-3.5" style={{ color: '#FBBF24' }} />
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nivel.estrelas_necessarias} estrelas</span>
                   </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <button
-                    onClick={() => setEditingNivel(null)}
-                    className="px-3 py-1.5 bg-gray-700 text-white rounded text-sm"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                  <button
-                    onClick={handleUpdateNivel}
-                    className="px-3 py-1.5 bg-cyan-600 text-white rounded text-sm"
-                  >
-                    <Save className="w-4 h-4" />
-                  </button>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nivel.meses_consecutivos} meses</span>
+                  {nivel.bonus_valor > 0 && (
+                    <span className="text-xs font-medium" style={{ color: '#10B981' }}>R$ {nivel.bonus_valor.toLocaleString('pt-BR')}/mes</span>
+                  )}
                 </div>
               </div>
-            ) : (
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div
-                    className="w-16 h-16 rounded-full flex items-center justify-center text-2xl font-bold"
-                    style={{ backgroundColor: nivel.cor + '30', color: nivel.cor }}
-                  >
-                    {nivel.ordem}
-                  </div>
-                  <div>
-                    <h3 className="text-2xl font-bold" style={{ color: nivel.cor }}>
-                      {nivel.nome}
-                    </h3>
-                    <p className="text-gray-400 text-sm">{nivel.descricao}</p>
-                    <div className="flex items-center gap-4 mt-2">
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 text-yellow-400" />
-                        <span className="text-gray-300 text-sm">
-                          {nivel.estrelas_necessarias} estrelas
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <TrendingUp className="w-4 h-4 text-cyan-400" />
-                        <span className="text-gray-300 text-sm">
-                          {nivel.meses_consecutivos} meses
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <div className="text-gray-400 text-sm">Bonus Mensal</div>
-                    <div className="text-2xl font-bold text-green-400">
-                      R$ {nivel.bonus_valor?.toLocaleString('pt-BR') || 0}
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col gap-1">
-                    <button
-                      onClick={() => handleMoveNivel(nivel.id, 'up')}
-                      disabled={idx === 0}
-                      className="p-1 text-gray-400 hover:text-white disabled:opacity-30"
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleMoveNivel(nivel.id, 'down')}
-                      disabled={idx === niveis.length - 1}
-                      className="p-1 text-gray-400 hover:text-white disabled:opacity-30 rotate-180"
-                    >
-                      <TrendingUp className="w-4 h-4" />
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => setEditingNivel(nivel)}
-                      className="p-2 text-gray-400 hover:text-cyan-400 transition-colors"
-                    >
-                      <Pencil className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteNivel(nivel.id)}
-                      className="p-2 text-gray-400 hover:text-red-400 transition-colors"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleMove(nivel.id, 'up')} disabled={idx === 0} className="p-1.5 rounded disabled:opacity-20" style={{ color: 'var(--text-secondary)' }}>
+                  <ChevronUp className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleMove(nivel.id, 'down')} disabled={idx === niveis.length - 1} className="p-1.5 rounded disabled:opacity-20" style={{ color: 'var(--text-secondary)' }}>
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleEdit(nivel)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                  <Pencil className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(nivel.id)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                  <Trash2 className="w-4 h-4" />
+                </button>
               </div>
-            )}
+            </div>
           </div>
         ))}
       </div>
 
       {niveis.length === 0 && (
-        <div className="text-center py-12">
-          <Award className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">Nenhum nivel cadastrado</p>
-          <p className="text-gray-500 text-sm">Clique em "Novo Nivel" para comecar</p>
+        <div className="text-center py-16">
+          <Award className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+          <p style={{ color: 'var(--text-secondary)' }}>Nenhum nivel configurado</p>
         </div>
       )}
     </div>

@@ -1,854 +1,397 @@
 import { useState, useEffect } from 'react';
-import { Star, Users, TrendingUp, Award, DollarSign, Target, Calendar, RefreshCw, X, Trophy, Zap, Clock, CheckCircle, AlertCircle, ChevronRight, Sparkles, Crown, Medal, Flame } from 'lucide-react';
+import { Star, TrendingUp, Award, Flame, Target, Trophy, CheckCircle2, Clock, ArrowUp, Zap, Users } from 'lucide-react';
+import { useSkywalker, type Profissional, type EstrelaMes } from '../../contexts/SkywalkerContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { supabase } from '../../lib/supabase';
 
-interface Profissional {
-  id: string;
-  usuario: { nome: string; email: string } | null;
-  unidade: { nome: string } | null;
-  nivel: { nome: string; cor: string; estrelas_necessarias: number; bonus_valor: number; ordem: number } | null;
-  time: string;
-  meses_consecutivos_validos: number;
-  ativo: boolean;
-}
-
-interface EstrelasMes {
-  profissional_id: string;
-  estrelas_conquistadas: number;
-  pilar: { nome: string } | null;
-}
-
-interface Nivel {
-  id: string;
-  nome: string;
-  cor: string;
-  ordem: number;
-  estrelas_necessarias: number;
-  bonus_valor: number;
-}
-
-interface Pilar {
-  id: string;
-  nome: string;
-  descricao: string;
-  estrelas_maximas: number;
-}
-
-const NIVEL_GRADIENTS: Record<string, { bg: string; border: string; glow: string; icon: typeof Star }> = {
-  'Starter': {
-    bg: 'from-slate-600/30 via-slate-700/20 to-slate-800/30',
-    border: 'border-slate-500/50',
-    glow: 'shadow-slate-500/20',
-    icon: Star
-  },
-  'Bronze': {
-    bg: 'from-amber-700/30 via-orange-800/20 to-amber-900/30',
-    border: 'border-amber-600/50',
-    glow: 'shadow-amber-500/30',
-    icon: Medal
-  },
-  'Prata': {
-    bg: 'from-gray-400/30 via-slate-500/20 to-gray-600/30',
-    border: 'border-gray-400/50',
-    glow: 'shadow-gray-400/30',
-    icon: Award
-  },
-  'Ouro': {
-    bg: 'from-yellow-500/30 via-amber-500/20 to-yellow-600/30',
-    border: 'border-yellow-500/50',
-    glow: 'shadow-yellow-500/40',
-    icon: Trophy
-  },
-  'Diamante': {
-    bg: 'from-cyan-400/30 via-blue-500/20 to-cyan-600/30',
-    border: 'border-cyan-400/50',
-    glow: 'shadow-cyan-400/40',
-    icon: Sparkles
-  },
-  'Master': {
-    bg: 'from-rose-500/30 via-pink-600/20 to-rose-700/30',
-    border: 'border-rose-500/50',
-    glow: 'shadow-rose-500/40',
-    icon: Crown
-  }
-};
-
-function getNivelStyle(nivelNome: string | undefined) {
-  return NIVEL_GRADIENTS[nivelNome || 'Starter'] || NIVEL_GRADIENTS['Starter'];
-}
-
 export function VisaoGeralTab() {
-  const [profissionais, setProfissionais] = useState<Profissional[]>([]);
-  const [estrelasMes, setEstrelasMes] = useState<EstrelasMes[]>([]);
-  const [niveis, setNiveis] = useState<Nivel[]>([]);
-  const [pilares, setPilares] = useState<Pilar[]>([]);
-  const [mesReferencia, setMesReferencia] = useState(new Date().toISOString().slice(0, 7));
-  const [loading, setLoading] = useState(true);
+  const { usuario } = useAuth();
+  const { myProfissional, profissionais, niveis, ranking, mesReferencia, loadEstrelasDoMes, estrelasDoMes, isAdmin } = useSkywalker();
   const [selectedProfissional, setSelectedProfissional] = useState<Profissional | null>(null);
+  const [selectedEstrelas, setSelectedEstrelas] = useState<EstrelaMes[]>([]);
 
   useEffect(() => {
-    loadData();
-  }, [mesReferencia]);
+    if (myProfissional) {
+      loadEstrelasDoMes(myProfissional.id, mesReferencia);
+    }
+  }, [myProfissional, mesReferencia]);
 
-  const loadData = async () => {
-    setLoading(true);
-
-    const [profRes, estrelasRes, niveisRes, pilaresRes] = await Promise.all([
-      supabase
-        .from('skywalker_profissionais')
-        .select(`
-          id,
-          time,
-          meses_consecutivos_validos,
-          ativo,
-          usuario:usuarios(nome, email),
-          unidade:unidades(nome),
-          nivel:skywalker_niveis(nome, cor, estrelas_necessarias, bonus_valor, ordem)
-        `)
-        .eq('ativo', true),
-      supabase
-        .from('skywalker_estrelas_mes')
-        .select(`
-          profissional_id,
-          estrelas_conquistadas,
-          pilar:skywalker_pilares(nome)
-        `)
-        .eq('mes_referencia', mesReferencia + '-01'),
-      supabase
-        .from('skywalker_niveis')
-        .select('id, nome, cor, ordem, estrelas_necessarias, bonus_valor')
-        .eq('ativo', true)
-        .order('ordem'),
-      supabase
-        .from('skywalker_pilares')
-        .select('id, nome, descricao, estrelas_maximas')
-        .eq('ativo', true)
-    ]);
-
-    if (profRes.data) setProfissionais(profRes.data as unknown as Profissional[]);
-    if (estrelasRes.data) setEstrelasMes(estrelasRes.data as unknown as EstrelasMes[]);
-    if (niveisRes.data) setNiveis(niveisRes.data);
-    if (pilaresRes.data) setPilares(pilaresRes.data);
-
-    setLoading(false);
+  const openDetails = async (prof: Profissional) => {
+    setSelectedProfissional(prof);
+    const { data } = await supabase
+      .from('skywalker_estrelas_mes')
+      .select('*, pilar:skywalker_pilares(nome, descricao, tipo_metrica, max_estrelas)')
+      .eq('profissional_id', prof.id)
+      .eq('mes_referencia', mesReferencia);
+    setSelectedEstrelas(data as any || []);
   };
 
-  const getProfissionalEstrelas = (profId: string) => {
-    return estrelasMes
-      .filter(e => e.profissional_id === profId)
-      .reduce((sum, e) => sum + e.estrelas_conquistadas, 0);
-  };
+  const myRankPos = ranking.findIndex(r => r.usuario_id === usuario?.id) + 1;
+  const myStars = estrelasDoMes.reduce((s, e) => s + e.estrelas_conquistadas, 0);
+  const metaStars = myProfissional?.nivel?.estrelas_necessarias || 6;
+  const progressPercent = Math.min((myStars / metaStars) * 100, 100);
+  const metaAtingida = myStars >= metaStars;
+  const nextNivel = niveis.find(n => n.ordem === (myProfissional?.nivel?.ordem || 0) + 1);
 
-  const getProfissionalEstrelasPorPilar = (profId: string) => {
-    return estrelasMes.filter(e => e.profissional_id === profId);
-  };
-
-  const profissionaisComEstrelas = profissionais.map(prof => ({
-    ...prof,
-    estrelas_mes: getProfissionalEstrelas(prof.id),
-    estrelas_por_pilar: getProfissionalEstrelasPorPilar(prof.id)
-  })).sort((a, b) => b.estrelas_mes - a.estrelas_mes);
-
-  const totalProfissionais = profissionais.length;
-  const mediaEstrelas = totalProfissionais > 0
-    ? (profissionaisComEstrelas.reduce((sum, p) => sum + p.estrelas_mes, 0) / totalProfissionais).toFixed(1)
-    : '0';
-
-  const promoviveis = profissionaisComEstrelas.filter(p =>
-    p.estrelas_mes >= (p.nivel?.estrelas_necessarias || 6) &&
-    p.meses_consecutivos_validos >= 1
-  ).length;
-
-  const bonusTotal = profissionaisComEstrelas
-    .filter(p => p.estrelas_mes >= (p.nivel?.estrelas_necessarias || 6))
-    .reduce((sum, p) => sum + (p.nivel?.bonus_valor || 0), 0);
-
-  const distribuicaoPorNivel = niveis.map(nivel => ({
-    ...nivel,
-    quantidade: profissionais.filter(p => p.nivel?.nome === nivel.nome).length
-  }));
-
-  const frontOffice = profissionaisComEstrelas.filter(p => p.time === 'front_office');
-  const insideSales = profissionaisComEstrelas.filter(p => p.time === 'inside_sales');
-
-  const mediaFront = frontOffice.length > 0
-    ? (frontOffice.reduce((sum, p) => sum + p.estrelas_mes, 0) / frontOffice.length).toFixed(1)
-    : '0';
-  const mediaInside = insideSales.length > 0
-    ? (insideSales.reduce((sum, p) => sum + p.estrelas_mes, 0) / insideSales.length).toFixed(1)
-    : '0';
-
-  const getProximoNivel = (nivelAtual: Nivel | null | undefined) => {
-    if (!nivelAtual) return niveis[0];
-    const idx = niveis.findIndex(n => n.nome === nivelAtual.nome);
-    if (idx < niveis.length - 1) return niveis[idx + 1];
-    return null;
-  };
-
-  if (loading) {
+  if (!myProfissional) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+      <div className="space-y-8">
+        <div className="text-center py-12 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <Star className="w-16 h-16 mx-auto mb-4 opacity-30" style={{ color: 'var(--text-accent)' }} />
+          <h3 className="text-xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
+            Voce ainda nao esta no programa Skywalker
+          </h3>
+          <p style={{ color: 'var(--text-secondary)' }}>
+            Solicite ao seu gestor para ser adicionado ao programa de gamificacao.
+          </p>
+        </div>
+        {isAdmin && <AdminOverview onSelect={openDetails} />}
+        {selectedProfissional && (
+          <ProfissionalModal profissional={selectedProfissional} estrelas={selectedEstrelas} onClose={() => setSelectedProfissional(null)} />
+        )}
       </div>
     );
   }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Star className="w-6 h-6 text-yellow-400" />
-            Visao Geral
-          </h2>
-          <p className="text-gray-400 text-sm">Acompanhe o desempenho da equipe</p>
+      <div className="rounded-2xl p-6 relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${myProfissional.nivel?.cor || '#3B82F6'}15, ${myProfissional.nivel?.cor || '#3B82F6'}05)`, border: `1px solid ${myProfissional.nivel?.cor || '#3B82F6'}30` }}>
+        <div className="absolute top-0 right-0 w-48 h-48 opacity-5">
+          <Star className="w-full h-full" style={{ color: myProfissional.nivel?.cor }} />
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2">
-            <Calendar className="w-4 h-4 text-gray-400" />
-            <input
-              type="month"
-              value={mesReferencia}
-              onChange={(e) => setMesReferencia(e.target.value)}
-              className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-white text-sm"
+
+        <div className="flex items-start justify-between flex-wrap gap-4 relative z-10">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-2xl font-bold" style={{ backgroundColor: (myProfissional.nivel?.cor || '#3B82F6') + '25', color: myProfissional.nivel?.cor || '#3B82F6' }}>
+              {usuario?.nome?.split(' ').map(n => n[0]).join('').substring(0, 2)}
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>{usuario?.nome}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-sm px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: (myProfissional.nivel?.cor || '#3B82F6') + '20', color: myProfissional.nivel?.cor }}>
+                  {myProfissional.nivel?.nome || 'Starter'}
+                </span>
+                <span className="text-sm px-2 py-0.5 rounded" style={{ backgroundColor: (myProfissional.skywalker_time?.cor || '#6B7280') + '20', color: myProfissional.skywalker_time?.cor }}>
+                  {myProfissional.skywalker_time?.nome || myProfissional.time}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-6">
+            <div className="text-center">
+              <div className="flex items-center gap-1 justify-center">
+                <Star className="w-8 h-8 fill-current" style={{ color: '#FBBF24' }} />
+                <span className="text-4xl font-bold" style={{ color: '#FBBF24' }}>{myStars}</span>
+                <span className="text-lg opacity-50" style={{ color: 'var(--text-secondary)' }}>/{metaStars}</span>
+              </div>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>estrelas este mes</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-5 relative z-10">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Progresso da Meta</span>
+            <span className="text-sm font-bold" style={{ color: metaAtingida ? '#10B981' : '#FBBF24' }}>
+              {Math.round(progressPercent)}%
+            </span>
+          </div>
+          <div className="h-3 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+            <div
+              className="h-full rounded-full transition-all duration-1000 ease-out"
+              style={{
+                width: `${progressPercent}%`,
+                background: metaAtingida
+                  ? 'linear-gradient(90deg, #10B981, #34D399)'
+                  : `linear-gradient(90deg, ${myProfissional.nivel?.cor || '#FBBF24'}, #FBBF24)`,
+              }}
             />
           </div>
-          <button
-            onClick={loadData}
-            className="p-2 bg-gray-800 border border-gray-700 rounded-lg text-gray-400 hover:text-white"
-          >
-            <RefreshCw className="w-4 h-4" />
-          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-gradient-to-br from-cyan-600/20 to-cyan-800/20 p-6 rounded-xl border border-cyan-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <Users className="w-8 h-8 text-cyan-400" />
-            <span className="text-cyan-400 text-xs">Total</span>
-          </div>
-          <div className="text-3xl font-bold text-white">{totalProfissionais}</div>
-          <div className="text-cyan-400 text-sm">Profissionais ativos</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-yellow-600/20 to-yellow-800/20 p-6 rounded-xl border border-yellow-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <Star className="w-8 h-8 text-yellow-400 fill-current" />
-            <span className="text-yellow-400 text-xs">Media</span>
-          </div>
-          <div className="text-3xl font-bold text-white">{mediaEstrelas}</div>
-          <div className="text-yellow-400 text-sm">Estrelas por pessoa</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-600/20 to-green-800/20 p-6 rounded-xl border border-green-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <TrendingUp className="w-8 h-8 text-green-400" />
-            <span className="text-green-400 text-xs">Promoviveis</span>
-          </div>
-          <div className="text-3xl font-bold text-white">{promoviveis}</div>
-          <div className="text-green-400 text-sm">Elegiveis para subir</div>
-        </div>
-
-        <div className="bg-gradient-to-br from-emerald-600/20 to-emerald-800/20 p-6 rounded-xl border border-emerald-500/30">
-          <div className="flex items-center justify-between mb-2">
-            <DollarSign className="w-8 h-8 text-emerald-400" />
-            <span className="text-emerald-400 text-xs">Bonus</span>
-          </div>
-          <div className="text-3xl font-bold text-white">
-            R$ {bonusTotal.toLocaleString('pt-BR')}
-          </div>
-          <div className="text-emerald-400 text-sm">Bonus previsto</div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <KPICard icon={Trophy} label="Ranking" value={myRankPos > 0 ? `#${myRankPos}` : '-'} sublabel={`de ${ranking.length}`} color="#FBBF24" />
+        <KPICard icon={Flame} label="Sequencia" value={`${myProfissional.meses_consecutivos_validos}`} sublabel="meses" color="#F97316" />
+        <KPICard icon={metaAtingida ? CheckCircle2 : Target} label="Meta" value={metaAtingida ? 'Atingida' : `Faltam ${metaStars - myStars}`} sublabel={metaAtingida ? 'Parabens!' : 'estrelas'} color={metaAtingida ? '#10B981' : '#EF4444'} />
+        <KPICard icon={Award} label="Bonus" value={metaAtingida ? `R$ ${(myProfissional.nivel?.bonus_valor || 0).toLocaleString('pt-BR')}` : '-'} sublabel={metaAtingida ? 'este mes' : 'atinja a meta'} color="#8B5CF6" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Award className="w-5 h-5 text-yellow-400" />
-            Distribuicao por Nivel
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2 space-y-3">
+          <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <Zap className="w-5 h-5" style={{ color: '#FBBF24' }} />
+            Seus Pilares
           </h3>
-          <div className="space-y-3">
-            {distribuicaoPorNivel.map((nivel) => (
-              <div key={nivel.id} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-4 h-4 rounded-full"
-                    style={{ backgroundColor: nivel.cor }}
-                  />
-                  <span className="text-gray-300">{nivel.nome}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div
-                    className="h-2 rounded-full"
-                    style={{
-                      width: `${Math.max(20, (nivel.quantidade / Math.max(totalProfissionais, 1)) * 100)}px`,
-                      backgroundColor: nivel.cor
-                    }}
-                  />
-                  <span className="text-white font-bold">{nivel.quantidade}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <Target className="w-5 h-5 text-cyan-400" />
-            Comparativo por Time
-          </h3>
-          <div className="space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-blue-400 font-medium">Front Office</span>
-                <span className="text-white font-bold">{frontOffice.length} pessoas</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-blue-500 to-blue-600"
-                    style={{ width: `${(Number(mediaFront) / 12) * 100}%` }}
-                  />
-                </div>
-                <span className="text-white font-bold">{mediaFront}</span>
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-teal-400 font-medium">Inside Sales</span>
-                <span className="text-white font-bold">{insideSales.length} pessoas</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-3 bg-gray-700 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-gradient-to-r from-teal-500 to-teal-600"
-                    style={{ width: `${(Number(mediaInside) / 12) * 100}%` }}
-                  />
-                </div>
-                <span className="text-white font-bold">{mediaInside}</span>
-                <Star className="w-4 h-4 text-yellow-400 fill-current" />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-            <TrendingUp className="w-5 h-5 text-green-400" />
-            Top 5 do Mes
-          </h3>
-          <div className="space-y-3">
-            {profissionaisComEstrelas.slice(0, 5).map((prof, idx) => (
-              <div
-                key={prof.id}
-                className="flex items-center justify-between cursor-pointer hover:bg-gray-700/30 p-2 rounded-lg transition-all"
-                onClick={() => setSelectedProfissional(prof)}
-              >
-                <div className="flex items-center gap-3">
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                    idx === 0 ? 'bg-yellow-500 text-black' :
-                    idx === 1 ? 'bg-gray-400 text-black' :
-                    idx === 2 ? 'bg-orange-600 text-white' :
-                    'bg-gray-700 text-gray-300'
-                  }`}>
-                    {idx + 1}
-                  </span>
-                  <div>
-                    <span className="text-white text-sm">{prof.usuario?.nome || 'Sem nome'}</span>
-                    <span className="text-gray-500 text-xs block">{prof.unidade?.nome}</span>
+          <div className="space-y-2">
+            {estrelasDoMes.length > 0 ? estrelasDoMes.map(e => {
+              const maxStars = (e.pilar as any)?.max_estrelas || 3;
+              const pctPilar = Math.min((e.estrelas_conquistadas / maxStars) * 100, 100);
+              return (
+                <div key={e.pilar_id} className="rounded-xl p-4 flex items-center gap-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{(e.pilar as any)?.nome}</p>
+                      <div className="flex items-center gap-1">
+                        {Array.from({ length: maxStars }).map((_, i) => (
+                          <Star key={i} className={`w-4 h-4 ${i < e.estrelas_conquistadas ? 'fill-current' : ''}`} style={{ color: i < e.estrelas_conquistadas ? '#FBBF24' : 'var(--border-primary)' }} />
+                        ))}
+                      </div>
+                    </div>
+                    <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+                      <div className="h-full rounded-full" style={{ width: `${pctPilar}%`, backgroundColor: e.estrelas_conquistadas >= maxStars ? '#10B981' : '#FBBF24' }} />
+                    </div>
+                    <div className="flex justify-between mt-1">
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Valor: {e.valor_metrica}</span>
+                      <span className="text-xs font-medium" style={{ color: e.estrelas_conquistadas >= maxStars ? '#10B981' : '#FBBF24' }}>{e.estrelas_conquistadas}/{maxStars}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <span className="text-yellow-400 font-bold">{prof.estrelas_mes}</span>
-                  <Star className="w-4 h-4 text-yellow-400 fill-current" />
-                </div>
+              );
+            }) : (
+              <div className="text-center py-8 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+                <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nenhuma estrela calculada para este mes</p>
               </div>
-            ))}
-            {profissionaisComEstrelas.length === 0 && (
-              <p className="text-gray-500 text-sm text-center py-4">
-                Nenhum dado disponivel
-              </p>
             )}
           </div>
         </div>
-      </div>
 
-      <div>
-        <h3 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
-          <Users className="w-5 h-5 text-cyan-400" />
-          Todos os Profissionais
-        </h3>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {profissionaisComEstrelas.map((prof, index) => {
-            const metaEstrelas = prof.nivel?.estrelas_necessarias || 6;
-            const progresso = Math.min(100, (prof.estrelas_mes / metaEstrelas) * 100);
-            const atingiuMeta = prof.estrelas_mes >= metaEstrelas;
-            const nivelStyle = getNivelStyle(prof.nivel?.nome);
-            const NivelIcon = nivelStyle.icon;
-            const ranking = index + 1;
-            const proximoNivel = getProximoNivel(prof.nivel);
-            const faltamEstrelas = Math.max(0, metaEstrelas - prof.estrelas_mes);
-
-            return (
-              <div
-                key={prof.id}
-                onClick={() => setSelectedProfissional(prof)}
-                className={`
-                  relative overflow-hidden cursor-pointer group
-                  bg-gradient-to-br from-gray-900/90 via-gray-800/80 to-gray-900/90
-                  backdrop-blur-sm
-                  rounded-2xl p-4 border-3
-                  transition-all duration-300
-                  hover:scale-[1.02]
-                  ${atingiuMeta ? 'ring-2 ring-green-500/50 ring-offset-2 ring-offset-gray-950' : ''}
-                `}
-                style={{
-                  borderWidth: '3px',
-                  borderStyle: 'solid',
-                  borderColor: prof.nivel?.cor || '#6B7280',
-                  boxShadow: `0 0 30px ${prof.nivel?.cor || '#6B7280'}40, 0 0 60px ${prof.nivel?.cor || '#6B7280'}20, inset 0 0 20px rgba(0,0,0,0.3)`,
-                }}
-              >
-                <div
-                  className="absolute inset-0 opacity-10 group-hover:opacity-20 transition-opacity"
-                  style={{
-                    background: `radial-gradient(circle at 50% 0%, ${prof.nivel?.cor || '#6B7280'}40, transparent 70%)`
-                  }}
-                />
-
-                {atingiuMeta && (
-                  <div className="absolute top-0 right-0 z-10">
-                    <div className="bg-green-500 text-white text-[10px] font-bold px-2 py-1 rounded-bl-lg flex items-center gap-1">
-                      <CheckCircle className="w-3 h-3" />
-                      Meta
-                    </div>
-                  </div>
-                )}
-
-                {ranking <= 3 && (
-                  <div className="absolute -top-2 -left-2 z-10">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center border-4 border-gray-950 ${
-                      ranking === 1 ? 'bg-gradient-to-br from-yellow-400 to-yellow-600 shadow-[0_0_20px_rgba(234,179,8,0.6)]' :
-                      ranking === 2 ? 'bg-gradient-to-br from-gray-300 to-gray-500 shadow-[0_0_20px_rgba(148,163,184,0.6)]' :
-                      'bg-gradient-to-br from-orange-500 to-orange-700 shadow-[0_0_20px_rgba(249,115,22,0.6)]'
-                    }`}>
-                      {ranking === 1 ? <Crown className="w-5 h-5 text-black drop-shadow-lg" /> :
-                       ranking === 2 ? <Medal className="w-5 h-5 text-black drop-shadow-lg" /> :
-                       <Award className="w-5 h-5 text-white drop-shadow-lg" />}
-                    </div>
-                  </div>
-                )}
-
-                <div className="relative">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className={`flex-1 min-w-0 ${ranking <= 3 ? 'ml-8' : ''}`}>
-                      <h4 className="text-white font-bold text-base truncate">{prof.usuario?.nome || 'Sem nome'}</h4>
-                      <p className="text-gray-400 text-xs truncate">{prof.unidade?.nome}</p>
-                    </div>
-                    <div
-                      className="flex items-center gap-1 px-2 py-1 rounded-md text-[10px] font-bold flex-shrink-0 ml-2"
-                      style={{
-                        backgroundColor: (prof.nivel?.cor || '#6B7280') + '25',
-                        color: prof.nivel?.cor || '#6B7280',
-                        border: `1.5px solid ${prof.nivel?.cor || '#6B7280'}60`
-                      }}
-                    >
-                      <NivelIcon className="w-3 h-3" />
-                      {prof.nivel?.nome || 'Starter'}
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-center mb-3">
-                    <div className="text-3xl font-black text-white drop-shadow-lg">
-                      {prof.estrelas_mes}
-                      <span className="text-gray-500 text-lg font-normal">/{metaEstrelas}</span>
-                    </div>
-                    <Star className="w-6 h-6 text-yellow-400 fill-current ml-2"
-                      style={{ filter: 'drop-shadow(0 0 6px rgba(250, 204, 21, 0.7))' }}
-                    />
-                  </div>
-
-                  <div className="mb-3">
-                    <div className="h-2 bg-black/40 rounded-full overflow-hidden border border-gray-700/50">
-                      <div
-                        className={`h-full transition-all duration-500 ${
-                          atingiuMeta
-                            ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                            : 'bg-gradient-to-r from-yellow-400 to-amber-500'
-                        }`}
-                        style={{
-                          width: `${progresso}%`,
-                          boxShadow: atingiuMeta
-                            ? '0 0 10px rgba(34, 197, 94, 0.5)'
-                            : '0 0 10px rgba(251, 191, 36, 0.5)'
-                        }}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-medium flex-shrink-0 ${
-                      prof.time === 'front_office'
-                        ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
-                        : 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                    }`}>
-                      {prof.time === 'front_office' ? 'Front' : 'Inside'}
-                    </span>
-
-                    {!atingiuMeta && faltamEstrelas > 0 && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-orange-500/15 text-orange-400 border border-orange-500/30 flex items-center gap-1 flex-shrink-0">
-                        <Zap className="w-2.5 h-2.5" />
-                        -{faltamEstrelas}
-                      </span>
-                    )}
-
-                    {atingiuMeta && proximoNivel && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-green-500/15 text-green-400 border border-green-500/30 flex items-center gap-1 flex-shrink-0">
-                        <TrendingUp className="w-2.5 h-2.5" />
-                        {proximoNivel.nome}
-                      </span>
-                    )}
-
-                    {prof.meses_consecutivos_validos > 0 && (
-                      <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-purple-500/15 text-purple-400 border border-purple-500/30 flex items-center gap-1 flex-shrink-0">
-                        <Flame className="w-2.5 h-2.5" />
-                        {prof.meses_consecutivos_validos}x
-                      </span>
-                    )}
-                  </div>
+        <div className="space-y-3">
+          {nextNivel && (
+            <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+              <h4 className="text-sm font-bold flex items-center gap-2 mb-3" style={{ color: 'var(--text-primary)' }}>
+                <ArrowUp className="w-4 h-4" style={{ color: nextNivel.cor }} />
+                Proximo Nivel
+              </h4>
+              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ backgroundColor: nextNivel.cor + '10', border: `1px solid ${nextNivel.cor}30` }}>
+                <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold" style={{ backgroundColor: nextNivel.cor + '25', color: nextNivel.cor }}>
+                  {nextNivel.ordem}
+                </div>
+                <div>
+                  <p className="font-bold" style={{ color: nextNivel.cor }}>{nextNivel.nome}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    {nextNivel.estrelas_necessarias} estrelas por {nextNivel.meses_consecutivos} meses
+                  </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
-
-        {profissionaisComEstrelas.length === 0 && (
-          <div className="text-center py-12 bg-gray-800/30 rounded-xl">
-            <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhum profissional cadastrado</p>
-            <p className="text-gray-500 text-sm">Cadastre profissionais na aba de Profissionais</p>
-          </div>
-        )}
-      </div>
-
-      {selectedProfissional && (
-        <ProfissionalDetailsModal
-          profissional={selectedProfissional}
-          estrelasPorPilar={getProfissionalEstrelasPorPilar(selectedProfissional.id)}
-          pilares={pilares}
-          niveis={niveis}
-          mesReferencia={mesReferencia}
-          onClose={() => setSelectedProfissional(null)}
-        />
-      )}
-    </div>
-  );
-}
-
-interface ProfissionalDetailsModalProps {
-  profissional: Profissional & { estrelas_mes: number; estrelas_por_pilar: EstrelasMes[] };
-  estrelasPorPilar: EstrelasMes[];
-  pilares: Pilar[];
-  niveis: Nivel[];
-  mesReferencia: string;
-  onClose: () => void;
-}
-
-function ProfissionalDetailsModal({
-  profissional,
-  estrelasPorPilar,
-  pilares,
-  niveis,
-  mesReferencia,
-  onClose
-}: ProfissionalDetailsModalProps) {
-  const metaEstrelas = profissional.nivel?.estrelas_necessarias || 6;
-  const atingiuMeta = profissional.estrelas_mes >= metaEstrelas;
-  const nivelStyle = getNivelStyle(profissional.nivel?.nome);
-  const NivelIcon = nivelStyle.icon;
-
-  const proximoNivel = (() => {
-    if (!profissional.nivel) return niveis[0];
-    const idx = niveis.findIndex(n => n.nome === profissional.nivel?.nome);
-    if (idx < niveis.length - 1) return niveis[idx + 1];
-    return null;
-  })();
-
-  const faltamEstrelas = Math.max(0, metaEstrelas - profissional.estrelas_mes);
-  const progressoGeral = Math.min(100, (profissional.estrelas_mes / metaEstrelas) * 100);
-
-  const conquistasPorPilar = pilares.map(pilar => {
-    const estrelas = estrelasPorPilar.find(e => e.pilar?.nome === pilar.nome);
-    return {
-      ...pilar,
-      conquistadas: estrelas?.estrelas_conquistadas || 0,
-      progresso: ((estrelas?.estrelas_conquistadas || 0) / pilar.estrelas_maximas) * 100
-    };
-  });
-
-  const pilaresCompletos = conquistasPorPilar.filter(p => p.conquistadas >= p.estrelas_maximas).length;
-  const pilaresPendentes = conquistasPorPilar.filter(p => p.conquistadas < p.estrelas_maximas);
-
-  const mesFormatado = new Date(mesReferencia + '-01').toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-  return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-      <div className="bg-gray-900 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl border border-gray-700">
-        <div className={`relative p-6 bg-gradient-to-br ${nivelStyle.bg} border-b border-gray-700`}>
-          <button
-            onClick={onClose}
-            className="absolute top-4 right-4 p-2 bg-gray-800/50 rounded-full text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-
-          <div className="flex items-start gap-4">
-            <div
-              className="w-20 h-20 rounded-2xl flex items-center justify-center shadow-lg"
-              style={{
-                backgroundColor: profissional.nivel?.cor + '30',
-                border: `2px solid ${profissional.nivel?.cor}`
-              }}
-            >
-              <NivelIcon className="w-10 h-10" style={{ color: profissional.nivel?.cor }} />
-            </div>
-
-            <div className="flex-1">
-              <h2 className="text-2xl font-bold text-white">{profissional.usuario?.nome || 'Sem nome'}</h2>
-              <p className="text-gray-400">{profissional.usuario?.email}</p>
-              <div className="flex items-center gap-3 mt-2">
-                <span
-                  className="px-3 py-1 rounded-full text-sm font-bold"
-                  style={{
-                    backgroundColor: profissional.nivel?.cor + '30',
-                    color: profissional.nivel?.cor,
-                    border: `1px solid ${profissional.nivel?.cor}`
-                  }}
-                >
-                  {profissional.nivel?.nome || 'Starter'}
-                </span>
-                <span className={`px-3 py-1 rounded-full text-sm ${
-                  profissional.time === 'front_office'
-                    ? 'bg-blue-500/20 text-blue-400'
-                    : 'bg-teal-500/20 text-teal-400'
-                }`}>
-                  {profissional.time === 'front_office' ? 'Front Office' : 'Inside Sales'}
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 mt-6">
-            {[...Array(12)].map((_, i) => (
-              <Star
-                key={i}
-                className={`w-6 h-6 ${
-                  i < profissional.estrelas_mes
-                    ? 'text-yellow-400 fill-current'
-                    : 'text-gray-600'
-                }`}
-                style={i < profissional.estrelas_mes ? {
-                  filter: 'drop-shadow(0 0 6px rgba(250, 204, 21, 0.6))'
-                } : {}}
-              />
-            ))}
-          </div>
-        </div>
-
-        <div className="p-6 overflow-y-auto max-h-[calc(90vh-280px)] space-y-6">
-          <div className="text-center text-gray-400 text-sm">
-            Referencia: {mesFormatado}
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className={`p-4 rounded-xl border ${
-              atingiuMeta
-                ? 'bg-green-500/10 border-green-500/30'
-                : 'bg-gray-800/50 border-gray-700'
-            }`}>
-              <div className="flex items-center gap-2 mb-2">
-                {atingiuMeta ? (
-                  <CheckCircle className="w-5 h-5 text-green-400" />
-                ) : (
-                  <Target className="w-5 h-5 text-orange-400" />
-                )}
-                <span className="text-gray-400 text-sm">Meta do Mes</span>
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {profissional.estrelas_mes}/{metaEstrelas}
-              </div>
-              {!atingiuMeta && (
-                <div className="text-orange-400 text-sm mt-1">
-                  Faltam {faltamEstrelas} estrela{faltamEstrelas !== 1 ? 's' : ''}
-                </div>
-              )}
-              {atingiuMeta && (
-                <div className="text-green-400 text-sm mt-1">Meta atingida!</div>
+              {nextNivel.bonus_valor > 0 && (
+                <p className="text-sm mt-2 text-center font-medium" style={{ color: '#10B981' }}>
+                  Bonus: R$ {nextNivel.bonus_valor.toLocaleString('pt-BR')}/mes
+                </p>
               )}
             </div>
+          )}
 
-            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <Flame className="w-5 h-5 text-orange-400" />
-                <span className="text-gray-400 text-sm">Sequencia</span>
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {profissional.meses_consecutivos_validos}
-              </div>
-              <div className="text-gray-500 text-sm mt-1">
-                mes{profissional.meses_consecutivos_validos !== 1 ? 'es' : ''} consecutivo{profissional.meses_consecutivos_validos !== 1 ? 's' : ''}
-              </div>
-            </div>
-
-            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <DollarSign className="w-5 h-5 text-emerald-400" />
-                <span className="text-gray-400 text-sm">Bonus</span>
-              </div>
-              <div className="text-2xl font-bold text-white">
-                R$ {atingiuMeta ? (profissional.nivel?.bonus_valor || 0).toLocaleString('pt-BR') : '0'}
-              </div>
-              <div className={`text-sm mt-1 ${atingiuMeta ? 'text-emerald-400' : 'text-gray-500'}`}>
-                {atingiuMeta ? 'Bonus garantido!' : 'Atinja a meta para ganhar'}
-              </div>
-            </div>
-
-            <div className="bg-gray-800/50 p-4 rounded-xl border border-gray-700">
-              <div className="flex items-center gap-2 mb-2">
-                <Award className="w-5 h-5 text-cyan-400" />
-                <span className="text-gray-400 text-sm">Pilares</span>
-              </div>
-              <div className="text-2xl font-bold text-white">
-                {pilaresCompletos}/{pilares.length}
-              </div>
-              <div className="text-gray-500 text-sm mt-1">
-                pilares completos
-              </div>
-            </div>
-          </div>
-
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-gray-400 text-sm">Progresso Geral</span>
-              <span className="text-white font-bold">{Math.round(progressoGeral)}%</span>
-            </div>
-            <div className="h-4 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
-              <div
-                className={`h-full transition-all duration-700 ${
-                  atingiuMeta
-                    ? 'bg-gradient-to-r from-green-400 to-emerald-500'
-                    : 'bg-gradient-to-r from-yellow-400 to-amber-500'
-                }`}
-                style={{ width: `${progressoGeral}%` }}
-              />
-            </div>
-          </div>
-
-          <div>
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <CheckCircle className="w-5 h-5 text-green-400" />
-              Conquistas por Pilar
-            </h3>
-            <div className="space-y-3">
-              {conquistasPorPilar.map((pilar) => {
-                const completo = pilar.conquistadas >= pilar.estrelas_maximas;
+          <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <h4 className="text-sm font-bold flex items-center gap-2 mb-3" style={{ color: 'var(--text-primary)' }}>
+              <Award className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
+              Todos os Niveis
+            </h4>
+            <div className="space-y-2">
+              {niveis.map(nivel => {
+                const isCurrent = nivel.id === myProfissional?.nivel?.id;
+                const isPast = nivel.ordem < (myProfissional?.nivel?.ordem || 1);
                 return (
                   <div
-                    key={pilar.id}
-                    className={`p-4 rounded-xl border ${
-                      completo
-                        ? 'bg-green-500/10 border-green-500/30'
-                        : 'bg-gray-800/50 border-gray-700'
-                    }`}
+                    key={nivel.id}
+                    className="flex items-center gap-3 p-2 rounded-lg transition-all"
+                    style={{
+                      backgroundColor: isCurrent ? nivel.cor + '15' : 'transparent',
+                      border: isCurrent ? `1px solid ${nivel.cor}40` : '1px solid transparent',
+                      opacity: isPast ? 0.5 : 1,
+                    }}
                   >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        {completo ? (
-                          <CheckCircle className="w-5 h-5 text-green-400" />
-                        ) : (
-                          <Clock className="w-5 h-5 text-gray-500" />
-                        )}
-                        <span className={`font-medium ${completo ? 'text-green-400' : 'text-white'}`}>
-                          {pilar.nome}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <span className={`font-bold ${completo ? 'text-green-400' : 'text-yellow-400'}`}>
-                          {pilar.conquistadas}
-                        </span>
-                        <span className="text-gray-500">/{pilar.estrelas_maximas}</span>
-                        <Star className={`w-4 h-4 ${completo ? 'text-green-400' : 'text-yellow-400'} fill-current`} />
-                      </div>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: nivel.cor + '25', color: nivel.cor }}>
+                      {isPast ? <CheckCircle2 className="w-4 h-4" /> : nivel.ordem}
                     </div>
-                    <div className="h-2 bg-gray-700 rounded-full overflow-hidden">
-                      <div
-                        className={`h-full transition-all ${
-                          completo ? 'bg-green-500' : 'bg-yellow-500'
-                        }`}
-                        style={{ width: `${pilar.progresso}%` }}
-                      />
+                    <div className="flex-1">
+                      <p className="text-xs font-medium" style={{ color: isCurrent ? nivel.cor : 'var(--text-primary)' }}>
+                        {nivel.nome} {isCurrent && '(atual)'}
+                      </p>
+                      <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{nivel.estrelas_necessarias} estrelas</p>
                     </div>
-                    <p className="text-gray-500 text-xs mt-2">{pilar.descricao}</p>
+                    {nivel.bonus_valor > 0 && (
+                      <span className="text-[10px] font-medium" style={{ color: '#10B981' }}>R${nivel.bonus_valor}</span>
+                    )}
                   </div>
                 );
               })}
             </div>
           </div>
+        </div>
+      </div>
 
-          {pilaresPendentes.length > 0 && !atingiuMeta && (
-            <div className="bg-orange-500/10 rounded-xl p-4 border border-orange-500/30">
-              <h3 className="text-lg font-bold text-orange-400 mb-3 flex items-center gap-2">
-                <AlertCircle className="w-5 h-5" />
-                O Que Falta Para Atingir a Meta
-              </h3>
-              <ul className="space-y-2">
-                {pilaresPendentes.map((pilar) => {
-                  const faltam = pilar.estrelas_maximas - pilar.conquistadas;
-                  return (
-                    <li key={pilar.id} className="flex items-center gap-2 text-gray-300">
-                      <div className="w-2 h-2 rounded-full bg-orange-500" />
-                      <span>
-                        <strong>{pilar.nome}:</strong> conquistar mais {faltam} estrela{faltam !== 1 ? 's' : ''}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-4 pt-4 border-t border-orange-500/20 text-orange-300 text-sm">
-                Total de estrelas faltando: <strong>{faltamEstrelas}</strong>
+      {isAdmin && <AdminOverview onSelect={openDetails} />}
+
+      {selectedProfissional && (
+        <ProfissionalModal profissional={selectedProfissional} estrelas={selectedEstrelas} onClose={() => setSelectedProfissional(null)} />
+      )}
+    </div>
+  );
+}
+
+function KPICard({ icon: Icon, label, value, sublabel, color }: { icon: any; label: string; value: string; sublabel: string; color: string }) {
+  return (
+    <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4" style={{ color }} />
+        <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>{label}</span>
+      </div>
+      <p className="text-xl font-bold" style={{ color }}>{value}</p>
+      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{sublabel}</p>
+    </div>
+  );
+}
+
+function AdminOverview({ onSelect }: { onSelect: (prof: Profissional) => void }) {
+  const { profissionais, ranking, niveis } = useSkywalker();
+
+  const niveisDistribution = niveis.map(nivel => {
+    const count = profissionais.filter(p => p.nivel?.id === nivel.id).length;
+    return { ...nivel, count };
+  });
+
+  const totalStars = ranking.reduce((s, r) => s + r.estrelas_total, 0);
+  const avgStars = ranking.length > 0 ? (totalStars / ranking.length).toFixed(1) : '0';
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+        <Users className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+        Visao do Gestor
+      </h3>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total Profissionais</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: 'var(--text-accent)' }}>{profissionais.length}</p>
+        </div>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Media de Estrelas</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: '#FBBF24' }}>{avgStars}</p>
+        </div>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Meta Atingida</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: '#10B981' }}>
+            {ranking.filter(r => r.estrelas_total >= r.estrelas_necessarias).length}
+          </p>
+        </div>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Abaixo da Meta</p>
+          <p className="text-2xl font-bold mt-1" style={{ color: '#EF4444' }}>
+            {ranking.filter(r => r.estrelas_total < r.estrelas_necessarias).length}
+          </p>
+        </div>
+      </div>
+
+      <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+        <h4 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Distribuicao por Nivel</h4>
+        <div className="space-y-2">
+          {niveisDistribution.map(nivel => {
+            const pct = profissionais.length > 0 ? (nivel.count / profissionais.length) * 100 : 0;
+            return (
+              <div key={nivel.id} className="flex items-center gap-3">
+                <span className="w-24 text-xs font-medium truncate" style={{ color: nivel.cor }}>{nivel.nome}</span>
+                <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: nivel.cor }} />
+                </div>
+                <span className="text-xs font-bold w-8 text-right" style={{ color: 'var(--text-secondary)' }}>{nivel.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {ranking.length > 0 && (
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <h4 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Top 5 do Mes</h4>
+          <div className="space-y-2">
+            {ranking.slice(0, 5).map((r, idx) => (
+              <div key={r.profissional_id} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:opacity-80" style={{ backgroundColor: idx === 0 ? '#FBBF2408' : 'transparent' }} onClick={() => {
+                const prof = profissionais.find(p => p.id === r.profissional_id);
+                if (prof) onSelect(prof);
+              }}>
+                <span className="w-6 text-center font-bold text-sm" style={{ color: idx < 3 ? '#FBBF24' : 'var(--text-secondary)' }}>{idx + 1}</span>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold" style={{ backgroundColor: r.nivel_cor + '25', color: r.nivel_cor }}>
+                  {r.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{r.nome}</p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Star className="w-3.5 h-3.5 fill-current" style={{ color: '#FBBF24' }} />
+                  <span className="text-sm font-bold" style={{ color: '#FBBF24' }}>{r.estrelas_total}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ProfissionalModal({ profissional, estrelas, onClose }: { profissional: Profissional; estrelas: EstrelaMes[]; onClose: () => void }) {
+  const totalStars = estrelas.reduce((s, e) => s + e.estrelas_conquistadas, 0);
+  const meta = profissional.nivel?.estrelas_necessarias || 6;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div className="w-full max-w-lg rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }} onClick={(e) => e.stopPropagation()}>
+        <div className="p-6" style={{ background: `linear-gradient(135deg, ${profissional.nivel?.cor || '#3B82F6'}20, transparent)` }}>
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold" style={{ backgroundColor: (profissional.nivel?.cor || '#3B82F6') + '25', color: profissional.nivel?.cor }}>
+              {profissional.usuario?.nome?.split(' ').map(n => n[0]).join('').substring(0, 2)}
+            </div>
+            <div>
+              <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{profissional.usuario?.nome}</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: (profissional.nivel?.cor || '#3B82F6') + '20', color: profissional.nivel?.cor }}>
+                  {profissional.nivel?.nome}
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{profissional.unidade?.nome}</span>
               </div>
             </div>
-          )}
+            <div className="ml-auto text-center">
+              <div className="flex items-center gap-1">
+                <Star className="w-6 h-6 fill-current" style={{ color: '#FBBF24' }} />
+                <span className="text-2xl font-bold" style={{ color: '#FBBF24' }}>{totalStars}</span>
+              </div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>/{meta}</p>
+            </div>
+          </div>
+        </div>
 
-          {proximoNivel && atingiuMeta && (
-            <div className="bg-cyan-500/10 rounded-xl p-4 border border-cyan-500/30">
-              <h3 className="text-lg font-bold text-cyan-400 mb-3 flex items-center gap-2">
-                <TrendingUp className="w-5 h-5" />
-                Proximo Nivel
-              </h3>
-              <div className="flex items-center gap-4">
-                <div
-                  className="w-12 h-12 rounded-xl flex items-center justify-center"
-                  style={{ backgroundColor: proximoNivel.cor + '30' }}
-                >
-                  <Award className="w-6 h-6" style={{ color: proximoNivel.cor }} />
-                </div>
-                <div>
-                  <div className="text-white font-bold">{proximoNivel.nome}</div>
-                  <div className="text-gray-400 text-sm">
-                    Meta: {proximoNivel.estrelas_necessarias} estrelas | Bonus: R$ {proximoNivel.bonus_valor.toLocaleString('pt-BR')}
+        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+          {estrelas.map(e => {
+            const maxS = (e.pilar as any)?.max_estrelas || 3;
+            return (
+              <div key={e.pilar_id} className="flex items-center gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{(e.pilar as any)?.nome}</p>
+                  <div className="h-1.5 rounded-full mt-1 overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+                    <div className="h-full rounded-full" style={{ width: `${Math.min((e.estrelas_conquistadas / maxS) * 100, 100)}%`, backgroundColor: e.estrelas_conquistadas >= maxS ? '#10B981' : '#FBBF24' }} />
                   </div>
                 </div>
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: maxS }).map((_, i) => (
+                    <Star key={i} className={`w-3.5 h-3.5 ${i < e.estrelas_conquistadas ? 'fill-current' : ''}`} style={{ color: i < e.estrelas_conquistadas ? '#FBBF24' : 'var(--border-primary)' }} />
+                  ))}
+                </div>
               </div>
-              <p className="text-cyan-300 text-sm mt-3">
-                Mantenha {profissional.meses_consecutivos_validos >= 2 ? 'mais 1 mes' : '3 meses'} consecutivos atingindo a meta para subir de nivel!
-              </p>
-            </div>
+            );
+          })}
+          {estrelas.length === 0 && (
+            <p className="text-center py-4 text-sm" style={{ color: 'var(--text-secondary)' }}>Sem dados para este mes</p>
           )}
+        </div>
+
+        <div className="p-4 flex justify-end" style={{ borderTop: '1px solid var(--border-primary)' }}>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
+            Fechar
+          </button>
         </div>
       </div>
     </div>

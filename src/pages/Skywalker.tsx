@@ -1,51 +1,39 @@
 import { useState, useEffect } from 'react';
-import { Star, Users, Trophy, BarChart3, BookOpen, Award, Settings, Layers } from 'lucide-react';
+import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck } from 'lucide-react';
+import { useSkywalker } from '../contexts/SkywalkerContext';
+import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { VisaoGeralTab } from '../components/skywalker/VisaoGeralTab';
 import { RegrasJogoTab } from '../components/skywalker/RegrasJogoTab';
 import { NiveisBonusTab } from '../components/skywalker/NiveisBonusTab';
 import { TimesTab } from '../components/skywalker/TimesTab';
 
-interface Profissional {
-  id: string;
-  usuario: { nome: string } | null;
-  unidade: { nome: string } | null;
-  nivel: { nome: string; cor: string; estrelas_necessarias: number } | null;
-  time: string;
-  meses_consecutivos_validos: number;
-}
-
-interface EstrelasMes {
-  profissional_id: string;
-  estrelas_conquistadas: number;
-}
-
 export function Skywalker() {
+  const { usuario } = useAuth();
+  const { loading, isAdmin, myProfissional } = useSkywalker();
   const [abaAtiva, setAbaAtiva] = useState('visao-geral');
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const timer = setTimeout(() => setLoading(false), 500);
-    return () => clearTimeout(timer);
-  }, []);
 
   const abas = [
-    { id: 'visao-geral', nome: 'Visao Geral', icone: Star },
-    { id: 'ranking', nome: 'Ranking', icone: Trophy },
-    { id: 'profissionais', nome: 'Profissionais', icone: Users },
-    { id: 'pipelines', nome: 'Metricas', icone: BarChart3 },
-    { id: 'regras', nome: 'Regras do Jogo', icone: BookOpen },
-    { id: 'niveis', nome: 'Niveis e Bonus', icone: Award },
-    { id: 'times', nome: 'Times', icone: Layers },
-    { id: 'config', nome: 'Configuracoes', icone: Settings }
+    { id: 'visao-geral', nome: 'Meu Painel', icone: Star, admin: false },
+    { id: 'ranking', nome: 'Ranking', icone: Trophy, admin: false },
+    { id: 'orcamentos', nome: 'Fechamentos', icone: FileCheck, admin: false },
+    ...(isAdmin ? [
+      { id: 'profissionais', nome: 'Profissionais', icone: Users, admin: true },
+      { id: 'regras', nome: 'Regras do Jogo', icone: BookOpen, admin: true },
+      { id: 'niveis', nome: 'Niveis e Bonus', icone: Award, admin: true },
+      { id: 'times', nome: 'Times', icone: Layers, admin: true },
+    ] : []),
   ];
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="flex flex-col items-center gap-4">
-          <Star className="w-16 h-16 text-cyan-400 animate-spin" />
-          <p className="text-cyan-400 text-lg">Carregando Skywalker...</p>
+          <div className="relative">
+            <Star className="w-16 h-16 animate-pulse" style={{ color: 'var(--text-accent)' }} />
+            <div className="absolute inset-0 w-16 h-16 rounded-full animate-ping opacity-20" style={{ backgroundColor: 'var(--text-accent)' }} />
+          </div>
+          <p style={{ color: 'var(--text-secondary)' }}>Carregando Skywalker...</p>
         </div>
       </div>
     );
@@ -53,246 +41,277 @@ export function Skywalker() {
 
   return (
     <div className="space-y-6">
-      <header>
-        <div className="flex items-center gap-4 mb-2">
-          <Star className="w-12 h-12 text-yellow-400" />
+      <header className="flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #FBBF24, #F59E0B)' }}>
+            <Star className="w-8 h-8 text-white fill-current" />
+          </div>
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-cyan-400 to-yellow-400 bg-clip-text text-transparent">
-              Skywalker
+            <h1 className="text-3xl font-bold tracking-tight" style={{ fontFamily: 'var(--font-tech)', color: 'var(--text-primary)' }}>
+              SKYWALKER
             </h1>
-            <p className="text-gray-400">Sistema de Gamificacao - Rota Estelar</p>
+            <p style={{ color: 'var(--text-secondary)' }} className="text-sm">
+              {myProfissional
+                ? `${myProfissional.skywalker_time?.nome || myProfissional.time} - ${myProfissional.nivel?.nome || 'Starter'}`
+                : 'Sistema de Gamificacao'}
+            </p>
           </div>
         </div>
+
+        {myProfissional?.nivel && (
+          <div className="flex items-center gap-3 px-4 py-2 rounded-xl" style={{ backgroundColor: myProfissional.nivel.cor + '15', border: `1px solid ${myProfissional.nivel.cor}40` }}>
+            <div className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: myProfissional.nivel.cor + '30', color: myProfissional.nivel.cor }}>
+              {myProfissional.nivel.ordem}
+            </div>
+            <div>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Nivel Atual</p>
+              <p className="font-bold text-sm" style={{ color: myProfissional.nivel.cor }}>{myProfissional.nivel.nome}</p>
+            </div>
+          </div>
+        )}
       </header>
 
       <nav>
-        <div className="flex flex-wrap gap-2 bg-gray-800/50 p-2 rounded-lg border border-cyan-500/30">
+        <div className="flex flex-wrap gap-1.5 p-1.5 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           {abas.map((aba) => {
             const Icon = aba.icone;
+            const isActive = abaAtiva === aba.id;
             return (
               <button
                 key={aba.id}
                 onClick={() => setAbaAtiva(aba.id)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg transition-all
-                  ${abaAtiva === aba.id
-                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30'
-                    : 'bg-gray-800/50 text-gray-400 hover:bg-gray-800 hover:text-white'
-                  }
-                `}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
+                style={{
+                  backgroundColor: isActive ? 'var(--text-accent)' : 'transparent',
+                  color: isActive ? 'var(--text-on-accent)' : 'var(--text-secondary)',
+                }}
               >
                 <Icon className="w-4 h-4" />
-                <span className="font-medium text-sm">{aba.nome}</span>
+                {aba.nome}
+                {aba.admin && (
+                  <Settings className="w-3 h-3 opacity-50" />
+                )}
               </button>
             );
           })}
         </div>
       </nav>
 
-      <div className="bg-gray-800/50 rounded-lg border border-cyan-500/30 p-6">
+      <div>
         {abaAtiva === 'visao-geral' && <VisaoGeralTab />}
-        {abaAtiva === 'ranking' && <RankingGeral />}
-        {abaAtiva === 'profissionais' && <ProfissionaisTab />}
-        {abaAtiva === 'pipelines' && <PipelinesTab />}
-        {abaAtiva === 'regras' && <RegrasJogoTab />}
-        {abaAtiva === 'niveis' && <NiveisBonusTab />}
-        {abaAtiva === 'times' && <TimesTab />}
-        {abaAtiva === 'config' && <ConfiguracoesTab />}
+        {abaAtiva === 'ranking' && <RankingTab />}
+        {abaAtiva === 'orcamentos' && <OrcamentosRankingTab />}
+        {abaAtiva === 'profissionais' && isAdmin && <ProfissionaisTab />}
+        {abaAtiva === 'regras' && isAdmin && <RegrasJogoTab />}
+        {abaAtiva === 'niveis' && isAdmin && <NiveisBonusTab />}
+        {abaAtiva === 'times' && isAdmin && <TimesTab />}
       </div>
     </div>
   );
 }
 
-function RankingGeral() {
-  const [periodo, setPeriodo] = useState<'mensal' | 'trimestral' | 'anual'>('mensal');
-  const [mesReferencia, setMesReferencia] = useState(new Date().toISOString().slice(0, 7));
-  const [ranking, setRanking] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+function RankingTab() {
+  const { ranking, mesReferencia, setMesReferencia, loadRanking, myProfissional } = useSkywalker();
+  const { usuario } = useAuth();
+  const [mes, setMes] = useState(mesReferencia.slice(0, 7));
 
   useEffect(() => {
-    loadRanking();
-  }, [mesReferencia]);
+    loadRanking(mes + '-01');
+  }, [mes]);
 
-  const loadRanking = async () => {
-    setLoading(true);
-
-    const { data: profissionais } = await supabase
-      .from('skywalker_profissionais')
-      .select(`
-        id,
-        time,
-        usuario:usuarios(nome),
-        unidade:unidades(nome),
-        nivel:skywalker_niveis(nome, cor, bonus_valor)
-      `)
-      .eq('ativo', true);
-
-    const { data: estrelas } = await supabase
-      .from('skywalker_estrelas_mes')
-      .select('profissional_id, estrelas_conquistadas')
-      .eq('mes_referencia', mesReferencia + '-01');
-
-    if (profissionais && estrelas) {
-      const rankingData = profissionais.map(prof => {
-        const estrelasProf = estrelas
-          .filter(e => e.profissional_id === prof.id)
-          .reduce((sum, e) => sum + e.estrelas_conquistadas, 0);
-
-        return {
-          ...prof,
-          estrelas: estrelasProf,
-          bonus: (prof.nivel as any)?.bonus_valor || 0
-        };
-      }).sort((a, b) => b.estrelas - a.estrelas);
-
-      setRanking(rankingData);
-    }
-
-    setLoading(false);
-  };
-
-  const getPodiumColor = (posicao: number) => {
-    if (posicao === 1) return 'from-yellow-500/30 to-yellow-700/30 border-yellow-500';
-    if (posicao === 2) return 'from-gray-400/30 to-gray-600/30 border-gray-400';
-    if (posicao === 3) return 'from-orange-600/30 to-orange-800/30 border-orange-600';
-    return '';
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const myRank = ranking.findIndex(r => r.usuario_id === usuario?.id) + 1;
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-4">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Trophy className="w-6 h-6 text-yellow-400" />
-          Ranking Geral
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <Trophy className="w-5 h-5" style={{ color: '#FBBF24' }} />
+          Ranking do Time
         </h2>
-
-        <div className="flex gap-3">
-          <input
-            type="month"
-            value={mesReferencia}
-            onChange={(e) => setMesReferencia(e.target.value)}
-            className="bg-gray-800 border border-gray-700 rounded-lg px-3 py-2 text-sm text-white"
-          />
-        </div>
+        <input
+          type="month"
+          value={mes}
+          onChange={(e) => setMes(e.target.value)}
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+        />
       </div>
 
-      {ranking.length >= 3 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-          {ranking.slice(0, 3).map((prof, idx) => (
-            <div
-              key={prof.id}
-              className={`bg-gradient-to-br ${getPodiumColor(idx + 1)} p-6 rounded-xl border-2 transform hover:scale-105 transition-all`}
-            >
-              <div className="text-center">
-                <div className="text-6xl mb-2">
-                  {idx === 0 ? '🥇' : idx === 1 ? '🥈' : '🥉'}
-                </div>
-                <h3 className="text-xl font-bold text-white mb-1">
-                  {(prof.usuario as any)?.nome || 'Sem nome'}
-                </h3>
-                <p className="text-gray-400 text-sm mb-3">{(prof.unidade as any)?.nome}</p>
-                <div className="flex items-center justify-center gap-1 mb-2">
-                  {Array.from({ length: Math.min(prof.estrelas, 8) }).map((_, i) => (
-                    <Star key={i} className="w-5 h-5 text-yellow-400 fill-current" />
-                  ))}
-                  {prof.estrelas > 8 && <span className="text-yellow-400 ml-1">+{prof.estrelas - 8}</span>}
-                </div>
-                <div
-                  className="inline-block px-3 py-1 rounded-full text-xs font-bold"
-                  style={{
-                    backgroundColor: ((prof.nivel as any)?.cor || '#6B7280') + '30',
-                    color: (prof.nivel as any)?.cor || '#6B7280'
-                  }}
-                >
-                  {(prof.nivel as any)?.nome || 'Starter'}
-                </div>
-                {prof.bonus > 0 && (
-                  <div className="mt-3 text-green-400 font-bold text-lg">
-                    +R$ {prof.bonus.toLocaleString('pt-BR')}
-                  </div>
-                )}
+      {myRank > 0 && (
+        <div className="p-4 rounded-xl" style={{ backgroundColor: 'var(--text-accent)' + '10', border: `1px solid var(--text-accent)` + '30' }}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center font-bold text-lg" style={{ backgroundColor: 'var(--text-accent)' + '20', color: 'var(--text-accent)' }}>
+                #{myRank}
+              </div>
+              <div>
+                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>Sua posicao no ranking</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                  {ranking[myRank - 1]?.estrelas_total || 0} estrelas este mes
+                </p>
               </div>
             </div>
-          ))}
+            {myRank <= 3 && (
+              <span className="text-3xl">{myRank === 1 ? '1o' : myRank === 2 ? '2o' : '3o'}</span>
+            )}
+          </div>
         </div>
       )}
 
-      <div className="bg-gray-900/50 rounded-xl border border-gray-700 overflow-hidden">
-        <table className="w-full">
-          <thead>
-            <tr className="border-b border-gray-700 bg-gray-800/50">
-              <th className="px-6 py-4 text-left text-sm font-bold text-cyan-400">#</th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-cyan-400">Profissional</th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-cyan-400">Unidade</th>
-              <th className="px-6 py-4 text-left text-sm font-bold text-cyan-400">Time</th>
-              <th className="px-6 py-4 text-center text-sm font-bold text-cyan-400">Estrelas</th>
-              <th className="px-6 py-4 text-center text-sm font-bold text-cyan-400">Nivel</th>
-              <th className="px-6 py-4 text-right text-sm font-bold text-cyan-400">Bonus</th>
-            </tr>
-          </thead>
-          <tbody>
-            {ranking.map((prof, idx) => (
-              <tr key={prof.id} className="border-b border-gray-700/50 hover:bg-gray-800/30">
-                <td className="px-6 py-4">
-                  <span className={`font-bold text-lg ${idx < 3 ? 'text-yellow-400' : 'text-gray-400'}`}>
-                    {idx + 1}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-white font-medium">
-                  {(prof.usuario as any)?.nome || 'Sem nome'}
-                </td>
-                <td className="px-6 py-4 text-gray-400">
-                  {(prof.unidade as any)?.nome || '-'}
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    prof.time === 'front_office'
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'bg-purple-500/20 text-purple-400'
-                  }`}>
-                    {prof.time === 'front_office' ? 'Front Office' : 'Inside Sales'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <div className="flex items-center justify-center gap-0.5">
-                    {Array.from({ length: Math.min(prof.estrelas, 5) }).map((_, i) => (
-                      <Star key={i} className="w-4 h-4 text-yellow-400 fill-current" />
-                    ))}
-                    {prof.estrelas > 5 && <span className="text-yellow-400 ml-1">+{prof.estrelas - 5}</span>}
-                    {prof.estrelas === 0 && <span className="text-gray-500">0</span>}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-center">
-                  <span
-                    className="px-3 py-1 rounded-full text-xs font-bold"
-                    style={{
-                      backgroundColor: ((prof.nivel as any)?.cor || '#6B7280') + '30',
-                      color: (prof.nivel as any)?.cor || '#6B7280'
-                    }}
-                  >
-                    {(prof.nivel as any)?.nome || 'Starter'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-right text-green-400 font-bold">
-                  {prof.bonus > 0 ? `+R$ ${prof.bonus.toLocaleString('pt-BR')}` : '-'}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+      {ranking.length >= 3 && (
+        <div className="grid grid-cols-3 gap-3">
+          {[1, 0, 2].map((idx) => {
+            const r = ranking[idx];
+            if (!r) return null;
+            const colors = ['#C0C0C0', '#FFD700', '#CD7F32'];
+            const sizes = ['h-28', 'h-36', 'h-24'];
+            return (
+              <div key={r.profissional_id} className="flex flex-col items-center">
+                <div
+                  className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold mb-2"
+                  style={{ backgroundColor: r.nivel_cor + '30', color: r.nivel_cor, border: `2px solid ${colors[idx]}` }}
+                >
+                  {r.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+                </div>
+                <p className="font-bold text-sm text-center" style={{ color: 'var(--text-primary)' }}>{r.nome.split(' ')[0]}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.unidade_nome}</p>
+                <div className="flex items-center gap-1 mt-1">
+                  <Star className="w-4 h-4 fill-current" style={{ color: '#FBBF24' }} />
+                  <span className="font-bold" style={{ color: '#FBBF24' }}>{r.estrelas_total}</span>
+                </div>
+                <div className={`w-full ${sizes[idx]} mt-2 rounded-t-lg flex items-end justify-center pb-2`} style={{ background: `linear-gradient(to top, ${colors[idx]}40, ${colors[idx]}10)` }}>
+                  <span className="text-2xl font-bold" style={{ color: colors[idx] }}>{idx === 1 ? 1 : idx === 0 ? 2 : 3}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
 
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+        {ranking.map((r, idx) => {
+          const isMe = r.usuario_id === usuario?.id;
+          return (
+            <div
+              key={r.profissional_id}
+              className="flex items-center gap-4 px-5 py-3.5 transition-all"
+              style={{
+                borderBottom: '1px solid var(--border-primary)',
+                backgroundColor: isMe ? 'var(--text-accent)' + '08' : undefined,
+              }}
+            >
+              <span className={`w-8 text-center font-bold ${idx < 3 ? 'text-lg' : 'text-sm'}`} style={{ color: idx < 3 ? '#FBBF24' : 'var(--text-secondary)' }}>
+                {idx + 1}
+              </span>
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                style={{ backgroundColor: r.nivel_cor + '25', color: r.nivel_cor }}
+              >
+                {r.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate" style={{ color: isMe ? 'var(--text-accent)' : 'var(--text-primary)' }}>
+                  {r.nome} {isMe && '(voce)'}
+                </p>
+                <div className="flex items-center gap-2 mt-0.5">
+                  <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: r.time_cor + '20', color: r.time_cor }}>
+                    {r.time_nome}
+                  </span>
+                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.unidade_nome}</span>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Star className="w-4 h-4 fill-current" style={{ color: '#FBBF24' }} />
+                <span className="font-bold" style={{ color: '#FBBF24' }}>{r.estrelas_total}</span>
+              </div>
+              <span
+                className="px-2.5 py-1 rounded-full text-xs font-bold hidden sm:block"
+                style={{ backgroundColor: r.nivel_cor + '20', color: r.nivel_cor }}
+              >
+                {r.nivel_nome}
+              </span>
+            </div>
+          );
+        })}
         {ranking.length === 0 && (
-          <div className="text-center py-12">
-            <Trophy className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhum profissional no ranking</p>
+          <div className="text-center py-16">
+            <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional no ranking deste mes</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function OrcamentosRankingTab() {
+  const { orcamentosRanking, mesReferencia, loadOrcamentosRanking } = useSkywalker();
+  const { usuario } = useAuth();
+  const [mes, setMes] = useState(mesReferencia.slice(0, 7));
+
+  useEffect(() => {
+    loadOrcamentosRanking(mes + '-01');
+  }, [mes]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-4">
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <FileCheck className="w-5 h-5" style={{ color: '#10B981' }} />
+          Ranking de Fechamentos
+        </h2>
+        <input
+          type="month"
+          value={mes}
+          onChange={(e) => setMes(e.target.value)}
+          className="rounded-lg px-3 py-2 text-sm"
+          style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+        />
+      </div>
+
+      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+        Quem mais aprovou orcamentos neste mes. Cada aprovacao e registrada automaticamente.
+      </p>
+
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+        {orcamentosRanking.map((r, idx) => {
+          const isMe = r.usuario_id === usuario?.id;
+          return (
+            <div
+              key={r.usuario_id}
+              className="flex items-center gap-4 px-5 py-4 transition-all"
+              style={{
+                borderBottom: '1px solid var(--border-primary)',
+                backgroundColor: isMe ? '#10B98110' : undefined,
+              }}
+            >
+              <span className={`w-8 text-center font-bold ${idx < 3 ? 'text-lg' : 'text-sm'}`} style={{ color: idx < 3 ? '#10B981' : 'var(--text-secondary)' }}>
+                {idx + 1}
+              </span>
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+                style={{ backgroundColor: '#10B98120', color: '#10B981' }}
+              >
+                {r.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate" style={{ color: isMe ? '#10B981' : 'var(--text-primary)' }}>
+                  {r.nome} {isMe && '(voce)'}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-bold" style={{ color: '#10B981' }}>{r.total} aprovado{r.total !== 1 ? 's' : ''}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                  R$ {r.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+        {orcamentosRanking.length === 0 && (
+          <div className="text-center py-16">
+            <FileCheck className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum orcamento aprovado neste mes</p>
           </div>
         )}
       </div>
@@ -301,77 +320,61 @@ function RankingGeral() {
 }
 
 function ProfissionaisTab() {
-  const [profissionais, setProfissionais] = useState<any[]>([]);
+  const { profissionais, niveis, times, loadProfissionais } = useSkywalker();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [unidades, setUnidades] = useState<any[]>([]);
-  const [niveis, setNiveis] = useState<any[]>([]);
-  const [times, setTimes] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [showNovo, setShowNovo] = useState(false);
-
+  const [loading, setLoading] = useState(true);
   const [novoProfissional, setNovoProfissional] = useState({
     usuario_id: '',
     unidade_id: '',
     time: 'front_office',
+    time_id: '',
     nivel_atual_id: ''
   });
 
   useEffect(() => {
-    loadData();
+    loadFormData();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-
-    const [profRes, userRes, unidRes, nivRes, timesRes] = await Promise.all([
-      supabase.from('skywalker_profissionais').select(`
-        id, time, meses_consecutivos_validos, ativo,
-        usuario:usuarios(id, nome, email),
-        unidade:unidades(id, nome),
-        nivel:skywalker_niveis(id, nome, cor)
-      `).order('created_at'),
-      supabase.from('usuarios').select('id, nome, email').eq('ativo', true),
+  const loadFormData = async () => {
+    const [userRes, unidRes] = await Promise.all([
+      supabase.from('usuarios').select('id, nome, email').eq('ativo', true).order('nome'),
       supabase.from('unidades').select('id, nome'),
-      supabase.from('skywalker_niveis').select('id, nome, cor, ordem').order('ordem'),
-      supabase.from('skywalker_times').select('*').eq('ativo', true).order('ordem')
     ]);
-
-    if (profRes.data) setProfissionais(profRes.data);
     if (userRes.data) setUsuarios(userRes.data);
     if (unidRes.data) setUnidades(unidRes.data);
-    if (nivRes.data) setNiveis(nivRes.data);
-    if (timesRes.data) setTimes(timesRes.data);
-
     setLoading(false);
   };
 
-  const handleSaveProfissional = async () => {
+  const handleSave = async () => {
     if (!novoProfissional.usuario_id || !novoProfissional.unidade_id) return;
-
     const { error } = await supabase.from('skywalker_profissionais').insert({
-      ...novoProfissional,
+      usuario_id: novoProfissional.usuario_id,
+      unidade_id: novoProfissional.unidade_id,
+      time: novoProfissional.time,
+      time_id: novoProfissional.time_id || null,
       nivel_atual_id: novoProfissional.nivel_atual_id || (niveis[0]?.id || null),
       meses_consecutivos_validos: 0,
       ativo: true
     });
-
     if (!error) {
       setShowNovo(false);
-      setNovoProfissional({ usuario_id: '', unidade_id: '', time: 'front_office', nivel_atual_id: '' });
-      loadData();
+      setNovoProfissional({ usuario_id: '', unidade_id: '', time: 'front_office', time_id: '', nivel_atual_id: '' });
+      loadProfissionais();
     }
   };
 
-  const handleDeleteProfissional = async (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Remover este profissional do programa?')) return;
     await supabase.from('skywalker_profissionais').delete().eq('id', id);
-    loadData();
+    loadProfissionais();
   };
 
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--text-accent)', borderTopColor: 'transparent' }} />
       </div>
     );
   }
@@ -379,136 +382,126 @@ function ProfissionaisTab() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6 text-cyan-400" />
-          Profissionais
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <Users className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+          Profissionais ({profissionais.length})
         </h2>
         <button
           onClick={() => setShowNovo(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm"
+          style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
         >
-          <Users className="w-4 h-4" />
-          Adicionar Profissional
+          <UserPlus className="w-4 h-4" />
+          Adicionar
         </button>
       </div>
 
       {showNovo && (
-        <div className="bg-gray-800/80 rounded-xl p-6 border border-cyan-500/50">
-          <h4 className="text-lg font-bold text-white mb-4">Adicionar ao Programa</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Adicionar ao Programa</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Usuario</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Usuario</label>
               <select
                 value={novoProfissional.usuario_id}
                 onChange={(e) => setNovoProfissional({ ...novoProfissional, usuario_id: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
               >
                 <option value="">Selecione...</option>
-                {usuarios.map(u => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
-                ))}
+                {usuarios.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Unidade</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Unidade</label>
               <select
                 value={novoProfissional.unidade_id}
                 onChange={(e) => setNovoProfissional({ ...novoProfissional, unidade_id: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
               >
                 <option value="">Selecione...</option>
-                {unidades.map(u => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
-                ))}
+                {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Time</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Time</label>
               <select
-                value={novoProfissional.time}
-                onChange={(e) => setNovoProfissional({ ...novoProfissional, time: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                value={novoProfissional.time_id}
+                onChange={(e) => {
+                  const t = times.find(t => t.id === e.target.value);
+                  setNovoProfissional({ ...novoProfissional, time_id: e.target.value, time: t?.codigo || 'front_office' });
+                }}
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
               >
-                {times.map(t => (
-                  <option key={t.codigo} value={t.codigo}>{t.nome}</option>
-                ))}
+                <option value="">Selecione...</option>
+                {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Nivel Inicial</label>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nivel Inicial</label>
               <select
                 value={novoProfissional.nivel_atual_id}
                 onChange={(e) => setNovoProfissional({ ...novoProfissional, nivel_atual_id: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
+                className="w-full rounded-lg px-3 py-2 text-sm"
+                style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
               >
-                <option value="">Starter</option>
-                {niveis.map(n => (
-                  <option key={n.id} value={n.id}>{n.nome}</option>
-                ))}
+                <option value="">Primeiro nivel</option>
+                {niveis.map(n => <option key={n.id} value={n.id}>{n.nome}</option>)}
               </select>
             </div>
-          </div>
-          <div className="flex justify-end gap-3 mt-4">
-            <button onClick={() => setShowNovo(false)} className="px-4 py-2 bg-gray-700 text-white rounded-lg">
-              Cancelar
-            </button>
-            <button onClick={handleSaveProfissional} className="px-4 py-2 bg-cyan-600 text-white rounded-lg">
-              Adicionar
-            </button>
+            <div className="flex items-end gap-2">
+              <button onClick={() => setShowNovo(false)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                Cancelar
+              </button>
+              <button onClick={handleSave} className="px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
+                Salvar
+              </button>
+            </div>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
         {profissionais.map(prof => (
           <div
             key={prof.id}
-            className="bg-gray-800/50 rounded-xl p-5 border border-gray-700 hover:border-cyan-500/50 transition-all"
+            className="rounded-xl p-4 transition-all hover:scale-[1.01]"
+            style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-3">
                 <div
-                  className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-bold"
-                  style={{
-                    backgroundColor: (prof.nivel?.cor || '#6B7280') + '30',
-                    color: prof.nivel?.cor || '#6B7280'
-                  }}
+                  className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold"
+                  style={{ backgroundColor: (prof.nivel?.cor || '#6B7280') + '25', color: prof.nivel?.cor || '#6B7280' }}
                 >
                   {prof.usuario?.nome?.split(' ').map((n: string) => n[0]).join('').substring(0, 2) || '??'}
                 </div>
                 <div>
-                  <h4 className="text-white font-bold">{prof.usuario?.nome || 'Sem nome'}</h4>
-                  <p className="text-gray-400 text-sm">{prof.unidade?.nome}</p>
+                  <h4 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{prof.usuario?.nome || 'Sem nome'}</h4>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{prof.unidade?.nome}</p>
                 </div>
               </div>
-              <button
-                onClick={() => handleDeleteProfissional(prof.id)}
-                className="p-1.5 text-gray-400 hover:text-red-400"
-              >
-                <Users className="w-4 h-4" />
+              <button onClick={() => handleDelete(prof.id)} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
-
             <div className="flex items-center justify-between">
-              <span className={`px-2 py-1 rounded text-xs ${
-                prof.time === 'front_office'
-                  ? 'bg-blue-500/20 text-blue-400'
-                  : 'bg-purple-500/20 text-purple-400'
-              }`}>
-                {prof.time === 'front_office' ? 'Front Office' : 'Inside Sales'}
+              <span
+                className="px-2 py-0.5 rounded text-xs font-medium"
+                style={{ backgroundColor: (prof.skywalker_time?.cor || '#6B7280') + '20', color: prof.skywalker_time?.cor || '#6B7280' }}
+              >
+                {prof.skywalker_time?.nome || prof.time}
               </span>
               <span
-                className="px-3 py-1 rounded-full text-xs font-bold"
-                style={{
-                  backgroundColor: (prof.nivel?.cor || '#6B7280') + '20',
-                  color: prof.nivel?.cor || '#6B7280'
-                }}
+                className="px-2.5 py-0.5 rounded-full text-xs font-bold"
+                style={{ backgroundColor: (prof.nivel?.cor || '#6B7280') + '20', color: prof.nivel?.cor || '#6B7280' }}
               >
                 {prof.nivel?.nome || 'Starter'}
               </span>
             </div>
-
-            <div className="mt-3 pt-3 border-t border-gray-700 text-sm text-gray-400">
+            <div className="mt-2 pt-2 text-xs" style={{ borderTop: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}>
               {prof.meses_consecutivos_validos} mes(es) consecutivos
             </div>
           </div>
@@ -516,185 +509,11 @@ function ProfissionaisTab() {
       </div>
 
       {profissionais.length === 0 && (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">Nenhum profissional cadastrado</p>
+        <div className="text-center py-16">
+          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+          <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional cadastrado</p>
         </div>
       )}
-    </div>
-  );
-}
-
-function PipelinesTab() {
-  const [pilares, setPilares] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    loadPilares();
-  }, []);
-
-  const loadPilares = async () => {
-    const { data } = await supabase
-      .from('skywalker_pilares')
-      .select('*')
-      .eq('ativo', true)
-      .order('ordem');
-
-    if (data) setPilares(data);
-    setLoading(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-6">
-      <h2 className="text-2xl font-bold flex items-center gap-2">
-        <BarChart3 className="w-6 h-6 text-green-400" />
-        Pipeline de Metricas
-      </h2>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {pilares.map(pilar => (
-          <div key={pilar.id} className="bg-gray-800/50 rounded-xl p-5 border border-gray-700">
-            <h4 className="text-white font-bold text-lg mb-2">{pilar.nome}</h4>
-            <p className="text-gray-400 text-sm mb-4">{pilar.descricao}</p>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Tipo:</span>
-                <span className="text-white capitalize">{pilar.tipo_metrica}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Max Estrelas:</span>
-                <span className="text-yellow-400 font-bold">{pilar.max_estrelas}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Meta Front:</span>
-                <span className="text-blue-400">{pilar.meta_front_office}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-500">Meta Inside:</span>
-                <span className="text-purple-400">{pilar.meta_inside_sales}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 pt-4 border-t border-gray-700">
-              <div className="flex gap-2">
-                {pilar.time_aplicavel?.map((time: string) => (
-                  <span
-                    key={time}
-                    className={`px-2 py-1 rounded text-xs ${
-                      time === 'front_office'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-purple-500/20 text-purple-400'
-                    }`}
-                  >
-                    {time === 'front_office' ? 'Front' : 'Inside'}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {pilares.length === 0 && (
-        <div className="text-center py-12">
-          <BarChart3 className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">Configure os pilares na aba "Regras do Jogo"</p>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ConfiguracoesTab() {
-  const [salvando, setSalvando] = useState(false);
-
-  const handleSalvar = () => {
-    setSalvando(true);
-    setTimeout(() => setSalvando(false), 1500);
-  };
-
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Settings className="w-6 h-6 text-gray-400" />
-          Configuracoes
-        </h2>
-        <button
-          onClick={handleSalvar}
-          disabled={salvando}
-          className="px-6 py-2 bg-cyan-600 text-white rounded-lg disabled:opacity-50"
-        >
-          {salvando ? 'Salvando...' : 'Salvar'}
-        </button>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-4">Ciclo de Avaliacao</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Periodo</label>
-              <select className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white">
-                <option value="mensal">Mensal</option>
-                <option value="quinzenal">Quinzenal</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">Dia de Fechamento</label>
-              <input
-                type="number"
-                defaultValue={25}
-                min={1}
-                max={31}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-          <h3 className="text-lg font-bold text-white mb-4">Notificacoes</h3>
-          <div className="space-y-4">
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-gray-300">Notificacoes push</span>
-              <input type="checkbox" defaultChecked className="w-5 h-5 accent-cyan-500" />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-gray-300">E-mails automaticos</span>
-              <input type="checkbox" defaultChecked className="w-5 h-5 accent-cyan-500" />
-            </label>
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-gray-300">Resumo semanal</span>
-              <input type="checkbox" className="w-5 h-5 accent-cyan-500" />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
-        <h3 className="text-lg font-bold text-white mb-4">Acoes</h3>
-        <div className="flex flex-wrap gap-3">
-          <button className="px-4 py-2 bg-blue-600/20 border border-blue-500/50 text-blue-400 rounded-lg hover:bg-blue-600/30">
-            Recalcular Estrelas
-          </button>
-          <button className="px-4 py-2 bg-green-600/20 border border-green-500/50 text-green-400 rounded-lg hover:bg-green-600/30">
-            Processar Promocoes
-          </button>
-          <button className="px-4 py-2 bg-yellow-600/20 border border-yellow-500/50 text-yellow-400 rounded-lg hover:bg-yellow-600/30">
-            Gerar Relatorio
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

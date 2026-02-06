@@ -1,179 +1,98 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Users, Plus, Pencil, Trash2, Save, X } from 'lucide-react';
+import { useSkywalker } from '../../contexts/SkywalkerContext';
 import { supabase } from '../../lib/supabase';
 
-interface Time {
-  id: string;
-  nome: string;
-  codigo: string;
-  descricao: string | null;
-  cor: string;
-  icone: string;
-  ativo: boolean;
-  ordem: number;
-}
+const CORES = [
+  { nome: 'Blue', hex: '#3B82F6' }, { nome: 'Green', hex: '#10B981' },
+  { nome: 'Yellow', hex: '#F59E0B' }, { nome: 'Red', hex: '#EF4444' },
+  { nome: 'Cyan', hex: '#06B6D4' }, { nome: 'Orange', hex: '#F97316' },
+  { nome: 'Teal', hex: '#14B8A6' }, { nome: 'Rose', hex: '#F43F5E' },
+];
 
 export function TimesTab() {
-  const [times, setTimes] = useState<Time[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [editingTime, setEditingTime] = useState<Time | null>(null);
-  const [showNovoTime, setShowNovoTime] = useState(false);
+  const { times, profissionais, loadTimes } = useSkywalker();
+  const [showNovo, setShowNovo] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' });
 
-  const [novoTime, setNovoTime] = useState({
-    nome: '',
-    codigo: '',
-    descricao: '',
-    cor: '#3B82F6',
-    icone: 'Users'
-  });
-
-  const cores = [
-    '#3B82F6', '#10B981', '#F59E0B', '#EF4444',
-    '#8B5CF6', '#EC4899', '#06B6D4', '#84CC16'
-  ];
-
-  useEffect(() => {
+  const handleSave = async () => {
+    if (!form.nome.trim() || (!editingId && !form.codigo.trim())) return;
+    const maxOrdem = times.reduce((m, t) => Math.max(m, t.ordem), 0);
+    if (editingId) {
+      await supabase.from('skywalker_times').update({ nome: form.nome, descricao: form.descricao, cor: form.cor }).eq('id', editingId);
+    } else {
+      await supabase.from('skywalker_times').insert({ nome: form.nome, codigo: form.codigo.toLowerCase().replace(/\s+/g, '_'), descricao: form.descricao, cor: form.cor, ordem: maxOrdem + 1, ativo: true });
+    }
+    setShowNovo(false);
+    setEditingId(null);
+    setForm({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' });
     loadTimes();
-  }, []);
-
-  const loadTimes = async () => {
-    setLoading(true);
-    const { data } = await supabase
-      .from('skywalker_times')
-      .select('*')
-      .order('ordem');
-
-    if (data) setTimes(data);
-    setLoading(false);
   };
 
-  const handleSaveTime = async () => {
-    if (!novoTime.nome.trim() || !novoTime.codigo.trim()) return;
-
-    const ordem = times.length + 1;
-    const { error } = await supabase.from('skywalker_times').insert({
-      ...novoTime,
-      codigo: novoTime.codigo.toLowerCase().replace(/\s+/g, '_'),
-      ordem,
-      ativo: true
-    });
-
-    if (!error) {
-      setShowNovoTime(false);
-      setNovoTime({ nome: '', codigo: '', descricao: '', cor: '#3B82F6', icone: 'Users' });
-      loadTimes();
-    }
+  const handleEdit = (time: any) => {
+    setForm({ nome: time.nome, codigo: time.codigo, descricao: time.descricao || '', cor: time.cor });
+    setEditingId(time.id);
+    setShowNovo(true);
   };
 
-  const handleUpdateTime = async () => {
-    if (!editingTime) return;
-
-    const { error } = await supabase
-      .from('skywalker_times')
-      .update({
-        nome: editingTime.nome,
-        descricao: editingTime.descricao,
-        cor: editingTime.cor
-      })
-      .eq('id', editingTime.id);
-
-    if (!error) {
-      setEditingTime(null);
-      loadTimes();
-    }
-  };
-
-  const handleDeleteTime = async (id: string) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Excluir este time? Profissionais vinculados serao afetados.')) return;
-    await supabase.from('skywalker_times').delete().eq('id', id);
+    await supabase.from('skywalker_times').update({ ativo: false }).eq('id', id);
     loadTimes();
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-8 h-8 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const getMemberCount = (timeId: string) => {
+    return profissionais.filter(p => p.time_id === timeId).length;
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Users className="w-6 h-6 text-cyan-400" />
-          Tipos de Times
+        <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+          <Users className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+          Times ({times.length})
         </h2>
         <button
-          onClick={() => setShowNovoTime(true)}
-          className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg hover:opacity-90"
+          onClick={() => { setShowNovo(true); setEditingId(null); setForm({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' }); }}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm"
+          style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
         >
           <Plus className="w-4 h-4" />
           Novo Time
         </button>
       </div>
 
-      {showNovoTime && (
-        <div className="bg-gray-800/80 rounded-xl p-6 border border-cyan-500/50">
-          <h4 className="text-lg font-bold text-white mb-4">Criar Novo Time</h4>
+      {showNovo && (
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{editingId ? 'Editar Time' : 'Criar Time'}</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Nome</label>
-              <input
-                type="text"
-                value={novoTime.nome}
-                onChange={(e) => setNovoTime({ ...novoTime, nome: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                placeholder="Ex: Front Office"
-              />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
+              <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Front Office" />
+            </div>
+            {!editingId && (
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Codigo (identificador)</label>
+                <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: front_office" />
+              </div>
+            )}
+            <div className={editingId ? '' : 'md:col-span-2'}>
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
+              <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descricao do time..." />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Codigo (identificador)</label>
-              <input
-                type="text"
-                value={novoTime.codigo}
-                onChange={(e) => setNovoTime({ ...novoTime, codigo: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                placeholder="Ex: front_office"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <label className="block text-sm text-gray-400 mb-1">Descricao</label>
-              <textarea
-                value={novoTime.descricao}
-                onChange={(e) => setNovoTime({ ...novoTime, descricao: e.target.value })}
-                className="w-full bg-gray-900 border border-gray-700 rounded-lg px-4 py-2 text-white"
-                rows={2}
-                placeholder="Descricao do time..."
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-gray-400 mb-1">Cor</label>
-              <div className="flex gap-2">
-                {cores.map((cor) => (
-                  <button
-                    key={cor}
-                    onClick={() => setNovoTime({ ...novoTime, cor })}
-                    className={`w-8 h-8 rounded-full border-2 ${
-                      novoTime.cor === cor ? 'border-white' : 'border-transparent'
-                    }`}
-                    style={{ backgroundColor: cor }}
-                  />
+              <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
+              <div className="flex flex-wrap gap-1.5">
+                {CORES.map(c => (
+                  <button key={c.hex} onClick={() => setForm({ ...form, cor: c.hex })} className="w-7 h-7 rounded-full border-2 transition-all" style={{ backgroundColor: c.hex, borderColor: form.cor === c.hex ? 'white' : 'transparent', transform: form.cor === c.hex ? 'scale(1.2)' : 'scale(1)' }} title={c.nome} />
                 ))}
               </div>
             </div>
           </div>
-          <div className="flex justify-end gap-3 mt-4">
-            <button
-              onClick={() => setShowNovoTime(false)}
-              className="px-4 py-2 bg-gray-700 text-white rounded-lg"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSaveTime}
-              className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg"
-            >
+          <div className="flex justify-end gap-2 mt-4">
+            <button onClick={() => { setShowNovo(false); setEditingId(null); }} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>Cancelar</button>
+            <button onClick={handleSave} className="flex items-center gap-1 px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
               <Save className="w-4 h-4" />
               Salvar
             </button>
@@ -182,88 +101,44 @@ export function TimesTab() {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {times.map((time) => (
-          <div
-            key={time.id}
-            className="bg-gray-800/50 rounded-xl p-5 border-2 transition-all"
-            style={{ borderColor: time.cor + '50' }}
-          >
-            {editingTime?.id === time.id ? (
-              <div className="space-y-3">
-                <input
-                  type="text"
-                  value={editingTime.nome}
-                  onChange={(e) => setEditingTime({ ...editingTime, nome: e.target.value })}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                />
-                <textarea
-                  value={editingTime.descricao || ''}
-                  onChange={(e) => setEditingTime({ ...editingTime, descricao: e.target.value })}
-                  className="w-full bg-gray-900 border border-gray-700 rounded px-3 py-2 text-white"
-                  rows={2}
-                />
-                <div className="flex gap-2">
-                  {cores.map((cor) => (
-                    <button
-                      key={cor}
-                      onClick={() => setEditingTime({ ...editingTime, cor })}
-                      className={`w-6 h-6 rounded-full border-2 ${
-                        editingTime.cor === cor ? 'border-white' : 'border-transparent'
-                      }`}
-                      style={{ backgroundColor: cor }}
-                    />
-                  ))}
+        {times.map((time) => {
+          const memberCount = getMemberCount(time.id);
+          return (
+            <div key={time.id} className="rounded-xl p-5 transition-all" style={{ backgroundColor: 'var(--bg-card)', border: `2px solid ${time.cor}30` }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: time.cor + '20' }}>
+                    <Users className="w-5 h-5" style={{ color: time.cor }} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold" style={{ color: time.cor }}>{time.nome}</h4>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{time.codigo}</p>
+                  </div>
                 </div>
-                <div className="flex justify-end gap-2">
-                  <button onClick={() => setEditingTime(null)} className="p-1.5 text-gray-400 hover:text-white">
-                    <X className="w-4 h-4" />
+                <div className="flex gap-1">
+                  <button onClick={() => handleEdit(time)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                    <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={handleUpdateTime} className="p-1.5 text-cyan-400 hover:text-cyan-300">
-                    <Save className="w-4 h-4" />
+                  <button onClick={() => handleDelete(time.id)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
-            ) : (
-              <>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-lg flex items-center justify-center"
-                      style={{ backgroundColor: time.cor + '20' }}
-                    >
-                      <Users className="w-5 h-5" style={{ color: time.cor }} />
-                    </div>
-                    <div>
-                      <h4 className="text-white font-bold">{time.nome}</h4>
-                      <p className="text-gray-500 text-xs">{time.codigo}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      onClick={() => setEditingTime(time)}
-                      className="p-1.5 text-gray-400 hover:text-cyan-400"
-                    >
-                      <Pencil className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteTime(time.id)}
-                      className="p-1.5 text-gray-400 hover:text-red-400"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-                <p className="text-gray-400 text-sm">{time.descricao || 'Sem descricao'}</p>
-              </>
-            )}
-          </div>
-        ))}
+              <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>{time.descricao || 'Sem descricao'}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: time.cor + '15', color: time.cor }}>
+                  {memberCount} membro{memberCount !== 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {times.length === 0 && (
-        <div className="text-center py-12">
-          <Users className="w-16 h-16 text-gray-600 mx-auto mb-4" />
-          <p className="text-gray-400">Nenhum time cadastrado</p>
+        <div className="text-center py-16">
+          <Users className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+          <p style={{ color: 'var(--text-secondary)' }}>Nenhum time cadastrado</p>
         </div>
       )}
     </div>
