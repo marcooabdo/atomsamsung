@@ -131,6 +131,12 @@ export function OSNotaFiscalTab({
   const [editValues, setEditValues] = useState<EditValues>({ descricao: '', quantidade: 1, valor_unitario: 0 });
   const [saving, setSaving] = useState(false);
 
+  const [descontoServicosManual, setDescontoServicosManual] = useState<number | null>(null);
+  const [editingDescontoServicos, setEditingDescontoServicos] = useState(false);
+  const [editingDescontoPecas, setEditingDescontoPecas] = useState(false);
+  const [descontoServicosInput, setDescontoServicosInput] = useState('');
+  const [descontoPecasInput, setDescontoPecasInput] = useState('');
+
   const isLpOrCortesia = tipoOs === 'LP' || isCortesia === true;
 
   useEffect(() => {
@@ -374,16 +380,51 @@ export function OSNotaFiscalTab({
     return { label: 'Pendente', color: '#FFBF00', bg: '#FFBF0020', icon: Clock };
   };
 
+  const startEditDescontoServicos = () => {
+    setDescontoServicosInput(descontoServicos.toFixed(2));
+    setEditingDescontoServicos(true);
+    setEditingDescontoPecas(false);
+  };
+
+  const startEditDescontoPecas = () => {
+    setDescontoPecasInput(descontoPecas.toFixed(2));
+    setEditingDescontoPecas(true);
+    setEditingDescontoServicos(false);
+  };
+
+  const confirmDescontoServicos = () => {
+    const val = Math.max(0, Math.min(parseFloat(descontoServicosInput.replace(',', '.')) || 0, valorDesconto));
+    const clamped = Math.min(val, totalServicos);
+    setDescontoServicosManual(Math.round(clamped * 100) / 100);
+    setEditingDescontoServicos(false);
+  };
+
+  const confirmDescontoPecas = () => {
+    const val = Math.max(0, Math.min(parseFloat(descontoPecasInput.replace(',', '.')) || 0, valorDesconto));
+    const clamped = Math.min(val, totalPecas);
+    const newServicos = Math.round((valorDesconto - clamped) * 100) / 100;
+    setDescontoServicosManual(Math.min(newServicos, totalServicos));
+    setEditingDescontoPecas(false);
+  };
+
+  const resetDescontoSplit = () => {
+    setDescontoServicosManual(null);
+    setEditingDescontoServicos(false);
+    setEditingDescontoPecas(false);
+  };
+
   const totalServicos = servicos.reduce((sum, s) => sum + s.valor_total, 0);
   const totalPecas = pecas.reduce((sum, p) => sum + p.valor_total, 0);
   const totalBruto = totalServicos + totalPecas;
 
-  const descontoServicos = totalBruto > 0
+  const descontoProporcionalServicos = totalBruto > 0
     ? Math.round((totalServicos / totalBruto) * valorDesconto * 100) / 100
     : 0;
-  const descontoPecas = totalBruto > 0
-    ? Math.round(valorDesconto * 100 - descontoServicos * 100) / 100
-    : 0;
+
+  const descontoServicos = descontoServicosManual !== null
+    ? descontoServicosManual
+    : descontoProporcionalServicos;
+  const descontoPecas = Math.round((valorDesconto - descontoServicos) * 100) / 100;
 
   const totalServicosComDesconto = Math.max(totalServicos - descontoServicos, 0);
   const totalPecasComDesconto = Math.max(totalPecas - descontoPecas, 0);
@@ -691,7 +732,7 @@ export function OSNotaFiscalTab({
             )}
           </div>
 
-          <div className={`grid gap-4 mb-4 ${descontoServicos > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div className={`grid gap-4 mb-4 ${valorDesconto > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
               <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Servicos</p>
               <p className={`text-lg font-bold ${descontoServicos > 0 ? 'text-gray-400 line-through' : 'text-white'}`}>{formatCurrency(totalServicos)}</p>
@@ -699,10 +740,39 @@ export function OSNotaFiscalTab({
                 <p className="text-sm font-bold text-white">{formatCurrency(totalServicosComDesconto)}</p>
               )}
             </div>
-            {descontoServicos > 0 && (
-              <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
-                <p className="text-[10px] text-[#FF0064] uppercase mb-1">Desconto</p>
-                <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoServicos)}</p>
+            {valorDesconto > 0 && (
+              <div
+                className={`p-3 rounded-lg border transition-all ${editingDescontoServicos ? 'bg-[#FF0064]/20 border-[#FF0064]/60' : 'bg-[#FF0064]/10 border-[#FF0064]/30 cursor-pointer hover:border-[#FF0064]/60'}`}
+                onClick={() => !editingDescontoServicos && startEditDescontoServicos()}
+              >
+                <p className="text-[10px] text-[#FF0064] uppercase mb-1 flex items-center gap-1">
+                  Desconto
+                  {!editingDescontoServicos && <Edit3 className="w-2.5 h-2.5 opacity-50" />}
+                </p>
+                {editingDescontoServicos ? (
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-[#FF0064] font-bold">-R$</span>
+                    <input
+                      type="text"
+                      value={descontoServicosInput}
+                      onChange={(e) => setDescontoServicosInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') confirmDescontoServicos();
+                        if (e.key === 'Escape') setEditingDescontoServicos(false);
+                      }}
+                      autoFocus
+                      className="w-full bg-transparent border-b border-[#FF0064]/60 text-[#FF0064] font-bold text-lg outline-none"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoServicos)}</p>
+                )}
+                {editingDescontoServicos && (
+                  <div className="flex gap-1 mt-1">
+                    <button onClick={(e) => { e.stopPropagation(); confirmDescontoServicos(); }} className="text-[9px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30 hover:bg-[#39FF14]/30">OK</button>
+                    <button onClick={(e) => { e.stopPropagation(); setEditingDescontoServicos(false); }} className="text-[9px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600">Esc</button>
+                  </div>
+                )}
               </div>
             )}
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
@@ -763,10 +833,16 @@ export function OSNotaFiscalTab({
                       </td>
                       <td></td>
                     </tr>
-                    {descontoServicos > 0 && (
+                    {valorDesconto > 0 && (
                       <tr className="bg-[#FF0064]/5">
                         <td colSpan={3} className="py-2 px-3 text-right text-xs font-bold text-[#FF0064] uppercase">
-                          Desconto proporcional
+                          <span
+                            className="cursor-pointer hover:underline inline-flex items-center gap-1"
+                            onClick={startEditDescontoServicos}
+                          >
+                            Desconto {descontoServicosManual !== null ? '(editado)' : '(proporcional)'}
+                            <Edit3 className="w-2.5 h-2.5 opacity-50" />
+                          </span>
                         </td>
                         <td className="py-2 px-3 text-right text-sm font-bold text-[#FF0064]">
                           - {formatCurrency(descontoServicos)}
@@ -834,7 +910,7 @@ export function OSNotaFiscalTab({
           )}
         </div>
 
-        <div className={`grid gap-4 mb-4 ${descontoPecas > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
+        <div className={`grid gap-4 mb-4 ${valorDesconto > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
             <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Pecas</p>
             <p className={`text-lg font-bold ${descontoPecas > 0 ? 'text-gray-400 line-through' : 'text-white'}`}>{formatCurrency(totalPecas)}</p>
@@ -842,10 +918,39 @@ export function OSNotaFiscalTab({
               <p className="text-sm font-bold text-white">{formatCurrency(totalPecasComDesconto)}</p>
             )}
           </div>
-          {descontoPecas > 0 && (
-            <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
-              <p className="text-[10px] text-[#FF0064] uppercase mb-1">Desconto</p>
-              <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoPecas)}</p>
+          {valorDesconto > 0 && (
+            <div
+              className={`p-3 rounded-lg border transition-all ${editingDescontoPecas ? 'bg-[#FF0064]/20 border-[#FF0064]/60' : 'bg-[#FF0064]/10 border-[#FF0064]/30 cursor-pointer hover:border-[#FF0064]/60'}`}
+              onClick={() => !editingDescontoPecas && startEditDescontoPecas()}
+            >
+              <p className="text-[10px] text-[#FF0064] uppercase mb-1 flex items-center gap-1">
+                Desconto
+                {!editingDescontoPecas && <Edit3 className="w-2.5 h-2.5 opacity-50" />}
+              </p>
+              {editingDescontoPecas ? (
+                <div className="flex items-center gap-1">
+                  <span className="text-sm text-[#FF0064] font-bold">-R$</span>
+                  <input
+                    type="text"
+                    value={descontoPecasInput}
+                    onChange={(e) => setDescontoPecasInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') confirmDescontoPecas();
+                      if (e.key === 'Escape') setEditingDescontoPecas(false);
+                    }}
+                    autoFocus
+                    className="w-full bg-transparent border-b border-[#FF0064]/60 text-[#FF0064] font-bold text-lg outline-none"
+                  />
+                </div>
+              ) : (
+                <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoPecas)}</p>
+              )}
+              {editingDescontoPecas && (
+                <div className="flex gap-1 mt-1">
+                  <button onClick={(e) => { e.stopPropagation(); confirmDescontoPecas(); }} className="text-[9px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30 hover:bg-[#39FF14]/30">OK</button>
+                  <button onClick={(e) => { e.stopPropagation(); setEditingDescontoPecas(false); }} className="text-[9px] px-1.5 py-0.5 rounded bg-gray-700 text-gray-300 border border-gray-600 hover:bg-gray-600">Esc</button>
+                </div>
+              )}
             </div>
           )}
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
@@ -929,10 +1034,16 @@ export function OSNotaFiscalTab({
                     </td>
                     <td></td>
                   </tr>
-                  {descontoPecas > 0 && (
+                  {valorDesconto > 0 && (
                     <tr className="bg-[#FF0064]/5">
                       <td colSpan={5} className="py-2 px-3 text-right text-xs font-bold text-[#FF0064] uppercase">
-                        Desconto proporcional
+                        <span
+                          className="cursor-pointer hover:underline inline-flex items-center gap-1"
+                          onClick={startEditDescontoPecas}
+                        >
+                          Desconto {descontoServicosManual !== null ? '(editado)' : '(proporcional)'}
+                          <Edit3 className="w-2.5 h-2.5 opacity-50" />
+                        </span>
                       </td>
                       <td className="py-2 px-3 text-right text-sm font-bold text-[#FF0064]">
                         - {formatCurrency(descontoPecas)}
@@ -965,15 +1076,34 @@ export function OSNotaFiscalTab({
             </div>
             {totalServicos > 0 && totalPecas > 0 && (
               <div className="flex items-center gap-4 text-xs">
-                <div className="text-right">
-                  <p className="text-gray-500">Servicos</p>
+                <div
+                  className="text-right cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={startEditDescontoServicos}
+                >
+                  <p className="text-gray-500 flex items-center gap-1 justify-end">Servicos <Edit3 className="w-2.5 h-2.5 opacity-50" /></p>
                   <p className="text-[#FF0064] font-bold">- {formatCurrency(descontoServicos)}</p>
                 </div>
                 <div className="w-px h-8 bg-gray-700" />
-                <div className="text-right">
-                  <p className="text-gray-500">Pecas</p>
+                <div
+                  className="text-right cursor-pointer hover:opacity-80 transition-opacity"
+                  onClick={startEditDescontoPecas}
+                >
+                  <p className="text-gray-500 flex items-center gap-1 justify-end">Pecas <Edit3 className="w-2.5 h-2.5 opacity-50" /></p>
                   <p className="text-[#FF0064] font-bold">- {formatCurrency(descontoPecas)}</p>
                 </div>
+                {descontoServicosManual !== null && (
+                  <>
+                    <div className="w-px h-8 bg-gray-700" />
+                    <button
+                      onClick={resetDescontoSplit}
+                      className="flex items-center gap-1 px-2 py-1 rounded bg-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-600/50 transition-colors"
+                      title="Voltar ao rateio proporcional"
+                    >
+                      <RotateCcw className="w-3 h-3" />
+                      <span className="text-[10px]">Resetar</span>
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </div>
