@@ -1264,11 +1264,11 @@ export function Kanban() {
         <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,245,255,0.05) 100%)',
-              border: '1px solid rgba(0,212,255,0.3)',
-              boxShadow: '0 0 20px rgba(0,212,255,0.1)'
+              background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.15) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+              border: '1px solid rgba(var(--accent-rgb),0.3)',
+              boxShadow: '0 0 20px rgba(var(--accent-rgb),0.1)'
             }}>
-              <Activity className="w-4 h-4 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+              <Activity className="w-4 h-4 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
               <h3 className="tech-heading text-sm text-[#00D4FF] tracking-widest">KANBAN</h3>
             </div>
           </div>
@@ -1648,10 +1648,10 @@ export function Kanban() {
               onClick={() => setCriarOSOW(true)}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
               style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                border: '1px solid #00D4FF',
-                color: '#00D4FF',
-                boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                border: '1px solid var(--text-accent)',
+                color: 'var(--text-accent)',
+                boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
               }}
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1677,10 +1677,10 @@ export function Kanban() {
               disabled={syncingSamsung || !selectedUnidade}
               className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,245,255,0.05) 100%)',
-                border: '1px solid #00D4FF',
-                color: '#00D4FF',
-                boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                border: '1px solid var(--text-accent)',
+                color: 'var(--text-accent)',
+                boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
               }}
               title={
                 !selectedUnidade
@@ -1972,7 +1972,7 @@ export function Kanban() {
                                   className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
                                   title="Copiar número da OS"
                                 >
-                                  <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                  <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
                                 </button>
                               </div>
                               <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
@@ -2010,10 +2010,10 @@ export function Kanban() {
                                 style={{
                                   background: os.tipo_os === 'LP'
                                     ? 'linear-gradient(135deg, rgba(255,165,0,0.25) 0%, rgba(255,165,0,0.1) 100%)'
-                                    : 'linear-gradient(135deg, rgba(0,212,255,0.25) 0%, rgba(0,212,255,0.1) 100%)',
-                                  color: os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF',
-                                  border: `1px solid ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.5)' : 'rgba(0,212,255,0.5)'}`,
-                                  boxShadow: `0 0 8px ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.2)' : 'rgba(0,212,255,0.2)'}`
+                                    : 'linear-gradient(135deg, rgba(var(--accent-rgb),0.25) 0%, rgba(var(--accent-rgb),0.1) 100%)',
+                                  color: os.tipo_os === 'LP' ? '#FFA500' : 'var(--text-accent)',
+                                  border: `1px solid ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.5)' : 'rgba(var(--accent-rgb),0.5)'}`,
+                                  boxShadow: `0 0 8px ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.2)' : 'rgba(var(--accent-rgb),0.2)'}`
                                 }}
                               >
                                 {os.tipo_os}
@@ -2101,19 +2101,19 @@ export function Kanban() {
                               return (
                                 <div className="mt-1.5 rounded-md p-1.5 space-y-1"
                                   style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,212,255,0.03) 100%)',
-                                    border: '1px solid rgba(0,212,255,0.3)',
-                                    boxShadow: '0 0 10px rgba(0,212,255,0.1)'
+                                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
+                                    border: '1px solid rgba(var(--accent-rgb),0.3)',
+                                    boxShadow: '0 0 10px rgba(var(--accent-rgb),0.1)'
                                   }}
                                 >
                                   <div className="flex items-center gap-1.5">
-                                    <Package className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                    <Package className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
                                     <span
                                       className="px-1.5 py-0.5 rounded text-[9px] font-bold"
                                       style={{
-                                        background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.15) 100%)',
-                                        color: '#00D4FF',
-                                        border: '1px solid rgba(0,212,255,0.5)'
+                                        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.15) 100%)',
+                                        color: 'var(--text-accent)',
+                                        border: '1px solid rgba(var(--accent-rgb),0.5)'
                                       }}
                                     >
                                       {pecasEmTransito.length} PEÇA{pecasEmTransito.length > 1 ? 'S' : ''} EM TRÂNSITO
@@ -2185,20 +2185,20 @@ export function Kanban() {
                             {badgeFilters.tecnico && os.tecnico_designado_id && (os as any).tecnico_designado?.nome && (
                               <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
-                                  borderColor: 'rgba(0,212,255,0.3)',
-                                  background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,212,255,0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(0,212,255,0.1)'
+                                  borderColor: 'rgba(var(--accent-rgb),0.3)',
+                                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
+                                  boxShadow: '0 0 10px rgba(var(--accent-rgb),0.1)'
                                 }}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <User className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #00D4FF)' }} />
+                                  <User className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
                                   <div className="flex-1 min-w-0">
                                     <span
                                       className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
                                       style={{
-                                        background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.15) 100%)',
-                                        color: '#00D4FF',
-                                        border: '1px solid rgba(0,212,255,0.5)'
+                                        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.15) 100%)',
+                                        color: 'var(--text-accent)',
+                                        border: '1px solid rgba(var(--accent-rgb),0.5)'
                                       }}
                                     >
                                       TÉCNICO
@@ -2278,8 +2278,8 @@ export function Kanban() {
                                   {valorPecas > 0 && (
                                     <div className="flex items-center justify-between gap-1.5">
                                       <span className="text-[10px] font-bold" style={{
-                                        color: '#00D4FF',
-                                        textShadow: '0 0 6px rgba(0,212,255,0.5)'
+                                        color: 'var(--text-accent)',
+                                        textShadow: '0 0 6px rgba(var(--accent-rgb),0.5)'
                                       }}>PEÇAS:</span>
                                       <span className="font-mono text-white text-[10px] font-bold">
                                         R$ {valorPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2300,8 +2300,8 @@ export function Kanban() {
                                   {os.tipo_os === 'OW' && subtotal && subtotal > 0 && (
                                     <div className="flex items-center justify-between gap-1.5">
                                       <span className="text-[10px] font-bold" style={{
-                                        color: '#00F5FF',
-                                        textShadow: '0 0 6px rgba(0,245,255,0.5)'
+                                        color: 'var(--text-accent)',
+                                        textShadow: '0 0 6px rgba(var(--accent-rgb),0.5)'
                                       }}>ORÇAM:</span>
                                       <span className="font-mono text-[#00F5FF] text-[10px] font-bold">
                                         R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2463,7 +2463,7 @@ export function Kanban() {
                             ))}
 
                             {badgeFilters.iniciarReparo && coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && os.tipo_orcamento !== 'samsung_contigo' && os.tipo_orcamento !== 'acessorios' && (
-                              <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
+                              <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
                                 {os.tecnico_designado_id && (os as any).tecnico_designado && (
                                   <div className="rounded-lg p-2" style={{
                                     background: 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)',
@@ -2529,7 +2529,7 @@ export function Kanban() {
                             )}
 
                             {badgeFilters.analiseConcluida && coluna.id === 'diagnostico' && (
-                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(0,212,255,0.2)' }}>
+                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -2541,10 +2541,10 @@ export function Kanban() {
                                   }}
                                   className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
                                   style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                                    border: '1px solid #00D4FF',
-                                    color: '#00D4FF',
-                                    boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                                    border: '1px solid var(--text-accent)',
+                                    color: 'var(--text-accent)',
+                                    boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
                                   }}
                                 >
                                   <CheckCircle className="w-3.5 h-3.5" />

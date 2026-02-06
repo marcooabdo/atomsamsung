@@ -61,10 +61,10 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
         <div
           className="flex items-center justify-between p-4 mb-4"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,0,0,0.5) 100%)',
-            border: '1px solid rgba(0,212,255,0.3)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(0,0,0,0.5) 100%)',
+            border: '1px solid rgba(var(--accent-rgb),0.3)',
             borderRadius: '12px',
-            boxShadow: '0 0 30px rgba(0,212,255,0.2)'
+            boxShadow: '0 0 30px rgba(var(--accent-rgb),0.2)'
           }}
         >
           <h3 className="text-lg font-bold text-white truncate max-w-[70%]">
@@ -104,9 +104,9 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
           className="flex-1 overflow-auto flex items-center justify-center"
           style={{
             background: 'linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.8) 100%)',
-            border: '1px solid rgba(0,212,255,0.2)',
+            border: '1px solid rgba(var(--accent-rgb),0.2)',
             borderRadius: '12px',
-            boxShadow: 'inset 0 0 30px rgba(0,212,255,0.1)'
+            boxShadow: 'inset 0 0 30px rgba(var(--accent-rgb),0.1)'
           }}
         >
           {isImage(anexo.nome_arquivo) ? (
@@ -115,7 +115,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
               alt={anexo.nome_arquivo}
               className="max-w-full max-h-full object-contain"
               style={{
-                boxShadow: '0 0 40px rgba(0,212,255,0.3)'
+                boxShadow: '0 0 40px rgba(var(--accent-rgb),0.3)'
               }}
             />
           ) : isPDF(anexo.nome_arquivo) ? (

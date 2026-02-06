@@ -146,7 +146,7 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
     const configs: Record<string, { bg: string; border: string; color: string; label: string }> = {
       emitida: { bg: '#39FF1415', border: '#39FF1460', color: '#39FF14', label: 'NF EMITIDA' },
       pendente: { bg: '#FFBF0015', border: '#FFBF0060', color: '#FFBF00', label: 'NF PENDENTE' },
-      processando: { bg: '#00D4FF15', border: '#00D4FF60', color: '#00D4FF', label: 'PROCESSANDO' },
+      processando: { bg: 'rgba(var(--accent-rgb), 0.082)', border: 'rgba(var(--accent-rgb), 0.38)', color: 'var(--text-accent)', label: 'PROCESSANDO' },
       erro: { bg: '#FF006415', border: '#FF006460', color: '#FF0064', label: 'NF ERRO' },
       cancelada: { bg: '#71717A15', border: '#71717A60', color: '#71717A', label: 'NF CANCELADA' }
     };
@@ -330,12 +330,12 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
 
         <div className="premium-card p-5">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#00D4FF20' }}>
-              <DollarSign className="w-5 h-5" style={{ color: '#00D4FF' }} />
+            <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--accent-rgb), 0.125)' }}>
+              <DollarSign className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
             </div>
           </div>
           <p className="text-xs text-gray-400 uppercase mb-1">PIX</p>
-          <p className="text-2xl font-bold" style={{ color: '#00D4FF' }}>
+          <p className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>
             R$ {totalPix.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>

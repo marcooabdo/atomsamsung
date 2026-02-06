@@ -104,8 +104,8 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
             <div
               className="p-2 rounded-lg"
               style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                border: '1px solid rgba(0,212,255,0.3)'
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                border: '1px solid rgba(var(--accent-rgb),0.3)'
               }}
             >
               <CheckCircle className="w-5 h-5 text-[#00D4FF]" />

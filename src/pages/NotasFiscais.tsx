@@ -281,8 +281,8 @@ export function NotasFiscais() {
       },
       processando: {
         bg: '#00D4FF10',
-        border: '#00D4FF60',
-        color: '#00D4FF',
+        border: 'rgba(var(--accent-rgb), 0.38)',
+        color: 'var(--text-accent)',
         icon: Clock,
         label: 'PROCESSANDO'
       },
@@ -681,9 +681,9 @@ export function NotasFiscais() {
                       onClick={() => setNotaDetalhes(nf)}
                       className="neon-button p-2"
                       style={{
-                        backgroundColor: '#00D4FF20',
-                        borderColor: '#00D4FF',
-                        color: '#00D4FF'
+                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                        borderColor: 'var(--text-accent)',
+                        color: 'var(--text-accent)'
                       }}
                       title="Ver detalhes"
                     >

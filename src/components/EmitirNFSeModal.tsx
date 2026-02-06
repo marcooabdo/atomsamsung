@@ -363,7 +363,7 @@ export function EmitirNFSeModal({
       <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-5 border-b border-gray-800">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)', border: '1px solid rgba(0,212,255,0.4)' }}>
+            <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)', border: '1px solid rgba(var(--accent-rgb),0.4)' }}>
               <Receipt className="w-5 h-5 text-[#00D4FF]" />
             </div>
             <div>
@@ -663,8 +663,8 @@ export function EmitirNFSeModal({
 
               <div className="flex items-center justify-between p-4 rounded-lg border"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(57,255,20,0.08) 100%)',
-                  borderColor: 'rgba(0,212,255,0.3)'
+                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(57,255,20,0.08) 100%)',
+                  borderColor: 'rgba(var(--accent-rgb),0.3)'
                 }}
               >
                 <div>
@@ -682,10 +682,10 @@ export function EmitirNFSeModal({
                   disabled={emitindo || form.valorServicos <= 0 || !form.configId}
                   className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.1) 100%)',
-                    border: '2px solid rgba(0,212,255,0.7)',
-                    color: '#00D4FF',
-                    boxShadow: '0 0 20px rgba(0,212,255,0.2)'
+                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.1) 100%)',
+                    border: '2px solid rgba(var(--accent-rgb),0.7)',
+                    color: 'var(--text-accent)',
+                    boxShadow: '0 0 20px rgba(var(--accent-rgb),0.2)'
                   }}
                 >
                   {emitindo ? (

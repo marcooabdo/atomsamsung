@@ -2101,10 +2101,10 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                       </p>
                       <div className="space-y-2">
                         {pecasBloqueadasInfo.map((info, idx) => {
-                          const statusConfig: Record<string, { label: string; color: string; icon: string }> = {
+                          const statusConfig: Record<string, { label: string; color: string; icon: string; isAccent?: boolean }> = {
                             // Status de requisição
                             pedido_feito: { label: 'PEDIDO ATIVO', color: '#FF0064', icon: '🚚' },
-                            atendida: { label: 'PEÇA ATENDIDA', color: '#00D4FF', icon: '✅' },
+                            atendida: { label: 'PEÇA ATENDIDA', color: '#00D4FF', icon: '✅', isAccent: true },
                             em_uso: { label: 'EM USO TÉCNICO', color: '#FFBF00', icon: '🔧' },
                             gi_postada: { label: 'GI PENDENTE', color: '#FF6B00', icon: '📦' },
                             devolvida: { label: 'DEVOLVIDA', color: '#00CED1', icon: '↩️' },
@@ -2123,11 +2123,15 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                           return (
                             <div key={idx} className="flex items-center gap-2 text-xs bg-black/30 rounded p-2">
                               <span>{config.icon}</span>
-                              <Lock className="w-3 h-3" style={{ color: config.color }} />
-                              <span className="font-mono font-bold" style={{ color: config.color }}>{info.pn}</span>
+                              <Lock className="w-3 h-3" style={{ color: config.isAccent ? 'var(--text-accent)' : config.color }} />
+                              <span className="font-mono font-bold" style={{ color: config.isAccent ? 'var(--text-accent)' : config.color }}>{info.pn}</span>
                               <span
                                 className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
-                                style={{
+                                style={config.isAccent ? {
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  color: 'var(--text-accent)',
+                                  border: '1px solid rgba(var(--accent-rgb), 0.38)'
+                                } : {
                                   backgroundColor: `${config.color}20`,
                                   color: config.color,
                                   border: `1px solid ${config.color}40`
@@ -2231,10 +2235,10 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                   {pecas.map((peca) => {
                     const isPecaBloqueada = pecasBloqueadasInfo.some(info => info.cotacao_peca_id === peca.id);
                     const pecaInfo = pecasBloqueadasInfo.find(p => p.cotacao_peca_id === peca.id);
-                    const statusConfig: Record<string, { label: string; color: string; icon: string; bg: string }> = {
+                    const statusConfig: Record<string, { label: string; color: string; icon: string; bg: string; isAccent?: boolean }> = {
                       // Status de requisição
                       pedido_feito: { label: 'PEDIDO ATIVO', color: '#FF0064', icon: '🚚', bg: '#FF006405' },
-                      atendida: { label: 'PEÇA ATENDIDA', color: '#00D4FF', icon: '✅', bg: '#00D4FF05' },
+                      atendida: { label: 'PEÇA ATENDIDA', color: '#00D4FF', icon: '✅', bg: 'rgba(var(--accent-rgb), 0.02)', isAccent: true },
                       em_uso: { label: 'EM USO TÉCNICO', color: '#FFBF00', icon: '🔧', bg: '#FFBF0005' },
                       gi_postada: { label: 'GI PENDENTE', color: '#FF6B00', icon: '📦', bg: '#FF6B0005' },
                       devolvida: { label: 'DEVOLVIDA', color: '#00CED1', icon: '↩️', bg: '#00CED105' },
@@ -2251,7 +2255,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                     const config = pecaInfo ? statusConfig[pecaInfo.status] : null;
 
                     return (
-                    <div key={peca.id} className={`premium-card p-4 ${isPecaBloqueada && config ? `border-2` : ''} ${peca.is_gspn ? 'border-l-4 border-blue-400' : ''}`} style={isPecaBloqueada && config ? { backgroundColor: config.bg, borderColor: `${config.color}40` } : {}}>
+                    <div key={peca.id} className={`premium-card p-4 ${isPecaBloqueada && config ? `border-2` : ''} ${peca.is_gspn ? 'border-l-4 border-blue-400' : ''}`} style={isPecaBloqueada && config ? { backgroundColor: config.bg, borderColor: config.isAccent ? 'rgba(var(--accent-rgb), 0.25)' : `${config.color}40` } : {}}>
                       {peca.is_gspn && (
                         <div className="flex items-center gap-2 mb-3 pb-3 border-b border-blue-400/20">
                           <span className="text-base">📡</span>
@@ -2268,12 +2272,16 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                         </div>
                       )}
                       {isPecaBloqueada && config && (
-                        <div className="flex items-center gap-2 mb-3 pb-3 border-b" style={{ borderColor: `${config.color}20` }}>
+                        <div className="flex items-center gap-2 mb-3 pb-3 border-b" style={{ borderColor: config.isAccent ? 'rgba(var(--accent-rgb), 0.125)' : `${config.color}20` }}>
                           <span className="text-base">{config.icon}</span>
-                          <Lock className="w-4 h-4" style={{ color: config.color }} />
+                          <Lock className="w-4 h-4" style={{ color: config.isAccent ? 'var(--text-accent)' : config.color }} />
                           <span
                             className="px-2 py-1 rounded text-xs font-bold uppercase flex-1"
-                            style={{
+                            style={config.isAccent ? {
+                              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                              color: 'var(--text-accent)',
+                              border: '1px solid rgba(var(--accent-rgb), 0.25)'
+                            } : {
                               backgroundColor: `${config.color}20`,
                               color: config.color,
                               border: `1px solid ${config.color}40`

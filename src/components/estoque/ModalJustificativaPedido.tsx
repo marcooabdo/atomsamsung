@@ -112,9 +112,9 @@ export function ModalJustificativaPedido({ requisicao, idsDisponiveis, onConfirm
               disabled={loading || justificativa.trim().length < 10}
               className="flex-1 neon-button text-sm py-3"
               style={{
-                backgroundColor: '#00D4FF20',
-                color: '#00D4FF',
-                borderColor: '#00D4FF60',
+                backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                color: 'var(--text-accent)',
+                borderColor: 'rgba(var(--accent-rgb), 0.38)',
                 opacity: loading || justificativa.trim().length < 10 ? 0.5 : 1
               }}
             >

@@ -185,8 +185,8 @@ export function IniciarReparoModal({
           {!isAlteracao ? (
             <>
               <div className="rounded-lg p-4 space-y-3" style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,212,255,0.03) 100%)',
-                border: '1px solid rgba(0,212,255,0.3)'
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
+                border: '1px solid rgba(var(--accent-rgb),0.3)'
               }}>
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-5 h-5 text-[#00D4FF]" />
@@ -220,10 +220,10 @@ export function IniciarReparoModal({
                 disabled={loading || !selectedTecnicoId}
                 className="w-full py-3 px-4 rounded-lg font-bold text-sm transition-all duration-300 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                  border: '1px solid #00D4FF',
-                  color: '#00D4FF',
-                  boxShadow: '0 0 20px rgba(0,212,255,0.3)'
+                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                  border: '1px solid var(--text-accent)',
+                  color: 'var(--text-accent)',
+                  boxShadow: '0 0 20px rgba(var(--accent-rgb),0.3)'
                 }}
               >
                 <CheckCircle className="w-5 h-5" />

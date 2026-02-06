@@ -30,7 +30,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
   const [trocarComprovante, setTrocarComprovante] = useState(false);
 
   const formasPagamento = [
-    { value: 'pix', label: 'PIX', icon: '💳', color: '#00D4FF' },
+    { value: 'pix', label: 'PIX', icon: '💳', color: 'var(--text-accent)' },
     { value: 'cartao_credito', label: 'Cartão de Crédito', icon: '💳', color: '#9D4EDD' },
     { value: 'cartao_debito', label: 'Cartão de Débito', icon: '💳', color: '#3b82f6' },
     { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: '#39FF14' },

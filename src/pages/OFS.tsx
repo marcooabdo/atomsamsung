@@ -46,7 +46,7 @@ export function OFS() {
 
       <div className="premium-card p-6">
         <div className="text-center py-16">
-          <ClipboardList className="w-16 h-16 text-[#00D4FF] mx-auto mb-4" style={{ filter: 'drop-shadow(0 0 8px rgba(0, 212, 255, 0.6))' }} />
+          <ClipboardList className="w-16 h-16 text-[#00D4FF] mx-auto mb-4" style={{ filter: 'drop-shadow(0 0 8px rgba(var(--accent-rgb), 0.6))' }} />
           <p className="text-gray-400">Sistema OFS em desenvolvimento</p>
         </div>
       </div>

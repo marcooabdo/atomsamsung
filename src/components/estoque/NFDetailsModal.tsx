@@ -112,8 +112,8 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
     const statusConfig = {
       disponivel: { label: 'Disponível', color: '#39FF14' },
       reservada: { label: 'Reservada', color: '#FFBF00' },
-      vinculada_tecnico: { label: 'Com Técnico', color: '#00D4FF' },
-      em_rota: { label: 'Em Rota', color: '#00D4FF' },
+      vinculada_tecnico: { label: 'Com Técnico', color: '#00D4FF', isAccent: true },
+      em_rota: { label: 'Em Rota', color: '#00D4FF', isAccent: true },
       em_uso: { label: 'Em Uso', color: '#FFBF00' },
       usada: { label: 'Usada', color: '#6B7280' },
       devolucao_pendente: { label: 'Devolução Pendente', color: '#FF0064' },
@@ -127,7 +127,11 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
     return (
       <span
         className="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
-        style={{
+        style={config.isAccent ? {
+          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+          color: 'var(--text-accent)',
+          border: '1px solid rgba(var(--accent-rgb), 0.38)'
+        } : {
           backgroundColor: `${config.color}20`,
           color: config.color,
           border: `1px solid ${config.color}60`,

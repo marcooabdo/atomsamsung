@@ -33,11 +33,11 @@ export function Estoque() {
   };
 
   const tabs = [
-    { id: 'geral' as Tab, label: 'Estoque Geral', icon: Package, color: '#00D4FF' },
-    { id: 'entrada' as Tab, label: 'Entrada de NF', icon: Upload, color: '#39FF14' },
-    { id: 'transferencias' as Tab, label: 'Transferências', icon: ArrowRightLeft, color: '#FFBF00' },
-    { id: 'devolucoes' as Tab, label: 'Devoluções', icon: RotateCcw, color: '#FF0064' },
-    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: '#00D4FF' }
+    { id: 'geral' as Tab, label: 'Estoque Geral', icon: Package, color: 'var(--text-accent)', isAccent: true },
+    { id: 'entrada' as Tab, label: 'Entrada de NF', icon: Upload, color: '#39FF14', isAccent: false },
+    { id: 'transferencias' as Tab, label: 'Transferências', icon: ArrowRightLeft, color: '#FFBF00', isAccent: false },
+    { id: 'devolucoes' as Tab, label: 'Devoluções', icon: RotateCcw, color: '#FF0064', isAccent: false },
+    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: 'var(--text-accent)', isAccent: true }
   ];
 
   return (
@@ -72,14 +72,20 @@ export function Estoque() {
                   }`}
                   style={{
                     borderColor: isActive ? tab.color : 'transparent',
-                    boxShadow: isActive ? `0 2px 0 ${tab.color}, 0 0 20px ${tab.color}40` : 'none'
+                    boxShadow: isActive
+                      ? tab.isAccent
+                        ? `0 2px 0 var(--text-accent), 0 0 20px rgba(var(--accent-rgb), 0.25)`
+                        : `0 2px 0 ${tab.color}, 0 0 20px ${tab.color}40`
+                      : 'none'
                   }}
                 >
                   <Icon
                     className="w-5 h-5"
                     style={isActive ? {
                       color: tab.color,
-                      filter: `drop-shadow(0 0 4px ${tab.color})`
+                      filter: tab.isAccent
+                        ? 'drop-shadow(0 0 4px var(--text-accent))'
+                        : `drop-shadow(0 0 4px ${tab.color})`
                     } : {}}
                   />
                   {tab.label}

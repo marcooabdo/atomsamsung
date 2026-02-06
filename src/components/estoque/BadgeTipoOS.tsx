@@ -7,9 +7,9 @@ export function BadgeTipoOS({ tipo }: BadgeTipoOSProps) {
     <span
       className="px-2 py-1 rounded text-xs font-bold"
       style={{
-        backgroundColor: tipo === 'LP' ? '#FFA50030' : '#00D4FF30',
-        color: tipo === 'LP' ? '#FFA500' : '#00D4FF',
-        border: `1px solid ${tipo === 'LP' ? '#FFA500' : '#00D4FF'}60`
+        backgroundColor: tipo === 'LP' ? '#FFA50030' : 'rgba(var(--accent-rgb), 0.19)',
+        color: tipo === 'LP' ? '#FFA500' : 'var(--text-accent)',
+        border: tipo === 'LP' ? '1px solid #FFA50060' : '1px solid rgba(var(--accent-rgb), 0.38)'
       }}
     >
       {tipo}

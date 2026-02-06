@@ -151,10 +151,10 @@ export function AgendamentoLista({
   };
 
   const getStatusBadge = (agendamento: Agendamento) => {
-    const statusConfig: Record<string, { label: string; color: string }> = {
+    const statusConfig: Record<string, { label: string; color: string; isAccent?: boolean }> = {
       pendente_confirmacao: { label: 'PENDENTE CONFIRMAÇÃO', color: '#FFBF00' },
       confirmado: { label: 'CONFIRMADO', color: '#39FF14' },
-      em_andamento: { label: 'EM ANDAMENTO', color: '#00D4FF' },
+      em_andamento: { label: 'EM ANDAMENTO', color: '#00D4FF', isAccent: true },
       concluido: { label: 'CONCLUÍDO', color: '#10b981' },
       cancelado: { label: 'CANCELADO', color: '#FF0064' }
     };
@@ -164,7 +164,11 @@ export function AgendamentoLista({
     return (
       <span
         className="px-2 py-1 rounded text-xs font-bold uppercase"
-        style={{
+        style={config.isAccent ? {
+          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+          color: 'var(--text-accent)',
+          border: '1px solid rgba(var(--accent-rgb), 0.38)'
+        } : {
           backgroundColor: `${config.color}20`,
           color: config.color,
           border: `1px solid ${config.color}60`
@@ -351,9 +355,9 @@ export function AgendamentoLista({
                           }}
                           className="neon-button px-4 py-1 text-xs flex items-center gap-1"
                           style={{
-                            backgroundColor: '#00D4FF20',
-                            borderColor: '#00D4FF',
-                            color: '#00D4FF'
+                            backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                            borderColor: 'var(--text-accent)',
+                            color: 'var(--text-accent)'
                           }}
                         >
                           <FileText className="w-3 h-3" />

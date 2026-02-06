@@ -457,9 +457,9 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                         onClick={onPedirPeca}
                         className="neon-button text-xs px-4 py-2"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          color: '#00D4FF',
-                          borderColor: '#00D4FF60'
+                          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                          color: 'var(--text-accent)',
+                          borderColor: 'rgba(var(--accent-rgb), 0.38)'
                         }}
                       >
                         CRIAR PEDIDO

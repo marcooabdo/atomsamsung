@@ -2068,16 +2068,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; color: string }> = {
+    const statusConfig: Record<string, { label: string; color: string; isAccent?: boolean }> = {
       pendente: { label: 'PENDENTE', color: '#FFBF00' },
-      atendida: { label: 'ATENDIDA', color: '#00D4FF' },
+      atendida: { label: 'ATENDIDA', color: '#00D4FF', isAccent: true },
       em_uso: { label: 'EM USO', color: '#9D00FF' },
       gi_postada: { label: 'GI POSTADA', color: '#39FF14' },
       devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FF6B00' },
       devolvida: { label: 'DEVOLVIDA', color: '#39FF14' },
       cancelada: { label: 'CANCELADA', color: '#808080' },
       reprovada: { label: 'REPROVADA', color: '#FF0064' },
-      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' }
+      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF', isAccent: true }
     };
 
     const config = statusConfig[status] || { label: status.toUpperCase(), color: '#6B7280' };
@@ -2085,7 +2085,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     return (
       <span
         className="px-2 py-1 rounded text-xs font-bold uppercase"
-        style={{
+        style={config.isAccent ? {
+          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+          color: 'var(--text-accent)',
+          border: '1px solid rgba(var(--accent-rgb), 0.38)'
+        } : {
           backgroundColor: `${config.color}20`,
           color: config.color,
           border: `1px solid ${config.color}60`
@@ -2135,11 +2139,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
       <div className="premium-card w-full max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
+        <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: tipoOS === 'LP' ? '#FFA50033' : 'rgba(var(--accent-rgb), 0.2)' }}>
           <div>
             {(() => {
               const isSCACC = modoSCACC || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
-              const headerColor = isSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF');
+              const headerColor = isSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)');
               const headerText = isSCACC ? 'SC / ACC - Samsung Contigo / Acessorio' : (tipoOS === 'LP' ? 'LP - Garantia' : 'OW - Fora de Garantia');
               return (
                 <h2 className="tech-heading text-xl flex items-center gap-2" style={{ color: headerColor }}>
@@ -2162,10 +2166,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   disabled={movendoOS}
                   className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
                   style={{
-                    background: os?.tipo_os === 'OW' ? 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)' : 'linear-gradient(135deg, rgba(255,165,0,0.2) 0%, rgba(255,165,0,0.05) 100%)',
-                    border: os?.tipo_os === 'OW' ? '1px solid #00D4FF' : '1px solid #FFA500',
-                    color: os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500',
-                    boxShadow: os?.tipo_os === 'OW' ? '0 0 10px rgba(0,212,255,0.2)' : '0 0 10px rgba(255,165,0,0.2)'
+                    background: os?.tipo_os === 'OW' ? 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)' : 'linear-gradient(135deg, rgba(255,165,0,0.2) 0%, rgba(255,165,0,0.05) 100%)',
+                    border: os?.tipo_os === 'OW' ? '1px solid var(--text-accent)' : '1px solid #FFA500',
+                    color: os?.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500',
+                    boxShadow: os?.tipo_os === 'OW' ? '0 0 10px rgba(var(--accent-rgb),0.2)' : '0 0 10px rgba(255,165,0,0.2)'
                   }}
                 >
                   <MoveHorizontal className="w-4 h-4" />
@@ -2175,9 +2179,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                 {mostrarMoverPara && (
                   <div className="absolute right-0 top-full mt-2 w-72 max-h-96 overflow-y-auto premium-card p-3 z-50 cyber-scrollbar">
-                    <div className="mb-3 pb-2" style={{ borderBottom: `1px solid ${os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'}33` }}>
+                    <div className="mb-3 pb-2" style={{ borderBottom: os?.tipo_os === 'OW' ? '1px solid rgba(var(--accent-rgb), 0.2)' : '1px solid #FFA50033' }}>
                       <p className="text-xs text-gray-400">Coluna Atual:</p>
-                      <p className="text-sm font-bold" style={{ color: os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500' }}>{colunaAtual?.label || 'N/A'}</p>
+                      <p className="text-sm font-bold" style={{ color: os?.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500' }}>{colunaAtual?.label || 'N/A'}</p>
                     </div>
                     <div className="space-y-1">
                       {COLUNAS_KANBAN.filter(c => c.id !== os.coluna_kanban).map((coluna) => (
@@ -2195,10 +2199,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             border: '1px solid transparent'
                           }}
                           onMouseEnter={(e) => {
-                            const cor = os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500';
+                            const cor = os?.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500';
                             e.currentTarget.style.borderColor = cor;
-                            e.currentTarget.style.boxShadow = os?.tipo_os === 'OW' ? '0 0 10px rgba(0,212,255,0.2)' : '0 0 10px rgba(255,165,0,0.2)';
-                            e.currentTarget.style.backgroundColor = os?.tipo_os === 'OW' ? '#00D4FF10' : '#FFA50010';
+                            e.currentTarget.style.boxShadow = os?.tipo_os === 'OW' ? '0 0 10px rgba(var(--accent-rgb),0.2)' : '0 0 10px rgba(255,165,0,0.2)';
+                            e.currentTarget.style.backgroundColor = os?.tipo_os === 'OW' ? 'rgba(var(--accent-rgb), 0.063)' : '#FFA50010';
                           }}
                           onMouseLeave={(e) => {
                             e.currentTarget.style.borderColor = 'transparent';
@@ -2237,10 +2241,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               onClick={onClose}
               className="p-2 rounded-lg transition-colors"
               style={{
-                color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+                color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.backgroundColor = tipoOS === 'LP' ? '#FFA50010' : '#00D4FF10';
+                e.currentTarget.style.backgroundColor = tipoOS === 'LP' ? '#FFA50010' : 'rgba(var(--accent-rgb), 0.063)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.backgroundColor = 'transparent';
@@ -2365,7 +2369,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
         {currentMode === 'create' ? (
           <>
-            <div className="flex border-b" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
+            <div className="flex border-b" style={{ borderColor: tipoOS === 'LP' ? '#FFA50033' : 'rgba(var(--accent-rgb), 0.2)' }}>
               {[
                 { id: 'dados', label: 'Dados Básicos', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
@@ -2376,7 +2380,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
               ].map(({ id, label, icon: Icon }) => {
-                const corPrimaria = tipoOS === 'OW' ? '#00D4FF' : '#FFA500';
+                const corPrimaria = tipoOS === 'OW' ? 'var(--text-accent)' : '#FFA500';
                 return (
                   <button
                     key={id}
@@ -2428,7 +2432,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {abaAtiva === 'dados' && (
                 <div className="space-y-6">
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)' }}>
                   Informações Básicas
                 </h3>
                 <div className="grid grid-cols-3 gap-4">
@@ -2495,7 +2499,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
 
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)' }}>
                   Dados do Cliente
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -2654,7 +2658,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               </div>
 
               <div className="premium-card p-6">
-                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+                <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{ color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)' }}>
                   Dados do Aparelho
                 </h3>
                 <div className="grid grid-cols-2 gap-4">
@@ -2904,9 +2908,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }}
                         className="neon-button px-4 py-2 flex-1 text-xs"
                         style={{
-                          backgroundColor: modoSCACC ? '#39FF1420' : (tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20'),
-                          borderColor: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF'),
-                          color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : '#00D4FF')
+                          backgroundColor: modoSCACC ? '#39FF1420' : (tipoOS === 'LP' ? '#FFA50020' : 'rgba(var(--accent-rgb), 0.125)'),
+                          borderColor: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'),
+                          color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)')
                         }}
                       >
                         ADICIONAR
@@ -2914,7 +2918,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                   </div>
                   {!modoSCACC && (
-                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF' }}>
+                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)' }}>
                       <AlertCircle className="w-4 h-4" />
                       <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                     </div>
@@ -2962,7 +2966,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 {peca.valor_gspn && peca.valor_gspn !== peca.valor && (
                                   <p className="text-xs text-gray-500">GSPN: R$ {peca.valor_gspn.toFixed(2)}</p>
                                 )}
-                                <p className="text-xs" style={{ color: modoSCACC ? '#39FF14' : '#00D4FF' }}>
+                                <p className="text-xs" style={{ color: modoSCACC ? '#39FF14' : 'var(--text-accent)' }}>
                                   Valor Venda: R$ {peca.valor.toFixed(2)} {peca.quantidade > 1 && `(Total: R$ ${(peca.valor * peca.quantidade).toFixed(2)})`}
                                 </p>
                               </div>
@@ -3188,9 +3192,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       }}
                       className="neon-button px-8 py-3 text-sm"
                       style={{
-                        backgroundColor: '#00D4FF20',
-                        borderColor: '#00D4FF',
-                        color: '#00D4FF'
+                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                        borderColor: 'var(--text-accent)',
+                        color: 'var(--text-accent)'
                       }}
                     >
                       <Plus className="w-4 h-4 inline mr-2" />
@@ -3210,9 +3214,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }}
                         className="neon-button px-4 py-2 text-xs"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          borderColor: '#00D4FF',
-                          color: '#00D4FF'
+                          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                          borderColor: 'var(--text-accent)',
+                          color: 'var(--text-accent)'
                         }}
                       >
                         <Plus className="w-3 h-3 inline mr-1" />
@@ -3222,7 +3226,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                     <div className="space-y-3">
                       {servicosAdicionados.map((servico, index) => (
-                        <div key={index} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                        <div key={index} className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.251)' }}>
                           <div className="flex items-start gap-4">
                             <div className="flex-1">
                               <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.codigo}</p>
@@ -3625,9 +3629,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       }}
                       className="neon-button px-8 py-3 text-sm"
                       style={{
-                        backgroundColor: '#00D4FF20',
-                        borderColor: '#00D4FF',
-                        color: '#00D4FF'
+                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                        borderColor: 'var(--text-accent)',
+                        color: 'var(--text-accent)'
                       }}
                     >
                       <Plus className="w-4 h-4 inline mr-2" />
@@ -3647,9 +3651,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }}
                         className="neon-button px-4 py-2 text-xs"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          borderColor: '#00D4FF',
-                          color: '#00D4FF'
+                          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                          borderColor: 'var(--text-accent)',
+                          color: 'var(--text-accent)'
                         }}
                       >
                         <Plus className="w-3 h-3 inline mr-1" />
@@ -3659,7 +3663,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                     <div className="space-y-3">
                       {servicos.map((servico) => (
-                        <div key={servico.id} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                        <div key={servico.id} className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.251)' }}>
                           <div className="flex items-start gap-4">
                             <div className="flex-1">
                               <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.codigo_servico}</p>
@@ -3823,9 +3827,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           </div>
                           <div className="mt-2 flex items-center gap-2">
                             <span className="text-xs px-2 py-1 rounded font-bold" style={{
-                              backgroundColor: '#00D4FF20',
-                              color: '#00D4FF',
-                              border: '1px solid #00D4FF60'
+                              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                              color: 'var(--text-accent)',
+                              border: '1px solid rgba(var(--accent-rgb), 0.376)'
                             }}>
                               {pag.forma_pagamento.toUpperCase().replace('_', ' ')}
                             </span>
@@ -3843,9 +3847,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div className="premium-card p-6">
                   <label className="neon-button flex items-center justify-center gap-2 w-full px-4 py-3 cursor-pointer"
                     style={{
-                      backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
-                      borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
-                      color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+                      backgroundColor: tipoOS === 'LP' ? '#FFA50020' : 'rgba(var(--accent-rgb), 0.125)',
+                      borderColor: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)',
+                      color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'
                     }}>
                     <Paperclip className="w-4 h-4" />
                     SELECIONAR ARQUIVO
@@ -3903,11 +3907,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             {abaAtiva === 'agendamento' && (
               <div className="space-y-6">
                 <div className="rounded-lg p-4" style={{
-                  backgroundColor: tipoOS === 'LP' ? '#FFA5001a' : '#00D4FF1a',
-                  border: `1px solid ${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}4d`
+                  backgroundColor: tipoOS === 'LP' ? '#FFA5001a' : 'rgba(var(--accent-rgb), 0.102)',
+                  border: tipoOS === 'LP' ? '1px solid #FFA5004d' : '1px solid rgba(var(--accent-rgb), 0.302)'
                 }}>
                   <h3 className="text-sm font-bold uppercase tracking-wider flex items-center gap-2" style={{
-                    color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+                    color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'
                   }}>
                     <Calendar className="w-4 h-4" />
                     Agendamento
@@ -3978,7 +3982,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </>
         ) : (
           <>
-            <div className="flex border-b" style={{ borderColor: `${os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'}33` }}>
+            <div className="flex border-b" style={{ borderColor: os?.tipo_os === 'OW' ? 'rgba(var(--accent-rgb), 0.2)' : '#FFA50033' }}>
               {[
                 { id: 'dados', label: 'Dados OS/Cliente', icon: User },
                 { id: 'estoque', label: 'Estoque & Peças', icon: Package },
@@ -3989,7 +3993,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
               ].map(({ id, label, icon: Icon }) => {
-                const corPrimaria = os?.tipo_os === 'OW' ? '#00D4FF' : '#FFA500';
+                const corPrimaria = os?.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500';
                 return (
                   <button
                     key={id}
@@ -4026,11 +4030,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               {abaAtiva === 'dados' && os && (
                 <div className="space-y-6">
                   <div className="premium-card p-4 border-l-4" style={{
-                    background: os.tipo_os === 'OW' ? 'linear-gradient(to right, #00D4FF1a, #00D4FF0a)' : 'linear-gradient(to right, #FFA5001a, #00D4FF0a)',
-                    borderLeftColor: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                    background: os.tipo_os === 'OW' ? 'linear-gradient(to right, rgba(var(--accent-rgb), 0.102), rgba(var(--accent-rgb), 0.039))' : 'linear-gradient(to right, #FFA5001a, rgba(var(--accent-rgb), 0.039))',
+                    borderLeftColor: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                   }}>
                     <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{
-                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                      color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                     }}>
                       <FileText className="w-4 h-4" />
                       Informações da OS
@@ -4118,9 +4122,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           <span
                             className="px-3 py-1 rounded text-xs font-bold"
                             style={{
-                              backgroundColor: os.tipo_os === 'LP' ? '#FFA50030' : '#00D4FF30',
-                              color: os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF',
-                              border: `1px solid ${os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF'}60`
+                              backgroundColor: os.tipo_os === 'LP' ? '#FFA50030' : 'rgba(var(--accent-rgb), 0.188)',
+                              color: os.tipo_os === 'LP' ? '#FFA500' : 'var(--text-accent)',
+                              border: os.tipo_os === 'LP' ? '1px solid #FFA50060' : '1px solid rgba(var(--accent-rgb), 0.376)'
                             }}
                           >
                             {os.tipo_os}
@@ -4132,7 +4136,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                   <div>
                     <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{
-                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                      color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                     }}>
                       <User className="w-4 h-4" />
                       Cliente
@@ -4196,7 +4200,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                   <div className="border-t border-gray-700 pt-6">
                     <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{
-                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                      color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                     }}>
                       Aparelho
                     </h3>
@@ -4270,9 +4274,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         onClick={() => setMostrarModalConversao(true)}
                         className="neon-button px-6 py-3 ml-4"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          borderColor: '#00D4FF',
-                          color: '#00D4FF'
+                          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                          borderColor: 'var(--text-accent)',
+                          color: 'var(--text-accent)'
                         }}
                       >
                         CONVERTER PARA OW
@@ -4443,9 +4447,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             }}
                             className="neon-button px-4 py-2 flex-1 text-xs"
                             style={{
-                              backgroundColor: '#00D4FF20',
-                              borderColor: '#00D4FF',
-                              color: '#00D4FF'
+                              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                              borderColor: 'var(--text-accent)',
+                              color: 'var(--text-accent)'
                             }}
                           >
                             REQUISITAR
@@ -4453,7 +4457,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         </div>
                       </div>
                     </div>
-                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: '#00D4FF' }}>
+                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-accent)' }}>
                       <AlertCircle className="w-4 h-4" />
                       <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                     </div>
@@ -4552,7 +4556,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                         </p>
                                       )}
                                       {peca.valor_com_markup && peca.valor_com_markup !== peca.valor_gspn && (
-                                        <p className="text-xs" style={{ color: '#00D4FF' }}>
+                                        <p className="text-xs" style={{ color: 'var(--text-accent)' }}>
                                           c/ Markup: R$ {Number(peca.valor_com_markup || 0).toFixed(2)}
                                         </p>
                                       )}
@@ -4612,8 +4616,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                     )}
                                     {requisicao?.status === 'pedido_feito' && (
                                       <div className="mt-3 p-3 rounded-lg" style={{
-                                        backgroundColor: '#00D4FF10',
-                                        border: '1px solid #00D4FF60'
+                                        backgroundColor: 'rgba(var(--accent-rgb), 0.063)',
+                                        border: '1px solid rgba(var(--accent-rgb), 0.376)'
                                       }}>
                                         <div className="flex items-start gap-2">
                                           <Clock className="w-4 h-4 text-[#00D4FF] flex-shrink-0 mt-0.5" />
@@ -4868,9 +4872,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }}
                         className="neon-button px-8 py-3 text-sm"
                         style={{
-                          backgroundColor: '#00D4FF20',
-                          borderColor: '#00D4FF',
-                          color: '#00D4FF'
+                          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                          borderColor: 'var(--text-accent)',
+                          color: 'var(--text-accent)'
                         }}
                       >
                         <Plus className="w-4 h-4 inline mr-2" />
@@ -4890,9 +4894,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           }}
                           className="neon-button px-4 py-2 text-xs"
                           style={{
-                            backgroundColor: '#00D4FF20',
-                            borderColor: '#00D4FF',
-                            color: '#00D4FF'
+                            backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                            borderColor: 'var(--text-accent)',
+                            color: 'var(--text-accent)'
                           }}
                         >
                           <Plus className="w-3 h-3 inline mr-1" />
@@ -4902,7 +4906,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                       <div className="space-y-3">
                         {servicos.map((servico) => (
-                          <div key={servico.id} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                          <div key={servico.id} className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.251)' }}>
                             <div className="flex items-start gap-4">
                               <div className="flex-1">
                                 <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
@@ -5017,7 +5021,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="text-sm font-bold uppercase tracking-wider" style={{
-                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                      color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                     }}>
                       Anexos
                     </h3>
@@ -5074,9 +5078,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   onClick={() => handleAbrirAnexo(anexo)}
                                   className="neon-button flex items-center gap-2 text-xs px-3 py-1.5"
                                   style={{
-                                    backgroundColor: '#00D4FF10',
-                                    borderColor: '#00D4FF',
-                                    color: '#00D4FF'
+                                    backgroundColor: 'rgba(var(--accent-rgb), 0.063)',
+                                    borderColor: 'var(--text-accent)',
+                                    color: 'var(--text-accent)'
                                   }}
                                   title="Abrir anexo"
                                 >
@@ -5111,7 +5115,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 <div>
                   <div className="mb-4">
                     <h3 className="text-sm font-bold uppercase tracking-wider mb-4" style={{
-                      color: os.tipo_os === 'OW' ? '#00D4FF' : '#FFA500'
+                      color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'
                     }}>
                       Adicionar Comentário
                     </h3>
@@ -5174,7 +5178,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         )}
 
         {currentMode === 'create' && (
-          <div className="p-6 border-t" style={{ borderColor: `${tipoOS === 'LP' ? '#FFA500' : '#00D4FF'}33` }}>
+          <div className="p-6 border-t" style={{ borderColor: tipoOS === 'LP' ? '#FFA50033' : 'rgba(var(--accent-rgb), 0.2)' }}>
             <div className="flex items-center justify-between mb-4">
               <div className="flex gap-4 text-xs text-gray-400">
                 <div className="flex items-center gap-2">
@@ -5204,9 +5208,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 disabled={loading || !unidadeId || !clienteNome || !defeitoRelatado}
                 className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
-                  backgroundColor: tipoOS === 'LP' ? '#FFA50020' : '#00D4FF20',
-                  borderColor: tipoOS === 'LP' ? '#FFA500' : '#00D4FF',
-                  color: tipoOS === 'LP' ? '#FFA500' : '#00D4FF'
+                  backgroundColor: tipoOS === 'LP' ? '#FFA50020' : 'rgba(var(--accent-rgb), 0.125)',
+                  borderColor: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)',
+                  color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'
                 }}
               >
                 {loading ? 'CRIANDO...' : `SALVAR OS ${tipoOS}`}
@@ -5325,9 +5329,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   disabled={convertendo || !motivoConversao.trim() || !confirmaConversao}
                   className="neon-button px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
-                    backgroundColor: '#00D4FF20',
-                    borderColor: '#00D4FF',
-                    color: '#00D4FF'
+                    backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                    borderColor: 'var(--text-accent)',
+                    color: 'var(--text-accent)'
                   }}
                 >
                   {convertendo ? 'CONVERTENDO...' : 'CONFIRMAR CONVERSÃO'}
@@ -5377,7 +5381,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setMostrarModalServico(false)}></div>
           <div className="relative bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" style={{
-            boxShadow: '0 0 40px rgba(0,212,255,0.2)'
+            boxShadow: '0 0 40px rgba(var(--accent-rgb),0.2)'
           }}>
             <div className="p-6 border-b border-[#00D4FF]/20 bg-gradient-to-r from-[#00D4FF]/5 to-transparent">
               <div className="flex items-center justify-between">
@@ -5499,8 +5503,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           }}
                           className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
                           style={{
-                            borderColor: jaAdicionado ? '#39FF1460' : '#00D4FF40',
-                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(0,212,255,0.05)'
+                            borderColor: jaAdicionado ? '#39FF1460' : 'rgba(var(--accent-rgb), 0.251)',
+                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(var(--accent-rgb),0.05)'
                           }}
                         >
                           <div className="flex items-center justify-between gap-4">

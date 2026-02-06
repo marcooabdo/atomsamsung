@@ -2373,16 +2373,16 @@ Não haverá cobrança ao cliente.`
   if (!os && mode === 'view') return null;
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { label: string; color: string }> = {
+    const statusConfig: Record<string, { label: string; color: string; isAccent?: boolean }> = {
       pendente: { label: 'PENDENTE', color: '#FFBF00' },
-      atendida: { label: 'ATENDIDA', color: '#00D4FF' },
+      atendida: { label: 'ATENDIDA', color: '#00D4FF', isAccent: true },
       em_uso: { label: 'EM USO', color: '#9D00FF' },
       gi_postada: { label: 'GI POSTADA', color: '#39FF14' },
       devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FF6B00' },
       devolvida: { label: 'DEVOLVIDA', color: '#39FF14' },
       cancelada: { label: 'CANCELADA', color: '#808080' },
       reprovada: { label: 'REPROVADA', color: '#FF0064' },
-      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' }
+      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF', isAccent: true }
     };
 
     const config = statusConfig[status] || { label: status.toUpperCase(), color: '#6B7280' };
@@ -2390,7 +2390,11 @@ Não haverá cobrança ao cliente.`
     return (
       <span
         className="px-2 py-1 rounded text-xs font-bold uppercase"
-        style={{
+        style={config.isAccent ? {
+          backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+          color: 'var(--text-accent)',
+          border: '1px solid rgba(var(--accent-rgb), 0.38)'
+        } : {
           backgroundColor: `${config.color}20`,
           color: config.color,
           border: `1px solid ${config.color}60`
@@ -2410,7 +2414,7 @@ Não haverá cobrança ao cliente.`
           <div>
             {(() => {
               const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
-              const headerColor = isSCACC ? '#39FF14' : '#00D4FF';
+              const headerColor = isSCACC ? '#39FF14' : 'var(--text-accent)';
               const headerText = mode === 'create'
                 ? `NOVA ORDEM DE SERVICO - ${tipoOS}`
                 : isSCACC
@@ -2450,10 +2454,10 @@ Não haverá cobrança ao cliente.`
                       onClick={() => setMostrarModalIniciarReparo(true)}
                       className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-[#00D4FF]/30"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                        border: '1px solid #00D4FF',
-                        color: '#00D4FF',
-                        boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                        border: '1px solid var(--text-accent)',
+                        color: 'var(--text-accent)',
+                        boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
                       }}
                       title={os.tecnico_designado_id ? 'Alterar Técnico Responsável' : 'Iniciar Reparo e Designar Técnico'}
                     >
@@ -2461,7 +2465,7 @@ Não haverá cobrança ao cliente.`
                       {os.tecnico_designado_id ? 'ALTERAR TÉCNICO' : 'INICIAR REPARO'}
                     </button>
                     {os.tecnico_designado_id && os.tecnico_designado?.nome && (
-                      <div className="text-xs text-center" style={{ color: '#00D4FF' }}>
+                      <div className="text-xs text-center" style={{ color: 'var(--text-accent)' }}>
                         <User className="w-3 h-3 inline mr-1" />
                         {os.tecnico_designado.nome}
                       </div>
@@ -2475,10 +2479,10 @@ Não haverá cobrança ao cliente.`
                 disabled={movendoOS}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                  border: '1px solid #00D4FF',
-                  color: '#00D4FF',
-                  boxShadow: '0 0 10px rgba(0,212,255,0.2)'
+                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
+                  border: '1px solid var(--text-accent)',
+                  color: 'var(--text-accent)',
+                  boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
                 }}
               >
                 <MoveHorizontal className="w-4 h-4" />
@@ -2508,8 +2512,8 @@ Não haverá cobrança ao cliente.`
                           border: '1px solid transparent'
                         }}
                         onMouseEnter={(e) => {
-                          e.currentTarget.style.borderColor = '#00D4FF';
-                          e.currentTarget.style.boxShadow = '0 0 10px rgba(0,212,255,0.2)';
+                          e.currentTarget.style.borderColor = 'var(--text-accent)';
+                          e.currentTarget.style.boxShadow = '0 0 10px rgba(var(--accent-rgb),0.2)';
                         }}
                         onMouseLeave={(e) => {
                           e.currentTarget.style.borderColor = 'transparent';
@@ -2752,9 +2756,9 @@ Não haverá cobrança ao cliente.`
                             disabled={salvandoNumeroSamsung}
                             className="px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-1"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.1) 100%)',
-                              border: '1px solid rgba(0,212,255,0.5)',
-                              color: '#00D4FF'
+                              background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.1) 100%)',
+                              border: '1px solid rgba(var(--accent-rgb),0.5)',
+                              color: 'var(--text-accent)'
                             }}
                           >
                             {salvandoNumeroSamsung ? (
@@ -2796,9 +2800,9 @@ Não haverá cobrança ao cliente.`
                             }}
                             className="px-3 py-2 rounded text-xs font-bold transition-colors flex items-center gap-1"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.1) 100%)',
-                              border: '1px solid rgba(0,212,255,0.5)',
-                              color: '#00D4FF'
+                              background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.1) 100%)',
+                              border: '1px solid rgba(var(--accent-rgb),0.5)',
+                              color: 'var(--text-accent)'
                             }}
                           >
                             <Save className="w-3 h-3" />
@@ -2884,9 +2888,9 @@ Não haverá cobrança ao cliente.`
                       <span
                         className="px-3 py-1 rounded text-xs font-bold"
                         style={{
-                          backgroundColor: os.tipo_os === 'LP' ? '#FFA50030' : '#00D4FF30',
-                          color: os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF',
-                          border: `1px solid ${os.tipo_os === 'LP' ? '#FFA500' : '#00D4FF'}60`
+                          backgroundColor: os.tipo_os === 'LP' ? '#FFA50030' : 'rgba(var(--accent-rgb), 0.19)',
+                          color: os.tipo_os === 'LP' ? '#FFA500' : 'var(--text-accent)',
+                          border: os.tipo_os === 'LP' ? '1px solid #FFA50060' : '1px solid rgba(var(--accent-rgb), 0.38)'
                         }}
                       >
                         {os.tipo_os}
@@ -2964,8 +2968,8 @@ Não haverá cobrança ao cliente.`
                             key={req.id}
                             className="p-3 rounded-lg border"
                             style={{
-                              background: 'linear-gradient(135deg, rgba(0,212,255,0.1) 0%, rgba(0,212,255,0.03) 100%)',
-                              borderColor: 'rgba(0,212,255,0.3)'
+                              background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
+                              borderColor: 'rgba(var(--accent-rgb),0.3)'
                             }}
                           >
                             <div className="flex items-start justify-between mb-2">
@@ -3153,7 +3157,7 @@ Não haverá cobrança ao cliente.`
                         />
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditandoDiagnostico(false)} className="px-3 py-1 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5">Cancelar</button>
-                          <button onClick={salvarDiagnostico} disabled={salvandoDiagnostico || !diagnosticoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}>
+                          <button onClick={salvarDiagnostico} disabled={salvandoDiagnostico || !diagnosticoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: 'rgba(var(--accent-rgb), 0.125)', border: '1px solid var(--text-accent)', color: 'var(--text-accent)' }}>
                             <Save className="w-3 h-3" /> {salvandoDiagnostico ? 'Salvando...' : 'Salvar'}
                           </button>
                         </div>
@@ -3189,7 +3193,7 @@ Não haverá cobrança ao cliente.`
                         />
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditandoReparo(false)} className="px-3 py-1 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5">Cancelar</button>
-                          <button onClick={salvarReparo} disabled={salvandoReparo || !reparoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}>
+                          <button onClick={salvarReparo} disabled={salvandoReparo || !reparoTemp.trim()} className="px-3 py-1 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50" style={{ background: 'rgba(var(--accent-rgb), 0.125)', border: '1px solid var(--text-accent)', color: 'var(--text-accent)' }}>
                             <Save className="w-3 h-3" /> {salvandoReparo ? 'Salvando...' : 'Salvar'}
                           </button>
                         </div>
@@ -3305,10 +3309,10 @@ Não haverá cobrança ao cliente.`
 
               {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (() => {
                 const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
-                const accentColor = isSCACC ? '#39FF14' : '#00D4FF';
+                const isSCACCColor = isSCACC;
                 return (
-                <div className="premium-card p-4 mb-4" style={{ backgroundColor: `${accentColor}10`, border: `1px solid ${accentColor}30` }}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: accentColor }}>
+                <div className="premium-card p-4 mb-4" style={{ backgroundColor: isSCACCColor ? '#39FF1410' : 'rgba(var(--accent-rgb), 0.063)', border: isSCACCColor ? '1px solid #39FF1430' : '1px solid rgba(var(--accent-rgb), 0.19)' }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: isSCACCColor ? '#39FF14' : 'var(--text-accent)' }}>
                     <Package className="w-4 h-4" />
                     Adicionar Peca {isSCACC ? '(Requisicao em Lote)' : 'Manualmente'}
                   </h3>
@@ -3507,9 +3511,9 @@ Não haverá cobrança ao cliente.`
                               )}
                               {peca.status === 'manual' && (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-bold" style={{
-                                  backgroundColor: '#00D4FF20',
-                                  color: '#00D4FF',
-                                  border: '1px solid #00D4FF60'
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  color: 'var(--text-accent)',
+                                  border: '1px solid rgba(var(--accent-rgb), 0.38)'
                                 }}>
                                   MANUAL
                                 </span>
@@ -3621,7 +3625,7 @@ Não haverá cobrança ao cliente.`
                                         GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
                                       </p>
                                       {os?.tipo_os === 'OW' && (
-                                        <p className="text-xs font-bold" style={{ color: '#00D4FF' }}>
+                                        <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
                                           c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
                                         </p>
                                       )}
@@ -3686,8 +3690,8 @@ Não haverá cobrança ao cliente.`
                             )}
                             {requisicao?.status === 'pedido_feito' && (
                               <div className="mt-3 p-3 rounded-lg" style={{
-                                backgroundColor: '#00D4FF10',
-                                border: '1px solid #00D4FF60'
+                                backgroundColor: 'rgba(var(--accent-rgb), 0.063)',
+                                border: '1px solid rgba(var(--accent-rgb), 0.38)'
                               }}>
                                 <div className="flex items-start gap-2">
                                   <Clock className="w-4 h-4 text-[#00D4FF] flex-shrink-0 mt-0.5" />
@@ -3810,9 +3814,9 @@ Não haverá cobrança ao cliente.`
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
                                 style={{
-                                  backgroundColor: '#00D4FF20',
-                                  borderColor: '#00D4FF',
-                                  color: '#00D4FF'
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  borderColor: 'var(--text-accent)',
+                                  color: 'var(--text-accent)'
                                 }}
                               >
                                 <RefreshCw className="w-3 h-3 animate-spin" />
@@ -3911,9 +3915,9 @@ Não haverá cobrança ao cliente.`
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
                                 style={{
-                                  backgroundColor: '#00D4FF20',
-                                  borderColor: '#00D4FF',
-                                  color: '#00D4FF'
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  borderColor: 'var(--text-accent)',
+                                  color: 'var(--text-accent)'
                                 }}
                               >
                                 <RefreshCw className="w-3 h-3 animate-spin" />
@@ -3956,9 +3960,9 @@ Não haverá cobrança ao cliente.`
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
                                 style={{
-                                  backgroundColor: '#00D4FF20',
-                                  borderColor: '#00D4FF',
-                                  color: '#00D4FF'
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  borderColor: 'var(--text-accent)',
+                                  color: 'var(--text-accent)'
                                 }}
                               >
                                 <RefreshCw className="w-3 h-3" />
@@ -4017,9 +4021,9 @@ Não haverá cobrança ao cliente.`
                     }}
                     className="neon-button px-8 py-3 text-sm"
                     style={{
-                      backgroundColor: '#00D4FF20',
-                      borderColor: '#00D4FF',
-                      color: '#00D4FF'
+                      backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                      borderColor: 'var(--text-accent)',
+                      color: 'var(--text-accent)'
                     }}
                   >
                     <span className="inline-flex items-center gap-2">
@@ -4041,9 +4045,9 @@ Não haverá cobrança ao cliente.`
                       }}
                       className="neon-button px-4 py-2 text-xs"
                       style={{
-                        backgroundColor: '#00D4FF20',
-                        borderColor: '#00D4FF',
-                        color: '#00D4FF'
+                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                        borderColor: 'var(--text-accent)',
+                        color: 'var(--text-accent)'
                       }}
                     >
                       <span className="inline-flex items-center gap-1">
@@ -4055,7 +4059,7 @@ Não haverá cobrança ao cliente.`
 
                   <div className="space-y-3">
                     {servicos.map((servico) => (
-                      <div key={servico.id} className="premium-card p-4" style={{ borderColor: '#00D4FF40' }}>
+                      <div key={servico.id} className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.25)' }}>
                         <div className="flex items-start gap-4">
                           <div className="flex-1">
                             <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
@@ -4277,7 +4281,7 @@ Não haverá cobrança ao cliente.`
                       onClick={confirmarUploadAnexo}
                       disabled={uploadingAnexo}
                       className="px-4 py-2 text-xs rounded font-bold flex items-center gap-1 disabled:opacity-50"
-                      style={{ background: '#00D4FF20', border: '1px solid #00D4FF', color: '#00D4FF' }}
+                      style={{ background: 'rgba(var(--accent-rgb), 0.125)', border: '1px solid var(--text-accent)', color: 'var(--text-accent)' }}
                     >
                       <Save className="w-3 h-3" />
                       {uploadingAnexo ? 'Enviando...' : 'Enviar'}
@@ -4688,7 +4692,7 @@ Não haverá cobrança ao cliente.`
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setMostrarModalServico(false)}></div>
           <div className="relative bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" style={{
-            boxShadow: '0 0 40px rgba(0,212,255,0.2)'
+            boxShadow: '0 0 40px rgba(var(--accent-rgb),0.2)'
           }}>
             <div className="p-6 border-b border-[#00D4FF]/20 bg-gradient-to-r from-[#00D4FF]/5 to-transparent">
               <div className="flex items-center justify-between">
@@ -4816,8 +4820,8 @@ Não haverá cobrança ao cliente.`
                           }}
                           className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
                           style={{
-                            borderColor: jaAdicionado ? '#39FF1460' : '#00D4FF40',
-                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(0,212,255,0.05)'
+                            borderColor: jaAdicionado ? '#39FF1460' : 'rgba(var(--accent-rgb), 0.25)',
+                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(var(--accent-rgb),0.05)'
                           }}
                         >
                           <div className="flex items-center justify-between gap-4">

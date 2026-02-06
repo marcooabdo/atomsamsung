@@ -60,22 +60,22 @@ export function EstoqueDashboard({ stats, onRegistrarPreco }: EstoqueDashboardPr
           </div>
         </div>
 
-        <div className="premium-card p-4" style={{ borderColor: '#00D4FF60' }}>
+        <div className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.376)' }}>
           <div className="flex items-start justify-between mb-3">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#00D4FF20' }}>
-              <ShoppingCart className="w-5 h-5" style={{ color: '#00D4FF' }} />
+            <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--accent-rgb), 0.125)' }}>
+              <ShoppingCart className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
             </div>
             <span className="text-xs font-bold px-2 py-1 rounded" style={{
-              backgroundColor: '#00D4FF30',
-              color: '#00D4FF',
-              border: '1px solid #00D4FF60'
+              backgroundColor: 'rgba(var(--accent-rgb), 0.188)',
+              color: 'var(--text-accent)',
+              border: '1px solid rgba(var(--accent-rgb), 0.376)'
             }}>
               OW
             </span>
           </div>
           <h3 className="text-sm font-bold text-gray-400 mb-2">PENDENTES OW</h3>
           <div className="space-y-1">
-            <p className="text-2xl font-bold" style={{ color: '#00D4FF' }}>
+            <p className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>
               {stats.owPendentes.osCount} OSs
             </p>
             <p className="text-xs text-gray-500">{stats.owPendentes.pecasCount} peças</p>
@@ -155,7 +155,7 @@ export function EstoqueDashboard({ stats, onRegistrarPreco }: EstoqueDashboardPr
                       <span style={{ color: '#FFA500' }}>{peca.lpCount} LP</span>
                     )}
                     {peca.owCount > 0 && (
-                      <span style={{ color: '#00D4FF' }}>{peca.owCount} OW</span>
+                      <span style={{ color: 'var(--text-accent)' }}>{peca.owCount} OW</span>
                     )}
                   </div>
                 </div>

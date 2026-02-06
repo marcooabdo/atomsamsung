@@ -29,13 +29,13 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const [observacoes, setObservacoes] = useState('');
 
   const formasPagamento = [
-    { value: 'pix', label: 'PIX', icon: '💳', color: '#00D4FF' },
-    { value: 'cartao_credito', label: 'Cartão de Crédito', icon: '💳', color: '#9D4EDD' },
-    { value: 'cartao_debito', label: 'Cartão de Débito', icon: '💳', color: '#3b82f6' },
-    { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: '#39FF14' },
-    { value: 'transferencia', label: 'Transferência', icon: '🏦', color: '#10b981' },
-    { value: 'boleto', label: 'Boleto', icon: '📄', color: '#FFBF00' },
-    { value: 'outro', label: 'Outro', icon: '📋', color: '#6B7280' }
+    { value: 'pix', label: 'PIX', icon: '💳', color: 'var(--text-accent)', isAccent: true },
+    { value: 'cartao_credito', label: 'Cartão de Crédito', icon: '💳', color: '#9D4EDD', isAccent: false },
+    { value: 'cartao_debito', label: 'Cartão de Débito', icon: '💳', color: '#3b82f6', isAccent: false },
+    { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: '#39FF14', isAccent: false },
+    { value: 'transferencia', label: 'Transferência', icon: '🏦', color: '#10b981', isAccent: false },
+    { value: 'boleto', label: 'Boleto', icon: '📄', color: '#FFBF00', isAccent: false },
+    { value: 'outro', label: 'Outro', icon: '📋', color: '#6B7280', isAccent: false }
   ];
 
   const isCartao = formaPagamento === 'cartao_credito' || formaPagamento === 'cartao_debito';
@@ -318,7 +318,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
                 </div>
                 <div>
                   <p className="text-xs text-gray-400 uppercase tracking-wider mb-1">Valor Total da OS</p>
-                  <p className="text-[#00D4FF] font-bold text-2xl" style={{ textShadow: '0 0 20px rgba(0, 212, 255, 0.5)' }}>
+                  <p className="text-[#00D4FF] font-bold text-2xl" style={{ textShadow: '0 0 20px rgba(var(--accent-rgb), 0.5)' }}>
                     R$ {(os.valor_total || 0).toFixed(2)}
                   </p>
                 </div>
@@ -348,7 +348,9 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
                         : 'border-gray-700 bg-black/30 hover:border-gray-500'
                     }`}
                     style={formaPagamento === forma.value ? {
-                      boxShadow: `0 0 30px ${forma.color}40`
+                      boxShadow: forma.isAccent
+                        ? '0 0 30px rgba(var(--accent-rgb), 0.25)'
+                        : `0 0 30px ${forma.color}40`
                     } : {}}
                   >
                     <div className="text-3xl mb-2">{forma.icon}</div>

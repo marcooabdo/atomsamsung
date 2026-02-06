@@ -156,9 +156,9 @@ export function MapEditor({ sala, estantes, onEstanteClick, onRefresh }: MapEdit
           className="premium-card relative overflow-hidden"
           style={{
             height: '600px',
-            backgroundColor: '#1a1a1a',
+            backgroundColor: 'var(--bg-secondary)',
             backgroundImage: showGrid
-              ? 'linear-gradient(#2a2a2a 1px, transparent 1px), linear-gradient(90deg, #2a2a2a 1px, transparent 1px)'
+              ? 'linear-gradient(var(--border-primary) 1px, transparent 1px), linear-gradient(90deg, var(--border-primary) 1px, transparent 1px)'
               : 'none',
             backgroundSize: showGrid ? `${20 * zoom}px ${20 * zoom}px` : 'auto'
           }}

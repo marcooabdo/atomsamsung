@@ -779,25 +779,26 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   };
 
   const getStatusBadge = (status: string) => {
-    const config: Record<string, { label: string; color: string }> = {
+    const config: Record<string, { label: string; color: string; bg?: string; borderColor?: string }> = {
       pendente: { label: 'PENDENTE', color: '#FFBF00' },
-      pedido_feito: { label: 'PEDIDO FEITO', color: '#00D4FF' },
+      pedido_feito: { label: 'PEDIDO FEITO', color: 'var(--text-accent)', bg: 'rgba(var(--accent-rgb), 0.125)', borderColor: 'rgba(var(--accent-rgb), 0.38)' },
       atendida: { label: 'ATENDIDA', color: '#39FF14' },
-      em_uso: { label: 'EM USO', color: '#00D4FF' },
+      em_uso: { label: 'EM USO', color: 'var(--text-accent)', bg: 'rgba(var(--accent-rgb), 0.125)', borderColor: 'rgba(var(--accent-rgb), 0.38)' },
       gi_postada: { label: 'GI POSTADA', color: '#9D00FF' },
       devolvida: { label: 'DEVOLVIDA', color: '#FF0064' },
       reprovada: { label: 'REPROVADA', color: '#FF0064' }
     };
 
-    const { label, color } = config[status] || { label: status.toUpperCase(), color: '#6B7280' };
+    const entry = config[status] || { label: status.toUpperCase(), color: '#6B7280' };
+    const { label, color } = entry;
 
     return (
       <span
         className="px-2 py-1 rounded text-xs font-bold uppercase"
         style={{
-          backgroundColor: `${color}20`,
+          backgroundColor: entry.bg || `${color}20`,
           color: color,
-          border: `1px solid ${color}60`
+          border: `1px solid ${entry.borderColor || `${color}60`}`
         }}
       >
         {label}
@@ -1110,9 +1111,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                               onClick={() => setModalVerPedido(req)}
                               className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                               style={{
-                                backgroundColor: '#00D4FF10',
-                                borderColor: '#00D4FF',
-                                color: '#00D4FF'
+                                backgroundColor: 'rgba(var(--accent-rgb), 0.063)',
+                                borderColor: 'var(--text-accent)',
+                                color: 'var(--text-accent)'
                               }}
                             >
                               <Package className="w-4 h-4" />
@@ -1274,9 +1275,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                 onClick={() => handleVerPedido(req)}
                                 className="neon-button text-xs px-4 py-2"
                                 style={{
-                                  backgroundColor: '#00D4FF20',
-                                  color: '#00D4FF',
-                                  borderColor: '#00D4FF60'
+                                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                  color: 'var(--text-accent)',
+                                  borderColor: 'rgba(var(--accent-rgb), 0.38)'
                                 }}
                               >
                                 VER PEDIDO
@@ -1342,9 +1343,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                       onClick={() => handleVerPedido(req)}
                                       className="neon-button text-xs px-4 py-2"
                                       style={{
-                                        backgroundColor: '#00D4FF20',
-                                        color: '#00D4FF',
-                                        borderColor: '#00D4FF60'
+                                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                        color: 'var(--text-accent)',
+                                        borderColor: 'rgba(var(--accent-rgb), 0.38)'
                                       }}
                                     >
                                       VER PEDIDO
@@ -1366,9 +1367,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                       onClick={() => handlePedirPeca(req)}
                                       className="neon-button text-xs px-4 py-2"
                                       style={{
-                                        backgroundColor: '#00D4FF20',
-                                        color: '#00D4FF',
-                                        borderColor: '#00D4FF60'
+                                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                        color: 'var(--text-accent)',
+                                        borderColor: 'rgba(var(--accent-rgb), 0.38)'
                                       }}
                                     >
                                       CRIAR PEDIDO
@@ -1783,9 +1784,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                 onClick={() => setModalVerPedido(null)}
                 className="neon-button w-full py-3"
                 style={{
-                  backgroundColor: '#00D4FF20',
-                  color: '#00D4FF',
-                  borderColor: '#00D4FF60'
+                  backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                  color: 'var(--text-accent)',
+                  borderColor: 'rgba(var(--accent-rgb), 0.38)'
                 }}
               >
                 FECHAR

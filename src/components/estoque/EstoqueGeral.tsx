@@ -447,9 +447,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                           <div
                             className="px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"
                             style={{
-                              backgroundColor: '#00D4FF20',
-                              color: '#00D4FF',
-                              border: '1px solid #00D4FF60'
+                              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                              color: 'var(--text-accent)',
+                              border: '1px solid rgba(var(--accent-rgb), 0.38)'
                             }}
                           >
                             <Package className="w-3 h-3" />

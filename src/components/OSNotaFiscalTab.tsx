@@ -363,13 +363,13 @@ export function OSNotaFiscalTab({
     if (peca.gi_postado_em) return { label: 'GI Postado', color: '#3b82f6', bg: '#3b82f620', icon: Truck };
     if (peca.usada_em) return { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle };
 
-    const workflowMap: Record<string, { label: string; color: string; bg: string; icon: any }> = {
+    const workflowMap: Record<string, { label: string; color: string; bg: string; icon: any; isAccent?: boolean }> = {
       requisitada: { label: 'Requisitada', color: '#FFBF00', bg: '#FFBF0020', icon: Clock },
-      aprovada: { label: 'Aprovada', color: '#00D4FF', bg: '#00D4FF20', icon: CheckCircle },
+      aprovada: { label: 'Aprovada', color: '#00D4FF', bg: 'rgba(var(--accent-rgb), 0.125)', icon: CheckCircle, isAccent: true },
       em_transito: { label: 'Em Transito', color: '#FFA500', bg: '#FFA50020', icon: Truck },
       disponivel: { label: 'Disponivel', color: '#10b981', bg: '#10b98120', icon: Box },
       vinculada_tecnico: { label: 'Com Tecnico', color: '#3b82f6', bg: '#3b82f620', icon: User },
-      em_uso: { label: 'Em Uso', color: '#00D4FF', bg: '#00D4FF20', icon: Wrench },
+      em_uso: { label: 'Em Uso', color: '#00D4FF', bg: 'rgba(var(--accent-rgb), 0.125)', icon: Wrench, isAccent: true },
       usada: { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle },
     };
 
@@ -507,7 +507,7 @@ export function OSNotaFiscalTab({
   const getStatusBadge = (status: string) => {
     const configs: Record<string, { bg: string; border: string; color: string; label: string; icon: any }> = {
       pendente: { bg: '#FFBF0015', border: '#FFBF0040', color: '#FFBF00', label: 'Na Fila', icon: Clock },
-      processando: { bg: '#00D4FF15', border: '#00D4FF40', color: '#00D4FF', label: 'Processando', icon: Clock },
+      processando: { bg: 'rgba(var(--accent-rgb), 0.082)', border: 'rgba(var(--accent-rgb), 0.25)', color: 'var(--text-accent)', label: 'Processando', icon: Clock },
       emitida: { bg: '#39FF1415', border: '#39FF1440', color: '#39FF14', label: 'Emitida', icon: CheckCircle },
       cancelada: { bg: '#71717A15', border: '#71717A40', color: '#71717A', label: 'Cancelada', icon: X },
       erro: { bg: '#FF006415', border: '#FF006440', color: '#FF0064', label: 'Erro', icon: AlertCircle }
@@ -875,10 +875,10 @@ export function OSNotaFiscalTab({
               }}
               className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
               style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.25) 0%, rgba(0,212,255,0.08) 100%)',
-                border: '2px solid rgba(0,212,255,0.6)',
-                color: '#00D4FF',
-                boxShadow: '0 0 15px rgba(0,212,255,0.15)'
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.25) 0%, rgba(var(--accent-rgb),0.08) 100%)',
+                border: '2px solid rgba(var(--accent-rgb),0.6)',
+                color: 'var(--text-accent)',
+                boxShadow: '0 0 15px rgba(var(--accent-rgb),0.15)'
               }}
             >
               <Send className="w-4 h-4" />
@@ -1014,7 +1014,7 @@ export function OSNotaFiscalTab({
                         <td className="py-2 px-3 text-center">
                           <span
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold whitespace-nowrap"
-                            style={{ backgroundColor: sc.bg, border: `1px solid ${sc.color}40`, color: sc.color }}
+                            style={{ backgroundColor: sc.bg, border: sc.isAccent ? '1px solid rgba(var(--accent-rgb), 0.25)' : `1px solid ${sc.color}40`, color: sc.isAccent ? 'var(--text-accent)' : sc.color }}
                           >
                             <StatusIcon className="w-2.5 h-2.5" />
                             {sc.label}

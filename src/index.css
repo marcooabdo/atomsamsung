@@ -46,3 +46,317 @@
     background: var(--scrollbar-thumb-hover, linear-gradient(180deg, #00FFFF, #00E5FF));
   }
 }
+
+/* ================================================================
+   THEME OVERRIDE LAYER
+   Maps hardcoded Tailwind [#00D4FF] classes to theme CSS variables.
+   Uses :not(.theme-dark-blue) to target all 3 non-default themes.
+   ================================================================ */
+
+/* --- ACCENT TEXT COLORS --- */
+:root:not(.theme-dark-blue) .text-\[\#00D4FF\] { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .text-\[\#00D4FF\]\/50 { color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .text-\[\#00D4FF\]\/60 { color: rgba(var(--accent-rgb), 0.6) !important; }
+:root:not(.theme-dark-blue) .text-\[\#00D4FF\]\/80 { color: rgba(var(--accent-rgb), 0.8) !important; }
+:root:not(.theme-dark-blue) .hover\:text-\[\#00D4FF\]:hover { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:text-\[\#00D4FF\]\/80:hover { color: rgba(var(--accent-rgb), 0.8) !important; }
+:root:not(.theme-dark-blue) .group-hover\:text-\[\#00D4FF\] { color: var(--text-accent) !important; }
+
+/* --- ACCENT BACKGROUND COLORS --- */
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\] { background-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/5 { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/10 { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/15 { background-color: rgba(var(--accent-rgb), 0.15) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/20 { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/30 { background-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/80 { background-color: rgba(var(--accent-rgb), 0.8) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF\]\/90 { background-color: rgba(var(--accent-rgb), 0.9) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF05\] { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF10\] { background-color: rgba(var(--accent-rgb), 0.063) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF20\] { background-color: rgba(var(--accent-rgb), 0.125) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00D4FF30\] { background-color: rgba(var(--accent-rgb), 0.19) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]:hover { background-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/5:hover { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/10:hover { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/20:hover { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/30:hover { background-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/80:hover { background-color: rgba(var(--accent-rgb), 0.8) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF\]\/90:hover { background-color: rgba(var(--accent-rgb), 0.9) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF20\]:hover { background-color: rgba(var(--accent-rgb), 0.125) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-\[\#00D4FF30\]:hover { background-color: rgba(var(--accent-rgb), 0.19) !important; }
+
+/* --- ACCENT BORDER COLORS --- */
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\] { border-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/10 { border-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/20 { border-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/30 { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/40 { border-color: rgba(var(--accent-rgb), 0.4) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/50 { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF\]\/60 { border-color: rgba(var(--accent-rgb), 0.6) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00D4FF30\] { border-color: rgba(var(--accent-rgb), 0.19) !important; }
+:root:not(.theme-dark-blue) .border-t-\[\#00D4FF\] { border-top-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:border-\[\#00D4FF\]:hover { border-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:border-\[\#00D4FF\]\/30:hover { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .hover\:border-\[\#00D4FF\]\/40:hover { border-color: rgba(var(--accent-rgb), 0.4) !important; }
+:root:not(.theme-dark-blue) .hover\:border-\[\#00D4FF\]\/50:hover { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .hover\:border-\[\#00D4FF\]\/60:hover { border-color: rgba(var(--accent-rgb), 0.6) !important; }
+:root:not(.theme-dark-blue) .focus\:border-\[\#00D4FF\]:focus { border-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .focus\:border-\[\#00D4FF\]\/40:focus { border-color: rgba(var(--accent-rgb), 0.4) !important; }
+:root:not(.theme-dark-blue) .focus\:border-\[\#00D4FF\]\/50:focus { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+
+/* --- ACCENT GRADIENT STOPS --- */
+:root:not(.theme-dark-blue) .from-\[\#00D4FF\]\/5 { --tw-gradient-from: rgba(var(--accent-rgb), 0.05) var(--tw-gradient-from-position) !important; }
+:root:not(.theme-dark-blue) .from-\[\#00D4FF\]\/10 { --tw-gradient-from: rgba(var(--accent-rgb), 0.1) var(--tw-gradient-from-position) !important; }
+:root:not(.theme-dark-blue) .from-\[\#00D4FF\]\/20 { --tw-gradient-from: rgba(var(--accent-rgb), 0.2) var(--tw-gradient-from-position) !important; }
+:root:not(.theme-dark-blue) .to-\[\#00D4FF\]\/5 { --tw-gradient-to: rgba(var(--accent-rgb), 0.05) var(--tw-gradient-to-position) !important; }
+:root:not(.theme-dark-blue) .to-\[\#00D4FF\]\/10 { --tw-gradient-to: rgba(var(--accent-rgb), 0.1) var(--tw-gradient-to-position) !important; }
+:root:not(.theme-dark-blue) .to-\[\#00D4FF\]\/20 { --tw-gradient-to: rgba(var(--accent-rgb), 0.2) var(--tw-gradient-to-position) !important; }
+
+/* --- ACCENT RING & SHADOW --- */
+:root:not(.theme-dark-blue) .ring-\[\#00D4FF\] { --tw-ring-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .ring-\[\#00D4FF\]\/50 { --tw-ring-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .hover\:ring-\[\#00D4FF\]\/50:hover { --tw-ring-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .focus\:ring-\[\#00D4FF\]:focus { --tw-ring-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .shadow-\[\#00D4FF\]\/50 { --tw-shadow-color: rgba(var(--accent-rgb), 0.5) !important; }
+
+/* ================================================================
+   LIGHT THEME OVERRIDES
+   Convert dark backgrounds, text, and borders for white themes.
+   Targets :root.light (added by ThemeContext for white-blue/white-pink).
+   ================================================================ */
+
+/* --- DARK BACKGROUNDS → LIGHT (solid) --- */
+:root.light .bg-gray-950 { background-color: var(--bg-primary) !important; }
+:root.light .bg-gray-900 { background-color: var(--bg-primary) !important; }
+:root.light .bg-gray-800 { background-color: var(--bg-secondary) !important; }
+:root.light .bg-gray-700 { background-color: #f1f5f9 !important; }
+:root.light .bg-gray-600 { background-color: #e2e8f0 !important; }
+
+/* --- DARK BACKGROUNDS → LIGHT (with opacity) --- */
+:root.light .bg-gray-950\/50 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-gray-900\/50 { background-color: var(--bg-secondary) !important; }
+:root.light .bg-gray-900\/70 { background-color: var(--bg-secondary) !important; }
+:root.light .bg-gray-900\/80 { background-color: var(--bg-primary) !important; }
+:root.light .bg-gray-900\/95 { background-color: var(--bg-primary) !important; }
+:root.light .bg-gray-800\/30 { background-color: rgba(var(--accent-rgb), 0.03) !important; }
+:root.light .bg-gray-800\/50 { background-color: var(--bg-card) !important; }
+:root.light .bg-gray-800\/60 { background-color: var(--bg-card) !important; }
+:root.light .bg-gray-800\/80 { background-color: var(--bg-secondary) !important; }
+:root.light .bg-gray-700\/20 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-gray-700\/30 { background-color: rgba(var(--accent-rgb), 0.03) !important; }
+:root.light .bg-gray-700\/50 { background-color: #f1f5f9 !important; }
+:root.light .bg-gray-700\/70 { background-color: #f1f5f9 !important; }
+:root.light .bg-gray-600\/50 { background-color: #e2e8f0 !important; }
+:root.light .bg-gray-500\/20 { background-color: rgba(0, 0, 0, 0.05) !important; }
+:root.light .bg-gray-400\/20 { background-color: rgba(0, 0, 0, 0.06) !important; }
+
+/* --- DARK HEX BACKGROUNDS → LIGHT --- */
+:root.light .bg-\[\#0A0F1E\],
+:root.light .bg-\[\#0F0F0F\],
+:root.light .bg-\[\#0A0A0D\],
+:root.light .bg-\[\#0a1015\],
+:root.light .bg-\[\#0d1419\],
+:root.light .bg-\[\#0f1419\],
+:root.light .bg-\[\#0a0f1a\] { background-color: var(--bg-primary) !important; }
+
+:root.light .bg-\[\#151f26\],
+:root.light .bg-\[\#1a1f2e\] { background-color: var(--bg-secondary) !important; }
+
+:root.light .bg-\[\#0d2832\],
+:root.light .bg-\[\#1a2832\] { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+
+:root.light .bg-\[\#1a3a4a\] { background-color: rgba(var(--accent-rgb), 0.06) !important; }
+
+:root.light .bg-\[\#1a3a4a\]\/30 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-\[\#1a3a4a\]\/50 { background-color: rgba(var(--accent-rgb), 0.03) !important; }
+:root.light .bg-\[\#1a3a4a\]\/70 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+:root.light .bg-\[\#0A0F1E\]\/50 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-\[\#0A0F1E\]\/80 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+:root.light .bg-\[\#0d2832\]\/80 { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+:root.light .bg-\[\#0d1419\]\/95 { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0A0A0D\]\/50 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-black\/50,
+:root.light .bg-black\/60,
+:root.light .bg-black\/70,
+:root.light .bg-black\/80 { background-color: rgba(0, 0, 0, 0.4) !important; }
+
+/* --- HOVER BACKGROUNDS --- */
+:root.light .hover\:bg-gray-700:hover { background-color: #e2e8f0 !important; }
+:root.light .hover\:bg-gray-700\/50:hover { background-color: #f1f5f9 !important; }
+:root.light .hover\:bg-gray-800:hover { background-color: #f1f5f9 !important; }
+:root.light .hover\:bg-gray-800\/50:hover { background-color: var(--bg-card) !important; }
+:root.light .hover\:bg-gray-600:hover { background-color: #e2e8f0 !important; }
+:root.light .hover\:bg-gray-900:hover { background-color: var(--bg-primary) !important; }
+:root.light .hover\:bg-gray-900\/50:hover { background-color: var(--bg-secondary) !important; }
+:root.light .hover\:bg-\[\#1a3a4a\]:hover { background-color: rgba(var(--accent-rgb), 0.08) !important; }
+
+/* --- TEXT COLORS --- */
+:root.light .text-white { color: var(--text-primary) !important; }
+:root.light .text-gray-100 { color: var(--text-primary) !important; }
+:root.light .text-gray-200 { color: var(--text-primary) !important; }
+:root.light .text-gray-300 { color: var(--text-secondary) !important; }
+:root.light .text-gray-400 { color: var(--text-secondary) !important; }
+:root.light .text-gray-500 { color: var(--text-secondary) !important; }
+:root.light .hover\:text-white:hover { color: var(--text-accent) !important; }
+
+/* Keep white text on solid accent/colored backgrounds */
+:root.light .bg-\[\#00D4FF\].text-white,
+:root.light .bg-\[\#00D4FF\]\/80.text-white,
+:root.light .bg-\[\#00D4FF\]\/90.text-white,
+:root.light .bg-\[\#39FF14\].text-white,
+:root.light .bg-\[\#FF0064\].text-white,
+:root.light .bg-\[\#FFBF00\].text-white,
+:root.light .bg-\[\#FFA500\].text-white,
+:root.light .bg-\[\#9D4EDD\].text-white,
+:root.light .bg-\[\#FF6B00\].text-white,
+:root.light .bg-\[\#25D366\].text-white,
+:root.light .bg-\[\#1428A0\].text-white,
+:root.light .bg-green-500.text-white,
+:root.light .bg-green-600.text-white,
+:root.light .bg-red-500.text-white,
+:root.light .bg-red-600.text-white,
+:root.light .bg-blue-500.text-white,
+:root.light .bg-blue-600.text-white { color: #ffffff !important; }
+
+:root.light .bg-\[\#00D4FF\] .text-white,
+:root.light .bg-\[\#00D4FF\]\/80 .text-white,
+:root.light .bg-\[\#00D4FF\]\/90 .text-white,
+:root.light .bg-\[\#39FF14\] .text-white,
+:root.light .bg-\[\#FF0064\] .text-white,
+:root.light .bg-\[\#FFBF00\] .text-white,
+:root.light .bg-\[\#FFA500\] .text-white,
+:root.light .bg-\[\#9D4EDD\] .text-white,
+:root.light .bg-green-500 .text-white,
+:root.light .bg-red-500 .text-white,
+:root.light .bg-blue-500 .text-white { color: #ffffff !important; }
+
+/* --- BORDER COLORS --- */
+:root.light .border-gray-700 { border-color: #e2e8f0 !important; }
+:root.light .border-gray-800 { border-color: #e2e8f0 !important; }
+:root.light .border-gray-600 { border-color: #e2e8f0 !important; }
+:root.light .border-gray-500 { border-color: #cbd5e1 !important; }
+:root.light .border-gray-950 { border-color: #e2e8f0 !important; }
+:root.light .hover\:border-gray-600:hover { border-color: #cbd5e1 !important; }
+:root.light .hover\:border-gray-700:hover { border-color: #cbd5e1 !important; }
+:root.light .divide-gray-700 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+:root.light .divide-gray-800 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+
+/* --- DARK GRADIENT ENDPOINTS → LIGHT --- */
+:root.light .from-\[\#0f1419\] { --tw-gradient-from: var(--bg-secondary) var(--tw-gradient-from-position) !important; }
+:root.light .from-\[\#0d1419\] { --tw-gradient-from: var(--bg-secondary) var(--tw-gradient-from-position) !important; }
+:root.light .to-\[\#1a1f2e\] { --tw-gradient-to: var(--bg-card) var(--tw-gradient-to-position) !important; }
+:root.light .to-\[\#0d2832\] { --tw-gradient-to: rgba(var(--accent-rgb), 0.05) var(--tw-gradient-to-position) !important; }
+
+:root.light .from-gray-900 { --tw-gradient-from: var(--bg-primary) var(--tw-gradient-from-position) !important; }
+:root.light .from-gray-800 { --tw-gradient-from: var(--bg-secondary) var(--tw-gradient-from-position) !important; }
+:root.light .via-gray-800 { --tw-gradient-to: var(--bg-secondary) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--bg-secondary) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+:root.light .via-gray-900 { --tw-gradient-to: var(--bg-primary) var(--tw-gradient-to-position) !important; --tw-gradient-stops: var(--tw-gradient-from), var(--bg-primary) var(--tw-gradient-via-position), var(--tw-gradient-to) !important; }
+:root.light .to-gray-900 { --tw-gradient-to: var(--bg-primary) var(--tw-gradient-to-position) !important; }
+:root.light .to-gray-800 { --tw-gradient-to: var(--bg-secondary) var(--tw-gradient-to-position) !important; }
+:root.light .to-black { --tw-gradient-to: #e2e8f0 var(--tw-gradient-to-position) !important; }
+:root.light .from-black { --tw-gradient-from: #e2e8f0 var(--tw-gradient-from-position) !important; }
+
+/* --- PLACEHOLDER COLORS --- */
+:root.light .placeholder-gray-500::placeholder { color: #94a3b8 !important; }
+:root.light .placeholder-gray-400::placeholder { color: #94a3b8 !important; }
+
+/* --- INPUT/SELECT BACKGROUNDS --- */
+:root.light select,
+:root.light input[type="text"],
+:root.light input[type="number"],
+:root.light input[type="email"],
+:root.light input[type="password"],
+:root.light input[type="search"],
+:root.light input[type="date"],
+:root.light input[type="datetime-local"],
+:root.light textarea {
+  color: var(--text-primary);
+}
+
+/* --- SHADOW ADJUSTMENTS --- */
+:root.light .shadow-lg { box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06) !important; }
+:root.light .shadow-xl { box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08) !important; }
+:root.light .shadow-2xl { box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1) !important; }
+
+/* ================================================================
+   TAILWIND CYAN-* CLASS OVERRIDES
+   Many components use cyan-400/500 as accent color.
+   Maps to theme accent for non-default themes.
+   ================================================================ */
+:root:not(.theme-dark-blue) .text-cyan-400 { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .text-cyan-300 { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .text-cyan-500 { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:text-cyan-400:hover { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .hover\:text-cyan-300:hover { color: var(--text-accent) !important; }
+
+:root:not(.theme-dark-blue) .bg-cyan-500\/10 { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root:not(.theme-dark-blue) .bg-cyan-500\/20 { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .bg-cyan-500\/30 { background-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .bg-cyan-400\/10 { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root:not(.theme-dark-blue) .bg-cyan-400\/20 { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-cyan-500\/20:hover { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .hover\:bg-cyan-500\/30:hover { background-color: rgba(var(--accent-rgb), 0.3) !important; }
+
+:root:not(.theme-dark-blue) .border-cyan-500\/30 { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .border-cyan-500\/50 { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .border-cyan-400\/30 { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .border-cyan-400\/50 { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .hover\:border-cyan-500\/50:hover { border-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .focus\:border-cyan-500:focus { border-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .focus\:border-cyan-400:focus { border-color: var(--text-accent) !important; }
+
+:root:not(.theme-dark-blue) .from-cyan-400 { --tw-gradient-from: var(--text-accent) var(--tw-gradient-from-position) !important; }
+:root:not(.theme-dark-blue) .from-cyan-500 { --tw-gradient-from: var(--text-accent) var(--tw-gradient-from-position) !important; }
+:root:not(.theme-dark-blue) .to-cyan-400 { --tw-gradient-to: var(--text-accent) var(--tw-gradient-to-position) !important; }
+:root:not(.theme-dark-blue) .to-cyan-500 { --tw-gradient-to: var(--text-accent) var(--tw-gradient-to-position) !important; }
+
+:root:not(.theme-dark-blue) .ring-cyan-500 { --tw-ring-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .ring-cyan-400 { --tw-ring-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .focus\:ring-cyan-500:focus { --tw-ring-color: var(--text-accent) !important; }
+
+/* ================================================================
+   ACCENT COLOR VARIANTS (#00F5FF, #00CED1, #00B8E6)
+   Some components use slightly different cyan shades as accent.
+   ================================================================ */
+:root:not(.theme-dark-blue) .text-\[\#00F5FF\] { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .text-\[\#00CED1\] { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .text-\[\#00B8E6\] { color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00F5FF\] { background-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .bg-\[\#00CED1\] { background-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00F5FF\] { border-color: var(--text-accent) !important; }
+:root:not(.theme-dark-blue) .border-\[\#00CED1\] { border-color: var(--text-accent) !important; }
+
+/* ================================================================
+   SHADOW OVERRIDES FOR ACCENT COLORS
+   Remap cyan/accent shadows for non-default themes.
+   ================================================================ */
+:root:not(.theme-dark-blue) .shadow-cyan-500\/20 { --tw-shadow-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root:not(.theme-dark-blue) .shadow-cyan-500\/30 { --tw-shadow-color: rgba(var(--accent-rgb), 0.3) !important; }
+:root:not(.theme-dark-blue) .shadow-cyan-400\/40 { --tw-shadow-color: rgba(var(--accent-rgb), 0.4) !important; }
+:root:not(.theme-dark-blue) .shadow-\[\#00D4FF\]\/50 { --tw-shadow-color: rgba(var(--accent-rgb), 0.5) !important; }
+:root:not(.theme-dark-blue) .hover\:shadow-cyan-500\/20:hover { --tw-shadow-color: rgba(var(--accent-rgb), 0.2) !important; }
+
+/* ================================================================
+   FOCUS/OUTLINE OVERRIDES
+   Ensure focus rings use theme accent color.
+   ================================================================ */
+:root:not(.theme-dark-blue) .focus\:outline-\[\#00D4FF\]:focus { outline-color: var(--text-accent) !important; }
+:root.light .focus\:border-cyan-500:focus { border-color: var(--text-accent) !important; }
+:root.light .outline-\[\#00D4FF\] { outline-color: var(--text-accent) !important; }
+
+/* ================================================================
+   LIGHT THEME - ADDITIONAL COMPONENT PATTERNS
+   premium-card, neon-input, futuristic-loader need theme awareness.
+   ================================================================ */
+:root.light .premium-card {
+  background-color: var(--bg-card) !important;
+  border-color: var(--border-primary) !important;
+}
+:root.light .neon-input {
+  background-color: var(--bg-secondary) !important;
+  border-color: var(--border-primary) !important;
+  color: var(--text-primary) !important;
+}
+:root.light .neon-input:focus {
+  border-color: var(--text-accent) !important;
+}

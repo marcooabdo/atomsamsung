@@ -973,7 +973,7 @@ Assistencia Tecnica Samsung`;
       },
       enviada: {
         label: 'Enviada',
-        color: '#00D4FF',
+        color: 'var(--text-accent)',
         icon: Send
       },
       aprovada: {
@@ -1063,9 +1063,9 @@ Assistencia Tecnica Samsung`;
             onClick={() => setMenuAberto(menuAberto === cotacao.id ? null : cotacao.id)}
             className="w-full px-3 py-2 rounded-lg font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-1.5"
             style={{
-              backgroundColor: '#00D4FF20',
-              color: '#00D4FF',
-              border: '1px solid #00D4FF60'
+              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+              color: 'var(--text-accent)',
+              border: '1px solid rgba(var(--accent-rgb), 0.38)'
             }}
           >
             <MoreVertical className="w-3.5 h-3.5" />
@@ -1116,9 +1116,9 @@ Assistencia Tecnica Samsung`;
                 onClick={() => { handleEnviarCotacao(cotacao.id); setMenuAberto(null); }}
                 className="w-full px-4 py-2.5 text-left text-xs font-bold uppercase flex items-center gap-2 transition-colors hover:bg-[#00D4FF]/20"
                 style={{
-                  backgroundColor: cotacao.orcamento_modificado_apos_envio ? '#FFBF0010' : '#00D4FF10',
-                  color: cotacao.orcamento_modificado_apos_envio ? '#FFBF00' : '#00D4FF',
-                  borderBottom: cotacao.orcamento_modificado_apos_envio ? '1px solid #FFBF0020' : '1px solid #00D4FF20'
+                  backgroundColor: cotacao.orcamento_modificado_apos_envio ? '#FFBF0010' : 'rgba(var(--accent-rgb), 0.063)',
+                  color: cotacao.orcamento_modificado_apos_envio ? '#FFBF00' : 'var(--text-accent)',
+                  borderBottom: cotacao.orcamento_modificado_apos_envio ? '1px solid #FFBF0020' : '1px solid rgba(var(--accent-rgb), 0.125)'
                 }}
               >
                 <Send className="w-3.5 h-3.5" />
@@ -1132,7 +1132,7 @@ Assistencia Tecnica Samsung`;
                 onClick={() => { handleEditarCotacao(cotacao.id); setMenuAberto(null); }}
                 className="w-full px-4 py-2.5 text-left text-xs font-bold uppercase flex items-center gap-2 hover:bg-[#00D4FF]/10 transition-colors text-[#00D4FF]"
                 style={{
-                  borderBottom: '1px solid #00D4FF20'
+                  borderBottom: '1px solid rgba(var(--accent-rgb), 0.125)'
                 }}
               >
                 <Edit className="w-3.5 h-3.5" />

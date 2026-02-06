@@ -12,7 +12,7 @@ import Analytics from '../components/otimizador/Analytics';
 import ConfiguracaoOtimizador from '../components/otimizador/ConfiguracaoOtimizador';
 
 const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: Activity, color: '#00D4FF' },
+  { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)' },
   { id: 'agenda', label: 'Agenda', icon: Calendar, color: '#3B82F6' },
   { id: 'mapa', label: 'Mapa', icon: MapPin, color: '#10B981' },
   { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00' },
@@ -54,12 +54,12 @@ function OtimizadorContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="min-h-screen" style={{ background: 'var(--bg-primary)' }}>
       <div className="max-w-[1920px] mx-auto p-6 space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600 flex items-center gap-3">
-              <Zap className="w-10 h-10 text-cyan-400 animate-pulse" />
+            <h1 className="text-4xl font-bold text-[#00D4FF] flex items-center gap-3" style={{ textShadow: '0 0 30px rgba(var(--accent-rgb), 0.3)' }}>
+              <Zap className="w-10 h-10 text-[#00D4FF] animate-pulse" />
               Centro de Comando IH
             </h1>
             <p className="text-gray-400 mt-2">Hub gerencial completo para gestao de atendimentos</p>
@@ -92,7 +92,7 @@ function OtimizadorContent() {
                     className={`
                       flex items-center gap-2 px-4 py-3 rounded-lg transition-all whitespace-nowrap
                       ${isActive
-                        ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 border-2 shadow-lg'
+                        ? 'bg-[#00D4FF]/20 border-2 shadow-lg'
                         : 'hover:bg-gray-700/50'
                       }
                     `}

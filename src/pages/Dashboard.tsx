@@ -418,8 +418,8 @@ export function Dashboard() {
       />
 
       <div className="flex items-center gap-4 p-4 rounded-xl" style={{
-        background: 'linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,0,0,0.4) 100%)',
-        border: '1px solid rgba(0,212,255,0.3)'
+        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+        border: '1px solid rgba(var(--accent-rgb),0.3)'
       }}>
         <div className="flex items-center gap-2">
           <Filter className="w-5 h-5 text-cyan-400" />
@@ -577,17 +577,17 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="rounded-xl p-4 relative overflow-hidden transition-all duration-300"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,0,0,0.4) 100%)',
-            border: '1px solid rgba(0,212,255,0.3)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+            border: '1px solid rgba(var(--accent-rgb),0.3)',
             boxShadow: '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(0,212,255,0.6)';
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,212,255,0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
+            e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.6)';
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(0,212,255,0.3)';
+            e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)';
             e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
@@ -658,17 +658,17 @@ export function Dashboard() {
 
         <div className="rounded-xl p-4 relative overflow-hidden transition-all duration-300"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,245,255,0.08) 0%, rgba(0,0,0,0.4) 100%)',
-            border: '1px solid rgba(0,245,255,0.3)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+            border: '1px solid rgba(var(--accent-rgb),0.3)',
             boxShadow: '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)'
           }}
           onMouseEnter={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(0,245,255,0.6)';
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,245,255,0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
+            e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.6)';
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
-            e.currentTarget.style.borderColor = 'rgba(0,245,255,0.3)';
+            e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)';
             e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}

@@ -65,7 +65,7 @@ export function Financeiro() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-emerald-500" style={{ textShadow: '0 0 30px rgba(0, 212, 255, 0.3)' }}>
+          <h1 className="text-3xl font-bold text-[#00D4FF]" style={{ textShadow: '0 0 30px rgba(var(--accent-rgb), 0.3)' }}>
             ATOM FINANCE
           </h1>
           <p className="text-gray-400 mt-1">Gestao financeira completa e controle de consumo</p>
@@ -114,7 +114,7 @@ export function Financeiro() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-lg transition-all ${
                 activeTab === tab.id
-                  ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-400'
+                  ? 'bg-[#00D4FF]/20 border border-[#00D4FF]/50 text-[#00D4FF]'
                   : 'bg-gray-800/50 border border-gray-700 text-gray-400 hover:bg-gray-700/50 hover:text-white'
               }`}
             >

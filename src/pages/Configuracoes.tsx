@@ -777,15 +777,15 @@ export function Configuracoes() {
   };
 
   const allTabs = [
-    { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: '#00D4FF' },
-    { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14', onlyFor: ['master', 'diretoria', 'gerente'] },
-    { id: 'servicos' as Tab, label: 'Serviços', icon: Wrench, color: '#FFBF00' },
-    { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064' },
-    { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD' },
-    { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981' },
-    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6' },
-    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6' },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b' }
+    { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true },
+    { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
+    { id: 'servicos' as Tab, label: 'Serviços', icon: Wrench, color: '#FFBF00', isAccent: false },
+    { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064', isAccent: false },
+    { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD', isAccent: false },
+    { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
+    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
+    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -1660,10 +1660,19 @@ export function Configuracoes() {
                     }`}
                     style={{
                       borderColor: isActive ? tab.color : 'transparent',
-                      boxShadow: isActive ? `0 2px 0 ${tab.color}, 0 0 20px ${tab.color}40` : 'none'
+                      boxShadow: isActive
+                        ? tab.isAccent
+                          ? `0 2px 0 var(--text-accent), 0 0 20px rgba(var(--accent-rgb), 0.25)`
+                          : `0 2px 0 ${tab.color}, 0 0 20px ${tab.color}40`
+                        : 'none'
                     }}
                   >
-                    <Icon className="w-5 h-5" style={isActive ? { color: tab.color, filter: `drop-shadow(0 0 4px ${tab.color})` } : {}} />
+                    <Icon className="w-5 h-5" style={isActive ? {
+                      color: tab.color,
+                      filter: tab.isAccent
+                        ? 'drop-shadow(0 0 4px var(--text-accent))'
+                        : `drop-shadow(0 0 4px ${tab.color})`
+                    } : {}} />
                     {tab.label}
                   </button>
                 );
@@ -1941,11 +1950,11 @@ export function Configuracoes() {
                                   className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                                   style={{
                                     backgroundColor: markup.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' :
-                                                     markup.tipo_orcamento === 'acessorios' ? '#39FF1430' : '#00D4FF30',
+                                                     markup.tipo_orcamento === 'acessorios' ? '#39FF1430' : 'rgba(var(--accent-rgb), 0.19)',
                                     color: markup.tipo_orcamento === 'samsung_contigo' ? '#FFA500' :
-                                           markup.tipo_orcamento === 'acessorios' ? '#39FF14' : '#00D4FF',
-                                    border: `1px solid ${markup.tipo_orcamento === 'samsung_contigo' ? '#FFA500' :
-                                                          markup.tipo_orcamento === 'acessorios' ? '#39FF14' : '#00D4FF'}60`
+                                           markup.tipo_orcamento === 'acessorios' ? '#39FF14' : 'var(--text-accent)',
+                                    border: markup.tipo_orcamento === 'samsung_contigo' ? '1px solid #FFA50060' :
+                                            markup.tipo_orcamento === 'acessorios' ? '1px solid #39FF1460' : '1px solid rgba(var(--accent-rgb), 0.38)'
                                   }}
                                 >
                                   {markup.tipo_orcamento === 'normal' ? 'NORMAL' :
@@ -1966,9 +1975,9 @@ export function Configuracoes() {
                                   <span
                                     className="px-2 py-0.5 rounded text-[10px] font-bold"
                                     style={{
-                                      backgroundColor: markup.unidade_id ? '#00D4FF20' : '#9D4EDD20',
-                                      color: markup.unidade_id ? '#00D4FF' : '#9D4EDD',
-                                      border: `1px solid ${markup.unidade_id ? '#00D4FF' : '#9D4EDD'}60`
+                                      backgroundColor: markup.unidade_id ? 'rgba(var(--accent-rgb), 0.125)' : '#9D4EDD20',
+                                      color: markup.unidade_id ? 'var(--text-accent)' : '#9D4EDD',
+                                      border: markup.unidade_id ? '1px solid rgba(var(--accent-rgb), 0.38)' : '1px solid #9D4EDD60'
                                     }}
                                   >
                                     {markup.unidade_id ? unidades.find(u => u.id === markup.unidade_id)?.nome || 'Unidade' : 'GLOBAL'}
@@ -2320,9 +2329,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-3 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: checklist.tipo_checklist === 'ADM' ? '#3b82f620' : '#00D4FF20',
-                                    color: checklist.tipo_checklist === 'ADM' ? '#3b82f6' : '#00D4FF',
-                                    border: `1px solid ${checklist.tipo_checklist === 'ADM' ? '#3b82f6' : '#00D4FF'}60`
+                                    backgroundColor: checklist.tipo_checklist === 'ADM' ? '#3b82f620' : 'rgba(var(--accent-rgb), 0.125)',
+                                    color: checklist.tipo_checklist === 'ADM' ? '#3b82f6' : 'var(--text-accent)',
+                                    border: checklist.tipo_checklist === 'ADM' ? '1px solid #3b82f660' : '1px solid rgba(var(--accent-rgb), 0.38)'
                                   }}
                                 >
                                   {checklist.tipo_checklist}

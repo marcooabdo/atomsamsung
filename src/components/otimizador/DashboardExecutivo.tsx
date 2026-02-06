@@ -155,7 +155,7 @@ export default function DashboardExecutivo() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
+          <h2 className="text-3xl font-bold text-[#00D4FF]" style={{ textShadow: '0 0 20px rgba(var(--accent-rgb), 0.3)' }}>
             Dashboard Executivo
           </h2>
           <p className="text-gray-400 mt-1">Visão 360° da operação em tempo real</p>
@@ -163,13 +163,13 @@ export default function DashboardExecutivo() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-gradient-to-br from-cyan-500/10 to-blue-500/10 border border-cyan-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-cyan-500/20 transition-all">
+        <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-xl p-6 hover:shadow-lg transition-all">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-gray-400 text-sm">OS do Dia</p>
-              <p className="text-4xl font-bold text-cyan-400 mt-2">{kpis.osDoDia}</p>
+              <p className="text-4xl font-bold text-[#00D4FF] mt-2">{kpis.osDoDia}</p>
             </div>
-            <Activity className="w-12 h-12 text-cyan-400 opacity-50" />
+            <Activity className="w-12 h-12 text-[#00D4FF] opacity-50" />
           </div>
         </div>
 
