@@ -418,7 +418,7 @@ export function Dashboard() {
       />
 
       <div className="flex items-center gap-4 p-4 rounded-xl" style={{
-        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, var(--card-gradient-end) 100%)',
         border: '1px solid rgba(var(--accent-rgb),0.3)'
       }}>
         <div className="flex items-center gap-2">
@@ -480,21 +480,21 @@ export function Dashboard() {
               key={index}
               className="rounded-xl p-4 group relative overflow-hidden transition-all duration-300"
               style={{
-                background: `linear-gradient(135deg, ${stat.color}08 0%, rgba(0,0,0,0.4) 100%)`,
+                background: `linear-gradient(135deg, ${stat.color}08 0%, var(--card-gradient-end) 100%)`,
                 border: `1px solid ${stat.color}30`,
-                boxShadow: `0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)`,
+                boxShadow: `0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)`,
                 animationDelay: `${index * 50}ms`,
                 cursor: stat.hasGoal ? 'pointer' : 'default'
               }}
               onClick={stat.onClick}
               onMouseEnter={(e) => {
                 e.currentTarget.style.borderColor = `${stat.color}60`;
-                e.currentTarget.style.boxShadow = `0 4px 20px ${stat.color}30, inset 0 1px 1px rgba(255,255,255,0.1)`;
+                e.currentTarget.style.boxShadow = `0 4px 20px ${stat.color}30, inset 0 1px 1px var(--subtle-border)`;
                 e.currentTarget.style.transform = 'translateY(-2px)';
               }}
               onMouseLeave={(e) => {
                 e.currentTarget.style.borderColor = `${stat.color}30`;
-                e.currentTarget.style.boxShadow = `0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)`;
+                e.currentTarget.style.boxShadow = `0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)`;
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
             >
@@ -527,14 +527,14 @@ export function Dashboard() {
                     }}
                     className="p-1 rounded transition-all duration-200"
                     style={{
-                      background: 'rgba(255,255,255,0.05)',
-                      border: '1px solid rgba(255,255,255,0.1)'
+                      background: 'var(--card-inset-glow)',
+                      border: '1px solid var(--subtle-border)'
                     }}
                     onMouseEnter={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                      e.currentTarget.style.background = 'var(--subtle-border)';
                     }}
                     onMouseLeave={(e) => {
-                      e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                      e.currentTarget.style.background = 'var(--card-inset-glow)';
                     }}
                   >
                     <Settings className="w-3 h-3 text-gray-400" />
@@ -559,7 +559,7 @@ export function Dashboard() {
                 </p>
               )}
 
-              <div className="h-1 bg-black/60 rounded-full overflow-hidden">
+              <div className="h-1 bg-[var(--progress-track)] rounded-full overflow-hidden">
                 <div
                   className="h-full rounded-full transition-all duration-1000"
                   style={{
@@ -577,18 +577,18 @@ export function Dashboard() {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
         <div className="rounded-xl p-4 relative overflow-hidden transition-all duration-300"
           style={{
-            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, var(--card-gradient-end) 100%)',
             border: '1px solid rgba(var(--accent-rgb),0.3)',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)'
+            boxShadow: '0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.6)';
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px var(--subtle-border)';
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)';
-            e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)';
+            e.currentTarget.style.boxShadow = '0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
@@ -658,18 +658,18 @@ export function Dashboard() {
 
         <div className="rounded-xl p-4 relative overflow-hidden transition-all duration-300"
           style={{
-            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, rgba(0,0,0,0.4) 100%)',
+            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08) 0%, var(--card-gradient-end) 100%)',
             border: '1px solid rgba(var(--accent-rgb),0.3)',
-            boxShadow: '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)'
+            boxShadow: '0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)'
           }}
           onMouseEnter={(e) => {
             e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.6)';
-            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px rgba(255,255,255,0.1)';
+            e.currentTarget.style.boxShadow = '0 4px 20px rgba(var(--accent-rgb),0.3), inset 0 1px 1px var(--subtle-border)';
             e.currentTarget.style.transform = 'translateY(-2px)';
           }}
           onMouseLeave={(e) => {
             e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.3)';
-            e.currentTarget.style.boxShadow = '0 2px 10px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)';
+            e.currentTarget.style.boxShadow = '0 2px 10px var(--shadow-primary), inset 0 1px 1px var(--card-inset-glow)';
             e.currentTarget.style.transform = 'translateY(0)';
           }}
         >
@@ -697,14 +697,14 @@ export function Dashboard() {
               }}
               className="p-1.5 rounded transition-all duration-200"
               style={{
-                background: 'rgba(255,255,255,0.05)',
-                border: '1px solid rgba(255,255,255,0.1)'
+                background: 'var(--card-inset-glow)',
+                border: '1px solid var(--subtle-border)'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.1)';
+                e.currentTarget.style.background = 'var(--subtle-border)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                e.currentTarget.style.background = 'var(--card-inset-glow)';
               }}
             >
               <Settings className="w-4 h-4 text-gray-400" />
@@ -727,7 +727,7 @@ export function Dashboard() {
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Taxa de Aprovacao</span>
                 <span className="text-xs text-[#10B981] font-bold">{stats.taxaAprovacao.toFixed(1)}%</span>
               </div>
-              <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000" style={{
                   width: `${Math.min(100, stats.taxaAprovacao)}%`,
                   background: 'linear-gradient(90deg, #10B981 0%, #06B6D4 100%)',
@@ -754,7 +754,7 @@ export function Dashboard() {
                 <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Eficiencia Operacional</span>
                 <span className="text-xs text-[#0EA5E9] font-bold">{stats.eficienciaOperacional.toFixed(1)} dias</span>
               </div>
-              <div className="h-1.5 bg-black/60 rounded-full overflow-hidden">
+              <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000" style={{
                   width: !stats.metaEficiencia || stats.eficienciaOperacional === 0
                     ? '0%'

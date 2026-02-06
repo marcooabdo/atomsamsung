@@ -314,14 +314,15 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
               <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
                 Escolha o tema visual da interface
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                {THEMES.map((t) => {
+              <div className="space-y-3">
+                {THEMES.map((t, idx) => {
                   const active = theme === t.id;
+                  const isFirst = idx === 0;
                   return (
                     <button
                       key={t.id}
                       onClick={() => setTheme(t.id as ThemeVariant)}
-                      className="relative p-4 rounded-xl border-2 transition-all duration-300 text-left group"
+                      className={`relative rounded-xl border-2 transition-all duration-300 text-left group ${isFirst ? 'w-full p-3 flex items-center gap-4' : 'inline-block w-[calc(50%-6px)] p-3 align-top'} ${idx === 1 || idx === 3 ? 'mr-3' : ''}`}
                       style={{
                         background: t.bg,
                         borderColor: active ? t.accent : t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
@@ -336,37 +337,38 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                           <Check className="w-3 h-3" style={{ color: t.isDark ? '#000' : '#fff' }} />
                         </div>
                       )}
-                      <div className="flex items-center gap-2 mb-3">
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{
-                            background: t.accent,
-                            boxShadow: `0 0 8px ${t.accent}60`,
-                          }}
-                        />
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }}
-                        />
-                        <div
-                          className="w-4 h-4 rounded-full"
-                          style={{ background: t.isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }}
-                        />
-                      </div>
-                      <div className="flex gap-1.5 mb-3">
-                        <div className="flex-1 h-2 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
-                        <div className="w-4 h-2 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }} />
-                      </div>
-                      <div className="space-y-1">
-                        <div className="h-1.5 rounded-full w-3/4" style={{ background: t.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }} />
-                        <div className="h-1.5 rounded-full w-1/2" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
-                      </div>
-                      <p
-                        className="text-xs font-semibold mt-3 tracking-wide"
-                        style={{ color: t.isDark ? '#ccc' : '#444' }}
-                      >
-                        {t.label}
-                      </p>
+                      {isFirst ? (
+                        <>
+                          <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
+                            <div className="w-5 h-5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex gap-1.5 mb-1.5">
+                              <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
+                              <div className="w-4 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                            </div>
+                            <div className="h-1 rounded-full w-3/4" style={{ background: 'rgba(255,255,255,0.2)' }} />
+                          </div>
+                          <p className="text-xs font-semibold tracking-wide" style={{ color: '#ccc' }}>{t.label}</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-2 mb-2">
+                            <div className="w-4 h-4 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
+                            <div className="w-4 h-4 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
+                          </div>
+                          <div className="flex gap-1.5 mb-2">
+                            <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
+                            <div className="w-4 h-1.5 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }} />
+                          </div>
+                          <div className="space-y-1">
+                            <div className="h-1 rounded-full w-3/4" style={{ background: t.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }} />
+                            <div className="h-1 rounded-full w-1/2" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
+                          </div>
+                          <p className="text-xs font-semibold mt-2 tracking-wide" style={{ color: t.isDark ? '#ccc' : '#444' }}>{t.label}</p>
+                        </>
+                      )}
                     </button>
                   );
                 })}

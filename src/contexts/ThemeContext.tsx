@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-export type ThemeVariant = 'dark-blue' | 'dark-pink' | 'white-blue' | 'white-pink';
+export type ThemeVariant = 'original' | 'dark-blue' | 'dark-pink' | 'white-blue' | 'white-pink';
 
 export interface ThemeInfo {
   id: ThemeVariant;
@@ -11,6 +11,7 @@ export interface ThemeInfo {
 }
 
 export const THEMES: ThemeInfo[] = [
+  { id: 'original', label: 'Padrao', accent: '#00D4FF', bg: '#0A0A0D', isDark: true },
   { id: 'dark-blue', label: 'Dark Blue', accent: '#00D4FF', bg: '#0b111a', isDark: true },
   { id: 'dark-pink', label: 'Dark Pink', accent: '#ff007f', bg: '#1a0b16', isDark: true },
   { id: 'white-blue', label: 'White Blue', accent: '#0077B6', bg: '#f8fafc', isDark: false },
@@ -33,7 +34,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (saved && THEMES.some(t => t.id === saved)) return saved as ThemeVariant;
     const legacy = localStorage.getItem('theme');
     if (legacy === 'light') return 'white-blue';
-    return 'dark-blue';
+    return 'original';
   });
 
   const themeInfo = THEMES.find(t => t.id === theme) || THEMES[0];

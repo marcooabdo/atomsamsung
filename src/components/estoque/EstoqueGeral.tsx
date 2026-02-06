@@ -685,145 +685,149 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         />
       )}
 
-      {/* Modal de Histórico */}
       {showHistory && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="premium-card w-full max-w-3xl max-h-[80vh] flex flex-col p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-[#00D4FF]">Histórico da Peça</h2>
+        <div className="fixed inset-0 z-50" onClick={() => setShowHistory(null)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="absolute right-4 top-1/2 -translate-y-1/2 w-[480px] max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
+            style={{
+              background: 'var(--bg-card)',
+              border: '1px solid var(--border-accent)',
+              boxShadow: '0 20px 60px var(--shadow-primary), 0 0 24px rgba(var(--accent-rgb), 0.08)',
+              backdropFilter: 'blur(24px)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="flex items-center gap-2">
+                <History className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text-accent)' }}>Historico da Peca</h2>
+              </div>
               <button
                 onClick={() => setShowHistory(null)}
-                className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+                className="p-1.5 rounded-lg transition-colors hover:bg-gray-800/50"
               >
-                <span className="text-2xl text-gray-400">×</span>
+                <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
 
-            {/* Informações da NF e Delivery */}
             {historicoData.length > 0 && historicoData[0].peca?.nf && (
-              <div className="mb-6 p-4 bg-gray-800/50 rounded-lg border border-gray-700 space-y-2">
-                <h3 className="text-sm font-bold text-gray-400 uppercase mb-3">Informações de Entrada</h3>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="mx-4 mt-4 p-3 rounded-lg border" style={{ background: 'rgba(var(--accent-rgb), 0.04)', borderColor: 'var(--border-primary)' }}>
+                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Informacoes de Entrada</h3>
+                <div className="grid grid-cols-2 gap-2 text-xs">
                   {historicoData[0].peca.id_numerico && (
                     <div>
-                      <span className="text-gray-500">ID Peça:</span>
-                      <span className="text-[#39FF14] font-bold ml-2">#{historicoData[0].peca.id_numerico}</span>
+                      <span className="text-gray-500">ID:</span>
+                      <span className="text-[#39FF14] font-bold ml-1">#{historicoData[0].peca.id_numerico}</span>
                     </div>
                   )}
                   <div>
                     <span className="text-gray-500">PN:</span>
-                    <span className="text-white font-mono ml-2">{historicoData[0].peca.pn}</span>
+                    <span className="text-white font-mono ml-1">{historicoData[0].peca.pn}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Número NF:</span>
-                    <span className="text-white font-bold ml-2">{historicoData[0].peca.nf.numero_nf}</span>
+                    <span className="text-gray-500">NF:</span>
+                    <span className="text-white font-bold ml-1">{historicoData[0].peca.nf.numero_nf}</span>
                   </div>
                   <div>
                     <span className="text-gray-500">Fornecedor:</span>
-                    <span className="text-white ml-2">{historicoData[0].peca.nf.fornecedor}</span>
+                    <span className="text-white ml-1">{historicoData[0].peca.nf.fornecedor}</span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Data Emissão:</span>
-                    <span className="text-white ml-2">
+                    <span className="text-gray-500">Emissao:</span>
+                    <span className="text-white ml-1">
                       {new Date(historicoData[0].peca.nf.data_emissao).toLocaleDateString('pt-BR')}
                     </span>
                   </div>
                   {historicoData[0].peca.nf.delivery && (
                     <div>
                       <span className="text-gray-500">Delivery:</span>
-                      <span className="text-[#00D4FF] font-bold ml-2">{historicoData[0].peca.nf.delivery}</span>
+                      <span className="font-bold ml-1" style={{ color: 'var(--text-accent)' }}>{historicoData[0].peca.nf.delivery}</span>
                     </div>
                   )}
                 </div>
               </div>
             )}
 
-            {loadingHistorico ? (
-              <div className="text-center py-12">
-                <div className="w-12 h-12 border-4 border-[#00D4FF] border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-                <p className="text-gray-400">Carregando histórico...</p>
-              </div>
-            ) : historicoData.length === 0 ? (
-              <div className="text-center py-12">
-                <History className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-                <p className="text-gray-400">Nenhum histórico encontrado para esta peça</p>
-              </div>
-            ) : (
-              <div className="space-y-3 flex-1 overflow-y-auto cyber-scrollbar">
-                {historicoData.map((item) => (
-                  <div key={item.id} className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="px-2 py-0.5 bg-[#00D4FF]/20 text-[#00D4FF] rounded text-xs font-medium">
-                            {item.acao}
-                          </span>
-                          <span className="text-xs text-gray-500">
-                            {new Date(item.created_at).toLocaleString('pt-BR')}
-                          </span>
+            <div className="flex-1 overflow-y-auto cyber-scrollbar p-4">
+              {loadingHistorico ? (
+                <div className="text-center py-12">
+                  <div className="w-10 h-10 border-3 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--border-primary)', borderTopColor: 'var(--text-accent)' }} />
+                  <p className="text-gray-400 text-sm">Carregando historico...</p>
+                </div>
+              ) : historicoData.length === 0 ? (
+                <div className="text-center py-12">
+                  <History className="w-10 h-10 text-gray-600 mx-auto mb-3" />
+                  <p className="text-gray-400 text-sm">Nenhum historico encontrado</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {historicoData.map((item) => (
+                    <div key={item.id} className="p-3 rounded-lg border" style={{ background: 'rgba(var(--accent-rgb), 0.03)', borderColor: 'var(--border-primary)' }}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="px-2 py-0.5 bg-[#00D4FF]/20 text-[#00D4FF] rounded text-xs font-medium">
+                              {item.acao}
+                            </span>
+                            <span className="text-[10px] text-gray-500">
+                              {new Date(item.created_at).toLocaleString('pt-BR')}
+                            </span>
+                          </div>
+
+                          {item.status_anterior && item.status_novo && (
+                            <div className="flex items-center gap-2 text-xs mt-1.5">
+                              <span className="text-gray-400">Status:</span>
+                              {getStatusBadge(item.status_anterior)}
+                              <span className="text-gray-500">-{'>'}</span>
+                              {getStatusBadge(item.status_novo)}
+                            </div>
+                          )}
+
+                          {item.origem && (
+                            <div className="text-xs text-gray-400 mt-1.5">
+                              <strong>Origem:</strong> {item.origem}
+                            </div>
+                          )}
+
+                          {item.destino && (
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              <strong>Destino:</strong> {item.destino}
+                            </div>
+                          )}
+
+                          {item.observacao && (
+                            <div
+                              className="text-xs mt-1.5 p-2 rounded border"
+                              style={{
+                                backgroundColor: item.observacao.includes('DEFEITO:') ? '#FF006410' : 'rgba(var(--accent-rgb), 0.04)',
+                                borderColor: item.observacao.includes('DEFEITO:') ? '#FF006460' : 'var(--border-primary)',
+                                color: item.observacao.includes('DEFEITO:') ? '#FF0064' : 'var(--text-secondary)'
+                              }}
+                            >
+                              {item.observacao.includes('DEFEITO:') && (
+                                <div className="font-bold mb-1 flex items-center gap-1">
+                                  <AlertCircle className="w-3 h-3" />
+                                  <span>DEFEITO DE FABRICA</span>
+                                </div>
+                              )}
+                              <div className={item.observacao.includes('DEFEITO:') ? 'font-medium' : ''}>
+                                {item.observacao}
+                              </div>
+                            </div>
+                          )}
                         </div>
 
-                        {item.status_anterior && item.status_novo && (
-                          <div className="flex items-center gap-2 text-sm mt-2">
-                            <span className="text-gray-400">Status:</span>
-                            {getStatusBadge(item.status_anterior)}
-                            <span className="text-gray-500">→</span>
-                            {getStatusBadge(item.status_novo)}
-                          </div>
-                        )}
-
-                        {item.origem && (
-                          <div className="text-sm text-gray-400 mt-2">
-                            <strong>Origem:</strong> {item.origem}
-                          </div>
-                        )}
-
-                        {item.destino && (
-                          <div className="text-sm text-gray-400 mt-1">
-                            <strong>Destino:</strong> {item.destino}
-                          </div>
-                        )}
-
-                        {item.observacao && (
-                          <div
-                            className="text-sm mt-2 p-3 rounded border"
-                            style={{
-                              backgroundColor: item.observacao.includes('⚠️ DEFEITO:') ? '#FF006410' : 'rgba(17, 24, 39, 0.5)',
-                              borderColor: item.observacao.includes('⚠️ DEFEITO:') ? '#FF006460' : 'rgba(75, 85, 99, 0.5)',
-                              color: item.observacao.includes('⚠️ DEFEITO:') ? '#FF0064' : 'rgb(209, 213, 219)'
-                            }}
-                          >
-                            {item.observacao.includes('⚠️ DEFEITO:') && (
-                              <div className="font-bold mb-1 flex items-center gap-2">
-                                <AlertCircle className="w-4 h-4" />
-                                <span>PEÇA COM DEFEITO DE FÁBRICA</span>
-                              </div>
-                            )}
-                            <div className={item.observacao.includes('⚠️ DEFEITO:') ? 'font-medium' : ''}>
-                              {item.observacao}
-                            </div>
+                        {item.usuario && (
+                          <div className="text-[10px] text-gray-500 ml-2 whitespace-nowrap">
+                            {item.usuario.nome}
                           </div>
                         )}
                       </div>
-
-                      {item.usuario && (
-                        <div className="text-xs text-gray-500 ml-4">
-                          {item.usuario.nome}
-                        </div>
-                      )}
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-gray-700 mt-6">
-              <button
-                onClick={() => setShowHistory(null)}
-                className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-              >
-                Fechar
-              </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

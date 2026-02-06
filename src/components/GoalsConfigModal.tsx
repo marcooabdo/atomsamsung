@@ -211,8 +211,8 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                   onChange={(e) => setSelectedMonth(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg text-sm text-white"
                   style={{
-                    background: 'rgba(0,0,0,0.4)',
-                    border: '1px solid rgba(255,255,255,0.1)'
+                    background: 'var(--card-gradient-end)',
+                    border: '1px solid var(--subtle-border)'
                   }}
                 >
                   {months.map((month, index) => (
@@ -227,8 +227,8 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                   onChange={(e) => setSelectedYear(Number(e.target.value))}
                   className="w-full px-3 py-2 rounded-lg text-sm text-white"
                   style={{
-                    background: 'rgba(0,0,0,0.4)',
-                    border: '1px solid rgba(255,255,255,0.1)'
+                    background: 'var(--card-gradient-end)',
+                    border: '1px solid var(--subtle-border)'
                   }}
                 >
                   {years.map((year) => (
@@ -258,7 +258,7 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                   onChange={(e) => setGoals({ ...goals, meta_receita_lp: Number(e.target.value) })}
                   className="w-full pl-10 pr-3 py-2 rounded-lg text-sm text-white"
                   style={{
-                    background: 'rgba(0,0,0,0.4)',
+                    background: 'var(--card-gradient-end)',
                     border: '1px solid rgba(168,85,247,0.3)'
                   }}
                   min="0"
@@ -285,7 +285,7 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                   onChange={(e) => setGoals({ ...goals, meta_receita_ow: Number(e.target.value) })}
                   className="w-full pl-10 pr-3 py-2 rounded-lg text-sm text-white"
                   style={{
-                    background: 'rgba(0,0,0,0.4)',
+                    background: 'var(--card-gradient-end)',
                     border: '1px solid rgba(14,165,233,0.3)'
                   }}
                   min="0"
@@ -310,7 +310,7 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                 onChange={(e) => setGoals({ ...goals, meta_eficiencia_operacional: Number(e.target.value) })}
                 className="w-full px-3 py-2 rounded-lg text-sm text-white"
                 style={{
-                  background: 'rgba(0,0,0,0.4)',
+                  background: 'var(--card-gradient-end)',
                   border: '1px solid rgba(6,182,212,0.3)'
                 }}
                 min="1"
@@ -337,7 +337,7 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
                 onChange={(e) => setGoals({ ...goals, meta_taxa_aprovacao: Number(e.target.value) })}
                 className="w-full px-3 py-2 rounded-lg text-sm text-white"
                 style={{
-                  background: 'rgba(0,0,0,0.4)',
+                  background: 'var(--card-gradient-end)',
                   border: '1px solid rgba(16,185,129,0.3)'
                 }}
                 min="0"
@@ -356,14 +356,14 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-bold text-gray-400 transition-all duration-300"
             style={{
-              background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)',
-              border: '1px solid rgba(255,255,255,0.1)'
+              background: 'linear-gradient(135deg, var(--card-inset-glow) 0%, rgba(255,255,255,0.02) 100%)',
+              border: '1px solid var(--subtle-border)'
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%)';
+              e.currentTarget.style.background = 'linear-gradient(135deg, var(--subtle-border) 0%, var(--card-inset-glow) 100%)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, rgba(255,255,255,0.02) 100%)';
+              e.currentTarget.style.background = 'linear-gradient(135deg, var(--card-inset-glow) 0%, rgba(255,255,255,0.02) 100%)';
             }}
           >
             Cancelar
