@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, Receipt, RefreshCw } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
 import { PaymentDetailsModal } from './PaymentDetailsModal';
 import { EditPaymentModal } from './EditPaymentModal';
-import { EmitirNFSeModal } from './EmitirNFSeModal';
 
 interface OSPagamentoTabProps {
   osId: string;
@@ -32,13 +31,9 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [descontoTipo, setDescontoTipo] = useState<'valor' | 'percentual'>(os.desconto_tipo || 'valor');
   const [descontoValor, setDescontoValor] = useState<string>(os.desconto_valor?.toString() || '');
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
-  const [showNFSeModal, setShowNFSeModal] = useState(false);
-  const [nfsEmitidas, setNfsEmitidas] = useState<any[]>([]);
-  const [retryNfId, setRetryNfId] = useState<string | null>(null);
 
   useEffect(() => {
     loadPagamentos();
-    loadNfsEmitidas();
   }, [osId]);
 
   useEffect(() => {
@@ -71,15 +66,6 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadNfsEmitidas = async () => {
-    const { data } = await supabase
-      .from('nf_emitidas')
-      .select('id, tipo, numero, status, valor_total, data_emissao, erro_mensagem, pdf_url, xml_url, tentativas')
-      .eq('os_id', osId)
-      .order('created_at', { ascending: false });
-    setNfsEmitidas(data || []);
   };
 
   const loadPecasServicos = async () => {
@@ -675,91 +661,6 @@ Assistencia Tecnica Samsung`;
           </div>
         </div>
 
-        <div className="premium-card p-6 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10 border border-[#00D4FF]/30">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-lg bg-[#00D4FF]/20 flex items-center justify-center border border-[#00D4FF]/40">
-                <Receipt className="w-5 h-5 text-[#00D4FF]" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-[#00D4FF]">NOTA FISCAL DE SERVICO</h3>
-                <p className="text-xs text-gray-400">Emita NFS-e Nacional vinculada a esta OS</p>
-              </div>
-            </div>
-            <button
-              onClick={() => {
-                setRetryNfId(null);
-                setShowNFSeModal(true);
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.1) 100%)',
-                border: '2px solid rgba(0,212,255,0.6)',
-                color: '#00D4FF',
-                boxShadow: '0 0 15px rgba(0,212,255,0.2)'
-              }}
-            >
-              <Receipt className="w-4 h-4" />
-              Emitir NFS-e
-            </button>
-          </div>
-
-          {nfsEmitidas.length > 0 && (
-            <div className="space-y-2">
-              {nfsEmitidas.map(nf => (
-                <div key={nf.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${
-                      nf.status === 'emitida' ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40' :
-                      nf.status === 'pendente' ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40' :
-                      nf.status === 'processando' ? 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40' :
-                      nf.status === 'erro' ? 'bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40' :
-                      'bg-gray-500/20 text-gray-400 border border-gray-500/40'
-                    }`}>
-                      {nf.status.toUpperCase()}
-                    </span>
-                    <span className="text-sm text-gray-300">
-                      {nf.tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
-                      {nf.numero ? ` #${nf.numero}` : ''}
-                    </span>
-                    <span className="text-sm font-bold text-[#39FF14]">
-                      R$ {(nf.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {nf.status === 'erro' && (
-                      <button
-                        onClick={() => {
-                          setRetryNfId(nf.id);
-                          setShowNFSeModal(true);
-                        }}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30 transition-colors"
-                      >
-                        <RefreshCw className="w-3 h-3" />
-                        Tentar Novamente
-                      </button>
-                    )}
-                    {nf.pdf_url && (
-                      <a href={nf.pdf_url} target="_blank" rel="noopener noreferrer" className="p-1.5 rounded hover:bg-[#39FF14]/20 transition-colors">
-                        <Download className="w-4 h-4 text-[#39FF14]" />
-                      </a>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {nfsEmitidas.some(nf => nf.status === 'erro' && nf.erro_mensagem) && (
-            <div className="mt-3 p-3 bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg">
-              <p className="text-xs font-bold text-[#FF0064] mb-1">Erro na ultima emissao:</p>
-              <p className="text-xs text-gray-300">
-                {nfsEmitidas.find(nf => nf.status === 'erro')?.erro_mensagem}
-              </p>
-            </div>
-          )}
-        </div>
-
         <div>
           <h4 className="text-[#00D4FF] font-bold mb-3 uppercase text-sm flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
@@ -1066,30 +967,6 @@ Assistencia Tecnica Samsung`;
             </div>
           </div>
         </div>
-      )}
-
-      {showNFSeModal && (
-        <EmitirNFSeModal
-          isOpen={showNFSeModal}
-          onClose={() => {
-            setShowNFSeModal(false);
-            setRetryNfId(null);
-          }}
-          onSuccess={() => {
-            loadNfsEmitidas();
-            setShowNFSeModal(false);
-            setRetryNfId(null);
-          }}
-          osId={osId}
-          unidadeId={os.unidade_id}
-          clienteNome={os.cliente_nome || ''}
-          clienteDocumento={os.cliente_documento}
-          clienteTelefone={os.cliente_telefone}
-          clienteEmail={os.cliente_email}
-          clienteEndereco={os.cliente_endereco}
-          valorServicos={os.valor_total || 0}
-          existingNfId={retryNfId}
-        />
       )}
 
       {showReprovarModal && (

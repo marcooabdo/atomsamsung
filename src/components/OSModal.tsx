@@ -3972,6 +3972,8 @@ Não haverá cobrança ao cliente.`
               valorServicos={os.valor_servicos || 0}
               valorPecas={os.valor_pecas || 0}
               valorTotal={os.valor_bruto || 0}
+              valorPago={os.valor_pago || 0}
+              valorDesconto={os.valor_desconto || 0}
               onReload={async () => {
                 await loadOS();
                 onReload?.();

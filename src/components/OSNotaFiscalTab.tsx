@@ -1,6 +1,11 @@
 import { useState, useEffect } from 'react';
-import { FileText, Building2, User, DollarSign, Percent, Receipt, Send, AlertCircle, CheckCircle, Clock, X, ChevronDown, FileCheck } from 'lucide-react';
+import {
+  FileText, Building2, User, DollarSign, Percent, Receipt, Send,
+  AlertCircle, CheckCircle, Clock, X, ChevronDown, FileCheck, RefreshCw,
+  Download, Package, Wrench
+} from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { EmitirNFSeModal } from './EmitirNFSeModal';
 
 interface NFConfig {
   id: string;
@@ -25,9 +30,15 @@ interface NFEmitida {
   numero: string | null;
   serie: string | null;
   valor_total: number;
+  valor_servicos: number;
+  valor_produtos: number;
   status: string;
   data_emissao: string | null;
   protocolo: string | null;
+  erro_mensagem: string | null;
+  pdf_url: string | null;
+  xml_url: string | null;
+  tentativas: number | null;
   nf_config: { nome: string } | null;
 }
 
@@ -42,6 +53,8 @@ interface OSNotaFiscalTabProps {
   valorServicos: number;
   valorPecas: number;
   valorTotal: number;
+  valorPago: number;
+  valorDesconto: number;
   onReload?: () => void;
 }
 
@@ -55,30 +68,18 @@ export function OSNotaFiscalTab({
   unidadeId,
   valorServicos,
   valorPecas,
-  valorTotal
+  valorTotal,
+  valorPago,
+  valorDesconto,
+  onReload
 }: OSNotaFiscalTabProps) {
   const [nfConfigs, setNfConfigs] = useState<NFConfig[]>([]);
   const [nfsEmitidas, setNfsEmitidas] = useState<NFEmitida[]>([]);
   const [unidade, setUnidade] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  const [activeSection, setActiveSection] = useState<'nfse' | 'nfe'>('nfse');
-  const [selectedConfig, setSelectedConfig] = useState<string>('');
   const [selectedNFeConfig, setSelectedNFeConfig] = useState<string>('');
-  const [showConfigDropdown, setShowConfigDropdown] = useState(false);
   const [showNFeConfigDropdown, setShowNFeConfigDropdown] = useState(false);
-
-  const [formNFSe, setFormNFSe] = useState({
-    valorServicos: valorServicos,
-    aliquotaIss: 5,
-    retencaoIr: 0,
-    retencaoPis: 0,
-    retencaoCofins: 0,
-    retencaoCsll: 0,
-    retencaoInss: 0,
-    codigoServico: '',
-    observacoes: ''
-  });
 
   const [formNFe, setFormNFe] = useState({
     valorProdutos: valorPecas,
@@ -89,15 +90,16 @@ export function OSNotaFiscalTab({
 
   const [emitindo, setEmitindo] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
+  const [showNFSeModal, setShowNFSeModal] = useState(false);
+  const [retryNfId, setRetryNfId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, [unidadeId, osId]);
 
   useEffect(() => {
-    setFormNFSe(prev => ({ ...prev, valorServicos }));
-    setFormNFe(prev => ({ ...prev, valorProdutos: valorPecas }));
-  }, [valorServicos, valorPecas]);
+    setFormNFe(prev => ({ ...prev, valorProdutos: valorPecasRestante }));
+  }, [valorPecas, nfsEmitidas]);
 
   const loadData = async () => {
     setLoading(true);
@@ -125,18 +127,10 @@ export function OSNotaFiscalTab({
       setUnidade(unidadeRes.data);
       setNfsEmitidas(nfsRes.data || []);
 
-      if (configsRes.data && configsRes.data.length > 0) {
-        const firstNfse = configsRes.data.find(c => c.tipo === 'nfse');
-        if (firstNfse) {
-          setSelectedConfig(firstNfse.id);
-          applyConfigToForm(firstNfse);
-        }
-
-        const firstNfe = configsRes.data.find(c => c.tipo === 'nfe');
-        if (firstNfe) {
-          setSelectedNFeConfig(firstNfe.id);
-          applyConfigToForm(firstNfe);
-        }
+      const nfeConfigs = (configsRes.data || []).filter((c: NFConfig) => c.tipo === 'nfe');
+      if (nfeConfigs.length > 0 && !selectedNFeConfig) {
+        setSelectedNFeConfig(nfeConfigs[0].id);
+        applyNFeConfig(nfeConfigs[0]);
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
@@ -145,110 +139,48 @@ export function OSNotaFiscalTab({
     }
   };
 
-  const applyConfigToForm = (config: NFConfig) => {
-    if (config.tipo === 'nfse') {
-      setFormNFSe(prev => ({
-        ...prev,
-        aliquotaIss: config.aliquota_iss || 5,
-        retencaoIr: config.retencao_ir || 0,
-        retencaoPis: config.retencao_pis || 0,
-        retencaoCofins: config.retencao_cofins || 0,
-        retencaoCsll: config.retencao_csll || 0,
-        retencaoInss: config.retencao_inss || 0,
-        codigoServico: config.codigo_servico || '',
-        observacoes: config.observacoes_padrao || ''
-      }));
-    } else {
-      setFormNFe(prev => ({
-        ...prev,
-        cfop: config.cfop || '5102',
-        ncm: config.ncm || '',
-        observacoes: config.observacoes_padrao || ''
-      }));
-    }
-  };
-
-  const handleSelectConfig = (configId: string) => {
-    setSelectedConfig(configId);
-    const config = nfConfigs.find(c => c.id === configId);
-    if (config) {
-      applyConfigToForm(config);
-    }
-    setShowConfigDropdown(false);
+  const applyNFeConfig = (config: NFConfig) => {
+    setFormNFe(prev => ({
+      ...prev,
+      cfop: config.cfop || '5102',
+      ncm: config.ncm || '',
+      observacoes: config.observacoes_padrao || ''
+    }));
   };
 
   const handleSelectNFeConfig = (configId: string) => {
     setSelectedNFeConfig(configId);
     const config = nfConfigs.find(c => c.id === configId);
-    if (config) {
-      applyConfigToForm(config);
-    }
+    if (config) applyNFeConfig(config);
     setShowNFeConfigDropdown(false);
   };
 
-  const calcularTotalRetencoes = () => {
-    const base = formNFSe.valorServicos;
-    return (
-      (base * formNFSe.retencaoIr / 100) +
-      (base * formNFSe.retencaoPis / 100) +
-      (base * formNFSe.retencaoCofins / 100) +
-      (base * formNFSe.retencaoCsll / 100) +
-      (base * formNFSe.retencaoInss / 100)
-    );
-  };
+  const activeNfse = nfsEmitidas.filter(nf => nf.tipo === 'nfse' && nf.status !== 'cancelada');
+  const activeNfe = nfsEmitidas.filter(nf => nf.tipo === 'nfe' && nf.status !== 'cancelada');
 
-  const calcularISS = () => {
-    return formNFSe.valorServicos * formNFSe.aliquotaIss / 100;
-  };
+  const valorServicosInvoiced = activeNfse
+    .filter(nf => nf.status !== 'erro')
+    .reduce((sum, nf) => sum + (nf.valor_servicos || nf.valor_total || 0), 0);
+  const valorPecasInvoiced = activeNfe
+    .filter(nf => nf.status !== 'erro')
+    .reduce((sum, nf) => sum + (nf.valor_produtos || nf.valor_total || 0), 0);
 
-  const calcularValorLiquidoNFSe = () => {
-    return formNFSe.valorServicos - calcularTotalRetencoes();
-  };
+  const valorServicosRestante = Math.max(valorServicos - valorServicosInvoiced, 0);
+  const valorPecasRestante = Math.max(valorPecas - valorPecasInvoiced, 0);
 
-  const handleEmitirNFSe = async () => {
-    if (!selectedConfig) {
-      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrização de NFS-e' });
-      return;
-    }
+  const servicosPctInvoiced = valorServicos > 0 ? Math.min((valorServicosInvoiced / valorServicos) * 100, 100) : 0;
+  const pecasPctInvoiced = valorPecas > 0 ? Math.min((valorPecasInvoiced / valorPecas) * 100, 100) : 0;
 
-    setEmitindo(true);
-    setMensagem(null);
-
-    try {
-      const { error } = await supabase
-        .from('nf_emitidas')
-        .insert({
-          os_id: osId,
-          nf_config_id: selectedConfig,
-          unidade_id: unidadeId,
-          tipo: 'nfse',
-          valor_servicos: formNFSe.valorServicos,
-          valor_produtos: 0,
-          valor_total: formNFSe.valorServicos,
-          valor_retencoes: calcularTotalRetencoes(),
-          base_calculo: formNFSe.valorServicos,
-          status: 'pendente',
-          tomador_nome: clienteNome,
-          tomador_documento: clienteDocumento,
-          tomador_endereco: clienteEndereco,
-          observacoes: formNFSe.observacoes
-        });
-
-      if (error) throw error;
-
-      setMensagem({ tipo: 'success', texto: 'NFS-e registrada com sucesso! Aguardando processamento da API.' });
-      loadData();
-    } catch (error: any) {
-      console.error('Erro ao emitir NFS-e:', error);
-      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao emitir NFS-e' });
-    } finally {
-      setEmitindo(false);
-    }
-  };
+  const canEmitNfse = valorPago > 0 && valorServicosRestante > 0.01 && valorServicos > 0;
+  const canEmitNfe = valorPago > 0 && valorPecasRestante > 0.01 && valorPecas > 0;
 
   const handleEmitirNFe = async () => {
     if (!selectedNFeConfig && nfeConfigs.length > 0) {
-      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrização de NF-e' });
+      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrizacao de NF-e' });
+      return;
+    }
+    if (formNFe.valorProdutos <= 0) {
+      setMensagem({ tipo: 'error', texto: 'Valor dos produtos deve ser maior que zero' });
       return;
     }
 
@@ -272,46 +204,46 @@ export function OSNotaFiscalTab({
           tomador_nome: clienteNome,
           tomador_documento: clienteDocumento,
           tomador_endereco: clienteEndereco,
-          observacoes: formNFe.observacoes
+          observacoes: formNFe.observacoes,
+          tentativas: 1
         });
 
       if (error) throw error;
-
-      setMensagem({ tipo: 'success', texto: 'NF-e registrada com sucesso! Aguardando processamento da API.' });
+      setMensagem({ tipo: 'success', texto: 'NF-e registrada! Aguardando processamento.' });
       loadData();
     } catch (error: any) {
-      console.error('Erro ao emitir NF-e:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao emitir NF-e' });
     } finally {
       setEmitindo(false);
     }
   };
 
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
-  };
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
   const getStatusBadge = (status: string) => {
-    const statusConfig: Record<string, { bg: string; text: string; icon: any }> = {
-      pendente: { bg: 'bg-yellow-500/20', text: 'text-yellow-400', icon: Clock },
-      processando: { bg: 'bg-blue-500/20', text: 'text-blue-400', icon: Clock },
-      emitida: { bg: 'bg-green-500/20', text: 'text-green-400', icon: CheckCircle },
-      cancelada: { bg: 'bg-gray-500/20', text: 'text-gray-400', icon: X },
-      erro: { bg: 'bg-red-500/20', text: 'text-red-400', icon: AlertCircle }
+    const configs: Record<string, { bg: string; border: string; color: string; label: string; icon: any }> = {
+      pendente: { bg: '#FFBF0015', border: '#FFBF0040', color: '#FFBF00', label: 'Na Fila', icon: Clock },
+      processando: { bg: '#00D4FF15', border: '#00D4FF40', color: '#00D4FF', label: 'Processando', icon: Clock },
+      emitida: { bg: '#39FF1415', border: '#39FF1440', color: '#39FF14', label: 'Emitida', icon: CheckCircle },
+      cancelada: { bg: '#71717A15', border: '#71717A40', color: '#71717A', label: 'Cancelada', icon: X },
+      erro: { bg: '#FF006415', border: '#FF006440', color: '#FF0064', label: 'Erro', icon: AlertCircle }
     };
-    const config = statusConfig[status] || statusConfig.pendente;
-    const Icon = config.icon;
+    const c = configs[status] || configs.pendente;
+    const Icon = c.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${config.bg} ${config.text}`}>
+      <span
+        className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold"
+        style={{ backgroundColor: c.bg, border: `1px solid ${c.border}`, color: c.color }}
+      >
         <Icon className="w-3 h-3" />
-        {status.charAt(0).toUpperCase() + status.slice(1)}
+        {c.label}
       </span>
     );
   };
 
   const nfseConfigs = nfConfigs.filter(c => c.tipo === 'nfse');
   const nfeConfigs = nfConfigs.filter(c => c.tipo === 'nfe');
-  const selectedConfigData = nfConfigs.find(c => c.id === selectedConfig);
   const selectedNFeConfigData = nfConfigs.find(c => c.id === selectedNFeConfig);
 
   if (loading) {
@@ -331,10 +263,26 @@ export function OSNotaFiscalTab({
             : 'bg-red-500/10 border border-red-500/30 text-red-400'
         }`}>
           {mensagem.tipo === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
-          <span>{mensagem.texto}</span>
+          <span className="flex-1">{mensagem.texto}</span>
           <button onClick={() => setMensagem(null)} className="ml-auto">
             <X className="w-4 h-4" />
           </button>
+        </div>
+      )}
+
+      {valorPago <= 0 && (
+        <div className="premium-card p-6 bg-[#FFBF00]/10 border-2 border-[#FFBF00]/40">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-full bg-[#FFBF00]/20 flex items-center justify-center border border-[#FFBF00]/40">
+              <AlertCircle className="w-6 h-6 text-[#FFBF00]" />
+            </div>
+            <div>
+              <h3 className="text-lg font-bold text-[#FFBF00]">PAGAMENTO NECESSARIO</h3>
+              <p className="text-sm text-gray-300">
+                A emissao de notas fiscais so fica disponivel apos o registro de pagamento na OS.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
@@ -342,24 +290,24 @@ export function OSNotaFiscalTab({
         <div className="premium-card p-4 bg-gradient-to-br from-[#00D4FF]/5 to-transparent border border-[#00D4FF]/20">
           <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-3 flex items-center gap-2">
             <User className="w-4 h-4" />
-            Dados do Tomador (Cliente)
+            Tomador (Cliente)
           </h4>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Nome:</span>
-              <span className="text-gray-200 font-medium">{clienteNome || 'Não informado'}</span>
+              <span className="text-gray-200 font-medium">{clienteNome || 'Nao informado'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">CPF/CNPJ:</span>
-              <span className="text-gray-200 font-medium">{clienteDocumento || 'Não informado'}</span>
+              <span className="text-gray-200 font-medium">{clienteDocumento || 'Nao informado'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Telefone:</span>
-              <span className="text-gray-200 font-medium">{clienteTelefone || 'Não informado'}</span>
+              <span className="text-gray-200 font-medium">{clienteTelefone || 'Nao informado'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Email:</span>
-              <span className="text-gray-200 font-medium truncate max-w-[200px]">{clienteEmail || 'Não informado'}</span>
+              <span className="text-gray-200 font-medium truncate max-w-[200px]">{clienteEmail || 'Nao informado'}</span>
             </div>
             {clienteEndereco && (
               <div className="pt-2 border-t border-gray-700">
@@ -373,457 +321,376 @@ export function OSNotaFiscalTab({
         <div className="premium-card p-4 bg-gradient-to-br from-[#FFA500]/5 to-transparent border border-[#FFA500]/20">
           <h4 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider mb-3 flex items-center gap-2">
             <Building2 className="w-4 h-4" />
-            Dados do Prestador (Emitente)
+            Prestador (Emitente)
           </h4>
           <div className="space-y-2 text-sm">
             <div className="flex justify-between">
               <span className="text-gray-500">Razao Social:</span>
-              <span className="text-gray-200 font-medium">{unidade?.nome || 'Carregando...'}</span>
+              <span className="text-gray-200 font-medium">{unidade?.razao_social || unidade?.nome || '-'}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-gray-500">CNPJ:</span>
+              <span className="text-gray-200 font-mono">{unidade?.cnpj || '-'}</span>
             </div>
             <div className="flex justify-between">
               <span className="text-gray-500">Cidade:</span>
-              <span className="text-gray-200 font-medium">{unidade?.cidade || '-'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Estado:</span>
-              <span className="text-gray-200 font-medium">{unidade?.estado || '-'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Telefone:</span>
-              <span className="text-gray-200 font-medium">{unidade?.telefone || '-'}</span>
+              <span className="text-gray-200">{unidade?.cidade || '-'} / {unidade?.estado || '-'}</span>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="flex gap-2 border-b border-gray-700">
-        <button
-          onClick={() => setActiveSection('nfse')}
-          className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
-            activeSection === 'nfse'
-              ? 'text-[#00D4FF] border-b-2 border-[#00D4FF] bg-[#00D4FF]/5'
-              : 'text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          <Receipt className="w-4 h-4 inline mr-2" />
-          NFS-e (Servicos)
-        </button>
-        <button
-          onClick={() => setActiveSection('nfe')}
-          className={`px-4 py-3 text-sm font-bold uppercase tracking-wider transition-all ${
-            activeSection === 'nfe'
-              ? 'text-[#00D4FF] border-b-2 border-[#00D4FF] bg-[#00D4FF]/5'
-              : 'text-gray-400 hover:text-gray-200'
-          }`}
-        >
-          <FileText className="w-4 h-4 inline mr-2" />
-          NF-e (Produtos)
-        </button>
+      <div className="premium-card p-5 border border-[#00D4FF]/20">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+            <Wrench className="w-4 h-4" />
+            NFS-e -- Servicos
+          </h4>
+          {servicosPctInvoiced >= 100 && valorServicos > 0 && (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+              100% FATURADO
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Servicos</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(valorServicos)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
+            <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorServicosInvoiced)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
+            <p className={`text-lg font-bold ${valorServicosRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
+              {formatCurrency(valorServicosRestante)}
+            </p>
+          </div>
+        </div>
+
+        {valorServicos > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Progresso de faturamento</span>
+              <span>{servicosPctInvoiced.toFixed(0)}%</span>
+            </div>
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${servicosPctInvoiced}%`,
+                  background: servicosPctInvoiced >= 100
+                    ? 'linear-gradient(90deg, #39FF14, #10B981)'
+                    : 'linear-gradient(90deg, #00D4FF, #39FF14)'
+                }}
+              />
+            </div>
+          </div>
+        )}
+
+        {canEmitNfse ? (
+          <button
+            onClick={() => {
+              setRetryNfId(null);
+              setShowNFSeModal(true);
+            }}
+            className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,212,255,0.25) 0%, rgba(0,212,255,0.08) 100%)',
+              border: '2px solid rgba(0,212,255,0.6)',
+              color: '#00D4FF',
+              boxShadow: '0 0 15px rgba(0,212,255,0.15)'
+            }}
+          >
+            <Send className="w-4 h-4" />
+            Emitir NFS-e -- {formatCurrency(valorServicosRestante)}
+          </button>
+        ) : valorServicos <= 0 ? (
+          <p className="text-center text-sm text-gray-500 py-2">Nenhum servico cadastrado nesta OS</p>
+        ) : servicosPctInvoiced >= 100 ? (
+          <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Todos os servicos ja foram faturados
+          </p>
+        ) : (
+          <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
+        )}
       </div>
 
-      {activeSection === 'nfse' && (
-        <div className="space-y-4">
-          <div className="premium-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-[#00D4FF]" />
-                Emissao de NFS-e
-              </h4>
+      <div className="premium-card p-5 border border-[#FFA500]/20">
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider flex items-center gap-2">
+            <Package className="w-4 h-4" />
+            NF-e -- Produtos / Pecas
+          </h4>
+          {pecasPctInvoiced >= 100 && valorPecas > 0 && (
+            <span className="px-3 py-1 rounded-full text-xs font-bold bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40">
+              100% FATURADO
+            </span>
+          )}
+        </div>
 
-              {nfseConfigs.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowConfigDropdown(!showConfigDropdown)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 hover:border-[#00D4FF]/50 transition-colors"
-                  >
-                    <span>{selectedConfigData?.nome || 'Selecionar parametrizacao'}</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showConfigDropdown ? 'rotate-180' : ''}`} />
-                  </button>
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Pecas</p>
+            <p className="text-lg font-bold text-white">{formatCurrency(valorPecas)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
+            <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorPecasInvoiced)}</p>
+          </div>
+          <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
+            <p className={`text-lg font-bold ${valorPecasRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
+              {formatCurrency(valorPecasRestante)}
+            </p>
+          </div>
+        </div>
 
-                  {showConfigDropdown && (
-                    <div className="absolute right-0 top-full mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                      {nfseConfigs.map(config => (
-                        <button
-                          key={config.id}
-                          onClick={() => handleSelectConfig(config.id)}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-[#00D4FF]/10 transition-colors ${
-                            selectedConfig === config.id ? 'bg-[#00D4FF]/20 text-[#00D4FF]' : 'text-gray-200'
-                          }`}
-                        >
-                          <div className="font-medium">{config.nome}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            ISS: {config.aliquota_iss}% | Cod: {config.codigo_servico || '-'}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+        {valorPecas > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+              <span>Progresso de faturamento</span>
+              <span>{pecasPctInvoiced.toFixed(0)}%</span>
             </div>
+            <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${pecasPctInvoiced}%`,
+                  background: pecasPctInvoiced >= 100
+                    ? 'linear-gradient(90deg, #39FF14, #10B981)'
+                    : 'linear-gradient(90deg, #FFA500, #39FF14)'
+                }}
+              />
+            </div>
+          </div>
+        )}
 
-            {nfseConfigs.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma parametrizacao de NFS-e cadastrada para esta unidade.</p>
-                <p className="text-sm mt-1">Configure em Atom Core Settings &gt; Nota Fiscal</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                      Valor dos Servicos (Base de Calculo)
-                    </label>
-                    <div className="relative">
-                      <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                      <input
-                        type="number"
-                        value={formNFSe.valorServicos}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, valorServicos: parseFloat(e.target.value) || 0 }))}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors"
-                        step="0.01"
-                      />
-                    </div>
+        {valorDesconto > 0 && (
+          <div className="mb-4 p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
+            <p className="text-xs text-gray-400">Desconto aplicado na OS:</p>
+            <p className="text-sm font-bold text-[#FF0064]">- {formatCurrency(valorDesconto)}</p>
+          </div>
+        )}
+
+        {canEmitNfe ? (
+          <div className="space-y-4">
+            {nfeConfigs.length > 0 && (
+              <div className="relative">
+                <label className="block text-[10px] text-gray-500 mb-1">Parametrizacao NF-e</label>
+                <button
+                  onClick={() => setShowNFeConfigDropdown(!showNFeConfigDropdown)}
+                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 hover:border-[#FFA500]/50 transition-colors"
+                >
+                  <span>{selectedNFeConfigData?.nome || 'Selecionar'}</span>
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showNFeConfigDropdown ? 'rotate-180' : ''}`} />
+                </button>
+                {showNFeConfigDropdown && (
+                  <div className="absolute left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden max-h-48 overflow-y-auto">
+                    {nfeConfigs.map(config => (
+                      <button
+                        key={config.id}
+                        onClick={() => handleSelectNFeConfig(config.id)}
+                        className={`w-full px-4 py-3 text-left text-sm hover:bg-[#FFA500]/10 transition-colors ${
+                          selectedNFeConfig === config.id ? 'bg-[#FFA500]/20 text-[#FFA500]' : 'text-gray-200'
+                        }`}
+                      >
+                        <div className="font-medium">{config.nome}</div>
+                        <div className="text-xs text-gray-500 mt-0.5">CFOP: {config.cfop || '-'} | NCM: {config.ncm || '-'}</div>
+                      </button>
+                    ))}
                   </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                      Codigo do Servico (LC 116)
-                    </label>
-                    <input
-                      type="text"
-                      value={formNFSe.codigoServico}
-                      onChange={(e) => setFormNFSe(prev => ({ ...prev, codigoServico: e.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors"
-                      placeholder="Ex: 14.01"
-                    />
-                  </div>
-                </div>
-
-                <div className="premium-card p-3 bg-gray-800/50">
-                  <h5 className="text-xs font-bold text-gray-300 uppercase mb-3 flex items-center gap-2">
-                    <Percent className="w-3.5 h-3.5" />
-                    Aliquotas e Retencoes
-                  </h5>
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">ISS (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.aliquotaIss}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, aliquotaIss: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">IR (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.retencaoIr}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, retencaoIr: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">PIS (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.retencaoPis}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, retencaoPis: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">COFINS (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.retencaoCofins}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, retencaoCofins: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">CSLL (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.retencaoCsll}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, retencaoCsll: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">INSS (%)</label>
-                      <input
-                        type="number"
-                        value={formNFSe.retencaoInss}
-                        onChange={(e) => setFormNFSe(prev => ({ ...prev, retencaoInss: parseFloat(e.target.value) || 0 }))}
-                        className="w-full px-2 py-1.5 rounded bg-gray-700 border border-gray-600 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        step="0.01"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Observacoes da Nota
-                  </label>
-                  <textarea
-                    value={formNFSe.observacoes}
-                    onChange={(e) => setFormNFSe(prev => ({ ...prev, observacoes: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors resize-none"
-                    rows={3}
-                    placeholder="Observacoes que serao incluidas na nota fiscal..."
-                  />
-                </div>
-
-                <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-[#00D4FF]/10 to-[#FFA500]/10 border border-[#00D4FF]/30">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-gray-400">Base de Calculo:</span>
-                      <span className="text-white font-bold">{formatCurrency(formNFSe.valorServicos)}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-gray-400">ISS ({formNFSe.aliquotaIss}%):</span>
-                      <span className="text-yellow-400">{formatCurrency(calcularISS())}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm">
-                      <span className="text-gray-400">Total Retencoes:</span>
-                      <span className="text-red-400">- {formatCurrency(calcularTotalRetencoes())}</span>
-                    </div>
-                    <div className="flex items-center gap-4 text-base pt-2 border-t border-gray-700">
-                      <span className="text-gray-200 font-medium">Valor Liquido:</span>
-                      <span className="text-[#00D4FF] font-bold text-lg">{formatCurrency(calcularValorLiquidoNFSe())}</span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={handleEmitirNFSe}
-                    disabled={emitindo || formNFSe.valorServicos <= 0}
-                    className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.1) 100%)',
-                      border: '2px solid rgba(0,212,255,0.7)',
-                      color: '#00D4FF',
-                      boxShadow: '0 0 20px rgba(0,212,255,0.3)'
-                    }}
-                  >
-                    {emitindo ? (
-                      <>
-                        <div className="w-4 h-4 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <Send className="w-4 h-4" />
-                        Emitir NFS-e
-                      </>
-                    )}
-                  </button>
-                </div>
+                )}
               </div>
             )}
-          </div>
-        </div>
-      )}
 
-      {activeSection === 'nfe' && (
-        <div className="space-y-4">
-          <div className="premium-card p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h4 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
-                <FileCheck className="w-4 h-4 text-[#FFA500]" />
-                Emissao de NF-e (Produtos/Pecas)
-              </h4>
-
-              {nfeConfigs.length > 0 && (
-                <div className="relative">
-                  <button
-                    onClick={() => setShowNFeConfigDropdown(!showNFeConfigDropdown)}
-                    className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 hover:border-[#FFA500]/50 transition-colors"
-                  >
-                    <span>{selectedNFeConfigData?.nome || 'Selecionar parametrizacao'}</span>
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showNFeConfigDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {showNFeConfigDropdown && (
-                    <div className="absolute right-0 top-full mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden">
-                      {nfeConfigs.map(config => (
-                        <button
-                          key={config.id}
-                          onClick={() => handleSelectNFeConfig(config.id)}
-                          className={`w-full px-4 py-3 text-left text-sm hover:bg-[#FFA500]/10 transition-colors ${
-                            selectedNFeConfig === config.id ? 'bg-[#FFA500]/20 text-[#FFA500]' : 'text-gray-200'
-                          }`}
-                        >
-                          <div className="font-medium">{config.nome}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            CFOP: {config.cfop || '-'} | NCM: {config.ncm || '-'}
-                          </div>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {nfeConfigs.length === 0 ? (
-              <div className="text-center py-8 text-gray-400">
-                <AlertCircle className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Nenhuma parametrizacao de NF-e cadastrada para esta unidade.</p>
-                <p className="text-sm mt-1">Configure em Atom Core Settings &gt; Nota Fiscal</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    Valor dos Produtos
-                  </label>
-                  <div className="relative">
-                    <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-                    <input
-                      type="number"
-                      value={formNFe.valorProdutos}
-                      onChange={(e) => setFormNFe(prev => ({ ...prev, valorProdutos: parseFloat(e.target.value) || 0 }))}
-                      className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors"
-                      step="0.01"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    CFOP
-                  </label>
-                  <input
-                    type="text"
-                    value={formNFe.cfop}
-                    onChange={(e) => setFormNFe(prev => ({ ...prev, cfop: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors"
-                    placeholder="Ex: 5102"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                    NCM
-                  </label>
-                  <input
-                    type="text"
-                    value={formNFe.ncm}
-                    onChange={(e) => setFormNFe(prev => ({ ...prev, ncm: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors"
-                    placeholder="Ex: 85171210"
-                  />
-                </div>
-              </div>
-
+            <div className="grid grid-cols-3 gap-3">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1.5">
-                  Observacoes da Nota
-                </label>
-                <textarea
-                  value={formNFe.observacoes}
-                  onChange={(e) => setFormNFe(prev => ({ ...prev, observacoes: e.target.value }))}
-                  className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] transition-colors resize-none"
-                  rows={3}
-                  placeholder="Observacoes que serao incluidas na nota fiscal..."
+                <label className="block text-[10px] text-gray-500 mb-1">Valor (R$)</label>
+                <div className="relative">
+                  <DollarSign className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+                  <input
+                    type="number"
+                    value={formNFe.valorProdutos}
+                    onChange={(e) => setFormNFe(prev => ({ ...prev, valorProdutos: parseFloat(e.target.value) || 0 }))}
+                    className="w-full pl-8 pr-3 py-2 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#FFA500] text-sm"
+                    step="0.01"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">CFOP</label>
+                <input
+                  type="text"
+                  value={formNFe.cfop}
+                  onChange={(e) => setFormNFe(prev => ({ ...prev, cfop: e.target.value }))}
+                  className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#FFA500] text-sm"
                 />
               </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">NCM</label>
+                <input
+                  type="text"
+                  value={formNFe.ncm}
+                  onChange={(e) => setFormNFe(prev => ({ ...prev, ncm: e.target.value }))}
+                  className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#FFA500] text-sm"
+                />
+              </div>
+            </div>
 
-              <div className="flex items-center justify-between p-4 rounded-lg bg-gradient-to-r from-[#FFA500]/10 to-[#00D4FF]/10 border border-[#FFA500]/30">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-400">Valor Total dos Produtos:</span>
-                    <span className="text-[#FFA500] font-bold text-lg">{formatCurrency(formNFe.valorProdutos)}</span>
-                  </div>
+            <textarea
+              value={formNFe.observacoes}
+              onChange={(e) => setFormNFe(prev => ({ ...prev, observacoes: e.target.value }))}
+              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#FFA500] resize-none text-sm"
+              rows={2}
+              placeholder="Observacoes..."
+            />
+
+            <button
+              onClick={handleEmitirNFe}
+              disabled={emitindo || formNFe.valorProdutos <= 0}
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,165,0,0.25) 0%, rgba(255,165,0,0.08) 100%)',
+                border: '2px solid rgba(255,165,0,0.6)',
+                color: '#FFA500',
+                boxShadow: '0 0 15px rgba(255,165,0,0.15)'
+              }}
+            >
+              {emitindo ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#FFA500] border-t-transparent rounded-full animate-spin" />
+                  Processando...
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" />
+                  Emitir NF-e -- {formatCurrency(formNFe.valorProdutos)}
+                </>
+              )}
+            </button>
+          </div>
+        ) : valorPecas <= 0 ? (
+          <p className="text-center text-sm text-gray-500 py-2">Nenhuma peca cadastrada nesta OS</p>
+        ) : pecasPctInvoiced >= 100 ? (
+          <p className="text-center text-sm text-[#39FF14] py-2 flex items-center justify-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            Todas as pecas ja foram faturadas
+          </p>
+        ) : (
+          <p className="text-center text-sm text-gray-500 py-2">Registre um pagamento para habilitar a emissao</p>
+        )}
+      </div>
+
+      {nfsEmitidas.length > 0 && (
+        <div className="premium-card p-5">
+          <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Receipt className="w-4 h-4 text-[#00D4FF]" />
+            Notas Fiscais desta OS ({nfsEmitidas.length})
+          </h4>
+
+          <div className="space-y-2">
+            {nfsEmitidas.map(nf => (
+              <div
+                key={nf.id}
+                className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
+              >
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
+                    nf.tipo === 'nfse'
+                      ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
+                      : 'bg-[#FFA500]/15 text-[#FFA500] border border-[#FFA500]/30'
+                  }`}>
+                    {nf.tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
+                  </span>
+                  {getStatusBadge(nf.status)}
+                  <span className="text-sm text-gray-300 truncate">
+                    {nf.numero ? `#${nf.numero}` : ''}
+                    {nf.nf_config?.nome ? ` - ${nf.nf_config.nome}` : ''}
+                  </span>
+                  <span className="text-sm font-bold text-white ml-auto mr-3">
+                    {formatCurrency(nf.valor_total)}
+                  </span>
                 </div>
 
-                <button
-                  onClick={handleEmitirNFe}
-                  disabled={emitindo || formNFe.valorProdutos <= 0}
-                  className="flex items-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
-                    border: '2px solid rgba(255,165,0,0.7)',
-                    color: '#FFA500',
-                    boxShadow: '0 0 20px rgba(255,165,0,0.3)'
-                  }}
-                >
-                  {emitindo ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-[#FFA500] border-t-transparent rounded-full animate-spin" />
-                      Processando...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      Emitir NF-e
-                    </>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {nf.status === 'erro' && (
+                    <button
+                      onClick={() => {
+                        if (nf.tipo === 'nfse') {
+                          setRetryNfId(nf.id);
+                          setShowNFSeModal(true);
+                        }
+                      }}
+                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30 transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      Tentar Novamente
+                    </button>
                   )}
-                </button>
+                  {nf.pdf_url && (
+                    <a
+                      href={nf.pdf_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded hover:bg-[#39FF14]/20 transition-colors"
+                      title="Download PDF"
+                    >
+                      <Download className="w-4 h-4 text-[#39FF14]" />
+                    </a>
+                  )}
+                  {nf.xml_url && (
+                    <a
+                      href={nf.xml_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded hover:bg-[#FFBF00]/20 transition-colors"
+                      title="Download XML"
+                    >
+                      <FileText className="w-4 h-4 text-[#FFBF00]" />
+                    </a>
+                  )}
+                </div>
               </div>
+            ))}
+
+            {nfsEmitidas.some(nf => nf.status === 'erro' && nf.erro_mensagem) && (
+              <div className="mt-2 p-3 bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg">
+                <p className="text-xs font-bold text-[#FF0064] mb-1">Erro na emissao:</p>
+                <p className="text-xs text-gray-300">
+                  {nfsEmitidas.find(nf => nf.status === 'erro')?.erro_mensagem}
+                </p>
               </div>
             )}
           </div>
         </div>
       )}
 
-      {nfsEmitidas.length > 0 && (
-        <div className="premium-card p-4">
-          <h4 className="text-sm font-bold text-white uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Receipt className="w-4 h-4 text-[#00D4FF]" />
-            Notas Fiscais desta OS
-          </h4>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-700">
-                  <th className="text-left py-2 px-3 text-gray-400 font-medium">Tipo</th>
-                  <th className="text-left py-2 px-3 text-gray-400 font-medium">Parametrizacao</th>
-                  <th className="text-left py-2 px-3 text-gray-400 font-medium">Numero</th>
-                  <th className="text-right py-2 px-3 text-gray-400 font-medium">Valor</th>
-                  <th className="text-center py-2 px-3 text-gray-400 font-medium">Status</th>
-                  <th className="text-left py-2 px-3 text-gray-400 font-medium">Data</th>
-                </tr>
-              </thead>
-              <tbody>
-                {nfsEmitidas.map(nf => (
-                  <tr key={nf.id} className="border-b border-gray-800 hover:bg-gray-800/50">
-                    <td className="py-2 px-3">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${
-                        nf.tipo === 'nfse'
-                          ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-purple-500/20 text-purple-400'
-                      }`}>
-                        {nf.tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3 text-gray-300">{nf.nf_config?.nome || '-'}</td>
-                    <td className="py-2 px-3 text-gray-200 font-mono">{nf.numero || '-'}</td>
-                    <td className="py-2 px-3 text-right text-gray-200">{formatCurrency(nf.valor_total)}</td>
-                    <td className="py-2 px-3 text-center">{getStatusBadge(nf.status)}</td>
-                    <td className="py-2 px-3 text-gray-400">
-                      {nf.data_emissao
-                        ? new Date(nf.data_emissao).toLocaleDateString('pt-BR')
-                        : new Date(nf.data_emissao || '').toLocaleDateString('pt-BR')
-                      }
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
+      {showNFSeModal && (
+        <EmitirNFSeModal
+          isOpen={showNFSeModal}
+          onClose={() => {
+            setShowNFSeModal(false);
+            setRetryNfId(null);
+          }}
+          onSuccess={() => {
+            loadData();
+            setShowNFSeModal(false);
+            setRetryNfId(null);
+          }}
+          osId={osId}
+          unidadeId={unidadeId}
+          clienteNome={clienteNome}
+          clienteDocumento={clienteDocumento}
+          clienteTelefone={clienteTelefone}
+          clienteEmail={clienteEmail}
+          clienteEndereco={clienteEndereco}
+          valorServicos={valorServicosRestante}
+          existingNfId={retryNfId}
+        />
       )}
     </div>
   );

@@ -5,7 +5,6 @@ import {
   CreditCard, User, FileText, ExternalLink, AlertTriangle, CheckCircle, Receipt
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { EmitirNFSeModal } from '../EmitirNFSeModal';
 
 interface LancamentosModuleProps {
   unidadeId: string;
@@ -65,8 +64,6 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
   const [busca, setBusca] = useState('');
   const [selectedPagamento, setSelectedPagamento] = useState<Pagamento | null>(null);
   const [nfMap, setNfMap] = useState<Record<string, NFEmitida>>({});
-  const [showNFSeModal, setShowNFSeModal] = useState(false);
-  const [nfseTarget, setNfseTarget] = useState<Pagamento | null>(null);
 
   useEffect(() => {
     const today = new Date();
@@ -159,11 +156,6 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
         {c.label}{nf.numero ? ` #${nf.numero}` : ''}
       </span>
     );
-  };
-
-  const handleEmitirNFSe = (pagamento: Pagamento) => {
-    setNfseTarget(pagamento);
-    setShowNFSeModal(true);
   };
 
   const handleExportar = () => {
@@ -647,28 +639,15 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
                   return (
                     <div className="flex items-center gap-2 text-sm text-green-400">
                       <CheckCircle className="w-4 h-4" />
-                      NFS-e Emitida{nf.numero ? ` #${nf.numero}` : ''}
+                      NF Emitida{nf.numero ? ` #${nf.numero}` : ''}
                     </div>
                   );
                 }
                 if (nf && nf.status === 'erro') {
                   return (
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2 text-sm text-red-400">
-                        <AlertTriangle className="w-4 h-4" />
-                        Erro: {nf.erro_mensagem || 'Falha na emissao'}
-                      </div>
-                      <button
-                        onClick={() => {
-                          setSelectedPagamento(null);
-                          handleEmitirNFSe(selectedPagamento);
-                        }}
-                        className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
-                        style={{ background: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                      >
-                        <Receipt className="w-3.5 h-3.5" />
-                        Tentar Novamente
-                      </button>
+                    <div className="flex items-center gap-2 text-sm text-red-400">
+                      <AlertTriangle className="w-4 h-4" />
+                      Erro na NF: {nf.erro_mensagem || 'Falha na emissao'}
                     </div>
                   );
                 }
@@ -676,26 +655,14 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
                   return (
                     <div className="flex items-center gap-2 text-sm text-yellow-400">
                       <Receipt className="w-4 h-4" />
-                      NFS-e {nf.status === 'processando' ? 'Processando' : 'Na Fila'}...
+                      NF {nf.status === 'processando' ? 'Processando' : 'Na Fila'}...
                     </div>
                   );
                 }
                 return (
-                  <button
-                    onClick={() => {
-                      setSelectedPagamento(null);
-                      handleEmitirNFSe(selectedPagamento);
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-all"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0,212,255,0.2) 0%, rgba(0,212,255,0.05) 100%)',
-                      border: '1px solid rgba(0,212,255,0.5)',
-                      color: '#00D4FF'
-                    }}
-                  >
-                    <Receipt className="w-4 h-4" />
-                    Emitir NFS-e
-                  </button>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-gray-700/50 text-gray-500 border border-gray-600">
+                    SEM NF
+                  </span>
                 );
               })()}
               <button
@@ -707,19 +674,6 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
             </div>
           </div>
         </div>
-      )}
-
-      {showNFSeModal && nfseTarget && (
-        <EmitirNFSeModal
-          isOpen={showNFSeModal}
-          onClose={() => { setShowNFSeModal(false); setNfseTarget(null); }}
-          onSuccess={() => loadPagamentos()}
-          osId={nfseTarget.os_id}
-          pagamentoId={nfseTarget.id}
-          unidadeId={unidadeId}
-          clienteNome={nfseTarget.os?.cliente_nome || nfseTarget.cotacao?.cliente_nome || ''}
-          valorServicos={nfseTarget.valor}
-        />
       )}
     </div>
   );
