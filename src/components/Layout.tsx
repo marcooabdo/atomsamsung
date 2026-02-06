@@ -5,6 +5,7 @@ import { useTheme, THEMES } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import { ProfileModal } from './ProfileModal';
+import { ChatNotificationToast } from './ChatNotificationToast';
 import {
   LayoutDashboard,
   Layers,
@@ -343,6 +344,7 @@ export function Layout({ children }: LayoutProps) {
       </main>
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+      <ChatNotificationToast />
     </div>
   );
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { ChatConversationList } from '../components/chat/ChatConversationList';
 import { ChatWindow, ChatWindowRef } from '../components/chat/ChatWindow';
@@ -10,6 +11,7 @@ import { useUserPresence } from '../hooks/useUserPresence';
 
 export function Chat() {
   const { usuario } = useAuth();
+  const location = useLocation();
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showCreateGroupModal, setShowCreateGroupModal] = useState(false);
   const [showGlobalSearch, setShowGlobalSearch] = useState(false);
@@ -72,6 +74,14 @@ export function Chat() {
       setTargetMessageId(null);
     }
   }, [selectedConversationId, targetMessageId]);
+
+  useEffect(() => {
+    const state = location.state as { openConversationId?: string } | null;
+    if (state?.openConversationId) {
+      setSelectedConversationId(state.openConversationId);
+      window.history.replaceState({}, '');
+    }
+  }, [location.state]);
 
   if (!usuario) return null;
 
