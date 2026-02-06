@@ -99,19 +99,27 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
           .update(goalData)
           .eq('id', goals.id);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao atualizar meta:', error);
+          throw error;
+        }
       } else {
         const { error } = await supabase
           .from('metas_performance')
           .insert([goalData]);
 
-        if (error) throw error;
+        if (error) {
+          console.error('Erro ao inserir meta:', error);
+          throw error;
+        }
       }
 
       if (onSaved) onSaved();
       onClose();
-    } catch (error) {
-      alert('Erro ao salvar metas. Verifique os dados e tente novamente.');
+    } catch (error: any) {
+      console.error('Erro completo ao salvar metas:', error);
+      const errorMessage = error?.message || 'Erro desconhecido';
+      alert(`Erro ao salvar metas: ${errorMessage}`);
     } finally {
       setSaving(false);
     }
