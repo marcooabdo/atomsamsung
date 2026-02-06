@@ -1366,16 +1366,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         }
       ];
 
-      // Adicionar comentários de cotação criada
-      if (cotacaoId) {
-        comentariosInsert.push({
-          os_id: novaOS.id,
-          usuario_id: usuario?.id,
-          comentario: `Cotação criada automaticamente durante a criação da OS`,
-          is_system: true
-        });
-      }
-
       // Adicionar comentários de serviços adicionados
       if (servicosAdicionados.length > 0) {
         servicosAdicionados.forEach(servico => {
