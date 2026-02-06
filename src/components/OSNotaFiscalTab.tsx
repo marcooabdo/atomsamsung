@@ -377,6 +377,16 @@ export function OSNotaFiscalTab({
   const totalServicos = servicos.reduce((sum, s) => sum + s.valor_total, 0);
   const totalPecas = pecas.reduce((sum, p) => sum + p.valor_total, 0);
   const totalBruto = totalServicos + totalPecas;
+
+  const descontoServicos = totalBruto > 0
+    ? Math.round((totalServicos / totalBruto) * valorDesconto * 100) / 100
+    : 0;
+  const descontoPecas = totalBruto > 0
+    ? Math.round(valorDesconto * 100 - descontoServicos * 100) / 100
+    : 0;
+
+  const totalServicosComDesconto = Math.max(totalServicos - descontoServicos, 0);
+  const totalPecasComDesconto = Math.max(totalPecas - descontoPecas, 0);
   const totalComDesconto = Math.max(totalBruto - valorDesconto, 0);
   const pagamentoIntegral = valorPago >= totalComDesconto && totalComDesconto > 0;
   const faltaPagar = Math.max(totalComDesconto - valorPago, 0);
@@ -391,18 +401,18 @@ export function OSNotaFiscalTab({
     .filter(nf => nf.status !== 'erro')
     .reduce((sum, nf) => sum + (nf.valor_produtos || nf.valor_total || 0), 0);
 
-  const valorServicosRestante = Math.max(totalServicos - valorServicosInvoiced, 0);
-  const valorPecasRestante = Math.max(totalPecas - valorPecasInvoiced, 0);
+  const valorServicosRestante = Math.max(totalServicosComDesconto - valorServicosInvoiced, 0);
+  const valorPecasRestante = Math.max(totalPecasComDesconto - valorPecasInvoiced, 0);
 
   useEffect(() => {
     setFormNFe(prev => ({ ...prev, valorProdutos: valorPecasRestante }));
-  }, [totalPecas, nfsEmitidas]);
+  }, [valorPecasRestante]);
 
-  const servicosPctInvoiced = totalServicos > 0 ? Math.min((valorServicosInvoiced / totalServicos) * 100, 100) : 0;
-  const pecasPctInvoiced = totalPecas > 0 ? Math.min((valorPecasInvoiced / totalPecas) * 100, 100) : 0;
+  const servicosPctInvoiced = totalServicosComDesconto > 0 ? Math.min((valorServicosInvoiced / totalServicosComDesconto) * 100, 100) : 0;
+  const pecasPctInvoiced = totalPecasComDesconto > 0 ? Math.min((valorPecasInvoiced / totalPecasComDesconto) * 100, 100) : 0;
 
-  const canEmitNfse = !isLpOrCortesia && pagamentoIntegral && valorServicosRestante > 0.01 && totalServicos > 0;
-  const canEmitNfe = (isLpOrCortesia || pagamentoIntegral) && valorPecasRestante > 0.01 && totalPecas > 0;
+  const canEmitNfse = !isLpOrCortesia && pagamentoIntegral && valorServicosRestante > 0.01 && totalServicosComDesconto > 0;
+  const canEmitNfe = (isLpOrCortesia || pagamentoIntegral) && valorPecasRestante > 0.01 && totalPecasComDesconto > 0;
 
   const showPaymentWarning = !isLpOrCortesia && !pagamentoIntegral && totalComDesconto > 0;
 
@@ -681,17 +691,26 @@ export function OSNotaFiscalTab({
             )}
           </div>
 
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className={`grid gap-4 mb-4 ${descontoServicos > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Servicos</p>
-              <p className="text-lg font-bold text-white">{formatCurrency(totalServicos)}</p>
+              <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Servicos</p>
+              <p className={`text-lg font-bold ${descontoServicos > 0 ? 'text-gray-400 line-through' : 'text-white'}`}>{formatCurrency(totalServicos)}</p>
+              {descontoServicos > 0 && (
+                <p className="text-sm font-bold text-white">{formatCurrency(totalServicosComDesconto)}</p>
+              )}
             </div>
+            {descontoServicos > 0 && (
+              <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
+                <p className="text-[10px] text-[#FF0064] uppercase mb-1">Desconto</p>
+                <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoServicos)}</p>
+              </div>
+            )}
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
               <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
               <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorServicosInvoiced)}</p>
             </div>
             <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-              <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
+              <p className="text-[10px] text-gray-500 uppercase mb-1">A Faturar</p>
               <p className={`text-lg font-bold ${valorServicosRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
                 {formatCurrency(valorServicosRestante)}
               </p>
@@ -737,13 +756,35 @@ export function OSNotaFiscalTab({
                   <tfoot>
                     <tr className="border-t-2 border-gray-700 bg-gray-800/50">
                       <td colSpan={3} className="py-2.5 px-3 text-right text-xs font-bold text-gray-300 uppercase">
-                        Total Servicos ({servicos.length})
+                        Subtotal Servicos ({servicos.length})
                       </td>
                       <td className="py-2.5 px-3 text-right text-sm font-bold text-[#00D4FF]">
                         {formatCurrency(totalServicos)}
                       </td>
                       <td></td>
                     </tr>
+                    {descontoServicos > 0 && (
+                      <tr className="bg-[#FF0064]/5">
+                        <td colSpan={3} className="py-2 px-3 text-right text-xs font-bold text-[#FF0064] uppercase">
+                          Desconto proporcional
+                        </td>
+                        <td className="py-2 px-3 text-right text-sm font-bold text-[#FF0064]">
+                          - {formatCurrency(descontoServicos)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    )}
+                    {descontoServicos > 0 && (
+                      <tr className="bg-gray-800/80">
+                        <td colSpan={3} className="py-2.5 px-3 text-right text-xs font-bold text-white uppercase">
+                          Total p/ NFS-e
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-sm font-bold text-white">
+                          {formatCurrency(totalServicosComDesconto)}
+                        </td>
+                        <td></td>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>
@@ -793,17 +834,26 @@ export function OSNotaFiscalTab({
           )}
         </div>
 
-        <div className="grid grid-cols-3 gap-4 mb-4">
+        <div className={`grid gap-4 mb-4 ${descontoPecas > 0 ? 'grid-cols-4' : 'grid-cols-3'}`}>
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Total Pecas</p>
-            <p className="text-lg font-bold text-white">{formatCurrency(totalPecas)}</p>
+            <p className="text-[10px] text-gray-500 uppercase mb-1">Valor Pecas</p>
+            <p className={`text-lg font-bold ${descontoPecas > 0 ? 'text-gray-400 line-through' : 'text-white'}`}>{formatCurrency(totalPecas)}</p>
+            {descontoPecas > 0 && (
+              <p className="text-sm font-bold text-white">{formatCurrency(totalPecasComDesconto)}</p>
+            )}
           </div>
+          {descontoPecas > 0 && (
+            <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
+              <p className="text-[10px] text-[#FF0064] uppercase mb-1">Desconto</p>
+              <p className="text-lg font-bold text-[#FF0064]">- {formatCurrency(descontoPecas)}</p>
+            </div>
+          )}
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
             <p className="text-[10px] text-gray-500 uppercase mb-1">Ja Faturado</p>
             <p className="text-lg font-bold text-[#39FF14]">{formatCurrency(valorPecasInvoiced)}</p>
           </div>
           <div className="p-3 rounded-lg bg-gray-800/50 border border-gray-700">
-            <p className="text-[10px] text-gray-500 uppercase mb-1">Restante</p>
+            <p className="text-[10px] text-gray-500 uppercase mb-1">A Faturar</p>
             <p className={`text-lg font-bold ${valorPecasRestante > 0 ? 'text-[#FFBF00]' : 'text-gray-500'}`}>
               {formatCurrency(valorPecasRestante)}
             </p>
@@ -872,13 +922,35 @@ export function OSNotaFiscalTab({
                 <tfoot>
                   <tr className="border-t-2 border-gray-700 bg-gray-800/50">
                     <td colSpan={5} className="py-2.5 px-3 text-right text-xs font-bold text-gray-300 uppercase">
-                      Total Pecas ({pecas.length})
+                      Subtotal Pecas ({pecas.length})
                     </td>
                     <td className="py-2.5 px-3 text-right text-sm font-bold text-[#FFA500]">
                       {formatCurrency(totalPecas)}
                     </td>
                     <td></td>
                   </tr>
+                  {descontoPecas > 0 && (
+                    <tr className="bg-[#FF0064]/5">
+                      <td colSpan={5} className="py-2 px-3 text-right text-xs font-bold text-[#FF0064] uppercase">
+                        Desconto proporcional
+                      </td>
+                      <td className="py-2 px-3 text-right text-sm font-bold text-[#FF0064]">
+                        - {formatCurrency(descontoPecas)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  )}
+                  {descontoPecas > 0 && (
+                    <tr className="bg-gray-800/80">
+                      <td colSpan={5} className="py-2.5 px-3 text-right text-xs font-bold text-white uppercase">
+                        Total p/ NF-e
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-sm font-bold text-white">
+                        {formatCurrency(totalPecasComDesconto)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  )}
                 </tfoot>
               </table>
             </div>
@@ -886,9 +958,24 @@ export function OSNotaFiscalTab({
         )}
 
         {valorDesconto > 0 && (
-          <div className="mb-4 p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
-            <p className="text-xs text-gray-400">Desconto aplicado na OS:</p>
-            <p className="text-sm font-bold text-[#FF0064]">- {formatCurrency(valorDesconto)}</p>
+          <div className="mb-4 p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30 flex items-center justify-between">
+            <div>
+              <p className="text-xs text-gray-400">Desconto total na OS</p>
+              <p className="text-sm font-bold text-[#FF0064]">- {formatCurrency(valorDesconto)}</p>
+            </div>
+            {totalServicos > 0 && totalPecas > 0 && (
+              <div className="flex items-center gap-4 text-xs">
+                <div className="text-right">
+                  <p className="text-gray-500">Servicos</p>
+                  <p className="text-[#FF0064] font-bold">- {formatCurrency(descontoServicos)}</p>
+                </div>
+                <div className="w-px h-8 bg-gray-700" />
+                <div className="text-right">
+                  <p className="text-gray-500">Pecas</p>
+                  <p className="text-[#FF0064] font-bold">- {formatCurrency(descontoPecas)}</p>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
