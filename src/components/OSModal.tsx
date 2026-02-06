@@ -2570,6 +2570,25 @@ Não haverá cobrança ao cliente.`
         <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 min-h-[400px]">
           {abaAtiva === 'dados' && (
             <div className="space-y-6">
+              {(() => {
+                const camposFaltantes: string[] = [];
+                if (!os.aparelho_linha) camposFaltantes.push('Linha');
+                if (!os.defeito_relatado) camposFaltantes.push('Defeito Relatado');
+                if (!os.diagnostico_tecnico) camposFaltantes.push('Diagnostico Tecnico');
+                if (!os.reparo_efetuado) camposFaltantes.push('Reparo Efetuado');
+                if (camposFaltantes.length === 0) return null;
+                return (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+                    <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-bold text-amber-400">Campos pendentes de preenchimento</p>
+                      <p className="text-xs text-amber-500/80 mt-1">
+                        {camposFaltantes.join('  |  ')}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
               <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#FFA500]/10 border-l-4 border-[#00D4FF]">
                 <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
@@ -2977,7 +2996,7 @@ Não haverá cobrança ao cliente.`
               <div>
                 <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-4 flex items-center gap-2">
                   <FileText className="w-4 h-4" />
-                  Serviço
+                  Servico
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -2985,7 +3004,25 @@ Não haverá cobrança ao cliente.`
                     <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.defeito_relatado || '-'}</p>
                   </div>
                   <div>
-                    <label className="text-xs text-gray-500 uppercase">Observações</label>
+                    <label className={`text-xs uppercase ${os.diagnostico_tecnico ? 'text-gray-500' : 'text-amber-500/70'}`}>
+                      Diagnostico Tecnico
+                      {!os.diagnostico_tecnico && <span className="text-amber-500 ml-1">(pendente)</span>}
+                    </label>
+                    <p className={`text-sm mt-1 whitespace-pre-wrap ${os.diagnostico_tecnico ? 'text-gray-300' : 'text-gray-600 italic'}`}>
+                      {os.diagnostico_tecnico || 'Preenchido automaticamente ao concluir analise tecnica'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className={`text-xs uppercase ${os.reparo_efetuado ? 'text-gray-500' : 'text-amber-500/70'}`}>
+                      Reparo Efetuado
+                      {!os.reparo_efetuado && <span className="text-amber-500 ml-1">(pendente)</span>}
+                    </label>
+                    <p className={`text-sm mt-1 whitespace-pre-wrap ${os.reparo_efetuado ? 'text-gray-300' : 'text-gray-600 italic'}`}>
+                      {os.reparo_efetuado || 'Preenchido automaticamente ao mover para OQC'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-500 uppercase">Observacoes</label>
                     <p className="text-sm text-gray-300 mt-1 whitespace-pre-wrap">{os.observacoes_internas || '-'}</p>
                   </div>
                 </div>

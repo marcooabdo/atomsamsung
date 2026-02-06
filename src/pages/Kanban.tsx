@@ -8,6 +8,7 @@ import { OSLPModal } from '../components/OSLPModal';
 import { JobStatusCard } from '../components/JobStatusCard';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
+import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
@@ -125,6 +126,9 @@ export function Kanban() {
   const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const [showIniciarReparoModal, setShowIniciarReparoModal] = useState(false);
   const [selectedOSForReparo, setSelectedOSForReparo] = useState<{ id: string; numero: string; tecnicoId: string | null; tecnicoNome: string | null; unidadeId: string } | null>(null);
+  const [showReparoEfetuadoModal, setShowReparoEfetuadoModal] = useState(false);
+  const [selectedOSForOQC, setSelectedOSForOQC] = useState<{ id: string; numero: string } | null>(null);
+  const [pendingOQCDrop, setPendingOQCDrop] = useState<{ card: OS; position: number | undefined } | null>(null);
   const autoScrollInterval = useRef<number | null>(null);
   const [showBadgeFilter, setShowBadgeFilter] = useState(false);
   const [showTipoFilter, setShowTipoFilter] = useState(false);
@@ -942,6 +946,15 @@ export function Kanban() {
           `• Aguardando Peça, Peça em Trânsito, Peça Disponível\n` +
           `• Aguardando Fechamento, Fechar OS`
         );
+        setDraggedCard(null);
+        return;
+      }
+
+      if (targetColumn === 'controle_qualidade' && draggedCard.coluna_kanban !== 'controle_qualidade') {
+        const osNumero = draggedCard.numero_os_samsung || draggedCard.numero_os_interna || draggedCard.id.slice(0, 8);
+        setPendingOQCDrop({ card: draggedCard, position: finalPosition });
+        setSelectedOSForOQC({ id: draggedCard.id, numero: String(osNumero) });
+        setShowReparoEfetuadoModal(true);
         setDraggedCard(null);
         return;
       }
@@ -2686,6 +2699,23 @@ export function Kanban() {
             setSelectedOSForReparo(null);
           }}
           onSuccess={loadKanbanData}
+        />
+      )}
+
+      {showReparoEfetuadoModal && selectedOSForOQC && (
+        <ReparoEfetuadoModal
+          isOpen={showReparoEfetuadoModal}
+          osId={selectedOSForOQC.id}
+          osNumero={selectedOSForOQC.numero}
+          onClose={() => {
+            setShowReparoEfetuadoModal(false);
+            setSelectedOSForOQC(null);
+            setPendingOQCDrop(null);
+          }}
+          onSuccess={() => {
+            setPendingOQCDrop(null);
+            loadKanbanData();
+          }}
         />
       )}
 

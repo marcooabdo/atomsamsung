@@ -44,8 +44,10 @@ interface OSData {
   aparelho_linha: string | null;
   aparelho_imei: string | null;
   defeito_relatado: string | null;
+  diagnostico_tecnico: string | null;
   observacoes_internas: string | null;
   descricao_reparo: string | null;
+  reparo_efetuado: string | null;
   acessorios: string | null;
   tipo_atendimento: 'IH' | 'CI';
   tipo_os: 'LP' | 'OW';
@@ -353,10 +355,16 @@ export function OSPrintView() {
                 <p className="text-gray-800 text-sm">{os.defeito_relatado}</p>
               </div>
             )}
-            {os.descricao_reparo && (
+            {os.diagnostico_tecnico && (
               <div className="mb-3">
-                <p className="text-gray-600 font-medium text-sm">Descrição do Reparo:</p>
-                <p className="text-gray-800 text-sm">{os.descricao_reparo}</p>
+                <p className="text-gray-600 font-medium text-sm">Diagnostico Tecnico:</p>
+                <p className="text-gray-800 text-sm">{os.diagnostico_tecnico}</p>
+              </div>
+            )}
+            {(os.descricao_reparo || os.reparo_efetuado) && (
+              <div className="mb-3">
+                <p className="text-gray-600 font-medium text-sm">Descricao do Reparo:</p>
+                <p className="text-gray-800 text-sm">{os.descricao_reparo || os.reparo_efetuado}</p>
               </div>
             )}
             {os.observacoes_internas && (

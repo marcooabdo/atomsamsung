@@ -71,6 +71,7 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
         .from('os')
         .update({
           coluna_kanban: proximaColuna,
+          diagnostico_tecnico: analise.trim(),
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);

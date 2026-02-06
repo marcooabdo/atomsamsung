@@ -48,8 +48,10 @@ interface OSData {
   aparelho_linha: string | null;
   aparelho_imei: string | null;
   defeito_relatado: string | null;
+  diagnostico_tecnico: string | null;
   observacoes_internas: string | null;
   descricao_reparo: string | null;
+  reparo_efetuado: string | null;
   acessorios: string | null;
   tipo_atendimento: 'IH' | 'CI';
   tipo_os: 'LP' | 'OW';
@@ -381,8 +383,12 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig)
         { content: osData.defeito_relatado || '' }
       ],
       [
+        { content: 'Diagnostico Tecnico', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: osData.diagnostico_tecnico || '' }
+      ],
+      [
         { content: 'Descricao do Reparo', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
-        { content: osData.descricao_reparo || '' }
+        { content: osData.descricao_reparo || osData.reparo_efetuado || '' }
       ],
       [
         { content: 'Observacoes', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
