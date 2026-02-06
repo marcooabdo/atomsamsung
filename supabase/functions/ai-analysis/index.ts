@@ -32,14 +32,6 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY");
-
-    if (!openaiKey) {
-      return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
 
     const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
       global: { headers: { Authorization: authHeader } },
@@ -54,6 +46,21 @@ Deno.serve(async (req: Request) => {
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: secretRow } = await supabase
+      .from("system_secrets")
+      .select("value")
+      .eq("key", "OPENAI_API_KEY")
+      .maybeSingle();
+
+    const openaiKey = secretRow?.value || Deno.env.get("OPENAI_API_KEY");
+
+    if (!openaiKey) {
+      return new Response(
+        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     const { data: usuario } = await supabase
       .from("usuarios")
