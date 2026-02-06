@@ -380,8 +380,22 @@ export function Dashboard() {
     { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
     { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
     { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
-    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#A855F7', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => setShowGoalsModal(true) },
-    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => setShowGoalsModal(true) },
+    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#A855F7', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
+      const unidadeId = selectedUnidade || usuario?.unidade_id;
+      if (!unidadeId) {
+        alert('Selecione uma unidade para configurar metas.');
+        return;
+      }
+      setShowGoalsModal(true);
+    } },
+    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
+      const unidadeId = selectedUnidade || usuario?.unidade_id;
+      if (!unidadeId) {
+        alert('Selecione uma unidade para configurar metas.');
+        return;
+      }
+      setShowGoalsModal(true);
+    } },
     { title: 'OS com Alerta', value: stats.osAtrasadas, icon: AlertCircle, color: '#EF4444', hasGoal: false }
   ];
 
@@ -502,6 +516,11 @@ export function Dashboard() {
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
+                      const unidadeId = selectedUnidade || usuario?.unidade_id;
+                      if (!unidadeId) {
+                        alert('Selecione uma unidade para configurar metas.');
+                        return;
+                      }
                       setShowGoalsModal(true);
                     }}
                     className="p-1 rounded transition-all duration-200"
@@ -666,7 +685,14 @@ export function Dashboard() {
               <h4 className="tech-heading text-xs text-[#06B6D4] tracking-widest">PERFORMANCE</h4>
             </div>
             <button
-              onClick={() => setShowGoalsModal(true)}
+              onClick={() => {
+                const unidadeId = selectedUnidade || usuario?.unidade_id;
+                if (!unidadeId) {
+                  alert('Selecione uma unidade para configurar metas.');
+                  return;
+                }
+                setShowGoalsModal(true);
+              }}
               className="p-1.5 rounded transition-all duration-200"
               style={{
                 background: 'rgba(255,255,255,0.05)',
@@ -753,14 +779,16 @@ export function Dashboard() {
         currentValue={performanceModalType === 'eficiencia' ? stats.eficienciaOperacional : stats.taxaAprovacao}
       />
 
-      <GoalsConfigModal
-        isOpen={showGoalsModal}
-        onClose={() => setShowGoalsModal(false)}
-        unidadeId={selectedUnidade || usuario?.unidade_id || ''}
-        onSaved={() => {
-          loadDashboardData();
-        }}
-      />
+      {(selectedUnidade || usuario?.unidade_id) && (
+        <GoalsConfigModal
+          isOpen={showGoalsModal}
+          onClose={() => setShowGoalsModal(false)}
+          unidadeId={selectedUnidade || usuario?.unidade_id!}
+          onSaved={() => {
+            loadDashboardData();
+          }}
+        />
+      )}
     </div>
   );
 }

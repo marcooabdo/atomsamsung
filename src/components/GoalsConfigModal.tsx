@@ -22,7 +22,7 @@ interface PerformanceGoal {
 }
 
 export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsConfigModalProps) {
-  const { user } = useAuth();
+  const { usuario } = useAuth();
   const [saving, setSaving] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -78,7 +78,15 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
   };
 
   const handleSave = async () => {
-    if (!user) return;
+    if (!usuario?.id) {
+      alert('Usuário não identificado. Faça login novamente.');
+      return;
+    }
+
+    if (!unidadeId) {
+      alert('Unidade não identificada.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -90,7 +98,7 @@ export function GoalsConfigModal({ isOpen, onClose, unidadeId, onSaved }: GoalsC
         meta_receita_ow: goals.meta_receita_ow,
         meta_eficiencia_operacional: goals.meta_eficiencia_operacional,
         meta_taxa_aprovacao: goals.meta_taxa_aprovacao,
-        criado_por: user.id
+        criado_por: usuario.id
       };
 
       if (goals.id) {
