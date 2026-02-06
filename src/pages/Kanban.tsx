@@ -128,7 +128,9 @@ export function Kanban() {
   const autoScrollInterval = useRef<number | null>(null);
   const [showBadgeFilter, setShowBadgeFilter] = useState(false);
   const [showTipoFilter, setShowTipoFilter] = useState(false);
-  const [badgeFilters, setBadgeFilters] = useState({
+  const badgeFilterRef = useRef<HTMLDivElement>(null);
+  const tipoFilterRef = useRef<HTMLDivElement>(null);
+  const defaultBadgeFilters = {
     pedidoAtivo: true,
     pecaTransito: true,
     comTecnico: true,
@@ -140,12 +142,38 @@ export function Kanban() {
     iniciarReparo: true,
     analiseConcluida: true,
     tecnico: true
+  };
+  const [badgeFilters, setBadgeFilters] = useState(() => {
+    try {
+      const saved = localStorage.getItem('kanban_badge_filters');
+      return saved ? JSON.parse(saved) : defaultBadgeFilters;
+    } catch { return defaultBadgeFilters; }
   });
-  const [tipoOSFilters, setTipoOSFilters] = useState<string[]>([]);
-  const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>([]);
-  const [tecnicoFilters, setTecnicoFilters] = useState<string[]>([]);
+  const [tipoOSFilters, setTipoOSFilters] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kanban_tipo_os_filters');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [tipoAtendimentoFilters, setTipoAtendimentoFilters] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kanban_tipo_atendimento_filters');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
+  const [tecnicoFilters, setTecnicoFilters] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kanban_tecnico_filters');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [tecnicos, setTecnicos] = useState<Array<{id: string; nome: string}>>([]);
-  const [minDiasAbertos, setMinDiasAbertos] = useState<number>(0);
+  const [minDiasAbertos, setMinDiasAbertos] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('kanban_min_dias_abertos');
+      return saved ? parseInt(saved) || 0 : 0;
+    } catch { return 0; }
+  });
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
 
@@ -239,22 +267,6 @@ export function Kanban() {
 
   useEffect(() => {
     loadUnidades();
-    const savedBadgeFilters = localStorage.getItem('kanban_badge_filters');
-    if (savedBadgeFilters) {
-      setBadgeFilters(JSON.parse(savedBadgeFilters));
-    }
-    const savedTipoOSFilters = localStorage.getItem('kanban_tipo_os_filters');
-    if (savedTipoOSFilters) {
-      setTipoOSFilters(JSON.parse(savedTipoOSFilters));
-    }
-    const savedTipoAtendimentoFilters = localStorage.getItem('kanban_tipo_atendimento_filters');
-    if (savedTipoAtendimentoFilters) {
-      setTipoAtendimentoFilters(JSON.parse(savedTipoAtendimentoFilters));
-    }
-    const savedTecnicoFilters = localStorage.getItem('kanban_tecnico_filters');
-    if (savedTecnicoFilters) {
-      setTecnicoFilters(JSON.parse(savedTecnicoFilters));
-    }
   }, []);
 
   useEffect(() => {
@@ -272,6 +284,10 @@ export function Kanban() {
   useEffect(() => {
     localStorage.setItem('kanban_tecnico_filters', JSON.stringify(tecnicoFilters));
   }, [tecnicoFilters]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban_min_dias_abertos', String(minDiasAbertos));
+  }, [minDiasAbertos]);
 
   useEffect(() => {
     loadTecnicos();
@@ -304,10 +320,14 @@ export function Kanban() {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
-      if (!target.closest('.relative')) {
+      const target = e.target as Node;
+      if (badgeFilterRef.current && !badgeFilterRef.current.contains(target)) {
         setShowBadgeFilter(false);
+      }
+      if (tipoFilterRef.current && !tipoFilterRef.current.contains(target)) {
         setShowTipoFilter(false);
+      }
+      if (!target || !(target as HTMLElement).closest?.('[data-sort-dropdown]')) {
         setOpenSortDropdown(null);
       }
     };
@@ -1253,7 +1273,7 @@ export function Kanban() {
           </div>
 
           <div className="flex gap-2">
-            <div className="relative">
+            <div className="relative" ref={badgeFilterRef}>
               <button
                 onClick={() => setShowBadgeFilter(!showBadgeFilter)}
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
@@ -1379,7 +1399,7 @@ export function Kanban() {
               )}
             </div>
 
-            <div className="relative">
+            <div className="relative" ref={tipoFilterRef}>
               <button
                 onClick={() => setShowTipoFilter(!showTipoFilter)}
                 className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300"
@@ -1721,7 +1741,7 @@ export function Kanban() {
                           </h4>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          <div className="relative">
+                          <div className="relative" data-sort-dropdown>
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
