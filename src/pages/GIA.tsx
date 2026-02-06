@@ -148,12 +148,17 @@ export function GIA() {
       const result = await response.json();
 
       if (!response.ok) {
+        let errorContent = '';
+        if (result.error === 'OPENAI_API_KEY not configured') {
+          errorContent = 'A chave da API OpenAI ainda nao foi configurada. Peca ao administrador para adicionar a OPENAI_API_KEY na tabela system_secrets do Supabase.';
+        } else {
+          errorContent = `Desculpe, ocorreu um erro: ${result.error || 'desconhecido'}`;
+          if (result.details) errorContent += `\n\nDetalhes: ${typeof result.details === 'string' ? result.details : JSON.stringify(result.details)}`;
+        }
         const errMsg: GIAMessage = {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: result.error === 'OPENAI_API_KEY not configured'
-            ? 'A chave da API OpenAI ainda nao foi configurada. Peca ao administrador para adicionar a OPENAI_API_KEY na tabela system_secrets do Supabase.'
-            : `Desculpe, ocorreu um erro: ${result.error || 'Tente novamente.'}`,
+          content: errorContent,
           timestamp: Date.now(),
         };
         setMessages(prev => [...prev, errMsg]);
@@ -194,11 +199,11 @@ export function GIA() {
       setMessages(prev => [...prev, aiMessage]);
       setAiState('idle');
       loadConversations();
-    } catch {
+    } catch (err) {
       const errMsg: GIAMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: 'Erro de conexao. Verifique sua internet e tente novamente.',
+        content: `Erro de conexao: ${err instanceof Error ? err.message : 'Verifique sua internet e tente novamente.'}`,
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, errMsg]);
@@ -411,19 +416,13 @@ export function GIA() {
               </div>
             </div>
           ) : (
-            <div className="flex-1 flex flex-col min-h-0 relative">
-              <div className="absolute top-0 left-0 right-0 h-48 pointer-events-none z-0 opacity-40">
-                <JarvisParticles state={aiState} />
-              </div>
-
-              <div className="flex-1 min-h-0 relative z-10">
-                <GIAConversation
-                  messages={messages}
-                  streamingText={streamingText}
-                  isThinking={aiState === 'thinking'}
-                  userName={usuario?.nome?.split(' ')[0] || 'Voce'}
-                />
-              </div>
+            <div className="flex-1 flex flex-col min-h-0">
+              <GIAConversation
+                messages={messages}
+                streamingText={streamingText}
+                isThinking={aiState === 'thinking'}
+                userName={usuario?.nome?.split(' ')[0] || 'Voce'}
+              />
             </div>
           )}
 
