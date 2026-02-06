@@ -10,27 +10,18 @@ interface AgendamentoOS {
   numero_os_samsung: string | null;
   cliente_nome: string;
   cliente_endereco: string;
+  cliente_cidade: string;
   data_agendamento: string;
+  periodo_agendamento: string | null;
   coluna_kanban: string;
   tecnico_agendado_id: string | null;
   confirmado_com_cliente: boolean;
   rota_id: string | null;
   tipo_atendimento: string;
   tipo_reparo: string | null;
-  tecnico?: {
-    id: string;
-    nome: string;
-  };
-  rota?: {
-    id: string;
-    nome: string;
-    cor: string;
-  };
-  agendamento_detalhes?: {
-    horario_inicio: string;
-    horario_fim: string;
-    status: string;
-  };
+  tipo_os: string | null;
+  tecnico?: { id: string; nome: string } | null;
+  rota?: { id: string; nome: string; cor: string } | null;
 }
 
 interface TecnicoDay {
@@ -45,8 +36,8 @@ interface Filtros {
   status: string | null;
 }
 
-const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const DAYS_OF_WEEK = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
+const MONTHS = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 
 export default function AgendaOperacional() {
   const { selectedUnidade, loading } = useOtimizador();
@@ -57,19 +48,14 @@ export default function AgendaOperacional() {
   const [rotas, setRotas] = useState<{ id: string; nome: string; cor: string }[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
-  const [filtros, setFiltros] = useState<Filtros>({
-    tecnico_id: null,
-    rota_id: null,
-    status: null,
-  });
+  const [filtros, setFiltros] = useState<Filtros>({ tecnico_id: null, rota_id: null, status: null });
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
 
-  // Helper function to format date as YYYY-MM-DD in local timezone
   const formatDateLocal = (date: Date): string => {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   };
 
   useEffect(() => {
@@ -81,34 +67,24 @@ export default function AgendaOperacional() {
   }, [selectedUnidade, currentDate, filtros]);
 
   const loadTecnicos = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('usuarios')
-        .select('id, nome')
-        .eq('unidade_id', selectedUnidade)
-        .in('tipo', ['tecnico', 'tecnico_ih'])
-        .eq('ativo', true)
-        .order('nome');
-
-      if (error) throw error;
-      setTecnicos(data || []);
-    } catch (error) {
-    }
+    const { data } = await supabase
+      .from('usuarios')
+      .select('id, nome')
+      .eq('unidade_id', selectedUnidade)
+      .in('tipo', ['tecnico', 'tecnico_ih'])
+      .eq('ativo', true)
+      .order('nome');
+    setTecnicos(data || []);
   };
 
   const loadRotas = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('rotas')
-        .select('id, nome, cor')
-        .eq('unidade_id', selectedUnidade)
-        .eq('ativa', true)
-        .order('nome');
-
-      if (error) throw error;
-      setRotas(data || []);
-    } catch (error) {
-    }
+    const { data } = await supabase
+      .from('rotas')
+      .select('id, nome, cor')
+      .eq('unidade_id', selectedUnidade)
+      .eq('ativa', true)
+      .order('nome');
+    setRotas(data || []);
   };
 
   const loadAgendamentos = async () => {
@@ -117,83 +93,33 @@ export default function AgendaOperacional() {
       const startOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
       const endOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0);
 
-      const startDateStr = formatDateLocal(startOfMonth);
-      const endDateStr = formatDateLocal(endOfMonth);
-
       let query = supabase
         .from('os')
         .select(`
-          id,
-          numero_os_interna,
-          numero_os_samsung,
-          cliente_nome,
-          cliente_endereco,
-          cliente_cidade,
-          data_agendamento,
-          periodo_agendamento,
-          coluna_kanban,
-          tecnico_agendado_id,
-          confirmado_com_cliente,
-          rota_id,
-          tipo_atendimento,
-          tipo_reparo,
-          tipo_os,
+          id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_cidade,
+          data_agendamento, periodo_agendamento, coluna_kanban, tecnico_agendado_id,
+          confirmado_com_cliente, rota_id, tipo_atendimento, tipo_reparo, tipo_os,
           tecnico:usuarios!os_tecnico_agendado_id_fkey(id, nome),
           rota:rotas!os_rota_id_fkey(id, nome, cor)
         `)
         .eq('unidade_id', selectedUnidade)
-        .eq('confirmado_com_cliente', true)
         .not('data_agendamento', 'is', null)
-        .gte('data_agendamento', startDateStr)
-        .lte('data_agendamento', endDateStr);
+        .gte('data_agendamento', formatDateLocal(startOfMonth))
+        .lte('data_agendamento', formatDateLocal(endOfMonth));
 
-      if (filtros.tecnico_id) {
-        query = query.eq('tecnico_agendado_id', filtros.tecnico_id);
-      }
-
-      if (filtros.rota_id) {
-        query = query.eq('rota_id', filtros.rota_id);
-      }
-
+      if (filtros.tecnico_id) query = query.eq('tecnico_agendado_id', filtros.tecnico_id);
+      if (filtros.rota_id) query = query.eq('rota_id', filtros.rota_id);
       if (filtros.status) {
-        if (filtros.status === 'perdida') {
-          query = query.eq('coluna_kanban', 'agendada').lt('data_agendamento', formatDateLocal(new Date()));
-        } else if (filtros.status === 'pendente') {
-          query = query.eq('coluna_kanban', 'agendada');
-        } else if (filtros.status === 'em_atendimento') {
-          query = query.eq('coluna_kanban', 'em_atendimento');
-        } else if (filtros.status === 'concluida') {
-          query = query.in('coluna_kanban', ['concluida', 'fechada']);
-        }
+        const hoje = formatDateLocal(new Date());
+        if (filtros.status === 'perdida') query = query.eq('coluna_kanban', 'agendada').lt('data_agendamento', hoje);
+        else if (filtros.status === 'pendente') query = query.eq('coluna_kanban', 'agendada');
+        else if (filtros.status === 'em_atendimento') query = query.eq('coluna_kanban', 'em_atendimento');
+        else if (filtros.status === 'concluida') query = query.in('coluna_kanban', ['concluida', 'fechada', 'os_fechada', 'reparo_concluido']);
       }
 
-      query = query.order('data_agendamento').order('created_at');
-
-      const { data, error } = await query;
-
-      if (error) throw error;
-
-      const agendamentosComDetalhes = await Promise.all(
-        (data || []).map(async (os) => {
-          const { data: agendamentoData } = await supabase
-            .from('agendamentos')
-            .select('horario_inicio, horario_fim, status')
-            .eq('os_id', os.id)
-            .maybeSingle();
-
-          return {
-            ...os,
-            agendamento_detalhes: agendamentoData || {
-              horario_inicio: '08:00:00',
-              horario_fim: '10:00:00',
-              status: 'pendente',
-            },
-          };
-        })
-      );
-
-      setAgendamentos(agendamentosComDetalhes);
-    } catch (error) {
+      const { data } = await query.order('data_agendamento').order('created_at');
+      setAgendamentos((data as any) || []);
+    } catch {
     } finally {
       setLoadingData(false);
     }
@@ -204,316 +130,162 @@ export default function AgendaOperacional() {
     const month = currentDate.getMonth();
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const daysInMonth = lastDay.getDate();
-    const startingDayOfWeek = firstDay.getDay();
-
+    const startingDay = firstDay.getDay();
     const days: Date[] = [];
 
-    for (let i = 0; i < startingDayOfWeek; i++) {
-      const prevDate = new Date(year, month, -startingDayOfWeek + i + 1);
-      days.push(prevDate);
-    }
-
-    for (let i = 1; i <= daysInMonth; i++) {
-      days.push(new Date(year, month, i));
-    }
-
-    const remainingDays = 42 - days.length;
-    for (let i = 1; i <= remainingDays; i++) {
-      days.push(new Date(year, month + 1, i));
-    }
-
+    for (let i = 0; i < startingDay; i++) days.push(new Date(year, month, -startingDay + i + 1));
+    for (let i = 1; i <= lastDay.getDate(); i++) days.push(new Date(year, month, i));
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) days.push(new Date(year, month + 1, i));
     return days;
   };
 
-  const getAgendamentosForDate = (date: Date) => {
-    const dateStr = formatDateLocal(date);
-    return agendamentos.filter(ag => ag.data_agendamento === dateStr);
-  };
+  const getAgendamentosForDate = (date: Date) => agendamentos.filter(a => a.data_agendamento === formatDateLocal(date));
 
   const getAgendamentosForDay = (): TecnicoDay[] => {
-    const dateStr = formatDateLocal(selectedDate);
-    const dayAgendamentos = agendamentos.filter(ag => ag.data_agendamento === dateStr);
-
-    const tecnicoMap = new Map<string, TecnicoDay>();
-
-    dayAgendamentos.forEach(ag => {
-      const tecId = ag.tecnico_agendado_id || 'sem_tecnico';
-
-      if (!tecnicoMap.has(tecId)) {
-        tecnicoMap.set(tecId, {
-          tecnico_id: ag.tecnico_agendado_id || null,
-          tecnico_nome: ag.tecnico?.nome || 'Sem Técnico Atribuído',
-          agendamentos: [],
-        });
-      }
-
-      tecnicoMap.get(tecId)!.agendamentos.push(ag);
+    const dayAg = agendamentos.filter(a => a.data_agendamento === formatDateLocal(selectedDate));
+    const map = new Map<string, TecnicoDay>();
+    dayAg.forEach(ag => {
+      const key = ag.tecnico_agendado_id || 'sem_tecnico';
+      if (!map.has(key)) map.set(key, { tecnico_id: ag.tecnico_agendado_id, tecnico_nome: ag.tecnico?.nome || 'Sem Tecnico', agendamentos: [] });
+      map.get(key)!.agendamentos.push(ag);
     });
-
-    return Array.from(tecnicoMap.values());
+    return Array.from(map.values());
   };
 
-  const previousMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
-  };
-
-  const nextMonth = () => {
-    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
-  };
-
-  const isToday = (date: Date) => {
-    const today = new Date();
-    return date.toDateString() === today.toDateString();
-  };
-
-  const isSelectedDate = (date: Date) => {
-    return date.toDateString() === selectedDate.toDateString();
-  };
-
-  const isCurrentMonth = (date: Date) => {
-    return date.getMonth() === currentDate.getMonth();
-  };
+  const isToday = (d: Date) => d.toDateString() === new Date().toDateString();
+  const isSelected = (d: Date) => d.toDateString() === selectedDate.toDateString();
+  const isCurrMonth = (d: Date) => d.getMonth() === currentDate.getMonth();
 
   const getStatusInfo = (os: AgendamentoOS) => {
     const hoje = formatDateLocal(new Date());
-    const dataAgendamento = os.data_agendamento;
-
-    if (os.coluna_kanban === 'concluida' || os.coluna_kanban === 'fechada') {
-      return {
-        label: 'Concluída',
-        color: 'bg-green-500/20 border-green-500/30 text-green-400',
-        icon: CheckCircle,
-      };
-    }
-
-    if (os.coluna_kanban === 'em_atendimento') {
-      return {
-        label: 'Em Atendimento',
-        color: 'bg-purple-500/20 border-purple-500/30 text-purple-400',
-        icon: Clock,
-      };
-    }
-
-    if (dataAgendamento < hoje && os.coluna_kanban === 'agendada') {
-      return {
-        label: 'Perdida',
-        color: 'bg-red-500/20 border-red-500/30 text-red-400',
-        icon: XCircle,
-      };
-    }
-
-    return {
-      label: 'Pendente',
-      color: 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400',
-      icon: AlertTriangle,
-    };
+    if (['concluida', 'fechada', 'os_fechada', 'reparo_concluido'].includes(os.coluna_kanban))
+      return { label: 'Concluida', color: '#10B981', icon: CheckCircle };
+    if (['em_atendimento', 'em_rota_ih', 'em_reparo_ci'].includes(os.coluna_kanban))
+      return { label: 'Em Atendimento', color: '#3B82F6', icon: Clock };
+    if (os.data_agendamento < hoje && os.coluna_kanban === 'agendada')
+      return { label: 'Perdida', color: '#EF4444', icon: XCircle };
+    return { label: 'Pendente', color: '#F59E0B', icon: AlertTriangle };
   };
 
-  const limparFiltros = () => {
-    setFiltros({
-      tecnico_id: null,
-      rota_id: null,
-      status: null,
-    });
-  };
-
-  const extrairCidade = (endereco: string): string => {
-    // Endereço geralmente vem no formato: "Rua X, 123 - Bairro - Cidade/UF"
-    // Vamos extrair a cidade
-    const partes = endereco.split('-').map(p => p.trim());
-    if (partes.length >= 3) {
-      const cidadeEstado = partes[partes.length - 1];
-      const cidade = cidadeEstado.split('/')[0]?.trim() || cidadeEstado;
-      return cidade;
-    }
-    return endereco;
-  };
+  const filtrosAtivos = filtros.tecnico_id || filtros.rota_id || filtros.status;
 
   if (loadingData || loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="futuristic-loader"></div>
+        <div className="w-8 h-8 border-3 rounded-full animate-spin" style={{ borderColor: 'var(--border-primary)', borderTopColor: 'var(--text-accent)' }} />
       </div>
     );
   }
 
   const days = getDaysInMonth();
   const tecnicoDays = getAgendamentosForDay();
-  const filtrosAtivos = filtros.tecnico_id || filtros.rota_id || filtros.status;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 via-blue-500 to-purple-600">
-            Agenda Operacional
-          </h2>
-          <p className="text-gray-400 mt-1">Calendário completo com timeline por técnico</p>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Agenda Operacional</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Calendario com timeline por tecnico</p>
         </div>
-
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
-              filtrosAtivos
-                ? 'bg-cyan-500/20 border border-cyan-500/50 text-cyan-400'
-                : 'bg-gray-700/50 hover:bg-gray-700 border border-gray-600 text-gray-300'
-            }`}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg text-sm transition-colors"
+            style={{
+              backgroundColor: filtrosAtivos ? '#3B82F615' : 'var(--bg-card)',
+              border: `1px solid ${filtrosAtivos ? '#3B82F650' : 'var(--border-primary)'}`,
+              color: filtrosAtivos ? '#3B82F6' : 'var(--text-secondary)',
+            }}
           >
-            <Filter className="w-5 h-5" />
-            <span>Filtros</span>
-            {filtrosAtivos && <span className="px-2 py-0.5 bg-cyan-500 rounded-full text-xs text-white">•</span>}
+            <Filter className="w-4 h-4" />
+            Filtros
           </button>
-
-          <button
-            onClick={previousMonth}
-            className="p-2 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 text-gray-300" />
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))}
+            className="p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <ChevronLeft className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
           </button>
-          <div className="px-6 py-2 bg-gray-700/50 rounded-lg">
-            <span className="text-white font-semibold">
-              {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
-            </span>
+          <div className="px-4 py-2 rounded-lg text-sm font-semibold" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+            {MONTHS[currentDate.getMonth()]} {currentDate.getFullYear()}
           </div>
-          <button
-            onClick={nextMonth}
-            className="p-2 bg-gray-700/50 hover:bg-gray-700 rounded-lg transition-colors"
-          >
-            <ChevronRight className="w-5 h-5 text-gray-300" />
+          <button onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))}
+            className="p-2 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
           </button>
         </div>
       </div>
 
       {showFilters && (
-        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold text-white">Filtros</h3>
+            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Filtros</h3>
             {filtrosAtivos && (
-              <button
-                onClick={limparFiltros}
-                className="text-sm text-cyan-400 hover:text-cyan-300 transition-colors"
-              >
-                Limpar Filtros
+              <button onClick={() => setFiltros({ tecnico_id: null, rota_id: null, status: null })} className="text-sm" style={{ color: '#3B82F6' }}>
+                Limpar
               </button>
             )}
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="text-gray-400 text-sm mb-2 block">Técnico</label>
-              <select
-                value={filtros.tecnico_id || ''}
-                onChange={(e) => setFiltros({ ...filtros, tecnico_id: e.target.value || null })}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="">Todos</option>
-                {tecnicos.map((tec) => (
-                  <option key={tec.id} value={tec.id}>
-                    {tec.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-gray-400 text-sm mb-2 block">Rota</label>
-              <select
-                value={filtros.rota_id || ''}
-                onChange={(e) => setFiltros({ ...filtros, rota_id: e.target.value || null })}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="">Todas</option>
-                {rotas.map((rota) => (
-                  <option key={rota.id} value={rota.id}>
-                    {rota.nome}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="text-gray-400 text-sm mb-2 block">Status</label>
-              <select
-                value={filtros.status || ''}
-                onChange={(e) => setFiltros({ ...filtros, status: e.target.value || null })}
-                className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-              >
-                <option value="">Todos</option>
-                <option value="pendente">Pendente</option>
-                <option value="em_atendimento">Em Atendimento</option>
-                <option value="concluida">Concluída</option>
-                <option value="perdida">Perdida (sem check-in)</option>
-              </select>
-            </div>
+            {[
+              { label: 'Tecnico', value: filtros.tecnico_id || '', onChange: (v: string) => setFiltros({ ...filtros, tecnico_id: v || null }), options: tecnicos.map(t => ({ value: t.id, label: t.nome })) },
+              { label: 'Rota', value: filtros.rota_id || '', onChange: (v: string) => setFiltros({ ...filtros, rota_id: v || null }), options: rotas.map(r => ({ value: r.id, label: r.nome })) },
+              { label: 'Status', value: filtros.status || '', onChange: (v: string) => setFiltros({ ...filtros, status: v || null }), options: [{ value: 'pendente', label: 'Pendente' }, { value: 'em_atendimento', label: 'Em Atendimento' }, { value: 'concluida', label: 'Concluida' }, { value: 'perdida', label: 'Perdida' }] },
+            ].map(f => (
+              <div key={f.label}>
+                <label className="text-xs mb-1 block" style={{ color: 'var(--text-tertiary)' }}>{f.label}</label>
+                <select value={f.value} onChange={e => f.onChange(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+                  <option value="">Todos</option>
+                  {f.options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+            ))}
           </div>
         </div>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Calendar className="w-6 h-6 text-cyan-400" />
-            <h3 className="text-xl font-bold text-white">Calendário do Mês</h3>
+        <div className="lg:col-span-2 rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="w-5 h-5" style={{ color: '#3B82F6' }} />
+            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Calendario</h3>
           </div>
-
-          <div className="grid grid-cols-7 gap-2">
-            {DAYS_OF_WEEK.map((day) => (
-              <div key={day} className="text-center py-2 text-gray-400 font-semibold text-sm">
-                {day}
-              </div>
+          <div className="grid grid-cols-7 gap-1.5">
+            {DAYS_OF_WEEK.map(d => (
+              <div key={d} className="text-center py-1.5 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>{d}</div>
             ))}
-
-            {days.map((day, index) => {
-              const dayAgendamentos = getAgendamentosForDate(day);
-              const isCurrentMonthDay = isCurrentMonth(day);
-              const isTodayDay = isToday(day);
-              const isSelected = isSelectedDate(day);
-
+            {days.map((day, i) => {
+              const dayAg = getAgendamentosForDate(day);
               return (
-                <div
-                  key={index}
-                  onClick={() => setSelectedDate(day)}
-                  className={`
-                    min-h-24 p-2 rounded-lg border cursor-pointer transition-all
-                    ${isSelected ? 'bg-cyan-500/20 border-cyan-500/50' : 'bg-gray-700/30 border-gray-600 hover:bg-gray-700/50'}
-                    ${!isCurrentMonthDay ? 'opacity-40' : ''}
-                  `}
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-sm font-semibold ${isTodayDay ? 'text-cyan-400' : 'text-white'}`}>
+                <div key={i} onClick={() => setSelectedDate(day)}
+                  className="min-h-[80px] p-1.5 rounded-lg cursor-pointer transition-all"
+                  style={{
+                    backgroundColor: isSelected(day) ? '#3B82F615' : 'var(--bg-secondary)',
+                    border: `1px solid ${isSelected(day) ? '#3B82F650' : 'var(--border-primary)'}`,
+                    opacity: isCurrMonth(day) ? 1 : 0.35,
+                  }}>
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-xs font-semibold" style={{ color: isToday(day) ? '#3B82F6' : 'var(--text-primary)' }}>
                       {day.getDate()}
                     </span>
-                    {dayAgendamentos.length > 0 && (
-                      <span className="px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 text-xs">
-                        {dayAgendamentos.length}
+                    {dayAg.length > 0 && (
+                      <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold" style={{ backgroundColor: '#3B82F620', color: '#3B82F6' }}>
+                        {dayAg.length}
                       </span>
                     )}
                   </div>
-                  <div className="space-y-1">
-                    {dayAgendamentos.slice(0, 3).map((ag) => (
-                      <div
-                        key={ag.id}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedOSId(ag.id);
-                        }}
-                        className="px-2 py-1 rounded text-xs cursor-pointer hover:opacity-80 transition-opacity"
-                        style={{
-                          backgroundColor: ag.rota ? `${ag.rota.cor}40` : '#3b82f640',
-                          borderLeft: `3px solid ${ag.rota?.cor || '#3b82f6'}`,
-                        }}
-                        title={`${ag.numero_os_interna} - ${ag.tecnico?.nome || 'Sem técnico'}`}
-                      >
-                        <span className="text-white font-semibold">{ag.numero_os_interna}</span>
+                  <div className="space-y-0.5">
+                    {dayAg.slice(0, 3).map(ag => (
+                      <div key={ag.id}
+                        onClick={e => { e.stopPropagation(); setSelectedOSId(ag.id); }}
+                        className="px-1 py-0.5 rounded text-[10px] cursor-pointer hover:opacity-80"
+                        style={{ backgroundColor: `${ag.rota?.cor || '#3B82F6'}30`, borderLeft: `2px solid ${ag.rota?.cor || '#3B82F6'}` }}
+                        title={`${ag.numero_os_interna} - ${ag.tecnico?.nome || ''}`}>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_interna}</span>
                       </div>
                     ))}
-                    {dayAgendamentos.length > 3 && (
-                      <div className="text-xs text-gray-400 text-center">
-                        +{dayAgendamentos.length - 3}
-                      </div>
-                    )}
+                    {dayAg.length > 3 && <div className="text-[10px] text-center" style={{ color: 'var(--text-tertiary)' }}>+{dayAg.length - 3}</div>}
                   </div>
                 </div>
               );
@@ -521,105 +293,74 @@ export default function AgendaOperacional() {
           </div>
         </div>
 
-        <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-          <div className="flex items-center gap-3 mb-4">
-            <Clock className="w-6 h-6 text-blue-400" />
-            <h3 className="text-xl font-bold text-white">
+        <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <div className="flex items-center gap-2 mb-4">
+            <Clock className="w-5 h-5" style={{ color: '#3B82F6' }} />
+            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>
               {selectedDate.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long' })}
             </h3>
           </div>
 
-          {loadingData ? (
-            <div className="flex items-center justify-center py-12">
-              <div className="futuristic-loader"></div>
-            </div>
-          ) : tecnicoDays.length === 0 ? (
+          {tecnicoDays.length === 0 ? (
             <div className="text-center py-12">
-              <Calendar className="w-12 h-12 text-gray-500 mx-auto mb-3" />
-              <p className="text-gray-400">Nenhum agendamento neste dia</p>
-              <p className="text-gray-500 text-sm mt-2">Selecione outro dia no calendário</p>
+              <Calendar className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
+              <p style={{ color: 'var(--text-secondary)' }}>Nenhum agendamento neste dia</p>
             </div>
           ) : (
             <div className="space-y-4 max-h-[600px] overflow-y-auto">
-              {tecnicoDays.map((tecDay) => (
-                <div key={tecDay.tecnico_id || 'sem_tecnico'} className="bg-gray-700/30 border border-gray-600 rounded-lg p-4">
+              {tecnicoDays.map(td => (
+                <div key={td.tecnico_id || 'none'} className="rounded-lg p-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
                   <div className="flex items-center gap-2 mb-3">
-                    <User className="w-4 h-4 text-purple-400" />
-                    <h4 className="font-bold text-white">{tecDay.tecnico_nome}</h4>
-                    <span className="ml-auto px-2 py-0.5 bg-blue-500/20 border border-blue-500/30 rounded-full text-blue-400 text-xs">
-                      {tecDay.agendamentos.length} OSs
+                    <User className="w-4 h-4" style={{ color: '#06B6D4' }} />
+                    <h4 className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{td.tecnico_nome}</h4>
+                    <span className="ml-auto px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: '#3B82F615', color: '#3B82F6' }}>
+                      {td.agendamentos.length}
                     </span>
                   </div>
-
                   <div className="space-y-2">
-                    {tecDay.agendamentos.map((ag) => {
-                      const statusInfo = getStatusInfo(ag);
-                      const StatusIcon = statusInfo.icon;
-                      const cidade = extrairCidade(ag.cliente_endereco);
-
+                    {td.agendamentos.map(ag => {
+                      const st = getStatusInfo(ag);
+                      const StIcon = st.icon;
                       return (
-                        <div
-                          key={ag.id}
-                          onClick={() => setSelectedOSId(ag.id)}
-                          className="bg-gray-800/50 border rounded-lg p-3 cursor-pointer hover:bg-gray-800/80 hover:border-cyan-500/50 transition-all hover:shadow-lg hover:shadow-cyan-500/20 group"
-                          style={{
-                            borderColor: ag.rota?.cor || '#374151',
-                            borderLeftWidth: '4px',
-                          }}
-                        >
-                          <div className="flex items-center justify-between mb-2">
+                        <div key={ag.id} onClick={() => setSelectedOSId(ag.id)}
+                          className="rounded-lg p-3 cursor-pointer transition-all group"
+                          style={{ backgroundColor: 'var(--bg-card)', border: `1px solid var(--border-primary)`, borderLeftWidth: '3px', borderLeftColor: ag.rota?.cor || 'var(--border-primary)' }}>
+                          <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-cyan-400" />
-                              <span className="text-white font-bold text-base">{ag.numero_os_interna}</span>
+                              <FileText className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
+                              <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_interna}</span>
                               {ag.rota && (
-                                <span
-                                  className="px-2 py-0.5 rounded text-xs font-medium"
-                                  style={{
-                                    backgroundColor: `${ag.rota.cor}30`,
-                                    color: ag.rota.cor,
-                                    border: `1px solid ${ag.rota.cor}60`,
-                                  }}
-                                >
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: `${ag.rota.cor}20`, color: ag.rota.cor, border: `1px solid ${ag.rota.cor}40` }}>
                                   {ag.rota.nome}
                                 </span>
                               )}
                             </div>
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2 py-0.5 rounded-full text-xs border flex items-center gap-1 ${statusInfo.color}`}>
-                                <StatusIcon className="w-3 h-3" />
-                                {statusInfo.label}
+                            <div className="flex items-center gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1" style={{ backgroundColor: `${st.color}15`, color: st.color, border: `1px solid ${st.color}30` }}>
+                                <StIcon className="w-3 h-3" />{st.label}
                               </span>
-                              <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-cyan-400 transition-colors" />
                             </div>
                           </div>
-                          <div className="text-sm text-gray-400 space-y-1.5">
-                            <p className="text-white font-medium">
-                              {ag.numero_os_samsung || ag.cliente_nome}
-                            </p>
-                            <div className="flex items-center gap-2 text-cyan-400">
-                              <Clock className="w-4 h-4" />
-                              <span className="font-medium">
-                                {ag.periodo_agendamento === 'manha' ? 'Manhã' : ag.periodo_agendamento === 'tarde' ? 'Tarde' : 'Não definido'}
-                              </span>
+                          <div className="space-y-1 text-xs">
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.cliente_nome}</p>
+                            <div className="flex items-center gap-1.5" style={{ color: '#06B6D4' }}>
+                              <Clock className="w-3 h-3" />
+                              <span>{ag.periodo_agendamento === 'manha' ? 'Manha' : ag.periodo_agendamento === 'tarde' ? 'Tarde' : 'Nao definido'}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <MapPin className="w-4 h-4 text-blue-400" />
-                              <span className="font-medium text-blue-300">
-                                {ag.cliente_cidade || cidade}
-                              </span>
+                            <div className="flex items-center gap-1.5" style={{ color: '#3B82F6' }}>
+                              <MapPin className="w-3 h-3" />
+                              <span>{ag.cliente_cidade || ag.cliente_endereco}</span>
                             </div>
-                            <div className="flex items-center flex-wrap gap-2 mt-2">
-                              <span
-                                className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                                  ag.tipo_os === 'LP'
-                                    ? 'bg-green-500/20 border border-green-500/30 text-green-300'
-                                    : 'bg-orange-500/20 border border-orange-500/30 text-orange-300'
-                                }`}
-                              >
-                                {ag.tipo_os}
-                              </span>
+                            <div className="flex gap-1.5 mt-1">
+                              {ag.tipo_os && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{
+                                  backgroundColor: ag.tipo_os === 'LP' ? '#10B98115' : '#F9731615',
+                                  color: ag.tipo_os === 'LP' ? '#10B981' : '#F97316',
+                                  border: `1px solid ${ag.tipo_os === 'LP' ? '#10B98130' : '#F9731630'}`,
+                                }}>{ag.tipo_os}</span>
+                              )}
                               {ag.tipo_atendimento === 'IH' && ag.tipo_reparo && (
-                                <span className="inline-block px-2 py-1 rounded text-xs font-medium bg-sky-500/20 border border-sky-500/30 text-sky-300">
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: '#0EA5E915', color: '#0EA5E9', border: '1px solid #0EA5E930' }}>
                                   {ag.tipo_reparo}
                                 </span>
                               )}
@@ -636,12 +377,7 @@ export default function AgendaOperacional() {
         </div>
       </div>
 
-      {selectedOSId && (
-        <OSDetailsModal
-          osId={selectedOSId}
-          onClose={() => setSelectedOSId(null)}
-        />
-      )}
+      {selectedOSId && <OSDetailsModal osId={selectedOSId} onClose={() => setSelectedOSId(null)} />}
     </div>
   );
 }

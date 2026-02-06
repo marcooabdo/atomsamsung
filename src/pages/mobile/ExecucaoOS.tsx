@@ -7,6 +7,7 @@ import {
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AssinaturaCanvas } from '../../components/mobile/AssinaturaCanvas';
+import { updateTrackingState } from '../../lib/geoTracker';
 
 async function reverseGeocode(lat: number, lng: number): Promise<string> {
   try {
@@ -359,6 +360,7 @@ export function ExecucaoOS() {
           is_system: true
         });
 
+      updateTrackingState(true, agendamento.os_id);
       setCurrentStep('checklist');
       loadAgendamento();
     }, (error) => {
@@ -776,6 +778,7 @@ export function ExecucaoOS() {
           .update({ coluna_kanban: novoStatus })
           .eq('id', agendamento.os_id);
 
+        updateTrackingState(false, null);
         navigate('/mobile/agenda');
       } catch (error) {
         console.error('Erro no checkout:', error);

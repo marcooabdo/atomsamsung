@@ -1,337 +1,180 @@
-import { Activity, AlertTriangle, CheckCircle, Clock, TrendingUp, Users, Calendar } from 'lucide-react';
+import { Activity, AlertTriangle, CheckCircle, Clock, TrendingUp, Package, Calendar, MapPin } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-
-interface ChartData {
-  date: string;
-  criadas: number;
-  fechadas: number;
-}
-
-interface TecnicoData {
-  nome: string;
-  total: number;
-}
-
-interface TipoData {
-  name: string;
-  value: number;
-}
+import { AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardExecutivo() {
   const { selectedUnidade, refreshKey } = useOtimizador();
-  const [kpis, setKpis] = useState({
-    osDoDia: 0,
-    osEmAndamento: 0,
-    osConcluidas: 0,
-    osAtrasadas: 0,
-    checkoutsPendentes: 0,
-    gisPendentes: 0
-  });
-
-  const [dataInicio, setDataInicio] = useState(() => {
-    const date = new Date();
-    date.setDate(date.getDate() - 30);
-    return date.toISOString().split('T')[0];
-  });
-
+  const [kpis, setKpis] = useState({ osDoDia: 0, emAndamento: 0, concluidas: 0, atrasadas: 0, checkoutsPendentes: 0, gisPendentes: 0 });
+  const [dataInicio, setDataInicio] = useState(() => { const d = new Date(); d.setDate(d.getDate() - 30); return d.toISOString().split('T')[0]; });
   const [dataFim, setDataFim] = useState(new Date().toISOString().split('T')[0]);
-
-  const [chartOsCriadas, setChartOsCriadas] = useState<ChartData[]>([]);
-  const [chartOsPorTecnico, setChartOsPorTecnico] = useState<TecnicoData[]>([]);
-  const [chartOsPorTipo, setChartOsPorTipo] = useState<TipoData[]>([]);
-  const [loadingCharts, setLoadingCharts] = useState(false);
+  const [chartCriadas, setChartCriadas] = useState<any[]>([]);
+  const [chartTecnicos, setChartTecnicos] = useState<any[]>([]);
+  const [chartTipos, setChartTipos] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (selectedUnidade) {
-      loadKPIs();
-      loadChartData();
-    }
+    if (selectedUnidade) { loadKPIs(); loadCharts(); }
   }, [selectedUnidade, refreshKey, dataInicio, dataFim]);
 
   const loadKPIs = async () => {
     if (!selectedUnidade) return;
+    const hoje = new Date().toISOString().split('T')[0];
 
-    try {
-      const hoje = new Date().toISOString().split('T')[0];
+    const [osHoje, agendHoje, giRes] = await Promise.all([
+      supabase.from('os').select('id, coluna_kanban, data_agendamento').eq('unidade_id', selectedUnidade).or(`data_agendamento.eq.${hoje},coluna_kanban.in.(em_atendimento,em_rota_ih)`),
+      supabase.from('agendamentos').select('id, status, checkout_realizado, data_agendamento').eq('unidade_id', selectedUnidade).eq('data_agendamento', hoje),
+      supabase.from('requisicoes_pecas').select('id, status').eq('status', 'aprovada').limit(500),
+    ]);
 
-      const { data: osHoje } = await supabase
-        .from('os')
-        .select('id, coluna_kanban')
-        .eq('unidade_id', selectedUnidade)
-        .eq('data_agendamento', hoje)
-        .neq('coluna_kanban', 'os_fechada');
+    const osToday = osHoje.data || [];
+    const agend = agendHoje.data || [];
 
-      const emAndamento = osHoje?.filter(os => os.coluna_kanban === 'em_atendimento').length || 0;
-      const concluidas = osHoje?.filter(os => os.coluna_kanban === 'finalizada').length || 0;
+    const emAndamento = osToday.filter(os => ['em_atendimento', 'em_rota_ih'].includes(os.coluna_kanban)).length;
+    const concluidas = agend.filter(a => a.status === 'concluido').length;
+    const checkoutsPend = agend.filter(a => a.status === 'em_atendimento' && !a.checkout_realizado).length;
 
-      setKpis({
-        osDoDia: osHoje?.length || 0,
-        osEmAndamento: emAndamento,
-        osConcluidas: concluidas,
-        osAtrasadas: 0,
-        checkoutsPendentes: 0,
-        gisPendentes: 0
-      });
-    } catch (error) {
-    }
+    const { count: atrasadas } = await supabase.from('os').select('id', { count: 'exact', head: true }).eq('unidade_id', selectedUnidade).in('coluna_kanban', ['em_aberto', 'aguardando_peca', 'orcamento_pendente']).lt('created_at', new Date(Date.now() - 7 * 86400000).toISOString());
+
+    setKpis({
+      osDoDia: osToday.filter(os => os.data_agendamento === hoje).length,
+      emAndamento,
+      concluidas,
+      atrasadas: atrasadas || 0,
+      checkoutsPendentes: checkoutsPend,
+      gisPendentes: giRes.data?.length || 0,
+    });
   };
 
-  const loadChartData = async () => {
+  const loadCharts = async () => {
     if (!selectedUnidade) return;
+    setLoading(true);
+    const { data: osData } = await supabase
+      .from('os')
+      .select('created_at, coluna_kanban, tipo_atendimento, tecnico_agendado_id, usuarios!os_tecnico_agendado_id_fkey(nome)')
+      .eq('unidade_id', selectedUnidade)
+      .gte('created_at', dataInicio)
+      .lte('created_at', dataFim + 'T23:59:59');
 
-    setLoadingCharts(true);
-    try {
-      const { data: osData } = await supabase
-        .from('os')
-        .select('created_at, coluna_kanban, tipo_atendimento, tecnico_agendado_id, usuarios!os_tecnico_agendado_id_fkey(nome)')
-        .eq('unidade_id', selectedUnidade)
-        .gte('created_at', dataInicio)
-        .lte('created_at', dataFim + 'T23:59:59')
-        .order('created_at');
+    const porDia = new Map<string, { criadas: number; fechadas: number }>();
+    const porTecnico = new Map<string, number>();
+    const tipos: Record<string, number> = {};
 
-      const osPorDia = new Map<string, { criadas: number; fechadas: number }>();
-      const osPorTecnico = new Map<string, number>();
-      const osPorTipo = { IH: 0, CI: 0 };
+    (osData || []).forEach((os: any) => {
+      const date = os.created_at?.split('T')[0];
+      if (!porDia.has(date)) porDia.set(date, { criadas: 0, fechadas: 0 });
+      const d = porDia.get(date)!;
+      d.criadas++;
+      if (os.coluna_kanban === 'os_fechada') d.fechadas++;
+      if (os.usuarios?.nome) porTecnico.set(os.usuarios.nome, (porTecnico.get(os.usuarios.nome) || 0) + 1);
+      const tipo = (os.tipo_atendimento || 'Outro').toUpperCase();
+      tipos[tipo] = (tipos[tipo] || 0) + 1;
+    });
 
-      osData?.forEach(os => {
-        const date = os.created_at.split('T')[0];
-
-        if (!osPorDia.has(date)) {
-          osPorDia.set(date, { criadas: 0, fechadas: 0 });
-        }
-        const dayData = osPorDia.get(date)!;
-        dayData.criadas++;
-
-        if (os.coluna_kanban === 'os_fechada') {
-          dayData.fechadas++;
-        }
-
-        if (os.usuarios?.nome) {
-          osPorTecnico.set(os.usuarios.nome, (osPorTecnico.get(os.usuarios.nome) || 0) + 1);
-        }
-
-        if (os.tipo_atendimento === 'IH' || os.tipo_atendimento === 'CI') {
-          osPorTipo[os.tipo_atendimento]++;
-        }
-      });
-
-      const chartDataCriadas: ChartData[] = [];
-      const start = new Date(dataInicio);
-      const end = new Date(dataFim);
-
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        const dateStr = d.toISOString().split('T')[0];
-        const data = osPorDia.get(dateStr) || { criadas: 0, fechadas: 0 };
-        chartDataCriadas.push({
-          date: new Date(dateStr).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }),
-          criadas: data.criadas,
-          fechadas: data.fechadas
-        });
-      }
-
-      const chartDataTecnicos: TecnicoData[] = Array.from(osPorTecnico.entries())
-        .map(([nome, total]) => ({ nome, total }))
-        .sort((a, b) => b.total - a.total)
-        .slice(0, 10);
-
-      const chartDataTipos: TipoData[] = [
-        { name: 'In-Home (IH)', value: osPorTipo.IH },
-        { name: 'Carry-In (CI)', value: osPorTipo.CI }
-      ];
-
-      setChartOsCriadas(chartDataCriadas);
-      setChartOsPorTecnico(chartDataTecnicos);
-      setChartOsPorTipo(chartDataTipos);
-    } catch (error) {
-    } finally {
-      setLoadingCharts(false);
+    const criadas: any[] = [];
+    for (let d = new Date(dataInicio); d <= new Date(dataFim); d.setDate(d.getDate() + 1)) {
+      const ds = d.toISOString().split('T')[0];
+      const v = porDia.get(ds) || { criadas: 0, fechadas: 0 };
+      criadas.push({ date: new Date(ds).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' }), ...v });
     }
+
+    setChartCriadas(criadas);
+    setChartTecnicos(Array.from(porTecnico.entries()).map(([nome, total]) => ({ nome, total })).sort((a, b) => b.total - a.total).slice(0, 10));
+    setChartTipos(Object.entries(tipos).map(([name, value]) => ({ name, value })));
+    setLoading(false);
   };
+
+  const CORES_PIE = ['#0EA5E9', '#F59E0B', '#10B981', '#EF4444', '#8B5CF6', '#F97316'];
+  const kpiCards = [
+    { label: 'OS do Dia', value: kpis.osDoDia, icon: Activity, color: '#00D4FF', bg: '#00D4FF' },
+    { label: 'Em Andamento', value: kpis.emAndamento, icon: Clock, color: '#3B82F6', bg: '#3B82F6' },
+    { label: 'Concluidas Hoje', value: kpis.concluidas, icon: CheckCircle, color: '#10B981', bg: '#10B981' },
+    { label: 'Checkouts Pendentes', value: kpis.checkoutsPendentes, icon: MapPin, color: '#F59E0B', bg: '#F59E0B' },
+    { label: 'GIs Pendentes', value: kpis.gisPendentes, icon: Package, color: '#F97316', bg: '#F97316' },
+    { label: 'Atrasadas (+7d)', value: kpis.atrasadas, icon: AlertTriangle, color: '#EF4444', bg: '#EF4444' },
+  ];
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold text-[#00D4FF]" style={{ textShadow: '0 0 20px rgba(var(--accent-rgb), 0.3)' }}>
-            Dashboard Executivo
-          </h2>
-          <p className="text-gray-400 mt-1">Visão 360° da operação em tempo real</p>
+          <h2 className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>Dashboard Executivo</h2>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Visao em tempo real da operacao</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-xl p-6 hover:shadow-lg transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">OS do Dia</p>
-              <p className="text-4xl font-bold text-[#00D4FF] mt-2">{kpis.osDoDia}</p>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {kpiCards.map((k) => (
+          <div key={k.label} className="rounded-xl p-4 transition-all hover:scale-[1.02]" style={{ backgroundColor: k.bg + '10', border: `1px solid ${k.bg}30` }}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{k.label}</p>
+                <p className="text-3xl font-bold mt-1" style={{ color: k.color }}>{k.value}</p>
+              </div>
+              <k.icon className="w-8 h-8 opacity-40" style={{ color: k.color }} />
             </div>
-            <Activity className="w-12 h-12 text-[#00D4FF] opacity-50" />
           </div>
-        </div>
+        ))}
+      </div>
 
-        <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-blue-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-blue-500/20 transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Em Andamento</p>
-              <p className="text-4xl font-bold text-blue-400 mt-2">{kpis.osEmAndamento}</p>
-            </div>
-            <Clock className="w-12 h-12 text-blue-400 opacity-50" />
-          </div>
+      <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+        <div className="flex items-center gap-3 mb-3">
+          <Calendar className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Periodo</span>
         </div>
-
-        <div className="bg-gradient-to-br from-green-500/10 to-emerald-500/10 border border-green-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-green-500/20 transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Concluídas</p>
-              <p className="text-4xl font-bold text-green-400 mt-2">{kpis.osConcluidas}</p>
-            </div>
-            <CheckCircle className="w-12 h-12 text-green-400 opacity-50" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-yellow-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-yellow-500/20 transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Checkouts Pendentes</p>
-              <p className="text-4xl font-bold text-yellow-400 mt-2">{kpis.checkoutsPendentes}</p>
-            </div>
-            <AlertTriangle className="w-12 h-12 text-yellow-400 opacity-50" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500/10 to-pink-500/10 border border-purple-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-purple-500/20 transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">GIs Pendentes</p>
-              <p className="text-4xl font-bold text-purple-400 mt-2">{kpis.gisPendentes}</p>
-            </div>
-            <Users className="w-12 h-12 text-purple-400 opacity-50" />
-          </div>
-        </div>
-
-        <div className="bg-gradient-to-br from-red-500/10 to-pink-500/10 border border-red-500/30 rounded-xl p-6 hover:shadow-lg hover:shadow-red-500/20 transition-all">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-gray-400 text-sm">Atrasadas</p>
-              <p className="text-4xl font-bold text-red-400 mt-2">{kpis.osAtrasadas}</p>
-            </div>
-            <TrendingUp className="w-12 h-12 text-red-400 opacity-50" />
-          </div>
+        <div className="grid grid-cols-2 gap-3">
+          <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+          <input type="date" value={dataFim} onChange={(e) => setDataFim(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
         </div>
       </div>
 
-      <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6 mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <Calendar className="w-6 h-6 text-cyan-400" />
-          <h3 className="text-xl font-bold text-white">Filtros de Período</h3>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-gray-400 text-sm mb-2 block">Data Início</label>
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-            />
-          </div>
-          <div>
-            <label className="text-gray-400 text-sm mb-2 block">Data Fim</label>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              className="w-full px-4 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white focus:outline-none focus:border-cyan-500"
-            />
-          </div>
-        </div>
-      </div>
-
-      {loadingCharts ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="futuristic-loader"></div>
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <div className="w-8 h-8 border-4 rounded-full animate-spin" style={{ borderColor: 'var(--text-accent)', borderTopColor: 'transparent' }} />
         </div>
       ) : (
         <div className="space-y-6">
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4">OSs Criadas vs Fechadas por Dia</h3>
-            <ResponsiveContainer width="100%" height={300}>
-              <AreaChart data={chartOsCriadas}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" stroke="#9CA3AF" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#9CA3AF" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F3F4F6' }}
-                />
+          <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>OS Criadas vs Fechadas</h3>
+            <ResponsiveContainer width="100%" height={280}>
+              <AreaChart data={chartCriadas}>
+                <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />
+                <XAxis dataKey="date" stroke="var(--text-secondary)" style={{ fontSize: '11px' }} />
+                <YAxis stroke="var(--text-secondary)" style={{ fontSize: '11px' }} />
+                <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                 <Legend />
-                <Area type="monotone" dataKey="criadas" stroke="#06B6D4" fill="#06B6D4" fillOpacity={0.3} name="Criadas" />
-                <Area type="monotone" dataKey="fechadas" stroke="#10B981" fill="#10B981" fillOpacity={0.3} name="Fechadas" />
+                <Area type="monotone" dataKey="criadas" stroke="#06B6D4" fill="#06B6D4" fillOpacity={0.2} name="Criadas" />
+                <Area type="monotone" dataKey="fechadas" stroke="#10B981" fill="#10B981" fillOpacity={0.2} name="Fechadas" />
               </AreaChart>
             </ResponsiveContainer>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-white mb-4">OSs por Técnico (Top 10)</h3>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartOsPorTecnico} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                  <XAxis type="number" stroke="#9CA3AF" style={{ fontSize: '12px' }} />
-                  <YAxis type="category" dataKey="nome" stroke="#9CA3AF" style={{ fontSize: '10px' }} width={120} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                    labelStyle={{ color: '#F3F4F6' }}
-                  />
-                  <Bar dataKey="total" fill="#3B82F6" name="Total OSs" />
+            <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+              <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>OS por Tecnico (Top 10)</h3>
+              <ResponsiveContainer width="100%" height={280}>
+                <BarChart data={chartTecnicos} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />
+                  <XAxis type="number" stroke="var(--text-secondary)" style={{ fontSize: '11px' }} />
+                  <YAxis type="category" dataKey="nome" stroke="var(--text-secondary)" style={{ fontSize: '10px' }} width={120} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', borderRadius: '8px', color: 'var(--text-primary)' }} />
+                  <Bar dataKey="total" fill="#3B82F6" name="Total" radius={[0, 4, 4, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
 
-            <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-              <h3 className="text-xl font-bold text-white mb-4">Distribuição por Tipo de Atendimento</h3>
-              <ResponsiveContainer width="100%" height={300}>
+            <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+              <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Por Tipo de Atendimento</h3>
+              <ResponsiveContainer width="100%" height={280}>
                 <PieChart>
-                  <Pie
-                    data={chartOsPorTipo}
-                    cx="50%"
-                    cy="50%"
-                    labelLine={false}
-                    label={(entry) => `${entry.name}: ${entry.value}`}
-                    outerRadius={100}
-                    fill="#8884d8"
-                    dataKey="value"
-                  >
-                    <Cell fill="#0EA5E9" />
-                    <Cell fill="#F59E0B" />
+                  <Pie data={chartTipos} cx="50%" cy="50%" outerRadius={100} dataKey="value" label={({ name, value }) => `${name}: ${value}`}>
+                    {chartTipos.map((_, i) => <Cell key={i} fill={CORES_PIE[i % CORES_PIE.length]} />)}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', borderRadius: '8px', color: 'var(--text-primary)' }} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
-
-          <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
-            <h3 className="text-xl font-bold text-white mb-4">Linha do Tempo - OSs Criadas</h3>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={chartOsCriadas}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                <XAxis dataKey="date" stroke="#9CA3AF" style={{ fontSize: '12px' }} />
-                <YAxis stroke="#9CA3AF" style={{ fontSize: '12px' }} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151', borderRadius: '8px' }}
-                  labelStyle={{ color: '#F3F4F6' }}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="criadas" stroke="#06B6D4" strokeWidth={2} dot={{ fill: '#06B6D4', r: 4 }} name="Criadas" />
-              </LineChart>
-            </ResponsiveContainer>
           </div>
         </div>
       )}
