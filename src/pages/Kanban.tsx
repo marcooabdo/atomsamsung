@@ -9,7 +9,7 @@ import { JobStatusCard } from '../components/JobStatusCard';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -180,6 +180,7 @@ export function Kanban() {
   });
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
+  const [routePickerOS, setRoutePickerOS] = useState<OS | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -1007,26 +1008,61 @@ export function Kanban() {
         throw error;
       }
 
-      // Se moveu para uma rota, criar agendamento com geocodificação
       const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
       if (rotasColumns.includes(targetColumn)) {
         await criarAgendamentoParaRota(draggedCard);
       }
 
+      const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
+
       setOsData(prevData => {
         const newData = { ...prevData };
         newData[draggedCard.coluna_kanban] = newData[draggedCard.coluna_kanban].filter(os => os.id !== draggedCard.id);
-        const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
         const newCards = [...(newData[targetColumn] || []), updatedCard];
         newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
         newData[targetColumn] = newCards;
         return newData;
       });
+
+      if (targetColumn === 'peca_disponivel' && updatedCard.cliente_cidade) {
+        setRoutePickerOS(updatedCard);
+      }
     } catch (error: any) {
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
       alert(`❌ Erro ao mover OS:\n\n${errorMessage}`);
     } finally {
       setDraggedCard(null);
+    }
+  };
+
+  const handleRoutePickerSelect = async (targetColumn: string) => {
+    if (!routePickerOS) return;
+    const osId = routePickerOS.id;
+    const prevColumn = routePickerOS.coluna_kanban;
+    setRoutePickerOS(null);
+
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ coluna_kanban: targetColumn, updated_at: new Date().toISOString() })
+        .eq('id', osId);
+      if (error) throw error;
+
+      setOsData(prevData => {
+        const newData = { ...prevData };
+        newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
+        const card = { ...routePickerOS!, coluna_kanban: targetColumn };
+        newData[targetColumn] = [...(newData[targetColumn] || []), card];
+        return newData;
+      });
+
+      const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
+      if (rotasColumns.includes(targetColumn)) {
+        await criarAgendamentoParaRota(routePickerOS!);
+      }
+    } catch (err: any) {
+      alert(`Erro ao mover para rota: ${err?.message || 'Erro desconhecido'}`);
+      await loadKanbanData();
     }
   };
 
@@ -2726,6 +2762,129 @@ export function Kanban() {
           onClose={() => setShowExportModal(false)}
         />
       )}
+
+      {routePickerOS && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-8 pointer-events-none" style={{ background: 'rgba(0,0,0,0.3)' }}>
+          <div
+            className="pointer-events-auto rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-accent)',
+              backdropFilter: 'blur(20px)',
+              minWidth: 380,
+              maxWidth: 460,
+              animation: 'slideUp 0.25s ease-out',
+            }}
+          >
+            <div className="p-4 border-b" style={{ borderColor: 'var(--border-primary)', background: 'linear-gradient(135deg, rgba(0,212,255,0.08), rgba(0,212,255,0.02))' }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-5 h-5" style={{ color: '#06B6D4' }} />
+                  <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                    OS em Peca Disponivel
+                  </span>
+                </div>
+                <button
+                  onClick={() => setRoutePickerOS(null)}
+                  className="p-1 rounded-lg transition-colors"
+                  style={{ color: 'var(--text-secondary)' }}
+                  onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-accent)' }}>
+                    {routePickerOS.numero_os_samsung || routePickerOS.numero_os_interna || 'S/N'}
+                  </p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    {routePickerOS.cliente_nome}
+                  </p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-xs font-bold" style={{ color: '#FFBF00' }}>
+                    {routePickerOS.cliente_cidade || 'Sem cidade'}
+                  </p>
+                  {routePickerOS.cliente_bairro && (
+                    <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                      {routePickerOS.cliente_bairro}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-3">
+              <p className="text-[10px] font-medium uppercase tracking-wider mb-2.5 text-center" style={{ color: 'var(--text-secondary)' }}>
+                Selecione a rota para esta OS
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { kanban: 'rota_preta', label: 'Preta', cor: '#1a1a1a', border: '#555' },
+                  { kanban: 'rota_vermelha', label: 'Vermelha', cor: '#EF4444', border: '#EF4444' },
+                  { kanban: 'rota_azul', label: 'Azul', cor: '#3B82F6', border: '#3B82F6' },
+                  { kanban: 'rota_verde', label: 'Verde', cor: '#10B981', border: '#10B981' },
+                  { kanban: 'rota_rosa', label: 'Rosa', cor: '#EC4899', border: '#EC4899' },
+                  { kanban: 'rota_amarela', label: 'Amarela', cor: '#EAB308', border: '#EAB308' },
+                  { kanban: 'rota_laranja', label: 'Laranja', cor: '#F97316', border: '#F97316' },
+                ].map(rota => (
+                  <button
+                    key={rota.kanban}
+                    onClick={() => handleRoutePickerSelect(rota.kanban)}
+                    className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      backgroundColor: rota.cor + '15',
+                      border: `1.5px solid ${rota.border}40`,
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.borderColor = rota.border;
+                      e.currentTarget.style.boxShadow = `0 0 12px ${rota.cor}30`;
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.borderColor = rota.border + '40';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div
+                      className="w-6 h-6 rounded-full"
+                      style={{
+                        backgroundColor: rota.cor,
+                        border: rota.cor === '#1a1a1a' ? '2px solid #555' : 'none',
+                        boxShadow: `0 0 8px ${rota.cor}50`,
+                      }}
+                    />
+                    <span className="text-[10px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? 'var(--text-primary)' : rota.cor }}>
+                      {rota.label}
+                    </span>
+                  </button>
+                ))}
+                <button
+                  onClick={() => setRoutePickerOS(null)}
+                  className="flex flex-col items-center gap-1.5 p-2.5 rounded-xl transition-all hover:scale-105 active:scale-95"
+                  style={{
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    border: '1.5px solid rgba(255,255,255,0.1)',
+                  }}
+                >
+                  <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: 'rgba(255,255,255,0.1)' }}>
+                    <X className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+                  </div>
+                  <span className="text-[10px] font-semibold" style={{ color: 'var(--text-secondary)' }}>
+                    Depois
+                  </span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <style>{`
+        @keyframes slideUp {
+          from { transform: translateY(40px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }
