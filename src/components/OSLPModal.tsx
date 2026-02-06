@@ -1256,7 +1256,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
         if (requisicoesError) {
           console.error('❌ Erro ao criar requisições:', requisicoesError);
-          throw requisicoesError;
         } else {
           console.log('✅ Requisições criadas');
         }
@@ -1451,7 +1450,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (comentariosError) {
         console.error('❌ Erro ao criar comentários:', comentariosError);
-        throw comentariosError;
       } else {
         console.log('✅ Comentários criados');
       }
@@ -1471,8 +1469,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setAbaAtiva('dados');
 
       onReload?.();
-    } catch (error) {
-      alert(`Erro ao criar OS ${tipoOS}`);
+    } catch (error: any) {
+      console.error('Erro ao criar OS:', error);
+      const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
+      alert(`Erro ao criar OS ${tipoOS}:\n\n${errorMessage}`);
     } finally {
       setLoading(false);
     }
