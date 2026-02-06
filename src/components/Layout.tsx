@@ -126,10 +126,10 @@ export function Layout({ children }: LayoutProps) {
           {sidebarOpen && (
             <div className="flex items-center gap-3 slide-in">
               <img
-                src="/logo.png"
+                src={themeInfo.isDark ? '/logo.png' : '/1_-_logo_transparente_preto_2.png'}
                 alt="Logo"
                 className="h-10 w-auto"
-                style={{ filter: `drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.25))` }}
+                style={{ filter: themeInfo.isDark ? `drop-shadow(0 0 4px rgba(var(--accent-rgb), 0.25))` : 'none' }}
               />
             </div>
           )}
