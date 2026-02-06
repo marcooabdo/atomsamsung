@@ -1,36 +1,61 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 
-type Theme = 'dark' | 'light';
+export type ThemeVariant = 'dark-blue' | 'dark-pink' | 'white-blue' | 'white-pink';
+
+export interface ThemeInfo {
+  id: ThemeVariant;
+  label: string;
+  accent: string;
+  bg: string;
+  isDark: boolean;
+}
+
+export const THEMES: ThemeInfo[] = [
+  { id: 'dark-blue', label: 'Dark Blue', accent: '#00D4FF', bg: '#0b111a', isDark: true },
+  { id: 'dark-pink', label: 'Dark Pink', accent: '#ff007f', bg: '#1a0b16', isDark: true },
+  { id: 'white-blue', label: 'White Blue', accent: '#0077B6', bg: '#f8fafc', isDark: false },
+  { id: 'white-pink', label: 'White Pink', accent: '#d6336c', bg: '#fcf8fa', isDark: false },
+];
 
 interface ThemeContextType {
-  theme: Theme;
+  theme: ThemeVariant;
+  themeInfo: ThemeInfo;
+  isDark: boolean;
+  setTheme: (t: ThemeVariant) => void;
   toggleTheme: () => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem('theme');
-    return (saved as Theme) || 'dark';
+  const [theme, setThemeState] = useState<ThemeVariant>(() => {
+    const saved = localStorage.getItem('theme-variant');
+    if (saved && THEMES.some(t => t.id === saved)) return saved as ThemeVariant;
+    const legacy = localStorage.getItem('theme');
+    if (legacy === 'light') return 'white-blue';
+    return 'dark-blue';
   });
+
+  const themeInfo = THEMES.find(t => t.id === theme) || THEMES[0];
 
   useEffect(() => {
     const root = document.documentElement;
-    if (theme === 'light') {
-      root.classList.add('light');
-    } else {
-      root.classList.remove('light');
-    }
-    localStorage.setItem('theme', theme);
-  }, [theme]);
+    root.className = '';
+    root.classList.add(`theme-${theme}`);
+    if (!themeInfo.isDark) root.classList.add('light');
+    localStorage.setItem('theme-variant', theme);
+    localStorage.setItem('theme', themeInfo.isDark ? 'dark' : 'light');
+  }, [theme, themeInfo]);
+
+  const setTheme = (t: ThemeVariant) => setThemeState(t);
 
   const toggleTheme = () => {
-    setTheme(prev => prev === 'dark' ? 'light' : 'dark');
+    const idx = THEMES.findIndex(t => t.id === theme);
+    setThemeState(THEMES[(idx + 1) % THEMES.length].id);
   };
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, themeInfo, isDark: themeInfo.isDark, setTheme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );

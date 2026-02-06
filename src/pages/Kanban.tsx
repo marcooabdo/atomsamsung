@@ -1699,7 +1699,7 @@ export function Kanban() {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
         >
-          <div className="flex gap-3 h-full pb-2" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
+          <div className="flex gap-4 h-full pb-2" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
             {visibleColumns.map((coluna) => {
               const ColumnIcon = coluna.icon;
               const isOver = dragOverColumn === coluna.id;
@@ -1708,14 +1708,15 @@ export function Kanban() {
                 <div
                   key={coluna.id}
                   className={`flex-shrink-0 w-72 h-full max-h-full rounded-xl transition-all duration-300 overflow-hidden ${
-                    isOver ? 'scale-[1.02]' : ''
+                    isOver ? 'scale-[1.01]' : ''
                   }`}
                   style={{
-                    background: `linear-gradient(180deg, ${coluna.color}08 0%, rgba(0,0,0,0.3) 100%)`,
-                    border: `1px solid ${isOver ? coluna.color : coluna.color + '30'}`,
+                    background: `linear-gradient(180deg, ${coluna.color}06 0%, var(--bg-secondary) 100%)`,
+                    border: `1px solid ${isOver ? coluna.color + '60' : coluna.color + '18'}`,
                     boxShadow: isOver
-                      ? `0 0 40px ${coluna.color}40, inset 0 0 30px ${coluna.color}10`
-                      : `0 0 15px ${coluna.color}15, inset 0 1px 1px ${coluna.color}05`
+                      ? `0 0 24px ${coluna.color}25, inset 0 0 20px ${coluna.color}08`
+                      : `0 2px 12px rgba(0,0,0,0.15)`,
+                    backdropFilter: 'blur(8px)',
                   }}
                   onDragOver={(e) => handleDragOver(e, coluna.id)}
                   onDragLeave={handleDragLeave}
@@ -1911,35 +1912,35 @@ export function Kanban() {
                             setSelectedOSId(os.id);
                             setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
                           }}
-                          className="rounded-lg p-2.5 cursor-pointer group relative overflow-hidden"
+                          className="rounded-xl p-3 cursor-pointer group relative overflow-hidden"
                           style={{
-                            background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(0,0,0,0.3) 100%)',
-                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}25`,
-                            boxShadow: `0 2px 8px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)`,
-                            transition: 'all 0.3s ease',
+                            background: 'var(--glass-bg)',
+                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}15`,
+                            boxShadow: `var(--card-shadow)`,
+                            backdropFilter: 'blur(12px)',
+                            transition: 'all 0.25s ease',
                             opacity: draggedCard?.id === os.id ? 0.4 : 1
                           }}
                           onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}60`;
-                            e.currentTarget.style.boxShadow = `0 4px 16px ${coluna.color}30, inset 0 1px 1px rgba(255,255,255,0.1)`;
+                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}45`;
+                            e.currentTarget.style.boxShadow = `0 6px 20px ${coluna.color}18, 0 0 16px ${coluna.color}10`;
                             e.currentTarget.style.transform = 'translateY(-2px)';
                           }}
                           onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}25`;
-                            e.currentTarget.style.boxShadow = `0 2px 8px rgba(0,0,0,0.3), inset 0 1px 1px rgba(255,255,255,0.05)`;
+                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}15`;
+                            e.currentTarget.style.boxShadow = `var(--card-shadow)`;
                             e.currentTarget.style.transform = 'translateY(0)';
                           }}
                         >
-                          <div className="absolute top-0 left-0 w-full h-0.5" style={{
-                            background: `linear-gradient(90deg, ${coluna.color} 0%, transparent 100%)`,
-                            opacity: 0.5
+                          <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
+                            background: `linear-gradient(90deg, ${coluna.color}, ${coluna.color}40, transparent)`,
                           }}></div>
 
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <h5 className="font-bold text-xs text-white truncate" style={{
-                                  textShadow: '0 0 8px rgba(0,212,255,0.5)'
+                                <h5 className="font-bold text-xs truncate" style={{
+                                  color: 'var(--text-primary)',
                                 }}>
                                   {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
                                 </h5>

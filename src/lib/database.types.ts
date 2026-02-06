@@ -59,6 +59,11 @@ export type Database = {
           unidade_id: string | null
           ativo: boolean
           numero_tecnico: string | null
+          foto_url: string | null
+          telefone: string | null
+          ramal: string | null
+          cargo: string | null
+          bio: string | null
           created_at: string
           updated_at: string
         }
@@ -70,6 +75,11 @@ export type Database = {
           unidade_id?: string | null
           ativo?: boolean
           numero_tecnico?: string | null
+          foto_url?: string | null
+          telefone?: string | null
+          ramal?: string | null
+          cargo?: string | null
+          bio?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -81,6 +91,11 @@ export type Database = {
           unidade_id?: string | null
           ativo?: boolean
           numero_tecnico?: string | null
+          foto_url?: string | null
+          telefone?: string | null
+          ramal?: string | null
+          cargo?: string | null
+          bio?: string | null
           created_at?: string
           updated_at?: string
         }

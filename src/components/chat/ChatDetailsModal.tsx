@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, FileText, Download, Users, Mail, Building2 } from 'lucide-react';
+import { X, FileText, Download, Users, Mail, Building2, Phone, Hash, Briefcase, MessageCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { ProfilePhotoUpload } from '../ProfilePhotoUpload';
 
@@ -20,6 +20,10 @@ interface UserDetails {
   tipo?: string;
   foto_url?: string;
   unidade_nome?: string;
+  telefone?: string | null;
+  ramal?: string | null;
+  cargo?: string | null;
+  bio?: string | null;
 }
 
 interface SharedFile {
@@ -59,7 +63,7 @@ export function ChatDetailsModal({
       if (conversationType === 'direct' && otherUserId) {
         const { data: userData } = await supabase
           .from('usuarios')
-          .select('id, nome, email, tipo, foto_url, unidade_id')
+          .select('id, nome, email, tipo, foto_url, unidade_id, telefone, ramal, cargo, bio')
           .eq('id', otherUserId)
           .maybeSingle();
 
@@ -80,7 +84,11 @@ export function ChatDetailsModal({
             email: userData.email,
             tipo: userData.tipo,
             foto_url: userData.foto_url,
-            unidade_nome: unidadeNome
+            unidade_nome: unidadeNome,
+            telefone: userData.telefone,
+            ramal: userData.ramal,
+            cargo: userData.cargo,
+            bio: userData.bio,
           });
         }
       } else if (conversationType === 'group') {
@@ -224,22 +232,55 @@ export function ChatDetailsModal({
                     )}
                   </div>
 
-                  <div className="space-y-3">
-                    {userDetails.unidade_nome && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
-                        <Building2 className="w-5 h-5 text-[#00D4FF]" />
+                  {userDetails.bio && (
+                    <p className="text-sm italic" style={{ color: 'var(--text-secondary)' }}>
+                      "{userDetails.bio}"
+                    </p>
+                  )}
+
+                  <div className="space-y-2">
+                    {userDetails.cargo && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)' }}>
+                        <Briefcase className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-accent)' }} />
                         <div>
-                          <p className="text-xs text-gray-500">Unidade</p>
-                          <p className="text-sm text-gray-200">{userDetails.unidade_nome}</p>
+                          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Cargo</p>
+                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{userDetails.cargo}</p>
+                        </div>
+                      </div>
+                    )}
+                    {userDetails.unidade_nome && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)' }}>
+                        <Building2 className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-accent)' }} />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Unidade</p>
+                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{userDetails.unidade_nome}</p>
                         </div>
                       </div>
                     )}
                     {userDetails.email && (
-                      <div className="flex items-center gap-3 px-4 py-3 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50">
-                        <Mail className="w-5 h-5 text-[#00D4FF]" />
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)' }}>
+                        <Mail className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-accent)' }} />
                         <div>
-                          <p className="text-xs text-gray-500">Email</p>
-                          <p className="text-sm text-gray-200 truncate">{userDetails.email}</p>
+                          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Email</p>
+                          <p className="text-sm truncate" style={{ color: 'var(--text-primary)' }}>{userDetails.email}</p>
+                        </div>
+                      </div>
+                    )}
+                    {userDetails.telefone && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)' }}>
+                        <Phone className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-accent)' }} />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Telefone</p>
+                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{userDetails.telefone}</p>
+                        </div>
+                      </div>
+                    )}
+                    {userDetails.ramal && (
+                      <div className="flex items-center gap-3 px-4 py-3 rounded-lg" style={{ background: 'var(--bg-hover)', border: '1px solid var(--border-primary)' }}>
+                        <Hash className="w-4 h-4 flex-shrink-0" style={{ color: 'var(--text-accent)' }} />
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Ramal</p>
+                          <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{userDetails.ramal}</p>
                         </div>
                       </div>
                     )}
