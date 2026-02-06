@@ -6,6 +6,7 @@ export type OtimizadorTab =
   | 'dashboard'
   | 'agenda'
   | 'mapa'
+  | 'rotas'
   | 'motor'
   | 'equipe'
   | 'checklists'

@@ -1,9 +1,10 @@
-import { Activity, BarChart3, Calendar, CheckSquare, Cog, MapPin, Package, Users, Zap, Navigation } from 'lucide-react';
+import { Activity, BarChart3, Calendar, CheckSquare, Cog, MapPin, Package, Users, Zap, Navigation, Route } from 'lucide-react';
 import { OtimizadorProvider, useOtimizador, type OtimizadorTab } from '../contexts/OtimizadorContext';
 import { UnitFilter } from '../components/UnitFilter';
 import DashboardExecutivo from '../components/otimizador/DashboardExecutivo';
 import AgendaOperacional from '../components/otimizador/AgendaOperacional';
 import MapaRastreamento from '../components/otimizador/MapaRastreamento';
+import GestaoRotas from '../components/otimizador/GestaoRotas';
 import MotorOtimizacaoNew from '../components/otimizador/MotorOtimizacaoNew';
 import GestaoEquipe from '../components/otimizador/GestaoEquipe';
 import SistemaChecklists from '../components/otimizador/SistemaChecklists';
@@ -15,6 +16,7 @@ const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }
   { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)' },
   { id: 'agenda', label: 'Agenda', icon: Calendar, color: '#3B82F6' },
   { id: 'mapa', label: 'Rastreamento', icon: Navigation, color: '#10B981' },
+  { id: 'rotas', label: 'Rotas', icon: Route, color: '#EC4899' },
   { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00' },
   { id: 'equipe', label: 'Equipe', icon: Users, color: '#06B6D4' },
   { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899' },
@@ -32,6 +34,7 @@ function OtimizadorContent() {
       case 'dashboard': return <DashboardExecutivo />;
       case 'agenda': return <AgendaOperacional />;
       case 'mapa': return <MapaRastreamento />;
+      case 'rotas': return <GestaoRotas />;
       case 'motor': return <MotorOtimizacaoNew />;
       case 'equipe': return <GestaoEquipe />;
       case 'checklists': return <SistemaChecklists />;
