@@ -1727,6 +1727,15 @@ export function Configuracoes() {
                       Adicionar Markup
                     </button>
                   )}
+                  {activeTab === 'rotas' && selectedUnidadeRota && (
+                    <button
+                      onClick={() => handleOpenModal()}
+                      className="neon-button flex items-center gap-2 px-4 py-2"
+                    >
+                      <Plus className="w-4 h-4" />
+                      Adicionar Rota
+                    </button>
+                  )}
                 </div>
 
                 {activeTab === 'unidades' && (

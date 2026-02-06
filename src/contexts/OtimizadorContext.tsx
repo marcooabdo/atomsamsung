@@ -97,7 +97,6 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         .from('os')
         .select(`
           *,
-          cliente:clientes(nome, telefone, email),
           tecnico:usuarios!os_tecnico_id_fkey(nome)
         `)
         .order('created_at', { ascending: false });
@@ -127,7 +126,8 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
           *,
           os:os!agendamentos_os_id_fkey(
             numero_os,
-            cliente:clientes(nome, telefone),
+            cliente_nome,
+            cliente_telefone,
             aparelho_marca,
             aparelho_modelo
           ),

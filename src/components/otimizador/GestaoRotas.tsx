@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import {
   MapPin, Package, ArrowRight, RefreshCw, Search,
   ChevronDown, ChevronUp, Navigation, AlertCircle, CheckCircle2, Loader2,
+  Globe, ArrowLeftRight,
 } from 'lucide-react';
 
 interface OSItem {
@@ -25,13 +26,12 @@ interface OSItem {
   unidade_id: string;
 }
 
-interface RotaInfo {
+interface RotaDB {
   id: string;
   nome: string;
   cor: string;
   coluna_kanban: string;
   cidades: string[];
-  count: number;
 }
 
 const ROTA_COLUMNS = [
@@ -48,12 +48,14 @@ export default function GestaoRotas() {
   const { selectedUnidade, refresh } = useOtimizador();
   const [pecaDisponivelOS, setPecaDisponivelOS] = useState<OSItem[]>([]);
   const [rotaOS, setRotaOS] = useState<Record<string, OSItem[]>>({});
-  const [rotas, setRotas] = useState<RotaInfo[]>([]);
+  const [rotasDB, setRotasDB] = useState<RotaDB[]>([]);
   const [loading, setLoading] = useState(false);
   const [geocoding, setGeocoding] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [selectedOS, setSelectedOS] = useState<Set<string>>(new Set());
+  const [selectedCities, setSelectedCities] = useState<Set<string>>(new Set());
   const [expandedRoutes, setExpandedRoutes] = useState<Set<string>>(new Set(ROTA_COLUMNS.map(r => r.kanban)));
+  const [expandedCities, setExpandedCities] = useState<Set<string>>(new Set());
 
   const loadData = useCallback(async () => {
     if (!selectedUnidade) return;
@@ -91,24 +93,29 @@ export default function GestaoRotas() {
       .eq('unidade_id', selectedUnidade)
       .eq('ativa', true);
 
-    const rotasInfo: RotaInfo[] = ROTA_COLUMNS.map(rc => {
-      const dbRota = (rotasData || []).find(r => r.coluna_kanban === rc.kanban);
-      return {
-        id: dbRota?.id || '',
-        nome: dbRota?.nome || rc.nome,
-        cor: dbRota?.cor || rc.cor,
-        coluna_kanban: rc.kanban,
-        cidades: dbRota?.cidades || [],
-        count: grouped[rc.kanban]?.length || 0,
-      };
-    });
-    setRotas(rotasInfo);
+    setRotasDB(rotasData || []);
     setLoading(false);
   }, [selectedUnidade]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const getCityGroups = () => {
+    const groups: Record<string, OSItem[]> = {};
+    const filtered = getFilteredOS();
+    for (const os of filtered) {
+      const city = os.cliente_cidade?.trim() || 'Sem cidade';
+      if (!groups[city]) groups[city] = [];
+      groups[city].push(os);
+    }
+    return Object.entries(groups).sort((a, b) => b[1].length - a[1].length);
+  };
+
+  const getRouteForCity = (city: string): RotaDB | null => {
+    if (!city || city === 'Sem cidade') return null;
+    return rotasDB.find(r => r.cidades?.some(c => c.toLowerCase() === city.toLowerCase())) || null;
+  };
 
   const geocodeOS = async (os: OSItem): Promise<{ lat: number; lng: number } | null> => {
     const addr = [os.cliente_endereco, os.cliente_bairro, os.cliente_cidade, os.cliente_cep].filter(Boolean).join(', ');
@@ -156,14 +163,48 @@ export default function GestaoRotas() {
 
     setGeocoding(null);
     setSelectedOS(new Set());
+    setSelectedCities(new Set());
     await loadData();
     refresh();
+  };
+
+  const moveCityToRoute = async (city: string, targetKanban: string) => {
+    const cityOS = pecaDisponivelOS.filter(os => (os.cliente_cidade?.trim() || 'Sem cidade') === city);
+    if (cityOS.length === 0) return;
+    await moveToRoute(cityOS.map(o => o.id), targetKanban);
   };
 
   const moveBackToDisponivel = async (osId: string) => {
     await supabase.from('os').update({ coluna_kanban: 'peca_disponivel' }).eq('id', osId);
     await loadData();
     refresh();
+  };
+
+  const autoAssignByRouteConfig = async () => {
+    const toMove: { osId: string; kanban: string }[] = [];
+
+    for (const os of pecaDisponivelOS) {
+      const city = os.cliente_cidade?.trim();
+      if (!city) continue;
+      const matchedRoute = getRouteForCity(city);
+      if (matchedRoute?.coluna_kanban) {
+        toMove.push({ osId: os.id, kanban: matchedRoute.coluna_kanban });
+      }
+    }
+
+    if (toMove.length === 0) {
+      return;
+    }
+
+    const byKanban: Record<string, string[]> = {};
+    for (const { osId, kanban } of toMove) {
+      if (!byKanban[kanban]) byKanban[kanban] = [];
+      byKanban[kanban].push(osId);
+    }
+
+    for (const [kanban, osIds] of Object.entries(byKanban)) {
+      await moveToRoute(osIds, kanban);
+    }
   };
 
   const toggleSelection = (osId: string) => {
@@ -175,13 +216,36 @@ export default function GestaoRotas() {
     });
   };
 
-  const selectAll = () => {
-    const filtered = getFilteredOS();
-    if (selectedOS.size === filtered.length) {
-      setSelectedOS(new Set());
-    } else {
-      setSelectedOS(new Set(filtered.map(o => o.id)));
-    }
+  const toggleCitySelection = (city: string) => {
+    const cityOS = pecaDisponivelOS.filter(os => (os.cliente_cidade?.trim() || 'Sem cidade') === city);
+    setSelectedCities(prev => {
+      const next = new Set(prev);
+      if (next.has(city)) {
+        next.delete(city);
+        setSelectedOS(prevOS => {
+          const nextOS = new Set(prevOS);
+          cityOS.forEach(os => nextOS.delete(os.id));
+          return nextOS;
+        });
+      } else {
+        next.add(city);
+        setSelectedOS(prevOS => {
+          const nextOS = new Set(prevOS);
+          cityOS.forEach(os => nextOS.add(os.id));
+          return nextOS;
+        });
+      }
+      return next;
+    });
+  };
+
+  const toggleCityExpand = (city: string) => {
+    setExpandedCities(prev => {
+      const next = new Set(prev);
+      if (next.has(city)) next.delete(city);
+      else next.add(city);
+      return next;
+    });
   };
 
   const toggleRouteExpand = (kanban: string) => {
@@ -209,8 +273,12 @@ export default function GestaoRotas() {
     return Math.floor((Date.now() - new Date(createdAt).getTime()) / 86400000);
   };
 
-  const filteredOS = getFilteredOS();
+  const cityGroups = getCityGroups();
   const totalEmRotas = Object.values(rotaOS).reduce((s, arr) => s + arr.length, 0);
+  const autoAssignableCount = pecaDisponivelOS.filter(os => {
+    const city = os.cliente_cidade?.trim();
+    return city && getRouteForCity(city);
+  }).length;
 
   if (!selectedUnidade) {
     return (
@@ -222,14 +290,22 @@ export default function GestaoRotas() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Package className="w-4 h-4" style={{ color: '#06B6D4' }} />
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Peca Disponivel</span>
           </div>
           <p className="text-2xl font-bold" style={{ color: '#06B6D4' }}>{pecaDisponivelOS.length}</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>OS aguardando alocacao em rota</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Aguardando alocacao</p>
+        </div>
+        <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <div className="flex items-center gap-2 mb-1">
+            <Globe className="w-4 h-4" style={{ color: '#8B5CF6' }} />
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Cidades</span>
+          </div>
+          <p className="text-2xl font-bold" style={{ color: '#8B5CF6' }}>{cityGroups.length}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Cidades com OS pendentes</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-1">
@@ -237,17 +313,44 @@ export default function GestaoRotas() {
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Em Rotas</span>
           </div>
           <p className="text-2xl font-bold" style={{ color: '#10B981' }}>{totalEmRotas}</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>OS alocadas em rotas de atendimento</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>OS alocadas em rotas</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Navigation className="w-4 h-4" style={{ color: '#FFBF00' }} />
             <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Rotas Ativas</span>
           </div>
-          <p className="text-2xl font-bold" style={{ color: '#FFBF00' }}>{rotas.filter(r => r.count > 0).length}</p>
+          <p className="text-2xl font-bold" style={{ color: '#FFBF00' }}>{ROTA_COLUMNS.filter(rc => (rotaOS[rc.kanban] || []).length > 0).length}</p>
           <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Prontas para otimizar</p>
         </div>
       </div>
+
+      {autoAssignableCount > 0 && (
+        <div
+          className="flex items-center justify-between p-3 rounded-xl"
+          style={{ backgroundColor: '#10B98110', border: '1px solid #10B98130' }}
+        >
+          <div className="flex items-center gap-3">
+            <ArrowLeftRight className="w-4 h-4" style={{ color: '#10B981' }} />
+            <div>
+              <p className="text-sm font-medium" style={{ color: '#10B981' }}>
+                {autoAssignableCount} OS podem ser atribuidas automaticamente
+              </p>
+              <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>
+                Cidades ja configuradas nas rotas desta unidade
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={autoAssignByRouteConfig}
+            disabled={!!geocoding}
+            className="px-4 py-2 rounded-lg text-xs font-semibold transition-all hover:scale-105 disabled:opacity-50"
+            style={{ backgroundColor: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}
+          >
+            Atribuir Automaticamente
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <div className="lg:col-span-1 rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
@@ -255,23 +358,12 @@ export default function GestaoRotas() {
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4" style={{ color: '#06B6D4' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Peca Disponivel ({filteredOS.length})
+                Peca Disponivel ({pecaDisponivelOS.length})
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              {filteredOS.length > 0 && (
-                <button
-                  onClick={selectAll}
-                  className="text-[10px] px-2 py-1 rounded-md font-medium"
-                  style={{ backgroundColor: '#06B6D415', color: '#06B6D4', border: '1px solid #06B6D430' }}
-                >
-                  {selectedOS.size === filteredOS.length ? 'Desmarcar' : 'Selecionar Todas'}
-                </button>
-              )}
-              <button onClick={loadData} className="p-1 rounded-md hover:bg-black/10 transition-colors">
-                <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
-              </button>
-            </div>
+            <button onClick={loadData} className="p-1 rounded-md hover:bg-black/10 transition-colors">
+              <RefreshCw className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
+            </button>
           </div>
 
           <div className="p-2 border-b" style={{ borderColor: 'var(--border-primary)' }}>
@@ -288,68 +380,124 @@ export default function GestaoRotas() {
             </div>
           </div>
 
-          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 380px)' }}>
+          <div className="overflow-y-auto" style={{ maxHeight: 'calc(100vh - 420px)' }}>
             {loading ? (
               <div className="p-8 text-center">
                 <Loader2 className="w-5 h-5 animate-spin mx-auto mb-2" style={{ color: '#06B6D4' }} />
                 <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Carregando...</p>
               </div>
-            ) : filteredOS.length === 0 ? (
+            ) : cityGroups.length === 0 ? (
               <div className="p-8 text-center">
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: '#10B98140' }} />
                 <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS em Peca Disponivel</p>
               </div>
             ) : (
               <div className="p-1.5 space-y-1">
-                {filteredOS.map(os => {
-                  const selected = selectedOS.has(os.id);
-                  const dias = diasAberta(os.created_at);
-                  const hasCoords = os.lat && os.lng;
-                  const isGeocoding = geocoding === os.id;
+                {cityGroups.map(([city, cityOSList]) => {
+                  const isExpanded = expandedCities.has(city);
+                  const isCitySelected = selectedCities.has(city);
+                  const matchedRoute = getRouteForCity(city);
+                  const rc = matchedRoute ? ROTA_COLUMNS.find(r => r.kanban === matchedRoute.coluna_kanban) : null;
 
                   return (
-                    <div
-                      key={os.id}
-                      onClick={() => toggleSelection(os.id)}
-                      className="p-2.5 rounded-lg cursor-pointer transition-all"
-                      style={{
-                        backgroundColor: selected ? '#06B6D412' : 'var(--bg-secondary)',
-                        border: selected ? '1.5px solid #06B6D450' : '1.5px solid transparent',
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2 min-w-0">
-                          <input type="checkbox" checked={selected} readOnly className="rounded shrink-0 accent-cyan-500" />
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-                                {os.numero_os_interna || 'S/N'}
+                    <div key={city} className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-primary)' }}>
+                      <div
+                        className="flex items-center gap-2 p-2.5 cursor-pointer transition-colors"
+                        style={{
+                          backgroundColor: isCitySelected ? '#06B6D410' : 'var(--bg-secondary)',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isCitySelected}
+                          onChange={() => toggleCitySelection(city)}
+                          className="rounded shrink-0 accent-cyan-500"
+                        />
+                        <div
+                          className="flex-1 flex items-center gap-2 min-w-0"
+                          onClick={() => toggleCityExpand(city)}
+                        >
+                          <Globe className="w-3.5 h-3.5 shrink-0" style={{ color: rc?.cor || '#8B5CF6' }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>{city}</span>
+                              <span
+                                className="text-[10px] px-1.5 py-0.5 rounded-full font-medium shrink-0"
+                                style={{ backgroundColor: '#06B6D415', color: '#06B6D4' }}
+                              >
+                                {cityOSList.length}
                               </span>
-                              {os.tipo_atendimento === 'IH' && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: '#10B98120', color: '#10B981' }}>IH</span>
-                              )}
-                              {os.tipo_atendimento === 'CI' && (
-                                <span className="text-[9px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: '#3B82F620', color: '#3B82F6' }}>CI</span>
-                              )}
-                              {isGeocoding && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#06B6D4' }} />}
                             </div>
-                            <p className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</p>
-                            <p className="text-[10px] truncate" style={{ color: 'var(--text-tertiary)' }}>
-                              {os.cliente_bairro}{os.cliente_cidade ? ` - ${os.cliente_cidade}` : ''}
-                            </p>
+                            {rc && (
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: rc.cor, border: rc.cor === '#1a1a1a' ? '1px solid #555' : 'none' }} />
+                                <span className="text-[9px] font-medium" style={{ color: rc.cor === '#1a1a1a' ? 'var(--text-secondary)' : rc.cor }}>
+                                  {rc.nome}
+                                </span>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                        <div className="flex flex-col items-end gap-1 shrink-0">
-                          <span className="text-[10px] font-medium tabular-nums" style={{ color: dias > 3 ? '#EF4444' : dias > 1 ? '#F59E0B' : 'var(--text-tertiary)' }}>
-                            {dias}d
-                          </span>
-                          {hasCoords ? (
-                            <MapPin className="w-3 h-3" style={{ color: '#10B981' }} />
+                          {isExpanded ? (
+                            <ChevronUp className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
                           ) : (
-                            <AlertCircle className="w-3 h-3" style={{ color: '#F59E0B' }} />
+                            <ChevronDown className="w-3.5 h-3.5 shrink-0" style={{ color: 'var(--text-tertiary)' }} />
                           )}
                         </div>
                       </div>
+
+                      {isExpanded && (
+                        <div className="border-t space-y-0.5 p-1" style={{ borderColor: 'var(--border-primary)', backgroundColor: 'var(--bg-primary)' }}>
+                          {cityOSList.map(os => {
+                            const selected = selectedOS.has(os.id);
+                            const dias = diasAberta(os.created_at);
+                            const hasCoords = os.lat && os.lng;
+                            const isGeocoding = geocoding === os.id;
+
+                            return (
+                              <div
+                                key={os.id}
+                                onClick={() => toggleSelection(os.id)}
+                                className="p-2 rounded-md cursor-pointer transition-all"
+                                style={{
+                                  backgroundColor: selected ? '#06B6D408' : 'transparent',
+                                  border: selected ? '1px solid #06B6D430' : '1px solid transparent',
+                                }}
+                              >
+                                <div className="flex items-center justify-between gap-2">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    <input type="checkbox" checked={selected} readOnly className="rounded shrink-0 accent-cyan-500" />
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <span className="text-[11px] font-bold" style={{ color: 'var(--text-primary)' }}>
+                                          {os.numero_os_interna || 'S/N'}
+                                        </span>
+                                        {os.tipo_atendimento === 'IH' && (
+                                          <span className="text-[8px] px-1 py-0.5 rounded font-medium" style={{ backgroundColor: '#10B98120', color: '#10B981' }}>IH</span>
+                                        )}
+                                        {os.tipo_atendimento === 'CI' && (
+                                          <span className="text-[8px] px-1 py-0.5 rounded font-medium" style={{ backgroundColor: '#3B82F620', color: '#3B82F6' }}>CI</span>
+                                        )}
+                                        {isGeocoding && <Loader2 className="w-3 h-3 animate-spin" style={{ color: '#06B6D4' }} />}
+                                      </div>
+                                      <p className="text-[10px] truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</p>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center gap-1.5 shrink-0">
+                                    <span className="text-[10px] font-medium tabular-nums" style={{ color: dias > 3 ? '#EF4444' : dias > 1 ? '#F59E0B' : 'var(--text-tertiary)' }}>
+                                      {dias}d
+                                    </span>
+                                    {hasCoords ? (
+                                      <MapPin className="w-3 h-3" style={{ color: '#10B981' }} />
+                                    ) : (
+                                      <AlertCircle className="w-3 h-3" style={{ color: '#F59E0B' }} />
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -384,7 +532,7 @@ export default function GestaoRotas() {
           {ROTA_COLUMNS.map(rc => {
             const osInRoute = rotaOS[rc.kanban] || [];
             const isExpanded = expandedRoutes.has(rc.kanban);
-            const rotaInfo = rotas.find(r => r.coluna_kanban === rc.kanban);
+            const dbRota = rotasDB.find(r => r.coluna_kanban === rc.kanban);
 
             return (
               <div key={rc.kanban} className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: `1px solid ${rc.borderCor}30` }}>
@@ -399,9 +547,9 @@ export default function GestaoRotas() {
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: rc.cor + '20', color: rc.cor === '#1a1a1a' ? 'var(--text-secondary)' : rc.cor }}>
                       {osInRoute.length}
                     </span>
-                    {rotaInfo?.cidades && rotaInfo.cidades.length > 0 && (
+                    {dbRota?.cidades && dbRota.cidades.length > 0 && (
                       <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-                        {rotaInfo.cidades.join(', ')}
+                        {dbRota.cidades.join(', ')}
                       </span>
                     )}
                   </div>
