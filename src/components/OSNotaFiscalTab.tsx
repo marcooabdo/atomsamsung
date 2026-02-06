@@ -179,7 +179,7 @@ export function OSNotaFiscalTab({
           .order('created_at', { ascending: true }),
         supabase
           .from('os')
-          .select('valor_pago, valor_desconto')
+          .select('valor_pago, valor_desconto_calculado')
           .eq('id', osId)
           .maybeSingle()
       ]);
@@ -190,7 +190,7 @@ export function OSNotaFiscalTab({
 
       if (osRes.data) {
         setValorPago(osRes.data.valor_pago || 0);
-        setValorDesconto(osRes.data.valor_desconto || 0);
+        setValorDesconto(osRes.data.valor_desconto_calculado || 0);
       }
 
       const osPecasIds = new Set((osPecasRes.data || []).map((p: any) => p.pn));
