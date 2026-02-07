@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Workflow } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
-import ConfiguracoesPipelineRegras from '../components/ConfiguracoesPipelineRegras';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'pipeline';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf';
 
 interface Unidade {
   id: string;
@@ -786,8 +785,7 @@ export function Configuracoes() {
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
-    { id: 'pipeline' as Tab, label: 'Regras Pipeline', icon: Workflow, color: '#06b6d4', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] }
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2443,10 +2441,6 @@ export function Configuracoes() {
 
                 {activeTab === 'nf' && (
                   <ConfiguracoesNF unidades={unidades} />
-                )}
-
-                {activeTab === 'pipeline' && (
-                  <ConfiguracoesPipelineRegras />
                 )}
               </>
             )}
