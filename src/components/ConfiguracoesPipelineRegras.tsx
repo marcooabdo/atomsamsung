@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Power, PowerOff, AlertCircle, TrendingUp, Search, Calendar } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit, Power, PowerOff, AlertCircle, TrendingUp, Search, Calendar, Move } from 'lucide-react';
 import { pipelineEngine, PipelineRegra, TipoRegraEnum } from '../lib/pipelineEngine';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -41,6 +41,11 @@ export default function ConfiguracoesPipelineRegras() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTipo, setFilterTipo] = useState<TipoRegraEnum | ''>('');
   const [filterAtivo, setFilterAtivo] = useState<boolean | ''>('');
+
+  const [modalPosition, setModalPosition] = useState({ x: 100, y: 50 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const modalRef = useRef<HTMLDivElement>(null);
 
   const [formData, setFormData] = useState({
     nome: '',
@@ -146,6 +151,7 @@ export default function ConfiguracoesPipelineRegras() {
   const fecharModal = () => {
     setShowModal(false);
     setRegraEditando(null);
+    setModalPosition({ x: 100, y: 50 });
     setFormData({
       nome: '',
       descricao: '',
@@ -163,6 +169,41 @@ export default function ConfiguracoesPipelineRegras() {
       },
     });
   };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (modalRef.current) {
+      const rect = modalRef.current.getBoundingClientRect();
+      setDragOffset({
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      });
+      setIsDragging(true);
+    }
+  };
+
+  const handleMouseMove = (e: MouseEvent) => {
+    if (isDragging) {
+      setModalPosition({
+        x: e.clientX - dragOffset.x,
+        y: e.clientY - dragOffset.y,
+      });
+    }
+  };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+  };
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+      return () => {
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+      };
+    }
+  }, [isDragging, dragOffset]);
 
   const regrasFiltradas = regras.filter((regra) => {
     const matchSearch = regra.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -349,15 +390,48 @@ export default function ConfiguracoesPipelineRegras() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-          <div className="bg-gray-900 rounded-lg border border-gray-700 w-full max-w-3xl my-8">
-            <div className="p-6 border-b border-gray-700">
-              <h3 className="text-xl font-semibold text-white">
-                {regraEditando ? 'Editar Regra' : 'Nova Regra'}
-              </h3>
+        <div className="fixed inset-0 bg-black/50 z-50">
+          <div
+            ref={modalRef}
+            className={`absolute bg-gray-900 rounded-lg border shadow-2xl w-full max-w-3xl transition-shadow ${
+              isDragging ? 'border-blue-500 shadow-blue-500/50' : 'border-gray-700'
+            }`}
+            style={{
+              left: `${modalPosition.x}px`,
+              top: `${modalPosition.y}px`,
+              maxHeight: 'calc(100vh - 100px)',
+              display: 'flex',
+              flexDirection: 'column',
+              userSelect: isDragging ? 'none' : 'auto',
+            }}
+          >
+            <div
+              className={`p-6 border-b border-gray-700 cursor-move flex items-center justify-between transition-colors ${
+                isDragging ? 'bg-blue-900/30' : 'bg-gray-800/50 hover:bg-gray-800/70'
+              }`}
+              onMouseDown={handleMouseDown}
+            >
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg transition-colors ${
+                  isDragging ? 'bg-blue-500/20' : 'bg-gray-700/50'
+                }`}>
+                  <Move className={`w-4 h-4 transition-colors ${
+                    isDragging ? 'text-blue-400' : 'text-gray-400'
+                  }`} />
+                </div>
+                <h3 className="text-xl font-semibold text-white">
+                  {regraEditando ? 'Editar Regra' : 'Nova Regra'}
+                </h3>
+              </div>
+              <button
+                onClick={fecharModal}
+                className="p-2 hover:bg-gray-700 rounded-lg transition-colors"
+              >
+                <Plus className="w-5 h-5 text-gray-400 rotate-45" />
+              </button>
             </div>
 
-            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
+            <div className="p-6 space-y-6 overflow-y-auto flex-1">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Nome da Regra *</label>
                 <input
@@ -562,7 +636,7 @@ export default function ConfiguracoesPipelineRegras() {
               </div>
             </div>
 
-            <div className="p-6 border-t border-gray-700 flex justify-end gap-3">
+            <div className="p-6 border-t border-gray-700 flex justify-end gap-3 bg-gray-900">
               <button
                 onClick={fecharModal}
                 className="px-4 py-2 text-gray-300 hover:bg-gray-800 rounded-lg transition-colors"
