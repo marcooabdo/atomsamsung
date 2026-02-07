@@ -608,8 +608,20 @@ REGRAS:
 
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
+      console.log("[GIA] OpenAI error status:", openaiResponse.status);
+      console.log("[GIA] OpenAI error body:", errText);
+
+      let userFriendlyError = "Erro na API OpenAI";
+      if (openaiResponse.status === 401) {
+        userFriendlyError = "Chave OpenAI invalida ou expirada";
+      } else if (openaiResponse.status === 429) {
+        userFriendlyError = "Limite de requisicoes OpenAI atingido";
+      } else if (openaiResponse.status === 500 || openaiResponse.status === 503) {
+        userFriendlyError = "Servidor OpenAI temporariamente indisponivel";
+      }
+
       return new Response(
-        JSON.stringify({ error: "OpenAI API error", details: errText }),
+        JSON.stringify({ error: userFriendlyError, details: errText }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

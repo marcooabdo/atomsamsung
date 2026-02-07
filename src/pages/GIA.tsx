@@ -6,8 +6,17 @@ import { ReactiveCards } from '../components/gia/ReactiveCards';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { speakGia } from '../lib/elevenLabsTTS';
-import { Sparkles, History, Plus, Trash2, X } from 'lucide-react';
+import { speakGia, checkElevenLabsConnection } from '../lib/elevenLabsTTS';
+import { Sparkles, History, Plus, Trash2, X, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+
+type ConnectionStatus = 'checking' | 'connected' | 'partial' | 'error';
+
+interface ConnectionState {
+  status: ConnectionStatus;
+  chatgpt: boolean;
+  elevenlabs: boolean;
+  error?: string;
+}
 
 export function GIA() {
   const { usuario } = useAuth();
@@ -20,7 +29,13 @@ export function GIA() {
   const [isListening, setIsListening] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<{ id: string; titulo: string; updated_at: string }[]>([]);
+  const [connection, setConnection] = useState<ConnectionState>({ status: 'checking', chatgpt: false, elevenlabs: false });
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const greetedRef = useRef(false);
+
+  useEffect(() => {
+    checkConnections();
+  }, []);
 
   useEffect(() => {
     if (usuario?.id) {
@@ -29,13 +44,75 @@ export function GIA() {
   }, [usuario?.id]);
 
   useEffect(() => {
-    if (usuario?.tipo === 'master' && messages.length === 0 && !conversationId) {
-      const timer = setTimeout(() => {
-        speakGia('Olá, chefe! Em que posso te ajudar?');
+    if (usuario?.tipo === 'master' && messages.length === 0 && !conversationId && connection.elevenlabs && !greetedRef.current) {
+      greetedRef.current = true;
+      const timer = setTimeout(async () => {
+        await speakGia('Ola, chefe! Em que posso te ajudar?');
       }, 1000);
       return () => clearTimeout(timer);
     }
-  }, [usuario?.tipo, messages.length, conversationId]);
+  }, [usuario?.tipo, messages.length, conversationId, connection.elevenlabs]);
+
+  const checkConnections = async () => {
+    setConnection({ status: 'checking', chatgpt: false, elevenlabs: false });
+
+    let chatgptOk = false;
+    let elevenlabsOk = false;
+    let errorMsg = '';
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gia-chat`;
+        const testResponse = await fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          },
+          body: JSON.stringify({ message: 'ping', conversationId: null, history: [] }),
+        });
+
+        if (testResponse.ok) {
+          chatgptOk = true;
+        } else {
+          const errData = await testResponse.json().catch(() => ({}));
+          if (errData.error === 'OPENAI_API_KEY not configured') {
+            errorMsg = 'Chave OpenAI nao configurada';
+          } else if (testResponse.status === 401) {
+            errorMsg = errData.details || 'Sessao expirada - faca login novamente';
+          } else if (testResponse.status === 502 && errData.details) {
+            if (errData.details.includes('401') || errData.details.includes('Incorrect API key')) {
+              errorMsg = 'Chave OpenAI invalida ou expirada';
+            } else {
+              errorMsg = 'Erro na API OpenAI';
+            }
+          } else {
+            errorMsg = errData.error || `Erro ${testResponse.status}`;
+          }
+        }
+      } else {
+        errorMsg = 'Usuario nao autenticado';
+      }
+    } catch (err) {
+      errorMsg = 'Falha ao conectar com o servidor';
+    }
+
+    const elevenResult = await checkElevenLabsConnection();
+    elevenlabsOk = elevenResult.ok;
+    if (!elevenlabsOk && !errorMsg) {
+      errorMsg = elevenResult.error || 'Erro ElevenLabs';
+    }
+
+    if (chatgptOk && elevenlabsOk) {
+      setConnection({ status: 'connected', chatgpt: true, elevenlabs: true });
+    } else if (chatgptOk || elevenlabsOk) {
+      setConnection({ status: 'partial', chatgpt: chatgptOk, elevenlabs: elevenlabsOk, error: errorMsg });
+    } else {
+      setConnection({ status: 'error', chatgpt: false, elevenlabs: false, error: errorMsg });
+    }
+  };
 
   const loadConversations = async () => {
     if (!usuario?.id) return;
@@ -262,7 +339,7 @@ export function GIA() {
     setAiState('listening');
   }, [isListening, sendMessage]);
 
-  const isActive = aiState !== 'idle' || messages.length > 0;
+  const isActive = connection.status === 'connected' || connection.status === 'partial';
 
   return (
     <div className="h-[calc(100vh-48px)] flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
@@ -307,15 +384,82 @@ export function GIA() {
           >
             <History className="w-4 h-4" style={{ color: '#64748b' }} />
           </button>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg ml-2"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-            <div className="w-1.5 h-1.5 rounded-full" style={{
-              background: isActive ? '#10b981' : '#374151',
-              boxShadow: isActive ? '0 0 4px #10b981' : 'none',
-            }} />
-            <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#64748b' }}>
-              {aiState === 'thinking' ? 'Analisando' : aiState === 'speaking' ? 'Respondendo' : aiState === 'listening' ? 'Ouvindo' : isActive ? 'Ativo' : 'Standby'}
-            </span>
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg ml-2 cursor-pointer group relative"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+            onClick={checkConnections}
+            title="Clique para verificar conexao"
+          >
+            {connection.status === 'checking' ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#f59e0b' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#f59e0b' }}>
+                  Verificando...
+                </span>
+              </>
+            ) : connection.status === 'error' ? (
+              <>
+                <WifiOff className="w-3 h-3" style={{ color: '#ef4444' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#ef4444' }}>
+                  Desconectado
+                </span>
+              </>
+            ) : connection.status === 'partial' ? (
+              <>
+                <AlertCircle className="w-3 h-3" style={{ color: '#f59e0b' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#f59e0b' }}>
+                  Parcial
+                </span>
+              </>
+            ) : aiState === 'thinking' ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00d2ff' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#00d2ff' }}>
+                  Analisando
+                </span>
+              </>
+            ) : aiState === 'speaking' ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#10b981' }}>
+                  Respondendo
+                </span>
+              </>
+            ) : aiState === 'listening' ? (
+              <>
+                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#8b5cf6' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#8b5cf6' }}>
+                  Ouvindo
+                </span>
+              </>
+            ) : (
+              <>
+                <Wifi className="w-3 h-3" style={{ color: '#10b981' }} />
+                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#10b981' }}>
+                  Conectado
+                </span>
+              </>
+            )}
+
+            {(connection.status === 'error' || connection.status === 'partial') && connection.error && (
+              <div className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64"
+                style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)' }}>
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                  <div>
+                    <p className="text-xs font-medium text-red-400 mb-1">Erro de Conexao</p>
+                    <p className="text-[10px]" style={{ color: '#94a3b8' }}>{connection.error}</p>
+                    <div className="flex gap-3 mt-2 text-[9px]">
+                      <span style={{ color: connection.chatgpt ? '#10b981' : '#ef4444' }}>
+                        ChatGPT: {connection.chatgpt ? 'OK' : 'ERRO'}
+                      </span>
+                      <span style={{ color: connection.elevenlabs ? '#10b981' : '#ef4444' }}>
+                        Voz: {connection.elevenlabs ? 'OK' : 'ERRO'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </header>

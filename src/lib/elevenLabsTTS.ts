@@ -1,12 +1,44 @@
 let currentAudio: HTMLAudioElement | null = null;
+let elevenlabsAvailable: boolean | null = null;
 
-export const speakGia = async (text: string): Promise<void> => {
+export const checkElevenLabsConnection = async (): Promise<{ ok: boolean; error?: string }> => {
   const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const voiceId = import.meta.env.VITE_ELEVENLABS_VOICE_ID;
 
   if (!apiKey || !voiceId) {
-    console.warn('ElevenLabs API key or Voice ID not configured');
-    return;
+    elevenlabsAvailable = false;
+    return { ok: false, error: 'ElevenLabs API key ou Voice ID nao configurado' };
+  }
+
+  try {
+    const response = await fetch('https://api.elevenlabs.io/v1/user', {
+      headers: { 'xi-api-key': apiKey },
+    });
+
+    if (response.ok) {
+      elevenlabsAvailable = true;
+      return { ok: true };
+    }
+
+    elevenlabsAvailable = false;
+    if (response.status === 401) {
+      return { ok: false, error: 'Chave ElevenLabs invalida ou expirada' };
+    }
+    return { ok: false, error: `ElevenLabs erro: ${response.status}` };
+  } catch (err) {
+    elevenlabsAvailable = false;
+    return { ok: false, error: 'Falha ao conectar com ElevenLabs' };
+  }
+};
+
+export const isElevenLabsAvailable = (): boolean | null => elevenlabsAvailable;
+
+export const speakGia = async (text: string): Promise<{ ok: boolean; error?: string }> => {
+  const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
+  const voiceId = import.meta.env.VITE_ELEVENLABS_VOICE_ID;
+
+  if (!apiKey || !voiceId) {
+    return { ok: false, error: 'ElevenLabs nao configurado' };
   }
 
   try {
@@ -32,9 +64,14 @@ export const speakGia = async (text: string): Promise<void> => {
     });
 
     if (!response.ok) {
-      throw new Error(`ElevenLabs API error: ${response.status}`);
+      elevenlabsAvailable = false;
+      if (response.status === 401) {
+        return { ok: false, error: 'Chave ElevenLabs invalida ou expirada' };
+      }
+      return { ok: false, error: `ElevenLabs erro: ${response.status}` };
     }
 
+    elevenlabsAvailable = true;
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
@@ -47,8 +84,10 @@ export const speakGia = async (text: string): Promise<void> => {
     };
 
     await audio.play();
+    return { ok: true };
   } catch (error) {
-    console.error('Erro ao reproduzir voz da GIA:', error);
+    elevenlabsAvailable = false;
+    return { ok: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
   }
 };
 
