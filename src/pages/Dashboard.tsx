@@ -5,7 +5,6 @@ import { UnitFilter } from '../components/UnitFilter';
 import { PerformanceDetailsModal } from '../components/PerformanceDetailsModal';
 import { GoalsConfigModal } from '../components/GoalsConfigModal';
 import { InfoModal } from '../components/InfoModal';
-import { AIAnalysisModal } from '../components/AIAnalysisModal';
 import {
   TrendingUp,
   Package,
@@ -74,7 +73,6 @@ export function Dashboard() {
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [showGoalsModal, setShowGoalsModal] = useState(false);
   const [showInfoModal, setShowInfoModal] = useState(false);
-  const [showAIModal, setShowAIModal] = useState(false);
   const [showPerformanceModal, setShowPerformanceModal] = useState(false);
   const [performanceModalType, setPerformanceModalType] = useState<'eficiencia' | 'aprovacao'>('eficiencia');
   const [performanceOSList, setPerformanceOSList] = useState<PerformanceOS[]>([]);
@@ -453,26 +451,6 @@ export function Dashboard() {
           <div className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
             <span className="text-cyan-400 text-sm font-medium">{formatDateLabel()}</span>
           </div>
-          <button
-            onClick={() => setShowAIModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-300"
-            style={{
-              background: 'linear-gradient(135deg, rgba(6,182,212,0.15), rgba(59,130,246,0.15))',
-              border: '1px solid rgba(6,182,212,0.35)',
-              boxShadow: '0 0 12px rgba(6,182,212,0.1)'
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6,182,212,0.25), rgba(59,130,246,0.25))';
-              e.currentTarget.style.boxShadow = '0 0 20px rgba(6,182,212,0.25)';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'linear-gradient(135deg, rgba(6,182,212,0.15), rgba(59,130,246,0.15))';
-              e.currentTarget.style.boxShadow = '0 0 12px rgba(6,182,212,0.1)';
-            }}
-          >
-            <Brain className="w-4 h-4 text-cyan-400" />
-            <span className="text-cyan-300">Analise IA</span>
-          </button>
         </div>
       </div>
 
@@ -824,13 +802,6 @@ export function Dashboard() {
         message="Para configurar as metas de performance, é necessário selecionar uma unidade específica. Por favor, utilize o filtro de unidades no topo da página."
       />
 
-      <AIAnalysisModal
-        isOpen={showAIModal}
-        onClose={() => setShowAIModal(false)}
-        unidadeId={selectedUnidade || usuario?.unidade_id}
-        periodoInicio={dataInicio}
-        periodoFim={dataFim}
-      />
     </div>
   );
 }
