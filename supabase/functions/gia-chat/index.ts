@@ -15,7 +15,14 @@ Deno.serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get("Authorization");
+    const apiKey = req.headers.get("apikey");
+
+    console.log("[GIA] Headers received:");
+    console.log("  - Authorization:", !!authHeader);
+    console.log("  - apikey:", !!apiKey);
+
     if (!authHeader) {
+      console.log("[GIA] Missing authorization header");
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -24,18 +31,49 @@ Deno.serve(async (req: Request) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    const supabaseAuth = createClient(supabaseUrl, Deno.env.get("SUPABASE_ANON_KEY")!, {
-      global: { headers: { Authorization: authHeader } },
+    console.log("[GIA] Environment check:");
+    console.log("  - SUPABASE_URL:", !!supabaseUrl);
+    console.log("  - SUPABASE_SERVICE_ROLE_KEY:", !!supabaseServiceKey);
+    console.log("  - SUPABASE_ANON_KEY:", !!supabaseAnonKey);
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+          apikey: apiKey || supabaseAnonKey
+        }
+      },
     });
 
+    console.log("[GIA] Getting user from token...");
     const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
-    if (userError || !user) {
+
+    if (userError) {
+      console.log("[GIA] User error:", userError.message, userError);
       return new Response(
-        JSON.stringify({ error: "Unauthorized" }),
+        JSON.stringify({
+          error: "Authentication failed",
+          details: userError.message,
+          hint: "Your session may have expired. Please try logging out and logging back in."
+        }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (!user) {
+      console.log("[GIA] No user found in token");
+      return new Response(
+        JSON.stringify({
+          error: "No user found",
+          hint: "Your session may have expired. Please try logging out and logging back in."
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("[GIA] ✓ User authenticated:", user.id);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
