@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json"
   },
   "dependencies": {
+    "@elevenlabs/elevenlabs-js": "^2.34.0",
     "@react-google-maps/api": "^2.20.7",
     "@supabase/supabase-js": "^2.57.4",
     "framer-motion": "^11.18.0",
