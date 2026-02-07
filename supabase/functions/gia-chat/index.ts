@@ -152,6 +152,7 @@ Deno.serve(async (req: Request) => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
+    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split("T")[0];
 
     const unidadeFilter = usuario.unidade_id;
     const isMaster = usuario.tipo === "master" || usuario.tipo === "diretoria";
@@ -159,9 +160,9 @@ Deno.serve(async (req: Request) => {
     let osQuery = supabase
       .from("os")
       .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido")
-      .gte("created_at", monthStart)
+      .gte("created_at", threeMonthsAgo)
       .order("created_at", { ascending: false })
-      .limit(500);
+      .limit(1000);
 
     if (!isMaster && unidadeFilter) {
       osQuery = osQuery.eq("unidade_id", unidadeFilter);
@@ -354,7 +355,9 @@ Deno.serve(async (req: Request) => {
       unidades: (unidades || []).map(u => ({ id: u.id, nome: u.nome, cidade: u.cidade, estado: u.estado, endereco: u.endereco })),
 
       resumoOS: {
-        totalMes: totalOS,
+        IMPORTANTE: "Existem OS cadastradas no sistema! Consulte os detalhes abaixo.",
+        totalUltimos3Meses: totalOS,
+        totalMesAtual: (osList || []).filter(os => (os.created_at || '').startsWith(monthStart)).length,
         hoje: osHoje.length,
         atrasadas: osAtrasadas.length,
         porStatus: statusCount,
@@ -368,6 +371,13 @@ Deno.serve(async (req: Request) => {
           cliente: os.cliente_nome,
           prazo: os.prazo_entrega,
           status: os.coluna_kanban
+        })),
+        exemplosDe5OS: (osList || []).slice(0, 5).map(os => ({
+          numero: os.numero_os_interna,
+          cliente: os.cliente_nome,
+          status: os.coluna_kanban,
+          criado_em: os.created_at,
+          valor_total: os.valor_total
         })),
       },
 

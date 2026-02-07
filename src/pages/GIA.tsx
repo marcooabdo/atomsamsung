@@ -6,8 +6,8 @@ import { ReactiveCards } from '../components/gia/ReactiveCards';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { speakGia, checkElevenLabsConnection } from '../lib/elevenLabsTTS';
-import { Sparkles, History, Plus, Trash2, X, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import { speakGia, checkElevenLabsConnection, stopGiaSpeaking, isGiaSpeaking } from '../lib/elevenLabsTTS';
+import { Sparkles, History, Plus, Trash2, X, AlertCircle, Wifi, WifiOff, Square } from 'lucide-react';
 
 type ConnectionStatus = 'checking' | 'connected' | 'partial' | 'error';
 
@@ -30,6 +30,7 @@ export function GIA() {
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<{ id: string; titulo: string; updated_at: string }[]>([]);
   const [connection, setConnection] = useState<ConnectionState>({ status: 'checking', chatgpt: false, elevenlabs: false });
+  const [isSpeaking, setIsSpeaking] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const greetedRef = useRef(false);
 
@@ -47,11 +48,20 @@ export function GIA() {
     if (usuario?.tipo === 'master' && messages.length === 0 && !conversationId && connection.elevenlabs && !greetedRef.current) {
       greetedRef.current = true;
       const timer = setTimeout(async () => {
+        setIsSpeaking(true);
         await speakGia('Ola, chefe! Em que posso te ajudar?');
+        setIsSpeaking(false);
       }, 1000);
       return () => clearTimeout(timer);
     }
   }, [usuario?.tipo, messages.length, conversationId, connection.elevenlabs]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsSpeaking(isGiaSpeaking());
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
 
   const checkConnections = async () => {
     setConnection({ status: 'checking', chatgpt: false, elevenlabs: false });
@@ -276,7 +286,8 @@ export function GIA() {
       setAiState('speaking');
       await streamResponse(result.content);
 
-      speakGia(result.content);
+      setIsSpeaking(true);
+      speakGia(result.content).finally(() => setIsSpeaking(false));
 
       const aiMessage: GIAMessage = {
         id: `ai-${Date.now()}`,
@@ -384,6 +395,18 @@ export function GIA() {
           >
             <History className="w-4 h-4" style={{ color: '#64748b' }} />
           </button>
+          {isSpeaking && (
+            <button
+              onClick={() => {
+                stopGiaSpeaking();
+                setIsSpeaking(false);
+              }}
+              className="p-2 rounded-lg transition-colors hover:bg-red-500/20"
+              title="Parar voz"
+            >
+              <Square className="w-4 h-4" style={{ color: '#ef4444' }} />
+            </button>
+          )}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg ml-2 cursor-pointer group relative"
             style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
             onClick={checkConnections}
