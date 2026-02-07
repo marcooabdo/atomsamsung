@@ -8,6 +8,7 @@ export function RegrasJogoTab() {
 
   const [expandedPilar, setExpandedPilar] = useState<string | null>(null);
   const [showNovoPilar, setShowNovoPilar] = useState(false);
+  const [showEditPilarModal, setShowEditPilarModal] = useState(false);
   const [editingPilarId, setEditingPilarId] = useState<string | null>(null);
   const [showNovaRegra, setShowNovaRegra] = useState<string | null>(null);
   const [editingRegraId, setEditingRegraId] = useState<string | null>(null);
@@ -53,6 +54,7 @@ export function RegrasJogoTab() {
       await supabase.from('skywalker_pilares').insert({ ...pilarForm, ordem: maxOrdem + 1, ativo: true });
     }
     setShowNovoPilar(false);
+    setShowEditPilarModal(false);
     setEditingPilarId(null);
     setPilarForm(defaultPilar);
     loadPilares();
@@ -142,6 +144,8 @@ export function RegrasJogoTab() {
         setExpandedPilar={setExpandedPilar}
         showNovoPilar={showNovoPilar}
         setShowNovoPilar={setShowNovoPilar}
+        showEditPilarModal={showEditPilarModal}
+        setShowEditPilarModal={setShowEditPilarModal}
         editingPilarId={editingPilarId}
         setEditingPilarId={setEditingPilarId}
         pilarForm={pilarForm}
@@ -193,7 +197,7 @@ export function RegrasJogoTab() {
   );
 }
 
-function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel }: any) {
+function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, showEditPilarModal, setShowEditPilarModal, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel }: any) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -208,13 +212,13 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
         </button>
       </div>
 
-      {showNovoPilar && (
+      {showNovoPilar && !editingPilarId && (
         <PilarForm
           form={pilarForm}
           setForm={setPilarForm}
           onSave={handleSavePilar}
           onCancel={() => { setShowNovoPilar(false); setEditingPilarId(null); }}
-          isEditing={!!editingPilarId}
+          isEditing={false}
           times={times}
         />
       )}
@@ -251,7 +255,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
                   <span className="text-xs px-2 py-0.5 rounded-full" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
                     {regras.length} regra{regras.length !== 1 ? 's' : ''}
                   </span>
-                  <button onClick={(e) => { e.stopPropagation(); setEditingPilarId(pilar.id); setPilarForm({ nome: pilar.nome, descricao: pilar.descricao || '', tipo_metrica: pilar.tipo_metrica, time_aplicavel: pilar.time_aplicavel || [], max_estrelas: pilar.max_estrelas, meta_front_office: pilar.meta_front_office, meta_inside_sales: pilar.meta_inside_sales }); setShowNovoPilar(true); }} className="p-1.5 rounded transition-colors" style={{ color: 'var(--text-secondary)' }}>
+                  <button onClick={(e) => { e.stopPropagation(); setEditingPilarId(pilar.id); setPilarForm({ nome: pilar.nome, descricao: pilar.descricao || '', tipo_metrica: pilar.tipo_metrica, time_aplicavel: pilar.time_aplicavel || [], max_estrelas: pilar.max_estrelas, meta_front_office: pilar.meta_front_office, meta_inside_sales: pilar.meta_inside_sales }); setShowEditPilarModal(true); }} className="p-1.5 rounded transition-colors" style={{ color: 'var(--text-secondary)' }}>
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); handleDeletePilar(pilar.id); }} className="p-1.5 rounded transition-colors" style={{ color: 'var(--text-secondary)' }}>
@@ -336,6 +340,80 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
           );
         })}
       </div>
+
+      {showEditPilarModal && editingPilarId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-3xl rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+            <h4 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Pencil className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+              Editar Pilar
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
+                <input type="text" value={pilarForm.nome} onChange={(e) => setPilarForm({ ...pilarForm, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Taxa de Conversao" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Tipo de Metrica</label>
+                <select value={pilarForm.tipo_metrica} onChange={(e) => setPilarForm({ ...pilarForm, tipo_metrica: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+                  <option value="quantidade">Quantidade</option>
+                  <option value="percentual">Percentual</option>
+                  <option value="valor">Valor (R$)</option>
+                  <option value="binario">Sim/Nao</option>
+                </select>
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
+                <textarea value={pilarForm.descricao} onChange={(e) => setPilarForm({ ...pilarForm, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descreva o que este pilar avalia..." />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Max Estrelas</label>
+                <input type="number" value={pilarForm.max_estrelas} onChange={(e) => setPilarForm({ ...pilarForm, max_estrelas: Number(e.target.value) })} min={1} max={5} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Aplicavel a</label>
+                <div className="flex flex-wrap gap-2 mt-1">
+                  {times.map((t: any) => {
+                    const checked = (pilarForm.time_aplicavel || []).includes(t.codigo);
+                    return (
+                      <label key={t.id} className="flex items-center gap-1.5 cursor-pointer text-sm" style={{ color: 'var(--text-primary)' }}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            const arr = e.target.checked
+                              ? [...(pilarForm.time_aplicavel || []), t.codigo]
+                              : (pilarForm.time_aplicavel || []).filter((c: string) => c !== t.codigo);
+                            setPilarForm({ ...pilarForm, time_aplicavel: arr });
+                          }}
+                          className="w-4 h-4 rounded"
+                          style={{ accentColor: t.cor }}
+                        />
+                        <span className="px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: t.cor + '20', color: t.cor }}>{t.nome}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Meta Front Office</label>
+                <input type="number" value={pilarForm.meta_front_office} onChange={(e) => setPilarForm({ ...pilarForm, meta_front_office: Number(e.target.value) })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Meta Inside Sales</label>
+                <input type="number" value={pilarForm.meta_inside_sales} onChange={(e) => setPilarForm({ ...pilarForm, meta_inside_sales: Number(e.target.value) })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => { setShowEditPilarModal(false); setEditingPilarId(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>Cancelar</button>
+              <button onClick={handleSavePilar} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
+                <Save className="w-4 h-4" />
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
