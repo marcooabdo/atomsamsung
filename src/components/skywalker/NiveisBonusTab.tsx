@@ -15,6 +15,7 @@ const CORES = [
 export function NiveisBonusTab() {
   const { niveis, loadNiveis } = useSkywalker();
   const [showNovo, setShowNovo] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' });
 
@@ -27,6 +28,7 @@ export function NiveisBonusTab() {
       await supabase.from('skywalker_niveis').insert({ ...form, ordem: maxOrdem + 1, ativo: true });
     }
     setShowNovo(false);
+    setShowEditModal(false);
     setEditingId(null);
     setForm({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' });
     loadNiveis();
@@ -35,7 +37,7 @@ export function NiveisBonusTab() {
   const handleEdit = (nivel: Nivel) => {
     setForm({ nome: nivel.nome, cor: nivel.cor, estrelas_necessarias: nivel.estrelas_necessarias, meses_consecutivos: nivel.meses_consecutivos, bonus_valor: nivel.bonus_valor || 0, descricao: nivel.descricao || '' });
     setEditingId(nivel.id);
-    setShowNovo(true);
+    setShowEditModal(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -69,9 +71,9 @@ export function NiveisBonusTab() {
         </button>
       </div>
 
-      {showNovo && (
+      {showNovo && !editingId && (
         <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
-          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{editingId ? 'Editar Nivel' : 'Criar Nivel'}</h4>
+          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Criar Nivel</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
@@ -156,6 +158,54 @@ export function NiveisBonusTab() {
         <div className="text-center py-16">
           <Award className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
           <p style={{ color: 'var(--text-secondary)' }}>Nenhum nivel configurado</p>
+        </div>
+      )}
+
+      {showEditModal && editingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-3xl rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+            <h4 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Pencil className="w-5 h-5" style={{ color: '#FBBF24' }} />
+              Editar Nivel
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
+                <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Starter" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CORES.map(c => (
+                    <button key={c.hex} onClick={() => setForm({ ...form, cor: c.hex })} className="w-7 h-7 rounded-full border-2 transition-all" style={{ backgroundColor: c.hex, borderColor: form.cor === c.hex ? 'white' : 'transparent', transform: form.cor === c.hex ? 'scale(1.2)' : 'scale(1)' }} title={c.nome} />
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
+                <input type="text" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Estrelas Necessarias</label>
+                <input type="number" value={form.estrelas_necessarias} onChange={(e) => setForm({ ...form, estrelas_necessarias: Number(e.target.value) })} min={0} max={20} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Meses Consecutivos</label>
+                <input type="number" value={form.meses_consecutivos} onChange={(e) => setForm({ ...form, meses_consecutivos: Number(e.target.value) })} min={0} max={12} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Bonus Mensal (R$)</label>
+                <input type="number" value={form.bonus_valor} onChange={(e) => setForm({ ...form, bonus_valor: Number(e.target.value) })} min={0} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => { setShowEditModal(false); setEditingId(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>Cancelar</button>
+              <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
+                <Save className="w-4 h-4" />
+                Salvar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -13,6 +13,7 @@ const CORES = [
 export function TimesTab() {
   const { times, profissionais, loadTimes } = useSkywalker();
   const [showNovo, setShowNovo] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' });
 
@@ -25,6 +26,7 @@ export function TimesTab() {
       await supabase.from('skywalker_times').insert({ nome: form.nome, codigo: form.codigo.toLowerCase().replace(/\s+/g, '_'), descricao: form.descricao, cor: form.cor, ordem: maxOrdem + 1, ativo: true });
     }
     setShowNovo(false);
+    setShowEditModal(false);
     setEditingId(null);
     setForm({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' });
     loadTimes();
@@ -33,7 +35,7 @@ export function TimesTab() {
   const handleEdit = (time: any) => {
     setForm({ nome: time.nome, codigo: time.codigo, descricao: time.descricao || '', cor: time.cor });
     setEditingId(time.id);
-    setShowNovo(true);
+    setShowEditModal(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -63,9 +65,9 @@ export function TimesTab() {
         </button>
       </div>
 
-      {showNovo && (
+      {showNovo && !editingId && (
         <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
-          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>{editingId ? 'Editar Time' : 'Criar Time'}</h4>
+          <h4 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Criar Time</h4>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
@@ -139,6 +141,46 @@ export function TimesTab() {
         <div className="text-center py-16">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
           <p style={{ color: 'var(--text-secondary)' }}>Nenhum time cadastrado</p>
+        </div>
+      )}
+
+      {showEditModal && editingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-2xl rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-accent)' }}>
+            <h4 className="text-lg font-bold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <Pencil className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+              Editar Time
+            </h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
+                <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Front Office" />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Codigo (somente leitura)</label>
+                <input type="text" value={form.codigo} disabled className="w-full rounded-lg px-3 py-2 text-sm opacity-60" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
+                <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descricao do time..." />
+              </div>
+              <div>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CORES.map(c => (
+                    <button key={c.hex} onClick={() => setForm({ ...form, cor: c.hex })} className="w-7 h-7 rounded-full border-2 transition-all" style={{ backgroundColor: c.hex, borderColor: form.cor === c.hex ? 'white' : 'transparent', transform: form.cor === c.hex ? 'scale(1.2)' : 'scale(1)' }} title={c.nome} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 mt-6">
+              <button onClick={() => { setShowEditModal(false); setEditingId(null); }} className="px-4 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>Cancelar</button>
+              <button onClick={handleSave} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}>
+                <Save className="w-4 h-4" />
+                Salvar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
