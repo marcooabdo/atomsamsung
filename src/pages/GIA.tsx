@@ -6,6 +6,7 @@ import { ReactiveCards } from '../components/gia/ReactiveCards';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { speakGia } from '../lib/elevenLabsTTS';
 import { Sparkles, History, Plus, Trash2, X } from 'lucide-react';
 
 export function GIA() {
@@ -26,6 +27,15 @@ export function GIA() {
       loadConversations();
     }
   }, [usuario?.id]);
+
+  useEffect(() => {
+    if (usuario?.tipo === 'master' && messages.length === 0 && !conversationId) {
+      const timer = setTimeout(() => {
+        speakGia('Olá, chefe! Em que posso te ajudar?');
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [usuario?.tipo, messages.length, conversationId]);
 
   const loadConversations = async () => {
     if (!usuario?.id) return;
@@ -188,6 +198,8 @@ export function GIA() {
 
       setAiState('speaking');
       await streamResponse(result.content);
+
+      speakGia(result.content);
 
       const aiMessage: GIAMessage = {
         id: `ai-${Date.now()}`,
