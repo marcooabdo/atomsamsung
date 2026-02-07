@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { BookOpen, Plus, Pencil, Trash2, Star, ChevronDown, ChevronUp, Save, X, AlertTriangle, Gift } from 'lucide-react';
 import { useSkywalker } from '../../contexts/SkywalkerContext';
 import { supabase } from '../../lib/supabase';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 export function RegrasJogoTab() {
   const { pilares, regrasEstrelas, regrasPromocao, bonificacoes, times, loadPilares, loadRegrasEstrelas, loadRegrasPromocao, loadBonificacoes } = useSkywalker();
@@ -16,6 +17,14 @@ export function RegrasJogoTab() {
   const [tipoRegraPromocao, setTipoRegraPromocao] = useState<'promocao' | 'rebaixamento'>('promocao');
   const [editingRegraPromocaoId, setEditingRegraPromocaoId] = useState<string | null>(null);
   const [showNovaBonificacao, setShowNovaBonificacao] = useState(false);
+
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; type: string; id: string; title: string; message: string }>({
+    show: false,
+    type: '',
+    id: '',
+    title: '',
+    message: ''
+  });
 
   const defaultPilar = { nome: '', descricao: '', tipo_metrica: 'quantidade', time_aplicavel: [] as string[], max_estrelas: 3, meta_front_office: 10, meta_inside_sales: 10 };
   const [pilarForm, setPilarForm] = useState(defaultPilar);
@@ -61,11 +70,33 @@ export function RegrasJogoTab() {
   };
 
   const handleDeletePilar = async (id: string) => {
-    if (!confirm('Excluir este pilar e todas as regras associadas?')) return;
-    await supabase.from('skywalker_regras_estrelas').delete().eq('pilar_id', id);
-    await supabase.from('skywalker_pilares').delete().eq('id', id);
-    loadPilares();
-    loadRegrasEstrelas();
+    setDeleteConfirm({
+      show: true,
+      type: 'pilar',
+      id,
+      title: 'Excluir Pilar',
+      message: 'Tem certeza que deseja excluir este pilar? Todas as regras de estrelas associadas tambem serao excluidas. Esta acao nao pode ser desfeita.'
+    });
+  };
+
+  const confirmDelete = async () => {
+    const { type, id } = deleteConfirm;
+
+    if (type === 'pilar') {
+      await supabase.from('skywalker_regras_estrelas').delete().eq('pilar_id', id);
+      await supabase.from('skywalker_pilares').delete().eq('id', id);
+      loadPilares();
+      loadRegrasEstrelas();
+    } else if (type === 'regra') {
+      await supabase.from('skywalker_regras_estrelas').delete().eq('id', id);
+      loadRegrasEstrelas();
+    } else if (type === 'regraPromocao') {
+      await supabase.from('skywalker_regras_promocao').delete().eq('id', id);
+      loadRegrasPromocao();
+    } else if (type === 'bonificacao') {
+      await supabase.from('skywalker_bonificacoes').delete().eq('id', id);
+      loadBonificacoes();
+    }
   };
 
   const handleSaveRegra = async () => {
@@ -82,9 +113,13 @@ export function RegrasJogoTab() {
   };
 
   const handleDeleteRegra = async (id: string) => {
-    if (!confirm('Excluir esta regra?')) return;
-    await supabase.from('skywalker_regras_estrelas').delete().eq('id', id);
-    loadRegrasEstrelas();
+    setDeleteConfirm({
+      show: true,
+      type: 'regra',
+      id,
+      title: 'Excluir Regra',
+      message: 'Tem certeza que deseja excluir esta regra de estrelas? Esta acao nao pode ser desfeita.'
+    });
   };
 
   const handleSaveRegraPromocao = async () => {
@@ -107,9 +142,13 @@ export function RegrasJogoTab() {
   };
 
   const handleDeleteRegraPromocao = async (id: string) => {
-    if (!confirm('Excluir esta regra?')) return;
-    await supabase.from('skywalker_regras_promocao').delete().eq('id', id);
-    loadRegrasPromocao();
+    setDeleteConfirm({
+      show: true,
+      type: 'regraPromocao',
+      id,
+      title: 'Excluir Regra de Promocao/Rebaixamento',
+      message: 'Tem certeza que deseja excluir esta regra? Esta acao nao pode ser desfeita.'
+    });
   };
 
   const handleSaveBonificacao = async () => {
@@ -121,9 +160,13 @@ export function RegrasJogoTab() {
   };
 
   const handleDeleteBonificacao = async (id: string) => {
-    if (!confirm('Excluir esta bonificacao?')) return;
-    await supabase.from('skywalker_bonificacoes').delete().eq('id', id);
-    loadBonificacoes();
+    setDeleteConfirm({
+      show: true,
+      type: 'bonificacao',
+      id,
+      title: 'Excluir Bonificacao',
+      message: 'Tem certeza que deseja excluir esta bonificacao? Esta acao nao pode ser desfeita.'
+    });
   };
 
   return (
@@ -192,6 +235,14 @@ export function RegrasJogoTab() {
         defaultBonificacao={defaultBonificacao}
         handleSaveBonificacao={handleSaveBonificacao}
         handleDeleteBonificacao={handleDeleteBonificacao}
+      />
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ ...deleteConfirm, show: false })}
+        onConfirm={confirmDelete}
+        title={deleteConfirm.title}
+        message={deleteConfirm.message}
       />
     </div>
   );

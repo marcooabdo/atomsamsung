@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Award, Plus, Pencil, Trash2, Star, Save, X, ChevronUp, ChevronDown } from 'lucide-react';
 import { useSkywalker, type Nivel } from '../../contexts/SkywalkerContext';
 import { supabase } from '../../lib/supabase';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 const CORES = [
   { nome: 'Blue', hex: '#3B82F6' }, { nome: 'Green', hex: '#10B981' },
@@ -18,6 +19,7 @@ export function NiveisBonusTab() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', cor: '#3B82F6', estrelas_necessarias: 6, meses_consecutivos: 2, bonus_valor: 0, descricao: '' });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string; nome: string }>({ show: false, id: '', nome: '' });
 
   const handleSave = async () => {
     if (!form.nome) return;
@@ -40,9 +42,12 @@ export function NiveisBonusTab() {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este nivel?')) return;
-    await supabase.from('skywalker_niveis').update({ ativo: false }).eq('id', id);
+  const handleDelete = async (id: string, nome: string) => {
+    setDeleteConfirm({ show: true, id, nome });
+  };
+
+  const confirmDelete = async () => {
+    await supabase.from('skywalker_niveis').update({ ativo: false }).eq('id', deleteConfirm.id);
     loadNiveis();
   };
 
@@ -145,7 +150,7 @@ export function NiveisBonusTab() {
                 <button onClick={() => handleEdit(nivel)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
                   <Pencil className="w-4 h-4" />
                 </button>
-                <button onClick={() => handleDelete(nivel.id)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                <button onClick={() => handleDelete(nivel.id, nivel.nome)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -208,6 +213,14 @@ export function NiveisBonusTab() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
+        onConfirm={confirmDelete}
+        title="Excluir Nivel"
+        message={`Tem certeza que deseja excluir o nivel "${deleteConfirm.nome}"? Profissionais neste nivel poderao ser afetados. Esta acao nao pode ser desfeita.`}
+      />
     </div>
   );
 }

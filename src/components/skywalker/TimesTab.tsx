@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Users, Plus, Pencil, Trash2, Save, X } from 'lucide-react';
 import { useSkywalker } from '../../contexts/SkywalkerContext';
 import { supabase } from '../../lib/supabase';
+import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 const CORES = [
   { nome: 'Blue', hex: '#3B82F6' }, { nome: 'Green', hex: '#10B981' },
@@ -16,6 +17,7 @@ export function TimesTab() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: '', codigo: '', descricao: '', cor: '#3B82F6' });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string; nome: string }>({ show: false, id: '', nome: '' });
 
   const handleSave = async () => {
     if (!form.nome.trim() || (!editingId && !form.codigo.trim())) return;
@@ -38,9 +40,12 @@ export function TimesTab() {
     setShowEditModal(true);
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Excluir este time? Profissionais vinculados serao afetados.')) return;
-    await supabase.from('skywalker_times').update({ ativo: false }).eq('id', id);
+  const handleDelete = async (id: string, nome: string) => {
+    setDeleteConfirm({ show: true, id, nome });
+  };
+
+  const confirmDelete = async () => {
+    await supabase.from('skywalker_times').update({ ativo: false }).eq('id', deleteConfirm.id);
     loadTimes();
   };
 
@@ -121,7 +126,7 @@ export function TimesTab() {
                   <button onClick={() => handleEdit(time)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
                     <Pencil className="w-4 h-4" />
                   </button>
-                  <button onClick={() => handleDelete(time.id)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
+                  <button onClick={() => handleDelete(time.id, time.nome)} className="p-1.5 rounded" style={{ color: 'var(--text-secondary)' }}>
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
@@ -183,6 +188,14 @@ export function TimesTab() {
           </div>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
+        onConfirm={confirmDelete}
+        title="Excluir Time"
+        message={`Tem certeza que deseja excluir o time "${deleteConfirm.nome}"? Profissionais vinculados a este time poderao ser afetados. Esta acao nao pode ser desfeita.`}
+      />
     </div>
   );
 }

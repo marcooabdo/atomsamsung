@@ -7,6 +7,7 @@ import { VisaoGeralTab } from '../components/skywalker/VisaoGeralTab';
 import { RegrasJogoTab } from '../components/skywalker/RegrasJogoTab';
 import { NiveisBonusTab } from '../components/skywalker/NiveisBonusTab';
 import { TimesTab } from '../components/skywalker/TimesTab';
+import { ConfirmDeleteModal } from '../components/skywalker/ConfirmDeleteModal';
 
 export function Skywalker() {
   const { usuario } = useAuth();
@@ -332,6 +333,7 @@ function ProfissionaisTab() {
     time_id: '',
     nivel_atual_id: ''
   });
+  const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string; nome: string }>({ show: false, id: '', nome: '' });
 
   useEffect(() => {
     loadFormData();
@@ -365,9 +367,12 @@ function ProfissionaisTab() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('Remover este profissional do programa?')) return;
-    await supabase.from('skywalker_profissionais').delete().eq('id', id);
+  const handleDelete = async (id: string, nome: string) => {
+    setDeleteConfirm({ show: true, id, nome });
+  };
+
+  const confirmDelete = async () => {
+    await supabase.from('skywalker_profissionais').delete().eq('id', deleteConfirm.id);
     loadProfissionais();
   };
 
@@ -483,7 +488,7 @@ function ProfissionaisTab() {
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{prof.unidade?.nome}</p>
                 </div>
               </div>
-              <button onClick={() => handleDelete(prof.id)} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
+              <button onClick={() => handleDelete(prof.id, prof.usuario?.nome || 'Profissional')} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
                 <Trash2 className="w-4 h-4" />
               </button>
             </div>
@@ -514,6 +519,15 @@ function ProfissionaisTab() {
           <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional cadastrado</p>
         </div>
       )}
+
+      <ConfirmDeleteModal
+        isOpen={deleteConfirm.show}
+        onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
+        onConfirm={confirmDelete}
+        title="Remover Profissional"
+        message={`Tem certeza que deseja remover "${deleteConfirm.nome}" do programa Skywalker? Todo o historico de desempenho sera mantido, mas o profissional nao participara mais das avaliacoes. Esta acao nao pode ser desfeita.`}
+        confirmText="Remover"
+      />
     </div>
   );
 }
