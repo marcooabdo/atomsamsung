@@ -20,6 +20,7 @@ import { OSPrintView } from './pages/OSPrintView';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
+import { RegistroVendas } from './pages/RegistroVendas';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -239,6 +240,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <NotasFiscais />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/registro-vendas"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <RegistroVendas />
               </Layout>
             </ProtectedRoute>
           }

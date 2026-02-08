@@ -22,7 +22,8 @@ import {
   FileText,
   ChevronRight,
   Palette,
-  Sparkles
+  Sparkles,
+  ShoppingCart
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -40,6 +41,7 @@ const allMenuItems = [
   { id: 'notas-fiscais', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
   { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
   { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
+  { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
   { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes', onlyFor: ['master', 'diretoria', 'gerente'] },
 ];
 
