@@ -3,7 +3,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { GIACoreVisualizer } from '../components/gia/GIACoreVisualizer';
 import { GIAConversation, type GIAMessage, type GIACardData } from '../components/gia/GIAConversation';
 import { GIAInputController } from '../components/gia/GIAInputController';
-import { FloatLayer } from '../components/gia/FloatLayer';
 import { createMockAIStream } from '../components/gia/mockAIStream';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,7 +18,6 @@ import {
   WifiOff,
   AlertCircle,
   Zap,
-  BarChart3,
 } from 'lucide-react';
 
 type ConnectionStatus = 'checking' | 'connected' | 'partial' | 'error';
@@ -37,8 +35,6 @@ export function GIA() {
   const [aiState, setAiState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [messages, setMessages] = useState<GIAMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
-  const [activeFloatingCards, setActiveFloatingCards] = useState<CardData[]>([]);
-  const [showFloatLayer, setShowFloatLayer] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
@@ -64,7 +60,7 @@ export function GIA() {
     if (!usuario || greetingDoneRef.current) return;
     greetingDoneRef.current = true;
 
-    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marco.abdo@gmail.com' || usuario.email?.includes('marco.abdo');
+    const isChefe = usuario.email === 'marcoabdo@groupglobal.com.br' || usuario.tipo === 'master';
     const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
     const greetingText = `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
 
@@ -124,20 +120,13 @@ export function GIA() {
         }));
       setMessages(loaded);
       setConversationId(convId);
-      const allCards: CardData[] = [];
-      for (const msg of loaded) {
-        if (msg.cards) {
-          for (const c of msg.cards) allCards.push(c as unknown as CardData);
-        }
-      }
-      setActiveFloatingCards(allCards);
     }
     setShowHistory(false);
   };
 
   const getGreetingText = useCallback(() => {
     if (!usuario) return 'Ola! Como posso ajudar?';
-    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marcoabdo@roupglobal.com.br' || usuario.email?.includes('marcoabdo@roupglobal.com.br');
+    const isChefe = usuario.email === 'marcoabdo@groupglobal.com.br' || usuario.tipo === 'master';
     const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
     return `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
   }, [usuario]);
@@ -148,7 +137,6 @@ export function GIA() {
       cancelStreamRef.current = null;
     }
     setConversationId(null);
-    setActiveFloatingCards([]);
     setStreamingText('');
 
     const greetingText = getGreetingText();
@@ -194,10 +182,6 @@ export function GIA() {
         },
         (card) => {
           collectedCards.push(card);
-          setActiveFloatingCards(prev => {
-            if (prev.find(c => c.id === card.id)) return prev;
-            return [...prev, card];
-          });
         },
         (fullText) => {
           setStreamingText('');
@@ -263,17 +247,6 @@ export function GIA() {
       }
 
       if (result.conversationId && !conversationId) setConversationId(result.conversationId);
-
-      if (result.cards?.length > 0) {
-        result.cards.forEach((card: CardData, i: number) => {
-          setTimeout(() => {
-            setActiveFloatingCards(prev => {
-              if (prev.find(c => c.id === card.id)) return prev;
-              return [...prev, card];
-            });
-          }, i * 300);
-        });
-      }
 
       setAiState('speaking');
       await streamResponse(result.content);
@@ -389,8 +362,6 @@ export function GIA() {
         onToggleHistory={() => { setShowHistory(!showHistory); if (!showHistory) loadConversations(); }}
         onToggleDemo={() => setDemoMode(!demoMode)}
         onCheckConnections={checkConnections}
-        hasCards={activeFloatingCards.length > 0}
-        onToggleCards={() => setShowFloatLayer(!showFloatLayer)}
       />
 
       <div className="flex-1 flex flex-col min-h-0 relative">
@@ -487,11 +458,6 @@ export function GIA() {
           transcribedText={transcribedText}
         />
 
-        <FloatLayer
-          cards={activeFloatingCards}
-          visible={showFloatLayer}
-          onToggle={() => setShowFloatLayer(!showFloatLayer)}
-        />
       </div>
     </div>
   );
@@ -533,8 +499,6 @@ interface GIAHeaderProps {
   onToggleHistory: () => void;
   onToggleDemo: () => void;
   onCheckConnections: () => void;
-  hasCards: boolean;
-  onToggleCards: () => void;
 }
 
 function GIAHeader({
@@ -546,8 +510,6 @@ function GIAHeader({
   onToggleHistory,
   onToggleDemo,
   onCheckConnections,
-  hasCards,
-  onToggleCards,
 }: GIAHeaderProps) {
   return (
     <header
@@ -597,16 +559,6 @@ function GIAHeader({
         >
           {demoMode ? 'DEMO' : 'REAL'}
         </span>
-
-        {hasCards && (
-          <button
-            onClick={onToggleCards}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5 hidden lg:block"
-            title="Painel de dados"
-          >
-            <BarChart3 className="w-3.5 h-3.5" style={{ color: '#A855F7' }} />
-          </button>
-        )}
 
         <button
           onClick={onNewConversation}
