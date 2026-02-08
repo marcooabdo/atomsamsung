@@ -323,8 +323,7 @@ Deno.serve(async (req: Request) => {
       }
 
       const statusAberto = !['concluido', 'entregue', 'cancelado', 'os_fechada'].includes(os.coluna_kanban || '');
-      const statusSamsungAberto = !['REPARO COMPLETO', 'PRODUTO ENTREGUE', 'CANCELADO'].includes(os.status_samsung_desc || '');
-      if (statusAberto && statusSamsungAberto) {
+      if (statusAberto) {
         osEmAberto++;
       }
 
