@@ -343,7 +343,7 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
   return (
     <div
       ref={scrollRef}
-      className="h-full overflow-y-auto px-4 sm:px-8 py-6 space-y-5"
+      className="h-full overflow-y-auto px-4 sm:px-8 pt-8 pb-12 space-y-5"
       style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.08) transparent' }}
     >
       <AnimatePresence mode="popLayout">

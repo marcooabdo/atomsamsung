@@ -92,7 +92,7 @@ export function GIAInputController({
   };
 
   return (
-    <div className="flex-shrink-0 px-4 sm:px-8 pb-5 pt-3">
+    <div className="flex-shrink-0 px-4 sm:px-8 pb-6 pt-4">
       <div className="flex items-center justify-center mb-4 gap-3">
         {isSpeaking && (
           <motion.button
