@@ -198,7 +198,7 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     new Date().toISOString().slice(0, 7) + '-01'
   );
 
-  const isAdmin = usuario?.tipo === 'master' || usuario?.tipo === 'diretor' || usuario?.tipo === 'gerente';
+  const isAdmin = usuario?.tipo === 'master' || usuario?.tipo === 'diretor' || usuario?.tipo === 'gerente' || usuario?.tipo === 'administrador';
 
   const loadProfissionais = useCallback(async () => {
     const { data } = await supabase
