@@ -119,10 +119,10 @@ export function GIACoreVisualizer({ state, compact }: GIACoreVisualizerProps) {
         : 'RESPONDENDO';
 
   const stateColor = isIdle ? '#2d3748' : state === 'listening' ? '#00ffc8' : '#00d2ff';
-  const height = compact ? 100 : 220;
+  const height = compact ? 130 : 220;
 
   return (
-    <div className="relative flex flex-col items-center justify-center overflow-visible" style={{ height }}>
+    <div className="relative flex flex-col items-center justify-center overflow-visible" style={{ height, paddingTop: compact ? 20 : 0 }}>
       <motion.div
         className="absolute rounded-full"
         style={{

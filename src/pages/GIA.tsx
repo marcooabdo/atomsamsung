@@ -372,7 +372,7 @@ export function GIA() {
   const hasMessages = messages.length > 0 || isProcessing;
 
   return (
-    <div className="h-[calc(100vh-48px)] flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
+    <div className="h-screen flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
       <GIAHeader
         aiState={aiState}
         connection={connection}
@@ -382,7 +382,7 @@ export function GIA() {
         onCheckConnections={checkConnections}
       />
 
-      <div className="flex-1 flex flex-col min-h-0 relative">
+      <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
         <AnimatePresence>
           {showHistory && (
             <HistoryPanel
