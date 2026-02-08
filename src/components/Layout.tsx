@@ -31,10 +31,10 @@ interface LayoutProps {
 }
 
 const allMenuItems = [
+  { id: 'gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
   { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
-  { id: 'gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
