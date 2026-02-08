@@ -1,13 +1,25 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { JarvisParticles } from '../components/gia/JarvisParticles';
+import { motion, AnimatePresence } from 'framer-motion';
+import { GIACoreVisualizer } from '../components/gia/GIACoreVisualizer';
 import { GIAConversation, type GIAMessage, type GIACardData } from '../components/gia/GIAConversation';
-import { GIAInputBar } from '../components/gia/GIAInputBar';
-import { ReactiveCards } from '../components/gia/ReactiveCards';
+import { GIAInputController } from '../components/gia/GIAInputController';
+import { FloatLayer } from '../components/gia/FloatLayer';
+import { createMockAIStream } from '../components/gia/mockAIStream';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { speakGia, checkElevenLabsConnection, stopGiaSpeaking, isGiaSpeaking } from '../lib/elevenLabsTTS';
-import { Sparkles, History, Plus, Trash2, X, AlertCircle, Wifi, WifiOff } from 'lucide-react';
+import {
+  Sparkles,
+  History,
+  Plus,
+  Trash2,
+  X,
+  Wifi,
+  WifiOff,
+  AlertCircle,
+  Zap,
+  BarChart3,
+} from 'lucide-react';
 
 type ConnectionStatus = 'checking' | 'connected' | 'partial' | 'error';
 
@@ -20,56 +32,35 @@ interface ConnectionState {
 
 export function GIA() {
   const { usuario } = useAuth();
+  const [currentMode, setCurrentMode] = useState<'voice' | 'text'>('text');
   const [aiState, setAiState] = useState<'idle' | 'listening' | 'thinking' | 'speaking'>('idle');
   const [messages, setMessages] = useState<GIAMessage[]>([]);
   const [streamingText, setStreamingText] = useState('');
-  const [activeCards, setActiveCards] = useState<CardData[]>([]);
-  const [conversationId, setConversationId] = useState<string | null>(null);
+  const [activeFloatingCards, setActiveFloatingCards] = useState<CardData[]>([]);
+  const [showFloatLayer, setShowFloatLayer] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [conversations, setConversations] = useState<{ id: string; titulo: string; updated_at: string }[]>([]);
   const [connection, setConnection] = useState<ConnectionState>({ status: 'checking', chatgpt: false, elevenlabs: false });
   const [isSpeaking, setIsSpeaking] = useState(false);
-  const [voiceEnabled, setVoiceEnabled] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string | undefined>(undefined);
+  const [demoMode, setDemoMode] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const greetedRef = useRef(false);
+  const cancelStreamRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     checkConnections();
   }, []);
 
   useEffect(() => {
-    if (usuario?.id) {
-      loadConversations();
-    }
+    if (usuario?.id) loadConversations();
   }, [usuario?.id]);
-
-  useEffect(() => {
-    if (usuario?.tipo === 'master' && messages.length === 0 && !conversationId && connection.elevenlabs && voiceEnabled && !greetedRef.current) {
-      greetedRef.current = true;
-      const timer = setTimeout(async () => {
-        setIsSpeaking(true);
-        await speakGia('Ola, chefe! Em que posso te ajudar?');
-        setIsSpeaking(false);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [usuario?.tipo, messages.length, conversationId, connection.elevenlabs, voiceEnabled]);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setIsSpeaking(isGiaSpeaking());
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
 
   const checkConnections = async () => {
     setConnection({ status: 'checking', chatgpt: false, elevenlabs: false });
-
     let chatgptOk = false;
-    let elevenlabsOk = false;
     let errorMsg = '';
 
     try {
@@ -85,44 +76,24 @@ export function GIA() {
           },
           body: JSON.stringify({ message: 'ping', conversationId: null, history: [] }),
         });
-
         if (testResponse.ok) {
           chatgptOk = true;
         } else {
           const errData = await testResponse.json().catch(() => ({}));
-          if (errData.error === 'OPENAI_API_KEY not configured') {
-            errorMsg = 'Chave OpenAI nao configurada';
-          } else if (testResponse.status === 401) {
-            errorMsg = errData.details || 'Sessao expirada - faca login novamente';
-          } else if (testResponse.status === 502 && errData.details) {
-            if (errData.details.includes('401') || errData.details.includes('Incorrect API key')) {
-              errorMsg = 'Chave OpenAI invalida ou expirada';
-            } else {
-              errorMsg = 'Erro na API OpenAI';
-            }
-          } else {
-            errorMsg = errData.error || `Erro ${testResponse.status}`;
-          }
+          errorMsg = errData.error || `Erro ${testResponse.status}`;
         }
       } else {
         errorMsg = 'Usuario nao autenticado';
       }
-    } catch (err) {
+    } catch {
       errorMsg = 'Falha ao conectar com o servidor';
     }
 
-    const elevenResult = await checkElevenLabsConnection();
-    elevenlabsOk = elevenResult.ok;
-    if (!elevenlabsOk && !errorMsg) {
-      errorMsg = elevenResult.error || 'Erro ElevenLabs';
-    }
-
-    if (chatgptOk && elevenlabsOk) {
-      setConnection({ status: 'connected', chatgpt: true, elevenlabs: true });
-    } else if (chatgptOk || elevenlabsOk) {
-      setConnection({ status: 'partial', chatgpt: chatgptOk, elevenlabs: elevenlabsOk, error: errorMsg });
+    if (chatgptOk) {
+      setConnection({ status: 'connected', chatgpt: true, elevenlabs: false });
     } else {
       setConnection({ status: 'error', chatgpt: false, elevenlabs: false, error: errorMsg });
+      setDemoMode(true);
     }
   };
 
@@ -143,7 +114,6 @@ export function GIA() {
       .select('id, role, content, metadata, created_at')
       .eq('conversation_id', convId)
       .order('created_at', { ascending: true });
-
     if (data) {
       const loaded: GIAMessage[] = data
         .filter(m => m.role !== 'system')
@@ -156,16 +126,13 @@ export function GIA() {
         }));
       setMessages(loaded);
       setConversationId(convId);
-
       const allCards: CardData[] = [];
       for (const msg of loaded) {
         if (msg.cards) {
-          for (const c of msg.cards) {
-            allCards.push(c as unknown as CardData);
-          }
+          for (const c of msg.cards) allCards.push(c as unknown as CardData);
         }
       }
-      setActiveCards(allCards);
+      setActiveFloatingCards(allCards);
     }
     setShowHistory(false);
   };
@@ -173,41 +140,22 @@ export function GIA() {
   const startNewConversation = () => {
     setMessages([]);
     setConversationId(null);
-    setActiveCards([]);
+    setActiveFloatingCards([]);
     setStreamingText('');
     setAiState('idle');
+    if (cancelStreamRef.current) {
+      cancelStreamRef.current();
+      cancelStreamRef.current = null;
+    }
   };
 
   const deleteConversation = async (convId: string) => {
     await supabase.from('gia_conversations').delete().eq('id', convId);
-    if (conversationId === convId) {
-      startNewConversation();
-    }
+    if (conversationId === convId) startNewConversation();
     loadConversations();
   };
 
-  const streamResponse = useCallback((text: string): Promise<void> => {
-    return new Promise((resolve) => {
-      let i = 0;
-      setStreamingText('');
-      const interval = setInterval(() => {
-        if (i < text.length) {
-          const chunkSize = Math.floor(Math.random() * 4) + 2;
-          const nextChunk = text.slice(i, i + chunkSize);
-          setStreamingText((prev) => prev + nextChunk);
-          i += chunkSize;
-        } else {
-          clearInterval(interval);
-          setStreamingText('');
-          resolve();
-        }
-      }, 25);
-    });
-  }, []);
-
-  const sendMessage = useCallback(async (text: string) => {
-    if (isProcessing || !usuario) return;
-
+  const sendMessageMock = useCallback((text: string) => {
     setIsProcessing(true);
     setTranscribedText(undefined);
 
@@ -218,18 +166,63 @@ export function GIA() {
       timestamp: Date.now(),
     };
     setMessages(prev => [...prev, userMessage]);
+    setAiState('thinking');
 
+    setTimeout(() => {
+      setAiState('speaking');
+      let accumulated = '';
+      const collectedCards: CardData[] = [];
+
+      const cancel = createMockAIStream(
+        (chunk) => {
+          accumulated += chunk;
+          setStreamingText(accumulated);
+        },
+        (card) => {
+          collectedCards.push(card);
+          setActiveFloatingCards(prev => {
+            if (prev.find(c => c.id === card.id)) return prev;
+            return [...prev, card];
+          });
+        },
+        (fullText) => {
+          setStreamingText('');
+          const aiMessage: GIAMessage = {
+            id: `ai-${Date.now()}`,
+            role: 'assistant',
+            content: fullText,
+            cards: collectedCards as unknown as GIACardData[],
+            timestamp: Date.now(),
+          };
+          setMessages(prev => [...prev, aiMessage]);
+          setAiState('idle');
+          setIsProcessing(false);
+          cancelStreamRef.current = null;
+        },
+      );
+      cancelStreamRef.current = cancel;
+    }, 800);
+  }, []);
+
+  const sendMessageAPI = useCallback(async (text: string) => {
+    if (!usuario) return;
+    setIsProcessing(true);
+    setTranscribedText(undefined);
+
+    const userMessage: GIAMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: text,
+      timestamp: Date.now(),
+    };
+    setMessages(prev => [...prev, userMessage]);
     setAiState('thinking');
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const history = messages.slice(-10).map(m => ({
-        role: m.role,
-        content: m.content,
-      }));
-
+      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gia-chat`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -238,27 +231,15 @@ export function GIA() {
           'Content-Type': 'application/json',
           'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
-        body: JSON.stringify({
-          message: text,
-          conversationId,
-          history,
-        }),
+        body: JSON.stringify({ message: text, conversationId, history }),
       });
 
       const result = await response.json();
-
       if (!response.ok) {
-        let errorContent = '';
-        if (result.error === 'OPENAI_API_KEY not configured') {
-          errorContent = 'A chave da API OpenAI ainda nao foi configurada. Peca ao administrador para adicionar a OPENAI_API_KEY na tabela system_secrets do Supabase.';
-        } else {
-          errorContent = `Desculpe, ocorreu um erro: ${result.error || 'desconhecido'}`;
-          if (result.details) errorContent += `\n\nDetalhes: ${typeof result.details === 'string' ? result.details : JSON.stringify(result.details)}`;
-        }
         const errMsg: GIAMessage = {
           id: `err-${Date.now()}`,
           role: 'assistant',
-          content: errorContent,
+          content: `Erro: ${result.error || 'desconhecido'}`,
           timestamp: Date.now(),
         };
         setMessages(prev => [...prev, errMsg]);
@@ -267,18 +248,12 @@ export function GIA() {
         return;
       }
 
-      if (result.conversationId && !conversationId) {
-        setConversationId(result.conversationId);
-      }
+      if (result.conversationId && !conversationId) setConversationId(result.conversationId);
 
-      if (result.cards && result.cards.length > 0) {
-        const newCards = result.cards.map((c: Record<string, unknown>, i: number) => ({
-          ...c,
-          delay: i * 300,
-        }));
-        newCards.forEach((card: CardData, i: number) => {
+      if (result.cards?.length > 0) {
+        result.cards.forEach((card: CardData, i: number) => {
           setTimeout(() => {
-            setActiveCards(prev => {
+            setActiveFloatingCards(prev => {
               if (prev.find(c => c.id === card.id)) return prev;
               return [...prev, card];
             });
@@ -288,11 +263,6 @@ export function GIA() {
 
       setAiState('speaking');
       await streamResponse(result.content);
-
-      if (voiceEnabled) {
-        setIsSpeaking(true);
-        speakGia(result.content).finally(() => setIsSpeaking(false));
-      }
 
       const aiMessage: GIAMessage = {
         id: `ai-${Date.now()}`,
@@ -308,7 +278,7 @@ export function GIA() {
       const errMsg: GIAMessage = {
         id: `err-${Date.now()}`,
         role: 'assistant',
-        content: `Erro de conexao: ${err instanceof Error ? err.message : 'Verifique sua internet e tente novamente.'}`,
+        content: `Erro de conexao: ${err instanceof Error ? err.message : 'Verifique sua internet.'}`,
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, errMsg]);
@@ -316,7 +286,35 @@ export function GIA() {
     } finally {
       setIsProcessing(false);
     }
-  }, [isProcessing, usuario, messages, conversationId, streamResponse, voiceEnabled]);
+  }, [usuario, messages, conversationId]);
+
+  const streamResponse = useCallback((text: string): Promise<void> => {
+    return new Promise((resolve) => {
+      let i = 0;
+      setStreamingText('');
+      const interval = setInterval(() => {
+        if (i < text.length) {
+          const chunkSize = Math.floor(Math.random() * 4) + 2;
+          const nextChunk = text.slice(i, i + chunkSize);
+          setStreamingText(prev => prev + nextChunk);
+          i += chunkSize;
+        } else {
+          clearInterval(interval);
+          setStreamingText('');
+          resolve();
+        }
+      }, 22);
+    });
+  }, []);
+
+  const sendMessage = useCallback((text: string) => {
+    if (isProcessing) return;
+    if (demoMode || connection.status !== 'connected') {
+      sendMessageMock(text);
+    } else {
+      sendMessageAPI(text);
+    }
+  }, [isProcessing, demoMode, connection.status, sendMessageMock, sendMessageAPI]);
 
   const toggleMicrophone = useCallback(() => {
     if (isListening) {
@@ -324,19 +322,18 @@ export function GIA() {
       setIsListening(false);
       return;
     }
+    const SR = (window as unknown as Record<string, unknown>).SpeechRecognition ||
+      (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
+    if (!SR) return;
 
-    const SpeechRecognition = (window as unknown as Record<string, unknown>).SpeechRecognition || (window as unknown as Record<string, unknown>).webkitSpeechRecognition;
-    if (!SpeechRecognition) return;
-
-    const recognition = new (SpeechRecognition as new () => SpeechRecognition)();
+    const recognition = new (SR as new () => SpeechRecognition)();
     recognition.lang = 'pt-BR';
     recognition.continuous = false;
     recognition.interimResults = false;
-
     recognition.onresult = (event: SpeechRecognitionEvent) => {
       const transcript = event.results[0][0].transcript;
       if (transcript.trim()) {
-        if (voiceEnabled) {
+        if (currentMode === 'voice') {
           sendMessage(transcript.trim());
         } else {
           setTranscribedText(transcript.trim());
@@ -344,232 +341,78 @@ export function GIA() {
       }
       setIsListening(false);
     };
-
-    recognition.onerror = () => {
-      setIsListening(false);
-    };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-
+    recognition.onerror = () => setIsListening(false);
+    recognition.onend = () => setIsListening(false);
     recognitionRef.current = recognition;
     recognition.start();
     setIsListening(true);
     setAiState('listening');
-  }, [isListening, sendMessage, voiceEnabled]);
-
-  const toggleVoice = useCallback(() => {
-    setVoiceEnabled(prev => !prev);
-    if (isSpeaking) {
-      stopGiaSpeaking();
-      setIsSpeaking(false);
-    }
-  }, [isSpeaking]);
+  }, [isListening, currentMode, sendMessage]);
 
   const handleStopSpeaking = useCallback(() => {
-    stopGiaSpeaking();
+    if (cancelStreamRef.current) {
+      cancelStreamRef.current();
+      cancelStreamRef.current = null;
+    }
     setIsSpeaking(false);
+    setAiState('idle');
+    setStreamingText('');
+    setIsProcessing(false);
   }, []);
 
-  const isActive = connection.status === 'connected' || connection.status === 'partial';
+  const isActive = connection.status === 'connected' || demoMode;
+  const hasMessages = messages.length > 0 || isProcessing;
 
   return (
     <div className="h-[calc(100vh-48px)] flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
-      <header className="flex-shrink-0 flex items-center justify-between px-6 py-3 z-10"
-        style={{ background: 'rgba(6,10,16,0.8)', borderBottom: '1px solid rgba(255,255,255,0.04)', backdropFilter: 'blur(20px)' }}>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{
-                background: 'linear-gradient(135deg, rgba(0,210,255,0.15), rgba(0,255,200,0.08))',
-                border: '1px solid rgba(0,210,255,0.25)',
-                boxShadow: isActive ? '0 0 20px rgba(0,210,255,0.15)' : 'none',
-              }}>
-              <Sparkles className="w-4 h-4" style={{ color: '#00d2ff' }} />
+      <GIAHeader
+        aiState={aiState}
+        isActive={isActive}
+        demoMode={demoMode}
+        connection={connection}
+        showHistory={showHistory}
+        onNewConversation={startNewConversation}
+        onToggleHistory={() => { setShowHistory(!showHistory); if (!showHistory) loadConversations(); }}
+        onToggleDemo={() => setDemoMode(!demoMode)}
+        onCheckConnections={checkConnections}
+        hasCards={activeFloatingCards.length > 0}
+        onToggleCards={() => setShowFloatLayer(!showFloatLayer)}
+      />
+
+      <div className="flex-1 flex flex-col min-h-0 relative">
+        <AnimatePresence>
+          {showHistory && (
+            <HistoryPanel
+              conversations={conversations}
+              conversationId={conversationId}
+              onLoad={loadConversation}
+              onDelete={deleteConversation}
+              onClose={() => setShowHistory(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        {!hasMessages ? (
+          <div className="flex-1 flex flex-col items-center justify-center relative">
+            <div className="absolute inset-0 overflow-hidden">
+              <GridBackground />
             </div>
-            <div className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
-              style={{
-                background: isActive ? '#00d2ff' : '#374151',
-                boxShadow: isActive ? '0 0 6px #00d2ff' : 'none',
-              }} />
-          </div>
-          <div>
-            <h1 className="text-base font-bold tracking-wide" style={{ color: '#e2e8f0' }}>GIA</h1>
-            <p className="text-[9px] tracking-widest uppercase font-medium" style={{ color: '#475569' }}>
-              Global Intelligence Assistant
-            </p>
-          </div>
-        </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={startNewConversation}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
-            title="Nova conversa"
-          >
-            <Plus className="w-4 h-4" style={{ color: '#64748b' }} />
-          </button>
-          <button
-            onClick={() => { setShowHistory(!showHistory); if (!showHistory) loadConversations(); }}
-            className="p-2 rounded-lg transition-colors hover:bg-white/5"
-            title="Historico"
-          >
-            <History className="w-4 h-4" style={{ color: '#64748b' }} />
-          </button>
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg ml-2 cursor-pointer group relative"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-            onClick={checkConnections}
-            title="Clique para verificar conexao"
-          >
-            {connection.status === 'checking' ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#f59e0b' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#f59e0b' }}>
-                  Verificando...
-                </span>
-              </>
-            ) : connection.status === 'error' ? (
-              <>
-                <WifiOff className="w-3 h-3" style={{ color: '#ef4444' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#ef4444' }}>
-                  Desconectado
-                </span>
-              </>
-            ) : connection.status === 'partial' ? (
-              <>
-                <AlertCircle className="w-3 h-3" style={{ color: '#f59e0b' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#f59e0b' }}>
-                  Parcial
-                </span>
-              </>
-            ) : aiState === 'thinking' ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00d2ff' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#00d2ff' }}>
-                  Analisando
-                </span>
-              </>
-            ) : aiState === 'speaking' ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#10b981' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#10b981' }}>
-                  Respondendo
-                </span>
-              </>
-            ) : aiState === 'listening' ? (
-              <>
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#8b5cf6' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#8b5cf6' }}>
-                  Ouvindo
-                </span>
-              </>
-            ) : (
-              <>
-                <Wifi className="w-3 h-3" style={{ color: '#10b981' }} />
-                <span className="text-[10px] uppercase tracking-widest font-medium" style={{ color: '#10b981' }}>
-                  Conectado
-                </span>
-              </>
-            )}
+            <div className="relative z-10 flex flex-col items-center">
+              <GIACoreVisualizer state={aiState} mode={currentMode} />
 
-            {(connection.status === 'error' || connection.status === 'partial') && connection.error && (
-              <div className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64"
-                style={{ background: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)' }}>
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
-                  <div>
-                    <p className="text-xs font-medium text-red-400 mb-1">Erro de Conexao</p>
-                    <p className="text-[10px]" style={{ color: '#94a3b8' }}>{connection.error}</p>
-                    <div className="flex gap-3 mt-2 text-[9px]">
-                      <span style={{ color: connection.chatgpt ? '#10b981' : '#ef4444' }}>
-                        ChatGPT: {connection.chatgpt ? 'OK' : 'ERRO'}
-                      </span>
-                      <span style={{ color: connection.elevenlabs ? '#10b981' : '#ef4444' }}>
-                        Voz: {connection.elevenlabs ? 'OK' : 'ERRO'}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="flex-1 flex min-h-0 relative">
-        {showHistory && (
-          <div className="absolute inset-0 z-20 flex">
-            <div className="w-80 h-full flex flex-col"
-              style={{ background: 'rgba(6,10,16,0.98)', borderRight: '1px solid rgba(255,255,255,0.06)' }}>
-              <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
-                <span className="text-xs font-semibold tracking-wide uppercase" style={{ color: '#64748b' }}>
-                  Conversas anteriores
-                </span>
-                <button onClick={() => setShowHistory(false)} className="p-1 rounded hover:bg-white/5">
-                  <X className="w-4 h-4" style={{ color: '#64748b' }} />
-                </button>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {conversations.length === 0 && (
-                  <p className="text-center text-xs py-8" style={{ color: '#374151' }}>Nenhuma conversa ainda</p>
-                )}
-                {conversations.map(conv => (
-                  <div
-                    key={conv.id}
-                    className="flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors hover:bg-white/3 group"
-                    style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.03)',
-                      background: conversationId === conv.id ? 'rgba(0,210,255,0.05)' : 'transparent',
-                    }}
-                    onClick={() => loadConversation(conv.id)}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-medium truncate" style={{ color: '#c8d6e5' }}>
-                        {conv.titulo || 'Conversa sem titulo'}
-                      </p>
-                      <p className="text-[10px] mt-0.5" style={{ color: '#374151' }}>
-                        {new Date(conv.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }}
-                      className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
-                    >
-                      <Trash2 className="w-3 h-3 text-gray-600 hover:text-red-400" />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex-1" onClick={() => setShowHistory(false)} />
-          </div>
-        )}
-
-        <div className="flex-1 flex flex-col min-w-0 relative">
-          {messages.length === 0 && !isProcessing ? (
-            <div className="flex-1 flex flex-col items-center justify-center relative">
-              <div className="absolute inset-0">
-                <JarvisParticles state={aiState} />
-              </div>
-
-              <div className="relative z-10 text-center px-8">
-                <div className="mb-6">
-                  <div className="w-16 h-16 mx-auto rounded-2xl flex items-center justify-center mb-4"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0,210,255,0.12), rgba(0,255,200,0.06))',
-                      border: '1px solid rgba(0,210,255,0.2)',
-                      boxShadow: '0 0 40px rgba(0,210,255,0.1)',
-                    }}>
-                    <Sparkles className="w-7 h-7" style={{ color: '#00d2ff' }} />
-                  </div>
-                  <h2 className="text-xl font-bold mb-1" style={{ color: '#e2e8f0' }}>
-                    Ola, {usuario?.nome?.split(' ')[0] || 'Usuario'}
-                  </h2>
-                  <p className="text-sm" style={{ color: '#475569' }}>
-                    Como posso ajudar voce hoje?
-                  </p>
-                </div>
+              <motion.div
+                className="text-center mt-2 px-8"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h2 className="text-xl font-bold mb-1.5" style={{ color: '#e2e8f0' }}>
+                  {usuario?.nome?.split(' ')[0] || 'Usuario'}
+                </h2>
+                <p className="text-sm mb-6" style={{ color: '#374151' }}>
+                  Como posso ajudar voce hoje?
+                </p>
 
                 <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                   {[
@@ -578,34 +421,36 @@ export function GIA() {
                     'Quais pecas estao em falta?',
                     'Produtividade da equipe',
                   ].map((suggestion) => (
-                    <button
+                    <motion.button
                       key={suggestion}
                       onClick={() => sendMessage(suggestion)}
-                      className="px-4 py-2 rounded-xl text-xs font-medium transition-all hover:scale-[1.02]"
+                      className="px-4 py-2.5 rounded-xl text-xs font-medium"
                       style={{
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)',
-                        color: '#94a3b8',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.06)',
+                        color: '#64748b',
                       }}
-                      onMouseEnter={(e) => {
-                        e.currentTarget.style.background = 'rgba(0,210,255,0.08)';
-                        e.currentTarget.style.borderColor = 'rgba(0,210,255,0.2)';
-                        e.currentTarget.style.color = '#00d2ff';
+                      whileHover={{
+                        background: 'rgba(0,210,255,0.06)',
+                        borderColor: 'rgba(0,210,255,0.2)',
+                        color: '#00d2ff',
+                        scale: 1.02,
                       }}
-                      onMouseLeave={(e) => {
-                        e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                        e.currentTarget.style.color = '#94a3b8';
-                      }}
+                      whileTap={{ scale: 0.98 }}
                     >
                       {suggestion}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
-              </div>
+              </motion.div>
             </div>
-          ) : (
-            <div className="flex-1 flex flex-col min-h-0">
+          </div>
+        ) : (
+          <>
+            <div className="flex-shrink-0">
+              <GIACoreVisualizer state={aiState} mode={currentMode} compact />
+            </div>
+            <div className="flex-1 min-h-0">
               <GIAConversation
                 messages={messages}
                 streamingText={streamingText}
@@ -613,42 +458,294 @@ export function GIA() {
                 userName={usuario?.nome?.split(' ')[0] || 'Voce'}
               />
             </div>
-          )}
-
-          <div className="relative z-10">
-            <GIAInputBar
-              onSend={sendMessage}
-              disabled={isProcessing}
-              isListening={isListening}
-              onMicToggle={toggleMicrophone}
-              voiceEnabled={voiceEnabled}
-              onVoiceToggle={toggleVoice}
-              isSpeaking={isSpeaking}
-              onStopSpeaking={handleStopSpeaking}
-              transcribedText={transcribedText}
-            />
-          </div>
-        </div>
-
-        {activeCards.length > 0 && (
-          <div className="w-[360px] flex-shrink-0 border-l hidden lg:block"
-            style={{ borderColor: 'rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.2)' }}>
-            <div className="h-11 flex items-center px-4 border-b"
-              style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-              <span className="text-[10px] uppercase tracking-widest font-semibold" style={{ color: '#475569' }}>
-                Dados em Tempo Real
-              </span>
-              <span className="ml-auto text-[10px] tabular-nums px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(0,210,255,0.1)', color: '#00d2ff', border: '1px solid rgba(0,210,255,0.15)' }}>
-                {activeCards.length}
-              </span>
-            </div>
-            <div className="h-[calc(100%-44px)]">
-              <ReactiveCards cards={activeCards} />
-            </div>
-          </div>
+          </>
         )}
+
+        <GIAInputController
+          mode={currentMode}
+          onModeChange={setCurrentMode}
+          onSend={sendMessage}
+          disabled={isProcessing}
+          isListening={isListening}
+          onMicToggle={toggleMicrophone}
+          isSpeaking={isSpeaking}
+          onStopSpeaking={handleStopSpeaking}
+          transcribedText={transcribedText}
+        />
+
+        <FloatLayer
+          cards={activeFloatingCards}
+          visible={showFloatLayer}
+          onToggle={() => setShowFloatLayer(!showFloatLayer)}
+        />
       </div>
     </div>
+  );
+}
+
+function GridBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden opacity-[0.03]">
+      <div
+        className="absolute inset-0"
+        style={{
+          backgroundImage: `
+            linear-gradient(rgba(0,210,255,0.3) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(0,210,255,0.3) 1px, transparent 1px)
+          `,
+          backgroundSize: '60px 60px',
+        }}
+      />
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(180deg, transparent 0%, rgba(0,210,255,0.08) 50%, transparent 100%)',
+          height: '200%',
+        }}
+        animate={{ y: ['-50%', '0%'] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+      />
+    </div>
+  );
+}
+
+interface GIAHeaderProps {
+  aiState: string;
+  isActive: boolean;
+  demoMode: boolean;
+  connection: ConnectionState;
+  showHistory: boolean;
+  onNewConversation: () => void;
+  onToggleHistory: () => void;
+  onToggleDemo: () => void;
+  onCheckConnections: () => void;
+  hasCards: boolean;
+  onToggleCards: () => void;
+}
+
+function GIAHeader({
+  aiState,
+  isActive,
+  demoMode,
+  connection,
+  onNewConversation,
+  onToggleHistory,
+  onToggleDemo,
+  onCheckConnections,
+  hasCards,
+  onToggleCards,
+}: GIAHeaderProps) {
+  return (
+    <header
+      className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 z-10"
+      style={{
+        background: 'rgba(6,10,16,0.85)',
+        borderBottom: '1px solid rgba(0,210,255,0.04)',
+        backdropFilter: 'blur(20px)',
+      }}
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <div
+            className="w-8 h-8 rounded-xl flex items-center justify-center"
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,210,255,0.12), rgba(0,255,200,0.06))',
+              border: '1px solid rgba(0,210,255,0.2)',
+              boxShadow: isActive ? '0 0 15px rgba(0,210,255,0.12)' : 'none',
+            }}
+          >
+            <Sparkles className="w-3.5 h-3.5" style={{ color: '#00d2ff' }} />
+          </div>
+          <div
+            className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
+            style={{
+              background: isActive ? '#00d2ff' : '#374151',
+              boxShadow: isActive ? '0 0 6px #00d2ff' : 'none',
+            }}
+          />
+        </div>
+        <div>
+          <h1 className="text-sm font-bold tracking-wide" style={{ color: '#e2e8f0' }}>GIA</h1>
+          <p className="text-[8px] tracking-[0.2em] uppercase font-medium" style={{ color: '#374151' }}>
+            Global Intelligence Assistant
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5">
+        {demoMode && (
+          <span
+            className="text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-lg mr-1"
+            style={{
+              background: 'rgba(245,158,11,0.1)',
+              color: '#f59e0b',
+              border: '1px solid rgba(245,158,11,0.15)',
+            }}
+          >
+            DEMO
+          </span>
+        )}
+
+        {hasCards && (
+          <button
+            onClick={onToggleCards}
+            className="p-2 rounded-lg transition-colors hover:bg-white/5 hidden lg:block"
+            title="Painel de dados"
+          >
+            <BarChart3 className="w-3.5 h-3.5" style={{ color: '#00d2ff' }} />
+          </button>
+        )}
+
+        <button
+          onClick={onNewConversation}
+          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          title="Nova conversa"
+        >
+          <Plus className="w-3.5 h-3.5" style={{ color: '#4a5568' }} />
+        </button>
+
+        <button
+          onClick={onToggleHistory}
+          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          title="Historico"
+        >
+          <History className="w-3.5 h-3.5" style={{ color: '#4a5568' }} />
+        </button>
+
+        <button
+          onClick={onToggleDemo}
+          className="p-2 rounded-lg transition-colors hover:bg-white/5"
+          title={demoMode ? 'Desativar modo demo' : 'Ativar modo demo'}
+        >
+          <Zap className="w-3.5 h-3.5" style={{ color: demoMode ? '#f59e0b' : '#4a5568' }} />
+        </button>
+
+        <div
+          className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ml-1 cursor-pointer group relative"
+          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+          onClick={onCheckConnections}
+          title="Verificar conexao"
+        >
+          {connection.status === 'checking' ? (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#f59e0b' }} />
+              <span className="text-[9px] tracking-widest uppercase font-medium" style={{ color: '#f59e0b' }}>
+                ...
+              </span>
+            </>
+          ) : connection.status === 'error' ? (
+            <>
+              <WifiOff className="w-3 h-3" style={{ color: '#4a5568' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#4a5568' }}>OFF</span>
+            </>
+          ) : aiState === 'thinking' ? (
+            <>
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00d2ff' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+                PROC
+              </span>
+            </>
+          ) : (
+            <>
+              <Wifi className="w-3 h-3" style={{ color: '#10b981' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#10b981' }}>ON</span>
+            </>
+          )}
+
+          {connection.status === 'error' && connection.error && (
+            <div
+              className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56"
+              style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                <div>
+                  <p className="text-[10px] font-medium text-red-400 mb-1">Erro de Conexao</p>
+                  <p className="text-[9px]" style={{ color: '#64748b' }}>{connection.error}</p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}
+
+interface HistoryPanelProps {
+  conversations: { id: string; titulo: string; updated_at: string }[];
+  conversationId: string | null;
+  onLoad: (id: string) => void;
+  onDelete: (id: string) => void;
+  onClose: () => void;
+}
+
+function HistoryPanel({ conversations, conversationId, onLoad, onDelete, onClose }: HistoryPanelProps) {
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="absolute inset-0 z-40 flex"
+    >
+      <motion.div
+        initial={{ x: -300 }}
+        animate={{ x: 0 }}
+        exit={{ x: -300 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="w-72 h-full flex flex-col"
+        style={{
+          background: 'rgba(6,10,16,0.98)',
+          borderRight: '1px solid rgba(0,210,255,0.06)',
+          backdropFilter: 'blur(20px)',
+        }}
+      >
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(0,210,255,0.04)' }}>
+          <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: '#4a5568' }}>
+            Historico
+          </span>
+          <button onClick={onClose} className="p-1 rounded hover:bg-white/5">
+            <X className="w-3.5 h-3.5" style={{ color: '#4a5568' }} />
+          </button>
+        </div>
+        <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.06) transparent' }}>
+          {conversations.length === 0 && (
+            <p className="text-center text-[11px] py-8" style={{ color: '#2d3748' }}>Nenhuma conversa</p>
+          )}
+          {conversations.map(conv => (
+            <div
+              key={conv.id}
+              className="flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors hover:bg-white/[0.02] group"
+              style={{
+                borderBottom: '1px solid rgba(255,255,255,0.02)',
+                background: conversationId === conv.id ? 'rgba(0,210,255,0.04)' : 'transparent',
+              }}
+              onClick={() => onLoad(conv.id)}
+            >
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-medium truncate" style={{ color: '#94a3b8' }}>
+                  {conv.titulo || 'Conversa sem titulo'}
+                </p>
+                <p className="text-[10px] mt-0.5" style={{ color: '#2d3748' }}>
+                  {new Date(conv.updated_at).toLocaleDateString('pt-BR', {
+                    day: '2-digit',
+                    month: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </p>
+              </div>
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(conv.id); }}
+                className="p-1 rounded opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-500/20"
+              >
+                <Trash2 className="w-3 h-3 text-gray-700 hover:text-red-400" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+      <div className="flex-1" onClick={onClose} />
+    </motion.div>
   );
 }
