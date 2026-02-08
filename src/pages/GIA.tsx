@@ -85,15 +85,15 @@ export function GIA() {
       } else {
         errorMsg = 'Usuario nao autenticado';
       }
-    } catch {
-      errorMsg = 'Falha ao conectar com o servidor';
+    } catch (err) {
+      errorMsg = err instanceof Error ? err.message : 'Falha ao conectar com o servidor';
     }
 
     if (chatgptOk) {
       setConnection({ status: 'connected', chatgpt: true, elevenlabs: false });
+      setDemoMode(false);
     } else {
-      setConnection({ status: 'error', chatgpt: false, elevenlabs: false, error: errorMsg });
-      setDemoMode(true);
+      setConnection({ status: 'partial', chatgpt: false, elevenlabs: false, error: errorMsg });
     }
   };
 
@@ -309,12 +309,12 @@ export function GIA() {
 
   const sendMessage = useCallback((text: string) => {
     if (isProcessing) return;
-    if (demoMode || connection.status !== 'connected') {
+    if (demoMode) {
       sendMessageMock(text);
     } else {
       sendMessageAPI(text);
     }
-  }, [isProcessing, demoMode, connection.status, sendMessageMock, sendMessageAPI]);
+  }, [isProcessing, demoMode, sendMessageMock, sendMessageAPI]);
 
   const toggleMicrophone = useCallback(() => {
     if (isListening) {
@@ -360,7 +360,7 @@ export function GIA() {
     setIsProcessing(false);
   }, []);
 
-  const isActive = connection.status === 'connected' || demoMode;
+  const isActive = !demoMode;
   const hasMessages = messages.length > 0 || isProcessing;
 
   return (
@@ -431,9 +431,9 @@ export function GIA() {
                         color: '#64748b',
                       }}
                       whileHover={{
-                        background: 'rgba(0,210,255,0.06)',
-                        borderColor: 'rgba(0,210,255,0.2)',
-                        color: '#00d2ff',
+                        background: 'rgba(168,85,247,0.08)',
+                        borderColor: 'rgba(168,85,247,0.25)',
+                        color: '#A855F7',
                         scale: 1.02,
                       }}
                       whileTap={{ scale: 0.98 }}
@@ -490,8 +490,8 @@ function GridBackground() {
         className="absolute inset-0"
         style={{
           backgroundImage: `
-            linear-gradient(rgba(0,210,255,0.3) 1px, transparent 1px),
-            linear-gradient(90deg, rgba(0,210,255,0.3) 1px, transparent 1px)
+            linear-gradient(rgba(168,85,247,0.3) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(168,85,247,0.3) 1px, transparent 1px)
           `,
           backgroundSize: '60px 60px',
         }}
@@ -499,7 +499,7 @@ function GridBackground() {
       <motion.div
         className="absolute inset-0"
         style={{
-          background: 'linear-gradient(180deg, transparent 0%, rgba(0,210,255,0.08) 50%, transparent 100%)',
+          background: 'linear-gradient(180deg, transparent 0%, rgba(168,85,247,0.08) 50%, transparent 100%)',
           height: '200%',
         }}
         animate={{ y: ['-50%', '0%'] }}
@@ -540,7 +540,7 @@ function GIAHeader({
       className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 z-10"
       style={{
         background: 'rgba(6,10,16,0.85)',
-        borderBottom: '1px solid rgba(0,210,255,0.04)',
+        borderBottom: '1px solid rgba(168,85,247,0.08)',
         backdropFilter: 'blur(20px)',
       }}
     >
@@ -549,18 +549,18 @@ function GIAHeader({
           <div
             className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{
-              background: 'linear-gradient(135deg, rgba(0,210,255,0.12), rgba(0,255,200,0.06))',
-              border: '1px solid rgba(0,210,255,0.2)',
-              boxShadow: isActive ? '0 0 15px rgba(0,210,255,0.12)' : 'none',
+              background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(192,132,252,0.06))',
+              border: '1px solid rgba(168,85,247,0.2)',
+              boxShadow: isActive ? '0 0 15px rgba(168,85,247,0.15)' : 'none',
             }}
           >
-            <Sparkles className="w-3.5 h-3.5" style={{ color: '#00d2ff' }} />
+            <Sparkles className="w-3.5 h-3.5" style={{ color: '#A855F7' }} />
           </div>
           <div
             className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
             style={{
-              background: isActive ? '#00d2ff' : '#374151',
-              boxShadow: isActive ? '0 0 6px #00d2ff' : 'none',
+              background: isActive ? '#A855F7' : '#374151',
+              boxShadow: isActive ? '0 0 6px #A855F7' : 'none',
             }}
           />
         </div>
@@ -573,18 +573,16 @@ function GIAHeader({
       </div>
 
       <div className="flex items-center gap-1.5">
-        {demoMode && (
-          <span
-            className="text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-lg mr-1"
-            style={{
-              background: 'rgba(245,158,11,0.1)',
-              color: '#f59e0b',
-              border: '1px solid rgba(245,158,11,0.15)',
-            }}
-          >
-            DEMO
-          </span>
-        )}
+        <span
+          className="text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-lg mr-1"
+          style={{
+            background: demoMode ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
+            color: demoMode ? '#f59e0b' : '#10b981',
+            border: demoMode ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(16,185,129,0.15)',
+          }}
+        >
+          {demoMode ? 'DEMO' : 'REAL'}
+        </span>
 
         {hasCards && (
           <button
@@ -592,7 +590,7 @@ function GIAHeader({
             className="p-2 rounded-lg transition-colors hover:bg-white/5 hidden lg:block"
             title="Painel de dados"
           >
-            <BarChart3 className="w-3.5 h-3.5" style={{ color: '#00d2ff' }} />
+            <BarChart3 className="w-3.5 h-3.5" style={{ color: '#A855F7' }} />
           </button>
         )}
 
@@ -615,9 +613,9 @@ function GIAHeader({
         <button
           onClick={onToggleDemo}
           className="p-2 rounded-lg transition-colors hover:bg-white/5"
-          title={demoMode ? 'Desativar modo demo' : 'Ativar modo demo'}
+          title={demoMode ? 'Mudar para modo REAL (conectado ao banco)' : 'Mudar para modo DEMO (respostas simuladas)'}
         >
-          <Zap className="w-3.5 h-3.5" style={{ color: demoMode ? '#f59e0b' : '#4a5568' }} />
+          <Zap className="w-3.5 h-3.5" style={{ color: demoMode ? '#f59e0b' : '#10b981' }} />
         </button>
 
         <div
@@ -633,28 +631,33 @@ function GIAHeader({
                 ...
               </span>
             </>
-          ) : connection.status === 'error' ? (
+          ) : demoMode ? (
             <>
-              <WifiOff className="w-3 h-3" style={{ color: '#4a5568' }} />
-              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#4a5568' }}>OFF</span>
+              <AlertCircle className="w-3 h-3" style={{ color: '#f59e0b' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#f59e0b' }}>SIMULADO</span>
+            </>
+          ) : connection.status === 'partial' ? (
+            <>
+              <WifiOff className="w-3 h-3" style={{ color: '#ef4444' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#ef4444' }}>ERRO</span>
             </>
           ) : aiState === 'thinking' ? (
             <>
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#00d2ff' }} />
-              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: '#A855F7' }} />
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#A855F7' }}>
                 PROC
               </span>
             </>
           ) : (
             <>
               <Wifi className="w-3 h-3" style={{ color: '#10b981' }} />
-              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#10b981' }}>ON</span>
+              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#10b981' }}>BANCO OK</span>
             </>
           )}
 
-          {connection.status === 'error' && connection.error && (
+          {(connection.status === 'error' || connection.status === 'partial') && connection.error && (
             <div
-              className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-56"
+              className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64"
               style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)' }}
             >
               <div className="flex items-start gap-2">
@@ -662,6 +665,9 @@ function GIAHeader({
                 <div>
                   <p className="text-[10px] font-medium text-red-400 mb-1">Erro de Conexao</p>
                   <p className="text-[9px]" style={{ color: '#64748b' }}>{connection.error}</p>
+                  <p className="text-[9px] mt-2" style={{ color: '#64748b' }}>
+                    Clique no botao de raio para ativar o modo REAL
+                  </p>
                 </div>
               </div>
             </div>
@@ -696,11 +702,11 @@ function HistoryPanel({ conversations, conversationId, onLoad, onDelete, onClose
         className="w-72 h-full flex flex-col"
         style={{
           background: 'rgba(6,10,16,0.98)',
-          borderRight: '1px solid rgba(0,210,255,0.06)',
+          borderRight: '1px solid rgba(168,85,247,0.08)',
           backdropFilter: 'blur(20px)',
         }}
       >
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(0,210,255,0.04)' }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(168,85,247,0.06)' }}>
           <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: '#4a5568' }}>
             Historico
           </span>
@@ -718,7 +724,7 @@ function HistoryPanel({ conversations, conversationId, onLoad, onDelete, onClose
               className="flex items-center gap-2 px-4 py-3 cursor-pointer transition-colors hover:bg-white/[0.02] group"
               style={{
                 borderBottom: '1px solid rgba(255,255,255,0.02)',
-                background: conversationId === conv.id ? 'rgba(0,210,255,0.04)' : 'transparent',
+                background: conversationId === conv.id ? 'rgba(168,85,247,0.06)' : 'transparent',
               }}
               onClick={() => onLoad(conv.id)}
             >
