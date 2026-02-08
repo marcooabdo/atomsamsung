@@ -137,7 +137,7 @@ export function GIA() {
 
   const getGreetingText = useCallback(() => {
     if (!usuario) return 'Ola! Como posso ajudar?';
-    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marco.abdo@gmail.com' || usuario.email?.includes('marco.abdo');
+    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marcoabdo@roupglobal.com.br' || usuario.email?.includes('marcoabdo@roupglobal.com.br');
     const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
     return `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
   }, [usuario]);
