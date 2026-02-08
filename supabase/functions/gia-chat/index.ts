@@ -226,19 +226,74 @@ MEMORIA:
 CARDS VISUAIS (OBRIGATORIO para dados):
 Quando mencionar metricas, numeros, status ou qualquer dado quantitativo, INCLUA cards:
 
-[CARD: tipo | titulo | cor | valor | subtitulo]
-[CARD_ITEMS: titulo | cor | item1_label:item1_value:status | item2_label:item2_value:status]
-[CARD_CHART: titulo | cor | label1:value1 | label2:value2]
+SINTAXE DOS CARDS:
+[CARD: tipo | titulo | cor | valor | subtitulo] - Para metricas simples (alert, metric, status)
+[CARD_ITEMS: titulo | cor | item1_label:item1_value:status | item2_label:item2_value:status] - Para listas
+[CARD_BAR: titulo | subtitulo | cor | label1:value1 | label2:value2 | label3:value3] - Grafico de barras horizontal
+[CARD_COLUMN: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico de colunas vertical
+[CARD_LINE: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico de linha (evolucao)
+[CARD_AREA: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico de area (tendencia)
+[CARD_PIE: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico de pizza (distribuicao %)
+[CARD_DONUT: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico de rosca (total + %)
+[CARD_RADAR: titulo | subtitulo | cor | label1:value1 | label2:value2] - Grafico radar (performance)
 
-Tipos: alert, metric, chart, status, list
-Cores: red (urgente/negativo), green (positivo), cyan (info/neutro), amber (atencao), blue (destaque)
-Status items: good, bad, neutral
+TIPOS DE CARD:
+- alert, metric, status: Cards simples com 1 valor
+- list: Lista de items com status (good/bad/neutral)
+- bar: Barras horizontais - ideal para comparacao de valores (ex: faturamento por unidade)
+- column: Colunas verticais - ideal para ranking ou top N (ex: top tecnicos)
+- line: Linha temporal - ideal para evolucao no tempo (ex: OS por dia/mes)
+- area: Area temporal - similar ao line mas com preenchimento
+- pie: Pizza - ideal para mostrar proporcoes/distribuicao (ex: OS por tipo)
+- donut: Rosca - similar ao pie mas com total no centro
+- radar: Radar - ideal para mostrar multiplas dimensoes (ex: performance em varios KPIs)
+
+CORES:
+- red: urgente/negativo/critico
+- green: positivo/sucesso/meta atingida
+- cyan: info/neutro/dados gerais
+- amber: atencao/warning/precisa monitorar
+- blue: destaque/especial
+
+STATUS (para items de lista):
+- good: positivo (ponto verde)
+- bad: negativo (ponto vermelho)
+- neutral: neutro (ponto cinza)
+
+QUANDO USAR CADA GRAFICO:
+- Use BAR para comparar valores entre categorias (unidades, tecnicos, periodos)
+- Use COLUMN para rankings (top N)
+- Use LINE ou AREA para mostrar evolucao temporal (ultimos dias/meses)
+- Use PIE ou DONUT para mostrar distribuicao percentual (tipos de OS, formas de pagamento)
+- Use RADAR para mostrar performance em multiplas dimensoes
+
+EXEMPLOS PRATICOS:
+"Faturamento por unidade essa semana foi..."
+[CARD_BAR: Faturamento por Unidade | Ultimos 7 dias | green | Campinas:18400 | Sao Bernardo:12300 | Osasco:8150]
+
+"Top tecnicos do mes no Skywalker:"
+[CARD_COLUMN: Ranking Skywalker | Top 5 do mes | blue | Rafael:847 | Ana:792 | Lucas:685 | Marcos:620 | Julia:598]
+
+"A evolucao de OS nos ultimos 7 dias..."
+[CARD_LINE: OS por Dia | Ultimos 7 dias | cyan | Seg:45 | Ter:52 | Qua:48 | Qui:61 | Sex:58 | Sab:32 | Dom:15]
+
+"A distribuicao de OS por tipo de servico..."
+[CARD_PIE: OS por Tipo de Servico | Total do mes | cyan | Troca Tela:342 | Troca Bateria:285 | Reparo Placa:156 | Outros:128]
+
+"Faturamento por metodo de pagamento..."
+[CARD_DONUT: Receita por Forma | Total do mes | green | PIX:18500 | Debito:12300 | Credito:8900 | Dinheiro:3200]
+
+"Performance geral da operacao..."
+[CARD_RADAR: KPIs de Performance | Score 0-100 | green | Qualidade:92 | Velocidade:85 | Satisfacao:94 | Eficiencia:78 | Custo:88 | Inovacao:82]
 
 REGRAS CRITICAS:
 1. SEMPRE inclua 2-4 cards quando responder com dados
-2. Use SOMENTE os dados reais acima - NUNCA invente ou diga que nao tem acesso
-3. Valores monetarios sempre em R$ formatado
-4. Seu nome e GIA - uma palavra, junto, SEMPRE`;
+2. Use o tipo de grafico mais adequado para o tipo de dado
+3. Use SOMENTE os dados reais acima - NUNCA invente
+4. Valores monetarios sempre em R$ formatado
+5. Seu nome e GIA - uma palavra, junto, SEMPRE
+6. Para graficos, sempre inclua pelo menos 3-4 pontos de dados (nao apenas 2)
+7. Labels devem ser curtos (max 15 chars) para caber nos graficos`;
 
     const chatMessages: { role: string; content: string }[] = [
       { role: "system", content: systemPrompt },
@@ -327,19 +382,94 @@ REGRAS CRITICAS:
       });
     }
 
-    const chartMatches = rawContent.matchAll(/\[CARD_CHART:\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
-    for (const match of chartMatches) {
-      const dataStr = match[3].trim();
-      const chartData = dataStr.split("|").map((item: string) => {
+    const parseChartData = (dataStr: string) => {
+      return dataStr.split("|").map((item: string) => {
         const parts = item.trim().split(":");
         return { label: parts[0]?.trim(), value: parseFloat(parts[1]?.trim()) || 0 };
       });
+    };
+
+    const barMatches = rawContent.matchAll(/\[CARD_BAR:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of barMatches) {
       cards.push({
         id: crypto.randomUUID(),
-        type: "chart",
+        type: "bar",
         title: match[1].trim(),
-        color: match[2].trim(),
-        chartData,
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const columnMatches = rawContent.matchAll(/\[CARD_COLUMN:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of columnMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "column",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const lineMatches = rawContent.matchAll(/\[CARD_LINE:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of lineMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "line",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const areaMatches = rawContent.matchAll(/\[CARD_AREA:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of areaMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "area",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const pieMatches = rawContent.matchAll(/\[CARD_PIE:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of pieMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "pie",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const donutMatches = rawContent.matchAll(/\[CARD_DONUT:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of donutMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "donut",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
+      });
+    }
+
+    const radarMatches = rawContent.matchAll(/\[CARD_RADAR:\s*([^|]+)\s*\|\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
+    for (const match of radarMatches) {
+      cards.push({
+        id: crypto.randomUUID(),
+        type: "radar",
+        title: match[1].trim(),
+        subtitle: match[2].trim(),
+        color: match[3].trim(),
+        chartData: parseChartData(match[4]),
       });
     }
 
@@ -348,6 +478,13 @@ REGRAS CRITICAS:
       .replace(/\[CARD:[^\]]+\]/g, "")
       .replace(/\[CARD_ITEMS:[^\]]+\]/g, "")
       .replace(/\[CARD_CHART:[^\]]+\]/g, "")
+      .replace(/\[CARD_BAR:[^\]]+\]/g, "")
+      .replace(/\[CARD_COLUMN:[^\]]+\]/g, "")
+      .replace(/\[CARD_LINE:[^\]]+\]/g, "")
+      .replace(/\[CARD_AREA:[^\]]+\]/g, "")
+      .replace(/\[CARD_PIE:[^\]]+\]/g, "")
+      .replace(/\[CARD_DONUT:[^\]]+\]/g, "")
+      .replace(/\[CARD_RADAR:[^\]]+\]/g, "")
       .trim();
 
     await supabase.from("gia_messages").insert({
