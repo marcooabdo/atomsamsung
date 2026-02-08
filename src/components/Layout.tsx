@@ -155,8 +155,8 @@ export function Layout({ children }: LayoutProps) {
 
             const glowBg = hasGlow
               ? isActive
-                ? 'linear-gradient(135deg, rgba(0, 210, 255, 0.18), rgba(0, 255, 200, 0.08))'
-                : 'linear-gradient(135deg, rgba(0, 210, 255, 0.06), rgba(0, 255, 200, 0.02))'
+                ? 'linear-gradient(135deg, rgba(168, 85, 247, 0.22), rgba(192, 132, 252, 0.10))'
+                : 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(192, 132, 252, 0.03))'
               : undefined;
 
             return (
@@ -167,20 +167,25 @@ export function Layout({ children }: LayoutProps) {
                 style={{
                   animationDelay: `${index * 40}ms`,
                   background: hasGlow ? glowBg : (isActive ? `rgba(var(--accent-rgb), 0.1)` : 'transparent'),
-                  color: hasGlow ? '#00d2ff' : (isActive ? 'var(--text-accent)' : 'var(--text-secondary)'),
+                  color: hasGlow ? '#A855F7' : (isActive ? 'var(--text-accent)' : 'var(--text-secondary)'),
                   border: hasGlow
-                    ? `1px solid rgba(0, 210, 255, ${isActive ? '0.4' : '0.15'})`
+                    ? `1px solid rgba(168, 85, 247, ${isActive ? '0.5' : '0.2'})`
                     : (isActive ? '1px solid var(--border-primary)' : '1px solid transparent'),
-                  boxShadow: hasGlow && isActive ? '0 0 20px rgba(0, 210, 255, 0.15), inset 0 0 20px rgba(0, 210, 255, 0.05)' : 'none',
+                  boxShadow: hasGlow && isActive
+                    ? '0 0 20px rgba(168, 85, 247, 0.25), 0 0 40px rgba(168, 85, 247, 0.1), inset 0 0 20px rgba(168, 85, 247, 0.08)'
+                    : hasGlow
+                      ? '0 0 10px rgba(168, 85, 247, 0.08)'
+                      : 'none',
+                  animation: hasGlow ? 'gia-neon-pulse 2.5s ease-in-out infinite' : 'none',
                 }}
                 onMouseEnter={(e) => {
                   if (!isActive && !hasGlow) {
                     e.currentTarget.style.background = 'var(--bg-hover)';
                     e.currentTarget.style.color = 'var(--text-accent)';
                   } else if (hasGlow && !isActive) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 210, 255, 0.12), rgba(0, 255, 200, 0.05))';
-                    e.currentTarget.style.borderColor = 'rgba(0, 210, 255, 0.3)';
-                    e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 210, 255, 0.1)';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.06))';
+                    e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+                    e.currentTarget.style.boxShadow = '0 0 20px rgba(168, 85, 247, 0.15)';
                   }
                 }}
                 onMouseLeave={(e) => {
@@ -188,9 +193,9 @@ export function Layout({ children }: LayoutProps) {
                     e.currentTarget.style.background = 'transparent';
                     e.currentTarget.style.color = 'var(--text-secondary)';
                   } else if (hasGlow && !isActive) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(0, 210, 255, 0.06), rgba(0, 255, 200, 0.02))';
-                    e.currentTarget.style.borderColor = 'rgba(0, 210, 255, 0.15)';
-                    e.currentTarget.style.boxShadow = 'none';
+                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(192, 132, 252, 0.03))';
+                    e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)';
+                    e.currentTarget.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.08)';
                   }
                 }}
                 title={!sidebarOpen ? item.label : ''}

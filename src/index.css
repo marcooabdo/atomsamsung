@@ -9,6 +9,15 @@
   }
 }
 
+@keyframes gia-neon-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(168, 85, 247, 0.1), 0 0 2px rgba(168, 85, 247, 0.05);
+  }
+  50% {
+    box-shadow: 0 0 18px rgba(168, 85, 247, 0.25), 0 0 40px rgba(168, 85, 247, 0.08);
+  }
+}
+
 @layer utilities {
   .tech-glow-blue {
     box-shadow: var(--neon-glow-blue);
