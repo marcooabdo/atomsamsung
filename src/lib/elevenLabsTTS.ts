@@ -87,11 +87,11 @@ export const speakGia = async (text: string): Promise<{ ok: boolean; error?: str
       },
       body: JSON.stringify({
         text: fixPronunciation(text),
-        model_id: 'eleven_turbo_v2_5',
+        model_id: 'eleven_multilingual_v2',
         voice_settings: {
-          stability: 0.65,
-          similarity_boost: 0.8,
-          style: 0,
+          stability: 0.75,
+          similarity_boost: 0.85,
+          style: 0.15,
           use_speaker_boost: true,
         }
       }),
