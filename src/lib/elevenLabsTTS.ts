@@ -33,6 +33,14 @@ export const checkElevenLabsConnection = async (): Promise<{ ok: boolean; error?
 
 export const isElevenLabsAvailable = (): boolean | null => elevenlabsAvailable;
 
+function fixPronunciation(text: string): string {
+  return text
+    .replace(/\bGIA\b/g, 'Gia')
+    .replace(/\bG\.I\.A\.\b/g, 'Gia')
+    .replace(/\bG I A\b/g, 'Gia')
+    .replace(/\bATOM\b/g, 'Átom');
+}
+
 function speakWithBrowserTTS(text: string): Promise<{ ok: boolean; error?: string }> {
   return new Promise((resolve) => {
     if (!window.speechSynthesis) {
@@ -41,7 +49,7 @@ function speakWithBrowserTTS(text: string): Promise<{ ok: boolean; error?: strin
     }
 
     window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
+    const utterance = new SpeechSynthesisUtterance(fixPronunciation(text));
     utterance.lang = 'pt-BR';
     utterance.rate = 1.05;
     utterance.pitch = 1.0;
@@ -78,7 +86,7 @@ export const speakGia = async (text: string): Promise<{ ok: boolean; error?: str
         'xi-api-key': apiKey,
       },
       body: JSON.stringify({
-        text: text,
+        text: fixPronunciation(text),
         model_id: 'eleven_flash_v2_5',
         voice_settings: {
           stability: 0.5,

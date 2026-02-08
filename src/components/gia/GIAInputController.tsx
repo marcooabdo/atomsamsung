@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, MicOff, Send, Loader2, Keyboard, AudioLines, Square } from 'lucide-react';
+import { Mic, MicOff, Send, Loader2, Keyboard, AudioLines, Square, ImagePlus } from 'lucide-react';
 
 interface GIAInputControllerProps {
   mode: 'voice' | 'text';
@@ -26,7 +26,10 @@ export function GIAInputController({
   transcribedText,
 }: GIAInputControllerProps) {
   const [text, setText] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!disabled && mode === 'text' && inputRef.current) {
@@ -48,8 +51,12 @@ export function GIAInputController({
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!text.trim() || disabled) return;
-    onSend(text.trim());
+    const msg = attachment
+      ? `${text.trim()} [Foto anexada: ${attachment.name}]`
+      : text.trim();
+    onSend(msg);
     setText('');
+    clearAttachment();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -59,9 +66,44 @@ export function GIAInputController({
     }
   };
 
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAttachment(file);
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+  };
+
+  const clearAttachment = () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setAttachment(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   return (
     <div className="flex-shrink-0 px-4 sm:px-8 pb-5 pt-3">
-      <div className="flex items-center justify-center mb-4">
+      <div className="flex items-center justify-center mb-4 gap-3">
+        {isSpeaking && (
+          <motion.button
+            onClick={onStopSpeaking}
+            className="flex items-center gap-2 px-4 py-2 rounded-full"
+            style={{
+              background: 'rgba(239,68,68,0.1)',
+              border: '1px solid rgba(239,68,68,0.25)',
+            }}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+          >
+            <Square className="w-3 h-3" style={{ color: '#ef4444' }} />
+            <span className="text-[10px] font-semibold tracking-wider uppercase" style={{ color: '#ef4444' }}>
+              Parar
+            </span>
+          </motion.button>
+        )}
+
         <div
           className="relative flex items-center rounded-full p-0.5"
           style={{
@@ -128,24 +170,6 @@ export function GIAInputController({
             className="flex flex-col items-center gap-4"
           >
             <div className="flex items-center gap-4">
-              {isSpeaking && (
-                <motion.button
-                  onClick={onStopSpeaking}
-                  className="p-3 rounded-full"
-                  style={{
-                    background: 'rgba(239,68,68,0.12)',
-                    border: '1px solid rgba(239,68,68,0.25)',
-                  }}
-                  whileHover={{ scale: 1.08 }}
-                  whileTap={{ scale: 0.9 }}
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  title="Parar fala"
-                >
-                  <Square className="w-4 h-4" style={{ color: '#ef4444' }} />
-                </motion.button>
-              )}
-
               <motion.button
                 onClick={onMicToggle}
                 disabled={disabled}
@@ -205,6 +229,24 @@ export function GIAInputController({
             exit={{ opacity: 0, y: -10 }}
             transition={{ duration: 0.25 }}
           >
+            {previewUrl && (
+              <div className="mb-2 relative inline-block">
+                <img
+                  src={previewUrl}
+                  alt="Anexo"
+                  className="h-16 rounded-xl object-cover"
+                  style={{ border: '1px solid rgba(0,210,255,0.2)' }}
+                />
+                <button
+                  onClick={clearAttachment}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center text-white text-[10px] font-bold"
+                  style={{ background: 'rgba(239,68,68,0.8)' }}
+                >
+                  x
+                </button>
+              </div>
+            )}
+
             <form
               onSubmit={handleSubmit}
               className="relative flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-300"
@@ -226,7 +268,31 @@ export function GIAInputController({
                 style={{ caretColor: '#00d2ff' }}
               />
 
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+
               <div className="flex items-center gap-1.5">
+                <motion.button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={disabled}
+                  className="p-2.5 rounded-full transition-all disabled:opacity-30"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}
+                  whileHover={{ scale: 1.05, borderColor: 'rgba(0,210,255,0.2)' }}
+                  whileTap={{ scale: 0.92 }}
+                  title="Anexar foto"
+                >
+                  <ImagePlus className="w-4 h-4" style={{ color: '#4a5568' }} />
+                </motion.button>
+
                 <motion.button
                   type="button"
                   onClick={onMicToggle}

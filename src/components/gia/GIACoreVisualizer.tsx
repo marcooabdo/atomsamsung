@@ -119,10 +119,10 @@ export function GIACoreVisualizer({ state, compact }: GIACoreVisualizerProps) {
         : 'RESPONDENDO';
 
   const stateColor = isIdle ? '#2d3748' : state === 'listening' ? '#00ffc8' : '#00d2ff';
-  const height = compact ? 140 : 200;
+  const height = compact ? 100 : 220;
 
   return (
-    <div className="relative flex flex-col items-center justify-center" style={{ height }}>
+    <div className="relative flex flex-col items-center justify-center overflow-visible" style={{ height }}>
       <motion.div
         className="absolute rounded-full"
         style={{
@@ -169,7 +169,7 @@ export function GIACoreVisualizer({ state, compact }: GIACoreVisualizerProps) {
         />
       ))}
 
-      <div className="relative" style={{ width: 180, height: 180 }}>
+      <div className="relative" style={{ width: compact ? 100 : 180, height: compact ? 100 : 180, transform: compact ? 'scale(0.55)' : 'none' }}>
         {orbs.map(orb => {
           const anim = getOrbAnimation(orb);
           const glowIntensity = isIdle ? 0.15 : isSpeaking ? 0.5 : 0.3;

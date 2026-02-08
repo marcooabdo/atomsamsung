@@ -7,7 +7,7 @@ import { createMockAIStream } from '../components/gia/mockAIStream';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { speakGia } from '../lib/elevenLabsTTS';
+import { speakGia, stopGiaSpeaking } from '../lib/elevenLabsTTS';
 import {
   Sparkles,
   History,
@@ -47,9 +47,16 @@ export function GIA() {
   const greetingDoneRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
+  const streamIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingContentRef = useRef<string>('');
 
   useEffect(() => {
     checkConnections();
+    return () => {
+      stopGiaSpeaking();
+      if (streamIntervalRef.current) clearInterval(streamIntervalRef.current);
+      if (cancelStreamRef.current) cancelStreamRef.current();
+    };
   }, []);
 
   useEffect(() => {
@@ -276,6 +283,7 @@ export function GIA() {
   }, [usuario, messages, conversationId]);
 
   const streamResponse = useCallback((text: string): Promise<void> => {
+    pendingContentRef.current = text;
     return new Promise((resolve) => {
       let i = 0;
       setStreamingText('');
@@ -287,10 +295,13 @@ export function GIA() {
           i += chunkSize;
         } else {
           clearInterval(interval);
+          streamIntervalRef.current = null;
           setStreamingText('');
+          pendingContentRef.current = '';
           resolve();
         }
       }, 22);
+      streamIntervalRef.current = interval;
     });
   }, []);
 
@@ -337,13 +348,31 @@ export function GIA() {
   }, [isListening, currentMode, sendMessage]);
 
   const handleStopSpeaking = useCallback(() => {
+    stopGiaSpeaking();
     if (cancelStreamRef.current) {
       cancelStreamRef.current();
       cancelStreamRef.current = null;
     }
+    if (streamIntervalRef.current) {
+      clearInterval(streamIntervalRef.current);
+      streamIntervalRef.current = null;
+    }
+    if (pendingContentRef.current) {
+      const fullContent = pendingContentRef.current;
+      pendingContentRef.current = '';
+      setStreamingText('');
+      const aiMessage: GIAMessage = {
+        id: `ai-${Date.now()}`,
+        role: 'assistant',
+        content: fullContent,
+        timestamp: Date.now(),
+      };
+      setMessages(prev => [...prev, aiMessage]);
+    } else {
+      setStreamingText('');
+    }
     setIsSpeaking(false);
     setAiState('idle');
-    setStreamingText('');
     setIsProcessing(false);
   }, []);
 
@@ -453,7 +482,7 @@ export function GIA() {
           disabled={isProcessing}
           isListening={isListening}
           onMicToggle={toggleMicrophone}
-          isSpeaking={isSpeaking}
+          isSpeaking={isSpeaking || (aiState === 'speaking' && !!streamingText)}
           onStopSpeaking={handleStopSpeaking}
           transcribedText={transcribedText}
         />
