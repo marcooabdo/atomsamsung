@@ -28,14 +28,14 @@ export function GIAInputController({
   const [text, setText] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!disabled && mode === 'text' && inputRef.current) {
+    if (mode === 'text' && inputRef.current) {
       inputRef.current.focus();
     }
-  }, [disabled, mode]);
+  }, [mode]);
 
   useEffect(() => {
     if (transcribedText) {
@@ -47,6 +47,13 @@ export function GIAInputController({
       }
     }
   }, [transcribedText, mode, onSend]);
+
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.style.height = '24px';
+      inputRef.current.style.height = `${Math.min(inputRef.current.scrollHeight, 120)}px`;
+    }
+  }, [text]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -60,6 +67,9 @@ export function GIAInputController({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && e.ctrlKey) {
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSubmit();
@@ -249,22 +259,21 @@ export function GIAInputController({
 
             <form
               onSubmit={handleSubmit}
-              className="relative flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-300"
+              className="relative flex items-start gap-3 rounded-2xl px-4 py-3 transition-all duration-300"
               style={{
                 background: 'rgba(255,255,255,0.03)',
                 border: `1px solid ${text.length > 0 ? 'rgba(0,210,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
                 boxShadow: text.length > 0 ? '0 0 25px rgba(0,210,255,0.05)' : 'none',
               }}
             >
-              <input
+              <textarea
                 ref={inputRef}
-                type="text"
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Digite sua mensagem para a GIA..."
-                disabled={disabled}
-                className="flex-1 bg-transparent text-sm text-white placeholder-gray-700 outline-none disabled:opacity-40"
+                rows={1}
+                className="flex-1 bg-transparent text-sm text-white placeholder-gray-700 outline-none resize-none min-h-[24px] max-h-[120px] overflow-y-auto"
                 style={{ caretColor: '#00d2ff' }}
               />
 

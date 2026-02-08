@@ -17,7 +17,6 @@ import {
   Wifi,
   WifiOff,
   AlertCircle,
-  Zap,
 } from 'lucide-react';
 
 type ConnectionStatus = 'checking' | 'connected' | 'partial' | 'error';
@@ -43,7 +42,6 @@ export function GIA() {
   const [connection, setConnection] = useState<ConnectionState>({ status: 'checking', chatgpt: false, elevenlabs: false });
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string | undefined>(undefined);
-  const [demoMode, setDemoMode] = useState(false);
   const greetingDoneRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
@@ -89,7 +87,6 @@ export function GIA() {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
         setConnection({ status: 'connected', chatgpt: true, elevenlabs: true });
-        setDemoMode(false);
       } else {
         setConnection({ status: 'partial', chatgpt: false, elevenlabs: false, error: 'Usuario nao autenticado' });
       }
@@ -307,12 +304,8 @@ export function GIA() {
 
   const sendMessage = useCallback((text: string) => {
     if (isProcessing) return;
-    if (demoMode) {
-      sendMessageMock(text);
-    } else {
-      sendMessageAPI(text);
-    }
-  }, [isProcessing, demoMode, sendMessageMock, sendMessageAPI]);
+    sendMessageAPI(text);
+  }, [isProcessing, sendMessageAPI]);
 
   const toggleMicrophone = useCallback(() => {
     if (isListening) {
@@ -376,20 +369,16 @@ export function GIA() {
     setIsProcessing(false);
   }, []);
 
-  const isActive = !demoMode;
   const hasMessages = messages.length > 0 || isProcessing;
 
   return (
     <div className="h-[calc(100vh-48px)] flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
       <GIAHeader
         aiState={aiState}
-        isActive={isActive}
-        demoMode={demoMode}
         connection={connection}
         showHistory={showHistory}
         onNewConversation={startNewConversation}
         onToggleHistory={() => { setShowHistory(!showHistory); if (!showHistory) loadConversations(); }}
-        onToggleDemo={() => setDemoMode(!demoMode)}
         onCheckConnections={checkConnections}
       />
 
@@ -520,24 +509,18 @@ function GridBackground() {
 
 interface GIAHeaderProps {
   aiState: string;
-  isActive: boolean;
-  demoMode: boolean;
   connection: ConnectionState;
   showHistory: boolean;
   onNewConversation: () => void;
   onToggleHistory: () => void;
-  onToggleDemo: () => void;
   onCheckConnections: () => void;
 }
 
 function GIAHeader({
   aiState,
-  isActive,
-  demoMode,
   connection,
   onNewConversation,
   onToggleHistory,
-  onToggleDemo,
   onCheckConnections,
 }: GIAHeaderProps) {
   return (
@@ -556,7 +539,7 @@ function GIAHeader({
             style={{
               background: 'linear-gradient(135deg, rgba(168,85,247,0.12), rgba(192,132,252,0.06))',
               border: '1px solid rgba(168,85,247,0.2)',
-              boxShadow: isActive ? '0 0 15px rgba(168,85,247,0.15)' : 'none',
+              boxShadow: '0 0 15px rgba(168,85,247,0.15)',
             }}
           >
             <Sparkles className="w-3.5 h-3.5" style={{ color: '#A855F7' }} />
@@ -564,8 +547,8 @@ function GIAHeader({
           <div
             className="absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full"
             style={{
-              background: isActive ? '#A855F7' : '#374151',
-              boxShadow: isActive ? '0 0 6px #A855F7' : 'none',
+              background: '#A855F7',
+              boxShadow: '0 0 6px #A855F7',
             }}
           />
         </div>
@@ -578,17 +561,6 @@ function GIAHeader({
       </div>
 
       <div className="flex items-center gap-1.5">
-        <span
-          className="text-[9px] tracking-widest uppercase font-semibold px-2 py-1 rounded-lg mr-1"
-          style={{
-            background: demoMode ? 'rgba(245,158,11,0.1)' : 'rgba(16,185,129,0.1)',
-            color: demoMode ? '#f59e0b' : '#10b981',
-            border: demoMode ? '1px solid rgba(245,158,11,0.15)' : '1px solid rgba(16,185,129,0.15)',
-          }}
-        >
-          {demoMode ? 'DEMO' : 'REAL'}
-        </span>
-
         <button
           onClick={onNewConversation}
           className="p-2 rounded-lg transition-colors hover:bg-white/5"
@@ -605,14 +577,6 @@ function GIAHeader({
           <History className="w-3.5 h-3.5" style={{ color: '#4a5568' }} />
         </button>
 
-        <button
-          onClick={onToggleDemo}
-          className="p-2 rounded-lg transition-colors hover:bg-white/5"
-          title={demoMode ? 'Mudar para modo REAL (conectado ao banco)' : 'Mudar para modo DEMO (respostas simuladas)'}
-        >
-          <Zap className="w-3.5 h-3.5" style={{ color: demoMode ? '#f59e0b' : '#10b981' }} />
-        </button>
-
         <div
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ml-1 cursor-pointer group relative"
           style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
@@ -625,11 +589,6 @@ function GIAHeader({
               <span className="text-[9px] tracking-widest uppercase font-medium" style={{ color: '#f59e0b' }}>
                 ...
               </span>
-            </>
-          ) : demoMode ? (
-            <>
-              <AlertCircle className="w-3 h-3" style={{ color: '#f59e0b' }} />
-              <span className="text-[9px] tracking-widest uppercase" style={{ color: '#f59e0b' }}>SIMULADO</span>
             </>
           ) : connection.status === 'partial' ? (
             <>
