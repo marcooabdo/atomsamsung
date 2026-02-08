@@ -370,7 +370,7 @@ Deno.serve(async (req: Request) => {
       unidades: (unidades || []).map(u => ({ id: u.id, nome: u.nome, cidade: u.cidade, estado: u.estado, endereco: u.endereco })),
 
       resumoOS: {
-        IMPORTANTE: "DADOS REAIS DO SISTEMA - SEM LIMITE DE REGISTROS",
+        ATENCAO_CRITICO: `EXISTEM ${totalOS} OS NO SISTEMA - NAO RESPONDA QUE TEM ZERO!`,
         totalGeral: totalOS,
         totalAnoAtual: osAnoAtual,
         totalMesAtual: osMesAtual,
@@ -449,6 +449,7 @@ Deno.serve(async (req: Request) => {
       tecnicos: (tecnicos || []).map(t => ({ id: t.id, nome: t.nome, tipo: t.tipo, numero_tecnico: t.numero_tecnico, unidade_id: t.unidade_id })),
 
       estoque: {
+        ATENCAO_CRITICO: `EXISTEM ${pecas?.length || 0} PECAS NO ESTOQUE - NAO RESPONDA QUE TEM ZERO!`,
         totalPecas: pecas?.length || 0,
         pecasCriticas: pecasCriticas.map(p => ({ sku: p.sku, descricao: p.descricao, qtd: p.quantidade, localizacao: `Sala ${p.sala_id}, Estante ${p.estante_id}, Bin ${p.bin_id}` })),
         giPendentes: pecasGIPendentes.length,
@@ -496,8 +497,35 @@ Deno.serve(async (req: Request) => {
     console.log("  - estoque.totalPecas:", databaseSnapshot.estoque.totalPecas);
     console.log("  - resumoFinanceiro.receitaTotalGeral:", databaseSnapshot.resumoFinanceiro.receitaTotalGeral);
     console.log("  - unidades:", databaseSnapshot.unidades.length);
+    console.log("  - JSON.stringify snapshot length:", JSON.stringify(databaseSnapshot).length);
+
+    if (databaseSnapshot.resumoOS.totalGeral === 0) {
+      console.log("[GIA] ⚠️ ALERTA: Nenhuma OS encontrada no banco!");
+      console.log("  - Query retornou array vazio ou null");
+      console.log("  - Verificar se há dados na tabela 'os'");
+    }
+
+    if (databaseSnapshot.estoque.totalPecas === 0) {
+      console.log("[GIA] ⚠️ ALERTA: Nenhuma peça encontrada no estoque!");
+      console.log("  - Query retornou array vazio ou null");
+      console.log("  - Verificar se há dados na tabela 'estoque_pecas'");
+    }
 
     const systemPrompt = `Voce e a GIA (Global Intelligence Assistant), a assistente de inteligencia artificial do Group Global, dentro do sistema ATOM, uma empresa de assistencia tecnica de celulares e eletronicos (Samsung, Apple, etc).
+
+===== NUMEROS PRINCIPAIS DO SISTEMA (LEIA PRIMEIRO!) =====
+🔢 TOTAL DE OS NO SISTEMA: ${totalOS}
+📦 TOTAL DE PECAS NO ESTOQUE: ${pecas?.length || 0}
+💰 RECEITA TOTAL: R$ ${receitaTotalGeral.toFixed(2)}
+👥 TOTAL DE TECNICOS: ${tecnicos?.length || 0}
+🏢 TOTAL DE UNIDADES: ${unidades?.length || 0}
+📋 OS ABERTAS: ${osEmAberto}
+📅 OS HOJE: ${osHoje.length}
+⚠️ OS ATRASADAS: ${osAtrasadas.length}
+💵 PAGAMENTOS REGISTRADOS: ${pagamentos?.length || 0}
+
+ATENCAO: Sempre use esses numeros reais ao responder! NUNCA diga que tem 0 se os numeros acima mostram valores!
+==========================================================
 
 PERSONALIDADE:
 - Voce e profissional, inteligente e proativa
