@@ -1,15 +1,30 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Mic, MicOff, Send, Loader2 } from 'lucide-react';
+import { Mic, MicOff, Send, Loader2, Volume2, VolumeX, Square } from 'lucide-react';
 
 interface GIAInputBarProps {
   onSend: (text: string) => void;
   disabled: boolean;
   isListening: boolean;
   onMicToggle: () => void;
+  voiceEnabled: boolean;
+  onVoiceToggle: () => void;
+  isSpeaking: boolean;
+  onStopSpeaking: () => void;
+  transcribedText?: string;
 }
 
-export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAInputBarProps) {
+export function GIAInputBar({
+  onSend,
+  disabled,
+  isListening,
+  onMicToggle,
+  voiceEnabled,
+  onVoiceToggle,
+  isSpeaking,
+  onStopSpeaking,
+  transcribedText,
+}: GIAInputBarProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -18,6 +33,15 @@ export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAI
       inputRef.current.focus();
     }
   }, [disabled]);
+
+  useEffect(() => {
+    if (transcribedText) {
+      setText(transcribedText);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }
+  }, [transcribedText]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -50,13 +74,13 @@ export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAI
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Digite sua mensagem..."
+          placeholder={isListening ? 'Ouvindo...' : 'Digite sua mensagem...'}
           disabled={disabled}
           className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none disabled:opacity-40"
           style={{ caretColor: '#00d2ff' }}
         />
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <motion.button
             type="button"
             onClick={onMicToggle}
@@ -72,6 +96,7 @@ export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAI
             }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.92 }}
+            title={isListening ? 'Parar de ouvir' : 'Falar'}
           >
             {isListening ? (
               <MicOff className="w-4 h-4" style={{ color: '#0a0e1a' }} />
@@ -87,6 +112,58 @@ export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAI
               />
             )}
           </motion.button>
+
+          <motion.button
+            type="button"
+            onClick={onVoiceToggle}
+            disabled={disabled}
+            className="relative p-2.5 rounded-full transition-all disabled:opacity-30"
+            style={{
+              background: voiceEnabled
+                ? 'linear-gradient(135deg, #10b981, #059669)'
+                : 'rgba(255,255,255,0.04)',
+              border: voiceEnabled
+                ? 'none'
+                : '1px solid rgba(255,255,255,0.08)',
+            }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.92 }}
+            title={voiceEnabled ? 'Desativar voz da GIA (modo conversa)' : 'Ativar voz da GIA (modo conversa)'}
+          >
+            {voiceEnabled ? (
+              <Volume2 className="w-4 h-4" style={{ color: '#fff' }} />
+            ) : (
+              <VolumeX className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
+            )}
+            {voiceEnabled && (
+              <motion.div
+                className="absolute inset-0 rounded-full"
+                style={{ border: '2px solid rgba(16,185,129,0.4)' }}
+                animate={{ scale: [1, 1.3], opacity: [0.5, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            )}
+          </motion.button>
+
+          {isSpeaking && (
+            <motion.button
+              type="button"
+              onClick={onStopSpeaking}
+              className="p-2.5 rounded-full transition-all"
+              style={{
+                background: 'rgba(239,68,68,0.15)',
+                border: '1px solid rgba(239,68,68,0.3)',
+              }}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              title="Parar fala"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0 }}
+            >
+              <Square className="w-4 h-4" style={{ color: '#ef4444' }} />
+            </motion.button>
+          )}
 
           <motion.button
             type="submit"
@@ -114,7 +191,7 @@ export function GIAInputBar({ onSend, disabled, isListening, onMicToggle }: GIAI
       </form>
 
       <p className="text-center mt-2 text-[10px] tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>
-        GIA tem acesso aos dados operacionais em tempo real
+        {voiceEnabled ? 'Modo conversa ativado - Fale e a GIA responde com voz' : 'GIA tem acesso aos dados operacionais em tempo real'}
       </p>
     </div>
   );
