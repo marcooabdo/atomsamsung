@@ -47,7 +47,7 @@ const SCENARIOS: MockScenario[] = [
         type: 'SHOW_CARD',
         card: {
           id: 'faturamento',
-          type: 'chart',
+          type: 'bar',
           title: 'Faturamento por Unidade',
           color: 'green',
           chartData: [
@@ -134,7 +134,7 @@ const SCENARIOS: MockScenario[] = [
         type: 'SHOW_CARD',
         card: {
           id: 'ranking-chart',
-          type: 'chart',
+          type: 'column',
           title: 'Ranking Skywalker - Top 4',
           color: 'blue',
           chartData: [
@@ -160,6 +160,143 @@ const SCENARIOS: MockScenario[] = [
           color: 'cyan',
         },
       },
+      { type: 'DONE' },
+    ],
+  },
+  {
+    chunks: [
+      { type: 'TEXT', content: 'Analisando a evolucao do faturamento dos ultimos 6 meses...\n\n' },
+      {
+        type: 'SHOW_CARD',
+        card: {
+          id: 'evolucao-faturamento',
+          type: 'line',
+          title: 'Evolucao do Faturamento',
+          subtitle: 'Ultimos 6 meses (em milhares)',
+          color: 'cyan',
+          chartData: [
+            { label: 'Jul', value: 380 },
+            { label: 'Ago', value: 420 },
+            { label: 'Set', value: 395 },
+            { label: 'Out', value: 450 },
+            { label: 'Nov', value: 490 },
+            { label: 'Dez', value: 520 },
+          ],
+        },
+      },
+      { type: 'TEXT', content: 'O faturamento tem crescido **consistentemente**, ' },
+      { type: 'TEXT', content: 'com destaque para dezembro que atingiu **R$ 520 mil**.\n\n' },
+      { type: 'TEXT', content: 'A tendencia e de crescimento continuo para 2025.' },
+      { type: 'DONE' },
+    ],
+  },
+  {
+    chunks: [
+      { type: 'TEXT', content: 'Vou mostrar a distribuicao de OS por tipo de servico...\n\n' },
+      {
+        type: 'SHOW_CARD',
+        card: {
+          id: 'os-por-tipo',
+          type: 'pie',
+          title: 'Distribuicao por Tipo de Servico',
+          subtitle: 'Total de OS do mes',
+          color: 'cyan',
+          chartData: [
+            { label: 'Troca de Tela', value: 342 },
+            { label: 'Troca de Bateria', value: 285 },
+            { label: 'Reparo Placa', value: 156 },
+            { label: 'Troca Camera', value: 89 },
+            { label: 'Outros', value: 128 },
+          ],
+        },
+      },
+      { type: 'TEXT', content: '**Troca de tela** lidera com 34.2%, seguido por **troca de bateria** com 28.5%.\n\n' },
+      { type: 'TEXT', content: 'Reparo de placa representa 15.6% das OS, necessitando de tecnicos especializados.' },
+      { type: 'DONE' },
+    ],
+  },
+  {
+    chunks: [
+      { type: 'TEXT', content: 'Analisando a participacao de mercado por fabricante...\n\n' },
+      {
+        type: 'SHOW_CARD',
+        card: {
+          id: 'market-share',
+          type: 'donut',
+          title: 'OS por Fabricante',
+          subtitle: 'Dezembro 2024',
+          color: 'blue',
+          chartData: [
+            { label: 'Samsung', value: 487 },
+            { label: 'Apple', value: 342 },
+            { label: 'Xiaomi', value: 156 },
+            { label: 'Motorola', value: 98 },
+            { label: 'Outros', value: 67 },
+          ],
+        },
+      },
+      { type: 'TEXT', content: '**Samsung domina** com 42.3% do total de OS, ' },
+      { type: 'TEXT', content: 'seguido pela Apple com 29.7%.\n\n' },
+      { type: 'TEXT', content: 'Xiaomi e Motorola juntos representam 22.0% do mercado.' },
+      { type: 'DONE' },
+    ],
+  },
+  {
+    chunks: [
+      { type: 'TEXT', content: 'Avaliando o desempenho geral da operacao...\n\n' },
+      {
+        type: 'SHOW_CARD',
+        card: {
+          id: 'performance-radar',
+          type: 'radar',
+          title: 'Indicadores de Performance',
+          subtitle: 'Pontuacao de 0 a 100',
+          color: 'green',
+          chartData: [
+            { label: 'Qualidade', value: 92 },
+            { label: 'Velocidade', value: 85 },
+            { label: 'Satisfacao', value: 94 },
+            { label: 'Eficiencia', value: 78 },
+            { label: 'Custo', value: 88 },
+            { label: 'Inovacao', value: 82 },
+          ],
+        },
+      },
+      { type: 'TEXT', content: '**Pontos fortes:**\n' },
+      { type: 'TEXT', content: '- Satisfacao do cliente: 94 pontos\n' },
+      { type: 'TEXT', content: '- Qualidade do servico: 92 pontos\n\n' },
+      { type: 'TEXT', content: '**Oportunidades de melhoria:**\n' },
+      { type: 'TEXT', content: '- Eficiencia operacional: 78 pontos\n' },
+      { type: 'TEXT', content: '- Inovacao: 82 pontos' },
+      { type: 'DONE' },
+    ],
+  },
+  {
+    chunks: [
+      { type: 'TEXT', content: 'Vou mostrar a evolucao do volume de OS nos ultimos meses...\n\n' },
+      {
+        type: 'SHOW_CARD',
+        card: {
+          id: 'volume-os',
+          type: 'area',
+          title: 'Volume de OS',
+          subtitle: 'Ultimos 8 meses',
+          color: 'amber',
+          chartData: [
+            { label: 'Mai', value: 850 },
+            { label: 'Jun', value: 920 },
+            { label: 'Jul', value: 980 },
+            { label: 'Ago', value: 1050 },
+            { label: 'Set', value: 980 },
+            { label: 'Out', value: 1120 },
+            { label: 'Nov', value: 1180 },
+            { label: 'Dez', value: 1250 },
+          ],
+        },
+      },
+      { type: 'TEXT', content: 'O volume cresceu **47%** desde maio, ' },
+      { type: 'TEXT', content: 'atingindo **1.250 OS em dezembro**.\n\n' },
+      { type: 'TEXT', content: 'Setembro teve uma pequena queda, mas a tendencia geral e de forte crescimento.' },
       { type: 'DONE' },
     ],
   },

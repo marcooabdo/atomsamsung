@@ -10,6 +10,16 @@ import {
   ArrowUpRight,
   ArrowDownRight,
 } from 'lucide-react';
+import {
+  BarChart,
+  ColumnChart,
+  LineChart,
+  AreaChart,
+  PieChart,
+  DonutChart,
+  RadarChart,
+  type ChartDataPoint,
+} from './GIACharts';
 
 export interface GIAMessage {
   id: string;
@@ -21,13 +31,13 @@ export interface GIAMessage {
 
 export interface GIACardData {
   id: string;
-  type: 'alert' | 'metric' | 'chart' | 'status' | 'list';
+  type: 'alert' | 'metric' | 'status' | 'list' | 'bar' | 'column' | 'line' | 'area' | 'pie' | 'donut' | 'radar';
   title: string;
   value?: string;
   subtitle?: string;
   color: string;
   items?: { label: string; value: string; status?: string }[];
-  chartData?: { label: string; value: number }[];
+  chartData?: ChartDataPoint[];
 }
 
 interface GIAConversationProps {
@@ -214,111 +224,138 @@ function ListCard({ card, delay = 0 }: { card: GIACardData; delay?: number }) {
   );
 }
 
-function ChartCard({ card, delay = 0 }: { card: GIACardData; delay?: number }) {
-  const colors = colorMap[card.color] || colorMap.cyan;
-  const Icon = iconMap[card.type] || BarChart3;
-  const max = Math.max(...(card.chartData || []).map(d => d.value), 1);
-
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 12, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ duration: 0.5, delay, ease: [0.23, 1, 0.32, 1] }}
-      className="rounded-2xl overflow-hidden"
-      style={{
-        background: 'rgba(255,255,255,0.02)',
-        border: `1px solid ${colors.border}`,
-        boxShadow: colors.glow,
-      }}
-    >
-      <div className="p-4">
-        <div className="flex items-center gap-2 mb-4">
-          <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: colors.badge }}
-          >
-            <Icon className="w-3.5 h-3.5" style={{ color: colors.accent }} />
-          </div>
-          <span
-            className="text-[10px] font-bold tracking-wider uppercase"
-            style={{ color: colors.accent }}
-          >
-            {card.title}
-          </span>
-        </div>
-
-        <div className="space-y-3">
-          {card.chartData?.map((item, i) => (
-            <div key={i}>
-              <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[11px] font-medium" style={{ color: 'rgba(255,255,255,0.5)' }}>
-                  {item.label}
-                </span>
-                <span className="text-[11px] font-bold tabular-nums" style={{ color: colors.accent }}>
-                  {item.value >= 1000 ? `R$ ${(item.value / 1000).toFixed(1)}k` : item.value}
-                </span>
-              </div>
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: 'rgba(255,255,255,0.04)' }}
-              >
-                <motion.div
-                  className="h-full rounded-full"
-                  style={{
-                    background: `linear-gradient(90deg, ${colors.accent}, ${colors.accent}99)`,
-                    boxShadow: `0 0 8px ${colors.accent}30`,
-                  }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${(item.value / max) * 100}%` }}
-                  transition={{ duration: 0.7, delay: delay + i * 0.1, ease: [0.23, 1, 0.32, 1] }}
-                />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </motion.div>
-  );
-}
 
 function InlineCards({ cards }: { cards: GIACardData[] }) {
   const metricCards = cards.filter(c => c.type === 'metric' || c.type === 'alert' || c.type === 'status');
   const listCards = cards.filter(c => c.type === 'list');
-  const chartCards = cards.filter(c => c.type === 'chart');
-  const otherCards = cards.filter(c => !['metric', 'alert', 'status', 'list', 'chart'].includes(c.type));
+  const barCharts = cards.filter(c => c.type === 'bar');
+  const columnCharts = cards.filter(c => c.type === 'column');
+  const lineCharts = cards.filter(c => c.type === 'line');
+  const areaCharts = cards.filter(c => c.type === 'area');
+  const pieCharts = cards.filter(c => c.type === 'pie');
+  const donutCharts = cards.filter(c => c.type === 'donut');
+  const radarCharts = cards.filter(c => c.type === 'radar');
 
   const useGrid = metricCards.length >= 2;
+  let currentDelay = 0;
 
   return (
     <div className="mt-3 space-y-3">
       {useGrid ? (
         <div className="grid grid-cols-2 gap-2.5">
-          {metricCards.map((card, i) => (
-            <MetricCard key={card.id} card={card} delay={i * 0.08} />
-          ))}
+          {metricCards.map((card, i) => {
+            const delay = i * 0.08;
+            return <MetricCard key={card.id} card={card} delay={delay} />;
+          })}
         </div>
       ) : (
-        metricCards.map((card, i) => (
-          <MetricCard key={card.id} card={card} delay={i * 0.08} />
-        ))
+        metricCards.map((card, i) => {
+          const delay = i * 0.08;
+          return <MetricCard key={card.id} card={card} delay={delay} />;
+        })
       )}
 
-      {listCards.map((card, i) => (
-        <ListCard key={card.id} card={card} delay={(metricCards.length * 0.08) + i * 0.1} />
-      ))}
+      {listCards.map((card, i) => {
+        currentDelay = (metricCards.length * 0.08) + i * 0.1;
+        return <ListCard key={card.id} card={card} delay={currentDelay} />;
+      })}
 
-      {chartCards.map((card, i) => (
-        <ChartCard
-          key={card.id}
-          card={card}
-          delay={(metricCards.length * 0.08) + (listCards.length * 0.1) + i * 0.1}
-        />
-      ))}
+      {barCharts.map((card, i) => {
+        currentDelay = (metricCards.length * 0.08) + (listCards.length * 0.1) + i * 0.1;
+        return (
+          <BarChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
 
-      {otherCards.map((card, i) => {
-        if (card.items) return <ListCard key={card.id} card={card} delay={i * 0.1} />;
-        if (card.chartData) return <ChartCard key={card.id} card={card} delay={i * 0.1} />;
-        return <MetricCard key={card.id} card={card} delay={i * 0.1} />;
+      {columnCharts.map((card, i) => {
+        currentDelay = (metricCards.length * 0.08) + (listCards.length * 0.1) + (barCharts.length * 0.1) + i * 0.1;
+        return (
+          <ColumnChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
+
+      {lineCharts.map((card, i) => {
+        currentDelay = (metricCards.length * 0.08) + (listCards.length * 0.1) + (barCharts.length * 0.1) + (columnCharts.length * 0.1) + i * 0.1;
+        return (
+          <LineChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
+
+      {areaCharts.map((card, i) => {
+        currentDelay += i * 0.1;
+        return (
+          <AreaChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
+
+      {pieCharts.map((card, i) => {
+        currentDelay += i * 0.1;
+        return (
+          <PieChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
+
+      {donutCharts.map((card, i) => {
+        currentDelay += i * 0.1;
+        return (
+          <DonutChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
+      })}
+
+      {radarCharts.map((card, i) => {
+        currentDelay += i * 0.1;
+        return (
+          <RadarChart
+            key={card.id}
+            data={card.chartData || []}
+            title={card.title}
+            color={card.color}
+            delay={currentDelay}
+            subtitle={card.subtitle}
+          />
+        );
       })}
     </div>
   );
