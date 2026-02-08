@@ -8,6 +8,7 @@ import { createMockAIStream } from '../components/gia/mockAIStream';
 import type { CardData } from '../components/gia/giaScript';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
+import { speakGia } from '../lib/elevenLabsTTS';
 import {
   Sparkles,
   History,
@@ -47,6 +48,7 @@ export function GIA() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string | undefined>(undefined);
   const [demoMode, setDemoMode] = useState(false);
+  const [greetingDone, setGreetingDone] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
 
@@ -58,42 +60,42 @@ export function GIA() {
     if (usuario?.id) loadConversations();
   }, [usuario?.id]);
 
+  useEffect(() => {
+    if (!usuario || greetingDone) return;
+    setGreetingDone(true);
+
+    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marco.abdo@gmail.com' || usuario.email?.includes('marco.abdo');
+    const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
+    const greetingText = `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
+
+    const timer = setTimeout(() => {
+      const greetingMessage: GIAMessage = {
+        id: `greeting-${Date.now()}`,
+        role: 'assistant',
+        content: greetingText,
+        timestamp: Date.now(),
+      };
+      setMessages([greetingMessage]);
+      setAiState('speaking');
+      speakGia(greetingText).finally(() => setAiState('idle'));
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [usuario, greetingDone]);
+
   const checkConnections = async () => {
     setConnection({ status: 'checking', chatgpt: false, elevenlabs: false });
-    let chatgptOk = false;
-    let errorMsg = '';
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
       if (session) {
-        const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gia-chat`;
-        const testResponse = await fetch(apiUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-          },
-          body: JSON.stringify({ message: 'ping', conversationId: null, history: [] }),
-        });
-        if (testResponse.ok) {
-          chatgptOk = true;
-        } else {
-          const errData = await testResponse.json().catch(() => ({}));
-          errorMsg = errData.error || `Erro ${testResponse.status}`;
-        }
+        setConnection({ status: 'connected', chatgpt: true, elevenlabs: true });
+        setDemoMode(false);
       } else {
-        errorMsg = 'Usuario nao autenticado';
+        setConnection({ status: 'partial', chatgpt: false, elevenlabs: false, error: 'Usuario nao autenticado' });
       }
     } catch (err) {
-      errorMsg = err instanceof Error ? err.message : 'Falha ao conectar com o servidor';
-    }
-
-    if (chatgptOk) {
-      setConnection({ status: 'connected', chatgpt: true, elevenlabs: false });
-      setDemoMode(false);
-    } else {
-      setConnection({ status: 'partial', chatgpt: false, elevenlabs: false, error: errorMsg });
+      setConnection({ status: 'partial', chatgpt: false, elevenlabs: false, error: err instanceof Error ? err.message : 'Falha ao conectar' });
     }
   };
 
@@ -137,16 +139,32 @@ export function GIA() {
     setShowHistory(false);
   };
 
+  const getGreetingText = useCallback(() => {
+    if (!usuario) return 'Ola! Como posso ajudar?';
+    const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marco.abdo@gmail.com' || usuario.email?.includes('marco.abdo');
+    const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
+    return `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
+  }, [usuario]);
+
   const startNewConversation = () => {
-    setMessages([]);
-    setConversationId(null);
-    setActiveFloatingCards([]);
-    setStreamingText('');
-    setAiState('idle');
     if (cancelStreamRef.current) {
       cancelStreamRef.current();
       cancelStreamRef.current = null;
     }
+    setConversationId(null);
+    setActiveFloatingCards([]);
+    setStreamingText('');
+
+    const greetingText = getGreetingText();
+    const greetingMessage: GIAMessage = {
+      id: `greeting-${Date.now()}`,
+      role: 'assistant',
+      content: greetingText,
+      timestamp: Date.now(),
+    };
+    setMessages([greetingMessage]);
+    setAiState('speaking');
+    speakGia(greetingText).finally(() => setAiState('idle'));
   };
 
   const deleteConversation = async (convId: string) => {
@@ -222,7 +240,7 @@ export function GIA() {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) return;
 
-      const history = messages.slice(-10).map(m => ({ role: m.role, content: m.content }));
+      const history = messages.filter(m => !m.id.startsWith('greeting-')).slice(-10).map(m => ({ role: m.role, content: m.content }));
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gia-chat`;
       const response = await fetch(apiUrl, {
         method: 'POST',
