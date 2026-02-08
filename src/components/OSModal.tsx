@@ -130,6 +130,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
+  const [mostrarConfirmacaoMover, setMostrarConfirmacaoMover] = useState(false);
+  const [colunaDestino, setColunaDestino] = useState<{ id: string; label: string } | null>(null);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -2501,9 +2503,8 @@ Não haverá cobrança ao cliente.`
                       <button
                         key={coluna.id}
                         onClick={() => {
-                          if (window.confirm(`Mover OS para "${coluna.label}"?`)) {
-                            moverOS(coluna.id);
-                          }
+                          setColunaDestino(coluna);
+                          setMostrarConfirmacaoMover(true);
                         }}
                         disabled={movendoOS}
                         className="w-full text-left px-3 py-2 rounded-lg text-sm font-medium transition-all hover:bg-[#00D4FF]/10 disabled:opacity-50"
@@ -4888,6 +4889,87 @@ Não haverá cobrança ao cliente.`
             loadComentarios();
           }}
         />
+      )}
+
+      {mostrarConfirmacaoMover && colunaDestino && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="premium-card w-full max-w-md">
+            <div className="p-6 border-b border-[#00D4FF]/20">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-[#00D4FF]/20 to-[#7B2FFF]/20 flex items-center justify-center">
+                  <MoveHorizontal className="w-5 h-5 text-[#00D4FF]" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Confirmar Movimentação</h3>
+                  <p className="text-xs text-gray-400">Verifique o destino antes de prosseguir</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="space-y-3">
+                <div className="p-4 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+                  <p className="text-xs text-gray-400 mb-1">De:</p>
+                  <p className="text-sm font-medium text-white">
+                    {COLUNAS_KANBAN.find(c => c.id === os?.coluna_kanban)?.label || 'N/A'}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center">
+                  <MoveHorizontal className="w-5 h-5 text-[#00D4FF]" />
+                </div>
+
+                <div className="p-4 rounded-lg bg-gradient-to-br from-[#00D4FF]/10 to-[#7B2FFF]/10 border border-[#00D4FF]/30">
+                  <p className="text-xs text-gray-400 mb-1">Para:</p>
+                  <p className="text-base font-bold text-[#00D4FF]">
+                    {colunaDestino.label}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
+                <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-200">
+                  Esta ação irá mover a OS para a coluna selecionada
+                </p>
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-[#00D4FF]/20 flex gap-3">
+              <button
+                onClick={() => {
+                  setMostrarConfirmacaoMover(false);
+                  setColunaDestino(null);
+                }}
+                disabled={movendoOS}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-white/5 hover:bg-white/10 text-white font-medium transition-all disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={async () => {
+                  await moverOS(colunaDestino.id);
+                  setMostrarConfirmacaoMover(false);
+                  setColunaDestino(null);
+                }}
+                disabled={movendoOS}
+                className="flex-1 px-4 py-2.5 rounded-lg bg-gradient-to-r from-[#00D4FF] to-[#7B2FFF] hover:shadow-lg hover:shadow-[#00D4FF]/50 text-white font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {movendoOS ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                    Movendo...
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-4 h-4" />
+                    Confirmar
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
