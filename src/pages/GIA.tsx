@@ -263,7 +263,11 @@ export function GIA() {
         timestamp: Date.now(),
       };
       setMessages(prev => [...prev, aiMessage]);
-      setAiState('idle');
+
+      if (currentMode !== 'voice') {
+        setAiState('idle');
+      }
+
       loadConversations();
     } catch (err) {
       const errMsg: GIAMessage = {
@@ -301,6 +305,23 @@ export function GIA() {
       streamIntervalRef.current = interval;
     });
   }, []);
+
+  useEffect(() => {
+    if (currentMode !== 'voice' || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage.role === 'assistant' && !lastMessage.id.startsWith('greeting-')) {
+      setIsSpeaking(true);
+      setAiState('speaking');
+      speakGia(lastMessage.content).then(() => {
+        setIsSpeaking(false);
+        setAiState('idle');
+      }).catch(() => {
+        setIsSpeaking(false);
+        setAiState('idle');
+      });
+    }
+  }, [messages, currentMode]);
 
   const sendMessage = useCallback((text: string) => {
     if (isProcessing) return;
