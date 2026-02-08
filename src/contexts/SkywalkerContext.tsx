@@ -384,6 +384,35 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     }
   }, [usuario]);
 
+  // Subscription em tempo real para skywalker_estrelas_mes
+  useEffect(() => {
+    if (!myProfissional) return;
+
+    const channel = supabase
+      .channel('skywalker_estrelas_changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'skywalker_estrelas_mes',
+          filter: `profissional_id=eq.${myProfissional.id}`,
+        },
+        (payload) => {
+          console.log('Skywalker estrelas changed:', payload);
+          // Recarregar estrelas do mês
+          loadEstrelasDoMes(myProfissional.id, mesReferencia);
+          // Recarregar ranking também
+          loadRanking(mesReferencia);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [myProfissional, mesReferencia, loadEstrelasDoMes, loadRanking]);
+
   return (
     <SkywalkerContext.Provider
       value={{
