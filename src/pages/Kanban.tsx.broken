@@ -373,11 +373,7 @@ export function Kanban() {
 
   const syncSamsungGSPN = async () => {
     if (!selectedUnidade) {
-      setInfoModalData({
-        title: 'Sincronização Samsung',
-        message: 'Selecione uma unidade para atualizar.'
-      });
-      setShowInfoModal(true);
+      alert('Selecione uma unidade para atualizar');
       return;
     }
 
@@ -390,20 +386,12 @@ export function Kanban() {
         .single();
 
       if (!unidadeData) {
-        setInfoModalData({
-          title: 'Sincronização Samsung',
-          message: 'Unidade não encontrada.'
-        });
-        setShowInfoModal(true);
+        alert('Unidade não encontrada');
         return;
       }
 
       if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        setInfoModalData({
-          title: 'Configuração Incompleta',
-          message: 'Esta unidade não possui configuração Samsung (ASC Code ou Token não configurados).'
-        });
-        setShowInfoModal(true);
+        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
         return;
       }
 
@@ -425,18 +413,10 @@ export function Kanban() {
       if (response.ok && result.status === 'success') {
         await loadKanbanData();
       } else {
-        setErrorModalData({
-          title: 'Erro na Sincronização',
-          message: result.message || 'Erro desconhecido ao sincronizar com Samsung.'
-        });
-        setShowErrorModal(true);
+        alert(`Erro na atualização: ${result.message || 'Erro desconhecido'}`);
       }
     } catch (error) {
-      setErrorModalData({
-        title: 'Erro ao Sincronizar',
-        message: error instanceof Error ? error.message : 'Erro desconhecido ao sincronizar.'
-      });
-      setShowErrorModal(true);
+      alert(`Erro ao atualizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     } finally {
       setSyncingSamsung(false);
     }
@@ -892,11 +872,7 @@ export function Kanban() {
         setDraggedCard(null);
         return;
       } catch (error: any) {
-        setErrorModalData({
-          title: 'Erro ao Reordenar OS',
-          message: error?.message || 'Erro desconhecido'
-        });
-        setShowErrorModal(true);
+        alert(`❌ Erro ao reordenar OS: ${error?.message || 'Erro desconhecido'}`);
         setDraggedCard(null);
         return;
       }
@@ -1059,8 +1035,6 @@ export function Kanban() {
       });
       setShowErrorModal(true);
       setDraggedCard(null);
-    } finally {
-      setDraggedCard(null);
     }
   };
 
@@ -1070,129 +1044,10 @@ export function Kanban() {
         onConfirm: continueWithConfirmedMove
       });
       setShowConfirmMove(true);
-      setDraggedCard(null);
       return;
     }
 
     try {
-      const { data: requisicoes } = await supabase
-        .from('requisicoes_pecas')
-        .select('id, status, codigo_peca, descricao, numero_pedido_samsung')
-        .eq('os_id', draggedCard.id);
-
-      const pecasAtivas = requisicoes?.filter(r =>
-        ['atendida', 'em_uso', 'gi_postada', 'pedido_feito'].includes(r.status)
-      ) || [];
-
-      const colunasPermitidas = [
-        'peca_em_transito',
-        'peca_disponivel',
-        'aguardando_peca',
-        'rota_preta',
-        'rota_vermelha',
-        'rota_azul',
-        'rota_verde',
-        'rota_rosa',
-        'rota_amarela',
-        'rota_laranja',
-        'em_rota_ih',
-        'reparo_concluido',
-        'em_reparo_ci',
-        'aguardando_fechamento',
-        'fechar_os'
-      ];
-
-      if (pecasAtivas.length > 0 && !colunasPermitidas.includes(targetColumn)) {
-        const statusLabels: Record<string, string> = {
-          pedido_feito: '🚚 Pedido Ativo',
-          atendida: '✅ Peça Atendida',
-          em_uso: '🔧 Em Uso',
-          gi_postada: '📦 GI Pendente'
-        };
-
-        setPecasAtivasData(pecasAtivas);
-        setShowPecasAtivasBlock(true);
-        setDraggedCard(null);
-        return;
-      }
-
-      if (targetColumn === 'controle_qualidade' && draggedCard.coluna_kanban !== 'controle_qualidade') {
-        const osNumero = draggedCard.numero_os_samsung || draggedCard.numero_os_interna || draggedCard.id.slice(0, 8);
-        setPendingOQCDrop({ card: draggedCard, position: finalPosition });
-        setSelectedOSForOQC({ id: draggedCard.id, numero: String(osNumero) });
-        setShowReparoEfetuadoModal(true);
-        setDraggedCard(null);
-        return;
-      }
-
-      let novaSequencia: number;
-      const cardsDestino = filteredData[targetColumn] || [];
-
-      if (finalPosition === undefined || finalPosition >= cardsDestino.length) {
-        const ultimoCard = cardsDestino[cardsDestino.length - 1];
-        novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
-      } else if (finalPosition === 0) {
-        const primeiroCard = cardsDestino[0];
-        novaSequencia = primeiroCard ? (primeiroCard.sequencia_coluna ?? 0) - 1 : 0;
-      } else {
-        const cardAntes = cardsDestino[finalPosition - 1];
-        const cardDepois = cardsDestino[finalPosition];
-        const seqAntes = cardAntes?.sequencia_coluna ?? 0;
-        const seqDepois = cardDepois?.sequencia_coluna ?? 0;
-        novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
-
-        if (novaSequencia === seqAntes || novaSequencia === seqDepois) {
-          await supabase.rpc('renumerar_sequencias_coluna', {
-            p_coluna_kanban: targetColumn,
-            p_unidade_id: draggedCard.unidade_id
-          });
-          await loadKanbanData();
-          setDraggedCard(null);
-          return;
-        }
-      }
-
-      const { error } = await supabase
-        .from('os')
-        .update({
-          coluna_kanban: targetColumn,
-          sequencia_coluna: novaSequencia,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', draggedCard.id);
-
-      if (error) throw error;
-
-      const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
-      if (rotasColumns.includes(targetColumn)) {
-        await criarAgendamentoParaRota(draggedCard);
-      }
-
-      const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
-
-      setOsData(prevData => {
-        const newData = { ...prevData };
-        newData[draggedCard.coluna_kanban] = newData[draggedCard.coluna_kanban].filter(os => os.id !== draggedCard.id);
-        const newCards = [...(newData[targetColumn] || []), updatedCard];
-        newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
-        newData[targetColumn] = newCards;
-        return newData;
-      });
-
-      if (targetColumn === 'peca_disponivel' && updatedCard.cliente_cidade) {
-        setRoutePickerOS(updatedCard);
-      }
-    } catch (error: any) {
-      const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
-      setErrorModalData({
-        title: 'Erro ao Mover OS',
-        message: errorMessage
-      });
-      setShowErrorModal(true);
-    } finally {
-      setDraggedCard(null);
-    }
-  };
 
   const handleRoutePickerSelect = async (targetColumn: string) => {
     if (!routePickerOS) return;
@@ -1220,11 +1075,7 @@ export function Kanban() {
         await criarAgendamentoParaRota(routePickerOS!);
       }
     } catch (err: any) {
-      setErrorModalData({
-        title: 'Erro ao Mover para Rota',
-        message: err?.message || 'Erro desconhecido'
-      });
-      setShowErrorModal(true);
+      alert(`Erro ao mover para rota: ${err?.message || 'Erro desconhecido'}`);
       await loadKanbanData();
     }
   };
@@ -2926,60 +2777,6 @@ export function Kanban() {
         />
       )}
 
-      <DiagnosticoBlockModal
-        isOpen={showDiagnosticoBlock}
-        onClose={() => setShowDiagnosticoBlock(false)}
-      />
-
-      {confirmMoveData && (
-        <ConfirmMoveModal
-          isOpen={showConfirmMove}
-          onClose={() => {
-            setShowConfirmMove(false);
-            setConfirmMoveData(null);
-            setDraggedCard(null);
-          }}
-          fromColumn={confirmMoveData.from}
-          toColumn={confirmMoveData.to}
-          onConfirm={confirmMoveData.onConfirm}
-        />
-      )}
-
-      <PecasAtivasBlockModal
-        isOpen={showPecasAtivasBlock}
-        onClose={() => {
-          setShowPecasAtivasBlock(false);
-          setPecasAtivasData([]);
-        }}
-        pecas={pecasAtivasData}
-        statusLabels={{
-          pedido_feito: '🚚 Pedido Ativo',
-          atendida: '✅ Peça Atendida',
-          em_uso: '🔧 Em Uso',
-          gi_postada: '📦 GI Pendente'
-        }}
-      />
-
-      <ErrorModal
-        isOpen={showErrorModal}
-        onClose={() => {
-          setShowErrorModal(false);
-          setErrorModalData({ title: '', message: '' });
-        }}
-        title={errorModalData.title}
-        message={errorModalData.message}
-      />
-
-      <InfoModal
-        isOpen={showInfoModal}
-        onClose={() => {
-          setShowInfoModal(false);
-          setInfoModalData({ title: '', message: '' });
-        }}
-        title={infoModalData.title}
-        message={infoModalData.message}
-      />
-
       {routePickerOS && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-8 pointer-events-none" style={{ background: 'rgba(0,0,0,0.3)' }}>
           <div
@@ -3127,11 +2924,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
 
   const handleExport = async () => {
     if (osData.length === 0) {
-      setInfoModalData({
-        title: 'Exportação',
-        message: 'Nenhuma OS para exportar.'
-      });
-      setShowInfoModal(true);
+      alert('Nenhuma OS para exportar');
       return;
     }
 
@@ -3448,11 +3241,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
       onClose();
     } catch (error) {
       console.error('Erro ao exportar:', error);
-      setErrorModalData({
-        title: 'Erro na Exportação',
-        message: 'Não foi possível exportar os dados. Por favor, tente novamente.'
-      });
-      setShowErrorModal(true);
+      alert('Erro ao exportar dados');
     } finally {
       setExporting(false);
     }
