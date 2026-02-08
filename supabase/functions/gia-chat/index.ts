@@ -166,45 +166,42 @@ Deno.serve(async (req: Request) => {
       .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido, status_samsung_desc")
       .order("created_at", { ascending: false });
 
-    console.log("[GIA] OS Query Results - TODAS AS OS:");
-    console.log("  - Total OS carregadas:", osList?.length || 0);
-    if (osError) {
-      console.log("  - ERRO na query:", JSON.stringify(osError));
-    }
+    console.log("[GIA] ===== RESULTADO QUERY OS =====");
+    console.log("  - osList existe?", !!osList);
+    console.log("  - osList é array?", Array.isArray(osList));
+    console.log("  - Total OS:", osList?.length || 0);
+    console.log("  - Erro?", osError ? JSON.stringify(osError) : "nenhum");
     if (osList && osList.length > 0) {
-      console.log("  - Primeira OS:", osList[0].numero_os_interna);
-      console.log("  - Ultima OS:", osList[osList.length - 1].numero_os_interna);
+      console.log("  - Sample OS 1:", JSON.stringify(osList[0]));
+    } else {
+      console.log("  - PROBLEMA: osList está vazio ou null!");
     }
 
-    let pagQuery = supabase
+    const { data: pagamentos, error: pagError } = await supabase
       .from("pagamentos")
       .select("id, valor, metodo_pagamento, status, created_at, os_id, comprovante_url, descricao, unidade_id")
       .order("created_at", { ascending: false });
 
-    if (!isMaster && unidadeFilter) {
-      pagQuery = pagQuery.eq("unidade_id", unidadeFilter);
-    }
+    console.log("[GIA] Pagamentos:", pagamentos?.length || 0, "| Erro:", pagError ? JSON.stringify(pagError) : "nenhum");
 
-    const { data: pagamentos } = await pagQuery;
-
-    const { data: unidades } = await supabase
+    const { data: unidades, error: unidadesError } = await supabase
       .from("unidades")
       .select("id, nome, cidade, estado, endereco, latitude, longitude, telefone");
 
-    const { data: tecnicos } = await supabase
+    console.log("[GIA] Unidades:", unidades?.length || 0, "| Erro:", unidadesError ? JSON.stringify(unidadesError) : "nenhum");
+
+    const { data: tecnicos, error: tecnicosError } = await supabase
       .from("usuarios")
       .select("id, nome, tipo, unidade_id, numero_tecnico")
       .in("tipo", ["tecnico", "tecnico_ih", "master", "diretoria"]);
 
-    let pecasQuery = supabase
+    console.log("[GIA] Tecnicos:", tecnicos?.length || 0, "| Erro:", tecnicosError ? JSON.stringify(tecnicosError) : "nenhum");
+
+    const { data: pecas, error: pecasError } = await supabase
       .from("estoque_pecas")
       .select("id, sku, descricao, quantidade, preco_custo, preco_venda, status, sala_id, estante_id, bin_id, gi_postada, gi_data_postagem, unidade_id");
 
-    if (!isMaster && unidadeFilter) {
-      pecasQuery = pecasQuery.eq("unidade_id", unidadeFilter);
-    }
-
-    const { data: pecas } = await pecasQuery;
+    console.log("[GIA] Pecas estoque:", pecas?.length || 0, "| Erro:", pecasError ? JSON.stringify(pecasError) : "nenhum");
 
     const { data: metas } = await supabase
       .from("metas_performance")
@@ -491,6 +488,14 @@ Deno.serve(async (req: Request) => {
       configuracoes: configuracoes?.length || 0,
       metas: metas || [],
     };
+
+    console.log("[GIA] ===== DATABASE SNAPSHOT MONTADO =====");
+    console.log("  - resumoOS.totalGeral:", databaseSnapshot.resumoOS.totalGeral);
+    console.log("  - resumoOS.totalMesAtual:", databaseSnapshot.resumoOS.totalMesAtual);
+    console.log("  - resumoOS.totalAnoAtual:", databaseSnapshot.resumoOS.totalAnoAtual);
+    console.log("  - estoque.totalPecas:", databaseSnapshot.estoque.totalPecas);
+    console.log("  - financeiro.receitaTotalGeral:", databaseSnapshot.financeiro.receitaTotalGeral);
+    console.log("  - unidades:", databaseSnapshot.unidades.length);
 
     const systemPrompt = `Voce e a GIA (Global Intelligence Assistant), a assistente de inteligencia artificial do Group Global, dentro do sistema ATOM, uma empresa de assistencia tecnica de celulares e eletronicos (Samsung, Apple, etc).
 
