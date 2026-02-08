@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion';
-import { BarChart3, TrendingUp, PieChart, Activity } from 'lucide-react';
+import { BarChart3, TrendingUp, PieChart as PieChartIcon, Activity } from 'lucide-react';
 
 export interface ChartDataPoint {
   label: string;
@@ -419,7 +419,7 @@ export function PieChart({
   });
 
   return (
-    <ChartCard title={title} color={color} delay={delay} icon={PieChart} subtitle={subtitle}>
+    <ChartCard title={title} color={color} delay={delay} icon={PieChartIcon} subtitle={subtitle}>
       <div className="flex items-center gap-4">
         <div className="relative w-32 h-32">
           <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
@@ -515,7 +515,7 @@ export function DonutChart({
   });
 
   return (
-    <ChartCard title={title} color={color} delay={delay} icon={PieChart} subtitle={subtitle}>
+    <ChartCard title={title} color={color} delay={delay} icon={PieChartIcon} subtitle={subtitle}>
       <div className="flex items-center gap-4">
         <div className="relative w-32 h-32">
           <svg viewBox="0 0 100 100" className="w-full h-full transform -rotate-90">
