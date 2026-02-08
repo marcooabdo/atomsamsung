@@ -157,22 +157,24 @@ Deno.serve(async (req: Request) => {
     const unidadeFilter = usuario.unidade_id;
     const isMaster = usuario.tipo === "master" || usuario.tipo === "diretoria";
 
-    let osQuery = supabase
+    console.log("[GIA] Iniciando query de OS...");
+    console.log("  - Usuario:", usuario.nome, "| Tipo:", usuario.tipo, "| Unidade:", usuario.unidade_id);
+    console.log("  - isMaster:", isMaster);
+
+    const { data: osList, error: osError } = await supabase
       .from("os")
       .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido, status_samsung_desc")
       .order("created_at", { ascending: false });
 
-    if (!isMaster && unidadeFilter) {
-      osQuery = osQuery.eq("unidade_id", unidadeFilter);
-    }
-
-    const { data: osList, error: osError } = await osQuery;
-
-    console.log("[GIA] OS Query Results - SEM LIMITES:");
-    console.log("  - isMaster:", isMaster);
-    console.log("  - unidadeFilter:", unidadeFilter);
+    console.log("[GIA] OS Query Results - TODAS AS OS:");
     console.log("  - Total OS carregadas:", osList?.length || 0);
-    if (osError) console.log("  - OS error:", osError);
+    if (osError) {
+      console.log("  - ERRO na query:", JSON.stringify(osError));
+    }
+    if (osList && osList.length > 0) {
+      console.log("  - Primeira OS:", osList[0].numero_os_interna);
+      console.log("  - Ultima OS:", osList[osList.length - 1].numero_os_interna);
+    }
 
     let pagQuery = supabase
       .from("pagamentos")
