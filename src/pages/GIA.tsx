@@ -375,7 +375,7 @@ export function GIA() {
           <div>
             <h1 className="text-base font-bold tracking-wide" style={{ color: '#e2e8f0' }}>GIA</h1>
             <p className="text-[9px] tracking-widest uppercase font-medium" style={{ color: '#475569' }}>
-              Group Intelligence Assistant
+              Global Intelligence Assistant
             </p>
           </div>
         </div>
