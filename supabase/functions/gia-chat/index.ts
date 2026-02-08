@@ -152,17 +152,15 @@ Deno.serve(async (req: Request) => {
     const now = new Date();
     const today = now.toISOString().split("T")[0];
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1).toISOString().split("T")[0];
+    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
 
     const unidadeFilter = usuario.unidade_id;
     const isMaster = usuario.tipo === "master" || usuario.tipo === "diretoria";
 
     let osQuery = supabase
       .from("os")
-      .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido")
-      .gte("created_at", threeMonthsAgo)
-      .order("created_at", { ascending: false })
-      .limit(1000);
+      .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido, status_samsung_desc")
+      .order("created_at", { ascending: false });
 
     if (!isMaster && unidadeFilter) {
       osQuery = osQuery.eq("unidade_id", unidadeFilter);
@@ -170,18 +168,16 @@ Deno.serve(async (req: Request) => {
 
     const { data: osList, error: osError } = await osQuery;
 
-    console.log("[GIA] OS Query Results:");
-    console.log("  - threeMonthsAgo filter:", threeMonthsAgo);
+    console.log("[GIA] OS Query Results - SEM LIMITES:");
     console.log("  - isMaster:", isMaster);
     console.log("  - unidadeFilter:", unidadeFilter);
-    console.log("  - OS count:", osList?.length || 0);
+    console.log("  - Total OS carregadas:", osList?.length || 0);
     if (osError) console.log("  - OS error:", osError);
 
     let pagQuery = supabase
       .from("pagamentos")
       .select("id, valor, metodo_pagamento, status, created_at, os_id, comprovante_url, descricao, unidade_id")
-      .gte("created_at", monthStart)
-      .limit(500);
+      .order("created_at", { ascending: false });
 
     if (!isMaster && unidadeFilter) {
       pagQuery = pagQuery.eq("unidade_id", unidadeFilter);
@@ -200,8 +196,7 @@ Deno.serve(async (req: Request) => {
 
     let pecasQuery = supabase
       .from("estoque_pecas")
-      .select("id, sku, descricao, quantidade, preco_custo, preco_venda, status, sala_id, estante_id, bin_id, gi_postada, gi_data_postagem")
-      .limit(300);
+      .select("id, sku, descricao, quantidade, preco_custo, preco_venda, status, sala_id, estante_id, bin_id, gi_postada, gi_data_postagem, unidade_id");
 
     if (!isMaster && unidadeFilter) {
       pecasQuery = pecasQuery.eq("unidade_id", unidadeFilter);
@@ -211,76 +206,63 @@ Deno.serve(async (req: Request) => {
 
     const { data: metas } = await supabase
       .from("metas_performance")
-      .select("*")
-      .limit(50);
+      .select("*");
 
     const { data: requisicoes } = await supabase
       .from("requisicoes_pecas")
       .select("id, status, numero_os_samsung, created_at, justificativa, motivo_reprovacao, os_id")
-      .gte("created_at", monthStart)
-      .limit(300);
+      .order("created_at", { ascending: false });
 
     const { data: agendamentos } = await supabase
       .from("agendamentos")
       .select("id, os_id, tecnico_id, data_agendamento, periodo, status, rota_id, checkin_at, checkout_at")
-      .gte("data_agendamento", monthStart)
-      .limit(300);
+      .order("data_agendamento", { ascending: false });
 
     const { data: rotas } = await supabase
       .from("rotas_otimizadas")
       .select("id, tecnico_id, data, total_os, distancia_total, tempo_total, status")
-      .gte("data", monthStart)
-      .limit(100);
+      .order("data", { ascending: false });
 
     const { data: cotacoes } = await supabase
       .from("cotacoes")
       .select("id, os_id, status, valor_total, desconto_valor, desconto_tipo, taxa_cliente, created_at")
-      .gte("created_at", monthStart)
-      .limit(200);
+      .order("created_at", { ascending: false });
 
     const { data: cotacoesPecas } = await supabase
       .from("cotacoes_pecas")
-      .select("id, cotacao_id, descricao, quantidade, preco_unitario, is_gspn")
-      .limit(500);
+      .select("id, cotacao_id, descricao, quantidade, preco_unitario, is_gspn");
 
     const { data: cotacoesServicos } = await supabase
       .from("cotacoes_servicos")
-      .select("id, cotacao_id, descricao, quantidade, preco_unitario")
-      .limit(300);
+      .select("id, cotacao_id, descricao, quantidade, preco_unitario");
 
     const { data: osPecas } = await supabase
       .from("os_pecas")
-      .select("id, os_id, peca_id, quantidade, gspn_status, valor_gspn, manual_status")
-      .limit(500);
+      .select("id, os_id, peca_id, quantidade, gspn_status, valor_gspn, manual_status");
 
     const { data: osServicos } = await supabase
       .from("os_servicos")
-      .select("id, os_id, servico_id, quantidade, preco_unitario")
-      .limit(500);
+      .select("id, os_id, servico_id, quantidade, preco_unitario");
 
     const { data: checklists } = await supabase
       .from("checklists")
       .select("id, nome, tipo, ativo")
-      .eq("ativo", true)
-      .limit(50);
+      .eq("ativo", true);
 
     const { data: osComentarios } = await supabase
       .from("os_comentarios")
       .select("id, os_id, comentario, created_at, is_system")
-      .gte("created_at", monthStart)
-      .limit(500);
+      .order("created_at", { ascending: false });
 
     const { data: nfs } = await supabase
       .from("estoque_nfs")
       .select("id, numero_nf, fornecedor, valor_total, data_emissao, delivery")
-      .gte("data_emissao", monthStart)
-      .limit(100);
+      .order("data_emissao", { ascending: false });
 
     const { data: skywalkerProfissionais } = await supabase
       .from("skywalker_profissionais")
       .select("id, usuario_id, nivel_atual_id, time_id, meses_consecutivos_validos, ativo")
-      .eq("ativo", true)
-      .limit(100);
+      .eq("ativo", true);
 
     const { data: skywalkerNiveis } = await supabase
       .from("skywalker_niveis")
@@ -295,35 +277,55 @@ Deno.serve(async (req: Request) => {
     const { data: jobs } = await supabase
       .from("jobs")
       .select("id, tecnico_id, data, total_os, status, finished_at")
-      .gte("data", monthStart)
-      .limit(100);
+      .order("data", { ascending: false });
 
     const { data: configuracoes } = await supabase
       .from("configuracoes_unidade")
-      .select("*")
-      .limit(20);
+      .select("*");
 
     const totalOS = osList?.length || 0;
     const statusCount: Record<string, number> = {};
     const kanbanCount: Record<string, number> = {};
     const tipoOSCount: Record<string, number> = {};
+    const statusSamsungCount: Record<string, number> = {};
+    let valorTotalGeral = 0;
     let valorTotalMes = 0;
+    let valorTotalAno = 0;
     let orcAprovados = 0;
     let orcTotal = 0;
     const osPorDia: Record<string, number> = {};
     const osHoje: typeof osList = [];
     const monthPrefix = monthStart.slice(0, 7);
+    const yearPrefix = yearStart.slice(0, 4);
     let osMesAtual = 0;
+    let osAnoAtual = 0;
+    let osEmAberto = 0;
 
     for (const os of osList || []) {
       statusCount[os.status || "unknown"] = (statusCount[os.status || "unknown"] || 0) + 1;
       kanbanCount[os.coluna_kanban || "unknown"] = (kanbanCount[os.coluna_kanban || "unknown"] || 0) + 1;
       tipoOSCount[os.tipo_os || "unknown"] = (tipoOSCount[os.tipo_os || "unknown"] || 0) + 1;
 
+      if (os.status_samsung_desc) {
+        statusSamsungCount[os.status_samsung_desc] = (statusSamsungCount[os.status_samsung_desc] || 0) + 1;
+      }
+
+      valorTotalGeral += os.valor_total || 0;
+
       const dia = (os.created_at || "").split("T")[0];
       if (dia.startsWith(monthPrefix)) {
         valorTotalMes += os.valor_total || 0;
         osMesAtual++;
+      }
+      if (dia.startsWith(yearPrefix)) {
+        valorTotalAno += os.valor_total || 0;
+        osAnoAtual++;
+      }
+
+      const statusAberto = !['concluido', 'entregue', 'cancelado', 'os_fechada'].includes(os.coluna_kanban || '');
+      const statusSamsungAberto = !['REPARO COMPLETO', 'PRODUTO ENTREGUE', 'CANCELADO'].includes(os.status_samsung_desc || '');
+      if (statusAberto && statusSamsungAberto) {
+        osEmAberto++;
       }
 
       if (os.tipo_orcamento === "lp" || os.tipo_orcamento === "normal") orcTotal++;
@@ -332,7 +334,8 @@ Deno.serve(async (req: Request) => {
       if (dia === today) osHoje.push(os);
     }
 
-    const receitaMes = (pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
+    const receitaTotalGeral = (pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
+    const receitaMes = (pagamentos || []).filter(p => (p.created_at || "").split("T")[0].startsWith(monthPrefix)).reduce((s, p) => s + (p.valor || 0), 0);
     const metodosPgto: Record<string, number> = {};
     for (const p of pagamentos || []) {
       metodosPgto[p.metodo_pagamento || "outro"] = (metodosPgto[p.metodo_pagamento || "outro"] || 0) + 1;
@@ -369,14 +372,19 @@ Deno.serve(async (req: Request) => {
       unidades: (unidades || []).map(u => ({ id: u.id, nome: u.nome, cidade: u.cidade, estado: u.estado, endereco: u.endereco })),
 
       resumoOS: {
-        IMPORTANTE: "Existem OS cadastradas no sistema! Consulte os detalhes abaixo.",
-        totalUltimos3Meses: totalOS,
+        IMPORTANTE: "DADOS REAIS DO SISTEMA - SEM LIMITE DE REGISTROS",
+        totalGeral: totalOS,
+        totalAnoAtual: osAnoAtual,
         totalMesAtual: osMesAtual,
+        osEmAberto: osEmAberto,
         hoje: osHoje.length,
         atrasadas: osAtrasadas.length,
         porStatus: statusCount,
         porKanban: kanbanCount,
         porTipoOS: tipoOSCount,
+        porStatusSamsung: statusSamsungCount,
+        valorTotalGeral: valorTotalGeral.toFixed(2),
+        valorTotalAno: valorTotalAno.toFixed(2),
         valorTotalMes: valorTotalMes.toFixed(2),
         taxaAprovacao: orcTotal > 0 ? ((orcAprovados / orcTotal) * 100).toFixed(1) + "%" : "N/A",
         osPorDia,
@@ -396,7 +404,7 @@ Deno.serve(async (req: Request) => {
       },
 
       agendamentos: {
-        totalMes: agendamentos?.length || 0,
+        totalGeral: agendamentos?.length || 0,
         hoje: osAgendadasHoje.length,
         agendaHoje: osAgendadasHoje.map(a => ({
           os_id: a.os_id,
@@ -408,7 +416,7 @@ Deno.serve(async (req: Request) => {
       },
 
       rotas: {
-        totalMes: rotas?.length || 0,
+        totalGeral: rotas?.length || 0,
         abertas: rotasAbertas.length,
         rotasDetalhes: rotasAbertas.map(r => ({
           tecnico_id: r.tecnico_id,
@@ -420,7 +428,7 @@ Deno.serve(async (req: Request) => {
       },
 
       cotacoes: {
-        totalMes: cotacoes?.length || 0,
+        totalGeral: cotacoes?.length || 0,
         pendentes: cotacoesPendentes.length,
         valorPendente: valorCotacoesPendentes.toFixed(2),
         pecasTotal: cotacoesPecas?.length || 0,
@@ -428,10 +436,11 @@ Deno.serve(async (req: Request) => {
       },
 
       resumoFinanceiro: {
+        receitaTotalGeral: receitaTotalGeral.toFixed(2),
         receitaMes: receitaMes.toFixed(2),
         totalPagamentos: pagamentos?.length || 0,
         porMetodo: metodosPgto,
-        pagamentosDetalhes: (pagamentos || []).slice(0, 20).map(p => ({
+        pagamentosDetalhes: (pagamentos || []).slice(0, 50).map(p => ({
           valor: p.valor,
           metodo: p.metodo_pagamento,
           status: p.status,
@@ -474,7 +483,7 @@ Deno.serve(async (req: Request) => {
       },
 
       jobs: {
-        totalMes: jobs?.length || 0,
+        totalGeral: jobs?.length || 0,
         emAndamento: jobsAbertos,
       },
 
