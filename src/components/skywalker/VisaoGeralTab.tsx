@@ -165,7 +165,7 @@ export function VisaoGeralTab() {
                 <ArrowUp className="w-4 h-4" style={{ color: nextNivel.cor }} />
                 Proximo Nivel
               </h4>
-              <div className="flex items-center gap-3 p-3 rounded-lg" style={{ backgroundColor: nextNivel.cor + '10', border: `1px solid ${nextNivel.cor}30` }}>
+              <div className="flex items-center gap-3 p-3 rounded-lg mb-3" style={{ backgroundColor: nextNivel.cor + '10', border: `1px solid ${nextNivel.cor}30` }}>
                 <div className="w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold" style={{ backgroundColor: nextNivel.cor + '25', color: nextNivel.cor }}>
                   {nextNivel.ordem}
                 </div>
@@ -176,8 +176,63 @@ export function VisaoGeralTab() {
                   </p>
                 </div>
               </div>
+
+              <div className="space-y-3">
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                      <Star className="w-3 h-3" style={{ color: '#FBBF24' }} />
+                      Estrelas necessarias
+                    </span>
+                    <span className="text-xs font-bold" style={{ color: nextNivel.cor }}>
+                      {myStars}/{nextNivel.estrelas_necessarias}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${Math.min((myStars / nextNivel.estrelas_necessarias) * 100, 100)}%`,
+                        background: `linear-gradient(90deg, ${nextNivel.cor}, ${nextNivel.cor}dd)`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {myStars >= nextNivel.estrelas_necessarias
+                      ? 'Meta de estrelas atingida!'
+                      : `Faltam ${nextNivel.estrelas_necessarias - myStars} estrelas`}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-xs font-medium flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                      <Flame className="w-3 h-3" style={{ color: '#F97316' }} />
+                      Meses consecutivos
+                    </span>
+                    <span className="text-xs font-bold" style={{ color: nextNivel.cor }}>
+                      {myProfissional.meses_consecutivos_validos}/{nextNivel.meses_consecutivos}
+                    </span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--progress-track)' }}>
+                    <div
+                      className="h-full rounded-full transition-all duration-1000 ease-out"
+                      style={{
+                        width: `${Math.min((myProfissional.meses_consecutivos_validos / nextNivel.meses_consecutivos) * 100, 100)}%`,
+                        background: 'linear-gradient(90deg, #F97316, #FB923C)',
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] mt-0.5" style={{ color: 'var(--text-secondary)' }}>
+                    {myProfissional.meses_consecutivos_validos >= nextNivel.meses_consecutivos
+                      ? 'Sequencia completa!'
+                      : `Faltam ${nextNivel.meses_consecutivos - myProfissional.meses_consecutivos_validos} meses`}
+                  </p>
+                </div>
+              </div>
+
               {nextNivel.bonus_valor > 0 && (
-                <p className="text-sm mt-2 text-center font-medium" style={{ color: '#10B981' }}>
+                <p className="text-sm mt-3 text-center font-medium" style={{ color: '#10B981' }}>
                   Bonus: R$ {nextNivel.bonus_valor.toLocaleString('pt-BR')}/mes
                 </p>
               )}
