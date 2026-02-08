@@ -569,6 +569,94 @@ CAPACIDADES E ACESSO COMPLETO AO SISTEMA:
 DADOS ATUAIS DO SISTEMA EM TEMPO REAL:
 ${JSON.stringify(databaseSnapshot, null, 2)}
 
+SCHEMA COMPLETO DO BANCO DE DADOS - TODAS AS TABELAS E COLUNAS:
+
+TABELA: os (Ordens de Servico)
+Colunas: id, numero_os_interna, numero_os_samsung, unidade_id, criado_por, cliente_nome, cliente_telefone, cliente_telefone_2, cliente_cpf, cliente_email, cliente_endereco, cliente_cidade, cliente_estado, cliente_cep, cliente_bairro, cliente_numero, cliente_complemento, latitude, longitude, equipamento_tipo, equipamento_marca, equipamento_modelo, equipamento_imei, equipamento_defeito, diagnostico_tecnico, reparo_efetuado, tipo_os (samsung/lp/normal), tipo_atendimento (presencial/ih/delivery), tipo_orcamento (samsung/lp/normal), status (aberto/em_andamento/concluido/cancelado), coluna_kanban (triagem/aguardando_aprovacao/em_reparo/aguardando_peca/concluido/entregue/cancelado), status_garantia (dentro_garantia/fora_garantia), prioridade (alta/media/baixa), data_agendamento, periodo_agendamento (manha/tarde), tecnico_designado, tecnico_agendado_id, data_inicio_reparo, data_conclusao, prazo_entrega, orcamento_aprovado (true/false), orcamento_enviado_em, orcamento_modificado_em, valor_servicos, valor_pecas, valor_bruto, valor_liquido, valor_total, desconto_tipo (percentual/fixo), desconto_valor, is_cortesia (true/false), motivo_cortesia, tipo_reparo, data_abertura_samsung, data_compra, status_samsung, cliente_vip (true/false), saw, oqc, created_at, updated_at
+
+TABELA: pagamentos
+Colunas: id, os_id, cotacao_id, unidade_id, valor, metodo_pagamento (dinheiro/cartao/pix/transferencia/outro), status (pendente/pago/cancelado), descricao, comprovante_url, pix_id_transacao, criado_por, created_at, updated_at
+
+TABELA: cotacoes
+Colunas: id, os_id, unidade_id, status (pendente/enviada/aprovada/reprovada), valor_pecas, valor_servicos, valor_bruto, valor_liquido, desconto_tipo (percentual/fixo), desconto_valor, taxa_cliente, analise_tecnico, criado_por, created_at, updated_at
+
+TABELA: cotacoes_pecas
+Colunas: id, cotacao_id, os_id, descricao, quantidade, preco_unitario, is_gspn (true/false), exibir_no_pdf (true/false)
+
+TABELA: cotacoes_servicos
+Colunas: id, cotacao_id, os_id, servico_id, descricao, quantidade, preco_unitario, linha
+
+TABELA: os_pecas (Pecas utilizadas na OS)
+Colunas: id, os_id, peca_id, numero_os_samsung, quantidade, gspn_status (pendente/aprovado/reprovado), valor_gspn, manual_status (pendente/aprovado/reprovado), requisitada_por, created_at
+
+TABELA: os_servicos (Servicos realizados na OS)
+Colunas: id, os_id, servico_id, descricao, quantidade, preco_unitario, created_at
+
+TABELA: os_comentarios
+Colunas: id, os_id, usuario_id, comentario, is_system (true/false), gspn_id, created_at
+
+TABELA: os_anexos
+Colunas: id, os_id, usuario_id, tipo (foto/documento/laudo/nf/evidencia), descricao, url, gspn_id, gspn_tipo, exibir_no_pdf (true/false), created_at
+
+TABELA: estoque_pecas
+Colunas: id, sku, descricao, quantidade, preco_custo, preco_venda, unidade_id, sala_id, estante_id, bin_id, status (disponivel/reservada/em_uso/devolvida_nova), nf_id, gi_postada (true/false), gi_data_postagem, gi_numero, disponivel_ih (true/false), created_at
+
+TABELA: requisicoes_pecas
+Colunas: id, os_id, cotacao_id, os_peca_id, peca_ids (array), numero_os_samsung, status (pendente/aguardando_aprovacao/aprovada/reprovada/cancelada/devolucao_pendente), justificativa, motivo_reprovacao, aprovado_por, solicitado_por, created_at
+
+TABELA: estoque_nfs (Notas Fiscais de Entrada)
+Colunas: id, numero_nf, fornecedor, chave_acesso, valor_total, data_emissao, delivery, unidade_id, criado_por, created_at
+
+TABELA: agendamentos
+Colunas: id, os_id, tecnico_id, data_agendamento, periodo (manha/tarde), status (agendado/confirmado/em_andamento/concluido/cancelado), rota_id, checkin_at, checkout_at, observacoes, created_at
+
+TABELA: rotas_otimizadas
+Colunas: id, tecnico_id, data, total_os, distancia_total, tempo_total, status (planejada/em_andamento/concluida/cancelada), rota_otimizada (JSON), unidade_id, created_at
+
+TABELA: jobs (Conjunto de OS por tecnico/data)
+Colunas: id, tecnico_id, data, total_os, os_ids (array), status (em_andamento/concluido/cancelado), started_at, finished_at
+
+TABELA: checklists
+Colunas: id, nome, tipo, itens (JSON), ativo (true/false), unidade_id, created_at
+
+TABELA: usuarios
+Colunas: id, email, nome, tipo (master/diretoria/supervisor/tecnico/tecnico_ih/financeiro/estoque), unidade_id, numero_tecnico, telefone, data_nascimento, cpf, foto_url, ativo (true/false), created_at
+
+TABELA: unidades
+Colunas: id, nome, cidade, estado, endereco, cep, bairro, numero, complemento, latitude, longitude, telefone, cnpj, razao_social, inscricao_estadual, samsung_partner_id, samsung_access_token, samsung_token_expires, samsung_client_id, samsung_client_secret, ativa (true/false)
+
+TABELA: skywalker_profissionais
+Colunas: id, usuario_id, unidade_id, nivel_atual_id, time_id, estrelas_atuais, meses_consecutivos_validos, ativo (true/false)
+
+TABELA: skywalker_niveis
+Colunas: id, nome, ordem, estrelas_necessarias, meses_consecutivos, bonus_valor, bonus_tipo (fixo/percentual), cor, ativo (true/false)
+
+TABELA: skywalker_pilares
+Colunas: id, nome, descricao, tipo_metrica, peso, ativo (true/false)
+
+TABELA: metas_performance
+Colunas: id, unidade_id, mes, ano, meta_receita, meta_os_concluidas, meta_aprovacao_orcamentos, meta_ticket_medio, created_at
+
+TABELA: samsung_sync_logs
+Colunas: id, unidade_id, tipo_sincronizacao, status (sucesso/erro), detalhes, created_at
+
+TABELA: configuracoes_unidade
+Colunas: id, unidade_id, turno_manha_inicio, turno_manha_fim, turno_tarde_inicio, turno_tarde_fim, duracao_visita_minutos, raio_base_km
+
+RELACIONAMENTOS IMPORTANTES:
+- os.unidade_id -> unidades.id
+- os.criado_por -> usuarios.id
+- os.tecnico_agendado_id -> usuarios.id
+- pagamentos.os_id -> os.id
+- cotacoes.os_id -> os.id
+- cotacoes_pecas.cotacao_id -> cotacoes.id
+- os_pecas.os_id -> os.id
+- os_pecas.peca_id -> estoque_pecas.id
+- requisicoes_pecas.os_id -> os.id
+- agendamentos.os_id -> os.id
+- agendamentos.tecnico_id -> usuarios.id
+- rotas_otimizadas.tecnico_id -> usuarios.id
+
 CARDS DE DADOS - OBRIGATORIO:
 SEMPRE que falar sobre numeros, metricas, valores, status, listas ou dados quantitativos, voce DEVE incluir cards visuais.
 
