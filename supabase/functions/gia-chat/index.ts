@@ -312,15 +312,22 @@ Deno.serve(async (req: Request) => {
     let orcTotal = 0;
     const osPorDia: Record<string, number> = {};
     const osHoje: typeof osList = [];
+    const monthPrefix = monthStart.slice(0, 7);
+    let osMesAtual = 0;
 
     for (const os of osList || []) {
       statusCount[os.status || "unknown"] = (statusCount[os.status || "unknown"] || 0) + 1;
       kanbanCount[os.coluna_kanban || "unknown"] = (kanbanCount[os.coluna_kanban || "unknown"] || 0) + 1;
       tipoOSCount[os.tipo_os || "unknown"] = (tipoOSCount[os.tipo_os || "unknown"] || 0) + 1;
-      valorTotalMes += os.valor_total || 0;
+
+      const dia = (os.created_at || "").split("T")[0];
+      if (dia.startsWith(monthPrefix)) {
+        valorTotalMes += os.valor_total || 0;
+        osMesAtual++;
+      }
+
       if (os.tipo_orcamento === "lp" || os.tipo_orcamento === "normal") orcTotal++;
       if (os.orcamento_aprovado) orcAprovados++;
-      const dia = (os.created_at || "").split("T")[0];
       osPorDia[dia] = (osPorDia[dia] || 0) + 1;
       if (dia === today) osHoje.push(os);
     }
@@ -364,7 +371,7 @@ Deno.serve(async (req: Request) => {
       resumoOS: {
         IMPORTANTE: "Existem OS cadastradas no sistema! Consulte os detalhes abaixo.",
         totalUltimos3Meses: totalOS,
-        totalMesAtual: (osList || []).filter(os => (os.created_at || '').startsWith(monthStart)).length,
+        totalMesAtual: osMesAtual,
         hoje: osHoje.length,
         atrasadas: osAtrasadas.length,
         porStatus: statusCount,
