@@ -168,7 +168,14 @@ Deno.serve(async (req: Request) => {
       osQuery = osQuery.eq("unidade_id", unidadeFilter);
     }
 
-    const { data: osList } = await osQuery;
+    const { data: osList, error: osError } = await osQuery;
+
+    console.log("[GIA] OS Query Results:");
+    console.log("  - threeMonthsAgo filter:", threeMonthsAgo);
+    console.log("  - isMaster:", isMaster);
+    console.log("  - unidadeFilter:", unidadeFilter);
+    console.log("  - OS count:", osList?.length || 0);
+    if (osError) console.log("  - OS error:", osError);
 
     let pagQuery = supabase
       .from("pagamentos")
