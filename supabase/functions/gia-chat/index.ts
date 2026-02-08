@@ -494,7 +494,7 @@ Deno.serve(async (req: Request) => {
     console.log("  - resumoOS.totalMesAtual:", databaseSnapshot.resumoOS.totalMesAtual);
     console.log("  - resumoOS.totalAnoAtual:", databaseSnapshot.resumoOS.totalAnoAtual);
     console.log("  - estoque.totalPecas:", databaseSnapshot.estoque.totalPecas);
-    console.log("  - financeiro.receitaTotalGeral:", databaseSnapshot.financeiro.receitaTotalGeral);
+    console.log("  - resumoFinanceiro.receitaTotalGeral:", databaseSnapshot.resumoFinanceiro.receitaTotalGeral);
     console.log("  - unidades:", databaseSnapshot.unidades.length);
 
     const systemPrompt = `Voce e a GIA (Global Intelligence Assistant), a assistente de inteligencia artificial do Group Global, dentro do sistema ATOM, uma empresa de assistencia tecnica de celulares e eletronicos (Samsung, Apple, etc).
