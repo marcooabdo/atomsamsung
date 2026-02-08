@@ -48,7 +48,7 @@ export function GIA() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [transcribedText, setTranscribedText] = useState<string | undefined>(undefined);
   const [demoMode, setDemoMode] = useState(false);
-  const [greetingDone, setGreetingDone] = useState(false);
+  const greetingDoneRef = useRef(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const cancelStreamRef = useRef<(() => void) | null>(null);
 
@@ -61,27 +61,23 @@ export function GIA() {
   }, [usuario?.id]);
 
   useEffect(() => {
-    if (!usuario || greetingDone) return;
-    setGreetingDone(true);
+    if (!usuario || greetingDoneRef.current) return;
+    greetingDoneRef.current = true;
 
     const isChefe = usuario.email === 'marco.abdo@groupglobal.com.br' || usuario.email === 'marco.abdo@gmail.com' || usuario.email?.includes('marco.abdo');
     const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
     const greetingText = `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
 
-    const timer = setTimeout(() => {
-      const greetingMessage: GIAMessage = {
-        id: `greeting-${Date.now()}`,
-        role: 'assistant',
-        content: greetingText,
-        timestamp: Date.now(),
-      };
-      setMessages([greetingMessage]);
-      setAiState('speaking');
-      speakGia(greetingText).finally(() => setAiState('idle'));
-    }, 600);
-
-    return () => clearTimeout(timer);
-  }, [usuario, greetingDone]);
+    const greetingMessage: GIAMessage = {
+      id: `greeting-${Date.now()}`,
+      role: 'assistant',
+      content: greetingText,
+      timestamp: Date.now(),
+    };
+    setMessages([greetingMessage]);
+    setAiState('speaking');
+    speakGia(greetingText).finally(() => setAiState('idle'));
+  }, [usuario]);
 
   const checkConnections = async () => {
     setConnection({ status: 'checking', chatgpt: false, elevenlabs: false });

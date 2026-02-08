@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle,
@@ -129,12 +130,13 @@ function StatusList({ items, color }: { items: { label: string; value: string; s
   );
 }
 
-function DataCard({ card }: { card: CardData }) {
+const DataCard = forwardRef<HTMLDivElement, { card: CardData }>(({ card }, ref) => {
   const colors = colorMap[card.color];
   const Icon = iconMap[card.type];
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, x: 60, scale: 0.92 }}
       animate={{ opacity: 1, x: 0, scale: 1 }}
@@ -178,7 +180,7 @@ function DataCard({ card }: { card: CardData }) {
       </div>
     </motion.div>
   );
-}
+});
 
 export function ReactiveCards({ cards }: ReactiveCardsProps) {
   return (

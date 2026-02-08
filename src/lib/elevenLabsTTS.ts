@@ -25,7 +25,7 @@ export const checkElevenLabsConnection = async (): Promise<{ ok: boolean; error?
       return { ok: false, error: 'Chave ElevenLabs invalida ou expirada' };
     }
     return { ok: false, error: `ElevenLabs erro: ${response.status}` };
-  } catch (err) {
+  } catch {
     elevenlabsAvailable = false;
     return { ok: false, error: 'Falha ao conectar com ElevenLabs' };
   }
@@ -33,12 +33,36 @@ export const checkElevenLabsConnection = async (): Promise<{ ok: boolean; error?
 
 export const isElevenLabsAvailable = (): boolean | null => elevenlabsAvailable;
 
+function speakWithBrowserTTS(text: string): Promise<{ ok: boolean; error?: string }> {
+  return new Promise((resolve) => {
+    if (!window.speechSynthesis) {
+      resolve({ ok: false, error: 'Speech synthesis not available' });
+      return;
+    }
+
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'pt-BR';
+    utterance.rate = 1.05;
+    utterance.pitch = 1.0;
+
+    const voices = window.speechSynthesis.getVoices();
+    const ptVoice = voices.find(v => v.lang.startsWith('pt'));
+    if (ptVoice) utterance.voice = ptVoice;
+
+    utterance.onend = () => resolve({ ok: true });
+    utterance.onerror = () => resolve({ ok: false, error: 'Browser TTS error' });
+
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
 export const speakGia = async (text: string): Promise<{ ok: boolean; error?: string }> => {
   const apiKey = import.meta.env.VITE_ELEVENLABS_API_KEY;
   const voiceId = import.meta.env.VITE_ELEVENLABS_VOICE_ID;
 
   if (!apiKey || !voiceId) {
-    return { ok: false, error: 'ElevenLabs nao configurado' };
+    return speakWithBrowserTTS(text);
   }
 
   try {
@@ -65,29 +89,35 @@ export const speakGia = async (text: string): Promise<{ ok: boolean; error?: str
 
     if (!response.ok) {
       elevenlabsAvailable = false;
-      if (response.status === 401) {
-        return { ok: false, error: 'Chave ElevenLabs invalida ou expirada' };
-      }
-      return { ok: false, error: `ElevenLabs erro: ${response.status}` };
+      return speakWithBrowserTTS(text);
     }
 
     elevenlabsAvailable = true;
     const audioBlob = await response.blob();
     const audioUrl = URL.createObjectURL(audioBlob);
     const audio = new Audio(audioUrl);
-
     currentAudio = audio;
 
-    audio.onended = () => {
-      URL.revokeObjectURL(audioUrl);
-      currentAudio = null;
-    };
-
-    await audio.play();
-    return { ok: true };
-  } catch (error) {
+    return new Promise((resolve) => {
+      audio.onended = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        resolve({ ok: true });
+      };
+      audio.onerror = () => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        resolve(speakWithBrowserTTS(text));
+      };
+      audio.play().catch(() => {
+        URL.revokeObjectURL(audioUrl);
+        currentAudio = null;
+        resolve(speakWithBrowserTTS(text));
+      });
+    });
+  } catch {
     elevenlabsAvailable = false;
-    return { ok: false, error: error instanceof Error ? error.message : 'Erro desconhecido' };
+    return speakWithBrowserTTS(text);
   }
 };
 
@@ -96,8 +126,9 @@ export const stopGiaSpeaking = (): void => {
     currentAudio.pause();
     currentAudio = null;
   }
+  window.speechSynthesis?.cancel();
 };
 
 export const isGiaSpeaking = (): boolean => {
-  return currentAudio !== null && !currentAudio.paused;
+  return (currentAudio !== null && !currentAudio.paused) || window.speechSynthesis?.speaking;
 };

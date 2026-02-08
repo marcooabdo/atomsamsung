@@ -17,12 +17,7 @@ Deno.serve(async (req: Request) => {
     const authHeader = req.headers.get("Authorization");
     const apiKey = req.headers.get("apikey");
 
-    console.log("[GIA] Headers received:");
-    console.log("  - Authorization:", !!authHeader);
-    console.log("  - apikey:", !!apiKey);
-
     if (!authHeader) {
-      console.log("[GIA] Missing authorization header");
       return new Response(
         JSON.stringify({ error: "Missing authorization header" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -33,11 +28,6 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
 
-    console.log("[GIA] Environment check:");
-    console.log("  - SUPABASE_URL:", !!supabaseUrl);
-    console.log("  - SUPABASE_SERVICE_ROLE_KEY:", !!supabaseServiceKey);
-    console.log("  - SUPABASE_ANON_KEY:", !!supabaseAnonKey);
-
     const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
       global: {
         headers: {
@@ -47,33 +37,18 @@ Deno.serve(async (req: Request) => {
       },
     });
 
-    console.log("[GIA] Getting user from token...");
     const { data: { user }, error: userError } = await supabaseAuth.auth.getUser();
 
-    if (userError) {
-      console.log("[GIA] User error:", userError.message, userError);
+    if (userError || !user) {
       return new Response(
         JSON.stringify({
           error: "Authentication failed",
-          details: userError.message,
+          details: userError?.message || "No user found",
           hint: "Your session may have expired. Please try logging out and logging back in."
         }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-
-    if (!user) {
-      console.log("[GIA] No user found in token");
-      return new Response(
-        JSON.stringify({
-          error: "No user found",
-          hint: "Your session may have expired. Please try logging out and logging back in."
-        }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    console.log("[GIA] ✓ User authenticated:", user.id);
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -94,13 +69,13 @@ Deno.serve(async (req: Request) => {
 
     const { data: usuario } = await supabase
       .from("usuarios")
-      .select("id, nome, tipo, unidade_id")
+      .select("id, nome, tipo, unidade_id, email")
       .eq("id", user.id)
       .maybeSingle();
 
     if (!usuario) {
       return new Response(
-        JSON.stringify({ error: "User not found" }),
+        JSON.stringify({ error: "User not found in usuarios table" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -146,573 +121,106 @@ Deno.serve(async (req: Request) => {
 
     const memoryContext = (memories || []).length > 0
       ? "\n\nMEMORIA DA GIA (informacoes aprendidas em conversas anteriores):\n" +
-        (memories || []).map(m => `- [${m.categoria}] ${m.chave}: ${m.valor}`).join("\n")
+        (memories || []).map((m: { categoria: string; chave: string; valor: string }) => `- [${m.categoria}] ${m.chave}: ${m.valor}`).join("\n")
       : "";
 
-    const now = new Date();
-    const today = now.toISOString().split("T")[0];
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split("T")[0];
-    const yearStart = new Date(now.getFullYear(), 0, 1).toISOString().split("T")[0];
+    const { data: stats, error: statsError } = await supabase.rpc("get_gia_stats");
 
-    const unidadeFilter = usuario.unidade_id;
-    const isMaster = usuario.tipo === "master" || usuario.tipo === "diretoria";
-
-    console.log("[GIA] Iniciando query de OS...");
-    console.log("  - Usuario:", usuario.nome, "| Tipo:", usuario.tipo, "| Unidade:", usuario.unidade_id);
-    console.log("  - isMaster:", isMaster);
-
-    const { data: osList, error: osError } = await supabase
-      .from("os")
-      .select("id, numero_os_interna, numero_os_samsung, status, coluna_kanban, tipo_os, tipo_atendimento, tipo_orcamento, cliente_nome, created_at, data_conclusao, valor_servicos, valor_pecas, valor_total, orcamento_aprovado, prioridade, tecnico_designado, tecnico_agendado_id, unidade_id, tipo_reparo, is_cortesia, diagnostico_tecnico, reparo_efetuado, data_agendamento, periodo_agendamento, status_garantia, latitude, longitude, prazo_entrega, desconto_tipo, desconto_valor, valor_bruto, valor_liquido, status_samsung_desc")
-      .order("created_at", { ascending: false });
-
-    console.log("[GIA] ===== RESULTADO QUERY OS =====");
-    console.log("  - osList existe?", !!osList);
-    console.log("  - osList é array?", Array.isArray(osList));
-    console.log("  - Total OS:", osList?.length || 0);
-    console.log("  - Erro?", osError ? JSON.stringify(osError) : "nenhum");
-    if (osList && osList.length > 0) {
-      console.log("  - Sample OS 1:", JSON.stringify(osList[0]));
-    } else {
-      console.log("  - PROBLEMA: osList está vazio ou null!");
+    if (statsError) {
+      console.error("[GIA] Stats RPC error:", statsError.message);
+      return new Response(
+        JSON.stringify({ error: "Failed to fetch system stats", details: statsError.message }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    const { data: pagamentos, error: pagError } = await supabase
-      .from("pagamentos")
-      .select("id, valor, metodo_pagamento, status, created_at, os_id, comprovante_url, descricao, unidade_id")
-      .order("created_at", { ascending: false });
-
-    console.log("[GIA] Pagamentos:", pagamentos?.length || 0, "| Erro:", pagError ? JSON.stringify(pagError) : "nenhum");
-
-    const { data: unidades, error: unidadesError } = await supabase
-      .from("unidades")
-      .select("id, nome, cidade, estado, endereco, latitude, longitude, telefone");
-
-    console.log("[GIA] Unidades:", unidades?.length || 0, "| Erro:", unidadesError ? JSON.stringify(unidadesError) : "nenhum");
-
-    const { data: tecnicos, error: tecnicosError } = await supabase
-      .from("usuarios")
-      .select("id, nome, tipo, unidade_id, numero_tecnico")
-      .in("tipo", ["tecnico", "tecnico_ih", "master", "diretoria"]);
-
-    console.log("[GIA] Tecnicos:", tecnicos?.length || 0, "| Erro:", tecnicosError ? JSON.stringify(tecnicosError) : "nenhum");
-
-    const { data: pecas, error: pecasError } = await supabase
-      .from("estoque_pecas")
-      .select("id, sku, descricao, quantidade, preco_custo, preco_venda, status, sala_id, estante_id, bin_id, gi_postada, gi_data_postagem, unidade_id");
-
-    console.log("[GIA] Pecas estoque:", pecas?.length || 0, "| Erro:", pecasError ? JSON.stringify(pecasError) : "nenhum");
-
-    const { data: metas } = await supabase
-      .from("metas_performance")
-      .select("*");
-
-    const { data: requisicoes } = await supabase
-      .from("requisicoes_pecas")
-      .select("id, status, numero_os_samsung, created_at, justificativa, motivo_reprovacao, os_id")
-      .order("created_at", { ascending: false });
-
-    const { data: agendamentos } = await supabase
-      .from("agendamentos")
-      .select("id, os_id, tecnico_id, data_agendamento, periodo, status, rota_id, checkin_at, checkout_at")
-      .order("data_agendamento", { ascending: false });
-
-    const { data: rotas } = await supabase
-      .from("rotas_otimizadas")
-      .select("id, tecnico_id, data, total_os, distancia_total, tempo_total, status")
-      .order("data", { ascending: false });
-
-    const { data: cotacoes } = await supabase
-      .from("cotacoes")
-      .select("id, os_id, status, valor_total, desconto_valor, desconto_tipo, taxa_cliente, created_at")
-      .order("created_at", { ascending: false });
-
-    const { data: cotacoesPecas } = await supabase
-      .from("cotacoes_pecas")
-      .select("id, cotacao_id, descricao, quantidade, preco_unitario, is_gspn");
-
-    const { data: cotacoesServicos } = await supabase
-      .from("cotacoes_servicos")
-      .select("id, cotacao_id, descricao, quantidade, preco_unitario");
-
-    const { data: osPecas } = await supabase
-      .from("os_pecas")
-      .select("id, os_id, peca_id, quantidade, gspn_status, valor_gspn, manual_status");
-
-    const { data: osServicos } = await supabase
-      .from("os_servicos")
-      .select("id, os_id, servico_id, quantidade, preco_unitario");
-
-    const { data: checklists } = await supabase
-      .from("checklists")
-      .select("id, nome, tipo, ativo")
-      .eq("ativo", true);
-
-    const { data: osComentarios } = await supabase
-      .from("os_comentarios")
-      .select("id, os_id, comentario, created_at, is_system")
-      .order("created_at", { ascending: false });
-
-    const { data: nfs } = await supabase
-      .from("estoque_nfs")
-      .select("id, numero_nf, fornecedor, valor_total, data_emissao, delivery")
-      .order("data_emissao", { ascending: false });
-
-    const { data: skywalkerProfissionais } = await supabase
-      .from("skywalker_profissionais")
-      .select("id, usuario_id, nivel_atual_id, time_id, meses_consecutivos_validos, ativo")
-      .eq("ativo", true);
-
-    const { data: skywalkerNiveis } = await supabase
-      .from("skywalker_niveis")
-      .select("id, nome, estrelas_necessarias, meses_consecutivos, bonus_valor")
-      .eq("ativo", true);
-
-    const { data: skywalkerPilares } = await supabase
-      .from("skywalker_pilares")
-      .select("id, nome, descricao, tipo_metrica")
-      .eq("ativo", true);
-
-    const { data: jobs } = await supabase
-      .from("jobs")
-      .select("id, tecnico_id, data, total_os, status, finished_at")
-      .order("data", { ascending: false });
-
-    const { data: configuracoes } = await supabase
-      .from("configuracoes_unidade")
-      .select("*");
-
-    const totalOS = osList?.length || 0;
-    const statusCount: Record<string, number> = {};
-    const kanbanCount: Record<string, number> = {};
-    const tipoOSCount: Record<string, number> = {};
-    const statusSamsungCount: Record<string, number> = {};
-    let valorTotalGeral = 0;
-    let valorTotalMes = 0;
-    let valorTotalAno = 0;
-    let orcAprovados = 0;
-    let orcTotal = 0;
-    const osPorDia: Record<string, number> = {};
-    const osHoje: typeof osList = [];
-    const monthPrefix = monthStart.slice(0, 7);
-    const yearPrefix = yearStart.slice(0, 4);
-    let osMesAtual = 0;
-    let osAnoAtual = 0;
-    let osEmAberto = 0;
-
-    for (const os of osList || []) {
-      statusCount[os.status || "unknown"] = (statusCount[os.status || "unknown"] || 0) + 1;
-      kanbanCount[os.coluna_kanban || "unknown"] = (kanbanCount[os.coluna_kanban || "unknown"] || 0) + 1;
-      tipoOSCount[os.tipo_os || "unknown"] = (tipoOSCount[os.tipo_os || "unknown"] || 0) + 1;
-
-      if (os.status_samsung_desc) {
-        statusSamsungCount[os.status_samsung_desc] = (statusSamsungCount[os.status_samsung_desc] || 0) + 1;
-      }
-
-      valorTotalGeral += os.valor_total || 0;
-
-      const dia = (os.created_at || "").split("T")[0];
-      if (dia.startsWith(monthPrefix)) {
-        valorTotalMes += os.valor_total || 0;
-        osMesAtual++;
-      }
-      if (dia.startsWith(yearPrefix)) {
-        valorTotalAno += os.valor_total || 0;
-        osAnoAtual++;
-      }
-
-      const statusAberto = !['concluido', 'entregue', 'cancelado', 'os_fechada'].includes(os.coluna_kanban || '');
-      if (statusAberto) {
-        osEmAberto++;
-      }
-
-      if (os.tipo_orcamento === "lp" || os.tipo_orcamento === "normal") orcTotal++;
-      if (os.orcamento_aprovado) orcAprovados++;
-      osPorDia[dia] = (osPorDia[dia] || 0) + 1;
-      if (dia === today) osHoje.push(os);
-    }
-
-    const receitaTotalGeral = (pagamentos || []).reduce((s, p) => s + (p.valor || 0), 0);
-    const receitaMes = (pagamentos || []).filter(p => (p.created_at || "").split("T")[0].startsWith(monthPrefix)).reduce((s, p) => s + (p.valor || 0), 0);
-    const metodosPgto: Record<string, number> = {};
-    for (const p of pagamentos || []) {
-      metodosPgto[p.metodo_pagamento || "outro"] = (metodosPgto[p.metodo_pagamento || "outro"] || 0) + 1;
-    }
-
-    const pecasCriticas = (pecas || []).filter(p => (p.quantidade || 0) <= 2);
-
-    const reqStatus: Record<string, number> = {};
-    for (const r of requisicoes || []) {
-      reqStatus[r.status || "unknown"] = (reqStatus[r.status || "unknown"] || 0) + 1;
-    }
-
-    const osAtrasadas = (osList || []).filter(os => {
-      if (!os.prazo_entrega || os.status === 'concluido' || os.status === 'entregue') return false;
-      return new Date(os.prazo_entrega) < new Date();
-    });
-
-    const osAgendadasHoje = (agendamentos || []).filter(a => a.data_agendamento === today);
-    const rotasAbertas = (rotas || []).filter(r => r.status === 'em_andamento' || r.status === 'planejada');
-
-    const cotacoesPendentes = (cotacoes || []).filter(c => c.status === 'pendente' || c.status === 'enviada');
-    const valorCotacoesPendentes = cotacoesPendentes.reduce((s, c) => s + (c.valor_total || 0), 0);
-
-    const pecasGIPendentes = (pecas || []).filter(p => p.status === 'devolvida_nova' && !p.gi_postada);
-    const reqPendentes = (requisicoes || []).filter(r => r.status === 'pendente' || r.status === 'aguardando_aprovacao');
-
-    const skywalkerAtivos = (skywalkerProfissionais || []).filter(p => p.ativo).length;
-    const jobsAbertos = (jobs || []).filter(j => j.status === 'em_andamento').length;
-
-    const databaseSnapshot = {
-      dataHoje: today,
-      periodoAnalise: `${monthStart} a ${today}`,
-      usuario: { nome: usuario.nome, tipo: usuario.tipo, unidade: usuario.unidade_id },
-      unidades: (unidades || []).map(u => ({ id: u.id, nome: u.nome, cidade: u.cidade, estado: u.estado, endereco: u.endereco })),
-
-      resumoOS: {
-        ATENCAO_CRITICO: `EXISTEM ${totalOS} OS NO SISTEMA - NAO RESPONDA QUE TEM ZERO!`,
-        totalGeral: totalOS,
-        totalAnoAtual: osAnoAtual,
-        totalMesAtual: osMesAtual,
-        osEmAberto: osEmAberto,
-        hoje: osHoje.length,
-        atrasadas: osAtrasadas.length,
-        porStatus: statusCount,
-        porKanban: kanbanCount,
-        porTipoOS: tipoOSCount,
-        porStatusSamsung: statusSamsungCount,
-        valorTotalGeral: valorTotalGeral.toFixed(2),
-        valorTotalAno: valorTotalAno.toFixed(2),
-        valorTotalMes: valorTotalMes.toFixed(2),
-        taxaAprovacao: orcTotal > 0 ? ((orcAprovados / orcTotal) * 100).toFixed(1) + "%" : "N/A",
-        osPorDia,
-        osAtrasadasDetalhes: osAtrasadas.slice(0, 10).map(os => ({
-          numero: os.numero_os_interna,
-          cliente: os.cliente_nome,
-          prazo: os.prazo_entrega,
-          status: os.coluna_kanban
-        })),
-        exemplosDe5OS: (osList || []).slice(0, 5).map(os => ({
-          numero: os.numero_os_interna,
-          cliente: os.cliente_nome,
-          status: os.coluna_kanban,
-          criado_em: os.created_at,
-          valor_total: os.valor_total
-        })),
-      },
-
-      agendamentos: {
-        totalGeral: agendamentos?.length || 0,
-        hoje: osAgendadasHoje.length,
-        agendaHoje: osAgendadasHoje.map(a => ({
-          os_id: a.os_id,
-          tecnico_id: a.tecnico_id,
-          periodo: a.periodo,
-          status: a.status,
-          checkin: a.checkin_at ? 'sim' : 'nao'
-        })),
-      },
-
-      rotas: {
-        totalGeral: rotas?.length || 0,
-        abertas: rotasAbertas.length,
-        rotasDetalhes: rotasAbertas.map(r => ({
-          tecnico_id: r.tecnico_id,
-          data: r.data,
-          total_os: r.total_os,
-          distancia_km: r.distancia_total,
-          status: r.status
-        })),
-      },
-
-      cotacoes: {
-        totalGeral: cotacoes?.length || 0,
-        pendentes: cotacoesPendentes.length,
-        valorPendente: valorCotacoesPendentes.toFixed(2),
-        pecasTotal: cotacoesPecas?.length || 0,
-        servicosTotal: cotacoesServicos?.length || 0,
-      },
-
-      resumoFinanceiro: {
-        receitaTotalGeral: receitaTotalGeral.toFixed(2),
-        receitaMes: receitaMes.toFixed(2),
-        totalPagamentos: pagamentos?.length || 0,
-        porMetodo: metodosPgto,
-        pagamentosDetalhes: (pagamentos || []).slice(0, 50).map(p => ({
-          valor: p.valor,
-          metodo: p.metodo_pagamento,
-          status: p.status,
-          data: p.created_at
-        })),
-      },
-
-      tecnicos: (tecnicos || []).map(t => ({ id: t.id, nome: t.nome, tipo: t.tipo, numero_tecnico: t.numero_tecnico, unidade_id: t.unidade_id })),
-
-      estoque: {
-        ATENCAO_CRITICO: `EXISTEM ${pecas?.length || 0} PECAS NO ESTOQUE - NAO RESPONDA QUE TEM ZERO!`,
-        totalPecas: pecas?.length || 0,
-        pecasCriticas: pecasCriticas.map(p => ({ sku: p.sku, descricao: p.descricao, qtd: p.quantidade, localizacao: `Sala ${p.sala_id}, Estante ${p.estante_id}, Bin ${p.bin_id}` })),
-        giPendentes: pecasGIPendentes.length,
-        nfsRecentes: nfs?.length || 0,
-      },
-
-      requisicoesPecas: {
-        total: requisicoes?.length || 0,
-        pendentes: reqPendentes.length,
-        porStatus: reqStatus,
-      },
-
-      osPecasServicos: {
-        totalPecasUsadas: osPecas?.length || 0,
-        totalServicosRealizados: osServicos?.length || 0,
-      },
-
-      checklists: {
-        total: checklists?.length || 0,
-        disponiveis: (checklists || []).map(c => ({ id: c.id, nome: c.nome, tipo: c.tipo })),
-      },
-
-      comentariosRecentes: osComentarios?.length || 0,
-
-      skywalker: {
-        profissionaisAtivos: skywalkerAtivos,
-        totalNiveis: skywalkerNiveis?.length || 0,
-        totalPilares: skywalkerPilares?.length || 0,
-        niveis: (skywalkerNiveis || []).map(n => ({ nome: n.nome, estrelas: n.estrelas_necessarias, bonus: n.bonus_valor })),
-      },
-
-      jobs: {
-        totalGeral: jobs?.length || 0,
-        emAndamento: jobsAbertos,
-      },
-
-      configuracoes: configuracoes?.length || 0,
-      metas: metas || [],
-    };
-
-    console.log("[GIA] ===== DATABASE SNAPSHOT MONTADO =====");
-    console.log("  - resumoOS.totalGeral:", databaseSnapshot.resumoOS.totalGeral);
-    console.log("  - resumoOS.totalMesAtual:", databaseSnapshot.resumoOS.totalMesAtual);
-    console.log("  - resumoOS.totalAnoAtual:", databaseSnapshot.resumoOS.totalAnoAtual);
-    console.log("  - estoque.totalPecas:", databaseSnapshot.estoque.totalPecas);
-    console.log("  - resumoFinanceiro.receitaTotalGeral:", databaseSnapshot.resumoFinanceiro.receitaTotalGeral);
-    console.log("  - unidades:", databaseSnapshot.unidades.length);
-    console.log("  - JSON.stringify snapshot length:", JSON.stringify(databaseSnapshot).length);
-
-    if (databaseSnapshot.resumoOS.totalGeral === 0) {
-      console.log("[GIA] ⚠️ ALERTA: Nenhuma OS encontrada no banco!");
-      console.log("  - Query retornou array vazio ou null");
-      console.log("  - Verificar se há dados na tabela 'os'");
-    }
-
-    if (databaseSnapshot.estoque.totalPecas === 0) {
-      console.log("[GIA] ⚠️ ALERTA: Nenhuma peça encontrada no estoque!");
-      console.log("  - Query retornou array vazio ou null");
-      console.log("  - Verificar se há dados na tabela 'estoque_pecas'");
-    }
+    const os = stats?.os || {};
+    const fin = stats?.financeiro || {};
+    const est = stats?.estoque || {};
 
     const systemPrompt = `Voce e a GIA (Global Intelligence Assistant), a assistente de inteligencia artificial do Group Global, dentro do sistema ATOM, uma empresa de assistencia tecnica de celulares e eletronicos (Samsung, Apple, etc).
 
-===== NUMEROS PRINCIPAIS DO SISTEMA (LEIA PRIMEIRO!) =====
-🔢 TOTAL DE OS NO SISTEMA: ${totalOS}
-📦 TOTAL DE PECAS NO ESTOQUE: ${pecas?.length || 0}
-💰 RECEITA TOTAL: R$ ${receitaTotalGeral.toFixed(2)}
-👥 TOTAL DE TECNICOS: ${tecnicos?.length || 0}
-🏢 TOTAL DE UNIDADES: ${unidades?.length || 0}
-📋 OS ABERTAS: ${osEmAberto}
-📅 OS HOJE: ${osHoje.length}
-⚠️ OS ATRASADAS: ${osAtrasadas.length}
-💵 PAGAMENTOS REGISTRADOS: ${pagamentos?.length || 0}
+===== DADOS REAIS DO SISTEMA - ${stats?.data_hoje} =====
 
-ATENCAO: Sempre use esses numeros reais ao responder! NUNCA diga que tem 0 se os numeros acima mostram valores!
+ORDENS DE SERVICO (OS):
+- Total geral: ${os.total}
+- Mes atual: ${os.mes_atual}
+- Ano atual: ${os.ano_atual}
+- Hoje: ${os.hoje}
+- Em aberto: ${os.em_aberto}
+- Atrasadas: ${os.atrasadas}
+- Valor total geral: R$ ${Number(os.valor_total_geral || 0).toFixed(2)}
+- Valor total mes: R$ ${Number(os.valor_total_mes || 0).toFixed(2)}
+- Valor total ano: R$ ${Number(os.valor_total_ano || 0).toFixed(2)}
+- Taxa aprovacao orcamentos: ${os.orcamentos_total > 0 ? ((os.orcamentos_aprovados / os.orcamentos_total) * 100).toFixed(1) : 0}%
+- Por status: ${JSON.stringify(os.por_status)}
+- Por kanban: ${JSON.stringify(os.por_kanban)}
+- Por tipo OS: ${JSON.stringify(os.por_tipo_os)}
+- Por tipo atendimento: ${JSON.stringify(os.por_tipo_atendimento)}
+- Por unidade: ${JSON.stringify(os.por_unidade)}
+- OS por dia (mes atual): ${JSON.stringify(os.por_dia_mes_atual)}
+- OS recentes (15 ultimas): ${JSON.stringify(os.recentes)}
+- OS atrasadas (detalhes): ${JSON.stringify(os.atrasadas_detalhes)}
+
+FINANCEIRO:
+- Total pagamentos: ${fin.total_pagamentos}
+- Receita total: R$ ${Number(fin.receita_total || 0).toFixed(2)}
+- Receita mes: R$ ${Number(fin.receita_mes || 0).toFixed(2)}
+- Receita ano: R$ ${Number(fin.receita_ano || 0).toFixed(2)}
+- Receita hoje: R$ ${Number(fin.receita_hoje || 0).toFixed(2)}
+- Por metodo (qtd): ${JSON.stringify(fin.por_metodo)}
+- Por metodo (valor): ${JSON.stringify(fin.valor_por_metodo)}
+- Pagamentos recentes: ${JSON.stringify(fin.recentes)}
+
+ESTOQUE:
+- Total pecas: ${est.total_pecas}
+- Disponiveis: ${est.pecas_disponiveis}
+- Reservadas: ${est.pecas_reservadas}
+- Em uso: ${est.pecas_em_uso}
+- Devolvidas novas: ${est.pecas_devolvidas_novas}
+- GI pendentes: ${est.gi_pendentes}
+- Valor total estoque: R$ ${Number(est.valor_total_estoque || 0).toFixed(2)}
+- Pecas criticas (qty<=2): ${JSON.stringify(est.pecas_criticas)}
+
+COTACOES:
+${JSON.stringify(stats?.cotacoes)}
+
+REQUISICOES DE PECAS:
+${JSON.stringify(stats?.requisicoes)}
+
+AGENDAMENTOS:
+${JSON.stringify(stats?.agendamentos)}
+
+ROTAS:
+${JSON.stringify(stats?.rotas)}
+
+TECNICOS:
+${JSON.stringify(stats?.tecnicos)}
+
+UNIDADES:
+${JSON.stringify(stats?.unidades)}
+
+SKYWALKER (Gamificacao):
+${JSON.stringify(stats?.skywalker)}
+
+JOBS: ${JSON.stringify(stats?.jobs)}
+NFs recentes: ${stats?.nfs_recentes}
+Checklists ativos: ${stats?.checklists_ativos}
+Metas: ${JSON.stringify(stats?.metas)}
+
+USUARIO ATUAL: ${usuario.nome} (${usuario.tipo}) - Unidade: ${usuario.unidade_id || 'todas'}
 ==========================================================
 
 PERSONALIDADE:
 - Voce e profissional, inteligente e proativa
-- Fala em portugues brasileiro e palavras em inglês também de forma natural e conversacional
+- Fala em portugues brasileiro de forma natural e conversacional
 - Use emojis com moderacao para deixar a conversa agradavel
 - Seja direta mas amigavel, como uma colega de trabalho muito competente
 - Quando o usuario perguntar algo que voce nao sabe sobre ele ou a empresa, PERGUNTE para aprender
-- Voce adora aprender sobre a empresa e as pessoas
-
-MEMORIA E APRENDIZADO:
-- Voce tem um sistema de memoria persistente
-- Quando aprender algo novo sobre o usuario ou a empresa, indique com [MEMORIA: categoria | chave | valor]
-- Exemplos: [MEMORIA: preferencia | formato_relatorio | detalhado], [MEMORIA: empresa | meta_mensal | R$200000]
-- Sempre consulte sua memoria antes de responder
 ${memoryContext}
 
-CAPACIDADES E ACESSO COMPLETO AO SISTEMA:
-
-1. CENTRAL ATOM - Dashboard e Centro de Comando:
-   - OS abertas, em andamento, concluidas e todas as suas datas
-   - Eficiencia operacional e taxa de aprovacao de orcamentos
-   - Performance por unidade e tecnico
-   - Metas de performance configuradas
-   - OS atrasadas e prazos de entrega
-
-2. PIPELINE OPERACIONAL (Kanban):
-   - Colunas: triagem, aguardando_aprovacao, em_reparo, aguardando_peca, concluido, entregue
-   - Movimentacao de OS entre colunas
-   - Prioridades (alta, media, baixa)
-   - Status de cada OS em tempo real
-
-3. TIPOS DE OS E ATENDIMENTO:
-   - Tipos: samsung (garantia GSPN), lp (fora garantia com orcamento), normal (reparo direto)
-   - Tipos de atendimento: presencial, ih (in-home), delivery
-   - Status garantia: dentro_garantia, fora_garantia, cortesia
-   - Integracao Samsung GSPN (numero_os_samsung, status_samsung)
-
-4. AGENDAMENTOS E ROTEIRIZACAO:
-   - Agendamentos por tecnico, data e periodo (manha/tarde)
-   - Rotas otimizadas com distancia e tempo total
-   - Check-in e check-out de tecnicos
-   - Jobs (conjuntos de OS por tecnico/data)
-   - Status de rotas: planejada, em_andamento, concluida
-
-5. COTACOES E ORCAMENTOS:
-   - Cotacoes pendentes, enviadas, aprovadas, reprovadas
-   - Pecas e servicos por cotacao
-   - Descontos (percentual ou valor fixo)
-   - Taxa de cliente e markup
-   - Valores: bruto, liquido, desconto
-
-6. FINANCEIRO - ATOM FINANCE:
-   - Pagamentos por metodo (dinheiro, cartao, pix, etc)
-   - Status: pendente, pago, cancelado
-   - Receita por periodo
-   - Comprovantes de pagamento
-   - Lancamentos e fluxo de caixa
-
-7. NUCLEO DE PECAS - Estoque Completo:
-   - Pecas por SKU, descricao, quantidade
-   - Localizacao fisica: sala > estante > bin
-   - Status: disponivel, reservada, em_uso, devolvida_nova
-   - Pecas criticas (quantidade <= 2)
-   - GI (Garantia Interna): postadas ou pendentes
-   - Requisicoes de pecas: status, aprovacao/reprovacao
-   - Notas Fiscais de entrada
-   - Preco custo vs preco venda
-
-8. OS - PECAS E SERVICOS:
-   - Pecas utilizadas em cada OS
-   - Servicos realizados em cada OS
-   - Status GSPN de pecas
-   - Valores individuais e totais
-
-9. CHECKLISTS E QUALIDADE:
-   - Checklists disponiveis por tipo
-   - Vinculacao com OS e agendamentos
-   - Controle de qualidade
-
-10. SKYWALKER - Sistema de Gamificacao:
-    - Profissionais ativos no programa
-    - Niveis de carreira (estrelas necessarias, bonus)
-    - Pilares de avaliacao e metricas
-    - Times e suas cores
-    - Meses consecutivos validos
-    - Ranking de performance
-
-11. COMENTARIOS E HISTORICO:
-    - Comentarios em OS (sistema e usuarios)
-    - Historico de mudancas
-    - Rastreamento de alteracoes
-
-12. CONFIGURACOES:
-    - Configuracoes por unidade
-    - Parametros operacionais
-    - Regras de negocio
-
-DADOS ATUAIS DO SISTEMA EM TEMPO REAL:
-${JSON.stringify(databaseSnapshot, null, 2)}
-
-SCHEMA COMPLETO DO BANCO DE DADOS - TODAS AS TABELAS E COLUNAS:
-
-TABELA: os (Ordens de Servico)
-Colunas: id, numero_os_interna, numero_os_samsung, unidade_id, criado_por, cliente_nome, cliente_telefone, cliente_telefone_2, cliente_cpf, cliente_email, cliente_endereco, cliente_cidade, cliente_estado, cliente_cep, cliente_bairro, cliente_numero, cliente_complemento, latitude, longitude, equipamento_tipo, equipamento_marca, equipamento_modelo, equipamento_imei, equipamento_defeito, diagnostico_tecnico, reparo_efetuado, tipo_os (samsung/lp/normal), tipo_atendimento (presencial/ih/delivery), tipo_orcamento (samsung/lp/normal), status (aberto/em_andamento/concluido/cancelado), coluna_kanban (triagem/aguardando_aprovacao/em_reparo/aguardando_peca/concluido/entregue/cancelado), status_garantia (dentro_garantia/fora_garantia), prioridade (alta/media/baixa), data_agendamento, periodo_agendamento (manha/tarde), tecnico_designado, tecnico_agendado_id, data_inicio_reparo, data_conclusao, prazo_entrega, orcamento_aprovado (true/false), orcamento_enviado_em, orcamento_modificado_em, valor_servicos, valor_pecas, valor_bruto, valor_liquido, valor_total, desconto_tipo (percentual/fixo), desconto_valor, is_cortesia (true/false), motivo_cortesia, tipo_reparo, data_abertura_samsung, data_compra, status_samsung, cliente_vip (true/false), saw, oqc, created_at, updated_at
-
-TABELA: pagamentos
-Colunas: id, os_id, cotacao_id, unidade_id, valor, metodo_pagamento (dinheiro/cartao/pix/transferencia/outro), status (pendente/pago/cancelado), descricao, comprovante_url, pix_id_transacao, criado_por, created_at, updated_at
-
-TABELA: cotacoes
-Colunas: id, os_id, unidade_id, status (pendente/enviada/aprovada/reprovada), valor_pecas, valor_servicos, valor_bruto, valor_liquido, desconto_tipo (percentual/fixo), desconto_valor, taxa_cliente, analise_tecnico, criado_por, created_at, updated_at
-
-TABELA: cotacoes_pecas
-Colunas: id, cotacao_id, os_id, descricao, quantidade, preco_unitario, is_gspn (true/false), exibir_no_pdf (true/false)
-
-TABELA: cotacoes_servicos
-Colunas: id, cotacao_id, os_id, servico_id, descricao, quantidade, preco_unitario, linha
-
-TABELA: os_pecas (Pecas utilizadas na OS)
-Colunas: id, os_id, peca_id, numero_os_samsung, quantidade, gspn_status (pendente/aprovado/reprovado), valor_gspn, manual_status (pendente/aprovado/reprovado), requisitada_por, created_at
-
-TABELA: os_servicos (Servicos realizados na OS)
-Colunas: id, os_id, servico_id, descricao, quantidade, preco_unitario, created_at
-
-TABELA: os_comentarios
-Colunas: id, os_id, usuario_id, comentario, is_system (true/false), gspn_id, created_at
-
-TABELA: os_anexos
-Colunas: id, os_id, usuario_id, tipo (foto/documento/laudo/nf/evidencia), descricao, url, gspn_id, gspn_tipo, exibir_no_pdf (true/false), created_at
-
-TABELA: estoque_pecas
-Colunas: id, sku, descricao, quantidade, preco_custo, preco_venda, unidade_id, sala_id, estante_id, bin_id, status (disponivel/reservada/em_uso/devolvida_nova), nf_id, gi_postada (true/false), gi_data_postagem, gi_numero, disponivel_ih (true/false), created_at
-
-TABELA: requisicoes_pecas
-Colunas: id, os_id, cotacao_id, os_peca_id, peca_ids (array), numero_os_samsung, status (pendente/aguardando_aprovacao/aprovada/reprovada/cancelada/devolucao_pendente), justificativa, motivo_reprovacao, aprovado_por, solicitado_por, created_at
-
-TABELA: estoque_nfs (Notas Fiscais de Entrada)
-Colunas: id, numero_nf, fornecedor, chave_acesso, valor_total, data_emissao, delivery, unidade_id, criado_por, created_at
-
-TABELA: agendamentos
-Colunas: id, os_id, tecnico_id, data_agendamento, periodo (manha/tarde), status (agendado/confirmado/em_andamento/concluido/cancelado), rota_id, checkin_at, checkout_at, observacoes, created_at
-
-TABELA: rotas_otimizadas
-Colunas: id, tecnico_id, data, total_os, distancia_total, tempo_total, status (planejada/em_andamento/concluida/cancelada), rota_otimizada (JSON), unidade_id, created_at
-
-TABELA: jobs (Conjunto de OS por tecnico/data)
-Colunas: id, tecnico_id, data, total_os, os_ids (array), status (em_andamento/concluido/cancelado), started_at, finished_at
-
-TABELA: checklists
-Colunas: id, nome, tipo, itens (JSON), ativo (true/false), unidade_id, created_at
-
-TABELA: usuarios
-Colunas: id, email, nome, tipo (master/diretoria/supervisor/tecnico/tecnico_ih/financeiro/estoque), unidade_id, numero_tecnico, telefone, data_nascimento, cpf, foto_url, ativo (true/false), created_at
-
-TABELA: unidades
-Colunas: id, nome, cidade, estado, endereco, cep, bairro, numero, complemento, latitude, longitude, telefone, cnpj, razao_social, inscricao_estadual, samsung_partner_id, samsung_access_token, samsung_token_expires, samsung_client_id, samsung_client_secret, ativa (true/false)
-
-TABELA: skywalker_profissionais
-Colunas: id, usuario_id, unidade_id, nivel_atual_id, time_id, estrelas_atuais, meses_consecutivos_validos, ativo (true/false)
-
-TABELA: skywalker_niveis
-Colunas: id, nome, ordem, estrelas_necessarias, meses_consecutivos, bonus_valor, bonus_tipo (fixo/percentual), cor, ativo (true/false)
-
-TABELA: skywalker_pilares
-Colunas: id, nome, descricao, tipo_metrica, peso, ativo (true/false)
-
-TABELA: metas_performance
-Colunas: id, unidade_id, mes, ano, meta_receita, meta_os_concluidas, meta_aprovacao_orcamentos, meta_ticket_medio, created_at
-
-TABELA: samsung_sync_logs
-Colunas: id, unidade_id, tipo_sincronizacao, status (sucesso/erro), detalhes, created_at
-
-TABELA: configuracoes_unidade
-Colunas: id, unidade_id, turno_manha_inicio, turno_manha_fim, turno_tarde_inicio, turno_tarde_fim, duracao_visita_minutos, raio_base_km
-
-RELACIONAMENTOS IMPORTANTES:
-- os.unidade_id -> unidades.id
-- os.criado_por -> usuarios.id
-- os.tecnico_agendado_id -> usuarios.id
-- pagamentos.os_id -> os.id
-- cotacoes.os_id -> os.id
-- cotacoes_pecas.cotacao_id -> cotacoes.id
-- os_pecas.os_id -> os.id
-- os_pecas.peca_id -> estoque_pecas.id
-- requisicoes_pecas.os_id -> os.id
-- agendamentos.os_id -> os.id
-- agendamentos.tecnico_id -> usuarios.id
-- rotas_otimizadas.tecnico_id -> usuarios.id
+MEMORIA E APRENDIZADO:
+- Quando aprender algo novo, indique com [MEMORIA: categoria | chave | valor]
 
 CARDS DE DADOS - OBRIGATORIO:
 SEMPRE que falar sobre numeros, metricas, valores, status, listas ou dados quantitativos, voce DEVE incluir cards visuais.
@@ -726,39 +234,12 @@ Tipos: alert, metric, chart, status, list
 Cores: red, green, cyan, amber, blue
 Status dos items: good, bad, neutral
 
-EXEMPLOS OBRIGATORIOS:
-
-1. Quando falar sobre FATURAMENTO/RECEITA:
-[CARD: metric | Faturamento do Mes | cyan | R$ 125.400 | 85% da meta]
-[CARD: metric | Receita Hoje | green | R$ 8.450 | 3 pagamentos]
-[CARD_CHART: Receita por Metodo | blue | Dinheiro:35000 | Cartao:48000 | PIX:42400]
-
-2. Quando falar sobre OS:
-[CARD: metric | Total de OS Mes | cyan | 89 | +12% vs mes anterior]
-[CARD: metric | OS Abertas Hoje | green | 5 | Em andamento]
-[CARD_ITEMS: OS por Status | amber | Em Reparo:23:neutral | Aguardando Peca:8:bad | Concluidas:45:good]
-
-3. Quando falar sobre PENDENCIAS:
-[CARD_ITEMS: OS Atrasadas | red | #4521:iPhone 15 - Cliente: Joao:bad | #4518:Galaxy S24 - Cliente: Maria:bad]
-
-4. Quando falar sobre ESTOQUE:
-[CARD: alert | Pecas Criticas | red | 12 pecas | Requer atencao imediata]
-[CARD_ITEMS: Pecas em Falta | red | Tela iPhone 13:0 un:bad | Bateria S21:1 un:bad]
-
-5. Quando falar sobre PERFORMANCE:
-[CARD: metric | Taxa Aprovacao | green | 78% | Meta: 75%]
-[CARD_CHART: OS por Tecnico | cyan | Joao:15 | Maria:12 | Carlos:18]
-
-REGRAS OBRIGATORIAS:
-1. SEMPRE use pelo menos 2-3 cards ao responder sobre dados numericos
-2. Sempre responda baseado nos dados reais do sistema
-3. Se nao tiver dados suficientes, diga e pergunte
-4. Faca perguntas para entender melhor o contexto quando necessario
-5. Sugira acoes concretas baseadas na analise
-6. Formate numeros monetarios em BRL (R$)
-7. NUNCA responda sobre metricas sem incluir cards visuais
-8. Use cores apropriadas: green (positivo), red (negativo/urgente), amber (atencao), cyan (neutro/info)
-9. Na primeira interacao, se apresente e pergunte como pode ajudar`;
+REGRAS:
+1. SEMPRE use pelo menos 2-3 cards ao responder sobre dados
+2. Sempre responda baseado nos dados REAIS acima - NUNCA diga que nao tem dados!
+3. Formate numeros monetarios em BRL (R$)
+4. Use cores: green (positivo), red (urgente), amber (atencao), cyan (info)
+5. OS numeros acima sao REAIS e ATUALIZADOS - use-os!`;
 
     const chatMessages: { role: string; content: string }[] = [
       { role: "system", content: systemPrompt },
@@ -786,9 +267,6 @@ REGRAS OBRIGATORIAS:
 
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
-      console.log("[GIA] OpenAI error status:", openaiResponse.status);
-      console.log("[GIA] OpenAI error body:", errText);
-
       let userFriendlyError = "Erro na API OpenAI";
       if (openaiResponse.status === 401) {
         userFriendlyError = "Chave OpenAI invalida ou expirada";
@@ -837,7 +315,7 @@ REGRAS OBRIGATORIAS:
     const cardItemsMatches = rawContent.matchAll(/\[CARD_ITEMS:\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
     for (const match of cardItemsMatches) {
       const itemsStr = match[3].trim();
-      const items = itemsStr.split("|").map(item => {
+      const items = itemsStr.split("|").map((item: string) => {
         const parts = item.trim().split(":");
         return { label: parts[0]?.trim(), value: parts[1]?.trim(), status: parts[2]?.trim() };
       });
@@ -853,7 +331,7 @@ REGRAS OBRIGATORIAS:
     const chartMatches = rawContent.matchAll(/\[CARD_CHART:\s*([^|]+)\s*\|\s*([^|]+)\s*\|([^\]]+)\]/g);
     for (const match of chartMatches) {
       const dataStr = match[3].trim();
-      const chartData = dataStr.split("|").map(item => {
+      const chartData = dataStr.split("|").map((item: string) => {
         const parts = item.trim().split(":");
         return { label: parts[0]?.trim(), value: parseFloat(parts[1]?.trim()) || 0 };
       });
