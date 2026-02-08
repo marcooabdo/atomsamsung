@@ -77,20 +77,31 @@ Deno.serve(async (req: Request) => {
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { data: secretRow } = await supabase
+    console.log("[GIA] Fetching OpenAI API key from system_secrets...");
+    const { data: secretRow, error: secretError } = await supabase
       .from("system_secrets")
       .select("value")
       .eq("key", "OPENAI_API_KEY")
       .maybeSingle();
 
+    if (secretError) {
+      console.log("[GIA] Error fetching secret:", secretError);
+    }
+
     const openaiKey = secretRow?.value || Deno.env.get("OPENAI_API_KEY");
 
     if (!openaiKey) {
+      console.log("[GIA] OPENAI_API_KEY not found in system_secrets or env");
       return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
+        JSON.stringify({
+          error: "OPENAI_API_KEY not configured",
+          details: "A chave da API OpenAI precisa ser configurada na tabela system_secrets do Supabase."
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("[GIA] ✓ OpenAI API key found, length:", openaiKey.length);
 
     const { data: usuario } = await supabase
       .from("usuarios")
@@ -625,6 +636,9 @@ REGRAS OBRIGATORIAS:
 
     chatMessages.push({ role: "user", content: message });
 
+    console.log("[GIA] Calling OpenAI API...");
+    console.log("[GIA] Model: gpt-4o-mini, messages count:", chatMessages.length);
+
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -639,25 +653,48 @@ REGRAS OBRIGATORIAS:
       }),
     });
 
+    console.log("[GIA] OpenAI response status:", openaiResponse.status);
+
     if (!openaiResponse.ok) {
       const errText = await openaiResponse.text();
       console.log("[GIA] OpenAI error status:", openaiResponse.status);
       console.log("[GIA] OpenAI error body:", errText);
 
       let userFriendlyError = "Erro na API OpenAI";
+      let detailedError = errText;
+
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.error?.message) {
+          detailedError = errJson.error.message;
+        }
+      } catch {
+        // Keep errText as is
+      }
+
       if (openaiResponse.status === 401) {
         userFriendlyError = "Chave OpenAI invalida ou expirada";
       } else if (openaiResponse.status === 429) {
-        userFriendlyError = "Limite de requisicoes OpenAI atingido";
+        userFriendlyError = "Limite de requisicoes OpenAI atingido (verifique seu credito na OpenAI)";
       } else if (openaiResponse.status === 500 || openaiResponse.status === 503) {
         userFriendlyError = "Servidor OpenAI temporariamente indisponivel";
+      } else if (openaiResponse.status === 400) {
+        userFriendlyError = "Requisicao invalida para a OpenAI";
       }
 
+      console.log("[GIA] Returning error to client:", userFriendlyError);
+
       return new Response(
-        JSON.stringify({ error: userFriendlyError, details: errText }),
+        JSON.stringify({
+          error: userFriendlyError,
+          details: detailedError,
+          status: openaiResponse.status
+        }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("[GIA] ✓ OpenAI response OK");
 
     const openaiData = await openaiResponse.json();
     const rawContent = openaiData.choices?.[0]?.message?.content || "";
