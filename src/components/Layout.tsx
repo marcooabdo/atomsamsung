@@ -37,11 +37,11 @@ const allMenuItems = [
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
+  { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
   { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
   { id: 'notas-fiscais', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
   { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
-  { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
   { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes', onlyFor: ['master', 'diretoria', 'gerente'] },
 ];
 
