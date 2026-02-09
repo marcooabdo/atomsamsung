@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock, Search } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
@@ -38,6 +38,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [vendedorResponsavel, setVendedorResponsavel] = useState<string | null>(os.vendedor_responsavel_id || null);
   const [salvandoVendedor, setSalvandoVendedor] = useState(false);
   const [showVendedorDropdown, setShowVendedorDropdown] = useState(false);
+  const [vendedorSearch, setVendedorSearch] = useState('');
 
   const podeEditarVendedor = () => {
     if (!os.vendedor_responsavel_id) return true;
@@ -584,69 +585,25 @@ Assistencia Tecnica Samsung`;
               </div>
             </div>
 
-            <div className="relative" data-vendedor-dropdown>
+            <div>
               {podeEditarVendedor() ? (
-                <>
-                  <button
-                    onClick={() => setShowVendedorDropdown(!showVendedorDropdown)}
-                    disabled={salvandoVendedor}
-                    className={`px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${
-                      vendedorResponsavel
-                        ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] border border-[#9D4EDD]/40 hover:bg-[#9D4EDD]/30'
-                        : 'bg-[#00D4FF] text-black hover:bg-[#00D4FF]/90'
-                    }`}
-                  >
-                    {salvandoVendedor ? (
-                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
-                    ) : (
-                      <UserCheck className="w-4 h-4" />
-                    )}
-                    {vendedorResponsavel ? 'Alterar' : 'Definir Vendedor'}
-                    <ChevronDown className={`w-4 h-4 transition-transform ${showVendedorDropdown ? 'rotate-180' : ''}`} />
-                  </button>
-
-                  {showVendedorDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[9999] overflow-hidden">
-                      <div className="p-2 border-b border-gray-700">
-                        <p className="text-xs text-gray-400 px-2">Selecione o vendedor responsavel</p>
-                      </div>
-                      <div className="max-h-64 overflow-y-auto">
-                        {vendedorResponsavel && (
-                          <button
-                            onClick={() => handleSalvarVendedorResponsavel(null)}
-                            className="w-full px-4 py-3 text-left hover:bg-red-500/10 flex items-center gap-3 text-red-400 border-b border-gray-800"
-                          >
-                            <X className="w-4 h-4" />
-                            <span className="text-sm">Remover vendedor</span>
-                          </button>
-                        )}
-                        {usuariosUnidade.map(u => (
-                          <button
-                            key={u.id}
-                            onClick={() => handleSalvarVendedorResponsavel(u.id)}
-                            className={`w-full px-4 py-3 text-left hover:bg-[#9D4EDD]/10 flex items-center justify-between transition-colors ${
-                              vendedorResponsavel === u.id ? 'bg-[#9D4EDD]/20' : ''
-                            }`}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                                vendedorResponsavel === u.id
-                                  ? 'bg-[#9D4EDD] text-white'
-                                  : 'bg-gray-700 text-gray-300'
-                              }`}>
-                                {u.nome.charAt(0).toUpperCase()}
-                              </div>
-                              <span className="text-sm text-white">{u.nome}</span>
-                            </div>
-                            {vendedorResponsavel === u.id && (
-                              <Check className="w-4 h-4 text-[#9D4EDD]" />
-                            )}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
+                <button
+                  onClick={() => { setShowVendedorDropdown(true); setVendedorSearch(''); }}
+                  disabled={salvandoVendedor}
+                  className={`px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${
+                    vendedorResponsavel
+                      ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] border border-[#9D4EDD]/40 hover:bg-[#9D4EDD]/30'
+                      : 'bg-[#00D4FF] text-black hover:bg-[#00D4FF]/90'
+                  }`}
+                >
+                  {salvandoVendedor ? (
+                    <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <UserCheck className="w-4 h-4" />
                   )}
-                </>
+                  {vendedorResponsavel ? 'Alterar' : 'Definir Vendedor'}
+                  <ChevronDown className={`w-4 h-4 transition-transform ${showVendedorDropdown ? 'rotate-180' : ''}`} />
+                </button>
               ) : (
                 <div className="px-4 py-2.5 rounded-xl bg-gray-800/50 border border-gray-700 text-gray-500 text-sm flex items-center gap-2">
                   <Lock className="w-4 h-4" />
@@ -1430,6 +1387,92 @@ Assistencia Tecnica Samsung`;
                 <ThumbsDown className="w-5 h-5" />
                 {processando ? 'PROCESSANDO...' : 'CONFIRMAR REPROVACAO'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showVendedorDropdown && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShowVendedorDropdown(false)}>
+          <div className="premium-card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between p-6 border-b border-[#9D4EDD]/20">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#9D4EDD] to-[#00D4FF] flex items-center justify-center">
+                  <Crown className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-[#9D4EDD]">SELECIONAR VENDEDOR</h2>
+                  <p className="text-xs text-gray-400">Escolha o vendedor responsavel</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowVendedorDropdown(false)}
+                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6 text-gray-400" />
+              </button>
+            </div>
+
+            <div className="p-4 border-b border-gray-700/50">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
+                <input
+                  type="text"
+                  value={vendedorSearch}
+                  onChange={(e) => setVendedorSearch(e.target.value)}
+                  placeholder="Pesquisar vendedor..."
+                  className="w-full pl-10 pr-4 py-3 bg-black/50 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:border-[#9D4EDD] focus:outline-none"
+                  autoFocus
+                />
+              </div>
+            </div>
+
+            <div className="max-h-80 overflow-y-auto">
+              {vendedorResponsavel && (
+                <button
+                  onClick={() => handleSalvarVendedorResponsavel(null)}
+                  className="w-full px-6 py-4 text-left hover:bg-red-500/10 flex items-center gap-4 text-red-400 border-b border-gray-800 transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-red-500/20 flex items-center justify-center">
+                    <X className="w-5 h-5" />
+                  </div>
+                  <span className="font-medium">Remover vendedor</span>
+                </button>
+              )}
+              {usuariosUnidade
+                .filter(u => u.nome.toLowerCase().includes(vendedorSearch.toLowerCase()))
+                .map(u => (
+                <button
+                  key={u.id}
+                  onClick={() => handleSalvarVendedorResponsavel(u.id)}
+                  className={`w-full px-6 py-4 text-left hover:bg-[#9D4EDD]/10 flex items-center justify-between transition-colors ${
+                    vendedorResponsavel === u.id ? 'bg-[#9D4EDD]/20' : ''
+                  }`}
+                >
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold ${
+                      vendedorResponsavel === u.id
+                        ? 'bg-gradient-to-br from-[#9D4EDD] to-[#00D4FF] text-white'
+                        : 'bg-gray-700 text-gray-300'
+                    }`}>
+                      {u.nome.charAt(0).toUpperCase()}
+                    </div>
+                    <div>
+                      <span className="text-white font-medium">{u.nome}</span>
+                      {u.tipo && <p className="text-xs text-gray-500 capitalize">{u.tipo}</p>}
+                    </div>
+                  </div>
+                  {vendedorResponsavel === u.id && (
+                    <Check className="w-5 h-5 text-[#9D4EDD]" />
+                  )}
+                </button>
+              ))}
+              {usuariosUnidade.filter(u => u.nome.toLowerCase().includes(vendedorSearch.toLowerCase())).length === 0 && (
+                <div className="px-6 py-8 text-center text-gray-500">
+                  <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p>Nenhum vendedor encontrado</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
