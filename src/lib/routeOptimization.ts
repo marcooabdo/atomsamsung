@@ -230,7 +230,8 @@ export async function optimizeRoutes(
     .from('os')
     .select(`
       id,
-      numero_os,
+      numero_os_samsung,
+      numero_os_interna,
       rota,
       tipo_atendimento,
       cliente_cep,
@@ -262,7 +263,7 @@ export async function optimizeRoutes(
 
     const osItem: OSForOptimization = {
       id: os.id,
-      numero_os: os.numero_os,
+      numero_os: os.numero_os_samsung || os.numero_os_interna || '',
       rota: os.rota,
       tipo_atendimento: os.tipo_atendimento,
       lat: agendamento?.lat,

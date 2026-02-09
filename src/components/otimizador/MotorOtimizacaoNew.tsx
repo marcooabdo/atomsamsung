@@ -43,8 +43,8 @@ export default function MotorOtimizacaoNew() {
   const loadConfig = async () => {
     const [cfgRes, baseRes, tecRes] = await Promise.all([
       supabase.from('configuracoes_unidade').select('*').eq('unidade_id', selectedUnidade!).maybeSingle(),
-      supabase.from('unidades').select('latitude, longitude, lat_base, lng_base').eq('id', selectedUnidade!).maybeSingle(),
-      supabase.from('usuarios').select('horario_inicio, horario_fim, tempo_almoco_minutos, permite_pernoite, dias_permitidos_fora, tempo_medio_ih_minutos').eq('id', selectedTecnico).maybeSingle(),
+      supabase.from('unidades').select('latitude, longitude').eq('id', selectedUnidade!).maybeSingle(),
+      supabase.from('usuarios').select('horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, permite_pernoite, dias_permitidos_fora, tempo_medio_ih_minutos').eq('id', selectedTecnico).maybeSingle(),
     ]);
 
     const cfg = cfgRes.data;
@@ -52,11 +52,11 @@ export default function MotorOtimizacaoNew() {
     const tec = tecRes.data;
 
     setConfig({
-      base: { lat: Number(base?.latitude || base?.lat_base || -23.55), lng: Number(base?.longitude || base?.lng_base || -46.63) },
-      horario_inicio: tec?.horario_inicio || cfg?.horario_inicio || '08:00',
-      horario_fim: tec?.horario_fim || cfg?.horario_fim || '18:00',
+      base: { lat: Number(base?.latitude || -23.55), lng: Number(base?.longitude || -46.63) },
+      horario_inicio: tec?.horario_inicio_expediente || cfg?.horario_inicio || '08:00',
+      horario_fim: tec?.horario_fim_expediente || cfg?.horario_fim || '18:00',
       almoco_inicio: '12:00',
-      duracao_almoco_min: tec?.tempo_almoco_minutos || cfg?.duracao_almoco || 60,
+      duracao_almoco_min: tec?.duracao_almoco_minutos || cfg?.duracao_almoco || 60,
       tempo_medio_atendimento_min: tec?.tempo_medio_ih_minutos || cfg?.tempo_medio_ih || 90,
       permite_pernoite: tec?.permite_pernoite || false,
       max_dias: tec?.dias_permitidos_fora ? tec.dias_permitidos_fora + 1 : 1,
@@ -75,7 +75,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os, cliente_nome, cliente_cidade, cliente_rua, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, prioridade, linha_produto_id, data_agendamento')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_rua, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, linha_produto_id, data_agendamento')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[])
       .eq('tipo_atendimento', 'IH');
@@ -102,7 +102,7 @@ export default function MotorOtimizacaoNew() {
 
       return {
         id: os.id,
-        numero_os: os.numero_os || '',
+        numero_os: os.numero_os_samsung || os.numero_os_interna || '',
         lat: Number(os.lat) || 0,
         lng: Number(os.lng) || 0,
         cliente_nome: os.cliente_nome || '',
@@ -395,9 +395,9 @@ function ConfigStep({ rotas, selectedRotas, setSelectedRotas, tecnicos, selected
                 onClick={() => setSelectedRotas(sel ? selectedRotas.filter((id: string) => id !== rota.id) : [...selectedRotas, rota.id])}
                 className="flex items-center gap-2 p-3 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  backgroundColor: sel ? rota.cor + '20' : 'var(--bg-secondary)',
-                  border: `2px solid ${sel ? rota.cor : 'var(--border-primary)'}`,
-                  color: sel ? rota.cor : 'var(--text-secondary)',
+                  backgroundColor: sel ? (rota.cor === '#1a1a1a' ? '#55555530' : rota.cor + '20') : 'var(--bg-secondary)',
+                  border: `2px solid ${sel ? (rota.cor === '#1a1a1a' ? '#888' : rota.cor) : 'var(--border-primary)'}`,
+                  color: sel ? (rota.cor === '#1a1a1a' ? '#fff' : rota.cor) : 'var(--text-secondary)',
                 }}
               >
                 <div className="w-3 h-3 rounded-full" style={{ backgroundColor: rota.cor }} />

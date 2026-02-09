@@ -14,7 +14,8 @@ interface RouteColumn {
 
 interface OS {
   id: string;
-  numero_os: string;
+  numero_os_samsung: string | null;
+  numero_os_interna: string | null;
   cliente_nome: string;
   cliente_endereco: string;
   cliente_cidade: string;
@@ -23,7 +24,6 @@ interface OS {
   lng: number | null;
   coluna_kanban: string;
   tipo_atendimento: string;
-  prioridade: number | null;
   concluida: boolean;
 }
 
@@ -75,11 +75,10 @@ class RouteKanbanSyncService {
 
       const { data, error } = await supabase
         .from('os')
-        .select('id, numero_os, cliente_nome, cliente_endereco, cliente_cidade, cliente_cep, lat, lng, coluna_kanban, tipo_atendimento, prioridade, concluida')
+        .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_endereco, cliente_cidade, cliente_cep, lat, lng, coluna_kanban, tipo_atendimento, concluida')
         .eq('unidade_id', unidadeId)
         .eq('tipo_atendimento', 'IH')
         .in('coluna_kanban', routeColumns)
-        .order('prioridade', { ascending: false, nullsFirst: false })
         .order('created_at', { ascending: true });
 
       if (error) throw error;

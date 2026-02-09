@@ -164,7 +164,6 @@ export async function otimizarRotaInteligente(
       lat,
       lng,
       tipo_atendimento,
-      prioridade,
       cliente_nome,
       cliente_logradouro,
       cliente_numero,
@@ -238,7 +237,7 @@ export async function otimizarRotaInteligente(
       cliente_bairro: os.cliente_bairro || '',
       cliente_cidade: os.cliente_cidade || '',
       cliente_cep: os.cliente_cep || '',
-      prioridade: os.prioridade || 'media',
+      prioridade: 'media',
       tipo_atendimento: os.tipo_atendimento || 'IH'
     });
   }
