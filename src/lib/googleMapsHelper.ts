@@ -102,7 +102,7 @@ export async function geocodeBatch(
 
 export function buildOSAddress(os: any): string {
   const parts: string[] = [];
-  if (os.cliente_rua) parts.push(os.cliente_rua);
+  if (os.cliente_logradouro) parts.push(os.cliente_logradouro);
   if (os.cliente_numero) parts.push(os.cliente_numero);
   if (os.cliente_bairro) parts.push(os.cliente_bairro);
   if (os.cliente_cidade) parts.push(os.cliente_cidade);

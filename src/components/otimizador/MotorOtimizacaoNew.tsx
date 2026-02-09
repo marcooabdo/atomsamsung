@@ -44,7 +44,7 @@ export default function MotorOtimizacaoNew() {
     const [cfgRes, baseRes, tecRes] = await Promise.all([
       supabase.from('configuracoes_unidade').select('*').eq('unidade_id', selectedUnidade!).maybeSingle(),
       supabase.from('unidades').select('latitude, longitude').eq('id', selectedUnidade!).maybeSingle(),
-      supabase.from('usuarios').select('horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, permite_pernoite, dias_permitidos_fora, tempo_medio_ih_minutos').eq('id', selectedTecnico).maybeSingle(),
+      supabase.from('usuarios').select('horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos').eq('id', selectedTecnico).maybeSingle(),
     ]);
 
     const cfg = cfgRes.data;
@@ -57,9 +57,9 @@ export default function MotorOtimizacaoNew() {
       horario_fim: tec?.horario_fim_expediente || cfg?.horario_fim || '18:00',
       almoco_inicio: '12:00',
       duracao_almoco_min: tec?.duracao_almoco_minutos || cfg?.duracao_almoco || 60,
-      tempo_medio_atendimento_min: tec?.tempo_medio_ih_minutos || cfg?.tempo_medio_ih || 90,
-      permite_pernoite: tec?.permite_pernoite || false,
-      max_dias: tec?.dias_permitidos_fora ? tec.dias_permitidos_fora + 1 : 1,
+      tempo_medio_atendimento_min: cfg?.tempo_medio_ih || 90,
+      permite_pernoite: cfg?.permite_pernoite || false,
+      max_dias: cfg?.dias_permitidos_fora ? cfg.dias_permitidos_fora + 1 : 1,
       velocidade_media_kmh: 40,
     });
   };
@@ -75,7 +75,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_rua, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, linha_produto_id, data_agendamento')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_logradouro, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, linha_produto_id, data_agendamento')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[])
       .eq('tipo_atendimento', 'IH');
