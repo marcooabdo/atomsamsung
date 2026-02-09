@@ -1310,7 +1310,13 @@ export function Configuracoes() {
                   </div>
 
                   <div className="premium-card p-4 bg-[#10b981]/5 border border-[#10b981]/20">
-                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-3">Cidades desta Rota</label>
+                    <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Cidades desta Rota</label>
+
+                    <div className="mb-3 p-2 rounded bg-blue-500/10 border border-blue-500/30">
+                      <p className="text-xs text-blue-400">
+                        As cidades sao automaticamente cadastradas quando uma OS IH e movida no Kanban pela primeira vez. Voce tambem pode adicionar cidades manualmente aqui.
+                      </p>
+                    </div>
 
                     <div className="flex gap-2 mb-3">
                       <input
@@ -1320,11 +1326,13 @@ export function Configuracoes() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && novaCidade.trim()) {
                             e.preventDefault();
-                            if (!formRota.cidades.includes(novaCidade.trim())) {
+                            const cidadeNormalizada = novaCidade.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            const cidadesNormalizadas = formRota.cidades.map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+                            if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
                               setFormRota({...formRota, cidades: [...formRota.cidades, novaCidade.trim()]});
                               setNovaCidade('');
                             } else {
-                              alert('Cidade já adicionada!');
+                              alert('Cidade já adicionada (mesmo com grafia diferente)!');
                             }
                           }
                         }}
@@ -1335,11 +1343,13 @@ export function Configuracoes() {
                         type="button"
                         onClick={() => {
                           if (novaCidade.trim()) {
-                            if (!formRota.cidades.includes(novaCidade.trim())) {
+                            const cidadeNormalizada = novaCidade.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            const cidadesNormalizadas = formRota.cidades.map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
+                            if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
                               setFormRota({...formRota, cidades: [...formRota.cidades, novaCidade.trim()]});
                               setNovaCidade('');
                             } else {
-                              alert('Cidade já adicionada!');
+                              alert('Cidade já adicionada (mesmo com grafia diferente)!');
                             }
                           }
                         }}

@@ -1307,6 +1307,7 @@ export function Kanban() {
     const osId = mandatoryRoutePickerOS.id;
     const prevColumn = mandatoryRoutePickerOS.coluna_kanban;
     const { targetColumn, position: finalPosition } = pendingMandatoryMove;
+    const cidadeOS = mandatoryRoutePickerOS.cliente_cidade;
 
     const rotaIdMap: Record<string, string> = {
       'rota_preta': 'preta',
@@ -1322,6 +1323,31 @@ export function Kanban() {
     setPendingMandatoryMove(null);
 
     try {
+      // Adicionar a cidade na rota selecionada automaticamente
+      if (cidadeOS) {
+        const rotaSelecionada = rotas.find(r => r.coluna_kanban === rotaColumn);
+        if (rotaSelecionada) {
+          const cidadeNormalizada = normalizeCidade(cidadeOS);
+          const cidadesNormalizadas = rotaSelecionada.cidades.map(c => normalizeCidade(c));
+
+          // Só adicionar se a cidade ainda não estiver na lista (evitar duplicatas)
+          if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
+            const novasCidades = [...rotaSelecionada.cidades, cidadeOS];
+
+            await supabase
+              .from('rotas')
+              .update({ cidades: novasCidades })
+              .eq('id', rotaSelecionada.id);
+
+            // Atualizar estado local
+            setRotas(prev => prev.map(r =>
+              r.id === rotaSelecionada.id
+                ? { ...r, cidades: novasCidades }
+                : r
+            ));
+          }
+        }
+      }
       let novaSequencia: number = 0;
       const cardsDestino = filteredData[targetColumn] || [];
 
@@ -3277,10 +3303,10 @@ export function Kanban() {
                 </div>
                 <div>
                   <span className="text-sm font-bold" style={{ color: '#F59E0B' }}>
-                    SELECAO DE ROTA OBRIGATORIA
+                    COR DE ROTA NAO CADASTRADA
                   </span>
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    OS In Home deve ter uma cor de rota definida
+                    Defina qual cor de rota esta cidade pertence
                   </p>
                 </div>
               </div>
@@ -3306,8 +3332,19 @@ export function Kanban() {
               </div>
             </div>
             <div className="p-4">
+              <div className="mb-4 p-3 rounded-lg text-center" style={{ background: 'linear-gradient(135deg, rgba(255,191,0,0.15), rgba(245,158,11,0.08))' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  A cidade
+                </p>
+                <p className="text-lg font-bold my-1" style={{ color: '#FFBF00' }}>
+                  {mandatoryRoutePickerOS.cliente_cidade || 'SEM CIDADE'}
+                </p>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  pertence a qual rota?
+                </p>
+              </div>
               <p className="text-xs font-medium uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-secondary)' }}>
-                Selecione a cor da rota para esta OS IH
+                Selecione a cor da rota
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {[
@@ -3350,12 +3387,17 @@ export function Kanban() {
                   </button>
                 ))}
               </div>
+              <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }}>
+                <p className="text-[10px] text-center" style={{ color: 'rgba(59,130,246,0.9)' }}>
+                  A cidade sera automaticamente cadastrada na rota selecionada. Nas proximas vezes, esta cidade ja tera sua rota definida.
+                </p>
+              </div>
               <button
                 onClick={() => {
                   setMandatoryRoutePickerOS(null);
                   setPendingMandatoryMove(null);
                 }}
-                className="w-full mt-4 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
+                className="w-full mt-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
                 style={{
                   backgroundColor: 'rgba(239,68,68,0.1)',
                   border: '1px solid rgba(239,68,68,0.3)',
