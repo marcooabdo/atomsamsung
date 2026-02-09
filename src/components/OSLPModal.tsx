@@ -93,6 +93,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [mostrarModalSucesso, setMostrarModalSucesso] = useState(false);
   const [dadosOSCriada, setDadosOSCriada] = useState<{ numeroInterna?: string; numeroSamsung?: string } | null>(null);
 
+  // Estados para validação de rota IH
+  const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
+  const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
+  const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
+
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [unidadeId, setUnidadeId] = useState('');
@@ -655,6 +660,46 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
+  const normalizeCidade = (cidade: string | null | undefined): string => {
+    if (!cidade) return '';
+    return cidade
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .trim();
+  };
+
+  const findRotaByCidade = (cidade: string | null | undefined): { coluna: string; nome: string } | null => {
+    if (!cidade) return null;
+    const cidadeNormalizada = normalizeCidade(cidade);
+
+    for (const rota of rotasUnidade) {
+      const cidadesNormalizadas = rota.cidades.map(c => normalizeCidade(c));
+      if (cidadesNormalizadas.includes(cidadeNormalizada)) {
+        return {
+          coluna: rota.coluna_kanban,
+          nome: rota.nome
+        };
+      }
+    }
+    return null;
+  };
+
+  const loadRotasUnidade = async (unidadeIdParam: string) => {
+    try {
+      const { data } = await supabase
+        .from('rotas')
+        .select('id, nome, cidades, coluna_kanban')
+        .eq('unidade_id', unidadeIdParam)
+        .eq('ativa', true);
+
+      if (data) {
+        setRotasUnidade(data);
+      }
+    } catch (error) {
+    }
+  };
+
   const loadOS = async () => {
     if (!currentOsId) return;
     try {
@@ -670,6 +715,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (error) throw error;
       setOS(data);
+
+      // Carregar rotas da unidade para validação IH
+      if (data?.unidade_id) {
+        await loadRotasUnidade(data.unidade_id);
+      }
     } catch (error) {
     } finally {
       setLoading(false);
@@ -2180,6 +2230,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         <button
                           key={coluna.id}
                           onClick={() => {
+                            // Validar rota IH obrigatória antes de permitir movimentação
+                            const isOSIH = os?.tipo_atendimento === 'IH';
+                            const isOrigemOSNova = os?.coluna_kanban === 'os_nova';
+
+                            if (isOSIH && isOrigemOSNova) {
+                              const cidadeOS = os?.cliente_cidade;
+                              const rotaEncontrada = findRotaByCidade(cidadeOS);
+
+                              if (!rotaEncontrada) {
+                                // Cidade não tem cor de rota cadastrada - mostrar modal para escolher
+                                setColunaDestinoAposSelecionarRota(coluna);
+                                setMostrarMoverPara(false);
+                                setMostrarSelecionarRotaObrigatoria(true);
+                                return;
+                              }
+                            }
+
                             setColunaDestino(coluna);
                             setMostrarConfirmacaoMover(true);
                           }}
@@ -6072,6 +6139,182 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     Confirmar
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarSelecionarRotaObrigatoria && os && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.8)' }}>
+          <div
+            className="rounded-2xl shadow-2xl overflow-hidden"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '2px solid #F59E0B',
+              backdropFilter: 'blur(20px)',
+              minWidth: 420,
+              maxWidth: 500
+            }}
+          >
+            <div className="p-4 border-b" style={{ borderColor: '#F59E0B30', background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))' }}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F59E0B20' }}>
+                  <AlertCircle className="w-6 h-6" style={{ color: '#F59E0B' }} />
+                </div>
+                <div>
+                  <span className="text-sm font-bold" style={{ color: '#F59E0B' }}>
+                    COR DE ROTA NAO CADASTRADA
+                  </span>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    Defina qual cor de rota esta cidade pertence
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mt-3 p-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-accent)' }}>
+                    {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+                  </p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    {os.cliente_nome}
+                  </p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-xs font-bold" style={{ color: '#FFBF00' }}>
+                    {os.cliente_cidade || 'Sem cidade'}
+                  </p>
+                  {os.cliente_bairro && (
+                    <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                      {os.cliente_bairro}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="mb-4 p-3 rounded-lg text-center" style={{ background: 'linear-gradient(135deg, rgba(255,191,0,0.15), rgba(245,158,11,0.08))' }}>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  A cidade
+                </p>
+                <p className="text-lg font-bold my-1" style={{ color: '#FFBF00' }}>
+                  {os.cliente_cidade || 'SEM CIDADE'}
+                </p>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  pertence a qual rota?
+                </p>
+              </div>
+              <p className="text-xs font-medium uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-secondary)' }}>
+                Selecione a cor da rota
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { kanban: 'rota_preta', label: 'Preta', cor: '#1a1a1a', border: '#555' },
+                  { kanban: 'rota_vermelha', label: 'Vermelha', cor: '#EF4444', border: '#EF4444' },
+                  { kanban: 'rota_azul', label: 'Azul', cor: '#3B82F6', border: '#3B82F6' },
+                  { kanban: 'rota_verde', label: 'Verde', cor: '#10B981', border: '#10B981' },
+                  { kanban: 'rota_rosa', label: 'Rosa', cor: '#EC4899', border: '#EC4899' },
+                  { kanban: 'rota_amarela', label: 'Amarela', cor: '#EAB308', border: '#EAB308' },
+                  { kanban: 'rota_laranja', label: 'Laranja', cor: '#F97316', border: '#F97316' },
+                ].map(rota => (
+                  <button
+                    key={rota.kanban}
+                    onClick={async () => {
+                      // Adicionar cidade na rota selecionada
+                      const cidadeOS = os?.cliente_cidade;
+                      if (cidadeOS) {
+                        const rotaSelecionada = rotasUnidade.find(r => r.coluna_kanban === rota.kanban);
+                        if (rotaSelecionada) {
+                          const cidadeNormalizada = normalizeCidade(cidadeOS);
+                          const cidadesNormalizadas = rotaSelecionada.cidades.map(c => normalizeCidade(c));
+
+                          if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
+                            const novasCidades = [...rotaSelecionada.cidades, cidadeOS];
+
+                            await supabase
+                              .from('rotas')
+                              .update({ cidades: novasCidades })
+                              .eq('id', rotaSelecionada.id);
+
+                            setRotasUnidade(prev => prev.map(r =>
+                              r.id === rotaSelecionada.id
+                                ? { ...r, cidades: novasCidades }
+                                : r
+                            ));
+                          }
+                        }
+                      }
+
+                      // Definir rota_id na OS
+                      const rotaIdMap: Record<string, string> = {
+                        'rota_preta': 'preta',
+                        'rota_vermelha': 'vermelha',
+                        'rota_azul': 'azul',
+                        'rota_verde': 'verde',
+                        'rota_rosa': 'rosa',
+                        'rota_amarela': 'amarela',
+                        'rota_laranja': 'laranja'
+                      };
+
+                      await supabase
+                        .from('os')
+                        .update({ rota_id: rotaIdMap[rota.kanban] })
+                        .eq('id', os.id);
+
+                      // Fechar modal e mostrar confirmação de movimentação
+                      setMostrarSelecionarRotaObrigatoria(false);
+                      if (colunaDestinoAposSelecionarRota) {
+                        setColunaDestino(colunaDestinoAposSelecionarRota);
+                        setColunaDestinoAposSelecionarRota(null);
+                        setMostrarConfirmacaoMover(true);
+                      }
+                    }}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      backgroundColor: rota.cor + '15',
+                      border: `2px solid ${rota.border}40`,
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.borderColor = rota.border;
+                      e.currentTarget.style.boxShadow = `0 0 16px ${rota.cor}40`;
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.borderColor = rota.border + '40';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full"
+                      style={{
+                        backgroundColor: rota.cor,
+                        border: rota.cor === '#1a1a1a' ? '2px solid #555' : 'none',
+                        boxShadow: `0 0 12px ${rota.cor}60`,
+                      }}
+                    />
+                    <span className="text-[11px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? 'var(--text-primary)' : rota.cor }}>
+                      {rota.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }}>
+                <p className="text-[10px] text-center" style={{ color: 'rgba(59,130,246,0.9)' }}>
+                  A cidade sera automaticamente cadastrada na rota selecionada. Nas proximas vezes, esta cidade ja tera sua rota definida.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setMostrarSelecionarRotaObrigatoria(false);
+                  setColunaDestinoAposSelecionarRota(null);
+                }}
+                className="w-full mt-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#EF4444',
+                }}
+              >
+                Cancelar Movimentacao
               </button>
             </div>
           </div>

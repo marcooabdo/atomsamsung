@@ -866,22 +866,26 @@ export function Kanban() {
       const rotaEncontrada = findRotaByCidade(cidadeOS);
 
       if (!rotaEncontrada) {
-        // Cidade não tem cor de rota definida - BLOQUEAR e mostrar modal
-        setErrorModalData({
-          title: 'Cor de Rota Obrigatória',
-          message: `A cidade "${cidadeOS || 'SEM CIDADE'}" não possui uma cor de rota designada.\n\nÉ OBRIGATÓRIO definir a cor da rota para esta cidade antes de movimentar esta OS.\n\nProcure o responsável pelo setor de roteirização para saber qual cor de rota deve ser cadastrada para esta cidade.`
-        });
-        setShowErrorModal(true);
-        setDraggedCard(null);
-        return;
-      }
-
-      // Se a cidade tem rota mas a OS não tem rota_id definida, forçar seleção
-      if (!draggedCard.rota_id) {
+        // Cidade NAO tem cor de rota cadastrada - mostrar modal para escolher qual cor pertence
         setMandatoryRoutePickerOS(draggedCard);
         setPendingMandatoryMove({ targetColumn, position: finalPosition });
         setDraggedCard(null);
         return;
+      }
+
+      // Se a cidade TEM rota cadastrada mas a OS não tem rota_id, definir automaticamente
+      if (!draggedCard.rota_id) {
+        // Definir a rota automaticamente baseado na cidade cadastrada
+        const rotaIdMap: Record<string, string> = {
+          'rota_preta': 'preta',
+          'rota_vermelha': 'vermelha',
+          'rota_azul': 'azul',
+          'rota_verde': 'verde',
+          'rota_rosa': 'rosa',
+          'rota_amarela': 'amarela',
+          'rota_laranja': 'laranja'
+        };
+        draggedCard.rota_id = rotaIdMap[rotaEncontrada.coluna] || null;
       }
     }
 
