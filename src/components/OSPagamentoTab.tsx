@@ -57,19 +57,20 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
   const loadUsuariosUnidade = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('usuarios')
-        .select('id, nome, tipo')
+        .select('id, nome, tipo, unidade_id')
         .eq('ativo', true)
         .order('nome');
 
-      if (os.unidade_id) {
-        query = query.or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`);
-      }
-
-      const { data, error } = await query;
       if (error) throw error;
-      setUsuariosUnidade(data || []);
+
+      const filtrados = (data || []).filter(u => {
+        if (!os.unidade_id) return true;
+        return u.unidade_id === os.unidade_id || !u.unidade_id;
+      });
+
+      setUsuariosUnidade(filtrados);
     } catch (error) {
       console.error('Erro ao carregar usuarios:', error);
     }
@@ -1423,7 +1424,7 @@ Assistencia Tecnica Samsung`;
 
       {showVendedorDropdown && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4" onClick={() => setShowVendedorDropdown(false)}>
-          <div className="premium-card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+          <div data-vendedor-dropdown className="premium-card w-full max-w-md" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between p-6 border-b border-[#9D4EDD]/20">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-[#9D4EDD] to-[#00D4FF] flex items-center justify-center">
