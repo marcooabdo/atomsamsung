@@ -2230,16 +2230,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         <button
                           key={coluna.id}
                           onClick={() => {
-                            // Validar rota IH obrigatória antes de permitir movimentação
                             const isOSIH = os?.tipo_atendimento === 'IH';
-                            const isOrigemOSNova = os?.coluna_kanban === 'os_nova';
 
-                            if (isOSIH && isOrigemOSNova) {
+                            if (isOSIH) {
                               const cidadeOS = os?.cliente_cidade;
                               const rotaEncontrada = findRotaByCidade(cidadeOS);
 
                               if (!rotaEncontrada) {
-                                // Cidade não tem cor de rota cadastrada - mostrar modal para escolher
                                 setColunaDestinoAposSelecionarRota(coluna);
                                 setMostrarMoverPara(false);
                                 setMostrarSelecionarRotaObrigatoria(true);
