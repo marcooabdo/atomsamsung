@@ -75,7 +75,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_logradouro, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, linha_produto_id, data_agendamento')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_logradouro, cliente_numero, cliente_bairro, cliente_estado, cliente_cep, cliente_endereco, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, data_agendamento')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[])
       .eq('tipo_atendimento', 'IH');
