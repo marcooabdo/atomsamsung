@@ -85,6 +85,21 @@ function formatDateBR(date: Date): string {
   return date.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' });
 }
 
+function isColorDark(hexColor: string): boolean {
+  const hex = hexColor.replace('#', '');
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return luminance < 0.5;
+}
+
+function getRouteTextColor(routeColor: string, isSelected: boolean): string {
+  if (!isSelected) return 'var(--text-secondary)';
+  if (isColorDark(routeColor)) return '#ffffff';
+  return routeColor;
+}
+
 export default function MotorOtimizacaoNew() {
   const { selectedUnidade, tecnicosData, unidades } = useOtimizador();
   const { isLoaded } = useJsApiLoader({ id: 'google-map-motor', googleMapsApiKey: getGoogleMapsApiKey() });
@@ -788,41 +803,23 @@ export default function MotorOtimizacaoNew() {
                     </select>
                   </div>
                 </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                      <Wrench className="w-3 h-3" /> Tempo Medio Reparo
-                    </label>
-                    <select
-                      value={tempoMedioReparo}
-                      onChange={(e) => setTempoMedioReparo(Number(e.target.value))}
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-                    >
-                      <option value={45}>45 min</option>
-                      <option value={60}>1h</option>
-                      <option value={90}>1h30</option>
-                      <option value={120}>2h</option>
-                      <option value={150}>2h30</option>
-                      <option value={180}>3h</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
-                      <Navigation className="w-3 h-3" /> Velocidade Media
-                    </label>
-                    <select
-                      value={velocidadeMedia}
-                      onChange={(e) => setVelocidadeMedia(Number(e.target.value))}
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-                    >
-                      <option value={30}>30 km/h (cidade)</option>
-                      <option value={40}>40 km/h (misto)</option>
-                      <option value={50}>50 km/h (estrada)</option>
-                      <option value={60}>60 km/h (rodovia)</option>
-                    </select>
-                  </div>
+                <div>
+                  <label className="block text-xs font-medium mb-1.5 flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
+                    <Wrench className="w-3 h-3" /> Tempo Medio Reparo
+                  </label>
+                  <select
+                    value={tempoMedioReparo}
+                    onChange={(e) => setTempoMedioReparo(Number(e.target.value))}
+                    className="w-full px-3 py-2 rounded-lg text-sm"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                  >
+                    <option value={45}>45 min</option>
+                    <option value={60}>1h</option>
+                    <option value={90}>1h30</option>
+                    <option value={120}>2h</option>
+                    <option value={150}>2h30</option>
+                    <option value={180}>3h</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -835,18 +832,26 @@ export default function MotorOtimizacaoNew() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                 {rotas.map((rota) => {
                   const sel = selectedRotas.includes(rota.id);
+                  const isDark = isColorDark(rota.cor || '#3B82F6');
+                  const textColor = getRouteTextColor(rota.cor || '#3B82F6', sel);
+                  const bgColor = sel
+                    ? (isDark ? rota.cor + '40' : rota.cor + '20')
+                    : 'var(--bg-secondary)';
+                  const borderColor = sel
+                    ? (isDark ? '#ffffff' : rota.cor)
+                    : 'var(--border-primary)';
                   return (
                     <button
                       key={rota.id}
                       onClick={() => setSelectedRotas(sel ? selectedRotas.filter(id => id !== rota.id) : [...selectedRotas, rota.id])}
                       className="flex items-center gap-2 p-3 rounded-xl text-sm font-medium transition-all"
                       style={{
-                        backgroundColor: sel ? rota.cor + '20' : 'var(--bg-secondary)',
-                        border: `2px solid ${sel ? rota.cor : 'var(--border-primary)'}`,
-                        color: sel ? rota.cor : 'var(--text-secondary)',
+                        backgroundColor: bgColor,
+                        border: `2px solid ${borderColor}`,
+                        color: textColor,
                       }}
                     >
-                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: rota.cor }} />
+                      <div className="w-3 h-3 rounded-full" style={{ backgroundColor: rota.cor, border: isDark ? '1px solid #666' : 'none' }} />
                       <span className="truncate">{rota.nome}</span>
                       {rota.cidades?.length > 0 && (
                         <span className="text-[10px] opacity-70">({rota.cidades.length})</span>
