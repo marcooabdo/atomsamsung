@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
@@ -34,10 +34,89 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [approvalLink, setApprovalLink] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [gerandoLink, setGerandoLink] = useState(false);
+  const [usuariosUnidade, setUsuariosUnidade] = useState<any[]>([]);
+  const [vendedorResponsavel, setVendedorResponsavel] = useState<string | null>(os.vendedor_responsavel_id || null);
+  const [salvandoVendedor, setSalvandoVendedor] = useState(false);
+  const [showVendedorDropdown, setShowVendedorDropdown] = useState(false);
+
+  const podeEditarVendedor = () => {
+    if (!os.vendedor_responsavel_id) return true;
+    if (!usuario) return false;
+    return ['master', 'diretoria', 'gerente'].includes(usuario.tipo);
+  };
 
   useEffect(() => {
     loadPagamentos();
+    loadUsuariosUnidade();
   }, [osId]);
+
+  useEffect(() => {
+    setVendedorResponsavel(os.vendedor_responsavel_id || null);
+  }, [os.vendedor_responsavel_id]);
+
+  const loadUsuariosUnidade = async () => {
+    try {
+      let query = supabase
+        .from('usuarios')
+        .select('id, nome, tipo')
+        .eq('ativo', true)
+        .order('nome');
+
+      if (os.unidade_id) {
+        query = query.or(`unidade_id.eq.${os.unidade_id},unidade_id.is.null`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      setUsuariosUnidade(data || []);
+    } catch (error) {
+      console.error('Erro ao carregar usuarios:', error);
+    }
+  };
+
+  const handleSalvarVendedorResponsavel = async (novoVendedorId: string | null) => {
+    if (!podeEditarVendedor() && os.vendedor_responsavel_id) {
+      alert('Somente gerentes, diretoria ou master podem alterar o vendedor responsavel.');
+      return;
+    }
+
+    setSalvandoVendedor(true);
+    try {
+      const vendedorAnterior = usuariosUnidade.find(u => u.id === os.vendedor_responsavel_id);
+      const vendedorNovo = usuariosUnidade.find(u => u.id === novoVendedorId);
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          vendedor_responsavel_id: novoVendedorId,
+          vendedor_responsavel_definido_em: new Date().toISOString(),
+          vendedor_responsavel_definido_por: usuario?.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      const comentario = vendedorAnterior
+        ? `Vendedor responsavel alterado de ${vendedorAnterior.nome} para ${vendedorNovo?.nome || 'Nenhum'}`
+        : `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Nenhum'}`;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario,
+        is_system: true
+      });
+
+      setVendedorResponsavel(novoVendedorId);
+      setShowVendedorDropdown(false);
+      onUpdate();
+    } catch (error: any) {
+      alert(`Erro ao salvar vendedor: ${error.message}`);
+    } finally {
+      setSalvandoVendedor(false);
+    }
+  };
 
   useEffect(() => {
     if (os) {
@@ -259,6 +338,17 @@ Assistencia Tecnica Samsung`;
     }
   }, [showWhatsAppModal]);
 
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (showVendedorDropdown && !target.closest('[data-vendedor-dropdown]')) {
+        setShowVendedorDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showVendedorDropdown]);
+
   const handleAprovarOrcamento = async () => {
     if (!confirm('Confirma a APROVACAO do orcamento? A OS sera movida para "Orcamento Aprovado".')) return;
 
@@ -455,6 +545,124 @@ Assistencia Tecnica Samsung`;
             </div>
           </div>
         )}
+
+        {/* VENDEDOR RESPONSAVEL - Em destaque no topo */}
+        <div className={`premium-card p-6 ${vendedorResponsavel
+          ? 'bg-gradient-to-r from-[#9D4EDD]/20 to-[#00D4FF]/10 border-2 border-[#9D4EDD]'
+          : 'bg-gradient-to-r from-gray-800/50 to-gray-700/30 border-2 border-dashed border-gray-600'}`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center ${
+                vendedorResponsavel
+                  ? 'bg-gradient-to-br from-[#9D4EDD] to-[#00D4FF] shadow-lg shadow-[#9D4EDD]/30'
+                  : 'bg-gray-700/50 border-2 border-dashed border-gray-500'
+              }`}>
+                {vendedorResponsavel ? (
+                  <Crown className="w-7 h-7 text-white" />
+                ) : (
+                  <User className="w-7 h-7 text-gray-400" />
+                )}
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className={`text-lg font-bold uppercase tracking-wide ${
+                    vendedorResponsavel ? 'text-[#9D4EDD]' : 'text-gray-400'
+                  }`}>
+                    VENDEDOR RESPONSAVEL
+                  </h3>
+                  {vendedorResponsavel && !podeEditarVendedor() && (
+                    <Lock className="w-4 h-4 text-gray-500" title="Somente gerentes podem alterar" />
+                  )}
+                </div>
+                {vendedorResponsavel ? (
+                  <p className="text-xl font-bold text-white">
+                    {usuariosUnidade.find(u => u.id === vendedorResponsavel)?.nome || 'Carregando...'}
+                  </p>
+                ) : (
+                  <p className="text-sm text-gray-400">Nenhum vendedor definido - Clique para selecionar</p>
+                )}
+              </div>
+            </div>
+
+            <div className="relative" data-vendedor-dropdown>
+              {podeEditarVendedor() ? (
+                <>
+                  <button
+                    onClick={() => setShowVendedorDropdown(!showVendedorDropdown)}
+                    disabled={salvandoVendedor}
+                    className={`px-4 py-2.5 rounded-xl font-semibold text-sm flex items-center gap-2 transition-all ${
+                      vendedorResponsavel
+                        ? 'bg-[#9D4EDD]/20 text-[#9D4EDD] border border-[#9D4EDD]/40 hover:bg-[#9D4EDD]/30'
+                        : 'bg-[#00D4FF] text-black hover:bg-[#00D4FF]/90'
+                    }`}
+                  >
+                    {salvandoVendedor ? (
+                      <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <UserCheck className="w-4 h-4" />
+                    )}
+                    {vendedorResponsavel ? 'Alterar' : 'Definir Vendedor'}
+                    <ChevronDown className={`w-4 h-4 transition-transform ${showVendedorDropdown ? 'rotate-180' : ''}`} />
+                  </button>
+
+                  {showVendedorDropdown && (
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                      <div className="p-2 border-b border-gray-700">
+                        <p className="text-xs text-gray-400 px-2">Selecione o vendedor responsavel</p>
+                      </div>
+                      <div className="max-h-64 overflow-y-auto">
+                        {vendedorResponsavel && (
+                          <button
+                            onClick={() => handleSalvarVendedorResponsavel(null)}
+                            className="w-full px-4 py-3 text-left hover:bg-red-500/10 flex items-center gap-3 text-red-400 border-b border-gray-800"
+                          >
+                            <X className="w-4 h-4" />
+                            <span className="text-sm">Remover vendedor</span>
+                          </button>
+                        )}
+                        {usuariosUnidade.map(u => (
+                          <button
+                            key={u.id}
+                            onClick={() => handleSalvarVendedorResponsavel(u.id)}
+                            className={`w-full px-4 py-3 text-left hover:bg-[#9D4EDD]/10 flex items-center justify-between transition-colors ${
+                              vendedorResponsavel === u.id ? 'bg-[#9D4EDD]/20' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                                vendedorResponsavel === u.id
+                                  ? 'bg-[#9D4EDD] text-white'
+                                  : 'bg-gray-700 text-gray-300'
+                              }`}>
+                                {u.nome.charAt(0).toUpperCase()}
+                              </div>
+                              <span className="text-sm text-white">{u.nome}</span>
+                            </div>
+                            {vendedorResponsavel === u.id && (
+                              <Check className="w-4 h-4 text-[#9D4EDD]" />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="px-4 py-2.5 rounded-xl bg-gray-800/50 border border-gray-700 text-gray-500 text-sm flex items-center gap-2">
+                  <Lock className="w-4 h-4" />
+                  Bloqueado
+                </div>
+              )}
+            </div>
+          </div>
+
+          {os.vendedor_responsavel_definido_em && (
+            <div className="mt-4 pt-3 border-t border-gray-700/50 flex items-center gap-4 text-xs text-gray-500">
+              <span>Definido em: {new Date(os.vendedor_responsavel_definido_em).toLocaleString('pt-BR')}</span>
+            </div>
+          )}
+        </div>
+
         <div className="premium-card p-6 bg-gradient-to-r from-[#F59E0B]/10 to-[#00D4FF]/10 border border-[#F59E0B]/30">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
