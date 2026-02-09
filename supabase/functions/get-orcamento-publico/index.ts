@@ -233,7 +233,7 @@ Deno.serve(async (req: Request) => {
       valor_servicos: Number(osData.valor_servicos || 0),
       desconto_tipo: osData.desconto_tipo,
       desconto_valor: Number(osData.desconto_valor || 0),
-      valor_liquido: Number(osData.valor_total || 0) - Number(osData.valor_desconto_calculado || 0),
+      valor_liquido: Number(osData.valor_total || 0),
       created_at: osData.created_at,
       cotacoes_pecas: (pecasData || []).map(p => ({
         id: p.id,

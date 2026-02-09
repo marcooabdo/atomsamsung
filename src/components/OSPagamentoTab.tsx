@@ -336,7 +336,7 @@ Assistencia Tecnica Samsung`;
     setGerandoLink(true);
     try {
       const { data, error } = await supabase
-        .rpc('upsert_orcamento_link', { p_os_id: osId });
+        .rpc('criar_novo_link_orcamento', { p_os_id: osId });
 
       if (error) throw error;
 
@@ -345,6 +345,7 @@ Assistencia Tecnica Samsung`;
         const baseUrl = window.location.origin;
         const link = `${baseUrl}/orcamento/${token}`;
         setApprovalLink(link);
+        onReload?.();
         return link;
       }
     } catch (error: any) {
