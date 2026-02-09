@@ -253,8 +253,9 @@ Assistencia Tecnica Samsung`;
   };
 
   useEffect(() => {
-    if (showWhatsAppModal && !approvalLink) {
-      gerarLinkAprovacao();
+    if (showWhatsAppModal) {
+      setApprovalLink('');
+      setLinkCopied(false);
     }
   }, [showWhatsAppModal]);
 
@@ -989,38 +990,49 @@ Assistencia Tecnica Samsung`;
                       Link de Aprovacao
                     </span>
                   </div>
-                  <button
-                    onClick={copiarLink}
-                    disabled={!approvalLink || gerandoLink}
-                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
-                      linkCopied
-                        ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40'
-                        : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 hover:bg-[#00D4FF]/30'
-                    }`}
-                  >
-                    {linkCopied ? (
-                      <>
-                        <Check className="w-4 h-4" />
-                        COPIADO!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4" />
-                        COPIAR LINK
-                      </>
-                    )}
-                  </button>
+                  {approvalLink && !gerandoLink && (
+                    <button
+                      onClick={copiarLink}
+                      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
+                        linkCopied
+                          ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40'
+                          : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 hover:bg-[#00D4FF]/30'
+                      }`}
+                    >
+                      {linkCopied ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          COPIADO!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          COPIAR LINK
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
+
                 {gerandoLink ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00D4FF]"></div>
+                  <div className="flex flex-col items-center justify-center py-6">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D4FF] mb-3"></div>
+                    <p className="text-xs text-gray-400">Gerando link seguro...</p>
                   </div>
                 ) : approvalLink ? (
                   <>
-                    <div className="text-xs text-gray-300 bg-black/30 p-3 rounded-lg border border-gray-800 break-all font-mono">
+                    <div className="text-xs text-gray-300 bg-black/30 p-3 rounded-lg border border-gray-800 break-all font-mono mb-3">
                       {approvalLink}
                     </div>
-                    <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+
+                    <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center gap-2">
+                      <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
+                      <p className="text-[10px] text-yellow-300">
+                        <strong>Validade:</strong> Este link expira em <strong>72 horas</strong> apos a geracao
+                      </p>
+                    </div>
+
+                    <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                       <p className="text-[10px] text-blue-300 leading-relaxed">
                         <strong>Como funciona:</strong> Ao acessar o link, o cliente podera visualizar o orcamento completo e:
                       </p>
@@ -1043,9 +1055,28 @@ Assistencia Tecnica Samsung`;
                     </div>
                   </>
                 ) : (
-                  <p className="text-xs text-gray-400 text-center py-2">
-                    Erro ao gerar link
-                  </p>
+                  <div className="text-center py-6">
+                    <p className="text-xs text-gray-400 mb-4">
+                      Clique no botao abaixo para gerar um link de aprovacao
+                    </p>
+                    <button
+                      onClick={gerarLinkAprovacao}
+                      disabled={gerandoLink}
+                      className="px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 mx-auto"
+                      style={{
+                        backgroundColor: '#00D4FF20',
+                        color: '#00D4FF',
+                        border: '1px solid #00D4FF60',
+                        boxShadow: '0 0 20px #00D4FF30'
+                      }}
+                    >
+                      <Send className="w-5 h-5" />
+                      GERAR LINK
+                    </button>
+                    <p className="text-[10px] text-gray-500 mt-3">
+                      Link tera validade de 72 horas
+                    </p>
+                  </div>
                 )}
               </div>
             </div>

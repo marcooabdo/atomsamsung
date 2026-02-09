@@ -42,6 +42,28 @@ Deno.serve(async (req: Request) => {
       );
     }
 
+    // Verificar se o link expirou
+    if (linkData.expires_at) {
+      const expiresAt = new Date(linkData.expires_at);
+      const now = new Date();
+
+      if (now > expiresAt) {
+        // Desativar link expirado
+        await supabase
+          .from('orcamento_links')
+          .update({ ativo: false, updated_at: new Date().toISOString() })
+          .eq('id', linkData.id);
+
+        return new Response(
+          JSON.stringify({
+            error: 'Link expirado',
+            message: 'Este link de aprovacao expirou. Entre em contato com a assistencia tecnica.'
+          }),
+          { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
+
     // Se for uma resposta do cliente
     if (req.method === 'POST' && action === 'respond') {
       const body = await req.json();

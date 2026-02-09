@@ -277,12 +277,25 @@ export function OrcamentoPublico() {
   }
 
   if (error || !data) {
+    const isExpired = error?.toLowerCase().includes('expirado') || error?.toLowerCase().includes('expirou');
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
         <div className="bg-gray-800 border border-red-500/30 rounded-xl p-8 max-w-md w-full text-center">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Link Inválido</h1>
-          <p className="text-gray-400">{error || 'O link de orçamento não foi encontrado ou expirou.'}</p>
+          <h1 className="text-2xl font-bold text-white mb-2">
+            {isExpired ? 'Link Expirado' : 'Link Inválido'}
+          </h1>
+          <p className="text-gray-400 mb-4">
+            {error || 'O link de orçamento não foi encontrado ou expirou.'}
+          </p>
+          {isExpired && (
+            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+              <p className="text-sm text-yellow-300">
+                Este link tinha validade de 72 horas e já expirou. Por favor, entre em contato com a assistência técnica para solicitar um novo link.
+              </p>
+            </div>
+          )}
         </div>
       </div>
     );
