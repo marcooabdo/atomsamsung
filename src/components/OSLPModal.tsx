@@ -6306,7 +6306,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         boxShadow: `0 0 12px ${rota.cor}60`,
                       }}
                     />
-                    <span className="text-[11px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? 'var(--text-primary)' : rota.cor }}>
+                    <span className="text-[11px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? '#fff' : rota.cor }}>
                       {rota.label}
                     </span>
                   </button>
