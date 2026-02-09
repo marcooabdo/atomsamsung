@@ -818,9 +818,9 @@ export function Kanban() {
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
     const isOrigemOSNova = draggedCard.coluna_kanban === 'os_nova';
     const isOSIH = draggedCard.tipo_atendimento === 'IH';
-    const isDestinoNaoRota = !rotasColumns.includes(targetColumn);
 
-    if (isOrigemOSNova && isOSIH && isDestinoNaoRota && !draggedCard.rota_id) {
+    // REGRA: OS IH saindo de "os_nova" DEVE ter rota designada OBRIGATORIAMENTE
+    if (isOrigemOSNova && isOSIH && !draggedCard.rota_id) {
       setMandatoryRoutePickerOS(draggedCard);
       setPendingMandatoryMove({ targetColumn, position: finalPosition });
       setDraggedCard(null);
