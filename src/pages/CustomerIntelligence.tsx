@@ -97,12 +97,14 @@ export default function CustomerIntelligence() {
   });
 
   const isMaster = user?.tipo === 'master';
+  const isDiretoria = user?.tipo === 'diretoria';
+  const isGerente = isMaster || isDiretoria;
 
   useEffect(() => {
-    if (user?.unidade_id && !isMaster) {
+    if (user?.unidade_id && !isGerente) {
       setSelectedUnidade(user.unidade_id);
     }
-  }, [user, isMaster]);
+  }, [user, isGerente]);
 
   const getDateRange = useCallback(() => {
     const now = new Date();
@@ -805,7 +807,7 @@ export default function CustomerIntelligence() {
         <div className="flex items-center gap-2 p-1 rounded-xl bg-slate-800/30 border border-slate-700/50 w-fit">
           {[
             { id: 'dashboard', label: 'Dashboard', icon: BarChart3 },
-            { id: 'carteira', label: 'Minha Carteira', icon: Users },
+            { id: 'carteira', label: isGerente ? 'Carteira de Vendas' : 'Minha Carteira', icon: Users },
             { id: 'vendedores', label: 'Performance', icon: TrendingUp },
             { id: 'produtos', label: 'Produtos', icon: Package }
           ].map(tab => (
