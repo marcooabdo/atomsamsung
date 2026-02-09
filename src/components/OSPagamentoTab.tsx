@@ -386,12 +386,17 @@ Assistencia Tecnica Samsung`;
 
     setProcessando(true);
     try {
+      const valorAtual = os.valor_total || 0;
+      const versaoAtual = os.versao_orcamento || 1;
+
       const { error } = await supabase
         .from('os')
         .update({
           coluna_kanban: 'orcamento_aprovado',
           orcamento_aprovado_em: new Date().toISOString(),
           orcamento_aprovado_por: usuario?.id,
+          valor_quando_aprovado: valorAtual,
+          versao_quando_aprovado: versaoAtual,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
@@ -401,7 +406,7 @@ Assistencia Tecnica Samsung`;
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Orcamento APROVADO pelo cliente - Valor: R$ ${(os.valor_total || 0).toFixed(2)}`,
+        comentario: `Orcamento APROVADO pelo cliente - Valor: R$ ${valorAtual.toFixed(2)}`,
         is_system: true
       });
 
@@ -693,19 +698,49 @@ Assistencia Tecnica Samsung`;
               <Send className="w-4 h-4" />
               {os.orcamento_enviado ? 'Reenviar' : 'Enviar'}
             </button>
-            <button
-              onClick={handleAprovarOrcamento}
-              disabled={processando}
-              className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
-              style={{
-                backgroundColor: '#39FF1420',
-                color: '#39FF14',
-                border: '1px solid #39FF1460'
-              }}
-            >
-              <ThumbsUp className="w-4 h-4" />
-              Aprovar
-            </button>
+            {(() => {
+              const isAprovado = os.orcamento_aprovado_em &&
+                os.valor_quando_aprovado !== null &&
+                os.valor_quando_aprovado !== undefined &&
+                Math.abs((os.valor_total || 0) - os.valor_quando_aprovado) < 0.01;
+
+              if (isAprovado) {
+                return (
+                  <div
+                    className="flex flex-col items-center justify-center gap-1 px-4 py-2 rounded-lg font-bold text-xs uppercase"
+                    style={{
+                      backgroundColor: '#39FF1430',
+                      color: '#39FF14',
+                      border: '2px solid #39FF14'
+                    }}
+                  >
+                    <div className="flex items-center gap-1">
+                      <Check className="w-4 h-4" />
+                      APROVADO
+                    </div>
+                    <span className="text-[10px] font-normal opacity-80">
+                      {new Date(os.orcamento_aprovado_em).toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                );
+              }
+
+              return (
+                <button
+                  onClick={handleAprovarOrcamento}
+                  disabled={processando}
+                  className="flex items-center justify-center gap-2 px-4 py-3 rounded-lg font-bold text-sm uppercase transition-all"
+                  style={{
+                    backgroundColor: '#39FF1420',
+                    color: '#39FF14',
+                    border: '1px solid #39FF1460'
+                  }}
+                >
+                  <ThumbsUp className="w-4 h-4" />
+                  Aprovar
+                </button>
+              );
+            })()}
             <button
               onClick={() => setShowReprovarModal(true)}
               disabled={processando}
