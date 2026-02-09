@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
-import { geocodeAddress, buildOSAddress, getGoogleMapsApiKey, haversineDistance, estimateDriveTime } from '../../lib/googleMapsHelper';
+import { geocodeAddress, buildOSAddress, getGoogleMapsApiKey, haversineDistance, estimateDriveTime, getRealTravelTime } from '../../lib/googleMapsHelper';
 import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow } from '@react-google-maps/api';
 
 interface OSItem {
@@ -124,7 +124,6 @@ export default function MotorOtimizacaoNew() {
   const [duracaoAlmoco, setDuracaoAlmoco] = useState(60);
   const [tempoMedioReparo, setTempoMedioReparo] = useState(90);
   const [permitePernoite, setPermitePernoite] = useState(false);
-  const [velocidadeMedia, setVelocidadeMedia] = useState(40);
 
   const [rotas, setRotas] = useState<any[]>([]);
   const [selectedRotas, setSelectedRotas] = useState<string[]>([]);
@@ -276,7 +275,7 @@ export default function MotorOtimizacaoNew() {
     return Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / 86400000) + 1);
   }, [dataInicio, dataFim]);
 
-  const runOptimization = useCallback(() => {
+  const runOptimization = useCallback(async () => {
     if (!baseCoords || filteredOS.length === 0) return;
     setLoading(true);
 
@@ -321,7 +320,10 @@ export default function MotorOtimizacaoNew() {
       const best = distances[0];
       if (!best) break;
 
-      const travelMin = estimateDriveTime(best.dist, velocidadeMedia);
+      const googleTime = await getRealTravelTime(currentPos, { lat: best.os.lat, lng: best.os.lng });
+      const travelMin = googleTime?.duration ?? estimateDriveTime(best.dist, 40);
+      const realDist = googleTime?.distance ?? best.dist;
+
       let arrivalMin = currentMin + travelMin;
 
       if (currentMin < almocoMin && arrivalMin >= almocoMin) {
@@ -346,7 +348,7 @@ export default function MotorOtimizacaoNew() {
       resultParadas.push({
         os: best.os,
         ordem: resultParadas.length + 1,
-        distancia_km: Math.round(best.dist * 10) / 10,
+        distancia_km: Math.round(realDist * 10) / 10,
         tempo_deslocamento_min: travelMin,
         horario_chegada: minutesToTime(arrivalMin),
         horario_saida: minutesToTime(departureMin),
@@ -368,7 +370,7 @@ export default function MotorOtimizacaoNew() {
     generateItinerary(resultParadas);
     setStep('result');
     setLoading(false);
-  }, [baseCoords, filteredOS, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, velocidadeMedia, maxDias]);
+  }, [baseCoords, filteredOS, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, maxDias]);
 
   const generateItinerary = useCallback((paradasList: ParadaItinerario[]) => {
     if (!baseCoords) return;
@@ -432,7 +434,7 @@ export default function MotorOtimizacaoNew() {
       if (paradasDia.length > 0) {
         const lastParada = paradasDia[paradasDia.length - 1];
         const retornoKm = haversineDistance(lastPos, baseCoords) * 1.3;
-        const retornoMin = estimateDriveTime(retornoKm, velocidadeMedia);
+        const retornoMin = estimateDriveTime(retornoKm, 40);
 
         if (d === maxDia || !permitePernoite) {
           eventos.push({
@@ -472,7 +474,7 @@ export default function MotorOtimizacaoNew() {
       dias: maxDia,
       atendimentos: paradasList.length,
     });
-  }, [baseCoords, dataInicio, horarioInicio, horarioAlmoco, duracaoAlmoco, permitePernoite, velocidadeMedia, tempoMedioReparo]);
+  }, [baseCoords, dataInicio, horarioInicio, horarioAlmoco, duracaoAlmoco, permitePernoite, tempoMedioReparo]);
 
   const handleReorder = useCallback((fromIdx: number, toIdx: number) => {
     if (fromIdx === toIdx) return;
@@ -482,7 +484,7 @@ export default function MotorOtimizacaoNew() {
     newParadas.splice(toIdx, 0, moved);
 
     recalculateParadas(newParadas);
-  }, [paradas, baseCoords, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, velocidadeMedia, maxDias]);
+  }, [paradas, baseCoords, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, maxDias]);
 
   const recalculateParadas = useCallback((newParadas: ParadaItinerario[]) => {
     if (!baseCoords) return;
@@ -497,7 +499,7 @@ export default function MotorOtimizacaoNew() {
 
     const recalculated = newParadas.map((p, idx) => {
       const dist = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.3;
-      const travelMin = estimateDriveTime(dist, velocidadeMedia);
+      const travelMin = estimateDriveTime(dist, 40);
       let arrivalMin = currentMin + travelMin;
 
       if (currentMin < almocoMin && arrivalMin >= almocoMin) {
@@ -511,7 +513,7 @@ export default function MotorOtimizacaoNew() {
         currentMin = inicioMin;
         currentPos = { ...baseCoords };
         const newDist = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.3;
-        const newTravel = estimateDriveTime(newDist, velocidadeMedia);
+        const newTravel = estimateDriveTime(newDist, 40);
         arrivalMin = currentMin + newTravel;
         const newDep = arrivalMin + tempoMedioReparo;
 
@@ -545,7 +547,7 @@ export default function MotorOtimizacaoNew() {
 
     setParadas(recalculated);
     generateItinerary(recalculated);
-  }, [baseCoords, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, velocidadeMedia, maxDias, generateItinerary]);
+  }, [baseCoords, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, maxDias, generateItinerary]);
 
   const handleRemoveFromRoute = useCallback((idx: number) => {
     const removed = paradas[idx];

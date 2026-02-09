@@ -20,6 +20,90 @@ export function estimateDriveTime(distKm: number, avgSpeedKmh = 40): number {
   return Math.round((distKm / avgSpeedKmh) * 60);
 }
 
+const TRAVEL_TIME_CACHE = new Map<string, { duration: number; distance: number }>();
+
+export async function getRealTravelTime(
+  origin: LatLng,
+  destination: LatLng
+): Promise<{ duration: number; distance: number } | null> {
+  const cacheKey = `${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}-${destination.lat.toFixed(4)},${destination.lng.toFixed(4)}`;
+
+  if (TRAVEL_TIME_CACHE.has(cacheKey)) {
+    return TRAVEL_TIME_CACHE.get(cacheKey)!;
+  }
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destination.lat},${destination.lng}&key=${API_KEY}&region=br&language=pt-BR`;
+    const res = await fetch(url);
+    const json = await res.json();
+
+    if (json.status === 'OK' && json.rows?.[0]?.elements?.[0]?.status === 'OK') {
+      const element = json.rows[0].elements[0];
+      const result = {
+        duration: Math.round(element.duration.value / 60),
+        distance: Math.round(element.distance.value / 1000 * 10) / 10,
+      };
+      TRAVEL_TIME_CACHE.set(cacheKey, result);
+      return result;
+    }
+  } catch {}
+
+  return null;
+}
+
+export async function getTravelTimesBatch(
+  origin: LatLng,
+  destinations: Array<{ id: string; coords: LatLng }>
+): Promise<Map<string, { duration: number; distance: number }>> {
+  const results = new Map<string, { duration: number; distance: number }>();
+
+  const uncached: Array<{ id: string; coords: LatLng; index: number }> = [];
+
+  destinations.forEach((dest, index) => {
+    const cacheKey = `${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}-${dest.coords.lat.toFixed(4)},${dest.coords.lng.toFixed(4)}`;
+    if (TRAVEL_TIME_CACHE.has(cacheKey)) {
+      results.set(dest.id, TRAVEL_TIME_CACHE.get(cacheKey)!);
+    } else {
+      uncached.push({ ...dest, index });
+    }
+  });
+
+  if (uncached.length === 0) return results;
+
+  const batchSize = 25;
+  for (let i = 0; i < uncached.length; i += batchSize) {
+    const batch = uncached.slice(i, i + batchSize);
+    const destStr = batch.map(d => `${d.coords.lat},${d.coords.lng}`).join('|');
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destStr}&key=${API_KEY}&region=br&language=pt-BR`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.status === 'OK' && json.rows?.[0]?.elements) {
+        json.rows[0].elements.forEach((element: any, idx: number) => {
+          if (element.status === 'OK') {
+            const dest = batch[idx];
+            const result = {
+              duration: Math.round(element.duration.value / 60),
+              distance: Math.round(element.distance.value / 1000 * 10) / 10,
+            };
+            const cacheKey = `${origin.lat.toFixed(4)},${origin.lng.toFixed(4)}-${dest.coords.lat.toFixed(4)},${dest.coords.lng.toFixed(4)}`;
+            TRAVEL_TIME_CACHE.set(cacheKey, result);
+            results.set(dest.id, result);
+          }
+        });
+      }
+    } catch {}
+
+    if (i + batchSize < uncached.length) {
+      await new Promise(r => setTimeout(r, 100));
+    }
+  }
+
+  return results;
+}
+
 export async function geocodeAddress(address: string): Promise<LatLng | null> {
   if (!address || address.trim().length < 5) return null;
   const key = address.trim().toLowerCase();
