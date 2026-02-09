@@ -254,8 +254,10 @@ export default function MotorOtimizacaoNew() {
   };
 
   useEffect(() => {
-    if (selectedRotas.length > 0) loadOSForRotas();
-  }, [selectedRotas]);
+    if (selectedRotas.length > 0 && rotas.length > 0 && selectedUnidade) {
+      loadOSForRotas();
+    }
+  }, [selectedRotas, rotas, selectedUnidade]);
 
   const cidades = useMemo(() => {
     const set = new Set<string>();
