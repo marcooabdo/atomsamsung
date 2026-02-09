@@ -200,7 +200,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento, prioridade')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[])
       .eq('tipo_atendimento', 'IH');
@@ -227,7 +227,7 @@ export default function MotorOtimizacaoNew() {
         dias_aberta: diasAberta,
         tempo_estimado_min: tempoMedioReparo,
         periodo_preferido: os.periodo_agendamento as any,
-        prioridade: os.prioridade || 'normal',
+        prioridade: 'normal',
         rota_nome: rotaMatch?.nome,
         rota_cor: rotaMatch?.cor || '#3B82F6',
       };
