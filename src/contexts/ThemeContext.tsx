@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { supabase } from '../lib/supabase';
 
 export type ThemeVariant = 'original' | 'dark-blue' | 'dark-pink' | 'white-blue' | 'white-pink';
 
@@ -22,8 +23,10 @@ interface ThemeContextType {
   theme: ThemeVariant;
   themeInfo: ThemeInfo;
   isDark: boolean;
+  customBackground: string | null;
   setTheme: (t: ThemeVariant) => void;
   toggleTheme: () => void;
+  setCustomBackground: (url: string | null) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -37,6 +40,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return 'original';
   });
 
+  const [customBackground, setCustomBackgroundState] = useState<string | null>(() => {
+    return localStorage.getItem('custom-background') || null;
+  });
+
   const themeInfo = THEMES.find(t => t.id === theme) || THEMES[0];
 
   useEffect(() => {
@@ -48,6 +55,25 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('theme', themeInfo.isDark ? 'dark' : 'light');
   }, [theme, themeInfo]);
 
+  useEffect(() => {
+    const body = document.body;
+    if (customBackground) {
+      body.style.backgroundImage = `url("${customBackground}")`;
+      body.style.backgroundSize = 'cover';
+      body.style.backgroundPosition = 'center';
+      body.style.backgroundRepeat = 'no-repeat';
+      body.style.backgroundAttachment = 'fixed';
+      localStorage.setItem('custom-background', customBackground);
+    } else {
+      body.style.backgroundImage = '';
+      body.style.backgroundSize = '';
+      body.style.backgroundPosition = '';
+      body.style.backgroundRepeat = '';
+      body.style.backgroundAttachment = '';
+      localStorage.removeItem('custom-background');
+    }
+  }, [customBackground]);
+
   const setTheme = (t: ThemeVariant) => setThemeState(t);
 
   const toggleTheme = () => {
@@ -55,8 +81,31 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     setThemeState(THEMES[(idx + 1) % THEMES.length].id);
   };
 
+  const setCustomBackground = (url: string | null) => {
+    setCustomBackgroundState(url);
+  };
+
+  useEffect(() => {
+    const loadUserBackground = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data } = await supabase
+          .from('usuarios')
+          .select('background_url')
+          .eq('id', session.user.id)
+          .maybeSingle();
+
+        if (data?.background_url) {
+          setCustomBackgroundState(data.background_url);
+        }
+      }
+    };
+
+    loadUserBackground();
+  }, []);
+
   return (
-    <ThemeContext.Provider value={{ theme, themeInfo, isDark: themeInfo.isDark, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, themeInfo, isDark: themeInfo.isDark, customBackground, setTheme, toggleTheme, setCustomBackground }}>
       {children}
     </ThemeContext.Provider>
   );

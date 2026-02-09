@@ -1,11 +1,12 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Palette, Upload, Loader2, Trash } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
+import { useTheme, THEMES } from '../contexts/ThemeContext';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'tema';
 
 interface Unidade {
   id: string;
@@ -113,8 +114,10 @@ interface ChecklistTemplate {
 
 export function Configuracoes() {
   const { usuario: usuarioLogado } = useAuth();
+  const { theme, setTheme, customBackground, setCustomBackground } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('unidades');
   const [loading, setLoading] = useState(true);
+  const [uploadingBackground, setUploadingBackground] = useState(false);
 
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
@@ -776,6 +779,66 @@ export function Configuracoes() {
     }
   };
 
+  const handleUploadBackground = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem.');
+      return;
+    }
+
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert('A imagem deve ter no maximo 5MB.');
+      return;
+    }
+
+    setUploadingBackground(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${usuarioLogado?.id}/background-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('user-backgrounds')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('user-backgrounds')
+        .getPublicUrl(fileName);
+
+      await supabase
+        .from('usuarios')
+        .update({ background_url: publicUrl })
+        .eq('id', usuarioLogado?.id);
+
+      setCustomBackground(publicUrl);
+      alert('Plano de fundo atualizado com sucesso!');
+    } catch (error: any) {
+      alert(`Erro ao fazer upload: ${error.message}`);
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!confirm('Deseja remover o plano de fundo personalizado?')) return;
+
+    try {
+      await supabase
+        .from('usuarios')
+        .update({ background_url: null })
+        .eq('id', usuarioLogado?.id);
+
+      setCustomBackground(null);
+      alert('Plano de fundo removido com sucesso!');
+    } catch (error: any) {
+      alert(`Erro ao remover plano de fundo: ${error.message}`);
+    }
+  };
+
   const allTabs = [
     { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true },
     { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
@@ -785,7 +848,8 @@ export function Configuracoes() {
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false }
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
+    { id: 'tema' as Tab, label: 'Tema', icon: Palette, color: '#ec4899', isAccent: false }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2441,6 +2505,128 @@ export function Configuracoes() {
 
                 {activeTab === 'nf' && (
                   <ConfiguracoesNF unidades={unidades} />
+                )}
+
+                {activeTab === 'tema' && (
+                  <div className="space-y-6">
+                    <div className="premium-card p-6">
+                      <h3 className="text-lg font-bold text-[#ec4899] mb-4 flex items-center gap-2">
+                        <Palette className="w-5 h-5" />
+                        SELECIONAR TEMA
+                      </h3>
+                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {THEMES.map((themeOption) => (
+                          <button
+                            key={themeOption.id}
+                            onClick={() => setTheme(themeOption.id)}
+                            className={`p-4 rounded-xl border-2 transition-all hover:scale-105 ${
+                              theme === themeOption.id
+                                ? 'border-[#ec4899] shadow-lg shadow-[#ec4899]/20'
+                                : 'border-gray-700 hover:border-gray-600'
+                            }`}
+                          >
+                            <div
+                              className="w-full h-20 rounded-lg mb-3"
+                              style={{ backgroundColor: themeOption.bg }}
+                            />
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-sm font-bold text-white">{themeOption.label}</p>
+                              {theme === themeOption.id && (
+                                <div className="w-5 h-5 rounded-full bg-[#ec4899] flex items-center justify-center">
+                                  <div className="w-2 h-2 rounded-full bg-white" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className="w-4 h-4 rounded-full border-2 border-white"
+                                style={{ backgroundColor: themeOption.accent }}
+                              />
+                              <span className="text-xs text-gray-400">
+                                {themeOption.isDark ? 'Escuro' : 'Claro'}
+                              </span>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="premium-card p-6">
+                      <h3 className="text-lg font-bold text-[#ec4899] mb-4 flex items-center gap-2">
+                        <Upload className="w-5 h-5" />
+                        PLANO DE FUNDO PERSONALIZADO
+                      </h3>
+                      <p className="text-sm text-gray-400 mb-4">
+                        Faça upload de uma imagem para usar como plano de fundo. A imagem será ajustada automaticamente para cobrir toda a tela.
+                      </p>
+
+                      {customBackground && (
+                        <div className="mb-4 relative">
+                          <div className="aspect-video rounded-xl overflow-hidden border-2 border-gray-700">
+                            <img
+                              src={customBackground}
+                              alt="Background atual"
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                          <button
+                            onClick={handleRemoveBackground}
+                            className="absolute top-3 right-3 p-2 bg-red-500/90 hover:bg-red-600 rounded-lg transition-colors"
+                          >
+                            <Trash className="w-5 h-5 text-white" />
+                          </button>
+                        </div>
+                      )}
+
+                      <label
+                        className={`block w-full p-6 border-2 border-dashed rounded-xl transition-all cursor-pointer ${
+                          uploadingBackground
+                            ? 'border-gray-600 bg-gray-800/50'
+                            : 'border-gray-700 hover:border-[#ec4899] hover:bg-[#ec4899]/5'
+                        }`}
+                      >
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleUploadBackground}
+                          disabled={uploadingBackground}
+                          className="hidden"
+                        />
+                        <div className="flex flex-col items-center gap-3">
+                          {uploadingBackground ? (
+                            <>
+                              <Loader2 className="w-10 h-10 text-[#ec4899] animate-spin" />
+                              <p className="text-sm font-semibold text-gray-300">Fazendo upload...</p>
+                            </>
+                          ) : (
+                            <>
+                              <div className="w-16 h-16 rounded-full bg-[#ec4899]/10 flex items-center justify-center">
+                                <Upload className="w-8 h-8 text-[#ec4899]" />
+                              </div>
+                              <div className="text-center">
+                                <p className="text-sm font-semibold text-white mb-1">
+                                  Clique para selecionar uma imagem
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  PNG, JPG ou GIF (máximo 5MB)
+                                </p>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </label>
+
+                      <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                        <p className="text-xs text-blue-300 flex items-center gap-2">
+                          <span className="text-lg">💡</span>
+                          <span>
+                            <strong>Dica:</strong> Use imagens com boa resolução (pelo menos 1920x1080) para melhor qualidade.
+                            A imagem será redimensionada automaticamente para cobrir toda a tela.
+                          </span>
+                        </p>
+                      </div>
+                    </div>
+                  </div>
                 )}
               </>
             )}
