@@ -45,7 +45,7 @@ Deno.serve(async (req: Request) => {
     // Se for uma resposta do cliente
     if (req.method === 'POST' && action === 'respond') {
       const body = await req.json();
-      const { status, mensagem } = body;
+      const { status, mensagem, latitude, longitude, endereco_completo, selfie_url } = body;
 
       if (!status || !['aprovado', 'rejeitado', 'negociando'].includes(status)) {
         return new Response(
@@ -62,6 +62,10 @@ Deno.serve(async (req: Request) => {
           mensagem_cliente: mensagem || null,
           data_resposta: new Date().toISOString(),
           ip_cliente: req.headers.get('x-forwarded-for') || 'unknown',
+          latitude: latitude || null,
+          longitude: longitude || null,
+          endereco_completo: endereco_completo || null,
+          selfie_url: selfie_url || null,
           updated_at: new Date().toISOString()
         })
         .eq('id', linkData.id);
@@ -71,6 +75,24 @@ Deno.serve(async (req: Request) => {
           JSON.stringify({ error: 'Erro ao salvar resposta' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
+      }
+
+      // Salvar selfie e localização como anexos da OS
+      if (selfie_url) {
+        await supabase.from('os_anexos').insert({
+          os_id: linkData.os_id,
+          url: selfie_url,
+          tipo: 'selfie_aprovacao',
+          descricao: `Selfie do cliente - ${status === 'aprovado' ? 'Orçamento Aprovado' : status === 'rejeitado' ? 'Orçamento Rejeitado' : 'Negociação'}`
+        });
+      }
+
+      if (latitude && longitude) {
+        await supabase.from('os_comentarios').insert({
+          os_id: linkData.os_id,
+          comentario: `📍 Localização do cliente ao ${status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : 'negociar'} orçamento:\nLatitude: ${latitude}\nLongitude: ${longitude}\n${endereco_completo ? `Endereço: ${endereco_completo}` : ''}`,
+          is_system: true
+        });
       }
 
       // Se aprovado, marcar OS como orçamento aprovado

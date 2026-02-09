@@ -31,6 +31,9 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [descontoTipo, setDescontoTipo] = useState<'valor' | 'percentual'>(os.desconto_tipo || 'valor');
   const [descontoValor, setDescontoValor] = useState<string>(os.desconto_valor?.toString() || '');
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
+  const [approvalLink, setApprovalLink] = useState<string>('');
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [gerandoLink, setGerandoLink] = useState(false);
 
   useEffect(() => {
     loadPagamentos();
@@ -218,6 +221,42 @@ Assistencia Tecnica Samsung`;
       setProcessando(false);
     }
   };
+
+  const gerarLinkAprovacao = async () => {
+    setGerandoLink(true);
+    try {
+      const { data, error } = await supabase
+        .rpc('upsert_orcamento_link', { p_os_id: osId });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const token = data[0].token;
+        const baseUrl = window.location.origin;
+        const link = `${baseUrl}/orcamento/${token}`;
+        setApprovalLink(link);
+        return link;
+      }
+    } catch (error: any) {
+      alert(`Erro ao gerar link: ${error.message}`);
+    } finally {
+      setGerandoLink(false);
+    }
+  };
+
+  const copiarLink = () => {
+    if (approvalLink) {
+      navigator.clipboard.writeText(approvalLink);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 3000);
+    }
+  };
+
+  useEffect(() => {
+    if (showWhatsAppModal && !approvalLink) {
+      gerarLinkAprovacao();
+    }
+  }, [showWhatsAppModal]);
 
   const handleAprovarOrcamento = async () => {
     if (!confirm('Confirma a APROVACAO do orcamento? A OS sera movida para "Orcamento Aprovado".')) return;
@@ -940,6 +979,74 @@ Assistencia Tecnica Samsung`;
                 <pre className="text-sm text-gray-300 whitespace-pre-wrap font-sans leading-relaxed bg-black/30 p-4 rounded-lg border border-gray-800 max-h-[300px] overflow-y-auto">
                   {gerarTextoWhatsApp()}
                 </pre>
+              </div>
+
+              <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20 mt-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Send className="w-4 h-4 text-[#00D4FF]" />
+                    <span className="text-xs text-[#00D4FF] uppercase tracking-wider font-bold">
+                      Link de Aprovacao
+                    </span>
+                  </div>
+                  <button
+                    onClick={copiarLink}
+                    disabled={!approvalLink || gerandoLink}
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-all ${
+                      linkCopied
+                        ? 'bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/40'
+                        : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 hover:bg-[#00D4FF]/30'
+                    }`}
+                  >
+                    {linkCopied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        COPIADO!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        COPIAR LINK
+                      </>
+                    )}
+                  </button>
+                </div>
+                {gerandoLink ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[#00D4FF]"></div>
+                  </div>
+                ) : approvalLink ? (
+                  <>
+                    <div className="text-xs text-gray-300 bg-black/30 p-3 rounded-lg border border-gray-800 break-all font-mono">
+                      {approvalLink}
+                    </div>
+                    <div className="mt-3 p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
+                      <p className="text-[10px] text-blue-300 leading-relaxed">
+                        <strong>Como funciona:</strong> Ao acessar o link, o cliente podera visualizar o orcamento completo e:
+                      </p>
+                      <ul className="text-[10px] text-blue-300 mt-2 ml-4 space-y-1">
+                        <li>✓ <strong>Aprovar</strong> o orcamento</li>
+                        <li>✓ <strong>Rejeitar</strong> com motivo</li>
+                        <li>✓ <strong>Negociar</strong> enviando uma mensagem</li>
+                      </ul>
+                      <p className="text-[10px] text-blue-300 mt-2">
+                        <strong>Importante:</strong> Ao tomar qualquer acao, o sistema capturara automaticamente:
+                      </p>
+                      <ul className="text-[10px] text-blue-300 mt-1 ml-4 space-y-1">
+                        <li>• Localizacao GPS do cliente</li>
+                        <li>• Selfie do cliente (via camera)</li>
+                        <li>• Data e hora da acao</li>
+                      </ul>
+                      <p className="text-[10px] text-blue-300 mt-2">
+                        Todas essas informacoes serao salvas nos <strong>Anexos da OS</strong> automaticamente.
+                      </p>
+                    </div>
+                  </>
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-2">
+                    Erro ao gerar link
+                  </p>
+                )}
               </div>
             </div>
 

@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS orcamento_links (
   mensagem_cliente text,
   data_resposta timestamptz,
   ip_cliente text,
+  latitude double precision,
+  longitude double precision,
+  endereco_completo text,
+  selfie_url text,
   ativo boolean DEFAULT true,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()

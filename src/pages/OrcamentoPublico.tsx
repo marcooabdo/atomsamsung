@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera } from 'lucide-react';
+import { supabase } from '../lib/supabase';
 
 interface OrcamentoData {
   link: {
@@ -63,6 +64,12 @@ export function OrcamentoPublico() {
   const [selectedAction, setSelectedAction] = useState<'aprovado' | 'rejeitado' | 'negociando' | null>(null);
   const [mensagem, setMensagem] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
+  const [showCamera, setShowCamera] = useState(false);
+  const [selfieCapturada, setSelfieCapturada] = useState<string | null>(null);
+  const [capturandoLocalizacao, setCapturandoLocalizacao] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [stream, setStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -96,7 +103,7 @@ export function OrcamentoPublico() {
     }
   };
 
-  const handleRespond = async () => {
+  const iniciarCapturaLocalizacaoESelfie = async () => {
     if (!selectedAction) return;
 
     if ((selectedAction === 'rejeitado' || selectedAction === 'negociando') && !mensagem.trim()) {
@@ -104,8 +111,128 @@ export function OrcamentoPublico() {
       return;
     }
 
+    setCapturandoLocalizacao(true);
+    try {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 10000,
+          maximumAge: 0
+        });
+      });
+
+      setCapturandoLocalizacao(false);
+      abrirCamera();
+    } catch (err: any) {
+      setCapturandoLocalizacao(false);
+      if (confirm('Não foi possível obter sua localização. Deseja continuar mesmo assim?')) {
+        abrirCamera();
+      }
+    }
+  };
+
+  const abrirCamera = async () => {
+    try {
+      const mediaStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: 'user', width: 1280, height: 720 },
+        audio: false
+      });
+
+      setStream(mediaStream);
+      setShowCamera(true);
+
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+        videoRef.current.play();
+      }
+    } catch (err: any) {
+      alert('Não foi possível acessar a câmera. Por favor, permita o acesso à câmera.');
+    }
+  };
+
+  const tirarSelfie = () => {
+    if (videoRef.current && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const video = videoRef.current;
+
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+
+      const context = canvas.getContext('2d');
+      if (context) {
+        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setSelfieCapturada(dataUrl);
+
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
+        }
+      }
+    }
+  };
+
+  const refazerSelfie = () => {
+    setSelfieCapturada(null);
+    abrirCamera();
+  };
+
+  const handleRespond = async () => {
+    if (!selectedAction) return;
+
     setResponding(true);
     try {
+      let latitude: number | null = null;
+      let longitude: number | null = null;
+      let enderecoCompleto: string | null = null;
+
+      try {
+        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject);
+        });
+        latitude = position.coords.latitude;
+        longitude = position.coords.longitude;
+
+        const geoResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+        );
+        const geoData = await geoResponse.json();
+        enderecoCompleto = geoData.display_name || null;
+      } catch (err) {
+        console.error('Erro ao obter localização:', err);
+      }
+
+      let selfieUrl: string | null = null;
+
+      if (selfieCapturada && token && data) {
+        try {
+          const base64Data = selfieCapturada.split(',')[1];
+          const byteCharacters = atob(base64Data);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'image/jpeg' });
+
+          const fileName = `${data.os.numero_os_interna}/selfie-aprovacao-${Date.now()}.jpg`;
+
+          const { error: uploadError } = await supabase.storage
+            .from('os-anexos')
+            .upload(fileName, blob, { upsert: true });
+
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('os-anexos')
+            .getPublicUrl(fileName);
+
+          selfieUrl = publicUrl;
+        } catch (err) {
+          console.error('Erro ao fazer upload da selfie:', err);
+        }
+      }
+
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-orcamento-publico?token=${token}&action=respond`;
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -116,6 +243,10 @@ export function OrcamentoPublico() {
         body: JSON.stringify({
           status: selectedAction,
           mensagem: mensagem.trim() || null,
+          latitude,
+          longitude,
+          endereco_completo: enderecoCompleto,
+          selfie_url: selfieUrl,
         }),
       });
 
@@ -125,6 +256,7 @@ export function OrcamentoPublico() {
       }
 
       setShowSuccess(true);
+      setShowCamera(false);
       await loadOrcamento();
     } catch (err: any) {
       alert(`Erro: ${err.message}`);
@@ -394,11 +526,16 @@ export function OrcamentoPublico() {
 
                 {selectedAction && (
                   <button
-                    onClick={handleRespond}
-                    disabled={responding}
+                    onClick={iniciarCapturaLocalizacaoESelfie}
+                    disabled={responding || capturandoLocalizacao}
                     className="w-full py-4 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   >
-                    {responding ? (
+                    {capturandoLocalizacao ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Capturando localização...
+                      </>
+                    ) : responding ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
                         Enviando...
@@ -413,6 +550,113 @@ export function OrcamentoPublico() {
           </div>
         </div>
       </div>
+
+      {showCamera && !selfieCapturada && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full">
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <Camera className="w-6 h-6" />
+                  Tire uma Selfie
+                </h3>
+                <p className="text-sm text-blue-100 mt-1">
+                  Para confirmar sua identidade, precisamos de uma foto sua
+                </p>
+              </div>
+
+              <div className="p-6">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="w-full h-full object-cover transform scale-x-[-1]"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => {
+                      if (stream) {
+                        stream.getTracks().forEach(track => track.stop());
+                        setStream(null);
+                      }
+                      setShowCamera(false);
+                    }}
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gray-700 hover:bg-gray-600 transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={tirarSelfie}
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    <Camera className="w-5 h-5" />
+                    Tirar Foto
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <canvas ref={canvasRef} className="hidden" />
+        </div>
+      )}
+
+      {selfieCapturada && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
+          <div className="max-w-2xl w-full">
+            <div className="bg-gray-800 rounded-xl overflow-hidden">
+              <div className="p-4 bg-gradient-to-r from-green-600 to-emerald-600">
+                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                  <CheckCircle className="w-6 h-6" />
+                  Foto Capturada!
+                </h3>
+                <p className="text-sm text-green-100 mt-1">
+                  Revise sua foto antes de enviar
+                </p>
+              </div>
+
+              <div className="p-6">
+                <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
+                  <img
+                    src={selfieCapturada}
+                    alt="Selfie"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={refazerSelfie}
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gray-700 hover:bg-gray-600 transition-all"
+                  >
+                    Tirar Outra
+                  </button>
+                  <button
+                    onClick={handleRespond}
+                    disabled={responding}
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center gap-2"
+                  >
+                    {responding ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Confirmar e Enviar
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
