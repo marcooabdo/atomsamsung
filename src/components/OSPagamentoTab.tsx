@@ -606,7 +606,7 @@ Assistencia Tecnica Samsung`;
                   </button>
 
                   {showVendedorDropdown && (
-                    <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-50 overflow-hidden">
+                    <div className="absolute right-0 top-full mt-2 w-72 bg-gray-900 border border-gray-700 rounded-xl shadow-2xl z-[9999] overflow-hidden">
                       <div className="p-2 border-b border-gray-700">
                         <p className="text-xs text-gray-400 px-2">Selecione o vendedor responsavel</p>
                       </div>
