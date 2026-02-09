@@ -11,7 +11,10 @@ import {
   Eye,
   ChevronRight,
   Clock,
-  Phone
+  Phone,
+  Link as LinkIcon,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 
 interface WhatsAppSendModalProps {
@@ -63,14 +66,72 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
   const [recentLogs, setRecentLogs] = useState<EnvioLog[]>([]);
   const [showLogs, setShowLogs] = useState(false);
   const [error, setError] = useState('');
+  const [orcamentoLink, setOrcamentoLink] = useState<string | null>(null);
+  const [generatingLink, setGeneratingLink] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
       loadTemplates();
       loadRecentLogs();
       prefillFromOS();
+      if (osData?.id) {
+        loadExistingLink();
+      }
     }
   }, [isOpen]);
+
+  const loadExistingLink = async () => {
+    if (!osData?.id) return;
+
+    try {
+      const { data } = await supabase
+        .from('orcamento_links')
+        .select('token')
+        .eq('os_id', osData.id)
+        .eq('ativo', true)
+        .maybeSingle();
+
+      if (data?.token) {
+        const baseUrl = window.location.origin;
+        setOrcamentoLink(`${baseUrl}/orcamento?token=${data.token}`);
+      }
+    } catch (err) {
+      console.error('Erro ao carregar link:', err);
+    }
+  };
+
+  const handleGenerateLink = async () => {
+    if (!osData?.id) return;
+
+    setGeneratingLink(true);
+    try {
+      const { data, error } = await supabase.rpc('upsert_orcamento_link', {
+        p_os_id: osData.id
+      });
+
+      if (error) throw error;
+
+      if (data && data.length > 0) {
+        const token = data[0].token;
+        const baseUrl = window.location.origin;
+        const link = `${baseUrl}/orcamento?token=${token}`;
+        setOrcamentoLink(link);
+      }
+    } catch (err: any) {
+      alert(`Erro ao gerar link: ${err.message}`);
+    } finally {
+      setGeneratingLink(false);
+    }
+  };
+
+  const handleCopyLink = () => {
+    if (!orcamentoLink) return;
+
+    navigator.clipboard.writeText(orcamentoLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+  };
 
   useEffect(() => {
     if (defaultTemplateSlug && templates.length > 0) {
@@ -236,6 +297,91 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
         </div>
 
         <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {osData?.id && (
+            <div className="rounded-xl p-4" style={{
+              background: 'rgba(59,130,246,0.1)',
+              border: '1px solid rgba(59,130,246,0.3)'
+            }}>
+              <div className="flex items-center gap-2 mb-3">
+                <LinkIcon className="w-4 h-4 text-blue-400" />
+                <span className="text-sm font-bold text-blue-300">Link de Aprovação do Orçamento</span>
+              </div>
+
+              {orcamentoLink ? (
+                <div className="space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={orcamentoLink}
+                      readOnly
+                      className="flex-1 px-3 py-2 rounded-lg bg-gray-900/50 text-gray-300 text-xs border border-gray-700 font-mono"
+                    />
+                    <button
+                      onClick={handleCopyLink}
+                      className="px-4 py-2 rounded-lg transition-all flex items-center gap-2"
+                      style={{
+                        background: linkCopied ? 'rgba(16,185,129,0.2)' : 'rgba(59,130,246,0.2)',
+                        border: `1px solid ${linkCopied ? 'rgba(16,185,129,0.4)' : 'rgba(59,130,246,0.4)'}`,
+                        color: linkCopied ? '#10b981' : '#3b82f6'
+                      }}
+                    >
+                      {linkCopied ? (
+                        <>
+                          <Check className="w-4 h-4" />
+                          <span className="text-xs font-medium">Copiado!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-4 h-4" />
+                          <span className="text-xs font-medium">Copiar</span>
+                        </>
+                      )}
+                    </button>
+                    <button
+                      onClick={handleGenerateLink}
+                      disabled={generatingLink}
+                      className="px-3 py-2 rounded-lg transition-all"
+                      style={{
+                        background: 'rgba(245,158,11,0.2)',
+                        border: '1px solid rgba(245,158,11,0.4)',
+                        color: '#f59e0b'
+                      }}
+                      title="Atualizar link"
+                    >
+                      <RefreshCw className={`w-4 h-4 ${generatingLink ? 'animate-spin' : ''}`} />
+                    </button>
+                  </div>
+                  <p className="text-xs text-blue-400">
+                    Envie este link para o cliente aprovar, rejeitar ou negociar o orçamento diretamente online.
+                  </p>
+                </div>
+              ) : (
+                <button
+                  onClick={handleGenerateLink}
+                  disabled={generatingLink}
+                  className="w-full py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
+                  style={{
+                    background: 'rgba(59,130,246,0.2)',
+                    border: '1px solid rgba(59,130,246,0.4)',
+                    color: '#3b82f6'
+                  }}
+                >
+                  {generatingLink ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span className="text-sm font-medium">Gerando link...</span>
+                    </>
+                  ) : (
+                    <>
+                      <LinkIcon className="w-4 h-4" />
+                      <span className="text-sm font-medium">Gerar Link de Aprovação</span>
+                    </>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
           {!selectedTemplate ? (
             <div className="space-y-3">
               <p className="text-sm text-gray-400 font-medium">Selecione um template:</p>

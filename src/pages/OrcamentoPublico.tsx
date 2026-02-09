@@ -1,0 +1,418 @@
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle } from 'lucide-react';
+
+interface OrcamentoData {
+  link: {
+    id: string;
+    status: 'pendente' | 'aprovado' | 'rejeitado' | 'negociando';
+    data_resposta: string | null;
+  };
+  os: {
+    numero_os_interna: string;
+    cliente_nome: string;
+    cliente_telefone: string;
+    aparelho_marca: string;
+    aparelho_modelo: string;
+    defeito_relatado: string;
+    diagnostico_tecnico: string;
+    data_abertura: string;
+    unidade: {
+      nome: string;
+      telefone: string;
+      endereco: string;
+      cidade: string;
+      uf: string;
+    };
+    cotacao: {
+      id: string;
+      valor_pecas: number;
+      valor_servicos: number;
+      desconto_tipo: 'percentual' | 'valor' | null;
+      desconto_valor: number;
+      valor_liquido: number;
+      cotacoes_pecas: Array<{
+        id: string;
+        codigo: string;
+        descricao: string;
+        quantidade: number;
+        valor_final_unitario: number;
+        valor_total: number;
+      }>;
+      cotacoes_servicos: Array<{
+        id: string;
+        nome: string;
+        descricao: string;
+        valor: number;
+        quantidade: number;
+        valor_total: number;
+      }>;
+    } | null;
+  };
+}
+
+export function OrcamentoPublico() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const token = searchParams.get('token');
+
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<OrcamentoData | null>(null);
+  const [error, setError] = useState('');
+  const [responding, setResponding] = useState(false);
+  const [selectedAction, setSelectedAction] = useState<'aprovado' | 'rejeitado' | 'negociando' | null>(null);
+  const [mensagem, setMensagem] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!token) {
+      setError('Token inválido');
+      setLoading(false);
+      return;
+    }
+    loadOrcamento();
+  }, [token]);
+
+  const loadOrcamento = async () => {
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-orcamento-publico?token=${token}`;
+      const response = await fetch(apiUrl, {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+        },
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao carregar orçamento');
+      }
+
+      const result = await response.json();
+      setData(result);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRespond = async () => {
+    if (!selectedAction) return;
+
+    if ((selectedAction === 'rejeitado' || selectedAction === 'negociando') && !mensagem.trim()) {
+      alert('Por favor, escreva uma mensagem explicando o motivo.');
+      return;
+    }
+
+    setResponding(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-orcamento-publico?token=${token}&action=respond`;
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: selectedAction,
+          mensagem: mensagem.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erro ao enviar resposta');
+      }
+
+      setShowSuccess(true);
+      await loadOrcamento();
+    } catch (err: any) {
+      alert(`Erro: ${err.message}`);
+    } finally {
+      setResponding(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
+          <p className="text-gray-300">Carregando orçamento...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 border border-red-500/30 rounded-xl p-8 max-w-md w-full text-center">
+          <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Link Inválido</h1>
+          <p className="text-gray-400">{error || 'O link de orçamento não foi encontrado ou expirou.'}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const { link, os } = data;
+  const jaRespondido = link.status !== 'pendente';
+
+  if (showSuccess) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
+        <div className="bg-gray-800 border border-green-500/30 rounded-xl p-8 max-w-md w-full text-center">
+          <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
+          <h1 className="text-2xl font-bold text-white mb-2">Resposta Enviada!</h1>
+          <p className="text-gray-400 mb-6">
+            {selectedAction === 'aprovado' && 'Obrigado por aprovar o orçamento! Em breve entraremos em contato.'}
+            {selectedAction === 'rejeitado' && 'Recebemos sua rejeição. Entraremos em contato para entender melhor.'}
+            {selectedAction === 'negociando' && 'Recebemos sua mensagem. Vamos analisar e retornar em breve.'}
+          </p>
+          <p className="text-sm text-gray-500">Você pode fechar esta página.</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-8">
+      <div className="max-w-4xl mx-auto">
+        <div className="bg-gray-800 border border-blue-500/30 rounded-xl overflow-hidden shadow-2xl">
+          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6">
+            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Orçamento de Reparo</h1>
+            <p className="text-blue-100">OS #{os.numero_os_interna}</p>
+          </div>
+
+          <div className="p-6 space-y-6">
+            <div className="grid md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Cliente</h3>
+                  <p className="text-lg text-white font-semibold">{os.cliente_nome}</p>
+                  <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
+                    <Phone className="w-4 h-4" />
+                    {os.cliente_telefone}
+                  </p>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Equipamento</h3>
+                  <p className="text-lg text-white">{os.aparelho_marca} {os.aparelho_modelo}</p>
+                </div>
+
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Defeito Relatado</h3>
+                  <p className="text-sm text-gray-300">{os.defeito_relatado}</p>
+                </div>
+
+                {os.diagnostico_tecnico && (
+                  <div>
+                    <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Diagnóstico Técnico</h3>
+                    <p className="text-sm text-gray-300">{os.diagnostico_tecnico}</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Unidade</h3>
+                  <p className="text-lg text-white font-semibold">{os.unidade.nome}</p>
+                  <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
+                    <Phone className="w-4 h-4" />
+                    {os.unidade.telefone}
+                  </p>
+                  <p className="text-sm text-gray-400 flex items-start gap-2 mt-1">
+                    <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                    <span>{os.unidade.endereco}, {os.unidade.cidade} - {os.unidade.uf}</span>
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {os.cotacao && (
+              <div className="border-t border-gray-700 pt-6">
+                <h3 className="text-xl font-bold text-white mb-4">Detalhes do Orçamento</h3>
+
+                {os.cotacao.cotacoes_pecas && os.cotacao.cotacoes_pecas.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
+                      <Package className="w-4 h-4" />
+                      Peças
+                    </h4>
+                    <div className="space-y-2">
+                      {os.cotacao.cotacoes_pecas.map((peca) => (
+                        <div key={peca.id} className="bg-gray-900/50 rounded-lg p-3 flex justify-between items-center">
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{peca.descricao}</p>
+                            <p className="text-xs text-gray-500">Código: {peca.codigo} | Qtd: {peca.quantidade}</p>
+                          </div>
+                          <p className="text-cyan-400 font-bold">R$ {peca.valor_total.toFixed(2)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {os.cotacao.cotacoes_servicos && os.cotacao.cotacoes_servicos.length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="text-sm font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
+                      <Wrench className="w-4 h-4" />
+                      Serviços
+                    </h4>
+                    <div className="space-y-2">
+                      {os.cotacao.cotacoes_servicos.map((servico) => (
+                        <div key={servico.id} className="bg-gray-900/50 rounded-lg p-3 flex justify-between items-center">
+                          <div className="flex-1">
+                            <p className="text-white font-medium">{servico.nome}</p>
+                            {servico.descricao && (
+                              <p className="text-xs text-gray-500">{servico.descricao}</p>
+                            )}
+                          </div>
+                          <p className="text-cyan-400 font-bold">R$ {servico.valor_total.toFixed(2)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-gradient-to-r from-blue-900/50 to-cyan-900/50 rounded-lg p-4 border border-blue-500/30">
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Peças:</span>
+                      <span className="text-white">R$ {os.cotacao.valor_pecas.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-gray-400">Serviços:</span>
+                      <span className="text-white">R$ {os.cotacao.valor_servicos.toFixed(2)}</span>
+                    </div>
+                    {os.cotacao.desconto_valor > 0 && (
+                      <div className="flex justify-between text-sm text-green-400">
+                        <span>Desconto:</span>
+                        <span>- R$ {os.cotacao.desconto_valor.toFixed(2)}</span>
+                      </div>
+                    )}
+                    <div className="border-t border-blue-500/30 pt-2 mt-2 flex justify-between">
+                      <span className="text-lg font-bold text-white">TOTAL:</span>
+                      <span className="text-2xl font-bold text-cyan-400">
+                        R$ {os.cotacao.valor_liquido.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {jaRespondido ? (
+              <div className="border-t border-gray-700 pt-6">
+                <div className={`p-4 rounded-lg border ${
+                  link.status === 'aprovado' ? 'bg-green-500/10 border-green-500/30' :
+                  link.status === 'rejeitado' ? 'bg-red-500/10 border-red-500/30' :
+                  'bg-yellow-500/10 border-yellow-500/30'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    {link.status === 'aprovado' && <CheckCircle className="w-6 h-6 text-green-500" />}
+                    {link.status === 'rejeitado' && <XCircle className="w-6 h-6 text-red-500" />}
+                    {link.status === 'negociando' && <MessageCircle className="w-6 h-6 text-yellow-500" />}
+                    <div>
+                      <p className={`font-bold ${
+                        link.status === 'aprovado' ? 'text-green-400' :
+                        link.status === 'rejeitado' ? 'text-red-400' :
+                        'text-yellow-400'
+                      }`}>
+                        {link.status === 'aprovado' && 'Orçamento Aprovado'}
+                        {link.status === 'rejeitado' && 'Orçamento Rejeitado'}
+                        {link.status === 'negociando' && 'Em Negociação'}
+                      </p>
+                      <p className="text-sm text-gray-400">
+                        Respondido em {new Date(link.data_resposta!).toLocaleString('pt-BR')}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="border-t border-gray-700 pt-6">
+                <h3 className="text-lg font-bold text-white mb-4">O que você decide?</h3>
+
+                <div className="grid md:grid-cols-3 gap-3 mb-4">
+                  <button
+                    onClick={() => {
+                      setSelectedAction('aprovado');
+                      setMensagem('');
+                    }}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      selectedAction === 'aprovado'
+                        ? 'border-green-500 bg-green-500/20'
+                        : 'border-gray-700 hover:border-green-500/50'
+                    }`}
+                  >
+                    <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
+                    <p className="text-white font-bold">Aprovar</p>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedAction('negociando')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      selectedAction === 'negociando'
+                        ? 'border-yellow-500 bg-yellow-500/20'
+                        : 'border-gray-700 hover:border-yellow-500/50'
+                    }`}
+                  >
+                    <MessageCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
+                    <p className="text-white font-bold">Negociar</p>
+                  </button>
+
+                  <button
+                    onClick={() => setSelectedAction('rejeitado')}
+                    className={`p-4 rounded-lg border-2 transition-all ${
+                      selectedAction === 'rejeitado'
+                        ? 'border-red-500 bg-red-500/20'
+                        : 'border-gray-700 hover:border-red-500/50'
+                    }`}
+                  >
+                    <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+                    <p className="text-white font-bold">Rejeitar</p>
+                  </button>
+                </div>
+
+                {selectedAction && selectedAction !== 'aprovado' && (
+                  <div className="mb-4">
+                    <label className="block text-sm font-bold text-gray-400 uppercase mb-2">
+                      {selectedAction === 'negociando' ? 'Sua proposta ou dúvida:' : 'Motivo da rejeição:'}
+                    </label>
+                    <textarea
+                      value={mensagem}
+                      onChange={(e) => setMensagem(e.target.value)}
+                      className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      rows={4}
+                      placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das peças...' : 'Por favor, explique o motivo...'}
+                    />
+                  </div>
+                )}
+
+                {selectedAction && (
+                  <button
+                    onClick={handleRespond}
+                    disabled={responding}
+                    className="w-full py-4 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  >
+                    {responding ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      'Confirmar Resposta'
+                    )}
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

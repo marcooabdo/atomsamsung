@@ -21,6 +21,7 @@ import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
 import { RegistroVendas } from './pages/RegistroVendas';
+import { OrcamentoPublico } from './pages/OrcamentoPublico';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -81,6 +82,8 @@ function AppContent() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+
+        <Route path="/orcamento" element={<OrcamentoPublico />} />
 
         <Route
           path="/os/print"
