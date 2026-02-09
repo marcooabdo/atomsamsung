@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -53,9 +53,8 @@ interface OrcamentoData {
 }
 
 export function OrcamentoPublico() {
-  const [searchParams] = useSearchParams();
+  const { token } = useParams<{ token: string }>();
   const navigate = useNavigate();
-  const token = searchParams.get('token');
 
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<OrcamentoData | null>(null);

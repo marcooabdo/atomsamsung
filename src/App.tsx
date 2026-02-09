@@ -83,7 +83,7 @@ function AppContent() {
       <Routes>
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
 
-        <Route path="/orcamento" element={<OrcamentoPublico />} />
+        <Route path="/orcamento/:token" element={<OrcamentoPublico />} />
 
         <Route
           path="/os/print"

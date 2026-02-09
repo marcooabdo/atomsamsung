@@ -94,7 +94,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
 
       if (data?.token) {
         const baseUrl = window.location.origin;
-        setOrcamentoLink(`${baseUrl}/orcamento?token=${data.token}`);
+        setOrcamentoLink(`${baseUrl}/orcamento/${data.token}`);
       }
     } catch (err) {
       console.error('Erro ao carregar link:', err);
@@ -115,7 +115,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
       if (data && data.length > 0) {
         const token = data[0].token;
         const baseUrl = window.location.origin;
-        const link = `${baseUrl}/orcamento?token=${token}`;
+        const link = `${baseUrl}/orcamento/${token}`;
         setOrcamentoLink(link);
       }
     } catch (err: any) {
