@@ -1,7 +1,14 @@
 import { supabase } from './supabase';
 
 const API_KEY = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || '';
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const GEOCODE_CACHE = new Map<string, { lat: number; lng: number }>();
+
+function getProxyUrl(action: string, params: Record<string, string>): string {
+  const searchParams = new URLSearchParams({ action, ...params });
+  return `${SUPABASE_URL}/functions/v1/google-maps-proxy?${searchParams.toString()}`;
+}
 
 export interface LatLng {
   lat: number;
@@ -33,8 +40,13 @@ export async function getRealTravelTime(
   }
 
   try {
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destination.lat},${destination.lng}&key=${API_KEY}&region=br&language=pt-BR`;
-    const res = await fetch(url);
+    const url = getProxyUrl('distancematrix', {
+      origins: `${origin.lat},${origin.lng}`,
+      destinations: `${destination.lat},${destination.lng}`,
+    });
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+    });
     const json = await res.json();
 
     if (json.status === 'OK' && json.rows?.[0]?.elements?.[0]?.status === 'OK') {
@@ -76,8 +88,13 @@ export async function getTravelTimesBatch(
     const destStr = batch.map(d => `${d.coords.lat},${d.coords.lng}`).join('|');
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.lat},${origin.lng}&destinations=${destStr}&key=${API_KEY}&region=br&language=pt-BR`;
-      const res = await fetch(url);
+      const url = getProxyUrl('distancematrix', {
+        origins: `${origin.lat},${origin.lng}`,
+        destinations: destStr,
+      });
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+      });
       const json = await res.json();
 
       if (json.status === 'OK' && json.rows?.[0]?.elements) {
@@ -124,8 +141,10 @@ export async function geocodeAddress(address: string): Promise<LatLng | null> {
   }
 
   try {
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${API_KEY}&region=br&language=pt-BR`;
-    const res = await fetch(url);
+    const url = getProxyUrl('geocode', { address });
+    const res = await fetch(url, {
+      headers: { 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` },
+    });
     const json = await res.json();
 
     if (json.status === 'OK' && json.results?.[0]) {
