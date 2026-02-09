@@ -2257,10 +2257,10 @@ export function Configuracoes() {
                                     borderColor: rota.cor
                                   }}
                                 >
-                                  <MapPin className="w-6 h-6" style={{ color: rota.cor }} />
+                                  <MapPin className="w-6 h-6" style={{ color: rota.cor === '#1a1a1a' ? '#fff' : rota.cor }} />
                                 </div>
                                 <div className="flex-1">
-                                  <h4 className="text-lg font-bold" style={{ color: rota.cor }}>
+                                  <h4 className="text-lg font-bold" style={{ color: rota.cor === '#1a1a1a' ? '#fff' : rota.cor }}>
                                     {rota.nome}
                                   </h4>
                                 </div>
@@ -2289,7 +2289,7 @@ export function Configuracoes() {
                                         style={{
                                           backgroundColor: `${rota.cor}15`,
                                           borderColor: `${rota.cor}40`,
-                                          color: rota.cor
+                                          color: rota.cor === '#1a1a1a' ? '#fff' : rota.cor
                                         }}
                                       >
                                         {cidade}
