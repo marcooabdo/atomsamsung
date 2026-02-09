@@ -53,7 +53,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
   useEffect(() => {
     setVendedorResponsavel(os.vendedor_responsavel_id || null);
-  }, [os.vendedor_responsavel_id]);
+  }, [os.vendedor_responsavel_id, os.updated_at]);
 
   const loadUsuariosUnidade = async () => {
     try {
@@ -83,33 +83,26 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
     setSalvandoVendedor(true);
     setShowVendedorDropdown(false);
+    setVendedorResponsavel(novoVendedorId);
 
     try {
-      const vendedorAnteriorId = vendedorResponsavel || os.vendedor_responsavel_id;
+      const vendedorAnteriorId = os.vendedor_responsavel_id;
       const vendedorAnterior = usuariosUnidade.find(u => u.id === vendedorAnteriorId);
       const vendedorNovo = usuariosUnidade.find(u => u.id === novoVendedorId);
 
-      const updateData: any = {
-        vendedor_responsavel_id: novoVendedorId,
-        vendedor_responsavel_definido_em: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-
-      if (usuario?.id) {
-        updateData.vendedor_responsavel_definido_por = usuario.id;
-      }
-
-      const { data, error } = await supabase
+      const { error: updateError } = await supabase
         .from('os')
-        .update(updateData)
-        .eq('id', osId)
-        .select('vendedor_responsavel_id')
-        .single();
+        .update({
+          vendedor_responsavel_id: novoVendedorId,
+          vendedor_responsavel_definido_em: new Date().toISOString(),
+          vendedor_responsavel_definido_por: usuario?.id || null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
 
-      if (error) throw error;
-
-      if (!data) {
-        throw new Error('Nenhum registro atualizado');
+      if (updateError) {
+        setVendedorResponsavel(vendedorAnteriorId || null);
+        throw updateError;
       }
 
       let comentario = '';
@@ -128,9 +121,8 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
         usuario_id: usuario?.id || null,
         comentario,
         is_system: true
-      });
+      }).then(() => {});
 
-      setVendedorResponsavel(novoVendedorId);
       onUpdate();
     } catch (error: any) {
       console.error('Erro ao salvar vendedor:', error);
