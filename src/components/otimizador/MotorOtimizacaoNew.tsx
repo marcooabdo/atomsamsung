@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   Zap, MapPin, User, Play, Clock, Coffee, Wrench, Calendar, ChevronRight,
   ChevronDown, ChevronUp, AlertTriangle, Plus, GripVertical, Trash2, Check,
@@ -407,6 +407,7 @@ export default function MotorOtimizacaoNew() {
     const maxDia = paradasList.length > 0 ? Math.max(...paradasList.map(p => p.dia)) : 1;
     const inicioMin = timeToMinutes(horarioInicio);
     const almocoMin = timeToMinutes(horarioAlmoco);
+    const almocoFimMin = almocoMin + duracaoAlmoco;
 
     for (let d = 1; d <= maxDia; d++) {
       const paradasDia = paradasList.filter(p => p.dia === d);
@@ -423,27 +424,67 @@ export default function MotorOtimizacaoNew() {
       let lastPos = baseCoords;
       let kmDia = 0;
       let almocoAdded = false;
+      let currentMin = inicioMin;
 
       paradasDia.forEach((parada, idx) => {
         const chegadaMin = timeToMinutes(parada.horario_chegada);
+        const saidaMin = timeToMinutes(parada.horario_saida);
 
-        if (!almocoAdded && chegadaMin >= almocoMin) {
+        const deslocamentoInicio = currentMin;
+        let deslocamentoFim = deslocamentoInicio + parada.tempo_deslocamento_min;
+
+        if (!almocoAdded && deslocamentoInicio < almocoMin && deslocamentoFim >= almocoMin) {
+          const tempoAteAlmoco = almocoMin - deslocamentoInicio;
+          eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(deslocamentoInicio),
+            horario_fim: minutesToTime(almocoMin),
+            descricao: `Deslocamento ate o almoco (~${tempoAteAlmoco} min)`,
+            distancia_km: Math.round(parada.distancia_km * (tempoAteAlmoco / parada.tempo_deslocamento_min) * 10) / 10,
+          });
+
           eventos.push({
             tipo: 'almoco',
             horario_inicio: horarioAlmoco,
-            horario_fim: minutesToTime(almocoMin + duracaoAlmoco),
+            horario_fim: minutesToTime(almocoFimMin),
             descricao: `Pausa para almoco (${duracaoAlmoco} min)`,
           });
           almocoAdded = true;
-        }
 
-        eventos.push({
-          tipo: 'deslocamento',
-          horario_inicio: idx === 0 ? horarioInicio : paradasDia[idx - 1].horario_saida,
-          horario_fim: parada.horario_chegada,
-          descricao: `Deslocamento ${parada.distancia_km} km (~${parada.tempo_deslocamento_min} min)`,
-          distancia_km: parada.distancia_km,
-        });
+          const tempoRestante = parada.tempo_deslocamento_min - tempoAteAlmoco;
+          if (tempoRestante > 0) {
+            eventos.push({
+              tipo: 'deslocamento',
+              horario_inicio: minutesToTime(almocoFimMin),
+              horario_fim: parada.horario_chegada,
+              descricao: `Continuacao do deslocamento (~${tempoRestante} min)`,
+              distancia_km: Math.round(parada.distancia_km * (tempoRestante / parada.tempo_deslocamento_min) * 10) / 10,
+            });
+          }
+        } else if (!almocoAdded && chegadaMin >= almocoMin && deslocamentoInicio < almocoMin) {
+          eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(deslocamentoInicio),
+            horario_fim: minutesToTime(almocoMin),
+            descricao: `Deslocamento ${parada.distancia_km} km (~${almocoMin - deslocamentoInicio} min)`,
+            distancia_km: parada.distancia_km,
+          });
+          eventos.push({
+            tipo: 'almoco',
+            horario_inicio: horarioAlmoco,
+            horario_fim: minutesToTime(almocoFimMin),
+            descricao: `Pausa para almoco (${duracaoAlmoco} min)`,
+          });
+          almocoAdded = true;
+        } else {
+          eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(currentMin),
+            horario_fim: parada.horario_chegada,
+            descricao: `Deslocamento ${parada.distancia_km} km (~${parada.tempo_deslocamento_min} min)`,
+            distancia_km: parada.distancia_km,
+          });
+        }
 
         eventos.push({
           tipo: 'atendimento',
@@ -456,6 +497,7 @@ export default function MotorOtimizacaoNew() {
 
         kmDia += parada.distancia_km;
         lastPos = { lat: parada.os.lat, lng: parada.os.lng };
+        currentMin = saidaMin;
       });
 
       if (paradasDia.length > 0) {
@@ -468,7 +510,7 @@ export default function MotorOtimizacaoNew() {
             tipo: 'retorno_base',
             horario_inicio: lastParada.horario_saida,
             horario_fim: minutesToTime(timeToMinutes(lastParada.horario_saida) + retornoMin),
-            descricao: `Retorno a base ${Math.round(retornoKm * 10) / 10} km`,
+            descricao: `Retorno a base ${Math.round(retornoKm * 10) / 10} km (~${retornoMin} min)`,
             distancia_km: Math.round(retornoKm * 10) / 10,
           });
           kmDia += retornoKm;
@@ -674,6 +716,8 @@ export default function MotorOtimizacaoNew() {
     setLoading(false);
   }, [paradas, handleSaveAgendamento, selectedTecnico, selectedUnidade]);
 
+  const mapRef = useRef<google.maps.Map | null>(null);
+
   const mapCenter = useMemo(() => {
     if (baseCoords) return baseCoords;
     if (paradas.length > 0) return { lat: paradas[0].os.lat, lng: paradas[0].os.lng };
@@ -688,6 +732,37 @@ export default function MotorOtimizacaoNew() {
       baseCoords,
     ];
   }, [baseCoords, paradas]);
+
+  const fitMapBounds = useCallback(() => {
+    if (!mapRef.current) return;
+    const bounds = new google.maps.LatLngBounds();
+    let hasPoints = false;
+
+    if (baseCoords) {
+      bounds.extend(baseCoords);
+      hasPoints = true;
+    }
+
+    filteredOS.filter(os => os.lat && os.lng).forEach(os => {
+      bounds.extend({ lat: os.lat, lng: os.lng });
+      hasPoints = true;
+    });
+
+    paradas.forEach(p => {
+      bounds.extend({ lat: p.os.lat, lng: p.os.lng });
+      hasPoints = true;
+    });
+
+    if (hasPoints) {
+      mapRef.current.fitBounds(bounds, 50);
+    }
+  }, [baseCoords, filteredOS, paradas]);
+
+  useEffect(() => {
+    if (mapRef.current && (filteredOS.length > 0 || paradas.length > 0)) {
+      setTimeout(fitMapBounds, 100);
+    }
+  }, [filteredOS, paradas, fitMapBounds]);
 
   const tecnicoNome = useMemo(() => {
     const t = tecnicosData.find((t: any) => t.id === selectedTecnico);
@@ -1084,6 +1159,10 @@ export default function MotorOtimizacaoNew() {
             center={mapCenter}
             zoom={10}
             options={{ styles: MAP_STYLES, disableDefaultUI: false, zoomControl: true, streetViewControl: false, mapTypeControl: false }}
+            onLoad={(map) => {
+              mapRef.current = map;
+              setTimeout(fitMapBounds, 200);
+            }}
           >
             {baseCoords && (
               <Marker
@@ -1199,62 +1278,144 @@ export default function MotorOtimizacaoNew() {
                   </button>
 
                   {expandedDays.includes(dia.dia) && (
-                    <div className="p-4 space-y-2" style={{ backgroundColor: 'var(--bg-card)' }}>
+                    <div className="p-4 space-y-1" style={{ backgroundColor: 'var(--bg-card)' }}>
                       {dia.eventos.map((evento, idx) => (
                         <div
                           key={idx}
-                          className="flex items-start gap-3 p-3 rounded-xl transition-all"
-                          style={{
-                            backgroundColor: evento.tipo === 'atendimento' ? 'var(--bg-secondary)' : 'transparent',
-                            borderLeft: evento.tipo === 'atendimento' ? `3px solid ${evento.os?.rota_cor || '#3B82F6'}` : 'none',
-                          }}
+                          className="relative"
                         >
-                          <div className="flex-shrink-0 w-16 text-right">
-                            <span className="text-xs font-mono font-medium" style={{ color: 'var(--text-primary)' }}>
-                              {evento.horario_inicio}
-                            </span>
-                          </div>
+                          {idx < dia.eventos.length - 1 && (
+                            <div
+                              className="absolute left-[72px] top-10 bottom-0 w-0.5"
+                              style={{ backgroundColor: 'var(--border-primary)' }}
+                            />
+                          )}
+                          <div
+                            className="flex items-start gap-3 p-3 rounded-xl transition-all"
+                            style={{
+                              backgroundColor: evento.tipo === 'atendimento' ? 'var(--bg-secondary)' : 'transparent',
+                              borderLeft: evento.tipo === 'atendimento' ? `4px solid ${evento.os?.rota_cor || '#3B82F6'}` : 'none',
+                            }}
+                          >
+                            <div className="flex-shrink-0 w-14 text-right">
+                              <span className="text-sm font-mono font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                {evento.horario_inicio}
+                              </span>
+                              {evento.horario_fim !== evento.horario_inicio && (
+                                <div className="text-[10px] font-mono" style={{ color: 'var(--text-secondary)' }}>
+                                  ate {evento.horario_fim}
+                                </div>
+                              )}
+                            </div>
 
-                          <div className="flex-shrink-0 flex flex-col items-center">
-                            {evento.tipo === 'saida_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
-                            {evento.tipo === 'deslocamento' && <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />}
-                            {evento.tipo === 'atendimento' && <Wrench className="w-4 h-4" style={{ color: evento.os?.rota_cor || '#3B82F6' }} />}
-                            {evento.tipo === 'almoco' && <Coffee className="w-4 h-4" style={{ color: '#F59E0B' }} />}
-                            {evento.tipo === 'pernoite' && <Moon className="w-4 h-4" style={{ color: '#8B5CF6' }} />}
-                            {evento.tipo === 'retorno_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
-                          </div>
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{
+                              backgroundColor: evento.tipo === 'saida_base' ? '#10B98120' :
+                                evento.tipo === 'deslocamento' ? 'var(--bg-tertiary)' :
+                                evento.tipo === 'atendimento' ? (evento.os?.rota_cor || '#3B82F6') + '20' :
+                                evento.tipo === 'almoco' ? '#F59E0B20' :
+                                evento.tipo === 'pernoite' ? '#8B5CF620' :
+                                '#10B98120'
+                            }}>
+                              {evento.tipo === 'saida_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
+                              {evento.tipo === 'deslocamento' && <Navigation className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />}
+                              {evento.tipo === 'atendimento' && <Wrench className="w-4 h-4" style={{ color: evento.os?.rota_cor || '#3B82F6' }} />}
+                              {evento.tipo === 'almoco' && <Coffee className="w-4 h-4" style={{ color: '#F59E0B' }} />}
+                              {evento.tipo === 'pernoite' && <Moon className="w-4 h-4" style={{ color: '#8B5CF6' }} />}
+                              {evento.tipo === 'retorno_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
+                            </div>
 
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm" style={{ color: evento.tipo === 'atendimento' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
-                              {evento.descricao}
-                            </p>
-                            {evento.tipo === 'atendimento' && evento.os && (
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  {evento.os.cliente_cidade} - {evento.os.cliente_bairro}
-                                </span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: evento.os.rota_cor + '20', color: evento.os.rota_cor }}>
-                                  {evento.os.rota_nome}
-                                </span>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium" style={{ color: evento.tipo === 'atendimento' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
+                                  {evento.tipo === 'saida_base' && 'Saida da Base'}
+                                  {evento.tipo === 'deslocamento' && 'Em Deslocamento'}
+                                  {evento.tipo === 'atendimento' && `OS ${evento.os?.numero_os}`}
+                                  {evento.tipo === 'almoco' && 'Pausa para Almoco'}
+                                  {evento.tipo === 'pernoite' && 'Pernoite'}
+                                  {evento.tipo === 'retorno_base' && 'Retorno a Base'}
+                                </p>
+                                {evento.tipo === 'atendimento' && evento.parada && (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: '#3B82F620', color: '#3B82F6' }}>
+                                    #{evento.parada.ordem}
+                                  </span>
+                                )}
                               </div>
+
+                              {evento.tipo === 'deslocamento' && evento.distancia_km && (
+                                <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {evento.distancia_km} km
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {evento.descricao.match(/~(\d+) min/)?.[1] || '?'} min
+                                  </span>
+                                </div>
+                              )}
+
+                              {evento.tipo === 'atendimento' && evento.os && (
+                                <>
+                                  <p className="text-sm mt-0.5" style={{ color: 'var(--text-primary)' }}>
+                                    {evento.os.cliente_nome}
+                                  </p>
+                                  <div className="flex items-center gap-3 mt-1">
+                                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                      {evento.os.cliente_cidade} - {evento.os.cliente_bairro}
+                                    </span>
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: (evento.os.rota_cor || '#3B82F6') + '20', color: evento.os.rota_cor || '#3B82F6' }}>
+                                      {evento.os.rota_nome}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {tempoMedioReparo} min atendimento
+                                    </span>
+                                    <span className="flex items-center gap-1">
+                                      <Timer className="w-3 h-3" />
+                                      {evento.os.dias_aberta} dias aberta
+                                    </span>
+                                  </div>
+                                </>
+                              )}
+
+                              {evento.tipo === 'almoco' && (
+                                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                                  Duracao: {duracaoAlmoco} minutos
+                                </p>
+                              )}
+
+                              {evento.tipo === 'retorno_base' && evento.distancia_km && (
+                                <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {evento.distancia_km} km
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {evento.descricao.match(/~(\d+) min/)?.[1] || '?'} min
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+
+                            {evento.tipo === 'atendimento' && evento.parada && (
+                              <button
+                                onClick={() => handleSaveAgendamento(evento.parada!)}
+                                disabled={savingOS === evento.os?.id}
+                                className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all"
+                                style={{ backgroundColor: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}
+                              >
+                                {savingOS === evento.os?.id ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                  <Calendar className="w-3.5 h-3.5" />
+                                )}
+                                Agendar
+                              </button>
                             )}
                           </div>
-
-                          {evento.tipo === 'atendimento' && evento.parada && (
-                            <button
-                              onClick={() => handleSaveAgendamento(evento.parada!)}
-                              disabled={savingOS === evento.os?.id}
-                              className="flex-shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all"
-                              style={{ backgroundColor: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}
-                            >
-                              {savingOS === evento.os?.id ? (
-                                <Loader2 className="w-3 h-3 animate-spin" />
-                              ) : (
-                                <Calendar className="w-3 h-3" />
-                              )}
-                              Agendar
-                            </button>
-                          )}
                         </div>
                       ))}
                     </div>
