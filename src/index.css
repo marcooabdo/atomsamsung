@@ -492,36 +492,36 @@
    Plano de fundo personalizado aplicado via ThemeContext
    ================================================================ */
 
-body[data-custom-bg] {
-  position: relative;
-  background: transparent !important;
-}
-
 body[data-custom-bg]::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  right: 0;
+  bottom: 0;
+  width: 100vw;
+  height: 100vh;
   background-image: var(--custom-background-url);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  z-index: 0;
+  z-index: -999;
   pointer-events: none;
   opacity: 0.3;
 }
 
 #root {
   position: relative;
-  z-index: 10;
+  z-index: 1;
 }
 
-/* Adicionar transparência aos elementos para ver o fundo */
-body[data-custom-bg] .premium-card,
-body[data-custom-bg] [class*="bg-"],
+/* Adicionar transparência moderada apenas aos cards principais */
+body[data-custom-bg] .premium-card {
+  background-color: rgba(var(--bg-primary-rgb, 10, 10, 13), 0.90) !important;
+  backdrop-filter: blur(12px);
+}
+
 body[data-custom-bg] .neon-card {
   background-color: rgba(var(--bg-primary-rgb, 10, 10, 13), 0.85) !important;
   backdrop-filter: blur(10px);

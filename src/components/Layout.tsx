@@ -116,7 +116,9 @@ export function Layout({ children }: LayoutProps) {
   };
 
   return (
-    <div className="min-h-screen cyber-grid" style={{ background: 'var(--bg-primary)' }}>
+    <div className="min-h-screen cyber-grid"
+      style={!document.body.hasAttribute('data-custom-bg') ? { background: 'var(--bg-primary)' } : {}}
+    >
       <aside
         className={`fixed top-0 left-0 h-full border-r transition-all duration-300 z-30 flex flex-col ${
           sidebarOpen ? 'w-72' : 'w-20'
