@@ -8,7 +8,7 @@ import {
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress, buildOSAddress, getGoogleMapsApiKey, haversineDistance, estimateDriveTime, getRealTravelTime } from '../../lib/googleMapsHelper';
-import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow, DirectionsRenderer } from '@react-google-maps/api';
 
 interface OSItem {
   id: string;
@@ -48,6 +48,7 @@ interface DiaItinerario {
     descricao: string;
     os?: OSItem;
     distancia_km?: number;
+    duracao_min?: number;
     parada?: ParadaItinerario;
   }>;
   km_total: number;
@@ -88,6 +89,14 @@ function isColorDark(hexColor: string): boolean {
   const b = parseInt(hex.substring(4, 6), 16);
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
   return luminance < 0.5;
+}
+
+function formatDuration(min: number): string {
+  const h = Math.floor(min / 60);
+  const m = Math.round(min % 60);
+  if (h === 0) return `${m}min`;
+  if (m === 0) return `${h}h`;
+  return `${h}h${m.toString().padStart(2, '0')}min`;
 }
 
 function getRouteTextColor(routeColor: string, isSelected: boolean): string {
@@ -135,10 +144,12 @@ export default function MotorOtimizacaoNew() {
 
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<ParadaItinerario | null>(null);
+  const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [expandedDays, setExpandedDays] = useState<number[]>([1]);
   const [savingOS, setSavingOS] = useState<string | null>(null);
 
   const [baseCoords, setBaseCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
 
   useEffect(() => {
     if (selectedUnidade) {
@@ -439,15 +450,17 @@ export default function MotorOtimizacaoNew() {
             tipo: 'deslocamento',
             horario_inicio: minutesToTime(deslocamentoInicio),
             horario_fim: minutesToTime(almocoMin),
-            descricao: `Deslocamento ate o almoco (~${tempoAteAlmoco} min)`,
+            descricao: `Deslocamento ate o almoco`,
             distancia_km: Math.round(parada.distancia_km * (tempoAteAlmoco / parada.tempo_deslocamento_min) * 10) / 10,
+            duracao_min: tempoAteAlmoco,
           });
 
           eventos.push({
             tipo: 'almoco',
             horario_inicio: horarioAlmoco,
             horario_fim: minutesToTime(almocoFimMin),
-            descricao: `Pausa para almoco (${duracaoAlmoco} min)`,
+            descricao: `Pausa para almoco`,
+            duracao_min: duracaoAlmoco,
           });
           almocoAdded = true;
 
@@ -457,8 +470,9 @@ export default function MotorOtimizacaoNew() {
               tipo: 'deslocamento',
               horario_inicio: minutesToTime(almocoFimMin),
               horario_fim: parada.horario_chegada,
-              descricao: `Continuacao do deslocamento (~${tempoRestante} min)`,
+              descricao: `Continuacao do deslocamento`,
               distancia_km: Math.round(parada.distancia_km * (tempoRestante / parada.tempo_deslocamento_min) * 10) / 10,
+              duracao_min: tempoRestante,
             });
           }
         } else if (!almocoAdded && chegadaMin >= almocoMin && deslocamentoInicio < almocoMin) {
@@ -466,14 +480,16 @@ export default function MotorOtimizacaoNew() {
             tipo: 'deslocamento',
             horario_inicio: minutesToTime(deslocamentoInicio),
             horario_fim: minutesToTime(almocoMin),
-            descricao: `Deslocamento ${parada.distancia_km} km (~${almocoMin - deslocamentoInicio} min)`,
+            descricao: `Deslocamento`,
             distancia_km: parada.distancia_km,
+            duracao_min: almocoMin - deslocamentoInicio,
           });
           eventos.push({
             tipo: 'almoco',
             horario_inicio: horarioAlmoco,
             horario_fim: minutesToTime(almocoFimMin),
-            descricao: `Pausa para almoco (${duracaoAlmoco} min)`,
+            descricao: `Pausa para almoco`,
+            duracao_min: duracaoAlmoco,
           });
           almocoAdded = true;
         } else {
@@ -481,8 +497,9 @@ export default function MotorOtimizacaoNew() {
             tipo: 'deslocamento',
             horario_inicio: minutesToTime(currentMin),
             horario_fim: parada.horario_chegada,
-            descricao: `Deslocamento ${parada.distancia_km} km (~${parada.tempo_deslocamento_min} min)`,
+            descricao: `Deslocamento`,
             distancia_km: parada.distancia_km,
+            duracao_min: parada.tempo_deslocamento_min,
           });
         }
 
@@ -510,8 +527,9 @@ export default function MotorOtimizacaoNew() {
             tipo: 'retorno_base',
             horario_inicio: lastParada.horario_saida,
             horario_fim: minutesToTime(timeToMinutes(lastParada.horario_saida) + retornoMin),
-            descricao: `Retorno a base ${Math.round(retornoKm * 10) / 10} km (~${retornoMin} min)`,
+            descricao: `Retorno a base`,
             distancia_km: Math.round(retornoKm * 10) / 10,
+            duracao_min: retornoMin,
           });
           kmDia += retornoKm;
         } else {
@@ -763,6 +781,38 @@ export default function MotorOtimizacaoNew() {
       setTimeout(fitMapBounds, 100);
     }
   }, [filteredOS, paradas, fitMapBounds]);
+
+  useEffect(() => {
+    if (!isLoaded || !baseCoords || paradas.length === 0) {
+      setDirections(null);
+      return;
+    }
+
+    const directionsService = new google.maps.DirectionsService();
+
+    const waypoints = paradas.map(p => ({
+      location: { lat: p.os.lat, lng: p.os.lng },
+      stopover: true,
+    }));
+
+    directionsService.route(
+      {
+        origin: baseCoords,
+        destination: baseCoords,
+        waypoints: waypoints,
+        travelMode: google.maps.TravelMode.DRIVING,
+        optimizeWaypoints: false,
+      },
+      (result, status) => {
+        if (status === google.maps.DirectionsStatus.OK && result) {
+          setDirections(result);
+        } else {
+          console.warn('Directions request failed:', status);
+          setDirections(null);
+        }
+      }
+    );
+  }, [isLoaded, baseCoords, paradas]);
 
   const tecnicoNome = useMemo(() => {
     const t = tecnicosData.find((t: any) => t.id === selectedTecnico);
@@ -1020,32 +1070,49 @@ export default function MotorOtimizacaoNew() {
                   </div>
                 ) : (
                   <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
-                    {filteredOS.map((os) => (
-                      <div
-                        key={os.id}
-                        className="flex items-center gap-3 p-3 rounded-xl transition-all"
-                        style={{ backgroundColor: 'var(--bg-secondary)' }}
-                      >
-                        <div className="w-2 h-8 rounded-full" style={{ backgroundColor: os.rota_cor || '#3B82F6' }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>OS {os.numero_os}</span>
-                            <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: os.rota_cor + '20', color: os.rota_cor }}>
-                              {os.rota_nome}
-                            </span>
+                    {filteredOS.map((os) => {
+                      const isSelected = selectedOSId === os.id;
+                      return (
+                        <div
+                          key={os.id}
+                          onClick={() => {
+                            setSelectedOSId(os.id);
+                            setSelectedMarker(null);
+                            if (os.lat && os.lng && mapRef.current) {
+                              mapRef.current.panTo({ lat: os.lat, lng: os.lng });
+                              mapRef.current.setZoom(14);
+                            }
+                          }}
+                          className="flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer hover:scale-[1.01]"
+                          style={{
+                            backgroundColor: isSelected ? (os.rota_cor || '#3B82F6') + '20' : 'var(--bg-secondary)',
+                            border: isSelected ? `2px solid ${os.rota_cor || '#3B82F6'}` : '2px solid transparent',
+                          }}
+                        >
+                          <div className="w-2 h-8 rounded-full" style={{ backgroundColor: os.rota_cor || '#3B82F6' }} />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>OS {os.numero_os}</span>
+                              <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: os.rota_cor + '20', color: os.rota_cor }}>
+                                {os.rota_nome}
+                              </span>
+                              {!os.lat && !os.lng && (
+                                <span className="text-[10px] px-1 py-0.5 rounded bg-red-500/20 text-red-400">Sem coord.</span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</span>
+                              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>|</span>
+                              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.cliente_cidade}</span>
+                            </div>
+                            <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{os.aparelho_linha}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</span>
-                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>|</span>
-                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.cliente_cidade}</span>
+                          <div className="text-right">
+                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.dias_aberta}d</span>
                           </div>
-                          <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{os.aparelho_linha}</span>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.dias_aberta}d</span>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>
@@ -1167,58 +1234,147 @@ export default function MotorOtimizacaoNew() {
             {baseCoords && (
               <Marker
                 position={baseCoords}
+                label={{
+                  text: 'B',
+                  color: 'white',
+                  fontWeight: 'bold',
+                }}
                 icon={{
-                  url: 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="22" fill="#059669" stroke="white" stroke-width="4"/><path d="M24 14v20M14 24h20M18 18l12 12M30 18l-12 12" stroke="white" stroke-width="2" stroke-linecap="round"/></svg>'),
-                  scaledSize: new google.maps.Size(48, 48),
-                  anchor: new google.maps.Point(24, 24),
+                  path: google.maps.SymbolPath.CIRCLE,
+                  scale: 20,
+                  fillColor: '#059669',
+                  fillOpacity: 1,
+                  strokeColor: 'white',
+                  strokeWeight: 3,
                 }}
                 title="Base - Unidade"
               />
             )}
-            {filteredOS.filter(os => os.lat && os.lng && !paradas.some(p => p.os.id === os.id)).map((os, idx) => (
-              <Marker
-                key={`os-${os.id}`}
-                position={{ lat: os.lat, lng: os.lng }}
-                icon={{
-                  url: 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="${os.rota_cor || '#6B7280'}" stroke="white" stroke-width="2"/><text x="16" y="21" text-anchor="middle" fill="white" font-size="12" font-weight="bold">${String.fromCharCode(65 + (idx % 26))}</text></svg>`),
-                  scaledSize: new google.maps.Size(32, 32),
-                  anchor: new google.maps.Point(16, 16),
+            {filteredOS.filter(os => os.lat && os.lng && !paradas.some(p => p.os.id === os.id)).map((os, idx) => {
+              const isSelected = selectedOSId === os.id;
+              return (
+                <Marker
+                  key={`os-${os.id}`}
+                  position={{ lat: os.lat, lng: os.lng }}
+                  label={{
+                    text: String.fromCharCode(65 + (idx % 26)),
+                    color: 'white',
+                    fontWeight: 'bold',
+                    fontSize: '12px',
+                  }}
+                  icon={{
+                    path: google.maps.SymbolPath.CIRCLE,
+                    scale: isSelected ? 18 : 14,
+                    fillColor: os.rota_cor || '#6B7280',
+                    fillOpacity: 1,
+                    strokeColor: isSelected ? '#FBBF24' : 'white',
+                    strokeWeight: isSelected ? 4 : 2,
+                  }}
+                  onClick={() => {
+                    setSelectedOSId(os.id);
+                    setSelectedMarker(null);
+                  }}
+                  zIndex={isSelected ? 1000 : 1}
+                />
+              );
+            })}
+            {paradas.map((p, idx) => {
+              const isSelected = selectedOSId === p.os.id || selectedMarker?.os.id === p.os.id;
+              return (
+                <Marker
+                  key={p.os.id}
+                  position={{ lat: p.os.lat, lng: p.os.lng }}
+                  label={{
+                    text: String(idx + 1),
+                    color: p.os.rota_cor || '#3B82F6',
+                    fontWeight: 'bold',
+                    fontSize: '14px',
+                  }}
+                  icon={{
+                    path: 'M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z',
+                    scale: isSelected ? 2.2 : 1.8,
+                    fillColor: p.os.rota_cor || '#3B82F6',
+                    fillOpacity: 1,
+                    strokeColor: isSelected ? '#FBBF24' : 'white',
+                    strokeWeight: isSelected ? 3 : 2,
+                    anchor: new google.maps.Point(12, 24),
+                    labelOrigin: new google.maps.Point(12, 9),
+                  }}
+                  onClick={() => {
+                    setSelectedMarker(p);
+                    setSelectedOSId(p.os.id);
+                  }}
+                  zIndex={isSelected ? 1000 : idx + 10}
+                />
+              );
+            })}
+            {directions ? (
+              <DirectionsRenderer
+                directions={directions}
+                options={{
+                  suppressMarkers: true,
+                  polylineOptions: {
+                    strokeColor: '#3B82F6',
+                    strokeWeight: 5,
+                    strokeOpacity: 0.8,
+                  },
                 }}
-                title={`OS ${os.numero_os} - ${os.cliente_nome}`}
               />
-            ))}
-            {paradas.map((p, idx) => (
-              <Marker
-                key={p.os.id}
-                position={{ lat: p.os.lat, lng: p.os.lng }}
-                icon={{
-                  url: 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="36" height="44" viewBox="0 0 36 44"><path d="M18 0C8.1 0 0 8.1 0 18c0 13.5 18 26 18 26s18-12.5 18-26C36 8.1 27.9 0 18 0z" fill="${p.os.rota_cor || '#3B82F6'}"/><circle cx="18" cy="18" r="13" fill="white"/><text x="18" y="23" text-anchor="middle" fill="${p.os.rota_cor || '#3B82F6'}" font-size="13" font-weight="bold">${idx + 1}</text></svg>`),
-                  scaledSize: new google.maps.Size(36, 44),
-                  anchor: new google.maps.Point(18, 44),
-                }}
-                onClick={() => setSelectedMarker(p)}
-              />
-            ))}
-            {routePath.length > 1 && (
-              <Polyline
-                path={routePath}
-                options={{ strokeColor: '#3B82F6', strokeWeight: 4, strokeOpacity: 0.8, geodesic: true }}
-              />
+            ) : routePath.length > 1 && (
+              <>
+                <Polyline
+                  path={routePath}
+                  options={{ strokeColor: '#1E40AF', strokeWeight: 6, strokeOpacity: 0.3, geodesic: true }}
+                />
+                <Polyline
+                  path={routePath}
+                  options={{ strokeColor: '#3B82F6', strokeWeight: 4, strokeOpacity: 1, geodesic: true }}
+                />
+              </>
             )}
+            {selectedOSId && !selectedMarker && (() => {
+              const os = filteredOS.find(o => o.id === selectedOSId);
+              if (!os || !os.lat || !os.lng) return null;
+              return (
+                <InfoWindow
+                  position={{ lat: os.lat, lng: os.lng }}
+                  onCloseClick={() => setSelectedOSId(null)}
+                >
+                  <div style={{ color: '#000', minWidth: 220, padding: '8px' }}>
+                    <div style={{ fontWeight: 'bold', fontSize: 15, marginBottom: 8 }}>OS {os.numero_os}</div>
+                    <div style={{ fontSize: 13 }}>{os.cliente_nome}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{os.cliente_cidade} - {os.cliente_bairro}</div>
+                    <div style={{ fontSize: 12, color: '#666', marginTop: 2 }}>{os.cliente_endereco}</div>
+                    <div style={{ display: 'flex', gap: 12, marginTop: 8, fontSize: 12 }}>
+                      <span><strong>Linha:</strong> {os.aparelho_linha || '-'}</span>
+                      <span><strong>Aberta ha:</strong> {os.dias_aberta} dias</span>
+                    </div>
+                    <div style={{ marginTop: 8, padding: '4px 8px', backgroundColor: (os.rota_cor || '#3B82F6') + '20', borderRadius: 4, fontSize: 11, color: os.rota_cor || '#3B82F6', fontWeight: 500 }}>
+                      {os.rota_nome}
+                    </div>
+                  </div>
+                </InfoWindow>
+              );
+            })()}
             {selectedMarker && (
               <InfoWindow
                 position={{ lat: selectedMarker.os.lat, lng: selectedMarker.os.lng }}
-                onCloseClick={() => setSelectedMarker(null)}
+                onCloseClick={() => { setSelectedMarker(null); setSelectedOSId(null); }}
               >
-                <div style={{ color: '#000', minWidth: 200, padding: '4px' }}>
-                  <div style={{ fontWeight: 'bold', fontSize: 14 }}>#{selectedMarker.ordem} - OS {selectedMarker.os.numero_os}</div>
-                  <div style={{ fontSize: 12, marginTop: 4 }}>{selectedMarker.os.cliente_nome}</div>
-                  <div style={{ fontSize: 11, color: '#666' }}>{selectedMarker.os.cliente_cidade} - {selectedMarker.os.cliente_bairro}</div>
-                  <div style={{ fontSize: 11, marginTop: 4 }}>
-                    <strong>Chegada:</strong> {selectedMarker.horario_chegada} | <strong>Dia</strong> {selectedMarker.dia}
+                <div style={{ color: '#000', minWidth: 240, padding: '8px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                    <span style={{ backgroundColor: selectedMarker.os.rota_cor || '#3B82F6', color: 'white', padding: '2px 8px', borderRadius: 4, fontSize: 12, fontWeight: 'bold' }}>#{selectedMarker.ordem}</span>
+                    <span style={{ fontWeight: 'bold', fontSize: 15 }}>OS {selectedMarker.os.numero_os}</span>
                   </div>
-                  <div style={{ fontSize: 11 }}>
-                    <strong>Distancia:</strong> {selectedMarker.distancia_km} km | <strong>Tempo:</strong> {selectedMarker.tempo_deslocamento_min} min
+                  <div style={{ fontSize: 13 }}>{selectedMarker.os.cliente_nome}</div>
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{selectedMarker.os.cliente_cidade} - {selectedMarker.os.cliente_bairro}</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12, padding: 8, backgroundColor: '#f5f5f5', borderRadius: 6 }}>
+                    <div style={{ fontSize: 11 }}><strong>Chegada:</strong> {selectedMarker.horario_chegada}</div>
+                    <div style={{ fontSize: 11 }}><strong>Saida:</strong> {selectedMarker.horario_saida}</div>
+                    <div style={{ fontSize: 11 }}><strong>Distancia:</strong> {selectedMarker.distancia_km} km</div>
+                    <div style={{ fontSize: 11 }}><strong>Deslocamento:</strong> {formatDuration(selectedMarker.tempo_deslocamento_min)}</div>
+                    <div style={{ fontSize: 11 }}><strong>Dia:</strong> {selectedMarker.dia}</div>
+                    <div style={{ fontSize: 11 }}><strong>Atendimento:</strong> {formatDuration(tempoMedioReparo)}</div>
                   </div>
                 </div>
               </InfoWindow>
@@ -1341,16 +1497,20 @@ export default function MotorOtimizacaoNew() {
                                 )}
                               </div>
 
-                              {evento.tipo === 'deslocamento' && evento.distancia_km && (
+                              {evento.tipo === 'deslocamento' && (
                                 <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {evento.distancia_km} km
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {evento.descricao.match(/~(\d+) min/)?.[1] || '?'} min
-                                  </span>
+                                  {evento.distancia_km && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {evento.distancia_km} km
+                                    </span>
+                                  )}
+                                  {evento.duracao_min && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatDuration(evento.duracao_min)}
+                                    </span>
+                                  )}
                                 </div>
                               )}
 
@@ -1370,7 +1530,7 @@ export default function MotorOtimizacaoNew() {
                                   <div className="flex items-center gap-3 mt-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                                     <span className="flex items-center gap-1">
                                       <Clock className="w-3 h-3" />
-                                      {tempoMedioReparo} min atendimento
+                                      {formatDuration(tempoMedioReparo)} atendimento
                                     </span>
                                     <span className="flex items-center gap-1">
                                       <Timer className="w-3 h-3" />
@@ -1380,22 +1540,26 @@ export default function MotorOtimizacaoNew() {
                                 </>
                               )}
 
-                              {evento.tipo === 'almoco' && (
+                              {evento.tipo === 'almoco' && evento.duracao_min && (
                                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                                  Duracao: {duracaoAlmoco} minutos
+                                  Duracao: {formatDuration(evento.duracao_min)}
                                 </p>
                               )}
 
-                              {evento.tipo === 'retorno_base' && evento.distancia_km && (
+                              {evento.tipo === 'retorno_base' && (
                                 <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  <span className="flex items-center gap-1">
-                                    <MapPin className="w-3 h-3" />
-                                    {evento.distancia_km} km
-                                  </span>
-                                  <span className="flex items-center gap-1">
-                                    <Clock className="w-3 h-3" />
-                                    {evento.descricao.match(/~(\d+) min/)?.[1] || '?'} min
-                                  </span>
+                                  {evento.distancia_km && (
+                                    <span className="flex items-center gap-1">
+                                      <MapPin className="w-3 h-3" />
+                                      {evento.distancia_km} km
+                                    </span>
+                                  )}
+                                  {evento.duracao_min && (
+                                    <span className="flex items-center gap-1">
+                                      <Clock className="w-3 h-3" />
+                                      {formatDuration(evento.duracao_min)}
+                                    </span>
+                                  )}
                                 </div>
                               )}
                             </div>
