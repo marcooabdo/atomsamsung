@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
-import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera, FileText, User, Cpu, Calendar } from 'lucide-react';
+import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera, FileText, User, Cpu, Calendar, Image } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { jsPDF } from 'jspdf';
 
 interface OrcamentoData {
   link: {
@@ -69,6 +70,13 @@ interface OrcamentoData {
       canais_atendimento: string | null;
       observacoes_gerais: string | null;
     } | null;
+    anexos: Array<{
+      id: string;
+      url: string;
+      nome_arquivo: string;
+      descricao: string | null;
+      tipo: string;
+    }>;
   };
 }
 
@@ -87,6 +95,12 @@ export function OrcamentoPublico() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [localizacaoCapturada, setLocalizacaoCapturada] = useState<{
+    latitude: number;
+    longitude: number;
+    endereco: string | null;
+  } | null>(null);
+  const [selectedFoto, setSelectedFoto] = useState<string | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -130,17 +144,34 @@ export function OrcamentoPublico() {
 
     setCapturandoLocalizacao(true);
     try {
-      await new Promise<GeolocationPosition>((resolve, reject) => {
+      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 0
         });
       });
+
+      let endereco: string | null = null;
+      try {
+        const geoResponse = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`
+        );
+        const geoData = await geoResponse.json();
+        endereco = geoData.display_name || null;
+      } catch {}
+
+      setLocalizacaoCapturada({
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        endereco
+      });
+
       setCapturandoLocalizacao(false);
       abrirCamera();
     } catch {
       setCapturandoLocalizacao(false);
+      setLocalizacaoCapturada(null);
       if (confirm('Nao foi possivel obter sua localizacao. Deseja continuar mesmo assim?')) {
         abrirCamera();
       }
@@ -193,59 +224,197 @@ export function OrcamentoPublico() {
     abrirCamera();
   };
 
+  const gerarPDFAprovacao = async (): Promise<Blob> => {
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const margin = 15;
+    let yPos = 20;
+
+    const addText = (text: string, size: number = 10, style: 'normal' | 'bold' = 'normal') => {
+      doc.setFontSize(size);
+      doc.setFont('helvetica', style);
+      const lines = doc.splitTextToSize(text, pageWidth - margin * 2);
+      doc.text(lines, margin, yPos);
+      yPos += lines.length * (size * 0.4) + 2;
+    };
+
+    const checkPageBreak = (height: number) => {
+      if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
+        doc.addPage();
+        yPos = 20;
+      }
+    };
+
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, pageWidth, 35, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(18);
+    doc.setFont('helvetica', 'bold');
+    doc.text('COMPROVANTE DE APROVACAO DE ORCAMENTO', pageWidth / 2, 15, { align: 'center' });
+    doc.setFontSize(11);
+    doc.text(`OS #${data?.os.numero_os_interna || ''}`, pageWidth / 2, 25, { align: 'center' });
+
+    yPos = 45;
+    doc.setTextColor(0, 0, 0);
+
+    if (data?.os.unidade) {
+      addText(data.os.unidade.nome, 12, 'bold');
+      addText(`${data.os.unidade.endereco}, ${data.os.unidade.cidade} - ${data.os.unidade.uf}`, 9);
+      addText(`Tel: ${data.os.unidade.telefone}`, 9);
+      yPos += 5;
+    }
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, yPos, pageWidth - margin, yPos);
+    yPos += 10;
+
+    addText('DADOS DO CLIENTE', 11, 'bold');
+    addText(`Nome: ${data?.os.cliente_nome || ''}`);
+    if (data?.os.cliente_cpf_cnpj) addText(`CPF/CNPJ: ${data.os.cliente_cpf_cnpj}`);
+    addText(`Telefone: ${data?.os.cliente_telefone || ''}`);
+    const endereco = [
+      data?.os.cliente_logradouro,
+      data?.os.cliente_numero,
+      data?.os.cliente_bairro,
+      data?.os.cliente_cidade,
+      data?.os.cliente_estado
+    ].filter(Boolean).join(', ');
+    if (endereco) addText(`Endereco: ${endereco}`);
+    yPos += 5;
+
+    addText('EQUIPAMENTO', 11, 'bold');
+    addText(`Marca/Modelo: ${data?.os.aparelho_marca || ''} ${data?.os.aparelho_modelo || ''}`);
+    if (data?.os.aparelho_numero_serie) addText(`N/S: ${data.os.aparelho_numero_serie}`);
+    if (data?.os.aparelho_imei) addText(`IMEI: ${data.os.aparelho_imei}`);
+    yPos += 5;
+
+    addText('DEFEITO E DIAGNOSTICO', 11, 'bold');
+    addText(`Defeito: ${data?.os.defeito_relatado || 'Nao informado'}`);
+    if (data?.os.diagnostico_tecnico) addText(`Diagnostico: ${data.os.diagnostico_tecnico}`);
+    yPos += 5;
+
+    if (data?.os.cotacao) {
+      checkPageBreak(60);
+      addText('DETALHES DO ORCAMENTO', 11, 'bold');
+
+      if (data.os.cotacao.cotacoes_pecas && data.os.cotacao.cotacoes_pecas.length > 0) {
+        addText('Pecas:', 10, 'bold');
+        data.os.cotacao.cotacoes_pecas.forEach(peca => {
+          checkPageBreak(15);
+          addText(`  - ${peca.descricao} (${peca.quantidade}x) - R$ ${peca.valor_total.toFixed(2)}`);
+        });
+      }
+
+      if (data.os.cotacao.cotacoes_servicos && data.os.cotacao.cotacoes_servicos.length > 0) {
+        addText('Servicos:', 10, 'bold');
+        data.os.cotacao.cotacoes_servicos.forEach(servico => {
+          checkPageBreak(15);
+          addText(`  - ${servico.nome} (${servico.quantidade}x) - R$ ${servico.valor_total.toFixed(2)}`);
+        });
+      }
+
+      yPos += 3;
+      addText(`Subtotal Pecas: R$ ${data.os.cotacao.valor_pecas.toFixed(2)}`);
+      addText(`Subtotal Servicos: R$ ${data.os.cotacao.valor_servicos.toFixed(2)}`);
+      if (data.os.cotacao.desconto_valor > 0) {
+        addText(`Desconto: - R$ ${data.os.cotacao.desconto_valor.toFixed(2)}`);
+      }
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      yPos += 2;
+      addText(`TOTAL: R$ ${data.os.cotacao.valor_liquido.toFixed(2)}`, 12, 'bold');
+    }
+
+    checkPageBreak(50);
+    yPos += 10;
+    doc.setFillColor(34, 197, 94);
+    doc.rect(margin, yPos - 5, pageWidth - margin * 2, 25, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('ORCAMENTO APROVADO PELO CLIENTE', pageWidth / 2, yPos + 5, { align: 'center' });
+    doc.setFontSize(10);
+    doc.text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos + 13, { align: 'center' });
+    yPos += 30;
+    doc.setTextColor(0, 0, 0);
+
+    if (localizacaoCapturada) {
+      checkPageBreak(30);
+      addText('GEOLOCALIZACAO DA APROVACAO', 11, 'bold');
+      addText(`Latitude: ${localizacaoCapturada.latitude.toFixed(6)}`);
+      addText(`Longitude: ${localizacaoCapturada.longitude.toFixed(6)}`);
+      if (localizacaoCapturada.endereco) {
+        addText(`Endereco: ${localizacaoCapturada.endereco}`);
+      }
+      addText(`Maps: https://www.google.com/maps?q=${localizacaoCapturada.latitude},${localizacaoCapturada.longitude}`, 8);
+      yPos += 5;
+    }
+
+    if (selfieCapturada) {
+      checkPageBreak(80);
+      addText('FOTO DO CLIENTE NO MOMENTO DA APROVACAO', 11, 'bold');
+      yPos += 3;
+      try {
+        doc.addImage(selfieCapturada, 'JPEG', margin, yPos, 60, 45);
+        yPos += 50;
+      } catch (err) {
+        console.error('Erro ao adicionar selfie ao PDF:', err);
+      }
+    }
+
+    checkPageBreak(20);
+    yPos += 10;
+    doc.setFontSize(8);
+    doc.setTextColor(100, 100, 100);
+    doc.text('Documento gerado eletronicamente. Este comprovante atesta a aprovacao do orcamento pelo cliente.', pageWidth / 2, yPos, { align: 'center' });
+
+    return doc.output('blob');
+  };
+
   const handleRespond = async () => {
     if (!selectedAction) return;
 
     setResponding(true);
     try {
-      let latitude: number | null = null;
-      let longitude: number | null = null;
-      let enderecoCompleto: string | null = null;
+      const latitude = localizacaoCapturada?.latitude || null;
+      const longitude = localizacaoCapturada?.longitude || null;
+      const enderecoCompleto = localizacaoCapturada?.endereco || null;
 
-      try {
-        const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject);
-        });
-        latitude = position.coords.latitude;
-        longitude = position.coords.longitude;
+      let pdfUrl: string | null = null;
 
-        const geoResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
-        );
-        const geoData = await geoResponse.json();
-        enderecoCompleto = geoData.display_name || null;
-      } catch {
-        console.error('Erro ao obter localizacao');
-      }
-
-      let selfieUrl: string | null = null;
-
-      if (selfieCapturada && token && data) {
+      if (selectedAction === 'aprovado' && data) {
         try {
-          const base64Data = selfieCapturada.split(',')[1];
-          const byteCharacters = atob(base64Data);
-          const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
-          const byteArray = new Uint8Array(byteNumbers);
-          const blob = new Blob([byteArray], { type: 'image/jpeg' });
-
-          const fileName = `${data.os.numero_os_interna}/selfie-aprovacao-${Date.now()}.jpg`;
+          const pdfBlob = await gerarPDFAprovacao();
+          const pdfFileName = `${data.os.numero_os_interna}/comprovante-aprovacao-${Date.now()}.pdf`;
 
           const { error: uploadError } = await supabase.storage
             .from('os-anexos')
-            .upload(fileName, blob, { upsert: true });
+            .upload(pdfFileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
 
-          if (uploadError) throw uploadError;
+          if (!uploadError) {
+            const { data: { publicUrl } } = supabase.storage
+              .from('os-anexos')
+              .getPublicUrl(pdfFileName);
+            pdfUrl = publicUrl;
 
-          const { data: { publicUrl } } = supabase.storage
-            .from('os-anexos')
-            .getPublicUrl(fileName);
+            const { data: linkData } = await supabase
+              .from('orcamento_links')
+              .select('os_id')
+              .eq('token', token)
+              .maybeSingle();
 
-          selfieUrl = publicUrl;
+            if (linkData?.os_id) {
+              await supabase.from('os_anexos').insert({
+                os_id: linkData.os_id,
+                url: pdfUrl,
+                tipo: 'pdf',
+                nome_arquivo: `comprovante-aprovacao-${data.os.numero_os_interna}.pdf`,
+                descricao: 'Comprovante de aprovacao do orcamento pelo cliente'
+              });
+            }
+          }
         } catch (err) {
-          console.error('Erro ao fazer upload da selfie:', err);
+          console.error('Erro ao gerar PDF:', err);
         }
       }
 
@@ -262,7 +431,7 @@ export function OrcamentoPublico() {
           latitude,
           longitude,
           endereco_completo: enderecoCompleto,
-          selfie_url: selfieUrl,
+          selfie_url: pdfUrl,
         }),
       });
 
@@ -548,6 +717,40 @@ export function OrcamentoPublico() {
               </div>
             )}
 
+            {os.anexos && os.anexos.length > 0 && (
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-blue-600 text-white px-4 py-2 flex items-center gap-2">
+                  <Image className="w-5 h-5" />
+                  <h3 className="font-bold text-sm uppercase">Fotos do Equipamento</h3>
+                </div>
+                <div className="p-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {os.anexos.map((anexo) => (
+                      <div
+                        key={anexo.id}
+                        className="relative aspect-square rounded-lg overflow-hidden border border-gray-200 cursor-pointer hover:opacity-90 transition-opacity"
+                        onClick={() => setSelectedFoto(anexo.url)}
+                      >
+                        <img
+                          src={anexo.url}
+                          alt={anexo.descricao || anexo.nome_arquivo}
+                          className="w-full h-full object-cover"
+                        />
+                        {anexo.descricao && (
+                          <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-1.5 truncate">
+                            {anexo.descricao}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-500 mt-3 text-center">
+                    Clique em uma foto para ampliar
+                  </p>
+                </div>
+              </div>
+            )}
+
             {os.termos && (os.termos.termo_orcamento || os.termos.termo_garantia || os.termos.observacoes_gerais) && (
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-4">
                 {os.termos.termo_orcamento && (
@@ -828,6 +1031,26 @@ export function OrcamentoPublico() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {selectedFoto && (
+        <div
+          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedFoto(null)}
+        >
+          <button
+            className="absolute top-4 right-4 text-white hover:text-gray-300 transition-colors"
+            onClick={() => setSelectedFoto(null)}
+          >
+            <XCircle className="w-8 h-8" />
+          </button>
+          <img
+            src={selectedFoto}
+            alt="Foto ampliada"
+            className="max-w-full max-h-full object-contain rounded-lg"
+            onClick={(e) => e.stopPropagation()}
+          />
         </div>
       )}
     </div>

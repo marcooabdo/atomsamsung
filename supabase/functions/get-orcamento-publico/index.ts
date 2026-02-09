@@ -227,6 +227,12 @@ Deno.serve(async (req: Request) => {
       .select('id, nome, descricao, valor, quantidade, valor_total')
       .eq('os_id', linkData.os_id);
 
+    const { data: anexosData } = await supabase
+      .from('os_anexos')
+      .select('id, url, nome_arquivo, descricao, tipo')
+      .eq('os_id', linkData.os_id)
+      .eq('exibir_no_pdf', true);
+
     const cotacao = {
       id: osData.id,
       valor_pecas: Number(osData.valor_pecas || 0),
@@ -277,7 +283,14 @@ Deno.serve(async (req: Request) => {
         data_abertura: osData.created_at,
         unidade: unidadeData,
         cotacao: cotacao,
-        termos: pdfConfig || null
+        termos: pdfConfig || null,
+        anexos: (anexosData || []).map(a => ({
+          id: a.id,
+          url: a.url,
+          nome_arquivo: a.nome_arquivo,
+          descricao: a.descricao,
+          tipo: a.tipo
+        }))
       }
     };
 
