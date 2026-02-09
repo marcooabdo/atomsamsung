@@ -134,34 +134,75 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Buscar dados da OS com cotações
+    // Buscar dados da OS
     const { data: osData, error: osError } = await supabase
       .from('os')
-      .select(`
-        *,
-        unidades:unidade_id(nome, telefone, endereco, cidade, uf),
-        cotacoes(
-          id,
-          valor_total,
-          valor_pecas,
-          valor_servicos,
-          desconto_tipo,
-          desconto_valor,
-          valor_liquido,
-          created_at,
-          cotacoes_pecas(id, codigo, descricao, quantidade, valor_final_unitario, valor_total),
-          cotacoes_servicos(id, nome, descricao, valor, quantidade, valor_total)
-        )
-      `)
+      .select('*')
       .eq('id', linkData.os_id)
       .maybeSingle();
 
-    if (osError || !osData) {
+    if (osError) {
+      console.error('Error fetching OS:', osError);
+      return new Response(
+        JSON.stringify({ error: 'Erro ao buscar OS', details: osError.message }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (!osData) {
+      console.error('OS not found:', linkData.os_id);
       return new Response(
         JSON.stringify({ error: 'OS nao encontrada' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Buscar unidade
+    const { data: unidadeData } = await supabase
+      .from('unidades')
+      .select('nome, telefone, endereco, cidade, uf')
+      .eq('id', osData.unidade_id)
+      .maybeSingle();
+
+    // Buscar peças da OS (apenas as que devem aparecer no orçamento)
+    const { data: pecasData } = await supabase
+      .from('os_pecas')
+      .select('id, codigo, descricao, quantidade, valor_unitario, valor_total')
+      .eq('os_id', linkData.os_id)
+      .or('exibir_no_pdf.eq.true,mostrar_no_pdf.eq.true');
+
+    // Buscar serviços da OS
+    const { data: servicosData } = await supabase
+      .from('os_servicos')
+      .select('id, nome, descricao, valor, quantidade, valor_total')
+      .eq('os_id', linkData.os_id);
+
+    // Montar objeto de cotação com os dados da OS
+    const cotacao = {
+      id: osData.id,
+      valor_pecas: Number(osData.valor_pecas || 0),
+      valor_servicos: Number(osData.valor_servicos || 0),
+      desconto_tipo: osData.desconto_tipo,
+      desconto_valor: Number(osData.desconto_valor || 0),
+      valor_liquido: Number(osData.valor_total || 0) - Number(osData.desconto_valor || 0),
+      created_at: osData.created_at,
+      cotacoes_pecas: (pecasData || []).map(p => ({
+        id: p.id,
+        codigo: p.codigo,
+        descricao: p.descricao,
+        quantidade: p.quantidade,
+        valor_final_unitario: Number(p.valor_unitario || 0),
+        valor_total: Number(p.valor_total || 0)
+      })),
+      cotacoes_servicos: (servicosData || []).map(s => ({
+        id: s.id,
+        nome: s.nome,
+        descricao: s.descricao || '',
+        valor: Number(s.valor || 0),
+        quantidade: s.quantidade,
+        valor_total: Number(s.valor_total || 0)
+      }))
+    };
 
     // Retornar dados públicos (sem informações sensíveis)
     const response = {
@@ -174,9 +215,9 @@ Deno.serve(async (req: Request) => {
         aparelho_modelo: osData.aparelho_modelo,
         defeito_relatado: osData.defeito_relatado,
         diagnostico_tecnico: osData.diagnostico_tecnico,
-        data_abertura: osData.data_abertura,
-        unidade: osData.unidades,
-        cotacao: osData.cotacoes?.[0] || null
+        data_abertura: osData.created_at,
+        unidade: unidadeData,
+        cotacao: cotacao
       }
     };
 
