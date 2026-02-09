@@ -80,15 +80,30 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
       if (osData?.id) {
         loadExistingLink();
       }
+    } else {
+      // Limpar estados ao fechar o modal
+      setSelectedTemplate(null);
+      setResult(null);
+      setError('');
+      setLinkCopied(false);
     }
   }, [isOpen, osData?.id]);
 
   const loadExistingLink = async () => {
-    if (!osData?.id) return;
+    console.log('=== loadExistingLink chamado ===');
+    console.log('osData:', osData);
 
+    if (!osData?.id) {
+      console.log('Sem osData.id, limpando links');
+      setOrcamentoLink(null);
+      setLinkExpiresAt(null);
+      return;
+    }
+
+    console.log('Buscando link para OS:', osData.id);
     setLoadingLink(true);
     try {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('orcamento_links')
         .select('token, expires_at, status')
         .eq('os_id', osData.id)
@@ -96,16 +111,28 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
         .order('created_at', { ascending: false })
         .maybeSingle();
 
+      if (error) {
+        console.error('Erro ao buscar link:', error);
+        setOrcamentoLink(null);
+        setLinkExpiresAt(null);
+        return;
+      }
+
       if (data?.token) {
+        // Verificar se o link expirou
         if (data.expires_at && new Date(data.expires_at) < new Date()) {
+          console.log('Link expirado:', data.expires_at);
           setOrcamentoLink(null);
           setLinkExpiresAt(null);
           return;
         }
         const baseUrl = window.location.origin;
-        setOrcamentoLink(`${baseUrl}/orcamento/${data.token}`);
+        const fullLink = `${baseUrl}/orcamento/${data.token}`;
+        console.log('Link encontrado:', fullLink);
+        setOrcamentoLink(fullLink);
         setLinkExpiresAt(data.expires_at);
       } else {
+        console.log('Nenhum link ativo encontrado para OS:', osData.id);
         setOrcamentoLink(null);
         setLinkExpiresAt(null);
       }
@@ -124,17 +151,26 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
     setGeneratingLink(true);
     try {
       const rpcName = forceNew ? 'regenerate_orcamento_link' : 'upsert_orcamento_link';
+      console.log(`Chamando ${rpcName} para OS:`, osData.id);
+
       const { data, error } = await supabase.rpc(rpcName, {
         p_os_id: osData.id
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Erro na RPC:', error);
+        throw error;
+      }
+
+      console.log('Resposta da RPC:', data);
 
       if (data && data.length > 0) {
         const token = data[0].token;
         const expiresAt = data[0].expires_at;
         const baseUrl = window.location.origin;
         const link = `${baseUrl}/orcamento/${token}`;
+
+        console.log('Link gerado:', link);
         setOrcamentoLink(link);
         setLinkExpiresAt(expiresAt);
 
@@ -145,9 +181,13 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
           is_system: false
         });
 
+        // Recarregar para garantir que o estado está sincronizado
         await loadExistingLink();
+      } else {
+        console.error('RPC não retornou dados');
       }
     } catch (err: any) {
+      console.error('Erro ao gerar link:', err);
       alert(`Erro ao gerar link: ${err.message}`);
     } finally {
       setGeneratingLink(false);
