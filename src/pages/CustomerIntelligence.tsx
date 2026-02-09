@@ -155,7 +155,8 @@ export default function CustomerIntelligence() {
           cliente_logradouro, cliente_numero, cliente_bairro, cliente_cidade, cliente_estado,
           tipo_os, valor_total, valor_pecas, valor_servicos, desconto_valor, desconto_tipo,
           created_at, fechada_em, coluna_kanban, criado_por, unidade_id,
-          vendedor_responsavel_id, orcamento_aprovado_em
+          vendedor_responsavel_id, orcamento_aprovado_em, orcamento_aprovado,
+          os_pecas (id, codigo, pn, descricao, quantidade, valor_unitario, valor_total, status, devolvida_em)
         `)
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
@@ -226,7 +227,8 @@ export default function CustomerIntelligence() {
         const desconto = Number(os.desconto_valor) || 0;
         const vendedorId = (os as any).vendedor_responsavel_id || os.criado_por;
         const vendedor = usuariosMap.get(vendedorId);
-        const isAprovado = os.coluna_kanban === 'orcamento_aprovado' ||
+        const isAprovado = (os as any).orcamento_aprovado === true ||
+                          os.coluna_kanban === 'orcamento_aprovado' ||
                           os.coluna_kanban === 'aguardando_peca' ||
                           os.coluna_kanban === 'peca_em_transito' ||
                           os.coluna_kanban === 'peca_disponivel' ||
@@ -240,6 +242,8 @@ export default function CustomerIntelligence() {
                           os.coluna_kanban === 'fechar_os' ||
                           os.coluna_kanban === 'os_fechada' ||
                           (os as any).orcamento_aprovado_em != null;
+
+        const osPecas = ((os as any).os_pecas || []).filter((p: any) => !p.devolvida_em);
 
         if (existing) {
           if (isAprovado) {
@@ -318,6 +322,55 @@ export default function CustomerIntelligence() {
 
       const pecasMap = new Map<string, PecaPopular>();
       const clientePecasMap = new Map<string, Map<string, { pn: string; descricao: string; quantidade: number; valorTotal: number }>>();
+
+      (osData || []).forEach(os => {
+        const clienteKey = os.cliente_cpf_cnpj || os.cliente_nome || 'desconhecido';
+        const osPecas = ((os as any).os_pecas || []).filter((p: any) => !p.devolvida_em);
+
+        if (!clientePecasMap.has(clienteKey)) {
+          clientePecasMap.set(clienteKey, new Map());
+        }
+        const clientePecas = clientePecasMap.get(clienteKey)!;
+
+        osPecas.forEach((peca: any) => {
+          const pecaKey = peca.pn || peca.descricao || peca.codigo;
+          if (!pecaKey) return;
+
+          const quantidade = Number(peca.quantidade) || 1;
+          const valorUnit = Number(peca.valor_unitario) || 0;
+          const valorTotal = Number(peca.valor_total) || valorUnit * quantidade;
+
+          const existingPeca = pecasMap.get(pecaKey);
+          if (existingPeca) {
+            existingPeca.quantidade += quantidade;
+            existingPeca.valorTotal += valorTotal;
+            if (!existingPeca.clientesUnicos) existingPeca.clientesUnicos = 1;
+          } else {
+            pecasMap.set(pecaKey, {
+              pn: peca.pn || peca.codigo || '',
+              descricao: peca.descricao || pecaKey,
+              quantidade,
+              valorTotal,
+              valorMedio: valorUnit,
+              margemMedia: 0,
+              clientesUnicos: 1
+            });
+          }
+
+          const existingClientePeca = clientePecas.get(pecaKey);
+          if (existingClientePeca) {
+            existingClientePeca.quantidade += quantidade;
+            existingClientePeca.valorTotal += valorTotal;
+          } else {
+            clientePecas.set(pecaKey, {
+              pn: peca.pn || peca.codigo || '',
+              descricao: peca.descricao || pecaKey,
+              quantidade,
+              valorTotal
+            });
+          }
+        });
+      });
 
       (cotacoesData || []).forEach(cotacao => {
         const clienteKey = cotacao.cliente_cpf_cnpj || cotacao.cliente_nome || 'desconhecido';
