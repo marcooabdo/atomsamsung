@@ -57,19 +57,15 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const body = document.body;
+    const root = document.documentElement;
+
     if (customBackground) {
-      body.style.backgroundImage = `url("${customBackground}")`;
-      body.style.backgroundSize = 'cover';
-      body.style.backgroundPosition = 'center';
-      body.style.backgroundRepeat = 'no-repeat';
-      body.style.backgroundAttachment = 'fixed';
+      body.setAttribute('data-custom-bg', 'true');
+      root.style.setProperty('--custom-background-url', `url("${customBackground}")`);
       localStorage.setItem('custom-background', customBackground);
     } else {
-      body.style.backgroundImage = '';
-      body.style.backgroundSize = '';
-      body.style.backgroundPosition = '';
-      body.style.backgroundRepeat = '';
-      body.style.backgroundAttachment = '';
+      body.removeAttribute('data-custom-bg');
+      root.style.removeProperty('--custom-background-url');
       localStorage.removeItem('custom-background');
     }
   }, [customBackground]);

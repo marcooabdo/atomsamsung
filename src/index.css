@@ -486,3 +486,44 @@
 :root.light .status-inactive {
   box-shadow: none !important;
 }
+
+/* ================================================================
+   CUSTOM BACKGROUND IMAGE SUPPORT
+   Plano de fundo personalizado aplicado via ThemeContext
+   ================================================================ */
+
+body {
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  z-index: -1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s ease-in-out;
+}
+
+body[data-custom-bg]::before {
+  opacity: 1;
+  background-image: var(--custom-background-url);
+}
+
+/* Ajusta a opacidade do plano de fundo principal para deixar a imagem visível */
+body[data-custom-bg] {
+  background: transparent !important;
+}
+
+body[data-custom-bg] > #root {
+  position: relative;
+  z-index: 1;
+}

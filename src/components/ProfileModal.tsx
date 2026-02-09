@@ -5,7 +5,7 @@ import { supabase } from '../lib/supabase';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import {
   X, Lock, Eye, EyeOff, Save, Palette, Phone,
-  Hash, Briefcase, FileText, Check, AlertCircle
+  Hash, Briefcase, FileText, Check, AlertCircle, Upload, Loader2, Trash
 } from 'lucide-react';
 
 interface ProfileModalProps {
@@ -15,9 +15,10 @@ interface ProfileModalProps {
 
 export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const { usuario, user, updateUsuario } = useAuth();
-  const { theme, setTheme } = useTheme();
+  const { theme, setTheme, customBackground, setCustomBackground } = useTheme();
 
   const [activeTab, setActiveTab] = useState<'profile' | 'password' | 'theme'>('profile');
+  const [uploadingBackground, setUploadingBackground] = useState(false);
 
   const [telefone, setTelefone] = useState(usuario?.telefone || '');
   const [ramal, setRamal] = useState(usuario?.ramal || '');
@@ -95,6 +96,65 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
       setPwMsg({ type: 'error', text: err.message || 'Erro ao alterar senha' });
     } finally {
       setChangingPw(false);
+    }
+  };
+
+  const handleUploadBackground = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione uma imagem válida');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Imagem muito grande! Máximo 10MB');
+      return;
+    }
+
+    setUploadingBackground(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${usuario?.id}/background-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('user-backgrounds')
+        .upload(fileName, file, { upsert: true });
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('user-backgrounds')
+        .getPublicUrl(fileName);
+
+      await supabase
+        .from('usuarios')
+        .update({ background_url: publicUrl })
+        .eq('id', usuario.id);
+
+      setCustomBackground(publicUrl);
+      alert('Plano de fundo atualizado com sucesso!');
+    } catch (error: any) {
+      alert(`Erro ao fazer upload: ${error.message}`);
+    } finally {
+      setUploadingBackground(false);
+    }
+  };
+
+  const handleRemoveBackground = async () => {
+    if (!confirm('Deseja remover o plano de fundo personalizado?')) return;
+
+    try {
+      await supabase
+        .from('usuarios')
+        .update({ background_url: null })
+        .eq('id', usuario.id);
+
+      setCustomBackground(null);
+      alert('Plano de fundo removido com sucesso!');
+    } catch (error: any) {
+      alert(`Erro ao remover plano de fundo: ${error.message}`);
     }
   };
 
@@ -310,68 +370,134 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           )}
 
           {activeTab === 'theme' && (
-            <div className="space-y-3">
-              <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
-                Escolha o tema visual da interface
-              </p>
-              <div className="space-y-3">
-                {THEMES.map((t, idx) => {
-                  const active = theme === t.id;
-                  const isFirst = idx === 0;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setTheme(t.id as ThemeVariant)}
-                      className={`relative rounded-xl border-2 transition-all duration-300 text-left group ${isFirst ? 'w-full p-3 flex items-center gap-4' : 'inline-block w-[calc(50%-6px)] p-3 align-top'} ${idx === 1 || idx === 3 ? 'mr-3' : ''}`}
-                      style={{
-                        background: t.bg,
-                        borderColor: active ? t.accent : t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
-                        boxShadow: active ? `0 0 20px ${t.accent}30, 0 0 40px ${t.accent}15` : 'none',
-                      }}
-                    >
-                      {active && (
-                        <div
-                          className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
-                          style={{ background: t.accent }}
-                        >
-                          <Check className="w-3 h-3" style={{ color: t.isDark ? '#000' : '#fff' }} />
-                        </div>
-                      )}
-                      {isFirst ? (
-                        <>
-                          <div className="flex items-center gap-2">
-                            <div className="w-5 h-5 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
-                            <div className="w-5 h-5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
+            <div className="space-y-6">
+              <div>
+                <p className="text-sm mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  Escolha o tema visual da interface
+                </p>
+                <div className="space-y-3">
+                  {THEMES.map((t, idx) => {
+                    const active = theme === t.id;
+                    const isFirst = idx === 0;
+                    return (
+                      <button
+                        key={t.id}
+                        onClick={() => setTheme(t.id as ThemeVariant)}
+                        className={`relative rounded-xl border-2 transition-all duration-300 text-left group ${isFirst ? 'w-full p-3 flex items-center gap-4' : 'inline-block w-[calc(50%-6px)] p-3 align-top'} ${idx === 1 || idx === 3 ? 'mr-3' : ''}`}
+                        style={{
+                          background: t.bg,
+                          borderColor: active ? t.accent : t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)',
+                          boxShadow: active ? `0 0 20px ${t.accent}30, 0 0 40px ${t.accent}15` : 'none',
+                        }}
+                      >
+                        {active && (
+                          <div
+                            className="absolute top-2 right-2 w-5 h-5 rounded-full flex items-center justify-center"
+                            style={{ background: t.accent }}
+                          >
+                            <Check className="w-3 h-3" style={{ color: t.isDark ? '#000' : '#fff' }} />
                           </div>
-                          <div className="flex-1">
-                            <div className="flex gap-1.5 mb-1.5">
-                              <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
-                              <div className="w-4 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                        )}
+                        {isFirst ? (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <div className="w-5 h-5 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
+                              <div className="w-5 h-5 rounded-full" style={{ background: 'rgba(255,255,255,0.1)' }} />
                             </div>
-                            <div className="h-1 rounded-full w-3/4" style={{ background: 'rgba(255,255,255,0.2)' }} />
-                          </div>
-                          <p className="text-xs font-semibold tracking-wide" style={{ color: '#ccc' }}>{t.label}</p>
-                        </>
-                      ) : (
-                        <>
-                          <div className="flex items-center gap-2 mb-2">
-                            <div className="w-4 h-4 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
-                            <div className="w-4 h-4 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
-                          </div>
-                          <div className="flex gap-1.5 mb-2">
-                            <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
-                            <div className="w-4 h-1.5 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }} />
-                          </div>
-                          <div className="space-y-1">
-                            <div className="h-1 rounded-full w-3/4" style={{ background: t.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }} />
-                            <div className="h-1 rounded-full w-1/2" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
-                          </div>
-                          <p className="text-xs font-semibold mt-2 tracking-wide" style={{ color: t.isDark ? '#ccc' : '#444' }}>{t.label}</p>
-                        </>
-                      )}
+                            <div className="flex-1">
+                              <div className="flex gap-1.5 mb-1.5">
+                                <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
+                                <div className="w-4 h-1.5 rounded-full" style={{ background: 'rgba(255,255,255,0.15)' }} />
+                              </div>
+                              <div className="h-1 rounded-full w-3/4" style={{ background: 'rgba(255,255,255,0.2)' }} />
+                            </div>
+                            <p className="text-xs font-semibold tracking-wide" style={{ color: '#ccc' }}>{t.label}</p>
+                          </>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-4 h-4 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}60` }} />
+                              <div className="w-4 h-4 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.08)' }} />
+                            </div>
+                            <div className="flex gap-1.5 mb-2">
+                              <div className="flex-1 h-1.5 rounded-full" style={{ background: t.accent, opacity: 0.8 }} />
+                              <div className="w-4 h-1.5 rounded-full" style={{ background: t.isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.08)' }} />
+                            </div>
+                            <div className="space-y-1">
+                              <div className="h-1 rounded-full w-3/4" style={{ background: t.isDark ? 'rgba(255,255,255,0.2)' : 'rgba(0,0,0,0.12)' }} />
+                              <div className="h-1 rounded-full w-1/2" style={{ background: t.isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.06)' }} />
+                            </div>
+                            <p className="text-xs font-semibold mt-2 tracking-wide" style={{ color: t.isDark ? '#ccc' : '#444' }}>{t.label}</p>
+                          </>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="pt-6 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Upload className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+                  <h3 className="font-bold uppercase tracking-wider" style={{ color: 'var(--text-accent)' }}>
+                    Plano de Fundo Personalizado
+                  </h3>
+                </div>
+                <p className="text-xs mb-4" style={{ color: 'var(--text-secondary)' }}>
+                  Faça upload de uma imagem para usar como plano de fundo. A imagem será ajustada automaticamente para cobrir toda a tela.
+                </p>
+
+                {customBackground && (
+                  <div className="mb-4 relative group">
+                    <div className="aspect-video rounded-xl overflow-hidden border-2" style={{ borderColor: 'var(--border-accent)' }}>
+                      <img
+                        src={customBackground}
+                        alt="Background atual"
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                    <button
+                      onClick={handleRemoveBackground}
+                      className="absolute top-2 right-2 p-2 rounded-lg bg-red-500/90 hover:bg-red-600 transition-colors opacity-0 group-hover:opacity-100"
+                      title="Remover plano de fundo"
+                    >
+                      <Trash className="w-4 h-4 text-white" />
                     </button>
-                  );
-                })}
+                  </div>
+                )}
+
+                <label className="block">
+                  <div
+                    className="w-full py-3 rounded-lg font-semibold text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    style={{
+                      background: uploadingBackground ? 'var(--bg-hover)' : 'var(--text-accent)',
+                      color: uploadingBackground ? 'var(--text-accent)' : 'var(--text-on-accent)',
+                      opacity: uploadingBackground ? 0.5 : 1
+                    }}
+                  >
+                    {uploadingBackground ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Fazendo upload...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-4 h-4" />
+                        {customBackground ? 'Trocar Plano de Fundo' : 'Adicionar Plano de Fundo'}
+                      </>
+                    )}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleUploadBackground}
+                    className="hidden"
+                    disabled={uploadingBackground}
+                  />
+                </label>
+                <p className="text-[10px] mt-2 text-center" style={{ color: 'var(--text-secondary)' }}>
+                  Formatos aceitos: JPG, PNG, GIF. Tamanho máximo: 10MB
+                </p>
               </div>
             </div>
           )}
