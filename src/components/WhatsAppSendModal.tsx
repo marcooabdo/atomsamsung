@@ -70,6 +70,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
   const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [generatingLink, setGeneratingLink] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [loadingLink, setLoadingLink] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -80,17 +81,19 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
         loadExistingLink();
       }
     }
-  }, [isOpen]);
+  }, [isOpen, osData?.id]);
 
   const loadExistingLink = async () => {
     if (!osData?.id) return;
 
+    setLoadingLink(true);
     try {
       const { data } = await supabase
         .from('orcamento_links')
-        .select('token, expires_at')
+        .select('token, expires_at, status')
         .eq('os_id', osData.id)
         .eq('ativo', true)
+        .order('created_at', { ascending: false })
         .maybeSingle();
 
       if (data?.token) {
@@ -102,9 +105,16 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
         const baseUrl = window.location.origin;
         setOrcamentoLink(`${baseUrl}/orcamento/${data.token}`);
         setLinkExpiresAt(data.expires_at);
+      } else {
+        setOrcamentoLink(null);
+        setLinkExpiresAt(null);
       }
     } catch (err) {
       console.error('Erro ao carregar link:', err);
+      setOrcamentoLink(null);
+      setLinkExpiresAt(null);
+    } finally {
+      setLoadingLink(false);
     }
   };
 
@@ -134,6 +144,8 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
           comentario: `🔗 Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente\nValido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
           is_system: false
         });
+
+        await loadExistingLink();
       }
     } catch (err: any) {
       alert(`Erro ao gerar link: ${err.message}`);
@@ -324,14 +336,28 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                 <span className="text-sm font-bold text-blue-300">Link de Aprovação do Orçamento</span>
               </div>
 
-              {orcamentoLink ? (
-                <div className="space-y-2">
+              {loadingLink ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-400" />
+                  <span className="ml-2 text-sm text-gray-400">Carregando link...</span>
+                </div>
+              ) : orcamentoLink ? (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{
+                    background: 'rgba(16,185,129,0.1)',
+                    border: '1px solid rgba(16,185,129,0.3)'
+                  }}>
+                    <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
+                    <span className="text-xs text-green-400 font-medium">Link ativo e valido</span>
+                  </div>
+
                   <div className="flex gap-2">
                     <input
                       type="text"
                       value={orcamentoLink}
                       readOnly
                       className="flex-1 px-3 py-2 rounded-lg bg-gray-900/50 text-gray-300 text-xs border border-gray-700 font-mono"
+                      onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <button
                       onClick={handleCopyLink}
@@ -354,20 +380,8 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                         </>
                       )}
                     </button>
-                    <button
-                      onClick={() => handleGenerateLink(true)}
-                      disabled={generatingLink}
-                      className="px-3 py-2 rounded-lg transition-all"
-                      style={{
-                        background: 'rgba(245,158,11,0.2)',
-                        border: '1px solid rgba(245,158,11,0.4)',
-                        color: '#f59e0b'
-                      }}
-                      title="Refazer link (invalida o anterior e cria novo com 72h)"
-                    >
-                      <RefreshCw className={`w-4 h-4 ${generatingLink ? 'animate-spin' : ''}`} />
-                    </button>
                   </div>
+
                   {linkExpiresAt && (
                     <div className="flex items-center gap-2 text-xs">
                       <Clock className="w-3 h-3 text-amber-400" />
@@ -376,8 +390,29 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                       </span>
                     </div>
                   )}
+
+                  <div className="pt-2 border-t border-blue-600/20">
+                    <button
+                      onClick={() => {
+                        if (confirm('Isto ira INVALIDAR o link atual e gerar um NOVO link. O link antigo nao funcionara mais. Deseja continuar?')) {
+                          handleGenerateLink(true);
+                        }
+                      }}
+                      disabled={generatingLink}
+                      className="w-full py-2 rounded-lg transition-all flex items-center justify-center gap-2 text-xs"
+                      style={{
+                        background: 'rgba(245,158,11,0.15)',
+                        border: '1px solid rgba(245,158,11,0.4)',
+                        color: '#f59e0b'
+                      }}
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${generatingLink ? 'animate-spin' : ''}`} />
+                      <span className="font-medium">Gerar Novo Link (invalida o anterior)</span>
+                    </button>
+                  </div>
+
                   <p className="text-xs text-blue-400">
-                    Envie este link para o cliente aprovar, rejeitar ou negociar o orcamento. Use o botao de refazer se o orcamento mudar.
+                    Este link permanece valido por 72 horas. O cliente pode aprovar, rejeitar ou negociar o orcamento. Gere um novo link apenas se o orcamento foi alterado.
                   </p>
                 </div>
               ) : (
