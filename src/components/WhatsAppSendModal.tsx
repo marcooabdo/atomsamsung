@@ -67,6 +67,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
   const [showLogs, setShowLogs] = useState(false);
   const [error, setError] = useState('');
   const [orcamentoLink, setOrcamentoLink] = useState<string | null>(null);
+  const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
   const [generatingLink, setGeneratingLink] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
@@ -87,26 +88,33 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
     try {
       const { data } = await supabase
         .from('orcamento_links')
-        .select('token')
+        .select('token, expires_at')
         .eq('os_id', osData.id)
         .eq('ativo', true)
         .maybeSingle();
 
       if (data?.token) {
+        if (data.expires_at && new Date(data.expires_at) < new Date()) {
+          setOrcamentoLink(null);
+          setLinkExpiresAt(null);
+          return;
+        }
         const baseUrl = window.location.origin;
         setOrcamentoLink(`${baseUrl}/orcamento/${data.token}`);
+        setLinkExpiresAt(data.expires_at);
       }
     } catch (err) {
       console.error('Erro ao carregar link:', err);
     }
   };
 
-  const handleGenerateLink = async () => {
+  const handleGenerateLink = async (forceNew = false) => {
     if (!osData?.id) return;
 
     setGeneratingLink(true);
     try {
-      const { data, error } = await supabase.rpc('upsert_orcamento_link', {
+      const rpcName = forceNew ? 'regenerate_orcamento_link' : 'upsert_orcamento_link';
+      const { data, error } = await supabase.rpc(rpcName, {
         p_os_id: osData.id
       });
 
@@ -114,9 +122,18 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
 
       if (data && data.length > 0) {
         const token = data[0].token;
+        const expiresAt = data[0].expires_at;
         const baseUrl = window.location.origin;
         const link = `${baseUrl}/orcamento/${token}`;
         setOrcamentoLink(link);
+        setLinkExpiresAt(expiresAt);
+
+        await supabase.from('os_comentarios').insert({
+          os_id: osData.id,
+          usuario_id: usuario?.id,
+          comentario: `🔗 Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente\nValido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
+          is_system: false
+        });
       }
     } catch (err: any) {
       alert(`Erro ao gerar link: ${err.message}`);
@@ -338,7 +355,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                       )}
                     </button>
                     <button
-                      onClick={handleGenerateLink}
+                      onClick={() => handleGenerateLink(true)}
                       disabled={generatingLink}
                       className="px-3 py-2 rounded-lg transition-all"
                       style={{
@@ -346,18 +363,26 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                         border: '1px solid rgba(245,158,11,0.4)',
                         color: '#f59e0b'
                       }}
-                      title="Atualizar link"
+                      title="Refazer link (invalida o anterior e cria novo com 72h)"
                     >
                       <RefreshCw className={`w-4 h-4 ${generatingLink ? 'animate-spin' : ''}`} />
                     </button>
                   </div>
+                  {linkExpiresAt && (
+                    <div className="flex items-center gap-2 text-xs">
+                      <Clock className="w-3 h-3 text-amber-400" />
+                      <span className="text-amber-400">
+                        Valido ate: {new Date(linkExpiresAt).toLocaleString('pt-BR')}
+                      </span>
+                    </div>
+                  )}
                   <p className="text-xs text-blue-400">
-                    Envie este link para o cliente aprovar, rejeitar ou negociar o orçamento diretamente online.
+                    Envie este link para o cliente aprovar, rejeitar ou negociar o orcamento. Use o botao de refazer se o orcamento mudar.
                   </p>
                 </div>
               ) : (
                 <button
-                  onClick={handleGenerateLink}
+                  onClick={() => handleGenerateLink(false)}
                   disabled={generatingLink}
                   className="w-full py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
                   style={{

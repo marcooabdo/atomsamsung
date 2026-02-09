@@ -525,7 +525,66 @@ Assistencia Tecnica Samsung`;
             </button>
           </div>
 
-          {os.orcamento_aprovado_em && (
+          {os.status_orcamento_link && os.status_orcamento_link !== 'pendente' && (
+            <div className={`mb-3 p-4 rounded-lg border ${
+              os.status_orcamento_link === 'aprovado'
+                ? 'bg-[#39FF14]/10 border-[#39FF14]/40'
+                : os.status_orcamento_link === 'rejeitado'
+                ? 'bg-[#FF0064]/10 border-[#FF0064]/40'
+                : 'bg-[#F59E0B]/10 border-[#F59E0B]/40'
+            }`}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                  os.status_orcamento_link === 'aprovado'
+                    ? 'bg-[#39FF14]/20'
+                    : os.status_orcamento_link === 'rejeitado'
+                    ? 'bg-[#FF0064]/20'
+                    : 'bg-[#F59E0B]/20'
+                }`}>
+                  {os.status_orcamento_link === 'aprovado' ? (
+                    <ThumbsUp className="w-4 h-4 text-[#39FF14]" />
+                  ) : os.status_orcamento_link === 'rejeitado' ? (
+                    <ThumbsDown className="w-4 h-4 text-[#FF0064]" />
+                  ) : (
+                    <MessageSquare className="w-4 h-4 text-[#F59E0B]" />
+                  )}
+                </div>
+                <div>
+                  <p className={`text-sm font-bold uppercase ${
+                    os.status_orcamento_link === 'aprovado'
+                      ? 'text-[#39FF14]'
+                      : os.status_orcamento_link === 'rejeitado'
+                      ? 'text-[#FF0064]'
+                      : 'text-[#F59E0B]'
+                  }`}>
+                    {os.status_orcamento_link === 'aprovado'
+                      ? 'CLIENTE APROVOU VIA LINK'
+                      : os.status_orcamento_link === 'rejeitado'
+                      ? 'CLIENTE REJEITOU VIA LINK'
+                      : 'CLIENTE QUER NEGOCIAR'}
+                  </p>
+                  {os.orcamento_aprovado_em && os.status_orcamento_link === 'aprovado' && (
+                    <p className="text-xs text-gray-400">
+                      Aprovado em {new Date(os.orcamento_aprovado_em).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                  {os.orcamento_reprovado_em && os.status_orcamento_link === 'rejeitado' && (
+                    <p className="text-xs text-gray-400">
+                      Rejeitado em {new Date(os.orcamento_reprovado_em).toLocaleString('pt-BR')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              {os.mensagem_cliente_orcamento && (
+                <div className="mt-3 p-3 rounded-lg bg-black/20 border border-gray-700">
+                  <p className="text-xs text-gray-400 uppercase font-semibold mb-1">Mensagem do Cliente:</p>
+                  <p className="text-sm text-white italic">"{os.mensagem_cliente_orcamento}"</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {os.orcamento_aprovado_em && !os.status_orcamento_link && (
             <div className="mb-3 p-3 rounded-lg bg-[#39FF14]/10 border border-[#39FF14]/30">
               <p className="text-xs text-[#39FF14]">
                 <ThumbsUp className="w-3 h-3 inline mr-1" />
@@ -534,7 +593,7 @@ Assistencia Tecnica Samsung`;
             </div>
           )}
 
-          {os.orcamento_reprovado_em && (
+          {os.orcamento_reprovado_em && !os.status_orcamento_link && (
             <div className="p-3 rounded-lg bg-[#FF0064]/10 border border-[#FF0064]/30">
               <p className="text-xs text-[#FF0064]">
                 <ThumbsDown className="w-3 h-3 inline mr-1" />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench, AlertCircle, Camera, FileText, User, Cpu, Calendar } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface OrcamentoData {
@@ -8,15 +8,27 @@ interface OrcamentoData {
     id: string;
     status: 'pendente' | 'aprovado' | 'rejeitado' | 'negociando';
     data_resposta: string | null;
+    expires_at: string | null;
   };
   os: {
     numero_os_interna: string;
     cliente_nome: string;
     cliente_telefone: string;
+    cliente_cpf_cnpj?: string;
+    cliente_endereco?: string;
+    cliente_logradouro?: string;
+    cliente_numero?: string;
+    cliente_bairro?: string;
+    cliente_cidade?: string;
+    cliente_estado?: string;
+    cliente_cep?: string;
     aparelho_marca: string;
     aparelho_modelo: string;
+    aparelho_numero_serie?: string;
+    aparelho_imei?: string;
     defeito_relatado: string;
     diagnostico_tecnico: string;
+    reparo_efetuado?: string;
     data_abertura: string;
     unidade: {
       nome: string;
@@ -24,7 +36,9 @@ interface OrcamentoData {
       endereco: string;
       cidade: string;
       uf: string;
-    };
+      cnpj?: string;
+      logo_url?: string;
+    } | null;
     cotacao: {
       id: string;
       valor_pecas: number;
@@ -54,8 +68,6 @@ interface OrcamentoData {
 
 export function OrcamentoPublico() {
   const { token } = useParams<{ token: string }>();
-  const navigate = useNavigate();
-
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<OrcamentoData | null>(null);
   const [error, setError] = useState('');
@@ -72,7 +84,7 @@ export function OrcamentoPublico() {
 
   useEffect(() => {
     if (!token) {
-      setError('Token inválido');
+      setError('Token invalido');
       setLoading(false);
       return;
     }
@@ -90,7 +102,7 @@ export function OrcamentoPublico() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao carregar orçamento');
+        throw new Error(errorData.error || 'Erro ao carregar orcamento');
       }
 
       const result = await response.json();
@@ -112,19 +124,18 @@ export function OrcamentoPublico() {
 
     setCapturandoLocalizacao(true);
     try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
+      await new Promise<GeolocationPosition>((resolve, reject) => {
         navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 10000,
           maximumAge: 0
         });
       });
-
       setCapturandoLocalizacao(false);
       abrirCamera();
-    } catch (err: any) {
+    } catch {
       setCapturandoLocalizacao(false);
-      if (confirm('Não foi possível obter sua localização. Deseja continuar mesmo assim?')) {
+      if (confirm('Nao foi possivel obter sua localizacao. Deseja continuar mesmo assim?')) {
         abrirCamera();
       }
     }
@@ -144,8 +155,8 @@ export function OrcamentoPublico() {
         videoRef.current.srcObject = mediaStream;
         videoRef.current.play();
       }
-    } catch (err: any) {
-      alert('Não foi possível acessar a câmera. Por favor, permita o acesso à câmera.');
+    } catch {
+      alert('Nao foi possivel acessar a camera. Por favor, permita o acesso a camera.');
     }
   };
 
@@ -197,8 +208,8 @@ export function OrcamentoPublico() {
         );
         const geoData = await geoResponse.json();
         enderecoCompleto = geoData.display_name || null;
-      } catch (err) {
-        console.error('Erro ao obter localização:', err);
+      } catch {
+        console.error('Erro ao obter localizacao');
       }
 
       let selfieUrl: string | null = null;
@@ -266,10 +277,10 @@ export function OrcamentoPublico() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center">
+      <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin mx-auto mb-4" />
-          <p className="text-gray-300">Carregando orçamento...</p>
+          <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
+          <p className="text-gray-600">Carregando orcamento...</p>
         </div>
       </div>
     );
@@ -279,19 +290,19 @@ export function OrcamentoPublico() {
     const isExpired = error?.toLowerCase().includes('expirado') || error?.toLowerCase().includes('expirou');
 
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800 border border-red-500/30 rounded-xl p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center border border-gray-200">
           <AlertCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">
-            {isExpired ? 'Link Expirado' : 'Link Inválido'}
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">
+            {isExpired ? 'Link Expirado' : 'Link Invalido'}
           </h1>
-          <p className="text-gray-400 mb-4">
-            {error || 'O link de orçamento não foi encontrado ou expirou.'}
+          <p className="text-gray-600 mb-4">
+            {error || 'O link de orcamento nao foi encontrado ou expirou.'}
           </p>
           {isExpired && (
-            <div className="mt-4 p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-              <p className="text-sm text-yellow-300">
-                Este link tinha validade de 72 horas e já expirou. Por favor, entre em contato com a assistência técnica para solicitar um novo link.
+            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <p className="text-sm text-yellow-700">
+                Este link tinha validade de 72 horas e ja expirou. Por favor, entre em contato com a assistencia tecnica para solicitar um novo link.
               </p>
             </div>
           )}
@@ -305,141 +316,224 @@ export function OrcamentoPublico() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 flex items-center justify-center p-4">
-        <div className="bg-gray-800 border border-green-500/30 rounded-xl p-8 max-w-md w-full text-center">
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md w-full text-center border border-green-200">
           <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Resposta Enviada!</h1>
-          <p className="text-gray-400 mb-6">
-            {selectedAction === 'aprovado' && 'Obrigado por aprovar o orçamento! Em breve entraremos em contato.'}
-            {selectedAction === 'rejeitado' && 'Recebemos sua rejeição. Entraremos em contato para entender melhor.'}
+          <h1 className="text-2xl font-bold text-gray-800 mb-2">Resposta Enviada!</h1>
+          <p className="text-gray-600 mb-6">
+            {selectedAction === 'aprovado' && 'Obrigado por aprovar o orcamento! Em breve entraremos em contato.'}
+            {selectedAction === 'rejeitado' && 'Recebemos sua rejeicao. Entraremos em contato para entender melhor.'}
             {selectedAction === 'negociando' && 'Recebemos sua mensagem. Vamos analisar e retornar em breve.'}
           </p>
-          <p className="text-sm text-gray-500">Você pode fechar esta página.</p>
+          <p className="text-sm text-gray-500">Voce pode fechar esta pagina.</p>
         </div>
       </div>
     );
   }
 
+  const clienteEndereco = os.cliente_logradouro
+    ? `${os.cliente_logradouro}${os.cliente_numero ? `, ${os.cliente_numero}` : ''}${os.cliente_bairro ? ` - ${os.cliente_bairro}` : ''}${os.cliente_cidade ? `, ${os.cliente_cidade}` : ''}${os.cliente_estado ? `/${os.cliente_estado}` : ''}${os.cliente_cep ? ` - ${os.cliente_cep}` : ''}`
+    : os.cliente_endereco || '';
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 p-4 md:p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-gray-800 border border-blue-500/30 rounded-xl overflow-hidden shadow-2xl">
-          <div className="bg-gradient-to-r from-blue-600 to-cyan-600 p-6">
-            <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">Orçamento de Reparo</h1>
-            <p className="text-blue-100">OS #{os.numero_os_interna}</p>
+    <div className="min-h-screen bg-gray-100 py-4 px-2 sm:py-8 sm:px-4">
+      <div className="max-w-3xl mx-auto">
+        <div className="bg-white rounded-lg shadow-lg overflow-hidden border border-gray-200">
+          <div className="bg-gradient-to-r from-blue-600 to-blue-800 p-4 sm:p-6 text-white">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-xl sm:text-2xl font-bold">ORCAMENTO DE SERVICO</h1>
+                <p className="text-blue-200 text-sm mt-1">Ordem de Servico #{os.numero_os_interna}</p>
+              </div>
+              {os.unidade?.logo_url && (
+                <img src={os.unidade.logo_url} alt="Logo" className="h-12 sm:h-16 object-contain" />
+              )}
+            </div>
+            {os.unidade && (
+              <div className="mt-4 pt-4 border-t border-blue-400/30 text-xs sm:text-sm">
+                <p className="font-semibold">{os.unidade.nome}</p>
+                <p className="text-blue-200">{os.unidade.endereco}, {os.unidade.cidade} - {os.unidade.uf}</p>
+                <p className="text-blue-200">Tel: {os.unidade.telefone}</p>
+              </div>
+            )}
           </div>
 
-          <div className="p-6 space-y-6">
-            <div className="grid md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Cliente</h3>
-                  <p className="text-lg text-white font-semibold">{os.cliente_nome}</p>
-                  <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
-                    <Phone className="w-4 h-4" />
-                    {os.cliente_telefone}
-                  </p>
+          <div className="p-4 sm:p-6 space-y-6">
+            <div className="grid sm:grid-cols-2 gap-4 sm:gap-6">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                  <User className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-gray-800 text-sm uppercase">Dados do Cliente</h3>
                 </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Equipamento</h3>
-                  <p className="text-lg text-white">{os.aparelho_marca} {os.aparelho_modelo}</p>
-                </div>
-
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Defeito Relatado</h3>
-                  <p className="text-sm text-gray-300">{os.defeito_relatado}</p>
-                </div>
-
-                {os.diagnostico_tecnico && (
+                <div className="space-y-2 text-sm">
                   <div>
-                    <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Diagnóstico Técnico</h3>
-                    <p className="text-sm text-gray-300">{os.diagnostico_tecnico}</p>
+                    <span className="text-gray-500">Nome:</span>
+                    <span className="ml-2 text-gray-800 font-medium">{os.cliente_nome}</span>
                   </div>
-                )}
+                  {os.cliente_cpf_cnpj && (
+                    <div>
+                      <span className="text-gray-500">CPF/CNPJ:</span>
+                      <span className="ml-2 text-gray-800">{os.cliente_cpf_cnpj}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Phone className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-gray-500">Tel:</span>
+                    <span className="ml-1 text-gray-800">{os.cliente_telefone}</span>
+                  </div>
+                  {clienteEndereco && (
+                    <div className="flex items-start gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-800 text-xs">{clienteEndereco}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <h3 className="text-sm font-bold text-gray-400 uppercase mb-2">Unidade</h3>
-                  <p className="text-lg text-white font-semibold">{os.unidade.nome}</p>
-                  <p className="text-sm text-gray-400 flex items-center gap-2 mt-1">
-                    <Phone className="w-4 h-4" />
-                    {os.unidade.telefone}
-                  </p>
-                  <p className="text-sm text-gray-400 flex items-start gap-2 mt-1">
-                    <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" />
-                    <span>{os.unidade.endereco}, {os.unidade.cidade} - {os.unidade.uf}</span>
-                  </p>
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                  <Cpu className="w-5 h-5 text-blue-600" />
+                  <h3 className="font-bold text-gray-800 text-sm uppercase">Equipamento</h3>
+                </div>
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <span className="text-gray-500">Marca/Modelo:</span>
+                    <span className="ml-2 text-gray-800 font-medium">{os.aparelho_marca} {os.aparelho_modelo}</span>
+                  </div>
+                  {os.aparelho_numero_serie && (
+                    <div>
+                      <span className="text-gray-500">N/S:</span>
+                      <span className="ml-2 text-gray-800 font-mono text-xs">{os.aparelho_numero_serie}</span>
+                    </div>
+                  )}
+                  {os.aparelho_imei && (
+                    <div>
+                      <span className="text-gray-500">IMEI:</span>
+                      <span className="ml-2 text-gray-800 font-mono text-xs">{os.aparelho_imei}</span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-1">
+                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                    <span className="text-gray-500">Data:</span>
+                    <span className="ml-1 text-gray-800">{new Date(os.data_abertura).toLocaleDateString('pt-BR')}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
+            <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+              <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
+                <FileText className="w-5 h-5 text-blue-600" />
+                <h3 className="font-bold text-gray-800 text-sm uppercase">Defeito e Diagnostico</h3>
+              </div>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <p className="text-gray-500 font-medium mb-1">Defeito Relatado:</p>
+                  <p className="text-gray-800 bg-white p-2 rounded border border-gray-100">{os.defeito_relatado || 'Nao informado'}</p>
+                </div>
+                {os.diagnostico_tecnico && (
+                  <div>
+                    <p className="text-gray-500 font-medium mb-1">Diagnostico Tecnico:</p>
+                    <p className="text-gray-800 bg-white p-2 rounded border border-gray-100">{os.diagnostico_tecnico}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {os.cotacao && (
-              <div className="border-t border-gray-700 pt-6">
-                <h3 className="text-xl font-bold text-white mb-4">Detalhes do Orçamento</h3>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-blue-600 text-white px-4 py-2 flex items-center gap-2">
+                  <Package className="w-5 h-5" />
+                  <h3 className="font-bold text-sm uppercase">Detalhes do Orcamento</h3>
+                </div>
 
                 {os.cotacao.cotacoes_pecas && os.cotacao.cotacoes_pecas.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
-                      <Package className="w-4 h-4" />
-                      Peças
+                  <div className="p-4 border-b border-gray-200">
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                      <Package className="w-4 h-4 text-blue-600" />
+                      Pecas
                     </h4>
-                    <div className="space-y-2">
-                      {os.cotacao.cotacoes_pecas.map((peca) => (
-                        <div key={peca.id} className="bg-gray-900/50 rounded-lg p-3 flex justify-between items-center">
-                          <div className="flex-1">
-                            <p className="text-white font-medium">{peca.descricao}</p>
-                            <p className="text-xs text-gray-500">Código: {peca.codigo} | Qtd: {peca.quantidade}</p>
-                          </div>
-                          <p className="text-cyan-400 font-bold">R$ {peca.valor_total.toFixed(2)}</p>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-gray-600 font-semibold">Descricao</th>
+                            <th className="text-center px-3 py-2 text-gray-600 font-semibold w-16">Qtd</th>
+                            <th className="text-right px-3 py-2 text-gray-600 font-semibold w-24">Unit.</th>
+                            <th className="text-right px-3 py-2 text-gray-600 font-semibold w-24">Total</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {os.cotacao.cotacoes_pecas.map((peca, idx) => (
+                            <tr key={peca.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-2 text-gray-800">
+                                <div className="font-medium">{peca.descricao}</div>
+                                <div className="text-xs text-gray-500">Cod: {peca.codigo}</div>
+                              </td>
+                              <td className="px-3 py-2 text-center text-gray-800">{peca.quantidade}</td>
+                              <td className="px-3 py-2 text-right text-gray-800">R$ {peca.valor_final_unitario.toFixed(2)}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-gray-800">R$ {peca.valor_total.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
 
                 {os.cotacao.cotacoes_servicos && os.cotacao.cotacoes_servicos.length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="text-sm font-bold text-gray-400 uppercase mb-3 flex items-center gap-2">
-                      <Wrench className="w-4 h-4" />
-                      Serviços
+                  <div className="p-4 border-b border-gray-200">
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-3 flex items-center gap-2">
+                      <Wrench className="w-4 h-4 text-blue-600" />
+                      Servicos
                     </h4>
-                    <div className="space-y-2">
-                      {os.cotacao.cotacoes_servicos.map((servico) => (
-                        <div key={servico.id} className="bg-gray-900/50 rounded-lg p-3 flex justify-between items-center">
-                          <div className="flex-1">
-                            <p className="text-white font-medium">{servico.nome}</p>
-                            {servico.descricao && (
-                              <p className="text-xs text-gray-500">{servico.descricao}</p>
-                            )}
-                          </div>
-                          <p className="text-cyan-400 font-bold">R$ {servico.valor_total.toFixed(2)}</p>
-                        </div>
-                      ))}
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead className="bg-gray-100">
+                          <tr>
+                            <th className="text-left px-3 py-2 text-gray-600 font-semibold">Descricao</th>
+                            <th className="text-center px-3 py-2 text-gray-600 font-semibold w-16">Qtd</th>
+                            <th className="text-right px-3 py-2 text-gray-600 font-semibold w-24">Valor</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {os.cotacao.cotacoes_servicos.map((servico, idx) => (
+                            <tr key={servico.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-3 py-2 text-gray-800">
+                                <div className="font-medium">{servico.nome}</div>
+                                {servico.descricao && (
+                                  <div className="text-xs text-gray-500">{servico.descricao}</div>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-center text-gray-800">{servico.quantidade}</td>
+                              <td className="px-3 py-2 text-right font-semibold text-gray-800">R$ {servico.valor_total.toFixed(2)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
                   </div>
                 )}
 
-                <div className="bg-gradient-to-r from-blue-900/50 to-cyan-900/50 rounded-lg p-4 border border-blue-500/30">
-                  <div className="space-y-2">
+                <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4">
+                  <div className="max-w-xs ml-auto space-y-2">
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Peças:</span>
-                      <span className="text-white">R$ {os.cotacao.valor_pecas.toFixed(2)}</span>
+                      <span className="text-gray-600">Pecas:</span>
+                      <span className="font-medium text-gray-800">R$ {os.cotacao.valor_pecas.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-sm">
-                      <span className="text-gray-400">Serviços:</span>
-                      <span className="text-white">R$ {os.cotacao.valor_servicos.toFixed(2)}</span>
+                      <span className="text-gray-600">Servicos:</span>
+                      <span className="font-medium text-gray-800">R$ {os.cotacao.valor_servicos.toFixed(2)}</span>
                     </div>
                     {os.cotacao.desconto_valor > 0 && (
-                      <div className="flex justify-between text-sm text-green-400">
+                      <div className="flex justify-between text-sm text-green-600">
                         <span>Desconto:</span>
-                        <span>- R$ {os.cotacao.desconto_valor.toFixed(2)}</span>
+                        <span className="font-medium">- R$ {os.cotacao.desconto_valor.toFixed(2)}</span>
                       </div>
                     )}
-                    <div className="border-t border-blue-500/30 pt-2 mt-2 flex justify-between">
-                      <span className="text-lg font-bold text-white">TOTAL:</span>
-                      <span className="text-2xl font-bold text-cyan-400">
+                    <div className="flex justify-between pt-2 border-t border-blue-200">
+                      <span className="text-lg font-bold text-gray-800">TOTAL:</span>
+                      <span className="text-xl font-bold text-blue-600">
                         R$ {os.cotacao.valor_liquido.toFixed(2)}
                       </span>
                     </div>
@@ -449,27 +543,27 @@ export function OrcamentoPublico() {
             )}
 
             {jaRespondido ? (
-              <div className="border-t border-gray-700 pt-6">
-                <div className={`p-4 rounded-lg border ${
-                  link.status === 'aprovado' ? 'bg-green-500/10 border-green-500/30' :
-                  link.status === 'rejeitado' ? 'bg-red-500/10 border-red-500/30' :
-                  'bg-yellow-500/10 border-yellow-500/30'
+              <div className="border-t border-gray-200 pt-6">
+                <div className={`p-4 rounded-lg border-2 ${
+                  link.status === 'aprovado' ? 'bg-green-50 border-green-400' :
+                  link.status === 'rejeitado' ? 'bg-red-50 border-red-400' :
+                  'bg-yellow-50 border-yellow-400'
                 }`}>
                   <div className="flex items-center gap-3">
-                    {link.status === 'aprovado' && <CheckCircle className="w-6 h-6 text-green-500" />}
-                    {link.status === 'rejeitado' && <XCircle className="w-6 h-6 text-red-500" />}
-                    {link.status === 'negociando' && <MessageCircle className="w-6 h-6 text-yellow-500" />}
+                    {link.status === 'aprovado' && <CheckCircle className="w-8 h-8 text-green-500" />}
+                    {link.status === 'rejeitado' && <XCircle className="w-8 h-8 text-red-500" />}
+                    {link.status === 'negociando' && <MessageCircle className="w-8 h-8 text-yellow-500" />}
                     <div>
-                      <p className={`font-bold ${
-                        link.status === 'aprovado' ? 'text-green-400' :
-                        link.status === 'rejeitado' ? 'text-red-400' :
-                        'text-yellow-400'
+                      <p className={`font-bold text-lg ${
+                        link.status === 'aprovado' ? 'text-green-700' :
+                        link.status === 'rejeitado' ? 'text-red-700' :
+                        'text-yellow-700'
                       }`}>
-                        {link.status === 'aprovado' && 'Orçamento Aprovado'}
-                        {link.status === 'rejeitado' && 'Orçamento Rejeitado'}
-                        {link.status === 'negociando' && 'Em Negociação'}
+                        {link.status === 'aprovado' && 'Orcamento Aprovado'}
+                        {link.status === 'rejeitado' && 'Orcamento Rejeitado'}
+                        {link.status === 'negociando' && 'Em Negociacao'}
                       </p>
-                      <p className="text-sm text-gray-400">
+                      <p className="text-sm text-gray-600">
                         Respondido em {new Date(link.data_resposta!).toLocaleString('pt-BR')}
                       </p>
                     </div>
@@ -477,61 +571,61 @@ export function OrcamentoPublico() {
                 </div>
               </div>
             ) : (
-              <div className="border-t border-gray-700 pt-6">
-                <h3 className="text-lg font-bold text-white mb-4">O que você decide?</h3>
+              <div className="border-t border-gray-200 pt-6">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">O que voce decide?</h3>
 
-                <div className="grid md:grid-cols-3 gap-3 mb-4">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
                   <button
                     onClick={() => {
                       setSelectedAction('aprovado');
                       setMensagem('');
                     }}
-                    className={`p-4 rounded-lg border-2 transition-all ${
+                    className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${
                       selectedAction === 'aprovado'
-                        ? 'border-green-500 bg-green-500/20'
-                        : 'border-gray-700 hover:border-green-500/50'
+                        ? 'border-green-500 bg-green-50'
+                        : 'border-gray-200 hover:border-green-300 bg-white'
                     }`}
                   >
-                    <CheckCircle className="w-8 h-8 text-green-500 mx-auto mb-2" />
-                    <p className="text-white font-bold">Aprovar</p>
+                    <CheckCircle className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 ${selectedAction === 'aprovado' ? 'text-green-500' : 'text-gray-400'}`} />
+                    <p className={`font-bold text-xs sm:text-sm ${selectedAction === 'aprovado' ? 'text-green-700' : 'text-gray-600'}`}>Aprovar</p>
                   </button>
 
                   <button
                     onClick={() => setSelectedAction('negociando')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
+                    className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${
                       selectedAction === 'negociando'
-                        ? 'border-yellow-500 bg-yellow-500/20'
-                        : 'border-gray-700 hover:border-yellow-500/50'
+                        ? 'border-yellow-500 bg-yellow-50'
+                        : 'border-gray-200 hover:border-yellow-300 bg-white'
                     }`}
                   >
-                    <MessageCircle className="w-8 h-8 text-yellow-500 mx-auto mb-2" />
-                    <p className="text-white font-bold">Negociar</p>
+                    <MessageCircle className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 ${selectedAction === 'negociando' ? 'text-yellow-500' : 'text-gray-400'}`} />
+                    <p className={`font-bold text-xs sm:text-sm ${selectedAction === 'negociando' ? 'text-yellow-700' : 'text-gray-600'}`}>Negociar</p>
                   </button>
 
                   <button
                     onClick={() => setSelectedAction('rejeitado')}
-                    className={`p-4 rounded-lg border-2 transition-all ${
+                    className={`p-3 sm:p-4 rounded-lg border-2 transition-all ${
                       selectedAction === 'rejeitado'
-                        ? 'border-red-500 bg-red-500/20'
-                        : 'border-gray-700 hover:border-red-500/50'
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-gray-200 hover:border-red-300 bg-white'
                     }`}
                   >
-                    <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-                    <p className="text-white font-bold">Rejeitar</p>
+                    <XCircle className={`w-6 h-6 sm:w-8 sm:h-8 mx-auto mb-2 ${selectedAction === 'rejeitado' ? 'text-red-500' : 'text-gray-400'}`} />
+                    <p className={`font-bold text-xs sm:text-sm ${selectedAction === 'rejeitado' ? 'text-red-700' : 'text-gray-600'}`}>Rejeitar</p>
                   </button>
                 </div>
 
                 {selectedAction && selectedAction !== 'aprovado' && (
                   <div className="mb-4">
-                    <label className="block text-sm font-bold text-gray-400 uppercase mb-2">
-                      {selectedAction === 'negociando' ? 'Sua proposta ou dúvida:' : 'Motivo da rejeição:'}
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">
+                      {selectedAction === 'negociando' ? 'Sua proposta ou duvida:' : 'Motivo da rejeicao:'}
                     </label>
                     <textarea
                       value={mensagem}
                       onChange={(e) => setMensagem(e.target.value)}
-                      className="w-full px-4 py-3 bg-gray-900 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-blue-500"
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
                       rows={4}
-                      placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das peças...' : 'Por favor, explique o motivo...'}
+                      placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das pecas...' : 'Por favor, explique o motivo...'}
                     />
                   </div>
                 )}
@@ -540,12 +634,12 @@ export function OrcamentoPublico() {
                   <button
                     onClick={iniciarCapturaLocalizacaoESelfie}
                     disabled={responding || capturandoLocalizacao}
-                    className="w-full py-4 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg"
                   >
                     {capturandoLocalizacao ? (
                       <>
                         <Loader2 className="w-5 h-5 animate-spin" />
-                        Capturando localização...
+                        Capturando localizacao...
                       </>
                     ) : responding ? (
                       <>
@@ -557,27 +651,39 @@ export function OrcamentoPublico() {
                     )}
                   </button>
                 )}
+
+                {link.expires_at && (
+                  <p className="text-xs text-gray-500 text-center mt-3">
+                    Este link e valido ate {new Date(link.expires_at).toLocaleString('pt-BR')}
+                  </p>
+                )}
               </div>
             )}
+          </div>
+
+          <div className="bg-gray-50 px-4 sm:px-6 py-4 border-t border-gray-200">
+            <p className="text-xs text-gray-500 text-center">
+              Documento gerado eletronicamente. Em caso de duvidas, entre em contato com a assistencia tecnica.
+            </p>
           </div>
         </div>
       </div>
 
       {showCamera && !selfieCapturada && (
-        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full">
-            <div className="bg-gray-800 rounded-xl overflow-hidden">
-              <div className="p-4 bg-gradient-to-r from-blue-600 to-cyan-600">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Camera className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          <div className="max-w-lg w-full">
+            <div className="bg-white rounded-lg overflow-hidden shadow-2xl">
+              <div className="p-4 bg-blue-600">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Camera className="w-5 h-5" />
                   Tire uma Selfie
                 </h3>
-                <p className="text-sm text-blue-100 mt-1">
+                <p className="text-sm text-blue-200 mt-1">
                   Para confirmar sua identidade, precisamos de uma foto sua
                 </p>
               </div>
 
-              <div className="p-6">
+              <div className="p-4">
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
                   <video
                     ref={videoRef}
@@ -597,13 +703,13 @@ export function OrcamentoPublico() {
                       }
                       setShowCamera(false);
                     }}
-                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gray-700 hover:bg-gray-600 transition-all"
+                    className="flex-1 py-3 rounded-lg font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all"
                   >
                     Cancelar
                   </button>
                   <button
                     onClick={tirarSelfie}
-                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
                   >
                     <Camera className="w-5 h-5" />
                     Tirar Foto
@@ -617,20 +723,20 @@ export function OrcamentoPublico() {
       )}
 
       {selfieCapturada && (
-        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
-          <div className="max-w-2xl w-full">
-            <div className="bg-gray-800 rounded-xl overflow-hidden">
-              <div className="p-4 bg-gradient-to-r from-green-600 to-emerald-600">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                  <CheckCircle className="w-6 h-6" />
+        <div className="fixed inset-0 bg-black/90 z-50 flex items-center justify-center p-4">
+          <div className="max-w-lg w-full">
+            <div className="bg-white rounded-lg overflow-hidden shadow-2xl">
+              <div className="p-4 bg-green-600">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5" />
                   Foto Capturada!
                 </h3>
-                <p className="text-sm text-green-100 mt-1">
+                <p className="text-sm text-green-200 mt-1">
                   Revise sua foto antes de enviar
                 </p>
               </div>
 
-              <div className="p-6">
+              <div className="p-4">
                 <div className="relative aspect-video bg-black rounded-lg overflow-hidden mb-4">
                   <img
                     src={selfieCapturada}
@@ -642,14 +748,14 @@ export function OrcamentoPublico() {
                 <div className="flex gap-3">
                   <button
                     onClick={refazerSelfie}
-                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gray-700 hover:bg-gray-600 transition-all"
+                    className="flex-1 py-3 rounded-lg font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all"
                   >
                     Tirar Outra
                   </button>
                   <button
                     onClick={handleRespond}
                     disabled={responding}
-                    className="flex-1 py-3 rounded-lg font-bold text-white bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 transition-all flex items-center justify-center gap-2"
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-green-600 hover:bg-green-700 transition-all flex items-center justify-center gap-2"
                   >
                     {responding ? (
                       <>
@@ -659,7 +765,7 @@ export function OrcamentoPublico() {
                     ) : (
                       <>
                         <CheckCircle className="w-5 h-5" />
-                        Confirmar e Enviar
+                        Confirmar
                       </>
                     )}
                   </button>

@@ -18,7 +18,7 @@ Deno.serve(async (req: Request) => {
 
     const url = new URL(req.url);
     const token = url.searchParams.get('token');
-    const action = url.searchParams.get('action'); // 'get' or 'respond'
+    const action = url.searchParams.get('action');
 
     if (!token) {
       return new Response(
@@ -27,7 +27,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Buscar link do orçamento
     const { data: linkData, error: linkError } = await supabase
       .from('orcamento_links')
       .select('*')
@@ -42,13 +41,11 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Verificar se o link expirou
     if (linkData.expires_at) {
       const expiresAt = new Date(linkData.expires_at);
       const now = new Date();
 
       if (now > expiresAt) {
-        // Desativar link expirado
         await supabase
           .from('orcamento_links')
           .update({ ativo: false, updated_at: new Date().toISOString() })
@@ -64,7 +61,8 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // Se for uma resposta do cliente
+    const clientIp = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown';
+
     if (req.method === 'POST' && action === 'respond') {
       const body = await req.json();
       const { status, mensagem, latitude, longitude, endereco_completo, selfie_url } = body;
@@ -76,14 +74,16 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Atualizar link com resposta
+      const statusEmoji = status === 'aprovado' ? '✅' : status === 'rejeitado' ? '❌' : '💬';
+      const statusTexto = status === 'aprovado' ? 'APROVADO' : status === 'rejeitado' ? 'REJEITADO' : 'EM NEGOCIACAO';
+
       const { error: updateError } = await supabase
         .from('orcamento_links')
         .update({
           status,
           mensagem_cliente: mensagem || null,
           data_resposta: new Date().toISOString(),
-          ip_cliente: req.headers.get('x-forwarded-for') || 'unknown',
+          ip_cliente: clientIp,
           latitude: latitude || null,
           longitude: longitude || null,
           endereco_completo: endereco_completo || null,
@@ -93,40 +93,78 @@ Deno.serve(async (req: Request) => {
         .eq('id', linkData.id);
 
       if (updateError) {
+        console.error('Error updating link:', updateError);
         return new Response(
           JSON.stringify({ error: 'Erro ao salvar resposta' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Salvar selfie e localização como anexos da OS
-      if (selfie_url) {
-        await supabase.from('os_anexos').insert({
-          os_id: linkData.os_id,
-          url: selfie_url,
-          tipo: 'selfie_aprovacao',
-          descricao: `Selfie do cliente - ${status === 'aprovado' ? 'Orçamento Aprovado' : status === 'rejeitado' ? 'Orçamento Rejeitado' : 'Negociação'}`
-        });
+      let comentarioResposta = `${statusEmoji} ORCAMENTO ${statusTexto} PELO CLIENTE VIA LINK\n`;
+      comentarioResposta += `Data/Hora: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}\n`;
+      comentarioResposta += `IP: ${clientIp}\n`;
+
+      if (mensagem) {
+        comentarioResposta += `\nMensagem do cliente:\n"${mensagem}"`;
       }
 
+      await supabase.from('os_comentarios').insert({
+        os_id: linkData.os_id,
+        comentario: comentarioResposta,
+        is_system: true
+      });
+
       if (latitude && longitude) {
+        let comentarioLocalizacao = `📍 LOCALIZACAO DO CLIENTE AO RESPONDER ORCAMENTO\n`;
+        comentarioLocalizacao += `Latitude: ${latitude}\n`;
+        comentarioLocalizacao += `Longitude: ${longitude}\n`;
+        if (endereco_completo) {
+          comentarioLocalizacao += `Endereco: ${endereco_completo}\n`;
+        }
+        comentarioLocalizacao += `\nLink do Maps: https://www.google.com/maps?q=${latitude},${longitude}`;
+
         await supabase.from('os_comentarios').insert({
           os_id: linkData.os_id,
-          comentario: `📍 Localização do cliente ao ${status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : 'negociar'} orçamento:\nLatitude: ${latitude}\nLongitude: ${longitude}\n${endereco_completo ? `Endereço: ${endereco_completo}` : ''}`,
+          comentario: comentarioLocalizacao,
           is_system: true
         });
       }
 
-      // Se aprovado, marcar OS como orçamento aprovado
-      if (status === 'aprovado') {
-        await supabase
-          .from('os')
-          .update({
-            orcamento_aprovado: true,
-            orcamento_aprovado_em: new Date().toISOString()
-          })
-          .eq('id', linkData.os_id);
+      if (selfie_url) {
+        const { error: anexoError } = await supabase.from('os_anexos').insert({
+          os_id: linkData.os_id,
+          url: selfie_url,
+          tipo: 'foto',
+          descricao: `Selfie do cliente - Orcamento ${statusTexto}`,
+          evidencia_tipo: 'selfie_aprovacao'
+        });
+
+        if (!anexoError) {
+          await supabase.from('os_comentarios').insert({
+            os_id: linkData.os_id,
+            comentario: `📸 Selfie do cliente registrada ao ${status === 'aprovado' ? 'aprovar' : status === 'rejeitado' ? 'rejeitar' : 'negociar'} o orcamento`,
+            is_system: true
+          });
+        }
       }
+
+      const osUpdateData: Record<string, unknown> = {
+        status_orcamento_link: status,
+        mensagem_cliente_orcamento: mensagem || null
+      };
+
+      if (status === 'aprovado') {
+        osUpdateData.orcamento_aprovado = true;
+        osUpdateData.orcamento_aprovado_em = new Date().toISOString();
+      } else if (status === 'rejeitado') {
+        osUpdateData.orcamento_aprovado = false;
+        osUpdateData.orcamento_reprovado_em = new Date().toISOString();
+      }
+
+      await supabase
+        .from('os')
+        .update(osUpdateData)
+        .eq('id', linkData.os_id);
 
       return new Response(
         JSON.stringify({ success: true, message: 'Resposta registrada com sucesso' }),
@@ -134,7 +172,12 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Buscar dados da OS
+    await supabase.from('os_comentarios').insert({
+      os_id: linkData.os_id,
+      comentario: `🔗 Link de orcamento acessado pelo cliente\nIP: ${clientIp}\nData/Hora: ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}`,
+      is_system: true
+    });
+
     const { data: osData, error: osError } = await supabase
       .from('os')
       .select('*')
@@ -157,34 +200,30 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Buscar unidade
     const { data: unidadeData } = await supabase
       .from('unidades')
-      .select('nome, telefone, endereco, cidade, uf')
+      .select('nome, telefone, endereco, cidade, uf, cnpj, logo_url')
       .eq('id', osData.unidade_id)
       .maybeSingle();
 
-    // Buscar peças da OS (apenas as que devem aparecer no orçamento)
     const { data: pecasData } = await supabase
       .from('os_pecas')
       .select('id, codigo, descricao, quantidade, valor_unitario, valor_total')
       .eq('os_id', linkData.os_id)
       .or('exibir_no_pdf.eq.true,mostrar_no_pdf.eq.true');
 
-    // Buscar serviços da OS
     const { data: servicosData } = await supabase
       .from('os_servicos')
       .select('id, nome, descricao, valor, quantidade, valor_total')
       .eq('os_id', linkData.os_id);
 
-    // Montar objeto de cotação com os dados da OS
     const cotacao = {
       id: osData.id,
       valor_pecas: Number(osData.valor_pecas || 0),
       valor_servicos: Number(osData.valor_servicos || 0),
       desconto_tipo: osData.desconto_tipo,
       desconto_valor: Number(osData.desconto_valor || 0),
-      valor_liquido: Number(osData.valor_total || 0) - Number(osData.desconto_valor || 0),
+      valor_liquido: Number(osData.valor_total || 0) - Number(osData.valor_desconto_calculado || 0),
       created_at: osData.created_at,
       cotacoes_pecas: (pecasData || []).map(p => ({
         id: p.id,
@@ -204,17 +243,27 @@ Deno.serve(async (req: Request) => {
       }))
     };
 
-    // Retornar dados públicos (sem informações sensíveis)
     const response = {
       link: linkData,
       os: {
         numero_os_interna: osData.numero_os_interna,
         cliente_nome: osData.cliente_nome,
         cliente_telefone: osData.cliente_telefone,
+        cliente_cpf_cnpj: osData.cliente_cpf_cnpj,
+        cliente_endereco: osData.cliente_endereco,
+        cliente_logradouro: osData.cliente_logradouro,
+        cliente_numero: osData.cliente_numero,
+        cliente_bairro: osData.cliente_bairro,
+        cliente_cidade: osData.cliente_cidade,
+        cliente_estado: osData.cliente_estado,
+        cliente_cep: osData.cliente_cep,
         aparelho_marca: osData.aparelho_marca,
         aparelho_modelo: osData.aparelho_modelo,
+        aparelho_numero_serie: osData.aparelho_numero_serie,
+        aparelho_imei: osData.aparelho_imei,
         defeito_relatado: osData.defeito_relatado,
         diagnostico_tecnico: osData.diagnostico_tecnico,
+        reparo_efetuado: osData.reparo_efetuado,
         data_abertura: osData.created_at,
         unidade: unidadeData,
         cotacao: cotacao
