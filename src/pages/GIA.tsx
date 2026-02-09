@@ -132,7 +132,7 @@ export function GIA() {
     if (!usuario) return 'Ola! Como posso ajudar?';
     const isChefe = usuario.email === 'marcoabdo@groupglobal.com.br' || usuario.tipo === 'master';
     const displayName = isChefe ? 'chefe' : (usuario.nome?.split(' ')[0] || 'usuario');
-    return `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que voce precisa?`;
+    return `Ola ${displayName}! Sou a GIA, sua assistente inteligente. Estou conectada ao sistema ATOM e pronta pra te ajudar. O que você precisa?`;
   }, [usuario]);
 
   const startNewConversation = () => {
