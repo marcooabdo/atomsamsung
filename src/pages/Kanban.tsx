@@ -1305,20 +1305,50 @@ export function Kanban() {
     const { targetColumn, position: finalPosition } = pendingMandatoryMove;
     const cidadeOS = mandatoryRoutePickerOS.cliente_cidade;
 
-    // Buscar a rota selecionada para usar o ID real (UUID)
-    const rotaSelecionada = rotas.find(r => r.coluna_kanban === rotaColumn);
-    const rotaIdReal = rotaSelecionada?.id || null;
+    const rotaColorMap: Record<string, { nome: string; cor: string }> = {
+      'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
+      'rota_vermelha': { nome: 'Rota Vermelha', cor: '#EF4444' },
+      'rota_azul': { nome: 'Rota Azul', cor: '#3B82F6' },
+      'rota_verde': { nome: 'Rota Verde', cor: '#10B981' },
+      'rota_rosa': { nome: 'Rota Rosa', cor: '#EC4899' },
+      'rota_amarela': { nome: 'Rota Amarela', cor: '#EAB308' },
+      'rota_laranja': { nome: 'Rota Laranja', cor: '#F97316' },
+    };
+
+    let rotaSelecionada = rotas.find(r => r.coluna_kanban === rotaColumn);
+    let rotaIdReal = rotaSelecionada?.id || null;
+
+    const unidadeParaRota = mandatoryRoutePickerOS.unidade_id || selectedUnidade || usuario?.unidade_id;
 
     setMandatoryRoutePickerOS(null);
     setPendingMandatoryMove(null);
 
     try {
-      // Adicionar a cidade na rota selecionada automaticamente
-      if (cidadeOS && rotaSelecionada) {
+      if (!rotaSelecionada && unidadeParaRota) {
+        const rotaInfo = rotaColorMap[rotaColumn];
+        const cidadesIniciais = cidadeOS ? [cidadeOS] : [];
+        const { data: novaRota, error: errCriar } = await supabase
+          .from('rotas')
+          .insert({
+            nome: rotaInfo.nome,
+            cor: rotaInfo.cor,
+            coluna_kanban: rotaColumn,
+            cidades: cidadesIniciais,
+            ativa: true,
+            unidade_id: unidadeParaRota
+          })
+          .select()
+          .single();
+
+        if (errCriar) throw errCriar;
+
+        rotaSelecionada = novaRota;
+        rotaIdReal = novaRota.id;
+        setRotas(prev => [...prev, novaRota]);
+      } else if (cidadeOS && rotaSelecionada) {
         const cidadeNormalizada = normalizeCidade(cidadeOS);
         const cidadesNormalizadas = rotaSelecionada.cidades.map(c => normalizeCidade(c));
 
-        // Só adicionar se a cidade ainda não estiver na lista (evitar duplicatas)
         if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
           const novasCidades = [...rotaSelecionada.cidades, cidadeOS];
 
@@ -1327,9 +1357,8 @@ export function Kanban() {
             .update({ cidades: novasCidades })
             .eq('id', rotaSelecionada.id);
 
-          // Atualizar estado local
           setRotas(prev => prev.map(r =>
-            r.id === rotaSelecionada.id
+            r.id === rotaSelecionada!.id
               ? { ...r, cidades: novasCidades }
               : r
           ));
