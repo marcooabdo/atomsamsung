@@ -76,6 +76,12 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   };
 
   const handleSalvarVendedorResponsavel = async (novoVendedorId: string | null) => {
+    console.log('=== SALVANDO VENDEDOR ===');
+    console.log('osId:', osId);
+    console.log('novoVendedorId:', novoVendedorId);
+    console.log('os.vendedor_responsavel_id atual:', os.vendedor_responsavel_id);
+    console.log('podeEditarVendedor():', podeEditarVendedor());
+
     if (!podeEditarVendedor() && os.vendedor_responsavel_id) {
       alert('Somente gerentes, diretoria ou master podem alterar o vendedor responsavel.');
       return;
@@ -90,7 +96,8 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       const vendedorAnterior = usuariosUnidade.find(u => u.id === vendedorAnteriorId);
       const vendedorNovo = usuariosUnidade.find(u => u.id === novoVendedorId);
 
-      const { error: updateError } = await supabase
+      console.log('Executando update...');
+      const { data, error: updateError } = await supabase
         .from('os')
         .update({
           vendedor_responsavel_id: novoVendedorId,
@@ -98,7 +105,10 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
           vendedor_responsavel_definido_por: usuario?.id || null,
           updated_at: new Date().toISOString()
         })
-        .eq('id', osId);
+        .eq('id', osId)
+        .select();
+
+      console.log('Resultado update:', { data, error: updateError });
 
       if (updateError) {
         setVendedorResponsavel(vendedorAnteriorId || null);
@@ -116,13 +126,19 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
         comentario = `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Desconhecido'}`;
       }
 
-      await supabase.from('os_comentarios').insert({
+      console.log('Inserindo comentario:', comentario);
+      const { error: commentError } = await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id || null,
         comentario,
         is_system: true
-      }).then(() => {});
+      });
 
+      if (commentError) {
+        console.error('Erro ao inserir comentario:', commentError);
+      }
+
+      console.log('Sucesso! Chamando onUpdate...');
       onUpdate();
     } catch (error: any) {
       console.error('Erro ao salvar vendedor:', error);
