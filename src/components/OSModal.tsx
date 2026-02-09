@@ -3311,6 +3311,7 @@ Não haverá cobrança ao cliente.`
               {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (() => {
                 const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
                 const isSCACCColor = isSCACC;
+                const accentColor = isSCACC ? '#39FF14' : 'var(--text-accent)';
                 return (
                 <div className="premium-card p-4 mb-4" style={{ backgroundColor: isSCACCColor ? '#39FF1410' : 'rgba(var(--accent-rgb), 0.063)', border: isSCACCColor ? '1px solid #39FF1430' : '1px solid rgba(var(--accent-rgb), 0.19)' }}>
                   <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: isSCACCColor ? '#39FF14' : 'var(--text-accent)' }}>
