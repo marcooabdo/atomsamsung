@@ -22,6 +22,7 @@ import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
 import { RegistroVendas } from './pages/RegistroVendas';
 import { OrcamentoPublico } from './pages/OrcamentoPublico';
+import CustomerIntelligence from './pages/CustomerIntelligence';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -254,6 +255,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <RegistroVendas />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/customer-intelligence"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <CustomerIntelligence />
               </Layout>
             </ProtectedRoute>
           }
