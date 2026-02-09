@@ -1279,34 +1279,48 @@ export function Configuracoes() {
               {activeTab === 'rotas' && (
                 <>
                   <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2">Nome da Rota *</label>
-                    <input
-                      type="text"
-                      value={formRota.nome}
-                      onChange={(e) => setFormRota({...formRota, nome: e.target.value})}
-                      placeholder="Ex: Rota Azul"
-                      className="neon-input"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Deve conter uma das cores: Preta, Vermelha, Azul, Verde, Rosa, Amarela ou Laranja</p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs text-gray-400 uppercase mb-2">Cor de Identificação</label>
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="color"
-                        value={formRota.cor}
-                        onChange={(e) => setFormRota({...formRota, cor: e.target.value})}
-                        className="w-20 h-10 rounded cursor-pointer border border-[#00D4FF]/30"
-                      />
-                      <input
-                        type="text"
-                        value={formRota.cor}
-                        onChange={(e) => setFormRota({...formRota, cor: e.target.value})}
-                        placeholder="#3b82f6"
-                        className="neon-input flex-1"
-                      />
+                    <label className="block text-xs text-gray-400 uppercase mb-3">Selecione a Cor da Rota *</label>
+                    <div className="grid grid-cols-4 gap-3">
+                      {[
+                        { nome: 'Rota Preta', kanban: 'rota_preta', label: 'Preta', cor: '#1a1a1a', border: '#555' },
+                        { nome: 'Rota Vermelha', kanban: 'rota_vermelha', label: 'Vermelha', cor: '#EF4444', border: '#EF4444' },
+                        { nome: 'Rota Azul', kanban: 'rota_azul', label: 'Azul', cor: '#3B82F6', border: '#3B82F6' },
+                        { nome: 'Rota Verde', kanban: 'rota_verde', label: 'Verde', cor: '#10B981', border: '#10B981' },
+                        { nome: 'Rota Rosa', kanban: 'rota_rosa', label: 'Rosa', cor: '#EC4899', border: '#EC4899' },
+                        { nome: 'Rota Amarela', kanban: 'rota_amarela', label: 'Amarela', cor: '#EAB308', border: '#EAB308' },
+                        { nome: 'Rota Laranja', kanban: 'rota_laranja', label: 'Laranja', cor: '#F97316', border: '#F97316' },
+                      ].map(rota => (
+                        <button
+                          key={rota.kanban}
+                          type="button"
+                          onClick={() => setFormRota({...formRota, nome: rota.nome, cor: rota.cor})}
+                          className="flex flex-col items-center gap-2 p-4 rounded-xl transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            backgroundColor: formRota.nome === rota.nome ? rota.cor + '30' : rota.cor + '15',
+                            border: formRota.nome === rota.nome ? `3px solid ${rota.border}` : `2px solid ${rota.border}40`,
+                            boxShadow: formRota.nome === rota.nome ? `0 0 20px ${rota.cor}50` : 'none',
+                          }}
+                        >
+                          <div
+                            className="w-10 h-10 rounded-full"
+                            style={{
+                              backgroundColor: rota.cor,
+                              border: rota.cor === '#1a1a1a' ? '2px solid #555' : 'none',
+                              boxShadow: `0 0 12px ${rota.cor}60`,
+                            }}
+                          />
+                          <span className="text-xs font-bold" style={{ color: rota.cor === '#1a1a1a' ? '#fff' : rota.cor }}>
+                            {rota.label}
+                          </span>
+                        </button>
+                      ))}
                     </div>
+                    {formRota.nome && (
+                      <div className="mt-3 p-2 rounded-lg flex items-center gap-2" style={{ backgroundColor: formRota.cor + '20', border: `1px solid ${formRota.cor}` }}>
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: formRota.cor }} />
+                        <span className="text-sm font-bold" style={{ color: formRota.cor }}>{formRota.nome}</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="premium-card p-4 bg-[#10b981]/5 border border-[#10b981]/20">

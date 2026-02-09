@@ -6245,20 +6245,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }
                       }
 
-                      // Definir rota_id na OS
-                      const rotaIdMap: Record<string, string> = {
-                        'rota_preta': 'preta',
-                        'rota_vermelha': 'vermelha',
-                        'rota_azul': 'azul',
-                        'rota_verde': 'verde',
-                        'rota_rosa': 'rosa',
-                        'rota_amarela': 'amarela',
-                        'rota_laranja': 'laranja'
-                      };
+                      // Definir rota_id na OS usando o ID real (UUID) da rota
+                      const rotaReal = rotasUnidade.find(r => r.coluna_kanban === rota.kanban);
+                      const rotaIdReal = rotaReal?.id || null;
 
                       await supabase
                         .from('os')
-                        .update({ rota_id: rotaIdMap[rota.kanban] })
+                        .update({ rota_id: rotaIdReal })
                         .eq('id', os.id);
 
                       // Fechar modal e mostrar confirmação de movimentação
