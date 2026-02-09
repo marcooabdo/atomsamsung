@@ -131,12 +131,13 @@ Deno.serve(async (req: Request) => {
       }
 
       if (selfie_url) {
+        const fileName = `selfie-aprovacao-${Date.now()}.jpg`;
         const { error: anexoError } = await supabase.from('os_anexos').insert({
           os_id: linkData.os_id,
           url: selfie_url,
           tipo: 'foto',
-          descricao: `Selfie do cliente - Orcamento ${statusTexto}`,
-          evidencia_tipo: 'selfie_aprovacao'
+          nome_arquivo: fileName,
+          descricao: `Selfie do cliente - Orcamento ${statusTexto}`
         });
 
         if (!anexoError) {
@@ -206,6 +207,12 @@ Deno.serve(async (req: Request) => {
       .eq('id', osData.unidade_id)
       .maybeSingle();
 
+    const { data: pdfConfig } = await supabase
+      .from('configuracoes_pdf_os')
+      .select('termo_orcamento, termo_garantia, canais_atendimento, observacoes_gerais')
+      .eq('unidade_id', osData.unidade_id)
+      .maybeSingle();
+
     const { data: pecasData } = await supabase
       .from('os_pecas')
       .select('id, codigo, descricao, quantidade, valor_unitario, valor_total')
@@ -266,7 +273,8 @@ Deno.serve(async (req: Request) => {
         reparo_efetuado: osData.reparo_efetuado,
         data_abertura: osData.created_at,
         unidade: unidadeData,
-        cotacao: cotacao
+        cotacao: cotacao,
+        termos: pdfConfig || null
       }
     };
 

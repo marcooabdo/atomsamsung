@@ -63,6 +63,12 @@ interface OrcamentoData {
         valor_total: number;
       }>;
     } | null;
+    termos: {
+      termo_orcamento: string | null;
+      termo_garantia: string | null;
+      canais_atendimento: string | null;
+      observacoes_gerais: string | null;
+    } | null;
   };
 }
 
@@ -539,6 +545,55 @@ export function OrcamentoPublico() {
                     </div>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {os.termos && (os.termos.termo_orcamento || os.termos.termo_garantia || os.termos.observacoes_gerais) && (
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200 space-y-4">
+                {os.termos.termo_orcamento && (
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-2 flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-blue-600" />
+                      Termos do Orcamento
+                    </h4>
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100">
+                      {os.termos.termo_orcamento}
+                    </div>
+                  </div>
+                )}
+                {os.termos.termo_garantia && (
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-2 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-600" />
+                      Termos de Garantia
+                    </h4>
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100">
+                      {os.termos.termo_garantia}
+                    </div>
+                  </div>
+                )}
+                {os.termos.observacoes_gerais && (
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-2 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 text-yellow-600" />
+                      Observacoes
+                    </h4>
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100">
+                      {os.termos.observacoes_gerais}
+                    </div>
+                  </div>
+                )}
+                {os.termos.canais_atendimento && (
+                  <div>
+                    <h4 className="text-sm font-bold text-gray-700 uppercase mb-2 flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-blue-600" />
+                      Canais de Atendimento
+                    </h4>
+                    <div className="text-xs text-gray-600 whitespace-pre-wrap bg-white p-3 rounded border border-gray-100">
+                      {os.termos.canais_atendimento}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
