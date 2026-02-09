@@ -82,37 +82,58 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
     }
 
     setSalvandoVendedor(true);
+    setShowVendedorDropdown(false);
+
     try {
-      const vendedorAnterior = usuariosUnidade.find(u => u.id === os.vendedor_responsavel_id);
+      const vendedorAnteriorId = vendedorResponsavel || os.vendedor_responsavel_id;
+      const vendedorAnterior = usuariosUnidade.find(u => u.id === vendedorAnteriorId);
       const vendedorNovo = usuariosUnidade.find(u => u.id === novoVendedorId);
 
-      const { error } = await supabase
+      const updateData: any = {
+        vendedor_responsavel_id: novoVendedorId,
+        vendedor_responsavel_definido_em: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+
+      if (usuario?.id) {
+        updateData.vendedor_responsavel_definido_por = usuario.id;
+      }
+
+      const { data, error } = await supabase
         .from('os')
-        .update({
-          vendedor_responsavel_id: novoVendedorId,
-          vendedor_responsavel_definido_em: new Date().toISOString(),
-          vendedor_responsavel_definido_por: usuario?.id,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', osId);
+        .update(updateData)
+        .eq('id', osId)
+        .select('vendedor_responsavel_id')
+        .single();
 
       if (error) throw error;
 
-      const comentario = vendedorAnterior
-        ? `Vendedor responsavel alterado de ${vendedorAnterior.nome} para ${vendedorNovo?.nome || 'Nenhum'}`
-        : `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Nenhum'}`;
+      if (!data) {
+        throw new Error('Nenhum registro atualizado');
+      }
+
+      let comentario = '';
+      if (novoVendedorId === null) {
+        comentario = vendedorAnterior
+          ? `Vendedor responsavel removido (era: ${vendedorAnterior.nome})`
+          : 'Vendedor responsavel removido';
+      } else if (vendedorAnterior) {
+        comentario = `Vendedor responsavel alterado de ${vendedorAnterior.nome} para ${vendedorNovo?.nome || 'Desconhecido'}`;
+      } else {
+        comentario = `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Desconhecido'}`;
+      }
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
-        usuario_id: usuario?.id,
+        usuario_id: usuario?.id || null,
         comentario,
         is_system: true
       });
 
       setVendedorResponsavel(novoVendedorId);
-      setShowVendedorDropdown(false);
       onUpdate();
     } catch (error: any) {
+      console.error('Erro ao salvar vendedor:', error);
       alert(`Erro ao salvar vendedor: ${error.message}`);
     } finally {
       setSalvandoVendedor(false);
