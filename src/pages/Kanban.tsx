@@ -191,6 +191,8 @@ export function Kanban() {
   const [errorModalData, setErrorModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
+  const [mandatoryRoutePickerOS, setMandatoryRoutePickerOS] = useState<OS | null>(null);
+  const [pendingMandatoryMove, setPendingMandatoryMove] = useState<{ targetColumn: string; position?: number } | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -813,6 +815,18 @@ export function Kanban() {
     const colunaOrigem = COLUNAS_KANBAN.find(c => c.id === draggedCard.coluna_kanban);
     const colunaDestino = COLUNAS_KANBAN.find(c => c.id === targetColumn);
 
+    const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
+    const isOrigemOSNova = draggedCard.coluna_kanban === 'os_nova';
+    const isOSIH = draggedCard.tipo_atendimento === 'IH';
+    const isDestinoNaoRota = !rotasColumns.includes(targetColumn);
+
+    if (isOrigemOSNova && isOSIH && isDestinoNaoRota && !draggedCard.rota_id) {
+      setMandatoryRoutePickerOS(draggedCard);
+      setPendingMandatoryMove({ targetColumn, position: finalPosition });
+      setDraggedCard(null);
+      return;
+    }
+
     // Se for reordenação na mesma coluna
     if (isSameColumn && finalPosition !== undefined) {
       try {
@@ -1222,6 +1236,77 @@ export function Kanban() {
     } catch (err: any) {
       setErrorModalData({
         title: 'Erro ao Mover para Rota',
+        message: err?.message || 'Erro desconhecido'
+      });
+      setShowErrorModal(true);
+      await loadKanbanData();
+    }
+  };
+
+  const handleMandatoryRouteSelect = async (rotaColumn: string) => {
+    if (!mandatoryRoutePickerOS || !pendingMandatoryMove) return;
+
+    const osId = mandatoryRoutePickerOS.id;
+    const prevColumn = mandatoryRoutePickerOS.coluna_kanban;
+    const { targetColumn, position: finalPosition } = pendingMandatoryMove;
+
+    const rotaIdMap: Record<string, string> = {
+      'rota_preta': 'preta',
+      'rota_vermelha': 'vermelha',
+      'rota_azul': 'azul',
+      'rota_verde': 'verde',
+      'rota_rosa': 'rosa',
+      'rota_amarela': 'amarela',
+      'rota_laranja': 'laranja'
+    };
+
+    setMandatoryRoutePickerOS(null);
+    setPendingMandatoryMove(null);
+
+    try {
+      let novaSequencia: number = 0;
+      const cardsDestino = filteredData[targetColumn] || [];
+
+      if (finalPosition === undefined || finalPosition >= cardsDestino.length) {
+        const ultimoCard = cardsDestino[cardsDestino.length - 1];
+        novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
+      } else if (finalPosition === 0) {
+        const primeiroCard = cardsDestino[0];
+        novaSequencia = primeiroCard ? (primeiroCard.sequencia_coluna ?? 0) - 1 : 0;
+      } else {
+        const cardAntes = cardsDestino[finalPosition - 1];
+        const cardDepois = cardsDestino[finalPosition];
+        const seqAntes = cardAntes?.sequencia_coluna ?? 0;
+        const seqDepois = cardDepois?.sequencia_coluna ?? 0;
+        novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
+      }
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          coluna_kanban: targetColumn,
+          sequencia_coluna: novaSequencia,
+          rota_id: rotaIdMap[rotaColumn],
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      const updatedCard = { ...mandatoryRoutePickerOS, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: rotaIdMap[rotaColumn] };
+
+      setOsData(prevData => {
+        const newData = { ...prevData };
+        newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
+        const newCards = [...(newData[targetColumn] || []), updatedCard];
+        newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
+        newData[targetColumn] = newCards;
+        return newData;
+      });
+
+    } catch (err: any) {
+      setErrorModalData({
+        title: 'Erro ao Definir Rota',
         message: err?.message || 'Erro desconhecido'
       });
       setShowErrorModal(true);
@@ -3092,6 +3177,118 @@ export function Kanban() {
                   </span>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mandatoryRoutePickerOS && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+          <div
+            className="rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '2px solid #F59E0B',
+              backdropFilter: 'blur(20px)',
+              minWidth: 420,
+              maxWidth: 500,
+              animation: 'slideUp 0.25s ease-out',
+            }}
+          >
+            <div className="p-4 border-b" style={{ borderColor: '#F59E0B30', background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))' }}>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F59E0B20' }}>
+                  <AlertCircle className="w-6 h-6" style={{ color: '#F59E0B' }} />
+                </div>
+                <div>
+                  <span className="text-sm font-bold" style={{ color: '#F59E0B' }}>
+                    SELECAO DE ROTA OBRIGATORIA
+                  </span>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                    OS In Home deve ter uma cor de rota definida
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3 mt-3 p-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-accent)' }}>
+                    {mandatoryRoutePickerOS.numero_os_samsung || mandatoryRoutePickerOS.numero_os_interna || 'S/N'}
+                  </p>
+                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
+                    {mandatoryRoutePickerOS.cliente_nome}
+                  </p>
+                </div>
+                <div className="ml-auto text-right">
+                  <p className="text-xs font-bold" style={{ color: '#FFBF00' }}>
+                    {mandatoryRoutePickerOS.cliente_cidade || 'Sem cidade'}
+                  </p>
+                  {mandatoryRoutePickerOS.cliente_bairro && (
+                    <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
+                      {mandatoryRoutePickerOS.cliente_bairro}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="text-xs font-medium uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-secondary)' }}>
+                Selecione a cor da rota para esta OS IH
+              </p>
+              <div className="grid grid-cols-4 gap-2">
+                {[
+                  { kanban: 'rota_preta', label: 'Preta', cor: '#1a1a1a', border: '#555' },
+                  { kanban: 'rota_vermelha', label: 'Vermelha', cor: '#EF4444', border: '#EF4444' },
+                  { kanban: 'rota_azul', label: 'Azul', cor: '#3B82F6', border: '#3B82F6' },
+                  { kanban: 'rota_verde', label: 'Verde', cor: '#10B981', border: '#10B981' },
+                  { kanban: 'rota_rosa', label: 'Rosa', cor: '#EC4899', border: '#EC4899' },
+                  { kanban: 'rota_amarela', label: 'Amarela', cor: '#EAB308', border: '#EAB308' },
+                  { kanban: 'rota_laranja', label: 'Laranja', cor: '#F97316', border: '#F97316' },
+                ].map(rota => (
+                  <button
+                    key={rota.kanban}
+                    onClick={() => handleMandatoryRouteSelect(rota.kanban)}
+                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      backgroundColor: rota.cor + '15',
+                      border: `2px solid ${rota.border}40`,
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.borderColor = rota.border;
+                      e.currentTarget.style.boxShadow = `0 0 16px ${rota.cor}40`;
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.borderColor = rota.border + '40';
+                      e.currentTarget.style.boxShadow = 'none';
+                    }}
+                  >
+                    <div
+                      className="w-8 h-8 rounded-full"
+                      style={{
+                        backgroundColor: rota.cor,
+                        border: rota.cor === '#1a1a1a' ? '2px solid #555' : 'none',
+                        boxShadow: `0 0 12px ${rota.cor}60`,
+                      }}
+                    />
+                    <span className="text-[11px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? 'var(--text-primary)' : rota.cor }}>
+                      {rota.label}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  setMandatoryRoutePickerOS(null);
+                  setPendingMandatoryMove(null);
+                }}
+                className="w-full mt-4 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
+                style={{
+                  backgroundColor: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.3)',
+                  color: '#EF4444',
+                }}
+              >
+                Cancelar Movimentacao
+              </button>
             </div>
           </div>
         </div>

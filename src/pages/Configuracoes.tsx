@@ -113,7 +113,6 @@ interface ChecklistTemplate {
 
 export function Configuracoes() {
   const { usuario: usuarioLogado } = useAuth();
-  const { theme, setTheme } = useTheme();
   const [activeTab, setActiveTab] = useState<Tab>('unidades');
   const [loading, setLoading] = useState(true);
 
