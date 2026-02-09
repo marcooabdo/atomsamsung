@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Palette, Upload, Loader2, Trash } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
-import { useTheme, THEMES } from '../contexts/ThemeContext';
 
-type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'tema';
+type Tab = 'unidades' | 'usuarios' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf';
 
 interface Unidade {
   id: string;
@@ -787,8 +786,7 @@ export function Configuracoes() {
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
-    { id: 'tema' as Tab, label: 'Tema', icon: Palette, color: '#ec4899', isAccent: false }
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2446,51 +2444,6 @@ export function Configuracoes() {
                   <ConfiguracoesNF unidades={unidades} />
                 )}
 
-                {activeTab === 'tema' && (
-                  <div className="space-y-6">
-                    <div className="premium-card p-6">
-                      <h3 className="text-lg font-bold text-[#ec4899] mb-4 flex items-center gap-2">
-                        <Palette className="w-5 h-5" />
-                        SELECIONAR TEMA
-                      </h3>
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {THEMES.map((themeOption) => (
-                          <button
-                            key={themeOption.id}
-                            onClick={() => setTheme(themeOption.id)}
-                            className={`p-4 rounded-xl border-2 transition-all hover:scale-105 ${
-                              theme === themeOption.id
-                                ? 'border-[#ec4899] shadow-lg shadow-[#ec4899]/20'
-                                : 'border-gray-700 hover:border-gray-600'
-                            }`}
-                          >
-                            <div
-                              className="w-full h-20 rounded-lg mb-3"
-                              style={{ backgroundColor: themeOption.bg }}
-                            />
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-sm font-bold text-white">{themeOption.label}</p>
-                              {theme === themeOption.id && (
-                                <div className="w-5 h-5 rounded-full bg-[#ec4899] flex items-center justify-center">
-                                  <div className="w-2 h-2 rounded-full bg-white" />
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div
-                                className="w-4 h-4 rounded-full border-2 border-white"
-                                style={{ backgroundColor: themeOption.accent }}
-                              />
-                              <span className="text-xs text-gray-400">
-                                {themeOption.isDark ? 'Escuro' : 'Claro'}
-                              </span>
-                            </div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
               </>
             )}
           </div>

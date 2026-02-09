@@ -31,6 +31,7 @@
   --transition-slow: 0.5s ease;
 
   --bg-primary: #0A0A0D;
+  --bg-primary-rgb: 10, 10, 13;
   --bg-secondary: #111114;
   --bg-card: rgba(20, 20, 24, 0.95);
   --bg-hover: rgba(0, 212, 255, 0.06);
@@ -86,6 +87,7 @@
   --transition-slow: 0.5s ease;
 
   --bg-primary: #0b111a;
+  --bg-primary-rgb: 11, 17, 26;
   --bg-secondary: #060a12;
   --bg-card: rgba(18, 25, 38, 0.95);
   --bg-hover: rgba(0, 212, 255, 0.06);
@@ -123,6 +125,7 @@
   --neon-glow-accent: 0 0 10px rgba(255, 0, 127, 0.5), 0 0 20px rgba(255, 0, 127, 0.3);
 
   --bg-primary: #1a0b16;
+  --bg-primary-rgb: 26, 11, 22;
   --bg-secondary: #120810;
   --bg-card: rgba(38, 18, 33, 0.95);
   --bg-hover: rgba(255, 0, 127, 0.06);
@@ -166,6 +169,7 @@
   --neon-glow-accent: 0 0 6px rgba(0, 119, 182, 0.2), 0 0 12px rgba(0, 119, 182, 0.1);
 
   --bg-primary: #f8fafc;
+  --bg-primary-rgb: 248, 250, 252;
   --bg-secondary: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.98);
   --bg-hover: rgba(0, 119, 182, 0.06);
@@ -209,6 +213,7 @@
   --neon-glow-accent: 0 0 6px rgba(214, 51, 108, 0.2), 0 0 12px rgba(214, 51, 108, 0.1);
 
   --bg-primary: #fcf8fa;
+  --bg-primary-rgb: 252, 248, 250;
   --bg-secondary: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.98);
   --bg-hover: rgba(214, 51, 108, 0.06);

@@ -492,38 +492,37 @@
    Plano de fundo personalizado aplicado via ThemeContext
    ================================================================ */
 
-body {
+body[data-custom-bg] {
   position: relative;
+  background: transparent !important;
 }
 
-body::before {
+body[data-custom-bg]::before {
   content: '';
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
+  background-image: var(--custom-background-url);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   background-attachment: fixed;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.3s ease-in-out;
+  opacity: 0.3;
 }
 
-body[data-custom-bg]::before {
-  opacity: 1;
-  background-image: var(--custom-background-url);
-}
-
-/* Ajusta a opacidade do plano de fundo principal para deixar a imagem visível */
-body[data-custom-bg] {
-  background: transparent !important;
-}
-
-body[data-custom-bg] > #root {
+#root {
   position: relative;
-  z-index: 1;
+  z-index: 10;
+}
+
+/* Adicionar transparência aos elementos para ver o fundo */
+body[data-custom-bg] .premium-card,
+body[data-custom-bg] [class*="bg-"],
+body[data-custom-bg] .neon-card {
+  background-color: rgba(var(--bg-primary-rgb, 10, 10, 13), 0.85) !important;
+  backdrop-filter: blur(10px);
 }
