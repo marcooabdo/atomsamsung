@@ -151,15 +151,18 @@ Deno.serve(async (req: Request) => {
 
       const osUpdateData: Record<string, unknown> = {
         status_orcamento_link: status,
-        mensagem_cliente_orcamento: mensagem || null
+        mensagem_cliente_orcamento: mensagem || null,
+        updated_at: new Date().toISOString()
       };
 
       if (status === 'aprovado') {
         osUpdateData.orcamento_aprovado = true;
         osUpdateData.orcamento_aprovado_em = new Date().toISOString();
+        osUpdateData.coluna_kanban = 'orcamento_aprovado';
       } else if (status === 'rejeitado') {
         osUpdateData.orcamento_aprovado = false;
         osUpdateData.orcamento_reprovado_em = new Date().toISOString();
+        osUpdateData.coluna_kanban = 'orcamentos_rejeitados';
       }
 
       await supabase
