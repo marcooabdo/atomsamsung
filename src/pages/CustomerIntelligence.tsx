@@ -79,6 +79,7 @@ export default function CustomerIntelligence() {
   const [clientes, setClientes] = useState<Cliente[]>([]);
   const [vendedores, setVendedores] = useState<Vendedor[]>([]);
   const [pecasPopulares, setPecasPopulares] = useState<PecaPopular[]>([]);
+  const [dadosMensais, setDadosMensais] = useState<{ mes: string; faturamento: number; orcamentos: number }[]>([]);
   const [selectedCliente, setSelectedCliente] = useState<Cliente | null>(null);
   const [selectedVendedor, setSelectedVendedor] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -153,7 +154,8 @@ export default function CustomerIntelligence() {
           id, cliente_nome, cliente_cpf_cnpj, cliente_telefone, cliente_email,
           cliente_logradouro, cliente_numero, cliente_bairro, cliente_cidade, cliente_estado,
           tipo_os, valor_total, valor_pecas, valor_servicos, desconto_valor, desconto_tipo,
-          created_at, fechada_em, coluna_kanban, criado_por, unidade_id
+          created_at, fechada_em, coluna_kanban, criado_por, unidade_id,
+          vendedor_responsavel_id, orcamento_aprovado_em
         `)
         .gte('created_at', start.toISOString())
         .lte('created_at', end.toISOString());
@@ -222,16 +224,38 @@ export default function CustomerIntelligence() {
         const existing = clientesMap.get(key);
         const valor = Number(os.valor_total) || 0;
         const desconto = Number(os.desconto_valor) || 0;
-        const criador = usuariosMap.get(os.criado_por);
+        const vendedorId = (os as any).vendedor_responsavel_id || os.criado_por;
+        const vendedor = usuariosMap.get(vendedorId);
+        const isAprovado = os.coluna_kanban === 'orcamento_aprovado' ||
+                          os.coluna_kanban === 'aguardando_peca' ||
+                          os.coluna_kanban === 'peca_em_transito' ||
+                          os.coluna_kanban === 'peca_disponivel' ||
+                          os.coluna_kanban === 'em_reparo_ci' ||
+                          os.coluna_kanban === 'disponivel_ih' ||
+                          os.coluna_kanban === 'em_rota_ih' ||
+                          os.coluna_kanban === 'saw' ||
+                          os.coluna_kanban === 'controle_qualidade' ||
+                          os.coluna_kanban === 'reparo_concluido' ||
+                          os.coluna_kanban === 'aguardando_fechamento' ||
+                          os.coluna_kanban === 'fechar_os' ||
+                          os.coluna_kanban === 'os_fechada' ||
+                          (os as any).orcamento_aprovado_em != null;
 
         if (existing) {
-          existing.totalGasto += valor;
-          existing.totalCompras += 1;
-          existing.descontoMedio = (existing.descontoMedio + desconto) / 2;
-          if (os.fechada_em && os.fechada_em > existing.ultimaCompra) {
-            existing.ultimaCompra = os.fechada_em;
+          if (isAprovado) {
+            existing.totalGasto += valor;
+            existing.totalCompras += 1;
           }
-        } else {
+          existing.descontoMedio = (existing.descontoMedio + desconto) / 2;
+          const dataRef = os.fechada_em || (os as any).orcamento_aprovado_em || os.created_at;
+          if (dataRef && dataRef > existing.ultimaCompra) {
+            existing.ultimaCompra = dataRef;
+          }
+          if (!existing.vendedorId && vendedorId) {
+            existing.vendedorId = vendedorId;
+            existing.vendedorNome = vendedor?.nome || 'N/A';
+          }
+        } else if (isAprovado) {
           clientesMap.set(key, {
             id: key,
             nome: os.cliente_nome || 'Cliente',
@@ -244,13 +268,13 @@ export default function CustomerIntelligence() {
             totalGasto: valor,
             totalCompras: 1,
             ticketMedio: valor,
-            ultimaCompra: os.fechada_em || os.created_at,
-            vendedorId: os.criado_por,
-            vendedorNome: criador?.nome || 'N/A',
+            ultimaCompra: os.fechada_em || (os as any).orcamento_aprovado_em || os.created_at,
+            vendedorId: vendedorId,
+            vendedorNome: vendedor?.nome || 'N/A',
             margemMedia: 0,
             descontoMedio: desconto,
             pecasMaisCompradas: [],
-            status: os.coluna_kanban === 'finalizado' ? 'ativo' : 'pendente'
+            status: os.coluna_kanban === 'os_fechada' ? 'ativo' : 'pendente'
           });
         }
       });
@@ -408,12 +432,63 @@ export default function CustomerIntelligence() {
         .sort((a, b) => b.faturamentoTotal - a.faturamentoTotal);
       setVendedores(vendedoresArray);
 
+      const mesesNomes = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const mensaisMap = new Map<string, { faturamento: number; orcamentos: number }>();
+
+      (osData || []).forEach(os => {
+        const isAprovado = os.coluna_kanban === 'orcamento_aprovado' ||
+                          os.coluna_kanban === 'aguardando_peca' ||
+                          os.coluna_kanban === 'peca_em_transito' ||
+                          os.coluna_kanban === 'peca_disponivel' ||
+                          os.coluna_kanban === 'em_reparo_ci' ||
+                          os.coluna_kanban === 'disponivel_ih' ||
+                          os.coluna_kanban === 'em_rota_ih' ||
+                          os.coluna_kanban === 'saw' ||
+                          os.coluna_kanban === 'controle_qualidade' ||
+                          os.coluna_kanban === 'reparo_concluido' ||
+                          os.coluna_kanban === 'aguardando_fechamento' ||
+                          os.coluna_kanban === 'fechar_os' ||
+                          os.coluna_kanban === 'os_fechada' ||
+                          (os as any).orcamento_aprovado_em != null;
+        if (!isAprovado) return;
+
+        const dataRef = (os as any).orcamento_aprovado_em || os.created_at;
+        const data = new Date(dataRef);
+        const mesKey = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}`;
+        const valor = Number(os.valor_total) || 0;
+
+        const existing = mensaisMap.get(mesKey);
+        if (existing) {
+          existing.faturamento += valor;
+          existing.orcamentos += 1;
+        } else {
+          mensaisMap.set(mesKey, { faturamento: valor, orcamentos: 1 });
+        }
+      });
+
+      const dadosMensaisArray = Array.from(mensaisMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .slice(-6)
+        .map(([key, data]) => {
+          const [ano, mes] = key.split('-');
+          return {
+            mes: `${mesesNomes[parseInt(mes) - 1]}/${ano.slice(2)}`,
+            faturamento: data.faturamento,
+            orcamentos: data.orcamentos
+          };
+        });
+      setDadosMensais(dadosMensaisArray);
+
       const totalFaturamento = clientesArray.reduce((sum, c) => sum + c.totalGasto, 0);
       const ticketMedioGeral = clientesArray.length > 0
         ? totalFaturamento / clientesArray.reduce((sum, c) => sum + c.totalCompras, 0)
         : 0;
       const topCliente = clientesArray[0];
       const topVendedor = vendedoresArray[0];
+
+      const mesAtual = dadosMensaisArray[dadosMensaisArray.length - 1]?.faturamento || 0;
+      const mesAnterior = dadosMensaisArray[dadosMensaisArray.length - 2]?.faturamento || 0;
+      const crescimentoCalc = mesAnterior > 0 ? ((mesAtual - mesAnterior) / mesAnterior) * 100 : 0;
 
       setKpis({
         ticketMedioGeral,
@@ -423,7 +498,7 @@ export default function CustomerIntelligence() {
         vendedorDestaqueValor: topVendedor?.faturamentoTotal || 0,
         totalFaturamento,
         totalClientes: clientesArray.length,
-        crescimento: Math.random() * 20 - 5
+        crescimento: crescimentoCalc
       });
 
     } catch (error) {
@@ -514,13 +589,12 @@ export default function CustomerIntelligence() {
   }, [vendedores]);
 
   const areaData = useMemo(() => {
-    const months = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun'];
-    return months.map((month, i) => ({
-      name: month,
-      faturamento: Math.random() * 50000 + 20000,
-      clientes: Math.floor(Math.random() * 50) + 20
+    return dadosMensais.map(d => ({
+      name: d.mes,
+      faturamento: d.faturamento,
+      orcamentos: d.orcamentos
     }));
-  }, []);
+  }, [dadosMensais]);
 
   if (loading) {
     return (
@@ -797,11 +871,11 @@ export default function CustomerIntelligence() {
                       contentStyle={{ backgroundColor: '#1E293B', border: '1px solid #06B6D4', borderRadius: '12px' }}
                       formatter={(value: number, name: string) => [
                         name === 'faturamento' ? formatCurrency(value) : value,
-                        name === 'faturamento' ? 'Faturamento' : 'Clientes'
+                        name === 'faturamento' ? 'Faturamento' : 'Orcamentos Aprovados'
                       ]}
                     />
                     <Area type="monotone" dataKey="faturamento" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#areaGradient)" />
-                    <Line type="monotone" dataKey="clientes" stroke="#F59E0B" strokeWidth={2} dot={{ fill: '#F59E0B', strokeWidth: 2 }} />
+                    <Line type="monotone" dataKey="orcamentos" stroke="#F59E0B" strokeWidth={2} dot={{ fill: '#F59E0B', strokeWidth: 2 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
