@@ -62,9 +62,9 @@ export default function MapaRastreamento() {
 
     const [posRes, baseRes, agendRes] = await Promise.all([
       supabase.rpc('get_latest_tecnico_positions', { p_unidade_id: selectedUnidade }),
-      supabase.from('unidades').select('latitude, longitude, lat_base, lng_base').eq('id', selectedUnidade).maybeSingle(),
+      supabase.from('unidades').select('latitude, longitude').eq('id', selectedUnidade).maybeSingle(),
       supabase.from('agendamentos')
-        .select('id, os_id, tecnico_id, status, periodo, data_agendamento, os:os!agendamentos_os_id_fkey(numero_os, cliente_nome, cliente_cidade, lat, lng, rota_cor, coluna_kanban), tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)')
+        .select('id, os_id, tecnico_id, status, periodo, data_agendamento, os:os!agendamentos_os_id_fkey(numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, lat, lng, rota_cor, coluna_kanban), tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)')
         .eq('unidade_id', selectedUnidade)
         .eq('data_agendamento', new Date().toISOString().split('T')[0])
         .neq('status', 'cancelado'),
@@ -73,8 +73,8 @@ export default function MapaRastreamento() {
     if (posRes.data) setTecnicos(posRes.data);
 
     if (baseRes.data) {
-      const lat = baseRes.data.latitude || baseRes.data.lat_base;
-      const lng = baseRes.data.longitude || baseRes.data.lng_base;
+      const lat = baseRes.data.latitude;
+      const lng = baseRes.data.longitude;
       if (lat && lng) setBaseLoc({ lat: Number(lat), lng: Number(lng) });
     }
 
@@ -82,7 +82,7 @@ export default function MapaRastreamento() {
       setAgenda(agendRes.data.filter((a: any) => a.os?.lat && a.os?.lng).map((a: any) => ({
         id: a.id,
         os_id: a.os_id,
-        numero_os: a.os?.numero_os || '',
+        numero_os: a.os?.numero_os_samsung || a.os?.numero_os_interna || '',
         cliente_nome: a.os?.cliente_nome || '',
         cliente_cidade: a.os?.cliente_cidade || '',
         lat: Number(a.os.lat),

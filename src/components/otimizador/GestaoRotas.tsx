@@ -63,7 +63,7 @@ export default function GestaoRotas() {
 
     const { data: osDisponivel } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_endereco, cliente_cep, tipo_atendimento, tipo_os, prioridade, coluna_kanban, lat, lng, created_at, unidade_id')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_endereco, cliente_cep, tipo_atendimento, tipo_os, coluna_kanban, lat, lng, created_at, unidade_id')
       .eq('unidade_id', selectedUnidade)
       .eq('coluna_kanban', 'peca_disponivel')
       .order('created_at', { ascending: true });
@@ -73,7 +73,7 @@ export default function GestaoRotas() {
     const rotaKanbans = ROTA_COLUMNS.map(r => r.kanban);
     const { data: osEmRotas } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_endereco, cliente_cep, tipo_atendimento, tipo_os, prioridade, coluna_kanban, lat, lng, created_at, unidade_id')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_endereco, cliente_cep, tipo_atendimento, tipo_os, coluna_kanban, lat, lng, created_at, unidade_id')
       .eq('unidade_id', selectedUnidade)
       .in('coluna_kanban', rotaKanbans)
       .order('created_at', { ascending: true });

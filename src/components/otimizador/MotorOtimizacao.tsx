@@ -241,7 +241,6 @@ export default function MotorOtimizacao() {
           cliente_cidade,
           cliente_cep,
           tipo_atendimento,
-          prioridade,
           coluna_kanban,
           lat,
           lng,
@@ -295,7 +294,7 @@ export default function MotorOtimizacao() {
           lat: osLat,
           lng: osLng,
           tipo_atendimento: os.tipo_atendimento,
-          prioridade: os.prioridade || 'normal',
+          prioridade: 'normal',
           tempo_estimado: unidadeConfig!.tempo_medio_ih,
           coluna_kanban: os.coluna_kanban,
         });
