@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf';
 interface OrcamentoData {
   link: {
     id: string;
+    os_id: string;
     status: 'pendente' | 'aprovado' | 'rejeitado' | 'negociando';
     data_resposta: string | null;
     expires_at: string | null;
@@ -127,10 +128,43 @@ export function OrcamentoPublico() {
 
       const result = await response.json();
       setData(result);
+
+      logAcao('aberto', result.link.id, result.link.os_id, null);
     } catch (err: any) {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const logAcao = async (
+    acao: 'aberto' | 'aprovado' | 'reprovado' | 'negociacao',
+    linkId: string,
+    osId: string,
+    mensagemLog: string | null,
+    lat?: number | null,
+    lng?: number | null,
+    endereco?: string | null
+  ) => {
+    try {
+      await supabase.from('orcamento_link_logs').insert({
+        link_id: linkId,
+        os_id: osId,
+        acao,
+        ip_address: null,
+        user_agent: navigator.userAgent,
+        latitude: lat || null,
+        longitude: lng || null,
+        endereco_aproximado: endereco || null,
+        mensagem: mensagemLog,
+        dados_adicionais: {
+          timestamp: new Date().toISOString(),
+          platform: navigator.platform,
+          language: navigator.language
+        }
+      });
+    } catch (err) {
+      console.error('Erro ao logar acao:', err);
     }
   };
 
@@ -224,9 +258,10 @@ export function OrcamentoPublico() {
     abrirCamera();
   };
 
-  const gerarPDFAprovacao = async (): Promise<Blob> => {
+  const gerarPDFCompleto = async (): Promise<Blob> => {
     const doc = new jsPDF();
     const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
     const margin = 15;
     let yPos = 20;
 
@@ -239,18 +274,23 @@ export function OrcamentoPublico() {
     };
 
     const checkPageBreak = (height: number) => {
-      if (yPos + height > doc.internal.pageSize.getHeight() - 20) {
+      if (yPos + height > pageHeight - 20) {
         doc.addPage();
         yPos = 20;
       }
     };
 
+    const acaoTitulo = selectedAction === 'aprovado' ? 'APROVACAO' :
+                       selectedAction === 'rejeitado' ? 'REJEICAO' : 'NEGOCIACAO';
+    const corHeader = selectedAction === 'aprovado' ? [34, 197, 94] :
+                      selectedAction === 'rejeitado' ? [239, 68, 68] : [245, 158, 11];
+
     doc.setFillColor(30, 64, 175);
     doc.rect(0, 0, pageWidth, 35, 'F');
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(18);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text('COMPROVANTE DE APROVACAO DE ORCAMENTO', pageWidth / 2, 15, { align: 'center' });
+    doc.text(`COMPROVANTE DE ${acaoTitulo} DE ORCAMENTO`, pageWidth / 2, 15, { align: 'center' });
     doc.setFontSize(11);
     doc.text(`OS #${data?.os.numero_os_interna || ''}`, pageWidth / 2, 25, { align: 'center' });
 
@@ -261,6 +301,7 @@ export function OrcamentoPublico() {
       addText(data.os.unidade.nome, 12, 'bold');
       addText(`${data.os.unidade.endereco}, ${data.os.unidade.cidade} - ${data.os.unidade.uf}`, 9);
       addText(`Tel: ${data.os.unidade.telefone}`, 9);
+      if (data.os.unidade.cnpj) addText(`CNPJ: ${data.os.unidade.cnpj}`, 9);
       yPos += 5;
     }
 
@@ -319,60 +360,131 @@ export function OrcamentoPublico() {
       if (data.os.cotacao.desconto_valor > 0) {
         addText(`Desconto: - R$ ${data.os.cotacao.desconto_valor.toFixed(2)}`);
       }
-      doc.setFontSize(12);
-      doc.setFont('helvetica', 'bold');
       yPos += 2;
       addText(`TOTAL: R$ ${data.os.cotacao.valor_liquido.toFixed(2)}`, 12, 'bold');
     }
 
     checkPageBreak(50);
     yPos += 10;
-    doc.setFillColor(34, 197, 94);
-    doc.rect(margin, yPos - 5, pageWidth - margin * 2, 25, 'F');
+    doc.setFillColor(corHeader[0], corHeader[1], corHeader[2]);
+    doc.rect(margin, yPos - 5, pageWidth - margin * 2, 30, 'F');
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text('ORCAMENTO APROVADO PELO CLIENTE', pageWidth / 2, yPos + 5, { align: 'center' });
+
+    const statusTexto = selectedAction === 'aprovado' ? 'ORCAMENTO APROVADO PELO CLIENTE' :
+                        selectedAction === 'rejeitado' ? 'ORCAMENTO REJEITADO PELO CLIENTE' :
+                        'CLIENTE SOLICITOU NEGOCIACAO';
+    doc.text(statusTexto, pageWidth / 2, yPos + 5, { align: 'center' });
     doc.setFontSize(10);
-    doc.text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos + 13, { align: 'center' });
-    yPos += 30;
+    doc.text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos + 15, { align: 'center' });
+    yPos += 35;
+    doc.setTextColor(0, 0, 0);
+
+    if (mensagem.trim()) {
+      checkPageBreak(40);
+      const labelMensagem = selectedAction === 'aprovado' ? 'OBSERVACOES DO CLIENTE:' :
+                            selectedAction === 'rejeitado' ? 'MOTIVO DA REJEICAO:' :
+                            'PROPOSTA/SOLICITACAO DO CLIENTE:';
+      addText(labelMensagem, 11, 'bold');
+      doc.setFillColor(245, 245, 245);
+      const mensagemLines = doc.splitTextToSize(mensagem.trim(), pageWidth - margin * 2 - 10);
+      const mensagemHeight = mensagemLines.length * 5 + 10;
+      doc.rect(margin, yPos - 3, pageWidth - margin * 2, mensagemHeight, 'F');
+      doc.setTextColor(60, 60, 60);
+      doc.setFontSize(10);
+      doc.text(mensagemLines, margin + 5, yPos + 5);
+      yPos += mensagemHeight + 10;
+      doc.setTextColor(0, 0, 0);
+    }
+
+    doc.addPage();
+    yPos = 20;
+
+    doc.setFillColor(30, 64, 175);
+    doc.rect(0, 0, pageWidth, 25, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'bold');
+    doc.text('VERIFICACAO DE IDENTIDADE E LOCALIZACAO', pageWidth / 2, 15, { align: 'center' });
+
+    yPos = 40;
     doc.setTextColor(0, 0, 0);
 
     if (localizacaoCapturada) {
-      checkPageBreak(30);
-      addText('GEOLOCALIZACAO DA APROVACAO', 11, 'bold');
+      addText('GEOLOCALIZACAO NO MOMENTO DA RESPOSTA', 12, 'bold');
+      yPos += 3;
+
+      doc.setFillColor(240, 249, 255);
+      doc.rect(margin, yPos - 5, pageWidth - margin * 2, 45, 'F');
+      doc.setDrawColor(59, 130, 246);
+      doc.rect(margin, yPos - 5, pageWidth - margin * 2, 45, 'S');
+
+      yPos += 5;
       addText(`Latitude: ${localizacaoCapturada.latitude.toFixed(6)}`);
       addText(`Longitude: ${localizacaoCapturada.longitude.toFixed(6)}`);
       if (localizacaoCapturada.endereco) {
-        addText(`Endereco: ${localizacaoCapturada.endereco}`);
+        addText(`Endereco Aproximado: ${localizacaoCapturada.endereco}`);
       }
-      addText(`Maps: https://www.google.com/maps?q=${localizacaoCapturada.latitude},${localizacaoCapturada.longitude}`, 8);
-      yPos += 5;
+      doc.setTextColor(59, 130, 246);
+      addText(`Link Google Maps: https://www.google.com/maps?q=${localizacaoCapturada.latitude},${localizacaoCapturada.longitude}`, 8);
+      doc.setTextColor(0, 0, 0);
+      yPos += 15;
+    } else {
+      addText('GEOLOCALIZACAO: Nao disponivel', 12, 'bold');
+      yPos += 10;
     }
 
     if (selfieCapturada) {
-      checkPageBreak(80);
-      addText('FOTO DO CLIENTE NO MOMENTO DA APROVACAO', 11, 'bold');
-      yPos += 3;
+      addText('FOTO DO CLIENTE NO MOMENTO DA RESPOSTA', 12, 'bold');
+      yPos += 5;
+
+      doc.setDrawColor(corHeader[0], corHeader[1], corHeader[2]);
+      doc.setLineWidth(2);
+      doc.rect(margin, yPos, pageWidth - margin * 2, 100, 'S');
+      doc.setLineWidth(0.5);
+
       try {
-        doc.addImage(selfieCapturada, 'JPEG', margin, yPos, 60, 45);
-        yPos += 50;
+        const imgWidth = pageWidth - margin * 2 - 10;
+        const imgHeight = 90;
+        const imgX = margin + 5;
+        const imgY = yPos + 5;
+        doc.addImage(selfieCapturada, 'JPEG', imgX, imgY, imgWidth, imgHeight);
+        yPos += 110;
       } catch (err) {
         console.error('Erro ao adicionar selfie ao PDF:', err);
+        yPos += 10;
+        addText('(Erro ao carregar imagem)', 10);
       }
+    } else {
+      addText('FOTO DO CLIENTE: Nao disponivel', 12, 'bold');
+      yPos += 10;
     }
 
-    checkPageBreak(20);
+    yPos += 10;
+    doc.setFillColor(245, 245, 245);
+    doc.rect(margin, yPos, pageWidth - margin * 2, 35, 'F');
     yPos += 10;
     doc.setFontSize(8);
     doc.setTextColor(100, 100, 100);
-    doc.text('Documento gerado eletronicamente. Este comprovante atesta a aprovacao do orcamento pelo cliente.', pageWidth / 2, yPos, { align: 'center' });
+    const disclaimer = [
+      'DECLARACAO DE AUTENTICIDADE',
+      '',
+      'Este documento foi gerado eletronicamente no momento da resposta do cliente.',
+      'A foto e geolocalizacao foram capturadas do dispositivo do cliente como prova de identidade.',
+      `Registrado em: ${new Date().toLocaleString('pt-BR')}`,
+      `User Agent: ${navigator.userAgent.substring(0, 80)}...`
+    ];
+    disclaimer.forEach(line => {
+      doc.text(line, pageWidth / 2, yPos, { align: 'center' });
+      yPos += 4;
+    });
 
     return doc.output('blob');
   };
 
   const handleRespond = async () => {
-    if (!selectedAction) return;
+    if (!selectedAction || !data) return;
 
     setResponding(true);
     try {
@@ -380,42 +492,61 @@ export function OrcamentoPublico() {
       const longitude = localizacaoCapturada?.longitude || null;
       const enderecoCompleto = localizacaoCapturada?.endereco || null;
 
+      const acaoLog = selectedAction === 'aprovado' ? 'aprovado' :
+                      selectedAction === 'rejeitado' ? 'reprovado' : 'negociacao';
+
+      await logAcao(
+        acaoLog,
+        data.link.id,
+        data.link.os_id,
+        mensagem.trim() || null,
+        latitude,
+        longitude,
+        enderecoCompleto
+      );
+
       let pdfUrl: string | null = null;
 
-      if (selectedAction === 'aprovado' && data) {
-        try {
-          const pdfBlob = await gerarPDFAprovacao();
-          const pdfFileName = `${data.os.numero_os_interna}/comprovante-aprovacao-${Date.now()}.pdf`;
+      try {
+        const pdfBlob = await gerarPDFCompleto();
+        const acaoNome = selectedAction === 'aprovado' ? 'aprovacao' :
+                         selectedAction === 'rejeitado' ? 'rejeicao' : 'negociacao';
+        const pdfFileName = `${data.os.numero_os_interna}/comprovante-${acaoNome}-${Date.now()}.pdf`;
 
-          const { error: uploadError } = await supabase.storage
+        const { error: uploadError } = await supabase.storage
+          .from('os-anexos')
+          .upload(pdfFileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
+
+        if (!uploadError) {
+          const { data: { publicUrl } } = supabase.storage
             .from('os-anexos')
-            .upload(pdfFileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
+            .getPublicUrl(pdfFileName);
+          pdfUrl = publicUrl;
 
-          if (!uploadError) {
-            const { data: { publicUrl } } = supabase.storage
-              .from('os-anexos')
-              .getPublicUrl(pdfFileName);
-            pdfUrl = publicUrl;
+          const { data: linkData } = await supabase
+            .from('orcamento_links')
+            .select('os_id')
+            .eq('token', token)
+            .maybeSingle();
 
-            const { data: linkData } = await supabase
-              .from('orcamento_links')
-              .select('os_id')
-              .eq('token', token)
-              .maybeSingle();
+          if (linkData?.os_id) {
+            const descricaoAnexo = selectedAction === 'aprovado'
+              ? 'Comprovante de APROVACAO do orcamento pelo cliente'
+              : selectedAction === 'rejeitado'
+              ? 'Comprovante de REJEICAO do orcamento pelo cliente'
+              : 'Comprovante de NEGOCIACAO do orcamento pelo cliente';
 
-            if (linkData?.os_id) {
-              await supabase.from('os_anexos').insert({
-                os_id: linkData.os_id,
-                url: pdfUrl,
-                tipo: 'pdf',
-                nome_arquivo: `comprovante-aprovacao-${data.os.numero_os_interna}.pdf`,
-                descricao: 'Comprovante de aprovacao do orcamento pelo cliente'
-              });
-            }
+            await supabase.from('os_anexos').insert({
+              os_id: linkData.os_id,
+              url: pdfUrl,
+              tipo: 'pdf',
+              nome_arquivo: `comprovante-${acaoNome}-${data.os.numero_os_interna}.pdf`,
+              descricao: descricaoAnexo
+            });
           }
-        } catch (err) {
-          console.error('Erro ao gerar PDF:', err);
         }
+      } catch (err) {
+        console.error('Erro ao gerar PDF:', err);
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-orcamento-publico?token=${token}&action=respond`;
