@@ -193,12 +193,38 @@ export function Kanban() {
   const [infoModalData, setInfoModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
   const [mandatoryRoutePickerOS, setMandatoryRoutePickerOS] = useState<OS | null>(null);
   const [pendingMandatoryMove, setPendingMandatoryMove] = useState<{ targetColumn: string; position?: number } | null>(null);
+  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
       return '#ffffff';
     }
     return originalColor;
+  };
+
+  const normalizeCidade = (cidade: string | null | undefined): string => {
+    if (!cidade) return '';
+    return cidade
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '') // Remove acentos
+      .trim();
+  };
+
+  const findRotaByCidade = (cidade: string | null | undefined): { coluna: string; nome: string } | null => {
+    if (!cidade) return null;
+    const cidadeNormalizada = normalizeCidade(cidade);
+
+    for (const rota of rotas) {
+      const cidadesNormalizadas = rota.cidades.map(c => normalizeCidade(c));
+      if (cidadesNormalizadas.includes(cidadeNormalizada)) {
+        return {
+          coluna: rota.coluna_kanban,
+          nome: rota.nome
+        };
+      }
+    }
+    return null;
   };
 
   const getTATLimite = (tipoOS: string, tipoAtendimento: string): number => {
@@ -616,6 +642,20 @@ export function Kanban() {
       }, {} as Record<string, OS[]>);
 
       setOsData(grouped);
+
+      // Carregar rotas da unidade para validação de cidades IH
+      const unidadeParaRotas = selectedUnidade || usuario?.unidade_id;
+      if (unidadeParaRotas) {
+        const { data: rotasData } = await supabase
+          .from('rotas')
+          .select('id, nome, cidades, coluna_kanban')
+          .eq('unidade_id', unidadeParaRotas)
+          .eq('ativa', true);
+
+        if (rotasData) {
+          setRotas(rotasData);
+        }
+      }
     } catch (error) {
       console.error('Erro ao carregar dados do Kanban:', error);
     } finally {
@@ -819,12 +859,30 @@ export function Kanban() {
     const isOrigemOSNova = draggedCard.coluna_kanban === 'os_nova';
     const isOSIH = draggedCard.tipo_atendimento === 'IH';
 
-    // REGRA: OS IH saindo de "os_nova" DEVE ter rota designada OBRIGATORIAMENTE
-    if (isOrigemOSNova && isOSIH && !draggedCard.rota_id) {
-      setMandatoryRoutePickerOS(draggedCard);
-      setPendingMandatoryMove({ targetColumn, position: finalPosition });
-      setDraggedCard(null);
-      return;
+    // REGRA: OS IH SEMPRE DEVE ter rota (cor) designada para ser movida
+    // Verificar se a cidade tem uma cor de rota cadastrada
+    if (isOSIH && isOrigemOSNova && !isSameColumn) {
+      const cidadeOS = draggedCard.cliente_cidade;
+      const rotaEncontrada = findRotaByCidade(cidadeOS);
+
+      if (!rotaEncontrada) {
+        // Cidade não tem cor de rota definida - BLOQUEAR e mostrar modal
+        setErrorModalData({
+          title: 'Cor de Rota Obrigatória',
+          message: `A cidade "${cidadeOS || 'SEM CIDADE'}" não possui uma cor de rota designada.\n\nÉ OBRIGATÓRIO definir a cor da rota para esta cidade antes de movimentar esta OS.\n\nProcure o responsável pelo setor de roteirização para saber qual cor de rota deve ser cadastrada para esta cidade.`
+        });
+        setShowErrorModal(true);
+        setDraggedCard(null);
+        return;
+      }
+
+      // Se a cidade tem rota mas a OS não tem rota_id definida, forçar seleção
+      if (!draggedCard.rota_id) {
+        setMandatoryRoutePickerOS(draggedCard);
+        setPendingMandatoryMove({ targetColumn, position: finalPosition });
+        setDraggedCard(null);
+        return;
+      }
     }
 
     // Se for reordenação na mesma coluna
@@ -1281,19 +1339,36 @@ export function Kanban() {
         novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
       }
 
+      // Normalizar e corrigir nome da cidade
+      const rotaSelecionada = rotas.find(r => r.coluna_kanban === rotaColumn);
+      const cidadeAtual = mandatoryRoutePickerOS.cliente_cidade;
+      let cidadeCorrigida = cidadeAtual;
+
+      if (rotaSelecionada && cidadeAtual) {
+        const cidadeNormalizada = normalizeCidade(cidadeAtual);
+        // Buscar a cidade correta na lista de cidades da rota (com capitalização e acentos corretos)
+        const cidadeCorrectaNaLista = rotaSelecionada.cidades.find(
+          c => normalizeCidade(c) === cidadeNormalizada
+        );
+        if (cidadeCorrectaNaLista) {
+          cidadeCorrigida = cidadeCorrectaNaLista;
+        }
+      }
+
       const { error } = await supabase
         .from('os')
         .update({
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
           rota_id: rotaIdMap[rotaColumn],
+          cliente_cidade: cidadeCorrigida,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
 
       if (error) throw error;
 
-      const updatedCard = { ...mandatoryRoutePickerOS, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: rotaIdMap[rotaColumn] };
+      const updatedCard = { ...mandatoryRoutePickerOS, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: rotaIdMap[rotaColumn], cliente_cidade: cidadeCorrigida };
 
       setOsData(prevData => {
         const newData = { ...prevData };
