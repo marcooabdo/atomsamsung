@@ -38,7 +38,7 @@ const allMenuItems = [
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
-  { id: 'customer-intelligence', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence', glow: true },
+  { id: 'customer-intelligence', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
   { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
   { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
   { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
