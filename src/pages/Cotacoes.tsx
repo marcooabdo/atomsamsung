@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { CotacaoModal } from '../components/CotacaoModal';
+import { WhatsAppSendModal } from '../components/WhatsAppSendModal';
 
 type Cotacao = Database['public']['Tables']['cotacoes']['Row'] & {
   valor_calculado?: number;
