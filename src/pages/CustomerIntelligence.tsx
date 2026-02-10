@@ -6,7 +6,7 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { useCIData } from '../components/ci/useCIData';
-import { PecaCI, getValorCliente } from '../components/ci/types';
+import { PecaCI, CI_FILTERS, getValorCliente } from '../components/ci/types';
 import { exportExcel, generateHTMLReport } from '../components/ci/ciExport';
 import CIDashboardTab from '../components/ci/CIDashboardTab';
 import CICarteiraTab from '../components/ci/CICarteiraTab';
@@ -44,7 +44,7 @@ export default function CustomerIntelligence() {
   const {
     loading, refreshing, refresh,
     allClientes, allVendedores, allPecas,
-    dadosMensais, kpis, tiposOSDisponiveis
+    dadosMensais, kpis
   } = useCIData(usuario?.unidade_id || null, isGerente, selectedUnidade, periodoFiltro);
 
   const filteredClientes = useMemo(() => {
@@ -111,7 +111,6 @@ export default function CustomerIntelligence() {
   }, [kpis, tipoFiltro, filteredClientes, filteredVendedores]);
 
   const carteiraLabel = isGerente ? 'Carteira de Vendas' : 'Minha Carteira';
-  const tipoFilters = ['geral', ...tiposOSDisponiveis];
 
   const handleExportExcel = () => exportExcel(filteredClientes, filteredVendedores, filteredPecas, filteredKpis);
   const handleReport = () => generateHTMLReport(
@@ -165,7 +164,7 @@ export default function CustomerIntelligence() {
             )}
 
             <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-slate-800/50 border border-cyan-500/30">
-              {tipoFilters.map(tipo => (
+              {CI_FILTERS.map(tipo => (
                 <button
                   key={tipo}
                   onClick={() => setTipoFiltro(tipo)}
