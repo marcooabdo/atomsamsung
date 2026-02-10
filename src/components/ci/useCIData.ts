@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import {
-  APPROVED_STAGES, ClienteCI, VendedorCI, PecaCI, CIKPIs, DadoMensal, OSRecord,
+  APPROVED_STAGES, ORCAMENTO_TO_CATEGORY, ClienteCI, VendedorCI, PecaCI, CIKPIs, DadoMensal, OSRecord,
   getValorCliente
 } from './types';
 
@@ -18,6 +18,7 @@ interface RawOS {
   cliente_cidade: string | null;
   cliente_estado: string | null;
   tipo_os: string;
+  tipo_orcamento: string | null;
   valor_total: string;
   valor_pecas: string | null;
   valor_servicos: string | null;
@@ -50,7 +51,6 @@ export function useCIData(
     vendedorDestaque: 'N/A', vendedorDestaqueValor: 0,
     crescimento: 0, totalClientes: 0
   });
-  const [tiposOSDisponiveis, setTiposOSDisponiveis] = useState<string[]>([]);
   const usuariosMapRef = useRef<Map<string, { id: string; nome: string; tipo: string }>>(new Map());
 
   const getDateStart = useCallback(() => {
@@ -75,7 +75,7 @@ export function useCIData(
         .select(`
           id, numero_os_interna, cliente_nome, cliente_cpf_cnpj, cliente_telefone, cliente_email,
           cliente_logradouro, cliente_numero, cliente_bairro, cliente_cidade, cliente_estado,
-          tipo_os, valor_total, valor_pecas, valor_servicos,
+          tipo_os, tipo_orcamento, valor_total, valor_pecas, valor_servicos,
           created_at, fechada_em, coluna_kanban, unidade_id,
           vendedor_responsavel_id, orcamento_aprovado_em, defeito_relatado, aparelho_modelo, numero_os_samsung
         `)
@@ -87,10 +87,6 @@ export function useCIData(
       const { data: osData, error: osError } = await osQuery;
       if (osError) throw osError;
       const osList = (osData || []) as RawOS[];
-
-      const tipos = [...new Set(osList.map(o => o.tipo_os).filter(Boolean))].sort();
-      setTiposOSDisponiveis(tipos);
-
       const osIds = osList.map(o => o.id);
 
       const [pagamentosData, pecasData, usuariosData] = await Promise.all([
@@ -129,10 +125,14 @@ export function useCIData(
         const valorFinal = valorPago > 0 ? valorPago : valorOS;
 
         const osPecas = pecasPorOS.get(os.id) || [];
+        const tipoOrc = os.tipo_orcamento || 'normal';
+        const categoria = ORCAMENTO_TO_CATEGORY[tipoOrc] || 'OW';
         const osRecord: OSRecord = {
           id: os.id,
           numero_os_interna: os.numero_os_interna,
           tipo_os: os.tipo_os,
+          tipo_orcamento: tipoOrc,
+          categoria,
           coluna_kanban: os.coluna_kanban,
           valor_total: valorOS,
           valor_pago: valorPago,
@@ -162,7 +162,7 @@ export function useCIData(
           existing.totalPago += valorPago;
           existing.totalOS += 1;
           existing.osRecords.push(osRecord);
-          if (!existing.tiposOS.includes(os.tipo_os)) existing.tiposOS.push(os.tipo_os);
+          if (!existing.tiposOS.includes(categoria)) existing.tiposOS.push(categoria);
           const dataRef = os.orcamento_aprovado_em || os.fechada_em || os.created_at;
           if (dataRef && dataRef > existing.ultimaOS) existing.ultimaOS = dataRef;
           if (!existing.vendedorId && vendedorId) {
@@ -188,7 +188,7 @@ export function useCIData(
             vendedorId,
             vendedorNome,
             status: os.coluna_kanban === 'os_fechada' ? 'ativo' : 'pendente',
-            tiposOS: [os.tipo_os],
+            tiposOS: [categoria],
             osRecords: [osRecord],
             pecas: []
           });
@@ -325,7 +325,7 @@ export function useCIData(
   return {
     loading, refreshing, refresh,
     allClientes, allVendedores, allPecas,
-    dadosMensais, kpis, tiposOSDisponiveis
+    dadosMensais, kpis
   };
 }
 

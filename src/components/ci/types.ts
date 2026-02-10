@@ -36,16 +36,18 @@ export const KANBAN_COLORS: Record<string, string> = {
   'os_fechada': 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30'
 };
 
-export const TIPO_OS_LABELS: Record<string, string> = {
-  'OW': 'OW',
-  'LP': 'LP',
-  'NA': 'NA'
+export const ORCAMENTO_TO_CATEGORY: Record<string, string> = {
+  'samsung_contigo': 'SC',
+  'acessorios': 'ACC',
+  'normal': 'OW'
 };
 
-export const TIPO_OS_COLORS: Record<string, string> = {
-  'OW': 'text-blue-400 bg-blue-500/20 border-blue-500/30',
-  'LP': 'text-amber-400 bg-amber-500/20 border-amber-500/30',
-  'NA': 'text-slate-400 bg-slate-500/20 border-slate-500/30'
+export const CI_FILTERS = ['geral', 'SC', 'ACC', 'OW'] as const;
+
+export const CI_FILTER_COLORS: Record<string, string> = {
+  'SC': 'text-amber-400 bg-amber-500/20 border-amber-500/30',
+  'ACC': 'text-teal-400 bg-teal-500/20 border-teal-500/30',
+  'OW': 'text-blue-400 bg-blue-500/20 border-blue-500/30'
 };
 
 export const CHART_COLORS = ['#06B6D4', '#3B82F6', '#F59E0B', '#10B981', '#EC4899', '#0EA5E9', '#14B8A6', '#F97316'];
@@ -57,6 +59,8 @@ export interface OSRecord {
   id: string;
   numero_os_interna: string;
   tipo_os: string;
+  tipo_orcamento: string;
+  categoria: string;
   coluna_kanban: string;
   valor_total: number;
   valor_pago: number;

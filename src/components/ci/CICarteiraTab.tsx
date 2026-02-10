@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search, Filter, ChevronDown, Users, Phone, Mail, MapPin,
   CheckCircle, Clock, Award, ShoppingCart, Package, ChevronRight,
@@ -7,7 +7,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClienteCI, VendedorCI, OSRecord, GLASS, GLASS_INNER,
-  KANBAN_LABELS, KANBAN_COLORS, TIPO_OS_COLORS,
+  KANBAN_LABELS, KANBAN_COLORS, CI_FILTER_COLORS,
   formatCurrency, formatDate, getValorCliente
 } from './types';
 
@@ -27,6 +27,13 @@ export default function CICarteiraTab({
 }: Props) {
   const [selectedCliente, setSelectedCliente] = useState<ClienteCI | null>(null);
   const [expandedOS, setExpandedOS] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (selectedCliente && !clientes.find(c => c.id === selectedCliente.id)) {
+      setSelectedCliente(null);
+      setExpandedOS(null);
+    }
+  }, [clientes, selectedCliente]);
 
   return (
     <div className="space-y-5">
@@ -102,7 +109,7 @@ export default function CICarteiraTab({
                   <div className="flex items-center justify-between mt-2.5 ml-8">
                     <div className="flex items-center gap-1.5">
                       {cliente.tiposOS.map(tipo => (
-                        <span key={tipo} className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${TIPO_OS_COLORS[tipo] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
+                        <span key={tipo} className={`px-1.5 py-0.5 rounded text-[10px] font-medium border ${CI_FILTER_COLORS[tipo] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
                           {tipo}
                         </span>
                       ))}
@@ -146,7 +153,7 @@ export default function CICarteiraTab({
                         <span className="text-slate-400 text-sm">{selectedCliente.documento}</span>
                         <div className="flex gap-1">
                           {selectedCliente.tiposOS.map(tipo => (
-                            <span key={tipo} className={`px-2 py-0.5 rounded text-xs font-medium border ${TIPO_OS_COLORS[tipo] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
+                            <span key={tipo} className={`px-2 py-0.5 rounded text-xs font-medium border ${CI_FILTER_COLORS[tipo] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
                               {tipo}
                             </span>
                           ))}
@@ -226,8 +233,8 @@ export default function CICarteiraTab({
                                 <Hash className="w-3.5 h-3.5 text-cyan-400" />
                                 <span className="font-mono font-semibold text-white text-sm">{os.numero_os_interna}</span>
                               </div>
-                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${TIPO_OS_COLORS[os.tipo_os] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
-                                {os.tipo_os}
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-medium border ${CI_FILTER_COLORS[os.categoria] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
+                                {os.categoria}
                               </span>
                               <span className={`px-2 py-0.5 rounded text-[10px] border ${KANBAN_COLORS[os.coluna_kanban] || 'text-slate-400 bg-slate-500/20 border-slate-500/30'}`}>
                                 {KANBAN_LABELS[os.coluna_kanban] || os.coluna_kanban}
@@ -250,9 +257,11 @@ export default function CICarteiraTab({
                                 className="overflow-hidden"
                               >
                                 <div className="p-4 border-t border-slate-700/30 bg-slate-900/40 space-y-4">
-                                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                                     <MiniStat label="Valor Total" value={formatCurrency(os.valor_total)} />
                                     <MiniStat label="Valor Pago" value={formatCurrency(os.valor_pago)} highlight />
+                                    <MiniStat label="Servicos" value={formatCurrency(os.valor_servicos)} />
+                                    <MiniStat label="Pecas" value={formatCurrency(os.valor_pecas)} />
                                     <MiniStat label="Aprovado em" value={formatDate(os.orcamento_aprovado_em)} />
                                     <MiniStat label="Fechada em" value={formatDate(os.fechada_em)} />
                                   </div>
