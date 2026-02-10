@@ -1703,7 +1703,7 @@ export function Kanban() {
                 }}
               >
                 <Settings className="w-3.5 h-3.5" />
-                ACAO
+                AÇÃO
                 <ChevronDown className={`w-3 h-3 transition-transform ${showActionMenu ? 'rotate-180' : ''}`} />
               </button>
 
