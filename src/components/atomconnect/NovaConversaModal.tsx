@@ -44,16 +44,27 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
   }, [osSearch]);
 
   const searchOS = async (term: string) => {
-    if (!unidadeAtual) return;
+    if (!unidadeAtual) {
+      console.log('Nenhuma unidade selecionada para buscar OS');
+      return;
+    }
     setSearchingOS(true);
 
-    const { data } = await supabase
+    console.log('Buscando OS com termo:', term, 'na unidade:', unidadeAtual);
+
+    const { data, error } = await supabase
       .from('os')
       .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban')
       .eq('unidade_id', unidadeAtual)
       .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%`)
       .order('created_at', { ascending: false })
       .limit(10);
+
+    if (error) {
+      console.error('Erro ao buscar OS:', error);
+    } else {
+      console.log('OS encontradas:', data?.length || 0, data);
+    }
 
     setOsResults(data || []);
     setSearchingOS(false);
@@ -73,53 +84,78 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       alert('Informe um telefone valido');
       return;
     }
-    if (!unidadeAtual) return;
+    if (!unidadeAtual) {
+      alert('Nenhuma unidade selecionada');
+      return;
+    }
 
     setCreating(true);
 
-    const { data: existing } = await supabase
-      .from('atom_connect_conversas')
-      .select('id')
-      .eq('cliente_telefone', cleanPhone)
-      .eq('unidade_id', unidadeAtual)
-      .maybeSingle();
+    try {
+      // Verificar se já existe conversa com esse telefone
+      const { data: existing } = await supabase
+        .from('atom_connect_conversas')
+        .select('id')
+        .eq('cliente_telefone', cleanPhone)
+        .eq('unidade_id', unidadeAtual)
+        .maybeSingle();
 
-    if (existing) {
-      onConversaCriada(existing.id);
-      return;
-    }
+      if (existing) {
+        console.log('Conversa já existe, abrindo:', existing.id);
+        onConversaCriada(existing.id);
+        setCreating(false);
+        return;
+      }
 
-    const { data: firstColumn } = await supabase
-      .from('atom_connect_pipeline_colunas')
-      .select('id')
-      .order('ordem', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      // Buscar a primeira coluna do pipeline (bot_triagem)
+      const { data: firstColumn } = await supabase
+        .from('atom_connect_pipeline_colunas')
+        .select('id')
+        .order('ordem', { ascending: true })
+        .limit(1)
+        .maybeSingle();
 
-    const { data: newConversa, error } = await supabase
-      .from('atom_connect_conversas')
-      .insert({
-        unidade_id: unidadeAtual,
-        cliente_telefone: cleanPhone,
-        cliente_nome: nome || null,
-        os_id: selectedOS?.id || null,
-        coluna_pipeline: firstColumn?.id || null,
-        atendente_id: usuario?.id,
-        is_bot_ativo: false,
-        tipo_atendimento: 'whatsapp',
-        prioridade: 'normal',
-        ultima_mensagem_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+      console.log('Primeira coluna encontrada:', firstColumn);
 
-    if (error || !newConversa) {
-      alert('Erro ao criar conversa');
+      // Criar nova conversa
+      const { data: newConversa, error } = await supabase
+        .from('atom_connect_conversas')
+        .insert({
+          unidade_id: unidadeAtual,
+          cliente_telefone: cleanPhone,
+          cliente_nome: nome || null,
+          os_id: selectedOS?.id || null,
+          coluna_pipeline: firstColumn?.id || 'bot_triagem', // Fallback para bot_triagem
+          atendente_id: usuario?.id || null,
+          is_bot_ativo: false,
+          tipo_atendimento: 'whatsapp',
+          prioridade: 'normal',
+          ultima_mensagem_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('Erro ao criar conversa:', error);
+        alert('Erro ao criar conversa: ' + error.message);
+        setCreating(false);
+        return;
+      }
+
+      if (!newConversa) {
+        console.error('Nenhuma conversa retornada');
+        alert('Erro ao criar conversa');
+        setCreating(false);
+        return;
+      }
+
+      console.log('Conversa criada com sucesso:', newConversa.id);
+      onConversaCriada(newConversa.id);
+    } catch (err) {
+      console.error('Erro inesperado ao criar conversa:', err);
+      alert('Erro inesperado ao criar conversa');
       setCreating(false);
-      return;
     }
-
-    onConversaCriada(newConversa.id);
   };
 
   return (
