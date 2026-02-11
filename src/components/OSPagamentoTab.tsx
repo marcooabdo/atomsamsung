@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
 import { PaymentDetailsModal } from './PaymentDetailsModal';
 import { EditPaymentModal } from './EditPaymentModal';
+import { SuccessModal } from './SuccessModal';
 
 interface OSPagamentoTabProps {
   osId: string;
@@ -39,6 +40,8 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [salvandoVendedor, setSalvandoVendedor] = useState(false);
   const [showVendedorDropdown, setShowVendedorDropdown] = useState(false);
   const [vendedorSearch, setVendedorSearch] = useState('');
+  const [showAprovarModal, setShowAprovarModal] = useState(false);
+  const [showReprovarSuccessModal, setShowReprovarSuccessModal] = useState(false);
 
   const podeEditarVendedor = () => {
     if (!os.vendedor_responsavel_id) return true;
@@ -411,7 +414,7 @@ Assistencia Tecnica Samsung`;
       });
 
       onUpdate();
-      alert('Orcamento aprovado! OS movida para "Orcamento Aprovado".');
+      setShowAprovarModal(true);
     } catch (error: any) {
       alert(`Erro ao aprovar orcamento: ${error.message}`);
     } finally {
@@ -450,7 +453,7 @@ Assistencia Tecnica Samsung`;
       setShowReprovarModal(false);
       setMotivoReprovacao('');
       onUpdate();
-      alert('Orcamento reprovado. OS movida para "Orcamentos Rejeitados".');
+      setShowReprovarSuccessModal(true);
     } catch (error: any) {
       alert(`Erro ao reprovar orcamento: ${error.message}`);
     } finally {
@@ -1543,6 +1546,20 @@ Assistencia Tecnica Samsung`;
           </div>
         </div>
       )}
+
+      <SuccessModal
+        isOpen={showAprovarModal}
+        onClose={() => setShowAprovarModal(false)}
+        title="Orçamento Aprovado"
+        message="Orçamento aprovado com sucesso! OS movida para coluna Orçamento Aprovado."
+      />
+
+      <SuccessModal
+        isOpen={showReprovarSuccessModal}
+        onClose={() => setShowReprovarSuccessModal(false)}
+        title="Orçamento Reprovado"
+        message="Orçamento reprovado. OS movida para coluna Orçamentos Rejeitados."
+      />
     </>
   );
 }

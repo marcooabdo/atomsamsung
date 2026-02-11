@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, DollarSign, Upload, CreditCard, Clock, Save, CheckCircle, FileText, AlertCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { SuccessModal } from './SuccessModal';
 
 interface AddPaymentModalProps {
   os: any;
@@ -27,6 +28,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const [skuMaquininha, setSkuMaquininha] = useState('');
   const [comprovante, setComprovante] = useState<File | null>(null);
   const [observacoes, setObservacoes] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const formasPagamento = [
     { value: 'pix', label: 'PIX', icon: '💳', color: 'var(--text-accent)', isAccent: true },
@@ -264,9 +266,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
         is_system: true
       });
 
-      alert('Pagamento registrado com sucesso!');
-      onSuccess();
-      onClose();
+      setShowSuccessModal(true);
     } catch (error: any) {
       alert(`Erro ao registrar pagamento: ${error.message}`);
       isSubmitting.current = false;
@@ -668,6 +668,17 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
           </div>
         </div>
       </div>
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          onSuccess();
+          onClose();
+        }}
+        title="Sucesso"
+        message="Pagamento registrado com sucesso!"
+      />
     </div>
   );
 }
