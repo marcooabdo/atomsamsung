@@ -289,7 +289,7 @@ export default function AtomConnect() {
             </div>
 
             {/* Unit Filter */}
-            {(usuario?.nivel === 'master' || usuario?.nivel === 'administrador') && unidades && unidades.length > 1 && (
+            {(usuario?.nivel === 'master' || usuario?.nivel === 'administrador') && unidades && unidades.length > 0 && (
               <div className="relative">
                 <button
                   onClick={() => setShowUnidadeFilter(!showUnidadeFilter)}
