@@ -467,6 +467,8 @@ async function processMessage(
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
 
+  let isNewConversa = false;
+
   if (!conversa) {
     if (fromMe) {
       return new Response(JSON.stringify({ skip: "no_conversation_for_sent" }), {
@@ -511,23 +513,7 @@ async function processMessage(
       });
     }
     conversa = newConversa;
-  } else {
-    const updateData: Record<string, any> = {
-      ultima_mensagem: conteudo,
-      ultima_mensagem_at: new Date().toISOString(),
-      cliente_digitando: null,
-      cliente_digitando_at: null,
-    };
-
-    if (!fromMe) {
-      updateData.ultima_resposta_cliente_at = new Date().toISOString();
-      updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
-    }
-
-    await supabase
-      .from("atom_connect_conversas")
-      .update(updateData)
-      .eq("id", conversa.id);
+    isNewConversa = true;
   }
 
   let mediaUrl: string | null = null;
@@ -550,7 +536,33 @@ async function processMessage(
   });
 
   if (msgError) {
+    if (msgError.code === "23505" || msgError.message?.includes("unique") || msgError.message?.includes("duplicate")) {
+      console.log("DUPLICATE blocked by DB constraint:", messageId);
+      return new Response(JSON.stringify({ success: true, duplicate: true }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
+    }
     console.error("Error inserting message:", msgError);
+  }
+
+  if (!isNewConversa) {
+    const updateData: Record<string, any> = {
+      ultima_mensagem: conteudo,
+      ultima_mensagem_at: new Date().toISOString(),
+      cliente_digitando: null,
+      cliente_digitando_at: null,
+    };
+
+    if (!fromMe) {
+      updateData.ultima_resposta_cliente_at = new Date().toISOString();
+      updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
+    }
+
+    await supabase
+      .from("atom_connect_conversas")
+      .update(updateData)
+      .eq("id", conversa.id);
   }
 
   if (!fromMe && tipo === "text" && conteudo) {

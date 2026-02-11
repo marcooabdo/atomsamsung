@@ -66,6 +66,8 @@ export default function AtomConnect() {
   const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(unidadeAtual || null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastNotifiedRef = useRef<Record<string, number>>({});
+  const selectedConversaRef = useRef<Conversa | null>(null);
+  const lastNotificationTimeRef = useRef<Record<string, number>>({});
 
   const loadConversas = useCallback(async () => {
     let query = supabase
@@ -95,6 +97,10 @@ export default function AtomConnect() {
   }, [loadConversas]);
 
   useEffect(() => {
+    selectedConversaRef.current = selectedConversa;
+  }, [selectedConversa]);
+
+  useEffect(() => {
     const filterUnidadeId = unidadeAtual || (usuario?.nivel !== 'master' ? usuario?.unidade_id : null);
 
     const channelConfig: any = {
@@ -118,26 +124,38 @@ export default function AtomConnect() {
             return [newConversa, ...prev];
           });
           if (newConversa.mensagens_nao_lidas > 0) {
-            lastNotifiedRef.current[newConversa.id] = newConversa.mensagens_nao_lidas;
-            showNewMessageNotification(newConversa);
+            const now = Date.now();
+            const lastTime = lastNotificationTimeRef.current[newConversa.id] || 0;
+            if (now - lastTime > 2000) {
+              lastNotifiedRef.current[newConversa.id] = newConversa.mensagens_nao_lidas;
+              lastNotificationTimeRef.current[newConversa.id] = now;
+              showNewMessageNotification(newConversa);
+            }
           }
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new as Conversa;
-          const oldConversa = payload.old as Conversa;
           setConversas(prev => prev.map(c => c.id === updated.id ? updated : c));
-          if (selectedConversa?.id === updated.id) {
+          if (selectedConversaRef.current?.id === updated.id) {
             setSelectedConversa(updated);
           }
-          const previousUnread = lastNotifiedRef.current[updated.id] ?? oldConversa?.mensagens_nao_lidas ?? 0;
+          const previousUnread = lastNotifiedRef.current[updated.id] ?? 0;
           if (updated.mensagens_nao_lidas > previousUnread) {
-            lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
-            showNewMessageNotification(updated);
+            const now = Date.now();
+            const lastTime = lastNotificationTimeRef.current[updated.id] || 0;
+            if (now - lastTime > 2000) {
+              lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
+              lastNotificationTimeRef.current[updated.id] = now;
+              showNewMessageNotification(updated);
+            } else {
+              lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
+            }
           } else {
             lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
           }
         } else if (payload.eventType === 'DELETE') {
           setConversas(prev => prev.filter(c => c.id !== payload.old.id));
           delete lastNotifiedRef.current[payload.old.id];
+          delete lastNotificationTimeRef.current[payload.old.id];
         }
       })
       .on(
@@ -159,7 +177,7 @@ export default function AtomConnect() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [unidadeAtual, selectedConversa, usuario]);
+  }, [unidadeAtual, usuario]);
 
   const showNewMessageNotification = (conversa: Conversa) => {
     const notification: Notification = {
