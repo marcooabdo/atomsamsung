@@ -116,6 +116,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [requisicaoCancelarGI, setRequisicaoCancelarGI] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalSucesso, setMostrarModalSucesso] = useState(false);
   const [dadosOSCriada, setDadosOSCriada] = useState<{ numeroInterna?: string; numeroSamsung?: string } | null>(null);
+  const [mostrarConfirmacaoRequisicao, setMostrarConfirmacaoRequisicao] = useState(false);
+  const [pecaParaRequisitar, setPecaParaRequisitar] = useState<any>(null);
+  const [requisitando, setRequisitando] = useState(false);
 
   // Estados para validação de rota IH
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
@@ -1693,8 +1696,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
-  const handleRequisitarPeca = async (peca: any) => {
+  const handleRequisitarPeca = (peca: any) => {
+    setPecaParaRequisitar(peca);
+    setMostrarConfirmacaoRequisicao(true);
+  };
+
+  const confirmarRequisicao = async () => {
+    if (!pecaParaRequisitar) return;
+
+    setRequisitando(true);
     try {
+      const peca = pecaParaRequisitar;
       console.log('🚀 Requisitando peça LP:', {
         peca_id: peca.id,
         os_peca_id: peca.os_peca_id,
@@ -1758,10 +1770,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       await loadOS();
       onReload?.();
 
-      alert('Requisição enviada! OS movida para "Aguardando Peça".');
+      setMostrarConfirmacaoRequisicao(false);
+      setPecaParaRequisitar(null);
     } catch (error) {
       console.error('Erro ao requisitar peça:', error);
       alert('Erro ao requisitar peça');
+    } finally {
+      setRequisitando(false);
     }
   };
 
@@ -6681,6 +6696,97 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               accentColor="#25D366"
               unidadeId={os.unidade_id}
             />
+          </div>
+        </div>
+      )}
+
+      {mostrarConfirmacaoRequisicao && pecaParaRequisitar && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#39FF14]/20 flex items-center justify-center">
+                  <Package className="w-6 h-6 text-[#39FF14]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Confirmar Requisição</h3>
+                  <p className="text-sm text-gray-400">Confirme a requisição desta peça</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMostrarConfirmacaoRequisicao(false);
+                    setPecaParaRequisitar(null);
+                  }}
+                  disabled={requisitando}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#1A1A1A] rounded-lg p-4 mb-6 border border-[#39FF14]/20">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-400">Código</p>
+                    <p className="text-white font-bold">{pecaParaRequisitar.codigo || pecaParaRequisitar.pn}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Descrição</p>
+                    <p className="text-white">{pecaParaRequisitar.descricao}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Quantidade</p>
+                    <p className="text-white font-bold">{pecaParaRequisitar.quantidade}x</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-500/10 rounded-lg p-4 mb-6 border border-blue-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white text-sm font-bold mb-1">Atenção</p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Ao confirmar, a requisição será criada e a OS será movida para "Aguardando Peça".
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setMostrarConfirmacaoRequisicao(false);
+                    setPecaParaRequisitar(null);
+                  }}
+                  disabled={requisitando}
+                  className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarRequisicao}
+                  disabled={requisitando}
+                  className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{
+                    background: 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)',
+                    color: '#000'
+                  }}
+                >
+                  {requisitando ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      Requisitando...
+                    </>
+                  ) : (
+                    <>
+                      <Package className="w-5 h-5" />
+                      Confirmar Requisição
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
