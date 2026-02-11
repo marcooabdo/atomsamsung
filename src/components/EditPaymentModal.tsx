@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, DollarSign, Upload, Save, AlertCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { SuccessModal } from './SuccessModal';
 
 interface EditPaymentModalProps {
   isOpen: boolean;
@@ -28,6 +29,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
   const [comprovante, setComprovante] = useState<File | null>(null);
   const [observacoes, setObservacoes] = useState(payment?.observacoes || '');
   const [trocarComprovante, setTrocarComprovante] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const formasPagamento = [
     { value: 'pix', label: 'PIX', icon: '💳', color: 'var(--text-accent)' },
@@ -204,9 +206,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
 
       if (error) throw error;
 
-      alert('✅ Pagamento atualizado com sucesso!');
-      onSuccess();
-      onClose();
+      setShowSuccessModal(true);
     } catch (error: any) {
       alert(`❌ Erro ao atualizar pagamento: ${error.message}`);
       isSubmitting.current = false;
@@ -486,6 +486,17 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
           </div>
         </div>
       </div>
+
+      <SuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => {
+          setShowSuccessModal(false);
+          onSuccess();
+          onClose();
+        }}
+        title="Sucesso"
+        message="Pagamento atualizado com sucesso!"
+      />
     </div>
   );
 }
