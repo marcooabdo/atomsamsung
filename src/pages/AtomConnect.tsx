@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MessageSquare, Users, BarChart3, Settings, Zap, Bell, Search,
-  Plus, AlertTriangle, ArrowRight,
-  X, Volume2, VolumeX, Megaphone, GitBranch
+  AlertTriangle, ArrowRight,
+  X, Volume2, VolumeX, Megaphone, GitBranch, Radio
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -63,7 +63,10 @@ export default function AtomConnect() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadConversas = useCallback(async () => {
-    if (!unidadeAtual) return;
+    if (!unidadeAtual) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('atom_connect_conversas')
@@ -212,78 +215,62 @@ export default function AtomConnect() {
     { id: 'settings' as TabType, label: 'Configuracoes', icon: Settings },
   ];
 
-  const getAccentColor = () => {
-    const colors: Record<string, string> = {
-      cyan: '#00D4FF',
-      green: '#39FF14',
-      purple: '#8B5CF6',
-      orange: '#FF6B35',
-      pink: '#FF1493',
-      blue: '#3B82F6'
-    };
-    return colors[theme] || '#00D4FF';
-  };
-
-  const accentColor = getAccentColor();
+  const accentColor = '#00D4FF';
 
   return (
-    <div className="h-full flex flex-col bg-[#0A0A0F] overflow-hidden">
+    <div className="-m-6 h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #060610 0%, #0A0A18 50%, #080814 100%)' }}>
       <audio ref={audioRef} src="/notification.mp3" preload="auto" />
 
-      {/* Header with integrated horizontal tabs */}
-      <header className="flex-shrink-0 border-b border-white/10 bg-black/40 backdrop-blur-xl">
-        {/* Top bar */}
-        <div className="h-14 flex items-center justify-between px-4">
+      {/* Top Bar */}
+      <header className="flex-shrink-0 border-b border-white/[0.06]" style={{ background: 'linear-gradient(180deg, rgba(0,212,255,0.03) 0%, transparent 100%)' }}>
+        <div className="h-12 flex items-center justify-between px-5">
           <div className="flex items-center gap-3">
-            <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{
-                background: `linear-gradient(135deg, ${accentColor}20, ${accentColor}40)`,
-                boxShadow: `0 0 15px ${accentColor}30`
-              }}
-            >
-              <Zap className="w-4 h-4" style={{ color: accentColor }} />
+            <div className="relative">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: 'linear-gradient(135deg, #00D4FF15, #00D4FF30)' }}
+              >
+                <Radio className="w-3.5 h-3.5 text-cyan-400" />
+              </div>
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-400" style={{ boxShadow: '0 0 6px #10b981' }} />
             </div>
             <div>
-              <h1 className="text-sm font-bold text-white leading-tight">ATOM CONNECT</h1>
-              <p className="text-[10px] text-gray-500">Central de Atendimento</p>
+              <h1 className="text-xs font-bold text-white tracking-wider">ATOM CONNECT</h1>
+              <p className="text-[9px] text-cyan-500/60 font-medium tracking-wide">CENTRAL DE ATENDIMENTO</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20" />
               <input
                 type="text"
-                placeholder="Buscar cliente ou telefone..."
+                placeholder="Buscar cliente..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-56 pl-9 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                className="w-48 pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.06] transition-all"
               />
             </div>
 
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              className="p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
             >
               {soundEnabled ? (
-                <Volume2 className="w-4 h-4 text-gray-400" />
+                <Volume2 className="w-3.5 h-3.5 text-white/30" />
               ) : (
-                <VolumeX className="w-4 h-4 text-gray-500" />
+                <VolumeX className="w-3.5 h-3.5 text-white/15" />
               )}
             </button>
 
             <div className="relative">
               <button
                 onClick={() => setShowNotifications(!showNotifications)}
-                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                className="relative p-1.5 rounded-lg hover:bg-white/[0.06] transition-colors"
               >
-                <Bell className="w-4 h-4 text-gray-400" />
+                <Bell className="w-3.5 h-3.5 text-white/30" />
                 {unreadCount > 0 && (
-                  <span
-                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center text-black"
-                    style={{ backgroundColor: accentColor }}
-                  >
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full text-[8px] font-bold flex items-center justify-center text-black bg-cyan-400" style={{ boxShadow: '0 0 8px #00D4FF60' }}>
                     {unreadCount > 9 ? '9+' : unreadCount}
                   </span>
                 )}
@@ -292,53 +279,45 @@ export default function AtomConnect() {
               <AnimatePresence>
                 {showNotifications && (
                   <motion.div
-                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
                     animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                    className="absolute right-0 top-10 w-80 max-h-96 overflow-y-auto bg-[#1A1A2E] border border-white/10 rounded-xl shadow-2xl z-50"
+                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                    className="absolute right-0 top-9 w-72 max-h-80 overflow-y-auto rounded-xl border border-white/[0.08] shadow-2xl z-50"
+                    style={{ background: 'linear-gradient(180deg, #12122a, #0d0d1e)' }}
                   >
-                    <div className="p-3 border-b border-white/10">
-                      <h3 className="font-semibold text-white text-sm">Notificacoes</h3>
+                    <div className="p-3 border-b border-white/[0.06]">
+                      <h3 className="font-semibold text-white text-xs">Notificacoes</h3>
                     </div>
                     {notifications.length === 0 ? (
-                      <div className="p-6 text-center text-gray-500 text-sm">
+                      <div className="p-5 text-center text-white/20 text-xs">
                         Nenhuma notificacao
                       </div>
                     ) : (
                       notifications.map(n => (
                         <div
                           key={n.id}
-                          className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                          className="p-2.5 border-b border-white/[0.04] hover:bg-white/[0.04] cursor-pointer transition-colors"
                           onClick={() => handleNotificationClick(n)}
                         >
-                          <div className="flex items-start gap-3">
-                            <div
-                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                              style={{ backgroundColor: `${accentColor}20` }}
-                            >
+                          <div className="flex items-start gap-2.5">
+                            <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 bg-cyan-500/10">
                               {n.type === 'message' ? (
-                                <MessageSquare className="w-4 h-4" style={{ color: accentColor }} />
+                                <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
                               ) : n.type === 'transfer' ? (
-                                <ArrowRight className="w-4 h-4" style={{ color: accentColor }} />
+                                <ArrowRight className="w-3.5 h-3.5 text-cyan-400" />
                               ) : (
-                                <AlertTriangle className="w-4 h-4 text-red-400" />
+                                <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white truncate">{n.title}</p>
-                              <p className="text-xs text-gray-400 truncate">{n.message}</p>
-                              <p className="text-xs text-gray-600 mt-1">
-                                {n.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                              </p>
+                              <p className="text-[11px] font-medium text-white truncate">{n.title}</p>
+                              <p className="text-[10px] text-white/40 truncate">{n.message}</p>
                             </div>
                             <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                dismissNotification(n.id);
-                              }}
-                              className="p-1 hover:bg-white/10 rounded"
+                              onClick={(e) => { e.stopPropagation(); dismissNotification(n.id); }}
+                              className="p-0.5 hover:bg-white/10 rounded"
                             >
-                              <X className="w-3 h-3 text-gray-500" />
+                              <X className="w-2.5 h-2.5 text-white/20" />
                             </button>
                           </div>
                         </div>
@@ -348,30 +327,11 @@ export default function AtomConnect() {
                 )}
               </AnimatePresence>
             </div>
-
-            <div className="flex items-center gap-2 pl-3 border-l border-white/10">
-              <div className="text-right">
-                <p className="text-xs font-medium text-white">{usuario?.nome}</p>
-                <p className="text-[10px] text-gray-500">{unidades?.find(u => u.id === unidadeAtual)?.nome || 'Unidade'}</p>
-              </div>
-              <div
-                className="w-8 h-8 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center"
-                style={{ border: `2px solid ${accentColor}` }}
-              >
-                {usuario?.foto_url ? (
-                  <img src={usuario.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
-                ) : (
-                  <span className="text-xs font-bold" style={{ color: accentColor }}>
-                    {usuario?.nome?.charAt(0)}
-                  </span>
-                )}
-              </div>
-            </div>
           </div>
         </div>
 
         {/* Horizontal Tabs */}
-        <div className="flex items-center gap-1 px-4">
+        <div className="flex items-center px-5 gap-0.5">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -379,18 +339,17 @@ export default function AtomConnect() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 rounded-t-lg ${
-                  isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
+                className={`relative flex items-center gap-1.5 px-3.5 py-2 text-[11px] font-medium transition-all duration-200 ${
+                  isActive ? 'text-cyan-400' : 'text-white/30 hover:text-white/50'
                 }`}
-                style={isActive ? { color: accentColor } : undefined}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5" />
                 {tab.label}
                 {isActive && (
                   <motion.div
-                    layoutId="activeTabIndicator"
-                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full"
-                    style={{ backgroundColor: accentColor }}
+                    layoutId="connectTabIndicator"
+                    className="absolute bottom-0 left-1 right-1 h-[2px] rounded-full bg-cyan-400"
+                    style={{ boxShadow: '0 0 10px #00D4FF60, 0 0 20px #00D4FF20' }}
                   />
                 )}
               </button>
@@ -399,7 +358,7 @@ export default function AtomConnect() {
         </div>
       </header>
 
-      {/* Main Content - full height */}
+      {/* Main Content */}
       <div className="flex-1 flex overflow-hidden min-h-0">
         <main className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
@@ -409,6 +368,7 @@ export default function AtomConnect() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="h-full"
               >
                 <AtomConnectKanban
@@ -429,6 +389,7 @@ export default function AtomConnect() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="h-full"
               >
                 <AtomConnectDashboard accentColor={accentColor} />
@@ -440,6 +401,7 @@ export default function AtomConnect() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="h-full"
               >
                 <AtomConnectMarketing accentColor={accentColor} />
@@ -451,6 +413,7 @@ export default function AtomConnect() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="h-full"
               >
                 <AtomConnectAutomation accentColor={accentColor} />
@@ -462,6 +425,7 @@ export default function AtomConnect() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
+                transition={{ duration: 0.15 }}
                 className="h-full"
               >
                 <AtomConnectSettings accentColor={accentColor} />
@@ -470,7 +434,6 @@ export default function AtomConnect() {
           </AnimatePresence>
         </main>
 
-        {/* Chat Panel */}
         <AnimatePresence>
           {showChat && selectedConversa && (
             <motion.div
@@ -478,7 +441,8 @@ export default function AtomConnect() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-[450px] flex-shrink-0 border-l border-white/10 bg-[#0D0D12]"
+              className="w-[420px] flex-shrink-0 border-l border-white/[0.06]"
+              style={{ background: '#0A0A16' }}
             >
               <AtomConnectChat
                 conversa={selectedConversa}

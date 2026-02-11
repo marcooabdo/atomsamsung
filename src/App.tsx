@@ -276,7 +276,9 @@ function AppContent() {
           path="/atom-connect"
           element={
             <ProtectedRoute>
-              <AtomConnect />
+              <Layout>
+                <AtomConnect />
+              </Layout>
             </ProtectedRoute>
           }
         />

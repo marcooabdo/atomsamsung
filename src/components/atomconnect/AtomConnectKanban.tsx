@@ -1,8 +1,8 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
-  Phone, MessageSquare, User, MoreVertical, AlertTriangle, ArrowRight,
-  Calendar, Navigation, Filter, Plus, Eye, UserPlus, Link2
+  Phone, MessageSquare, User, AlertTriangle,
+  Plus, UserPlus, Link2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,15 +48,7 @@ interface Props {
 }
 
 const ICON_MAP: Record<string, any> = {
-  Bot,
-  Clock,
-  DollarSign,
-  Package,
-  Wrench,
-  CheckCircle,
-  MapPin,
-  Star,
-  MessageSquare
+  Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star, MessageSquare
 };
 
 export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, accentColor }: Props) {
@@ -180,60 +172,49 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
     onUpdateConversa();
   };
 
+  const totalConversas = filteredConversas.length;
+
   return (
     <div className="h-full flex flex-col">
       {/* Filter Bar */}
-      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
-            <button
-              onClick={() => setFilterAtendente('all')}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                filterAtendente === 'all' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Todos
-            </button>
-            <button
-              onClick={() => setFilterAtendente('mine')}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                filterAtendente === 'mine' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Meus
-            </button>
-            <button
-              onClick={() => setFilterAtendente('unassigned')}
-              className={`px-3 py-1.5 rounded-md text-sm transition-colors ${
-                filterAtendente === 'unassigned' ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Sem Atendente
-            </button>
+      <div className="flex-shrink-0 px-5 py-2.5 flex items-center justify-between border-b border-white/[0.04]">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center bg-white/[0.03] rounded-lg p-0.5 border border-white/[0.06]">
+            {(['all', 'mine', 'unassigned'] as const).map(f => (
+              <button
+                key={f}
+                onClick={() => setFilterAtendente(f)}
+                className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all ${
+                  filterAtendente === f
+                    ? 'bg-cyan-500/15 text-cyan-400 shadow-sm'
+                    : 'text-white/30 hover:text-white/50'
+                }`}
+                style={filterAtendente === f ? { boxShadow: '0 0 10px rgba(0,212,255,0.1)' } : undefined}
+              >
+                {f === 'all' ? 'Todos' : f === 'mine' ? 'Meus' : 'Sem Atendente'}
+              </button>
+            ))}
           </div>
 
-          <span className="text-sm text-gray-500">
-            {filteredConversas.length} conversa{filteredConversas.length !== 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-1.5 text-[11px] text-white/20">
+            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40" />
+            {totalConversas} conversa{totalConversas !== 1 ? 's' : ''}
+          </div>
         </div>
 
         <button
-          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
-          style={{
-            backgroundColor: `${accentColor}20`,
-            color: accentColor,
-            border: `1px solid ${accentColor}40`
-          }}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-cyan-400 transition-all hover:bg-cyan-500/10"
+          style={{ border: '1px solid rgba(0,212,255,0.15)' }}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-3 h-3" />
           Nova Conversa
         </button>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4 pt-4 min-h-0">
-        <div className="flex gap-3 h-full">
-          {colunas.map(coluna => {
+      {/* Kanban Board - fills remaining height */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
+        <div className="flex gap-0 h-full">
+          {colunas.map((coluna, idx) => {
             const Icon = ICON_MAP[coluna.icone] || MessageSquare;
             const columnConversas = getConversasByColuna(coluna.id);
             const isDropTarget = dragOverColumn === coluna.id;
@@ -241,43 +222,45 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             return (
               <div
                 key={coluna.id}
-                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col rounded-xl transition-all duration-200 ${
-                  isDropTarget ? 'ring-2 ring-offset-2 ring-offset-[#0A0A0F]' : ''
+                className={`min-w-[260px] w-[260px] flex-shrink-0 flex flex-col h-full transition-all duration-200 ${
+                  idx > 0 ? 'border-l border-white/[0.04]' : ''
                 }`}
                 style={{
-                  backgroundColor: isDropTarget ? `${coluna.cor}10` : 'rgba(255,255,255,0.03)',
-                  ringColor: isDropTarget ? coluna.cor : undefined
+                  background: isDropTarget ? `${coluna.cor}08` : 'transparent',
                 }}
                 onDragOver={(e) => handleDragOver(e, coluna.id)}
                 onDragLeave={handleDragLeave}
                 onDrop={(e) => handleDrop(e, coluna.id)}
               >
                 {/* Column Header */}
-                <div className="flex-shrink-0 p-4 border-b border-white/5">
+                <div className="flex-shrink-0 px-3 py-2.5 border-b border-white/[0.04]">
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-2">
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center"
-                        style={{ backgroundColor: `${coluna.cor}20` }}
+                        className="w-6 h-6 rounded-md flex items-center justify-center"
+                        style={{ backgroundColor: `${coluna.cor}15` }}
                       >
-                        <Icon className="w-4 h-4" style={{ color: coluna.cor }} />
+                        <Icon className="w-3 h-3" style={{ color: coluna.cor }} />
                       </div>
                       <div>
-                        <h3 className="text-sm font-semibold text-white">{coluna.nome}</h3>
-                        <p className="text-xs text-gray-500">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
+                        <h3 className="text-[11px] font-semibold text-white/80">{coluna.nome}</h3>
+                        <p className="text-[9px] text-white/20">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
                     {coluna.sla_minutos && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Clock className="w-3 h-3" />
+                      <div className="flex items-center gap-1 text-[9px] text-white/20 px-1.5 py-0.5 rounded bg-white/[0.03]">
+                        <Clock className="w-2.5 h-2.5" />
                         {coluna.sla_minutos}min
                       </div>
                     )}
                   </div>
+                  {isDropTarget && (
+                    <div className="mt-2 h-0.5 rounded-full" style={{ background: `linear-gradient(90deg, ${coluna.cor}, transparent)` }} />
+                  )}
                 </div>
 
                 {/* Cards */}
-                <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                <div className="flex-1 overflow-y-auto p-2 space-y-1.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.05) transparent' }}>
                   <AnimatePresence>
                     {columnConversas.map(conversa => {
                       const slaBreached = isSLABreached(conversa, coluna);
@@ -287,111 +270,96 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                         <motion.div
                           key={conversa.id}
                           layout
-                          initial={{ opacity: 0, y: 20 }}
+                          initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
+                          exit={{ opacity: 0, scale: 0.95 }}
                           draggable
                           onDragStart={(e: any) => handleDragStart(e, conversa)}
                           onClick={() => onSelectConversa(conversa)}
-                          className={`p-3 rounded-lg bg-white/5 border cursor-pointer transition-all duration-200 hover:bg-white/10 ${
-                            slaBreached ? 'animate-pulse border-red-500/50' : 'border-white/10 hover:border-white/20'
+                          className={`p-2.5 rounded-lg cursor-pointer transition-all duration-150 group ${
+                            slaBreached
+                              ? 'border border-red-500/30 bg-red-500/[0.05]'
+                              : 'border border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.08]'
                           }`}
-                          style={slaBreached ? {
-                            boxShadow: '0 0 20px rgba(239, 68, 68, 0.3)'
-                          } : undefined}
                         >
-                          {/* SLA Warning */}
                           {slaBreached && (
-                            <div className="flex items-center gap-2 mb-2 text-xs text-red-400">
-                              <AlertTriangle className="w-3 h-3" />
+                            <div className="flex items-center gap-1 mb-1.5 text-[9px] text-red-400 font-medium">
+                              <AlertTriangle className="w-2.5 h-2.5" />
                               SLA excedido
                             </div>
                           )}
 
-                          {/* Client Info */}
-                          <div className="flex items-start gap-3">
+                          <div className="flex items-start gap-2">
                             <div
-                              className="w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0"
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
                               style={{
-                                backgroundColor: conversa.cliente_foto_url ? 'transparent' : `${coluna.cor}20`,
-                                border: conversa.os_id ? `2px solid ${accentColor}` : undefined
+                                backgroundColor: conversa.cliente_foto_url ? 'transparent' : `${coluna.cor}12`,
+                                border: conversa.os_id ? `1.5px solid ${accentColor}50` : '1.5px solid rgba(255,255,255,0.06)'
                               }}
                             >
                               {conversa.cliente_foto_url ? (
-                                <img
-                                  src={conversa.cliente_foto_url}
-                                  alt=""
-                                  className="w-full h-full rounded-full object-cover"
-                                />
+                                <img src={conversa.cliente_foto_url} alt="" className="w-full h-full rounded-full object-cover" />
                               ) : (
-                                <User className="w-5 h-5" style={{ color: coluna.cor }} />
+                                <User className="w-3.5 h-3.5" style={{ color: coluna.cor }} />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-sm font-medium text-white truncate">
+                                <h4 className="text-[11px] font-medium text-white/80 truncate">
                                   {conversa.cliente_nome || conversa.cliente_telefone}
                                 </h4>
-                                <span className="text-xs text-gray-500">
+                                <span className="text-[9px] text-white/15 ml-1 flex-shrink-0">
                                   {getTimeAgo(conversa.ultima_mensagem_at)}
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
-                                <Phone className="w-3 h-3" />
+                              <p className="text-[9px] text-white/25 flex items-center gap-0.5 mt-0.5">
+                                <Phone className="w-2.5 h-2.5" />
                                 {conversa.cliente_telefone}
                               </p>
                             </div>
                           </div>
 
-                          {/* Last Message */}
                           {conversa.ultima_mensagem && (
-                            <p className="mt-2 text-xs text-gray-400 line-clamp-2">
+                            <p className="mt-1.5 text-[10px] text-white/25 line-clamp-2 leading-relaxed">
                               {conversa.ultima_mensagem}
                             </p>
                           )}
 
-                          {/* Tags & Status */}
-                          <div className="mt-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                          <div className="mt-2 flex items-center justify-between">
+                            <div className="flex items-center gap-1">
                               {conversa.mensagens_nao_lidas > 0 && (
-                                <span
-                                  className="px-2 py-0.5 rounded-full text-xs font-bold text-black"
-                                  style={{ backgroundColor: accentColor }}
-                                >
+                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-black bg-cyan-400" style={{ boxShadow: '0 0 6px #00D4FF40' }}>
                                   {conversa.mensagens_nao_lidas}
                                 </span>
                               )}
                               {conversa.is_bot_ativo && (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-purple-500/20 text-purple-400">
-                                  <Bot className="w-3 h-3" />
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] bg-violet-500/15 text-violet-400">
+                                  <Bot className="w-2.5 h-2.5" />
                                   Bot
                                 </span>
                               )}
                               {conversa.os_id && (
-                                <span className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-blue-500/20 text-blue-400">
-                                  <Link2 className="w-3 h-3" />
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] bg-blue-500/15 text-blue-400">
+                                  <Link2 className="w-2.5 h-2.5" />
                                   OS
                                 </span>
                               )}
                             </div>
 
-                            {/* Atendente */}
                             {atendente ? (
-                              <div className="flex items-center gap-1">
-                                <div className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                                  {atendente.foto_url ? (
-                                    <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
-                                  ) : (
-                                    <span className="text-[8px] text-gray-400">{atendente.nome?.charAt(0)}</span>
-                                  )}
-                                </div>
+                              <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center overflow-hidden border border-white/[0.08]">
+                                {atendente.foto_url ? (
+                                  <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <span className="text-[7px] text-white/40">{atendente.nome?.charAt(0)}</span>
+                                )}
                               </div>
                             ) : (
                               <button
                                 onClick={(e) => assignToMe(conversa, e)}
-                                className="flex items-center gap-1 px-2 py-1 rounded text-xs bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] text-white/20 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover:opacity-100"
                               >
-                                <UserPlus className="w-3 h-3" />
+                                <UserPlus className="w-2.5 h-2.5" />
                                 Assumir
                               </button>
                             )}
@@ -402,9 +370,11 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                   </AnimatePresence>
 
                   {columnConversas.length === 0 && (
-                    <div className="flex flex-col items-center justify-center py-8 text-gray-600">
-                      <Icon className="w-8 h-8 mb-2 opacity-50" />
-                      <p className="text-xs">Nenhum cliente</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-white/10">
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ background: `${coluna.cor}08` }}>
+                        <Icon className="w-5 h-5" style={{ color: `${coluna.cor}30` }} />
+                      </div>
+                      <p className="text-[10px]">Nenhum cliente</p>
                     </div>
                   )}
                 </div>

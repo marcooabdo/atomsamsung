@@ -22,61 +22,49 @@ Deno.serve(async (req: Request) => {
     );
 
     const body = await req.json();
-    console.log("Evolution Webhook received:", JSON.stringify(body, null, 2));
+    console.log("Evolution Webhook received:", JSON.stringify(body).substring(0, 500));
 
-    const { event, data, instance } = body;
+    const event = body.event || body.type;
+    const data = body.data || body;
+    const instance = body.instance || body.instanceName || data?.instance;
 
     if (event === "messages.upsert") {
-      const message = data.message;
-      const remoteJid = message.key.remoteJid;
-      const phoneNumber = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-      const fromMe = message.key.fromMe;
-      const messageId = message.key.id;
+      const message = data.message || data;
+      const key = message.key || {};
+      const remoteJid = key.remoteJid || "";
 
-      const { data: instancia } = await supabase
-        .from("atom_connect_instancias")
-        .select("id, unidade_id")
-        .eq("instance_name", instance)
-        .maybeSingle();
-
-      if (!instancia) {
-        console.log("Instancia nao encontrada:", instance);
-        return new Response(JSON.stringify({ error: "Instancia nao encontrada" }), {
-          status: 404,
+      if (remoteJid.endsWith("@g.us")) {
+        return new Response(JSON.stringify({ skip: "group message" }), {
+          status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      let { data: conversa } = await supabase
-        .from("atom_connect_conversas")
-        .select("id")
-        .eq("cliente_telefone", phoneNumber)
-        .eq("unidade_id", instancia.unidade_id)
+      const phoneNumber = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+      const fromMe = key.fromMe || false;
+      const messageId = key.id || crypto.randomUUID();
+
+      if (!phoneNumber) {
+        return new Response(JSON.stringify({ skip: "no phone" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const instanceName = typeof instance === 'string' ? instance : instance?.instanceName || '';
+
+      const { data: instancia } = await supabase
+        .from("atom_connect_instancias")
+        .select("id, unidade_id")
+        .eq("instance_name", instanceName)
         .maybeSingle();
 
-      if (!conversa) {
-        const pushName = message.pushName || phoneNumber;
-        const { data: newConversa, error: insertError } = await supabase
-          .from("atom_connect_conversas")
-          .insert({
-            unidade_id: instancia.unidade_id,
-            instancia_id: instancia.id,
-            cliente_telefone: phoneNumber,
-            cliente_nome: pushName,
-            coluna_pipeline: "bot_triagem",
-            is_bot_ativo: true,
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error("Erro ao criar conversa:", insertError);
-          return new Response(JSON.stringify({ error: "Erro ao criar conversa" }), {
-            status: 500,
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        conversa = newConversa;
+      if (!instancia) {
+        console.log("Instancia nao encontrada:", instanceName);
+        return new Response(JSON.stringify({ error: "Instancia nao encontrada", instanceName }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       let tipo = "text";
@@ -85,43 +73,110 @@ Deno.serve(async (req: Request) => {
       let mediaUrl = null;
       let mediaMimetype = null;
 
-      if (message.message?.conversation) {
-        tipo = "text";
-        conteudo = message.message.conversation;
-      } else if (message.message?.extendedTextMessage) {
-        tipo = "text";
-        conteudo = message.message.extendedTextMessage.text;
-      } else if (message.message?.imageMessage) {
+      const msg = message.message || {};
+
+      if (msg.conversation) {
+        conteudo = msg.conversation;
+      } else if (msg.extendedTextMessage) {
+        conteudo = msg.extendedTextMessage.text || "";
+      } else if (msg.imageMessage) {
         tipo = "image";
-        caption = message.message.imageMessage.caption;
-        mediaMimetype = message.message.imageMessage.mimetype;
-        mediaUrl = message.message.imageMessage.url;
-      } else if (message.message?.audioMessage) {
+        caption = msg.imageMessage.caption;
+        mediaMimetype = msg.imageMessage.mimetype;
+        mediaUrl = msg.imageMessage.url;
+        conteudo = caption || "[Imagem]";
+      } else if (msg.audioMessage) {
         tipo = "audio";
-        mediaMimetype = message.message.audioMessage.mimetype;
-        mediaUrl = message.message.audioMessage.url;
-      } else if (message.message?.videoMessage) {
+        mediaMimetype = msg.audioMessage.mimetype;
+        mediaUrl = msg.audioMessage.url;
+        conteudo = "[Audio]";
+      } else if (msg.videoMessage) {
         tipo = "video";
-        caption = message.message.videoMessage.caption;
-        mediaMimetype = message.message.videoMessage.mimetype;
-        mediaUrl = message.message.videoMessage.url;
-      } else if (message.message?.documentMessage) {
+        caption = msg.videoMessage.caption;
+        mediaMimetype = msg.videoMessage.mimetype;
+        mediaUrl = msg.videoMessage.url;
+        conteudo = caption || "[Video]";
+      } else if (msg.documentMessage) {
         tipo = "document";
-        caption = message.message.documentMessage.fileName;
-        mediaMimetype = message.message.documentMessage.mimetype;
-        mediaUrl = message.message.documentMessage.url;
-      } else if (message.message?.stickerMessage) {
+        caption = msg.documentMessage.fileName;
+        mediaMimetype = msg.documentMessage.mimetype;
+        mediaUrl = msg.documentMessage.url;
+        conteudo = caption || "[Documento]";
+      } else if (msg.stickerMessage) {
         tipo = "sticker";
-        mediaMimetype = message.message.stickerMessage.mimetype;
-        mediaUrl = message.message.stickerMessage.url;
-      } else if (message.message?.locationMessage) {
+        mediaMimetype = msg.stickerMessage.mimetype;
+        mediaUrl = msg.stickerMessage.url;
+        conteudo = "[Sticker]";
+      } else if (msg.locationMessage) {
         tipo = "location";
-        const lat = message.message.locationMessage.degreesLatitude;
-        const lng = message.message.locationMessage.degreesLongitude;
-        conteudo = `${lat},${lng}`;
-      } else if (message.message?.contactMessage) {
+        conteudo = `${msg.locationMessage.degreesLatitude},${msg.locationMessage.degreesLongitude}`;
+      } else if (msg.contactMessage) {
         tipo = "contact";
-        conteudo = message.message.contactMessage.displayName;
+        conteudo = msg.contactMessage.displayName || "[Contato]";
+      } else {
+        conteudo = "[Mensagem]";
+      }
+
+      let { data: conversa } = await supabase
+        .from("atom_connect_conversas")
+        .select("id, coluna_pipeline, mensagens_nao_lidas")
+        .eq("cliente_telefone", phoneNumber)
+        .eq("unidade_id", instancia.unidade_id)
+        .maybeSingle();
+
+      if (!conversa) {
+        const { data: firstColumn } = await supabase
+          .from("atom_connect_pipeline_colunas")
+          .select("id")
+          .order("ordem", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        const pipelineColumnId = firstColumn?.id || null;
+
+        const pushName = message.pushName || data.pushName || phoneNumber;
+        const { data: newConversa, error: insertError } = await supabase
+          .from("atom_connect_conversas")
+          .insert({
+            unidade_id: instancia.unidade_id,
+            instancia_id: instancia.id,
+            cliente_telefone: phoneNumber,
+            cliente_nome: pushName,
+            coluna_pipeline: pipelineColumnId,
+            is_bot_ativo: true,
+            ultima_mensagem: conteudo,
+            ultima_mensagem_at: new Date().toISOString(),
+            ultima_resposta_cliente_at: fromMe ? null : new Date().toISOString(),
+            mensagens_nao_lidas: fromMe ? 0 : 1,
+            tipo_atendimento: "whatsapp",
+            prioridade: "normal",
+          })
+          .select()
+          .single();
+
+        if (insertError) {
+          console.error("Erro ao criar conversa:", insertError);
+          return new Response(JSON.stringify({ error: "Erro ao criar conversa", details: insertError }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        conversa = newConversa;
+      } else {
+        const updateData: Record<string, any> = {
+          ultima_mensagem: conteudo,
+          ultima_mensagem_at: new Date().toISOString(),
+        };
+
+        if (!fromMe) {
+          updateData.ultima_resposta_cliente_at = new Date().toISOString();
+          updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
+        }
+
+        await supabase
+          .from("atom_connect_conversas")
+          .update(updateData)
+          .eq("id", conversa.id);
       }
 
       const { data: existingMsg } = await supabase
@@ -144,6 +199,8 @@ Deno.serve(async (req: Request) => {
           is_bot: false,
         });
       }
+
+      console.log(`Mensagem processada: ${phoneNumber} -> ${conteudo.substring(0, 50)}`);
     }
 
     if (event === "messages.update") {
@@ -168,20 +225,22 @@ Deno.serve(async (req: Request) => {
     }
 
     if (event === "connection.update") {
-      const state = data.state;
-      const newStatus = state === "open" ? "connected" : "disconnected";
+      const state = data.state || data.status;
+      const instanceName = typeof instance === 'string' ? instance : instance?.instanceName || '';
+      const isConnected = state === "open" || state === "connected";
 
       await supabase
         .from("atom_connect_instancias")
         .update({
-          status: newStatus,
-          qr_code: state === "open" ? null : undefined,
+          status: isConnected ? "connected" : "disconnected",
+          qr_code: isConnected ? null : undefined,
         })
-        .eq("instance_name", instance);
+        .eq("instance_name", instanceName);
     }
 
     if (event === "qrcode.updated") {
-      const base64 = data.qrcode?.base64;
+      const base64 = data.qrcode?.base64 || data.base64;
+      const instanceName = typeof instance === 'string' ? instance : instance?.instanceName || '';
 
       if (base64) {
         await supabase
@@ -190,7 +249,7 @@ Deno.serve(async (req: Request) => {
             qr_code: base64,
             status: "connecting",
           })
-          .eq("instance_name", instance);
+          .eq("instance_name", instanceName);
       }
     }
 
@@ -201,7 +260,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error("Erro no webhook:", error);
     return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

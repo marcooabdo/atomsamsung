@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from 'react';
 import {
   Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
   Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
-  Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone
+  Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone,
+  Webhook
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -89,12 +90,17 @@ export function AtomConnectSettings({ accentColor }: Props) {
   };
 
   const loadRespostasRapidas = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('atom_connect_respostas_rapidas')
-      .select('*')
-      .or(`unidade_id.is.null,unidade_id.eq.${unidadeAtual}`)
-      .order('titulo');
+      .select('*');
 
+    if (unidadeAtual) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${unidadeAtual}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data } = await query.order('titulo');
     if (data) setRespostasRapidas(data);
   };
 
@@ -323,6 +329,8 @@ export function AtomConnectSettings({ accentColor }: Props) {
     };
   }, []);
 
+  const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
+
   const createEvolutionInstance = async (instanceName: string) => {
     try {
       const response = await fetch(`${EVOLUTION_URL}/instance/create`, {
@@ -334,15 +342,86 @@ export function AtomConnectSettings({ accentColor }: Props) {
         body: JSON.stringify({
           instanceName,
           qrcode: true,
-          integration: 'WHATSAPP-BAILEYS'
+          integration: 'WHATSAPP-BAILEYS',
+          webhook: {
+            url: webhookUrl,
+            byEvents: false,
+            base64: false,
+            events: [
+              'messages.upsert',
+              'messages.update',
+              'connection.update',
+              'qrcode.updated'
+            ]
+          }
         })
       });
 
       const data = await response.json();
+
+      try {
+        await fetch(`${EVOLUTION_URL}/webhook/set/${instanceName}`, {
+          method: 'POST',
+          headers: {
+            'apikey': EVOLUTION_API_KEY,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            enabled: true,
+            url: webhookUrl,
+            webhookByEvents: false,
+            webhookBase64: false,
+            events: [
+              'MESSAGES_UPSERT',
+              'MESSAGES_UPDATE',
+              'CONNECTION_UPDATE',
+              'QRCODE_UPDATED'
+            ]
+          })
+        });
+      } catch (e) {
+        console.log('Webhook set fallback failed, may already be configured:', e);
+      }
+
       return data;
     } catch (error) {
       console.error('Erro ao criar instancia:', error);
       throw error;
+    }
+  };
+
+  const configureWebhook = async (instancia: Instancia) => {
+    try {
+      await fetch(`${instancia.api_url}/webhook/set/${instancia.instance_name}`, {
+        method: 'POST',
+        headers: {
+          'apikey': instancia.api_key,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          enabled: true,
+          url: webhookUrl,
+          webhookByEvents: false,
+          webhookBase64: false,
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
+            'CONNECTION_UPDATE',
+            'QRCODE_UPDATED'
+          ]
+        })
+      });
+
+      await supabase
+        .from('atom_connect_instancias')
+        .update({ webhook_url: webhookUrl })
+        .eq('id', instancia.id);
+
+      loadInstancias();
+      alert('Webhook configurado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao configurar webhook:', error);
+      alert('Erro ao configurar webhook');
     }
   };
 
@@ -536,6 +615,13 @@ export function AtomConnectSettings({ accentColor }: Props) {
                             Conectar
                           </button>
                         )}
+                        <button
+                          onClick={() => configureWebhook(instancia)}
+                          className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-cyan-500/20 hover:text-cyan-400 transition-colors"
+                          title="Configurar Webhook"
+                        >
+                          <Webhook className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => checkConnectionStatus(instancia)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
