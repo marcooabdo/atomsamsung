@@ -65,16 +65,18 @@ export default function AtomConnect() {
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadConversas = useCallback(async () => {
-    if (!unidadeAtual) {
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
+    let query = supabase
       .from('atom_connect_conversas')
       .select('*')
-      .eq('unidade_id', unidadeAtual)
       .order('ultima_mensagem_at', { ascending: false });
+
+    if (unidadeAtual) {
+      query = query.eq('unidade_id', unidadeAtual);
+    } else if (usuario?.nivel !== 'master' && usuario?.unidade_id) {
+      query = query.eq('unidade_id', usuario.unidade_id);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setConversas(data);
@@ -82,44 +84,45 @@ export default function AtomConnect() {
       setUnreadCount(unread);
     }
     setLoading(false);
-  }, [unidadeAtual]);
+  }, [unidadeAtual, usuario]);
 
   useEffect(() => {
     loadConversas();
   }, [loadConversas]);
 
   useEffect(() => {
-    if (!unidadeAtual) return;
+    const filterUnidadeId = unidadeAtual || (usuario?.nivel !== 'master' ? usuario?.unidade_id : null);
+
+    const channelConfig: any = {
+      event: '*',
+      schema: 'public',
+      table: 'atom_connect_conversas'
+    };
+
+    if (filterUnidadeId) {
+      channelConfig.filter = `unidade_id=eq.${filterUnidadeId}`;
+    }
 
     const channel = supabase
       .channel('atom-connect-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'atom_connect_conversas',
-          filter: `unidade_id=eq.${unidadeAtual}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            const newConversa = payload.new as Conversa;
-            setConversas(prev => [newConversa, ...prev]);
-            showNewMessageNotification(newConversa);
-          } else if (payload.eventType === 'UPDATE') {
-            const updated = payload.new as Conversa;
-            setConversas(prev => prev.map(c => c.id === updated.id ? updated : c));
-            if (selectedConversa?.id === updated.id) {
-              setSelectedConversa(updated);
-            }
-            if (updated.mensagens_nao_lidas > 0 && !updated.atendente_id) {
-              showNewMessageNotification(updated);
-            }
-          } else if (payload.eventType === 'DELETE') {
-            setConversas(prev => prev.filter(c => c.id !== payload.old.id));
+      .on('postgres_changes', channelConfig, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const newConversa = payload.new as Conversa;
+          setConversas(prev => [newConversa, ...prev]);
+          showNewMessageNotification(newConversa);
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as Conversa;
+          setConversas(prev => prev.map(c => c.id === updated.id ? updated : c));
+          if (selectedConversa?.id === updated.id) {
+            setSelectedConversa(updated);
           }
+          if (updated.mensagens_nao_lidas > 0 && !updated.atendente_id) {
+            showNewMessageNotification(updated);
+          }
+        } else if (payload.eventType === 'DELETE') {
+          setConversas(prev => prev.filter(c => c.id !== payload.old.id));
         }
-      )
+      })
       .on(
         'postgres_changes',
         {
