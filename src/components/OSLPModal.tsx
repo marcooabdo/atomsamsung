@@ -763,7 +763,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       created_at: p.created_at,
       updated_at: p.updated_at,
       tipo: 'os_peca',
-      estoque_peca_id: p.estoque_peca_id
+      estoque_peca_id: p.estoque_peca_id,
+      exibir_no_pdf: p.exibir_no_pdf
     }));
 
     const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
@@ -781,7 +782,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       valor_com_markup: p.valor_final_unitario,
       created_at: p.created_at,
       updated_at: p.updated_at,
-      tipo: 'cotacao'
+      tipo: 'cotacao',
+      exibir_no_pdf: p.exibir_no_pdf
     }));
 
     const todasPecas = [...osPecasFormatadas, ...cotacaoPecas];
