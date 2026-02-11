@@ -5,11 +5,18 @@ import type { Database } from '../lib/database.types';
 
 type Usuario = Database['public']['Tables']['usuarios']['Row'];
 
+interface Unidade {
+  id: string;
+  nome: string;
+}
+
 interface AuthContextType {
   user: User | null;
   usuario: Usuario | null;
   session: Session | null;
   loading: boolean;
+  unidadeAtual: string | null;
+  unidades: Unidade[];
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUsuario?: (updatedUsuario: Usuario) => void;
@@ -22,6 +29,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [unidades, setUnidades] = useState<Unidade[]>([]);
+
+  const unidadeAtual = usuario?.unidade_id || null;
+
+  const loadUnidades = async () => {
+    const { data } = await supabase
+      .from('unidades')
+      .select('id, nome')
+      .order('nome');
+    if (data) setUnidades(data);
+  };
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .maybeSingle();
 
           setUsuario(data);
+          await loadUnidades();
         }
 
         setLoading(false);
@@ -56,8 +75,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .maybeSingle();
 
           setUsuario(data);
+          await loadUnidades();
         } else {
           setUsuario(null);
+          setUnidades([]);
         }
       })();
     });
@@ -82,6 +103,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
     setSession(null);
     setUsuario(null);
+    setUnidades([]);
   };
 
   const updateUsuario = (updatedUsuario: Usuario) => {
@@ -93,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     usuario,
     session,
     loading,
+    unidadeAtual,
+    unidades,
     signIn,
     signOut,
     updateUsuario,

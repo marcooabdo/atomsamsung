@@ -184,7 +184,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
               <button
                 key={f}
                 onClick={() => setFilterAtendente(f)}
-                className={`px-3 py-1 rounded-md text-[11px] font-medium transition-all ${
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                   filterAtendente === f
                     ? 'bg-cyan-500/15 text-cyan-400 shadow-sm'
                     : 'text-white/30 hover:text-white/50'
@@ -196,14 +196,14 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             ))}
           </div>
 
-          <div className="flex items-center gap-1.5 text-[11px] text-white/20">
+          <div className="flex items-center gap-1.5 text-xs text-white/20">
             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40" />
             {totalConversas} conversa{totalConversas !== 1 ? 's' : ''}
           </div>
         </div>
 
         <button
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-cyan-400 transition-all hover:bg-cyan-500/10"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-cyan-400 transition-all hover:bg-cyan-500/10"
           style={{ border: '1px solid rgba(0,212,255,0.15)' }}
         >
           <Plus className="w-3 h-3" />
@@ -222,7 +222,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             return (
               <div
                 key={coluna.id}
-                className={`min-w-[260px] w-[260px] flex-shrink-0 flex flex-col h-full transition-all duration-200 ${
+                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col h-full transition-all duration-200 ${
                   idx > 0 ? 'border-l border-white/[0.04]' : ''
                 }`}
                 style={{
@@ -243,13 +243,13 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                         <Icon className="w-3 h-3" style={{ color: coluna.cor }} />
                       </div>
                       <div>
-                        <h3 className="text-[11px] font-semibold text-white/80">{coluna.nome}</h3>
-                        <p className="text-[9px] text-white/20">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
+                        <h3 className="text-xs font-semibold text-white/80">{coluna.nome}</h3>
+                        <p className="text-[11px] text-white/30">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
                     {coluna.sla_minutos && (
-                      <div className="flex items-center gap-1 text-[9px] text-white/20 px-1.5 py-0.5 rounded bg-white/[0.03]">
-                        <Clock className="w-2.5 h-2.5" />
+                      <div className="flex items-center gap-1 text-[10px] text-white/25 px-1.5 py-0.5 rounded bg-white/[0.03]">
+                        <Clock className="w-3 h-3" />
                         {coluna.sla_minutos}min
                       </div>
                     )}
@@ -283,8 +283,8 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                           }`}
                         >
                           {slaBreached && (
-                            <div className="flex items-center gap-1 mb-1.5 text-[9px] text-red-400 font-medium">
-                              <AlertTriangle className="w-2.5 h-2.5" />
+                            <div className="flex items-center gap-1 mb-1.5 text-[11px] text-red-400 font-medium">
+                              <AlertTriangle className="w-3 h-3" />
                               SLA excedido
                             </div>
                           )}
@@ -305,22 +305,22 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-[11px] font-medium text-white/80 truncate">
+                                <h4 className="text-xs font-medium text-white/85 truncate">
                                   {conversa.cliente_nome || conversa.cliente_telefone}
                                 </h4>
-                                <span className="text-[9px] text-white/15 ml-1 flex-shrink-0">
+                                <span className="text-[10px] text-white/20 ml-1 flex-shrink-0">
                                   {getTimeAgo(conversa.ultima_mensagem_at)}
                                 </span>
                               </div>
-                              <p className="text-[9px] text-white/25 flex items-center gap-0.5 mt-0.5">
-                                <Phone className="w-2.5 h-2.5" />
+                              <p className="text-[11px] text-white/30 flex items-center gap-0.5 mt-0.5">
+                                <Phone className="w-3 h-3" />
                                 {conversa.cliente_telefone}
                               </p>
                             </div>
                           </div>
 
                           {conversa.ultima_mensagem && (
-                            <p className="mt-1.5 text-[10px] text-white/25 line-clamp-2 leading-relaxed">
+                            <p className="mt-1.5 text-[11px] text-white/30 line-clamp-2 leading-relaxed">
                               {conversa.ultima_mensagem}
                             </p>
                           )}
@@ -328,19 +328,19 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                           <div className="mt-2 flex items-center justify-between">
                             <div className="flex items-center gap-1">
                               {conversa.mensagens_nao_lidas > 0 && (
-                                <span className="px-1.5 py-0.5 rounded-full text-[9px] font-bold text-black bg-cyan-400" style={{ boxShadow: '0 0 6px #00D4FF40' }}>
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold text-black bg-cyan-400" style={{ boxShadow: '0 0 6px #00D4FF40' }}>
                                   {conversa.mensagens_nao_lidas}
                                 </span>
                               )}
                               {conversa.is_bot_ativo && (
-                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] bg-violet-500/15 text-violet-400">
-                                  <Bot className="w-2.5 h-2.5" />
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-violet-500/15 text-violet-400">
+                                  <Bot className="w-3 h-3" />
                                   Bot
                                 </span>
                               )}
                               {conversa.os_id && (
-                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] bg-blue-500/15 text-blue-400">
-                                  <Link2 className="w-2.5 h-2.5" />
+                                <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-blue-500/15 text-blue-400">
+                                  <Link2 className="w-3 h-3" />
                                   OS
                                 </span>
                               )}
@@ -351,13 +351,13 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                                 {atendente.foto_url ? (
                                   <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
                                 ) : (
-                                  <span className="text-[7px] text-white/40">{atendente.nome?.charAt(0)}</span>
+                                  <span className="text-[9px] text-white/40">{atendente.nome?.charAt(0)}</span>
                                 )}
                               </div>
                             ) : (
                               <button
                                 onClick={(e) => assignToMe(conversa, e)}
-                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] text-white/20 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-white/20 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover:opacity-100"
                               >
                                 <UserPlus className="w-2.5 h-2.5" />
                                 Assumir
@@ -374,7 +374,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                       <div className="w-10 h-10 rounded-full flex items-center justify-center mb-2" style={{ background: `${coluna.cor}08` }}>
                         <Icon className="w-5 h-5" style={{ color: `${coluna.cor}30` }} />
                       </div>
-                      <p className="text-[10px]">Nenhum cliente</p>
+                      <p className="text-xs">Nenhum cliente</p>
                     </div>
                   )}
                 </div>
