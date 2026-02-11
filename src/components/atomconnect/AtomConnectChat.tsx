@@ -601,6 +601,26 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     onUpdate();
   };
 
+  const currentWidthRef = useRef(chatWidth);
+
+  useEffect(() => {
+    currentWidthRef.current = chatWidth;
+  }, [chatWidth]);
+
+  const handleResizeMove = useCallback((e: MouseEvent) => {
+    const diff = resizeStartX.current - e.clientX;
+    const newWidth = Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, resizeStartWidth.current + diff));
+    setChatWidth(newWidth);
+    currentWidthRef.current = newWidth;
+  }, []);
+
+  const handleResizeEnd = useCallback(() => {
+    setIsResizing(false);
+    localStorage.setItem(CHAT_WIDTH_KEY, currentWidthRef.current.toString());
+    document.removeEventListener('mousemove', handleResizeMove);
+    document.removeEventListener('mouseup', handleResizeEnd);
+  }, [handleResizeMove]);
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -610,19 +630,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     document.addEventListener('mousemove', handleResizeMove);
     document.addEventListener('mouseup', handleResizeEnd);
   };
-
-  const handleResizeMove = useCallback((e: MouseEvent) => {
-    const diff = resizeStartX.current - e.clientX;
-    const newWidth = Math.min(MAX_CHAT_WIDTH, Math.max(MIN_CHAT_WIDTH, resizeStartWidth.current + diff));
-    setChatWidth(newWidth);
-  }, []);
-
-  const handleResizeEnd = useCallback(() => {
-    setIsResizing(false);
-    localStorage.setItem(CHAT_WIDTH_KEY, chatWidth.toString());
-    document.removeEventListener('mousemove', handleResizeMove);
-    document.removeEventListener('mouseup', handleResizeEnd);
-  }, [handleResizeMove, chatWidth]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
