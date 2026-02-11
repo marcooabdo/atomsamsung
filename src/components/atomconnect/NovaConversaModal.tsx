@@ -325,23 +325,13 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       alert('Este numero nao possui WhatsApp cadastrado');
       return;
     }
+    if (existingConversa) {
+      return;
+    }
 
     setCreating(true);
 
     try {
-      const { data: existing } = await supabase
-        .from('atom_connect_conversas')
-        .select('id')
-        .eq('cliente_telefone', formattedPhone)
-        .eq('unidade_id', selectedUnidadeId)
-        .maybeSingle();
-
-      if (existing) {
-        onConversaCriada(existing.id);
-        setCreating(false);
-        return;
-      }
-
       const { data: firstColumn } = await supabase
         .from('atom_connect_pipeline_colunas')
         .select('id')
@@ -401,7 +391,8 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
   const canCreate = telefone.replace(/\D/g, '').length >= 10 &&
                     selectedUnidadeId &&
                     whatsappStatus !== 'invalid' &&
-                    whatsappStatus !== 'checking';
+                    whatsappStatus !== 'checking' &&
+                    !existingConversa;
 
   return (
     <motion.div
@@ -513,20 +504,24 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                 </p>
               )}
               {existingConversa && (
-                <div className="mt-2 p-2.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
-                  <p className="text-xs text-yellow-400 flex items-center gap-1.5">
-                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>
-                      Este numero ja possui uma conversa ativa
-                      {existingConversa.cliente_nome && ` (${existingConversa.cliente_nome})`}
-                    </span>
+                <div className="mt-3 p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
+                  <p className="text-xs text-cyan-300 flex items-center gap-1.5 font-medium">
+                    <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>Numero ja cadastrado</span>
+                  </p>
+                  <p className="text-[11px] text-white/60 mt-1.5 ml-5">
+                    Este numero ja possui uma conversa ativa
+                    {existingConversa.cliente_nome && (
+                      <span className="text-white/80 font-medium"> com {existingConversa.cliente_nome}</span>
+                    )}
                   </p>
                   <button
                     onClick={() => onConversaCriada(existingConversa.id)}
-                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors"
+                    className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                    style={{ backgroundColor: accentColor, color: '#000' }}
                   >
-                    <MessageSquare className="w-3 h-3" />
-                    Abrir conversa existente
+                    <MessageSquare className="w-4 h-4" />
+                    Abrir Conversa
                   </button>
                 </div>
               )}
@@ -642,29 +637,31 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
               onClick={onClose}
               className="px-4 py-2 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors"
             >
-              Cancelar
+              {existingConversa ? 'Fechar' : 'Cancelar'}
             </button>
-            <button
-              onClick={handleCreate}
-              disabled={!canCreate || creating}
-              className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                backgroundColor: canCreate && !creating ? accentColor : 'rgba(255,255,255,0.1)',
-                color: canCreate && !creating ? '#000' : 'rgba(255,255,255,0.5)'
-              }}
-            >
-              {creating ? (
-                <>
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Criando...
-                </>
-              ) : (
-                <>
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  Iniciar Conversa
-                </>
-              )}
-            </button>
+            {!existingConversa && (
+              <button
+                onClick={handleCreate}
+                disabled={!canCreate || creating}
+                className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  backgroundColor: canCreate && !creating ? accentColor : 'rgba(255,255,255,0.1)',
+                  color: canCreate && !creating ? '#000' : 'rgba(255,255,255,0.5)'
+                }}
+              >
+                {creating ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    Criando...
+                  </>
+                ) : (
+                  <>
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Iniciar Conversa
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </div>
       </motion.div>
