@@ -446,7 +446,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .from('atom_connect_instancias')
         .select('api_url, api_key, instance_name')
         .eq('unidade_id', os.unidade_id)
-        .eq('is_ativa', true)
+        .eq('status', 'connected')
         .maybeSingle();
 
       if (!instancia) {
