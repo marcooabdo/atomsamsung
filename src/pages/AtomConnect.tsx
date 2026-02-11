@@ -263,6 +263,17 @@ export default function AtomConnect() {
           </div>
 
           <div className="flex items-center gap-2">
+            <div className="relative">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20" />
+              <input
+                type="text"
+                placeholder="Buscar cliente..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-48 pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.06] transition-all"
+              />
+            </div>
+
             {/* Unit Filter */}
             {(usuario?.nivel === 'master' || usuario?.nivel === 'administrador') && unidades && unidades.length > 1 && (
               <div className="relative">
@@ -271,7 +282,7 @@ export default function AtomConnect() {
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 transition-colors"
                 >
                   <Building2 className="w-3.5 h-3.5" />
-                  <span className="text-[11px] font-medium max-w-24 truncate">
+                  <span className="text-[11px] font-medium max-w-32 truncate">
                     {selectedUnidadeFilter
                       ? unidades.find(u => u.id === selectedUnidadeFilter)?.nome || 'Unidade'
                       : 'Todas Unidades'}
@@ -320,17 +331,6 @@ export default function AtomConnect() {
                 </AnimatePresence>
               </div>
             )}
-
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20" />
-              <input
-                type="text"
-                placeholder="Buscar cliente..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-48 pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.06] transition-all"
-              />
-            </div>
 
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
