@@ -4797,43 +4797,43 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                       <p className="text-xs font-bold text-[#39FF14]">
                                         Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                       </p>
-                                      <button
-                                        onClick={async () => {
-                                          const currentValue = peca.exibir_no_pdf !== false;
-                                          const newValue = !currentValue;
-                                          try {
-                                            if (requisicao) {
-                                              await supabase
-                                                .from('requisicoes_pecas')
-                                                .update({ exibir_no_pdf: newValue })
-                                                .eq('id', requisicao.id);
-                                            } else if (tipo === 'os_peca') {
-                                              await supabase
-                                                .from('os_pecas')
-                                                .update({ exibir_no_pdf: newValue })
-                                                .eq('id', peca.id);
-                                            } else if (tipo === 'cotacao') {
-                                              await supabase
-                                                .from('cotacoes_pecas')
-                                                .update({ exibir_no_pdf: newValue })
-                                                .eq('id', peca.id);
+                                      <label className="flex items-center gap-2 cursor-pointer">
+                                        <div
+                                          onClick={async () => {
+                                            const currentValue = peca.exibir_no_pdf !== false;
+                                            const newValue = !currentValue;
+                                            try {
+                                              if (requisicao) {
+                                                await supabase
+                                                  .from('requisicoes_pecas')
+                                                  .update({ exibir_no_pdf: newValue })
+                                                  .eq('id', requisicao.id);
+                                              } else if (tipo === 'os_peca') {
+                                                await supabase
+                                                  .from('os_pecas')
+                                                  .update({ exibir_no_pdf: newValue })
+                                                  .eq('id', peca.id);
+                                              } else if (tipo === 'cotacao') {
+                                                await supabase
+                                                  .from('cotacoes_pecas')
+                                                  .update({ exibir_no_pdf: newValue })
+                                                  .eq('id', peca.id);
+                                              }
+                                              await loadOSData();
+                                            } catch (error) {
+                                              console.error('Erro ao atualizar exibir_no_pdf:', error);
                                             }
-                                            await loadOSData();
-                                          } catch (error) {
-                                            console.error('Erro ao atualizar exibir_no_pdf:', error);
-                                          }
-                                        }}
-                                        className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
-                                        style={{
-                                          backgroundColor: peca.exibir_no_pdf !== false ? 'rgba(59,130,246,0.2)' : 'rgba(100,100,100,0.2)',
-                                          border: peca.exibir_no_pdf !== false ? '1px solid #3B82F6' : '1px solid #666',
-                                          color: peca.exibir_no_pdf !== false ? '#3B82F6' : '#888'
-                                        }}
-                                        title={peca.exibir_no_pdf !== false ? 'Aparece no PDF' : 'Oculto no PDF'}
-                                      >
-                                        {peca.exibir_no_pdf !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                        PDF
-                                      </button>
+                                          }}
+                                          className={`relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer ${
+                                            peca.exibir_no_pdf !== false ? 'bg-[#00D4FF]' : 'bg-gray-600'
+                                          }`}
+                                        >
+                                          <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                            peca.exibir_no_pdf !== false ? 'translate-x-5' : 'translate-x-0.5'
+                                          }`} />
+                                        </div>
+                                        <span className="text-xs text-gray-400">EXIBIR NO PDF</span>
+                                      </label>
                                     </div>
                                     {(requisicao || requisicaoDevolvida) && (
                                       <p className="text-xs text-gray-500 mt-2">
@@ -5320,31 +5320,31 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <button
-                                  onClick={async () => {
-                                    const currentValue = anexo.exibir_no_pdf !== false;
-                                    const newValue = !currentValue;
-                                    try {
-                                      await supabase
-                                        .from('os_anexos')
-                                        .update({ exibir_no_pdf: newValue })
-                                        .eq('id', anexo.id);
-                                      await loadAnexos();
-                                    } catch (error) {
-                                      console.error('Erro ao atualizar exibir_no_pdf:', error);
-                                    }
-                                  }}
-                                  className="flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-all"
-                                  style={{
-                                    backgroundColor: anexo.exibir_no_pdf !== false ? 'rgba(59,130,246,0.2)' : 'rgba(100,100,100,0.2)',
-                                    border: anexo.exibir_no_pdf !== false ? '1px solid #3B82F6' : '1px solid #666',
-                                    color: anexo.exibir_no_pdf !== false ? '#3B82F6' : '#888'
-                                  }}
-                                  title={anexo.exibir_no_pdf !== false ? 'Aparece no PDF' : 'Oculto no PDF'}
-                                >
-                                  {anexo.exibir_no_pdf !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
-                                  PDF
-                                </button>
+                                <label className="flex items-center gap-2 cursor-pointer">
+                                  <div
+                                    onClick={async () => {
+                                      const currentValue = anexo.exibir_no_pdf !== false;
+                                      const newValue = !currentValue;
+                                      try {
+                                        await supabase
+                                          .from('os_anexos')
+                                          .update({ exibir_no_pdf: newValue })
+                                          .eq('id', anexo.id);
+                                        await loadAnexos();
+                                      } catch (error) {
+                                        console.error('Erro ao atualizar exibir_no_pdf:', error);
+                                      }
+                                    }}
+                                    className={`relative w-10 h-5 rounded-full transition-colors duration-200 cursor-pointer ${
+                                      anexo.exibir_no_pdf !== false ? 'bg-[#00D4FF]' : 'bg-gray-600'
+                                    }`}
+                                  >
+                                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white shadow transition-transform duration-200 ${
+                                      anexo.exibir_no_pdf !== false ? 'translate-x-5' : 'translate-x-0.5'
+                                    }`} />
+                                  </div>
+                                  <span className="text-xs text-gray-400">EXIBIR NO PDF</span>
+                                </label>
                                 <button
                                   onClick={() => handleAbrirAnexo(anexo)}
                                   className="neon-button flex items-center gap-2 text-xs px-3 py-1.5"
