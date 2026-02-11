@@ -119,6 +119,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [mostrarConfirmacaoRequisicao, setMostrarConfirmacaoRequisicao] = useState(false);
   const [pecaParaRequisitar, setPecaParaRequisitar] = useState<any>(null);
   const [requisitando, setRequisitando] = useState(false);
+  const [mostrarConfirmacaoRequisicaoManual, setMostrarConfirmacaoRequisicaoManual] = useState(false);
+  const [dadosRequisicaoManual, setDadosRequisicaoManual] = useState<{
+    codigo: string;
+    descricao: string;
+    quantidade: number;
+    valor: string;
+  } | null>(null);
+  const [requisitandoManual, setRequisitandoManual] = useState(false);
 
   // Estados para validação de rota IH
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
@@ -1777,6 +1785,52 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       alert('Erro ao requisitar peça');
     } finally {
       setRequisitando(false);
+    }
+  };
+
+  const confirmarRequisicaoManual = async () => {
+    if (!dadosRequisicaoManual) return;
+
+    setRequisitandoManual(true);
+    try {
+      const valorNumerico = dadosRequisicaoManual.valor ? parseFloat(dadosRequisicaoManual.valor) : null;
+
+      const { data: requisicaoId, error: insertError } = await supabase.rpc('inserir_requisicao_peca', {
+        p_os_id: osId,
+        p_cotacao_peca_id: null,
+        p_codigo_peca: dadosRequisicaoManual.codigo,
+        p_descricao: dadosRequisicaoManual.descricao,
+        p_quantidade_requisitada: dadosRequisicaoManual.quantidade,
+        p_valor_peca: valorNumerico,
+        p_numero_os_samsung: os?.numero_os_samsung || null
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `✚ Requisição adicionada: ${dadosRequisicaoManual.descricao} (${dadosRequisicaoManual.codigo}) - Qtd: ${dadosRequisicaoManual.quantidade}${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
+        is_system: true
+      });
+
+      setNovaPecaCodigo('');
+      setNovaPecaDescricao('');
+      setNovaPecaQuantidade(1);
+      setNovaPecaValor('');
+      setSugestoesPecas([]);
+      await loadPecas();
+      await loadRequisicoes();
+      await loadComentarios();
+
+      setMostrarConfirmacaoRequisicaoManual(false);
+      setDadosRequisicaoManual(null);
+    } catch (error: any) {
+      alert(`Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setRequisitandoManual(false);
     }
   };
 
@@ -4683,48 +4737,19 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             placeholder="0.00"
                           />
                           <button
-                            onClick={async () => {
+                            onClick={() => {
                               if (!novaPecaCodigo || !novaPecaDescricao) {
                                 alert('Preencha código e descrição');
                                 return;
                               }
 
-                              try {
-                                const valorNumerico = novaPecaValor ? parseFloat(novaPecaValor) : null;
-
-                                const { data: requisicaoId, error: insertError } = await supabase.rpc('inserir_requisicao_peca', {
-                                  p_os_id: osId,
-                                  p_cotacao_peca_id: null,
-                                  p_codigo_peca: novaPecaCodigo,
-                                  p_descricao: novaPecaDescricao,
-                                  p_quantidade_requisitada: 1,
-                                  p_valor_peca: valorNumerico,
-                                  p_numero_os_samsung: os?.numero_os_samsung || null
-                                });
-
-                                if (insertError) {
-                                  throw insertError;
-                                }
-
-                                await supabase.from('os_comentarios').insert({
-                                  os_id: osId,
-                                  usuario_id: usuario?.id,
-                                  comentario: `✚ Requisição adicionada: ${novaPecaDescricao} (${novaPecaCodigo}) - Qtd: 1${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
-                                  is_system: true
-                                });
-
-                                setNovaPecaCodigo('');
-                                setNovaPecaDescricao('');
-                                setNovaPecaQuantidade(1);
-                                setNovaPecaValor('');
-                                setSugestoesPecas([]);
-                                await loadPecas();
-                                await loadRequisicoes();
-                                await loadComentarios();
-                                alert('Requisição criada com sucesso!');
-                              } catch (error: any) {
-                                alert(`Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`);
-                              }
+                              setDadosRequisicaoManual({
+                                codigo: novaPecaCodigo,
+                                descricao: novaPecaDescricao,
+                                quantidade: novaPecaQuantidade,
+                                valor: novaPecaValor
+                              });
+                              setMostrarConfirmacaoRequisicaoManual(true);
                             }}
                             className="neon-button px-4 py-2 flex-1 text-xs"
                             style={{
@@ -6782,6 +6807,105 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     <>
                       <Package className="w-5 h-5" />
                       Confirmar Requisição
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarConfirmacaoRequisicaoManual && dadosRequisicaoManual && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#39FF14]/20 flex items-center justify-center">
+                  <Plus className="w-6 h-6 text-[#39FF14]" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Adicionar Requisição</h3>
+                  <p className="text-sm text-gray-400">Confirme a criação da requisição manual</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMostrarConfirmacaoRequisicaoManual(false);
+                    setDadosRequisicaoManual(null);
+                  }}
+                  disabled={requisitandoManual}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#1A1A1A] rounded-lg p-4 mb-6 border border-[#39FF14]/20">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-400">Código</p>
+                    <p className="text-white font-bold">{dadosRequisicaoManual.codigo}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Descrição</p>
+                    <p className="text-white">{dadosRequisicaoManual.descricao}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-400">Quantidade</p>
+                      <p className="text-white font-bold">{dadosRequisicaoManual.quantidade}x</p>
+                    </div>
+                    {dadosRequisicaoManual.valor && (
+                      <div>
+                        <p className="text-xs text-gray-400">Valor</p>
+                        <p className="text-white font-bold">R$ {parseFloat(dadosRequisicaoManual.valor).toFixed(2)}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-500/10 rounded-lg p-4 mb-6 border border-blue-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white text-sm font-bold mb-1">Atenção</p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Esta requisição será adicionada manualmente à OS e um comentário será registrado no histórico.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setMostrarConfirmacaoRequisicaoManual(false);
+                    setDadosRequisicaoManual(null);
+                  }}
+                  disabled={requisitandoManual}
+                  className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarRequisicaoManual}
+                  disabled={requisitandoManual}
+                  className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                  style={{
+                    background: 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)',
+                    color: '#000'
+                  }}
+                >
+                  {requisitandoManual ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5" />
+                      Adicionar Requisição
                     </>
                   )}
                 </button>
