@@ -17,13 +17,40 @@ function normalizeEvent(rawEvent: string): string {
 
 function cleanPhoneNumber(remoteJid: string): string {
   let cleaned = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
-
   const colonIndex = cleaned.indexOf(":");
   if (colonIndex !== -1) {
     cleaned = cleaned.substring(0, colonIndex);
   }
-
+  cleaned = cleaned.replace(/[^0-9]/g, "");
   return cleaned;
+}
+
+function isProtocolMessage(msg: any): boolean {
+  if (!msg) return true;
+  if (msg.protocolMessage) return true;
+  if (msg.reactionMessage) return true;
+  if (msg.pollUpdateMessage) return true;
+  if (msg.editedMessage) return true;
+  if (msg.senderKeyDistributionMessage && !msg.conversation && !msg.extendedTextMessage) return true;
+  return false;
+}
+
+function hasActualContent(msg: any, body: any, data: any): boolean {
+  if (!msg && !body && !data) return false;
+  if (msg?.conversation) return true;
+  if (msg?.extendedTextMessage?.text) return true;
+  if (msg?.imageMessage) return true;
+  if (msg?.audioMessage) return true;
+  if (msg?.videoMessage) return true;
+  if (msg?.documentMessage) return true;
+  if (msg?.stickerMessage) return true;
+  if (msg?.locationMessage) return true;
+  if (msg?.contactMessage) return true;
+  if (msg?.contactsArrayMessage) return true;
+  if (body?.text) return true;
+  if (data?.text) return true;
+  if (body?.body) return true;
+  return false;
 }
 
 Deno.serve(async (req: Request) => {
@@ -35,7 +62,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", service: "evolution-webhook", version: "2.0" }), {
+    return new Response(JSON.stringify({ status: "ok", service: "evolution-webhook", version: "3.0" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -59,51 +86,114 @@ Deno.serve(async (req: Request) => {
     console.log("Event:", event, "| Raw:", rawEvent);
     console.log("Instance:", JSON.stringify(instance));
 
+    if (event.includes("messages.update") || event === "message.update") {
+      console.log("Processing message STATUS UPDATE (not a new message)");
+      const updates = Array.isArray(data) ? data : [data];
+
+      for (const update of updates) {
+        const messageId = update.key?.id || update.id;
+        const status = update.update?.status || update.status;
+
+        if (messageId && status !== undefined) {
+          let newStatus = "sent";
+          if (status === 2) newStatus = "sent";
+          if (status === 3) newStatus = "delivered";
+          if (status === 4) newStatus = "read";
+
+          const { error } = await supabase
+            .from("atom_connect_mensagens")
+            .update({ status: newStatus })
+            .eq("message_id", messageId);
+
+          if (!error) {
+            console.log("Updated message status:", messageId, "->", newStatus);
+          }
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, type: "status_update" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     const isMessageEvent =
       event.includes("messages.upsert") ||
-      event.includes("message") ||
-      event === "messages" ||
+      (event.includes("message") && !event.includes("update")) ||
       body.message ||
       body.data?.message ||
       body.data?.key;
 
     if (isMessageEvent) {
-      console.log("Processing as message event");
+      console.log("Processing as NEW MESSAGE event");
 
       const message = body.message || data.message || data;
       const key = body.key || message?.key || data?.key || {};
-      const remoteJid = key.remoteJid || body.remoteJid || data?.remoteJid || "";
+      const rawRemoteJid = key.remoteJid || body.remoteJid || data?.remoteJid || "";
 
-      console.log("RemoteJid:", remoteJid);
+      console.log("Raw RemoteJid:", rawRemoteJid);
       console.log("Key:", JSON.stringify(key));
 
-      if (remoteJid.endsWith("@g.us")) {
+      if (rawRemoteJid.endsWith("@g.us")) {
         console.log("Skipping group message");
-        return new Response(JSON.stringify({ skip: "group message" }), {
+        return new Response(JSON.stringify({ skip: "group_message" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (remoteJid.endsWith("@lid") || remoteJid.includes("@lid")) {
-        console.log("Skipping lid format message (linked device)");
-        return new Response(JSON.stringify({ skip: "lid format message" }), {
+      if (rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@lid")) {
+        console.log("Skipping lid format message (linked device internal)");
+        return new Response(JSON.stringify({ skip: "lid_format" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const phoneNumber = cleanPhoneNumber(remoteJid);
-      const fromMe = key.fromMe || false;
+      if (rawRemoteJid.includes("@broadcast")) {
+        console.log("Skipping broadcast message");
+        return new Response(JSON.stringify({ skip: "broadcast" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
 
-      console.log("Original remoteJid:", remoteJid, "| Cleaned phone:", phoneNumber);
+      const phoneNumber = cleanPhoneNumber(rawRemoteJid);
+      const fromMe = key.fromMe === true;
       const messageId = key.id || body.messageId || crypto.randomUUID();
 
-      console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
+      console.log("Cleaned phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
 
-      if (!phoneNumber) {
-        console.log("No phone number found, skipping");
-        return new Response(JSON.stringify({ skip: "no phone" }), {
+      if (!phoneNumber || phoneNumber.length < 8) {
+        console.log("Invalid phone number, skipping:", phoneNumber);
+        return new Response(JSON.stringify({ skip: "invalid_phone" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const msg = message?.message || body?.message?.message || data?.message || {};
+
+      if (isProtocolMessage(msg)) {
+        console.log("Skipping protocol message (status update, reaction, etc)");
+        return new Response(JSON.stringify({ skip: "protocol_message" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      if (!hasActualContent(msg, body, data)) {
+        console.log("No actual content found, skipping (probably status update or empty message)");
+        return new Response(JSON.stringify({ skip: "no_content" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const messageStubType = message?.messageStubType || data?.messageStubType || body?.messageStubType;
+      if (messageStubType) {
+        console.log("Skipping stub message type:", messageStubType);
+        return new Response(JSON.stringify({ skip: "stub_message", type: messageStubType }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -133,46 +223,21 @@ Deno.serve(async (req: Request) => {
 
         if (allInstancias && allInstancias.length === 1) {
           console.log("Only one instance available, using it as fallback");
-          const fallback = allInstancias[0];
-          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, fallback);
+          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, allInstancias[0]);
         }
 
         if (allInstancias && allInstancias.length > 0) {
           console.log("Multiple instances available, using first as fallback");
-          const fallback = allInstancias[0];
-          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, fallback);
+          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, allInstancias[0]);
         }
 
-        return new Response(JSON.stringify({ error: "Instance not found", instanceName }), {
+        return new Response(JSON.stringify({ error: "instance_not_found", instanceName }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
       return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, instancia);
-    }
-
-    if (event.includes("messages.update") || event === "message.update") {
-      console.log("Processing message update");
-      const updates = Array.isArray(data) ? data : [data];
-
-      for (const update of updates) {
-        const messageId = update.key?.id || update.id;
-        const status = update.update?.status || update.status;
-
-        if (messageId && status !== undefined) {
-          let newStatus = "sent";
-          if (status === 2) newStatus = "sent";
-          if (status === 3) newStatus = "delivered";
-          if (status === 4) newStatus = "read";
-
-          await supabase
-            .from("atom_connect_mensagens")
-            .update({ status: newStatus })
-            .eq("message_id", messageId);
-          console.log("Updated message status:", messageId, newStatus);
-        }
-      }
     }
 
     if (event.includes("connection") || event.includes("status")) {
@@ -237,7 +302,7 @@ async function processMessage(
   instancia: { id: string; unidade_id: string }
 ) {
   console.log("=== PROCESSING MESSAGE ===");
-  console.log("Phone:", phoneNumber);
+  console.log("Phone:", phoneNumber, "| FromMe:", fromMe);
   console.log("Instancia:", JSON.stringify(instancia));
 
   const msg = message?.message || body?.message?.message || data?.message || {};
@@ -262,7 +327,7 @@ async function processMessage(
     tipo = "audio";
     mediaMimetype = msg.audioMessage.mimetype;
     mediaUrl = msg.audioMessage.url;
-    conteudo = "[Audio]";
+    conteudo = msg.audioMessage.ptt ? "[Audio]" : "[Audio]";
   } else if (msg.videoMessage) {
     tipo = "video";
     caption = msg.videoMessage.caption;
@@ -286,12 +351,22 @@ async function processMessage(
   } else if (msg.contactMessage) {
     tipo = "contact";
     conteudo = msg.contactMessage.displayName || "[Contato]";
+  } else if (msg.contactsArrayMessage) {
+    tipo = "contact";
+    const names = msg.contactsArrayMessage.contacts?.map((c: any) => c.displayName).join(", ");
+    conteudo = names || "[Contatos]";
   } else if (body.text || data.text) {
     conteudo = body.text || data.text;
   } else if (body.body) {
     conteudo = body.body;
-  } else {
-    conteudo = "[Mensagem]";
+  }
+
+  if (!conteudo || conteudo.trim() === "") {
+    console.log("Empty content after extraction, skipping message");
+    return new Response(JSON.stringify({ skip: "empty_content" }), {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+    });
   }
 
   console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100));
@@ -303,7 +378,7 @@ async function processMessage(
     .maybeSingle();
 
   if (existingMsgEarly) {
-    console.log("Message already exists by ID (early check):", messageId);
+    console.log("Message already exists by ID:", messageId);
     return new Response(JSON.stringify({ success: true, duplicate: true }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -346,8 +421,8 @@ async function processMessage(
 
   if (!conversa) {
     if (fromMe) {
-      console.log("No existing conversation and fromMe=true, skipping (don't create conversation for sent messages)");
-      return new Response(JSON.stringify({ success: true, skip: "no_conversation_for_sent_message" }), {
+      console.log("No existing conversation and fromMe=true, skipping");
+      return new Response(JSON.stringify({ success: true, skip: "no_conversation_for_sent" }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       });
@@ -387,7 +462,7 @@ async function processMessage(
 
     if (insertError) {
       console.error("Error creating conversation:", insertError);
-      return new Response(JSON.stringify({ error: "Error creating conversation", details: insertError }), {
+      return new Response(JSON.stringify({ error: "create_conversation_failed", details: insertError }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       });
@@ -415,7 +490,7 @@ async function processMessage(
     }
   }
 
-  console.log("Inserting new message:", messageId);
+  console.log("Inserting message:", messageId, "| FromMe:", fromMe);
   const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
     conversa_id: conversa.id,
     message_id: messageId,
@@ -506,7 +581,7 @@ async function processRatingResponse(
 
   if (instanciaData && matchedOption.resposta) {
     try {
-      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, "");
+      const phoneForSend = conversa.cliente_telefone.replace(/\D/g, "");
       const response = await fetch(
         `${instanciaData.api_url}/message/sendText/${instanciaData.instance_name}`,
         {
@@ -516,7 +591,7 @@ async function processRatingResponse(
             apikey: instanciaData.api_key,
           },
           body: JSON.stringify({
-            number: phoneNumber,
+            number: phoneForSend,
             text: matchedOption.resposta,
           }),
         }
