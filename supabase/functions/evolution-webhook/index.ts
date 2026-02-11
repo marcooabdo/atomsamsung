@@ -15,6 +15,17 @@ function normalizeEvent(rawEvent: string): string {
     .trim();
 }
 
+function cleanPhoneNumber(remoteJid: string): string {
+  let cleaned = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+
+  const colonIndex = cleaned.indexOf(":");
+  if (colonIndex !== -1) {
+    cleaned = cleaned.substring(0, colonIndex);
+  }
+
+  return cleaned;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -82,8 +93,10 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      const phoneNumber = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
+      const phoneNumber = cleanPhoneNumber(remoteJid);
       const fromMe = key.fromMe || false;
+
+      console.log("Original remoteJid:", remoteJid, "| Cleaned phone:", phoneNumber);
       const messageId = key.id || body.messageId || crypto.randomUUID();
 
       console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
@@ -332,6 +345,14 @@ async function processMessage(
   }
 
   if (!conversa) {
+    if (fromMe) {
+      console.log("No existing conversation and fromMe=true, skipping (don't create conversation for sent messages)");
+      return new Response(JSON.stringify({ success: true, skip: "no_conversation_for_sent_message" }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
+    }
+
     const { data: firstColumn } = await supabase
       .from("atom_connect_pipeline_colunas")
       .select("id")
@@ -356,8 +377,8 @@ async function processMessage(
         is_bot_ativo: true,
         ultima_mensagem: conteudo,
         ultima_mensagem_at: new Date().toISOString(),
-        ultima_resposta_cliente_at: fromMe ? null : new Date().toISOString(),
-        mensagens_nao_lidas: fromMe ? 0 : 1,
+        ultima_resposta_cliente_at: new Date().toISOString(),
+        mensagens_nao_lidas: 1,
         tipo_atendimento: "whatsapp",
         prioridade: "normal",
       })
