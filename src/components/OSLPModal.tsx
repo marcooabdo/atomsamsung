@@ -734,7 +734,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   };
 
   const loadPecas = async () => {
-    if (!currentOsId) return;
+    if (!currentOsId) {
+      console.log('⚠️ loadPecas: currentOsId não definido');
+      return;
+    }
+    console.log('🔄 loadPecas: Carregando peças para OS:', currentOsId);
+
     const [osPecasResult, cotacaoPecasResult] = await Promise.all([
       supabase
         .from('os_pecas')
@@ -747,6 +752,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .eq('os_id', currentOsId)
         .order('created_at', { ascending: true })
     ]);
+
+    console.log('📦 os_pecas result:', osPecasResult.data?.length || 0, 'peças');
+    console.log('📦 cotacoes_pecas result:', cotacaoPecasResult.data?.length || 0, 'peças');
 
     const osPecasFormatadas = (osPecasResult.data || []).map(p => ({
       id: p.id,
@@ -791,7 +799,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       desc: p.descricao?.substring(0, 30),
       os_peca_id: p.os_peca_id,
       cotacao_peca_id: p.cotacao_peca_id,
-      tipo: p.tipo
+      tipo: p.tipo,
+      exibir_no_pdf: p.exibir_no_pdf
     })));
     setPecas(todasPecas);
   };
@@ -4696,26 +4705,39 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                         onClick={async () => {
                                           const currentValue = peca.exibir_no_pdf !== false;
                                           const newValue = !currentValue;
+                                          console.log('🔘 Toggle clicked:', {
+                                            peca_id: peca.id,
+                                            tipo,
+                                            currentValue,
+                                            newValue,
+                                            requisicao_id: requisicao?.id
+                                          });
+
                                           try {
+                                            let result;
                                             if (requisicao) {
-                                              await supabase
+                                              console.log('📝 Atualizando requisicoes_pecas:', requisicao.id);
+                                              result = await supabase
                                                 .from('requisicoes_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', requisicao.id);
                                             } else if (tipo === 'os_peca') {
-                                              await supabase
+                                              console.log('📝 Atualizando os_pecas:', peca.id);
+                                              result = await supabase
                                                 .from('os_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', peca.id);
                                             } else if (tipo === 'cotacao') {
-                                              await supabase
+                                              console.log('📝 Atualizando cotacoes_pecas:', peca.id);
+                                              result = await supabase
                                                 .from('cotacoes_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', peca.id);
                                             }
+                                            console.log('✅ Update result:', result);
                                             await loadPecas();
                                           } catch (error) {
-                                            console.error('Erro ao atualizar exibir_no_pdf:', error);
+                                            console.error('❌ Erro ao atualizar exibir_no_pdf:', error);
                                           }
                                         }}
                                       >
