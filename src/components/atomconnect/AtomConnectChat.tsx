@@ -140,6 +140,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [loadingRegras, setLoadingRegras] = useState(false);
   const [sendingAvaliacao, setSendingAvaliacao] = useState(false);
   const [typingStatus, setTypingStatus] = useState<string | null>(conversa.cliente_digitando || null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [uploadError, setUploadError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
@@ -148,6 +151,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const resizeStartX = useRef(0);
   const resizeStartWidth = useRef(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const recordingIntervalRef = useRef<number | null>(null);
 
   const loadMensagens = useCallback(async () => {
     const { data, error } = await supabase
@@ -460,6 +466,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if ((!inputText.trim() && attachments.length === 0) || sending) return;
 
     setSending(true);
+    setUploadError(null);
     const messageContent = inputText.trim();
     setInputText('');
 
@@ -469,18 +476,30 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     try {
       if (attachments.length > 0) {
         for (const file of attachments) {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `${conversa.id}/${Date.now()}.${fileExt}`;
+          const fileExt = file.name.split('.').pop() || 'bin';
+          const timestamp = Date.now();
+          const fileName = `${conversa.id}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-          const { error: uploadError } = await supabase.storage
+          console.log('Uploading file:', fileName, 'Type:', file.type, 'Size:', file.size);
+
+          const { error: storageError, data: uploadData } = await supabase.storage
             .from('atom-connect')
-            .upload(fileName, file);
+            .upload(fileName, file, {
+              contentType: file.type || 'application/octet-stream',
+              upsert: true
+            });
 
-          if (uploadError) throw uploadError;
+          if (storageError) {
+            console.error('Storage upload error:', storageError);
+            setUploadError(`Erro ao enviar ${file.name}: ${storageError.message}`);
+            continue;
+          }
 
           const { data: { publicUrl } } = supabase.storage
             .from('atom-connect')
             .getPublicUrl(fileName);
+
+          console.log('File uploaded, public URL:', publicUrl);
 
           let tipo = 'document';
           if (file.type.startsWith('image/')) tipo = 'image';
@@ -490,7 +509,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           const captionWithName = attendantName ? `*${attendantName}:*\n${file.name}` : file.name;
           const evolutionMessageId = await sendToEvolutionAPI(captionWithName, publicUrl, tipo);
 
-          await supabase
+          const { error: insertError } = await supabase
             .from('atom_connect_mensagens')
             .insert({
               conversa_id: conversa.id,
@@ -505,6 +524,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               enviado_por: usuario?.id,
               is_bot: false
             });
+
+          if (insertError) {
+            console.error('Message insert error:', insertError);
+          }
         }
         setAttachments([]);
         setShowAttachmentPreview(false);
@@ -526,10 +549,13 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             is_bot: false
           });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Text message insert error:', error);
+        }
       }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
+      setUploadError('Erro ao enviar mensagem. Tente novamente.');
     } finally {
       setSending(false);
       inputRef.current?.focus();
@@ -701,18 +727,138 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     document.addEventListener('mouseup', handleResizeEnd);
   };
 
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.onstop = async () => {
+        stream.getTracks().forEach(track => track.stop());
+
+        if (audioChunksRef.current.length > 0) {
+          const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+          await sendAudioMessage(audioBlob);
+        }
+      };
+
+      mediaRecorder.start(100);
+      setIsRecording(true);
+      setRecordingTime(0);
+
+      recordingIntervalRef.current = window.setInterval(() => {
+        setRecordingTime(prev => prev + 1);
+      }, 1000);
+    } catch (error) {
+      console.error('Erro ao iniciar gravacao:', error);
+      alert('Nao foi possivel acessar o microfone. Verifique as permissoes do navegador.');
+    }
+  };
+
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  };
+
+  const cancelRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+      audioChunksRef.current = [];
+      setIsRecording(false);
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+    }
+  };
+
+  const sendAudioMessage = async (audioBlob: Blob) => {
+    if (!instancia) return;
+    setSending(true);
+
+    try {
+      const fileName = `${conversa.id}/${Date.now()}.webm`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('atom-connect')
+        .upload(fileName, audioBlob, { contentType: 'audio/webm' });
+
+      if (uploadError) {
+        console.error('Upload error:', uploadError);
+        setUploadError('Erro ao fazer upload do audio');
+        setSending(false);
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('atom-connect')
+        .getPublicUrl(fileName);
+
+      const attendantName = usuario?.nome || '';
+      const evolutionMessageId = await sendToEvolutionAPI(attendantName ? `*${attendantName}*` : '', publicUrl, 'audio');
+
+      await supabase
+        .from('atom_connect_mensagens')
+        .insert({
+          conversa_id: conversa.id,
+          message_id: evolutionMessageId,
+          from_me: true,
+          tipo: 'audio',
+          conteudo: '[Audio]',
+          media_url: publicUrl,
+          media_mimetype: 'audio/webm',
+          status: evolutionMessageId ? 'sent' : 'failed',
+          enviado_por: usuario?.id,
+          is_bot: false
+        });
+    } catch (error) {
+      console.error('Erro ao enviar audio:', error);
+      setUploadError('Erro ao enviar audio');
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const formatRecordingTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(true);
   };
 
   const handleDragLeave = (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragging(false);
+    e.stopPropagation();
+    const rect = chatContainerRef.current?.getBoundingClientRect();
+    if (rect) {
+      const { clientX, clientY } = e;
+      if (clientX < rect.left || clientX > rect.right || clientY < rect.top || clientY > rect.bottom) {
+        setIsDragging(false);
+      }
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
+    e.stopPropagation();
     setIsDragging(false);
 
     const files = Array.from(e.dataTransfer.files);
@@ -727,6 +873,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if (files.length > 0) {
       setAttachments(prev => [...prev, ...files]);
       setShowAttachmentPreview(true);
+    }
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
     }
   };
 
@@ -976,8 +1125,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       </div>
 
       {isDragging && (
-        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center border-2 border-dashed rounded-xl ml-1" style={{ borderColor: accentColor }}>
-          <div className="text-center">
+        <div
+          className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center border-2 border-dashed rounded-xl ml-1"
+          style={{ borderColor: accentColor }}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+        >
+          <div className="text-center pointer-events-none">
             <Upload className="w-16 h-16 mx-auto mb-4" style={{ color: accentColor }} />
             <p className="text-xl font-semibold text-white">Solte os arquivos aqui</p>
             <p className="text-sm text-gray-400 mt-2">Imagens, documentos, audios e videos</p>
@@ -1338,6 +1493,25 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           <div ref={messagesEndRef} />
         </div>
 
+        {/* Error Message */}
+        <AnimatePresence>
+          {uploadError && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="border-t border-red-500/30 bg-red-500/10 px-3 py-2"
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-red-400">{uploadError}</span>
+                <button onClick={() => setUploadError(null)} className="p-1 hover:bg-red-500/20 rounded">
+                  <X className="w-3 h-3 text-red-400" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Attachment Preview */}
         <AnimatePresence>
           {showAttachmentPreview && attachments.length > 0 && (
@@ -1370,63 +1544,111 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
         {/* Input */}
         <div className="flex-shrink-0 p-3 border-t border-white/10 bg-black/20">
-          <div className="flex items-center gap-2">
-            <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple className="hidden" />
-            <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-              <Paperclip className="w-4 h-4 text-gray-400" />
-            </button>
-
-            <div className="relative">
-              <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-                <Smile className="w-4 h-4 text-gray-400" />
+          {isRecording ? (
+            <div className="flex items-center gap-3">
+              <button
+                onClick={cancelRecording}
+                className="p-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/30 transition-colors"
+                title="Cancelar"
+              >
+                <Trash2 className="w-4 h-4 text-red-400" />
               </button>
 
-              <AnimatePresence>
-                {showEmojiPicker && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: 10 }}
-                    className="absolute bottom-full left-0 mb-2 w-72 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl p-2 z-50"
-                  >
-                    <div className="grid grid-cols-8 gap-0.5 max-h-40 overflow-y-auto">
-                      {EMOJI_LIST.map((emoji, i) => (
-                        <button key={i} onClick={() => addEmoji(emoji)} className="w-7 h-7 flex items-center justify-center text-lg hover:bg-white/10 rounded">
-                          {emoji}
-                        </button>
-                      ))}
-                    </div>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+              <div className="flex-1 flex items-center gap-3 px-4 py-2.5 bg-white/5 border border-red-500/30 rounded-xl">
+                <div className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+                <span className="text-sm text-white font-medium">{formatRecordingTime(recordingTime)}</span>
+                <div className="flex-1 flex items-center gap-1">
+                  {[...Array(20)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="w-1 bg-red-400 rounded-full animate-pulse"
+                      style={{
+                        height: `${Math.random() * 16 + 4}px`,
+                        animationDelay: `${i * 50}ms`
+                      }}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-gray-400">Gravando...</span>
+              </div>
 
-            <div className="flex-1 relative">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
-                placeholder="Digite uma mensagem..."
-                className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
-              />
-            </div>
-            {inputText.trim() || attachments.length > 0 ? (
               <button
-                onClick={sendMessage}
+                onClick={stopRecording}
                 disabled={sending}
                 className="p-2.5 rounded-xl transition-colors"
                 style={{ backgroundColor: accentColor, opacity: sending ? 0.5 : 1 }}
+                title="Enviar audio"
               >
                 <Send className="w-4 h-4 text-black" />
               </button>
-            ) : (
-              <button className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors">
-                <Mic className="w-4 h-4 text-gray-400" />
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <input type="file" ref={fileInputRef} onChange={handleFileSelect} multiple accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx" className="hidden" />
+              <button onClick={() => fileInputRef.current?.click()} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+                <Paperclip className="w-4 h-4 text-gray-400" />
               </button>
-            )}
-          </div>
+
+              <div className="relative">
+                <button onClick={() => setShowEmojiPicker(!showEmojiPicker)} className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+                  <Smile className="w-4 h-4 text-gray-400" />
+                </button>
+
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute bottom-full left-0 mb-2 w-72 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl p-2 z-50"
+                    >
+                      <div className="grid grid-cols-8 gap-0.5 max-h-40 overflow-y-auto">
+                        {EMOJI_LIST.map((emoji, i) => (
+                          <button key={i} onClick={() => addEmoji(emoji)} className="w-7 h-7 flex items-center justify-center text-lg hover:bg-white/10 rounded">
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="flex-1 relative">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputText}
+                  onChange={(e) => setInputText(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  placeholder="Digite uma mensagem..."
+                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                />
+              </div>
+              {inputText.trim() || attachments.length > 0 ? (
+                <button
+                  onClick={sendMessage}
+                  disabled={sending}
+                  className="p-2.5 rounded-xl transition-colors"
+                  style={{ backgroundColor: accentColor, opacity: sending ? 0.5 : 1 }}
+                >
+                  {sending ? (
+                    <Loader2 className="w-4 h-4 text-black animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4 text-black" />
+                  )}
+                </button>
+              ) : (
+                <button
+                  onClick={startRecording}
+                  className="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors"
+                  title="Gravar audio"
+                >
+                  <Mic className="w-4 h-4 text-gray-400" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
