@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt } from 'lucide-react';
+import { useEffect, useState, useCallback } from 'react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -13,9 +13,30 @@ import { AnaliseConcluidaModal } from './AnaliseConcluidaModal';
 import { IniciarReparoModal } from './IniciarReparoModal';
 import { ReparoEfetuadoModal } from './ReparoEfetuadoModal';
 import { GIModal } from './agendamento/GIModal';
+import { AtomConnectChat } from './atomconnect/AtomConnectChat';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import type { Database } from '../lib/database.types';
+
+interface WhatsAppConversa {
+  id: string;
+  unidade_id: string;
+  cliente_telefone: string;
+  cliente_nome: string | null;
+  cliente_foto_url: string | null;
+  os_id: string | null;
+  coluna_pipeline: string;
+  atendente_id: string | null;
+  ultima_mensagem: string | null;
+  ultima_mensagem_at: string;
+  ultima_resposta_cliente_at: string | null;
+  mensagens_nao_lidas: number;
+  is_bot_ativo: boolean;
+  tipo_atendimento: string;
+  prioridade: string;
+  tags: string[];
+  created_at: string;
+}
 
 const COLUNAS_KANBAN = [
   { id: 'os_nova', label: 'OS Nova' },
@@ -136,6 +157,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
+
+  // Estados para WhatsApp Chat
+  const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
+  const [whatsAppConversa, setWhatsAppConversa] = useState<WhatsAppConversa | null>(null);
+  const [loadingWhatsApp, setLoadingWhatsApp] = useState(false);
+  const [whatsAppError, setWhatsAppError] = useState<string | null>(null);
 
   // Estado para editar numero_os_samsung
   const [editandoNumeroSamsung, setEditandoNumeroSamsung] = useState(false);
@@ -354,6 +381,132 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     } catch (error) {
     } finally {
       setLoading(false);
+    }
+  };
+
+  const formatPhoneNumber = (phone: string): string => {
+    let cleanPhone = phone.replace(/\D/g, '');
+    if (cleanPhone.startsWith('55') && cleanPhone.length >= 12) {
+      return cleanPhone;
+    }
+    if (cleanPhone.length === 11 || cleanPhone.length === 10) {
+      return '55' + cleanPhone;
+    }
+    return cleanPhone;
+  };
+
+  const checkWhatsAppNumber = async (phone: string, apiUrl: string, apiKey: string, instanceName: string): Promise<boolean> => {
+    try {
+      const response = await fetch(`${apiUrl}/chat/whatsappNumbers/${instanceName}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': apiKey
+        },
+        body: JSON.stringify({ numbers: [phone] })
+      });
+
+      if (!response.ok) return false;
+      const data = await response.json();
+      return data?.[0]?.exists === true;
+    } catch (error) {
+      console.error('Erro ao verificar WhatsApp:', error);
+      return false;
+    }
+  };
+
+  const handlePhoneClick = async (phone: string | null) => {
+    if (!phone || !os) return;
+
+    const formattedPhone = formatPhoneNumber(phone);
+    if (formattedPhone.length < 10) {
+      setWhatsAppError('Numero de telefone invalido');
+      return;
+    }
+
+    setLoadingWhatsApp(true);
+    setWhatsAppError(null);
+
+    try {
+      const { data: existingConversa } = await supabase
+        .from('atom_connect_conversas')
+        .select('*')
+        .eq('cliente_telefone', formattedPhone)
+        .eq('unidade_id', os.unidade_id)
+        .maybeSingle();
+
+      if (existingConversa) {
+        setWhatsAppConversa(existingConversa as WhatsAppConversa);
+        setShowWhatsAppChat(true);
+        setLoadingWhatsApp(false);
+        return;
+      }
+
+      const { data: instancia } = await supabase
+        .from('atom_connect_instancias')
+        .select('api_url, api_key, instance_name')
+        .eq('unidade_id', os.unidade_id)
+        .eq('is_ativa', true)
+        .maybeSingle();
+
+      if (!instancia) {
+        setWhatsAppError('WhatsApp nao configurado para esta unidade');
+        setLoadingWhatsApp(false);
+        return;
+      }
+
+      const hasWhatsApp = await checkWhatsAppNumber(
+        formattedPhone,
+        instancia.api_url,
+        instancia.api_key,
+        instancia.instance_name
+      );
+
+      if (!hasWhatsApp) {
+        setWhatsAppError('Este numero nao possui WhatsApp');
+        setLoadingWhatsApp(false);
+        return;
+      }
+
+      const { data: firstColumn } = await supabase
+        .from('atom_connect_pipeline_colunas')
+        .select('id')
+        .order('ordem', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: newConversa, error: createError } = await supabase
+        .from('atom_connect_conversas')
+        .insert({
+          unidade_id: os.unidade_id,
+          cliente_telefone: formattedPhone,
+          cliente_nome: os.cliente_nome || null,
+          os_id: os.id,
+          coluna_pipeline: firstColumn?.id || 'bot_triagem',
+          atendente_id: usuario?.id || null,
+          is_bot_ativo: false,
+          tipo_atendimento: 'balcao',
+          prioridade: 'normal',
+          ultima_mensagem_at: new Date().toISOString(),
+          tags: []
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        console.error('Erro ao criar conversa:', createError);
+        setWhatsAppError('Erro ao criar conversa');
+        setLoadingWhatsApp(false);
+        return;
+      }
+
+      setWhatsAppConversa(newConversa as WhatsAppConversa);
+      setShowWhatsAppChat(true);
+    } catch (error) {
+      console.error('Erro ao abrir WhatsApp:', error);
+      setWhatsAppError('Erro ao processar solicitacao');
+    } finally {
+      setLoadingWhatsApp(false);
     }
   };
 
@@ -3025,11 +3178,33 @@ Não haverá cobrança ao cliente.`
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Telefone 1</label>
-                    <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone || '-'}</p>
+                    {os.cliente_telefone ? (
+                      <button
+                        onClick={() => handlePhoneClick(os.cliente_telefone)}
+                        disabled={loadingWhatsApp}
+                        className="flex items-center gap-1.5 mt-1 px-2 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-400 transition-colors disabled:opacity-50"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{os.cliente_telefone}</span>
+                      </button>
+                    ) : (
+                      <p className="text-sm text-gray-300 mt-1">-</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Telefone 2</label>
-                    <p className="text-sm text-gray-300 mt-1">{os.cliente_telefone_2 || '-'}</p>
+                    {os.cliente_telefone_2 ? (
+                      <button
+                        onClick={() => handlePhoneClick(os.cliente_telefone_2)}
+                        disabled={loadingWhatsApp}
+                        className="flex items-center gap-1.5 mt-1 px-2 py-1 bg-green-500/10 hover:bg-green-500/20 border border-green-500/30 rounded-lg text-sm text-green-400 transition-colors disabled:opacity-50"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>{os.cliente_telefone_2}</span>
+                      </button>
+                    ) : (
+                      <p className="text-sm text-gray-300 mt-1">-</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs text-gray-500 uppercase">Email</label>
@@ -4969,6 +5144,48 @@ Não haverá cobrança ao cliente.`
                 )}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp Loading/Error Indicator */}
+      {(loadingWhatsApp || whatsAppError) && (
+        <div className="fixed bottom-4 right-4 z-[70]">
+          {loadingWhatsApp && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-[#1A1A2E] border border-green-500/30 rounded-xl shadow-lg">
+              <Loader2 className="w-5 h-5 text-green-400 animate-spin" />
+              <span className="text-sm text-white">Verificando WhatsApp...</span>
+            </div>
+          )}
+          {whatsAppError && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-[#1A1A2E] border border-red-500/30 rounded-xl shadow-lg">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <span className="text-sm text-red-400">{whatsAppError}</span>
+              <button
+                onClick={() => setWhatsAppError(null)}
+                className="p-1 hover:bg-white/10 rounded"
+              >
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* WhatsApp Chat Modal */}
+      {showWhatsAppChat && whatsAppConversa && os && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="w-full max-w-4xl h-[85vh] bg-[#0A0A16] rounded-xl overflow-hidden flex">
+            <AtomConnectChat
+              conversa={whatsAppConversa}
+              onClose={() => {
+                setShowWhatsAppChat(false);
+                setWhatsAppConversa(null);
+              }}
+              onUpdate={() => {}}
+              accentColor="#25D366"
+              unidadeId={os.unidade_id}
+            />
           </div>
         </div>
       )}
