@@ -169,7 +169,7 @@ export function OSPrintView() {
 
       const { data: reqPecas } = await supabase
         .from('requisicoes_pecas')
-        .select('pn, descricao, quantidade, exibir_no_pdf')
+        .select('pn:codigo_peca, descricao, quantidade:quantidade_requisitada, exibir_no_pdf')
         .eq('os_id', osId!)
         .not('status', 'eq', 'cancelada');
 
