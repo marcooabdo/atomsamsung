@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSNotaFiscalTab } from './OSNotaFiscalTab';
-import { gerarPDFOrdemServicoLP } from '../lib/pdfOS';
+import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
@@ -475,28 +475,29 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       const { data: osPecas } = await supabase
         .from('os_pecas')
-        .select('pn, descricao, quantidade, exibir_no_pdf')
+        .select('pn, descricao, quantidade, valor_unitario, valor_total, exibir_no_pdf')
         .eq('os_id', os.id);
 
       const { data: reqPecas } = await supabase
         .from('requisicoes_pecas')
-        .select('pn, descricao, quantidade')
+        .select('pn, descricao, quantidade, exibir_no_pdf')
         .eq('os_id', os.id)
         .not('status', 'eq', 'cancelada');
 
-      const { data: anexos } = await supabase
-        .from('os_anexos')
-        .select('nome_arquivo, url, tipo, exibir_no_pdf')
-        .eq('os_id', os.id)
-        .eq('exibir_no_pdf', true);
-
       const existingPNs = new Set((osPecas || []).map(p => p.pn));
-      const allPecas = [
+      const allOsPecas = [
         ...(osPecas || []).map(p => ({ ...p, exibir_no_pdf: p.exibir_no_pdf !== false })),
-        ...(reqPecas || []).filter(p => !existingPNs.has(p.pn)).map(p => ({ ...p, exibir_no_pdf: true }))
+        ...(reqPecas || []).filter(p => !existingPNs.has(p.pn)).map(p => ({
+          pn: p.pn,
+          descricao: p.descricao,
+          quantidade: p.quantidade,
+          valor_unitario: 0,
+          valor_total: 0,
+          exibir_no_pdf: p.exibir_no_pdf !== false
+        }))
       ];
 
-      const osDataLP = {
+      const osData = {
         numero_os_samsung: os.numero_os_samsung,
         numero_os_interna: os.numero_os_interna,
         cliente_nome: os.cliente_nome || '',
@@ -520,6 +521,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         reparo_efetuado: os.reparo_efetuado,
         acessorios: os.acessorios,
         tipo_atendimento: os.tipo_atendimento as 'IH' | 'CI',
+        tipo_os: 'LP' as const,
+        tipo_orcamento: os.tipo_orcamento,
         status_garantia: os.status_garantia,
         data_abertura: os.data_abertura_samsung || os.created_at,
         data_agendamento: os.data_agendamento,
@@ -530,8 +533,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           samsung_asccode: unidade?.samsung_asccode || null,
           telefone: unidade?.telefone || null
         },
-        pecas: allPecas,
-        anexos: anexos || []
+        os_pecas: allOsPecas,
+        cotacoes_pecas: [],
+        cotacoes_servicos: [],
+        pagamentos: [],
+        valor_total: null,
+        valor_pago: null,
+        saldo_restante: null,
+        status_pagamento: null
       };
 
       const config = {
@@ -543,7 +552,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         rodape_personalizado: pdfConfig?.rodape_personalizado || null
       };
 
-      const pdfBlob = await gerarPDFOrdemServicoLP(osDataLP, config);
+      const pdfBlob = await gerarPDFOrdemServico(osData, config, { ocultarValores: true });
       const pdfUrl = URL.createObjectURL(pdfBlob);
       window.open(pdfUrl, '_blank');
     } catch (error) {
