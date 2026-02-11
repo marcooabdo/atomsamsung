@@ -15,6 +15,7 @@ import { AtomConnectMarketing } from '../components/atomconnect/AtomConnectMarke
 import { AtomConnectAutomation } from '../components/atomconnect/AtomConnectAutomation';
 import { AtomConnectSettings } from '../components/atomconnect/AtomConnectSettings';
 import { AtomConnectNotification } from '../components/atomconnect/AtomConnectNotification';
+import { NovaConversaModal } from '../components/atomconnect/NovaConversaModal';
 
 type TabType = 'kanban' | 'dashboard' | 'marketing' | 'automation' | 'settings';
 
@@ -60,6 +61,7 @@ export default function AtomConnect() {
   const [showNotifications, setShowNotifications] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [showNovaConversa, setShowNovaConversa] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const loadConversas = useCallback(async () => {
@@ -206,6 +208,20 @@ export default function AtomConnect() {
       Notification.requestPermission();
     }
   }, []);
+
+  const handleNovaConversaCriada = async (conversaId: string) => {
+    setShowNovaConversa(false);
+    await loadConversas();
+    const { data } = await supabase
+      .from('atom_connect_conversas')
+      .select('*')
+      .eq('id', conversaId)
+      .maybeSingle();
+    if (data) {
+      setSelectedConversa(data);
+      setShowChat(true);
+    }
+  };
 
   const tabs = [
     { id: 'kanban' as TabType, label: 'Pipeline', icon: Users },
@@ -379,6 +395,7 @@ export default function AtomConnect() {
                     setShowChat(true);
                   }}
                   onUpdateConversa={loadConversas}
+                  onNovaConversa={() => setShowNovaConversa(true)}
                   accentColor={accentColor}
                 />
               </motion.div>
@@ -464,6 +481,16 @@ export default function AtomConnect() {
         onClick={handleNotificationClick}
         accentColor={accentColor}
       />
+
+      <AnimatePresence>
+        {showNovaConversa && (
+          <NovaConversaModal
+            accentColor={accentColor}
+            onClose={() => setShowNovaConversa(false)}
+            onConversaCriada={handleNovaConversaCriada}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

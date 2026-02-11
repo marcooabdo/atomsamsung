@@ -44,6 +44,7 @@ interface Props {
   searchTerm: string;
   onSelectConversa: (c: Conversa) => void;
   onUpdateConversa: () => void;
+  onNovaConversa: () => void;
   accentColor: string;
 }
 
@@ -51,7 +52,7 @@ const ICON_MAP: Record<string, any> = {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star, MessageSquare
 };
 
-export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, accentColor }: Props) {
+export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
   const { usuario, unidadeAtual } = useAuth();
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
@@ -203,6 +204,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
         </div>
 
         <button
+          onClick={onNovaConversa}
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-cyan-400 transition-all hover:bg-cyan-500/10"
           style={{ border: '1px solid rgba(0,212,255,0.15)' }}
         >
@@ -279,13 +281,22 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                           className={`p-2.5 rounded-lg cursor-pointer transition-all duration-150 group ${
                             slaBreached
                               ? 'border border-red-500/30 bg-red-500/[0.05]'
-                              : 'border border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.08]'
+                              : !conversa.atendente_id
+                                ? 'border border-amber-500/30 bg-amber-500/[0.04] hover:bg-amber-500/[0.08]'
+                                : 'border border-white/[0.04] bg-white/[0.02] hover:bg-white/[0.05] hover:border-white/[0.08]'
                           }`}
                         >
                           {slaBreached && (
                             <div className="flex items-center gap-1 mb-1.5 text-[11px] text-red-400 font-medium">
                               <AlertTriangle className="w-3 h-3" />
                               SLA excedido
+                            </div>
+                          )}
+
+                          {!conversa.atendente_id && !slaBreached && (
+                            <div className="flex items-center gap-1 mb-1.5 text-[11px] text-amber-400 font-medium">
+                              <div className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                              Sem atendente
                             </div>
                           )}
 
