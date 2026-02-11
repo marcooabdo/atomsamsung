@@ -65,6 +65,7 @@ export default function AtomConnect() {
   const [showUnidadeFilter, setShowUnidadeFilter] = useState(false);
   const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(unidadeAtual || null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastNotifiedRef = useRef<Record<string, number>>({});
 
   const loadConversas = useCallback(async () => {
     let query = supabase
@@ -111,19 +112,32 @@ export default function AtomConnect() {
       .on('postgres_changes', channelConfig, (payload) => {
         if (payload.eventType === 'INSERT') {
           const newConversa = payload.new as Conversa;
-          setConversas(prev => [newConversa, ...prev]);
-          showNewMessageNotification(newConversa);
+          setConversas(prev => {
+            const exists = prev.some(c => c.id === newConversa.id);
+            if (exists) return prev;
+            return [newConversa, ...prev];
+          });
+          if (newConversa.mensagens_nao_lidas > 0) {
+            lastNotifiedRef.current[newConversa.id] = newConversa.mensagens_nao_lidas;
+            showNewMessageNotification(newConversa);
+          }
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new as Conversa;
+          const oldConversa = payload.old as Conversa;
           setConversas(prev => prev.map(c => c.id === updated.id ? updated : c));
           if (selectedConversa?.id === updated.id) {
             setSelectedConversa(updated);
           }
-          if (updated.mensagens_nao_lidas > 0 && !updated.atendente_id) {
+          const previousUnread = lastNotifiedRef.current[updated.id] ?? oldConversa?.mensagens_nao_lidas ?? 0;
+          if (updated.mensagens_nao_lidas > previousUnread) {
+            lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
             showNewMessageNotification(updated);
+          } else {
+            lastNotifiedRef.current[updated.id] = updated.mensagens_nao_lidas;
           }
         } else if (payload.eventType === 'DELETE') {
           setConversas(prev => prev.filter(c => c.id !== payload.old.id));
+          delete lastNotifiedRef.current[payload.old.id];
         }
       })
       .on(

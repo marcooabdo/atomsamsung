@@ -33,6 +33,8 @@ interface Conversa {
   tecnico_ih_id?: string;
   status_ih?: string;
   endereco_visita?: string;
+  cliente_digitando?: string | null;
+  cliente_digitando_at?: string | null;
   created_at: string;
 }
 
@@ -117,7 +119,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [isDragging, setIsDragging] = useState(false);
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
-  const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string; name?: string } | null>(null);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string; name?: string; mimetype?: string } | null>(null);
   const [chatWidth, setChatWidth] = useState(() => {
     const saved = localStorage.getItem(CHAT_WIDTH_KEY);
     return saved ? parseInt(saved, 10) : DEFAULT_CHAT_WIDTH;
@@ -137,8 +139,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [regrasFinalizacao, setRegrasFinalizacao] = useState<any[]>([]);
   const [loadingRegras, setLoadingRegras] = useState(false);
   const [sendingAvaliacao, setSendingAvaliacao] = useState(false);
+  const [typingStatus, setTypingStatus] = useState<string | null>(conversa.cliente_digitando || null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -290,6 +294,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             const newMsg = payload.new as Mensagem;
             setMensagens(prev => [...prev, newMsg]);
             scrollToBottom();
+            if (!newMsg.from_me) {
+              setTypingStatus(null);
+            }
           } else if (payload.eventType === 'UPDATE') {
             const updatedMsg = payload.new as Mensagem;
             setMensagens(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
@@ -299,12 +306,34 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           }
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'atom_connect_conversas',
+          filter: `id=eq.${conversa.id}`
+        },
+        (payload) => {
+          const updated = payload.new as Conversa;
+          setTypingStatus(updated.cliente_digitando || null);
+        }
+      )
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
   }, [conversa.id]);
+
+  useEffect(() => {
+    if (typingStatus) {
+      const timeout = setTimeout(() => {
+        setTypingStatus(null);
+      }, 10000);
+      return () => clearTimeout(timeout);
+    }
+  }, [typingStatus]);
 
   useEffect(() => {
     scrollToBottom();
@@ -714,14 +743,51 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     inputRef.current?.focus();
   };
 
-  const downloadMedia = (url: string, filename: string) => {
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    link.target = '_blank';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+  const getExtensionFromMimetype = (mimetype: string | null): string => {
+    if (!mimetype) return '';
+    const mimeMap: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/gif': '.gif',
+      'image/webp': '.webp',
+      'audio/ogg': '.ogg',
+      'audio/mpeg': '.mp3',
+      'audio/mp4': '.m4a',
+      'audio/opus': '.opus',
+      'audio/aac': '.aac',
+      'video/mp4': '.mp4',
+      'video/3gpp': '.3gp',
+      'application/pdf': '.pdf',
+      'application/msword': '.doc',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
+      'application/vnd.ms-excel': '.xls',
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
+      'image/webp': '.webp',
+    };
+    return mimeMap[mimetype] || '';
+  };
+
+  const downloadMedia = async (url: string, filename: string, mimetype?: string | null) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const extension = getExtensionFromMimetype(mimetype || blob.type);
+      let finalFilename = filename;
+      if (extension && !filename.includes('.')) {
+        finalFilename = filename + extension;
+      }
+      const blobUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = finalFilename;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Erro ao baixar arquivo:', error);
+      window.open(url, '_blank');
+    }
   };
 
   const searchOS = useCallback(async (term: string) => {
@@ -936,9 +1002,20 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   <Phone className="w-3 h-3" />
                   {conversa.cliente_telefone}
                 </p>
-                <p className="text-[10px] text-gray-500 mt-0.5">
-                  Visto: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
-                </p>
+                {typingStatus ? (
+                  <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: accentColor }}>
+                    <span className="flex gap-0.5">
+                      <span className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: '0ms' }} />
+                      <span className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: '150ms' }} />
+                      <span className="w-1 h-1 rounded-full animate-bounce" style={{ backgroundColor: accentColor, animationDelay: '300ms' }} />
+                    </span>
+                    {typingStatus === 'recording' ? 'Gravando audio...' : 'Digitando...'}
+                  </p>
+                ) : (
+                  <p className="text-[10px] text-gray-500 mt-0.5">
+                    Visto: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
+                  </p>
+                )}
               </div>
             </div>
             <div className="flex items-center gap-1.5">
@@ -1140,29 +1217,62 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                               <img
                                 src={msg.media_url || msg.conteudo || ''}
                                 alt=""
-                                className="max-w-full max-h-64 rounded cursor-pointer"
-                                onClick={() => setPreviewMedia({ url: msg.media_url || msg.conteudo || '', type: 'image' })}
+                                className="max-w-full max-h-64 rounded cursor-pointer object-contain bg-black/20"
+                                onClick={() => setPreviewMedia({ url: msg.media_url || msg.conteudo || '', type: 'image', name: msg.caption || 'imagem', mimetype: msg.media_mimetype || undefined })}
+                                onError={(e) => {
+                                  const target = e.target as HTMLImageElement;
+                                  target.style.display = 'none';
+                                  target.nextElementSibling?.classList.remove('hidden');
+                                }}
                               />
+                              <div className="hidden w-full h-32 bg-white/5 rounded flex-col items-center justify-center">
+                                <ImageLucide className="w-8 h-8 text-gray-500 mb-2" />
+                                <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                              </div>
                               <button
-                                onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'image.jpg')}
+                                onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'imagem', msg.media_mimetype)}
                                 className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity"
                               >
                                 <Download className="w-3 h-3 text-white" />
                               </button>
                             </div>
-                            {msg.caption && <p className="text-xs text-white">{msg.caption}</p>}
+                            {msg.caption && msg.caption !== '[Imagem]' && <p className="text-xs text-white">{msg.caption}</p>}
+                          </div>
+                        )}
+
+                        {msg.tipo === 'sticker' && (
+                          <div className="space-y-1">
+                            <img
+                              src={msg.media_url || msg.conteudo || ''}
+                              alt="Sticker"
+                              className="max-w-[150px] max-h-[150px] object-contain"
+                              onError={(e) => {
+                                const target = e.target as HTMLImageElement;
+                                target.src = '';
+                                target.alt = '[Figurinha]';
+                                target.className = 'hidden';
+                              }}
+                            />
                           </div>
                         )}
 
                         {msg.tipo === 'audio' && (
-                          <div className="flex items-center gap-2 min-w-[180px]">
-                            <button className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                              <Play className="w-4 h-4 text-white" />
-                            </button>
-                            <div className="flex-1 h-1 bg-white/20 rounded-full" />
-                            <span className="text-[10px] text-gray-400">0:00</span>
-                            <button onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'audio.mp3')} className="p-1 hover:bg-white/10 rounded">
-                              <Download className="w-3 h-3 text-gray-400" />
+                          <div className="flex items-center gap-2 min-w-[220px] p-1 bg-white/5 rounded-lg">
+                            <audio
+                              ref={(el) => { audioRefs.current[msg.id] = el; }}
+                              src={msg.media_url || msg.conteudo || ''}
+                              className="w-full h-8"
+                              controls
+                              controlsList="nodownload"
+                              preload="metadata"
+                              style={{ filter: 'invert(1)', opacity: 0.7 }}
+                            />
+                            <button
+                              onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'audio', msg.media_mimetype)}
+                              className="p-1.5 hover:bg-white/10 rounded flex-shrink-0"
+                              title="Baixar audio"
+                            >
+                              <Download className="w-3.5 h-3.5 text-gray-400" />
                             </button>
                           </div>
                         )}
@@ -1176,7 +1286,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                               <p className="text-xs text-white truncate font-medium">{msg.caption || 'Documento'}</p>
                               <p className="text-[10px] text-gray-500">{msg.media_mimetype}</p>
                             </div>
-                            <button onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'documento')} className="p-1.5 hover:bg-white/10 rounded">
+                            <button onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'documento', msg.media_mimetype)} className="p-1.5 hover:bg-white/10 rounded">
                               <Download className="w-4 h-4 text-gray-400" />
                             </button>
                           </div>
@@ -1185,15 +1295,15 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         {msg.tipo === 'video' && (
                           <div className="space-y-1">
                             <div className="relative group/vid">
-                              <video src={msg.media_url || ''} className="max-w-full max-h-64 rounded" controls />
+                              <video src={msg.media_url || msg.conteudo || ''} className="max-w-full max-h-64 rounded" controls />
                               <button
-                                onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'video.mp4')}
+                                onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'video', msg.media_mimetype)}
                                 className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/vid:opacity-100 transition-opacity"
                               >
                                 <Download className="w-3 h-3 text-white" />
                               </button>
                             </div>
-                            {msg.caption && <p className="text-xs text-white">{msg.caption}</p>}
+                            {msg.caption && msg.caption !== '[Video]' && <p className="text-xs text-white">{msg.caption}</p>}
                           </div>
                         )}
 
@@ -1794,7 +1904,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             <button onClick={() => setPreviewMedia(null)} className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20">
               <X className="w-5 h-5 text-white" />
             </button>
-            <button onClick={() => downloadMedia(previewMedia.url, previewMedia.name || 'download')} className="absolute top-4 right-14 p-2 rounded-lg bg-white/10 hover:bg-white/20">
+            <button onClick={() => downloadMedia(previewMedia.url, previewMedia.name || 'download', previewMedia.mimetype)} className="absolute top-4 right-14 p-2 rounded-lg bg-white/10 hover:bg-white/20">
               <Download className="w-5 h-5 text-white" />
             </button>
             {previewMedia.type === 'image' && (

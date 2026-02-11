@@ -278,6 +278,42 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (event.includes("presence") || event.includes("composing") || event.includes("recording") || event.includes("paused")) {
+      console.log("Processing presence event:", event);
+      const remoteJid = data.remoteJid || data.id || body.remoteJid || "";
+      const presenceState = data.presence || data.state || body.presence || event.split(".").pop() || "";
+
+      if (remoteJid && !remoteJid.endsWith("@g.us")) {
+        const phoneNumber = cleanPhoneNumber(remoteJid);
+        console.log("Presence update for:", phoneNumber, "| State:", presenceState);
+
+        const { data: conversa } = await supabase
+          .from("atom_connect_conversas")
+          .select("id, unidade_id")
+          .eq("cliente_telefone", phoneNumber)
+          .maybeSingle();
+
+        if (conversa) {
+          let typingStatus = null;
+          if (presenceState === "composing" || event.includes("composing")) {
+            typingStatus = "typing";
+          } else if (presenceState === "recording" || event.includes("recording")) {
+            typingStatus = "recording";
+          }
+
+          await supabase
+            .from("atom_connect_conversas")
+            .update({
+              cliente_digitando: typingStatus,
+              cliente_digitando_at: typingStatus ? new Date().toISOString() : null
+            })
+            .eq("id", conversa.id);
+
+          console.log("Updated typing status:", conversa.id, typingStatus);
+        }
+      }
+    }
+
     return new Response(JSON.stringify({ success: true, event }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
