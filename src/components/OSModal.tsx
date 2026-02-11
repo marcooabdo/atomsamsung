@@ -150,6 +150,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [criandoRequisicao, setCriandoRequisicao] = useState(false);
   const [pecaRequisitandoId, setPecaRequisitandoId] = useState<string | null>(null);
   const [finalizandoAnalise, setFinalizandoAnalise] = useState(false);
+  const [mostrarErroRequisicaoExistente, setMostrarErroRequisicaoExistente] = useState(false);
+  const [erroRequisicaoInfo, setErroRequisicaoInfo] = useState<{ status: string; id: string } | null>(null);
+  const [mostrarSucessoRequisicao, setMostrarSucessoRequisicao] = useState(false);
+  const [mostrarErroRequisicao, setMostrarErroRequisicao] = useState(false);
+  const [erroRequisicaoMsg, setErroRequisicaoMsg] = useState('');
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
   const [mostrarConfirmacaoMover, setMostrarConfirmacaoMover] = useState(false);
@@ -1749,7 +1754,8 @@ Não haverá cobrança ao cliente.`
           devolucao_pendente: 'COM DEVOLUÇÃO PENDENTE'
         };
         const statusLabel = statusLabels[existente.status] || existente.status.toUpperCase();
-        alert(`❌ Não é possível criar nova requisição!\n\nJá existe uma requisição ${statusLabel} para esta peça.\n\nID da requisição: ${existente.id.slice(0, 8)}`);
+        setErroRequisicaoInfo({ status: statusLabel, id: existente.id.slice(0, 8) });
+        setMostrarErroRequisicaoExistente(true);
         setPecaRequisitandoId(null);
         setCriandoRequisicao(false);
         return;
@@ -1818,11 +1824,12 @@ Não haverá cobrança ao cliente.`
         await onReload();
       }
 
-      alert('Requisição de peça criada com sucesso! OS movida para "Aguardando Peça".');
+      setMostrarSucessoRequisicao(true);
     } catch (error: any) {
       console.error('Erro ao criar requisição:', error);
       const errorMsg = error?.message || 'Erro desconhecido';
-      alert(`Erro ao criar requisição de peça:\n${errorMsg}`);
+      setErroRequisicaoMsg(errorMsg);
+      setMostrarErroRequisicao(true);
     } finally {
       setPecaRequisitandoId(null);
       setCriandoRequisicao(false);
@@ -5189,6 +5196,110 @@ Não haverá cobrança ao cliente.`
           </div>
         </div>
       )}
+
+      {mostrarErroRequisicaoExistente && erroRequisicaoInfo && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Requisição Já Existe</h3>
+                  <p className="text-sm text-gray-400">Não é possível criar nova requisição</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMostrarErroRequisicaoExistente(false);
+                    setErroRequisicaoInfo(null);
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-red-500/10 rounded-lg p-4 mb-6 border border-red-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white text-sm font-bold mb-2">Já existe uma requisição ativa para esta peça</p>
+                    <div className="space-y-1 text-xs text-gray-300">
+                      <p><span className="text-gray-400">Status:</span> <span className="font-bold text-red-400">{erroRequisicaoInfo.status}</span></p>
+                      <p><span className="text-gray-400">ID:</span> <span className="font-mono">{erroRequisicaoInfo.id}</span></p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setMostrarErroRequisicaoExistente(false);
+                  setErroRequisicaoInfo(null);
+                }}
+                className="w-full px-6 py-3 rounded-lg font-bold transition-all bg-red-600 hover:bg-red-700 text-white"
+              >
+                Entendi
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mostrarErroRequisicao && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Erro ao Criar Requisição</h3>
+                  <p className="text-sm text-gray-400">Não foi possível processar a requisição</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMostrarErroRequisicao(false);
+                    setErroRequisicaoMsg('');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-red-500/10 rounded-lg p-4 mb-6 border border-red-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white text-sm font-bold mb-2">Detalhes do erro:</p>
+                    <p className="text-xs text-gray-300 leading-relaxed">{erroRequisicaoMsg}</p>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  setMostrarErroRequisicao(false);
+                  setErroRequisicaoMsg('');
+                }}
+                className="w-full px-6 py-3 rounded-lg font-bold transition-all bg-red-600 hover:bg-red-700 text-white"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SuccessModal
+        isOpen={mostrarSucessoRequisicao}
+        onClose={() => setMostrarSucessoRequisicao(false)}
+        title="Requisição Criada!"
+        message="A requisição foi criada com sucesso e a OS foi movida para 'Aguardando Peça'."
+      />
 
       <SuccessModal
         isOpen={mostrarSucessoMover}
