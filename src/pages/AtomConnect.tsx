@@ -358,7 +358,7 @@ export default function AtomConnect() {
           <div className="flex items-center gap-3 pl-4 border-l border-white/10">
             <div className="text-right">
               <p className="text-sm font-medium text-white">{usuario?.nome}</p>
-              <p className="text-xs text-gray-500">{unidades.find(u => u.id === unidadeAtual)?.nome}</p>
+              <p className="text-xs text-gray-500">{unidades?.find(u => u.id === unidadeAtual)?.nome || 'Unidade'}</p>
             </div>
             <div
               className="w-10 h-10 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center"
