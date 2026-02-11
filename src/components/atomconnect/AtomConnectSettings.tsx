@@ -185,13 +185,22 @@ export function AtomConnectSettings({ accentColor }: Props) {
       });
 
       const data = await response.json();
-      const newStatus = data.state === 'open' ? 'connected' : 'disconnected';
+      console.log('Check connection response:', data);
+
+      const state = data?.state || data?.instance?.state;
+      const isConnected = state === 'open' || state === 'connected';
+      const newStatus = isConnected ? 'connected' : 'disconnected';
+
+      const phoneNumber = data?.instance?.phoneNumber ||
+                         data?.instance?.wuid?.split('@')[0] ||
+                         data?.phoneNumber ||
+                         null;
 
       await supabase
         .from('atom_connect_instancias')
         .update({
           status: newStatus,
-          phone_number: data.instance?.phoneNumber || null
+          phone_number: phoneNumber
         })
         .eq('id', instancia.id);
 
@@ -251,13 +260,22 @@ export function AtomConnectSettings({ accentColor }: Props) {
         });
 
         const data = await response.json();
+        console.log('Connection state:', data);
 
-        if (data.state === 'open') {
+        const state = data?.state || data?.instance?.state;
+        const isConnected = state === 'open' || state === 'connected';
+
+        if (isConnected) {
+          const phoneNumber = data?.instance?.phoneNumber ||
+                             data?.instance?.wuid?.split('@')[0] ||
+                             data?.phoneNumber ||
+                             null;
+
           await supabase
             .from('atom_connect_instancias')
             .update({
               status: 'connected',
-              phone_number: data.instance?.phoneNumber || null,
+              phone_number: phoneNumber,
               qr_code: null
             })
             .eq('id', instancia.id);
@@ -268,6 +286,16 @@ export function AtomConnectSettings({ accentColor }: Props) {
           }
           setQrCodeModal(null);
           loadInstancias();
+        } else if (state === 'close' || state === 'disconnected') {
+          const connectResponse = await fetch(`${instancia.api_url}/instance/connect/${instancia.instance_name}`, {
+            headers: { 'apikey': instancia.api_key }
+          });
+          const connectData = await connectResponse.json();
+
+          if (connectData.base64 || connectData.code) {
+            const newQR = connectData.base64 || `data:image/png;base64,${connectData.code}`;
+            setQrCodeModal({ instancia, qrCode: newQR });
+          }
         }
       } catch (error) {
         console.error('Erro ao verificar conexao:', error);

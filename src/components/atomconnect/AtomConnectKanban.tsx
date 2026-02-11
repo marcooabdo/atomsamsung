@@ -231,8 +231,8 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden p-6">
-        <div className="flex gap-4 h-full min-w-max">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
+        <div className="flex gap-4 h-full">
           {colunas.map(coluna => {
             const Icon = ICON_MAP[coluna.icone] || MessageSquare;
             const columnConversas = getConversasByColuna(coluna.id);
@@ -241,7 +241,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             return (
               <div
                 key={coluna.id}
-                className={`w-80 flex-shrink-0 flex flex-col rounded-xl transition-all duration-200 ${
+                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col rounded-xl transition-all duration-200 ${
                   isDropTarget ? 'ring-2 ring-offset-2 ring-offset-[#0A0A0F]' : ''
                 }`}
                 style={{
