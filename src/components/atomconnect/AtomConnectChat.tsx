@@ -131,6 +131,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [usersCache, setUsersCache] = useState<Record<string, string>>({});
   const [instancia, setInstancia] = useState<Instancia | null>(null);
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
+  const [showEditClienteModal, setShowEditClienteModal] = useState(false);
+  const [editClienteNome, setEditClienteNome] = useState(conversa.cliente_nome || '');
+  const [savingCliente, setSavingCliente] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -193,6 +196,62 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   }, [conversa.unidade_id, unidadeId, unidadeAtual]);
 
+  const fetchClientPhoto = useCallback(async () => {
+    if (conversa.cliente_foto_url) {
+      setClienteFoto(conversa.cliente_foto_url);
+      return;
+    }
+
+    if (!instancia) return;
+
+    try {
+      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
+      const response = await fetch(`${instancia.api_url}/chat/fetchProfilePictureUrl/${instancia.instance_name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': instancia.api_key
+        },
+        body: JSON.stringify({
+          number: phoneNumber
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const photoUrl = result.profilePictureUrl || result.picture || result.url;
+        if (photoUrl) {
+          setClienteFoto(photoUrl);
+          await supabase
+            .from('atom_connect_conversas')
+            .update({ cliente_foto_url: photoUrl })
+            .eq('id', conversa.id);
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao buscar foto do perfil:', error);
+    }
+  }, [conversa.id, conversa.cliente_telefone, conversa.cliente_foto_url, instancia]);
+
+  const saveClienteNome = async () => {
+    if (!editClienteNome.trim()) return;
+    setSavingCliente(true);
+
+    try {
+      await supabase
+        .from('atom_connect_conversas')
+        .update({ cliente_nome: editClienteNome.trim() })
+        .eq('id', conversa.id);
+
+      setShowEditClienteModal(false);
+      onUpdate();
+    } catch (error) {
+      console.error('Erro ao salvar nome:', error);
+    } finally {
+      setSavingCliente(false);
+    }
+  };
+
   useEffect(() => {
     loadMensagens();
     loadColunas();
@@ -203,7 +262,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
     markAsRead();
     setClienteFoto(conversa.cliente_foto_url);
+    setEditClienteNome(conversa.cliente_nome || '');
   }, [conversa.id]);
+
+  useEffect(() => {
+    if (instancia && !conversa.cliente_foto_url) {
+      fetchClientPhoto();
+    }
+  }, [instancia, fetchClientPhoto]);
 
   useEffect(() => {
     const channel = supabase
@@ -1216,9 +1282,21 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               {/* Client Info */}
               <div className="flex flex-col items-center text-center">
                 {renderClientPhoto('lg')}
-                <p className="text-sm font-medium text-white mt-3">
-                  {conversa.cliente_nome || 'Nome n\u00e3o informado'}
-                </p>
+                <div className="flex items-center gap-1.5 mt-3">
+                  <p className="text-sm font-medium text-white">
+                    {conversa.cliente_nome || 'Nome nao informado'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEditClienteNome(conversa.cliente_nome || '');
+                      setShowEditClienteModal(true);
+                    }}
+                    className="p-1 rounded hover:bg-white/10 transition-colors"
+                    title="Editar nome"
+                  >
+                    <Edit2 className="w-3 h-3 text-gray-500 hover:text-white" />
+                  </button>
+                </div>
                 <p className="text-xs text-gray-400">{conversa.cliente_telefone}</p>
                 <p className="text-[10px] text-gray-500 mt-1">
                   Ultima resposta: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
@@ -1467,6 +1545,56 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               >
                 Cancelar
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Cliente Modal */}
+      <AnimatePresence>
+        {showEditClienteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowEditClienteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl p-5 w-80"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-sm font-semibold text-white mb-1">Editar Nome do Cliente</h3>
+              <p className="text-xs text-gray-400 mb-4">Altere o nome de identificacao do cliente</p>
+
+              <input
+                type="text"
+                value={editClienteNome}
+                onChange={(e) => setEditClienteNome(e.target.value)}
+                placeholder="Nome do cliente"
+                autoFocus
+                className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40 mb-4"
+              />
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowEditClienteModal(false)}
+                  className="flex-1 px-4 py-2 bg-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveClienteNome}
+                  disabled={savingCliente || !editClienteNome.trim()}
+                  className="flex-1 px-4 py-2 rounded-lg text-xs font-medium transition-colors disabled:opacity-50"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingCliente ? 'Salvando...' : 'Salvar'}
+                </button>
+              </div>
             </motion.div>
           </motion.div>
         )}

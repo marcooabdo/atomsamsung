@@ -32,20 +32,26 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   }, [effectiveUnidadeId, periodo]);
 
   const loadStats = async () => {
-    if (!effectiveUnidadeId) {
-      setLoading(false);
-      return;
+    let query = supabase
+      .from('atom_connect_conversas')
+      .select('*, atom_connect_pipeline_colunas(nome, cor)');
+
+    if (effectiveUnidadeId) {
+      query = query.eq('unidade_id', effectiveUnidadeId);
     }
 
-    const { data: conversas } = await supabase
-      .from('atom_connect_conversas')
-      .select('*, atom_connect_pipeline_colunas(nome, cor)')
-      .eq('unidade_id', effectiveUnidadeId);
+    const { data: conversas } = await query;
 
-    const { data: colunas } = await supabase
+    let colunasQuery = supabase
       .from('atom_connect_pipeline_colunas')
       .select('*')
       .order('ordem');
+
+    if (effectiveUnidadeId) {
+      colunasQuery = colunasQuery.or(`unidade_id.eq.${effectiveUnidadeId},unidade_id.is.null`);
+    }
+
+    const { data: colunas } = await colunasQuery;
 
     const allConversas = conversas || [];
 

@@ -365,28 +365,53 @@ async function processMessage(
     .eq("message_id", messageId)
     .maybeSingle();
 
-  if (!existingMsg) {
-    console.log("Inserting new message:", messageId);
-    const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
-      conversa_id: conversa.id,
-      message_id: messageId,
-      from_me: fromMe,
-      tipo,
-      conteudo,
-      caption,
-      media_url: mediaUrl,
-      media_mimetype: mediaMimetype,
-      status: fromMe ? "sent" : "delivered",
-      is_bot: false,
+  if (existingMsg) {
+    console.log("Message already exists by ID:", messageId);
+    return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
     });
+  }
 
-    if (msgError) {
-      console.error("Error inserting message:", msgError);
-    } else {
-      console.log("Message inserted successfully");
+  if (fromMe) {
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    const { data: recentSentMsg } = await supabase
+      .from("atom_connect_mensagens")
+      .select("id")
+      .eq("conversa_id", conversa.id)
+      .eq("from_me", true)
+      .eq("conteudo", conteudo)
+      .gte("created_at", oneMinuteAgo)
+      .limit(1)
+      .maybeSingle();
+
+    if (recentSentMsg) {
+      console.log("Skipping duplicate sent message (same content within 1 min)");
+      return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
     }
+  }
+
+  console.log("Inserting new message:", messageId);
+  const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
+    conversa_id: conversa.id,
+    message_id: messageId,
+    from_me: fromMe,
+    tipo,
+    conteudo,
+    caption,
+    media_url: mediaUrl,
+    media_mimetype: mediaMimetype,
+    status: fromMe ? "sent" : "delivered",
+    is_bot: false,
+  });
+
+  if (msgError) {
+    console.error("Error inserting message:", msgError);
   } else {
-    console.log("Message already exists:", messageId);
+    console.log("Message inserted successfully");
   }
 
   console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${conteudo.substring(0, 50)} ===`);
