@@ -127,6 +127,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     valor: string;
   } | null>(null);
   const [requisitandoManual, setRequisitandoManual] = useState(false);
+  const [mostrarModalCancelarRequisicao, setMostrarModalCancelarRequisicao] = useState(false);
+  const [requisicaoParaCancelar, setRequisicaoParaCancelar] = useState<RequisicaoPeca | null>(null);
+  const [motivoCancelamento, setMotivoCancelamento] = useState('');
+  const [cancelando, setCancelando] = useState(false);
+  const [mostrarSucessoRequisicao, setMostrarSucessoRequisicao] = useState(false);
 
   // Estados para validação de rota IH
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
@@ -1780,6 +1785,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       setMostrarConfirmacaoRequisicao(false);
       setPecaParaRequisitar(null);
+      setMostrarSucessoRequisicao(true);
     } catch (error) {
       console.error('Erro ao requisitar peça:', error);
       alert('Erro ao requisitar peça');
@@ -1888,15 +1894,24 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
-  const handleCancelarRequisicao = async (requisicao: RequisicaoPeca) => {
-    const motivo = prompt('Digite o motivo do cancelamento:');
-    if (!motivo) return;
+  const handleCancelarRequisicao = (requisicao: RequisicaoPeca) => {
+    setRequisicaoParaCancelar(requisicao);
+    setMotivoCancelamento('');
+    setMostrarModalCancelarRequisicao(true);
+  };
 
+  const confirmarCancelamento = async () => {
+    if (!requisicaoParaCancelar || !motivoCancelamento.trim()) {
+      alert('É necessário informar o motivo do cancelamento');
+      return;
+    }
+
+    setCancelando(true);
     try {
       const { error: updateError } = await supabase
         .from('requisicoes_pecas')
-        .update({ status: 'cancelada', motivo_cancelamento: motivo })
-        .eq('id', requisicao.id);
+        .update({ status: 'cancelada', motivo_cancelamento: motivoCancelamento })
+        .eq('id', requisicaoParaCancelar.id);
 
       if (updateError) {
         throw updateError;
@@ -1905,19 +1920,24 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       const { error: commentError } = await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Requisição cancelada por ${usuario?.nome}: ${requisicao.descricao}\nMotivo: ${motivo}`,
+        comentario: `Requisição cancelada por ${usuario?.nome}: ${requisicaoParaCancelar.descricao}\nMotivo: ${motivoCancelamento}`,
         is_system: true
       });
 
       if (commentError) {
       }
 
-      alert('Requisição cancelada!');
       await loadPecas();
       await loadRequisicoes();
       await loadComentarios();
+
+      setMostrarModalCancelarRequisicao(false);
+      setRequisicaoParaCancelar(null);
+      setMotivoCancelamento('');
     } catch (error) {
       alert('Erro ao cancelar requisição');
+    } finally {
+      setCancelando(false);
     }
   };
 
@@ -6914,6 +6934,116 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </div>
         </div>
       )}
+
+      {mostrarModalCancelarRequisicao && requisicaoParaCancelar && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <X className="w-6 h-6 text-red-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Cancelar Requisição</h3>
+                  <p className="text-sm text-gray-400">Informe o motivo do cancelamento</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setMostrarModalCancelarRequisicao(false);
+                    setRequisicaoParaCancelar(null);
+                    setMotivoCancelamento('');
+                  }}
+                  disabled={cancelando}
+                  className="text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#1A1A1A] rounded-lg p-4 mb-6 border border-red-500/20">
+                <div className="space-y-2">
+                  <div>
+                    <p className="text-xs text-gray-400">Código</p>
+                    <p className="text-white font-bold">{requisicaoParaCancelar.codigo_peca}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Descrição</p>
+                    <p className="text-white">{requisicaoParaCancelar.descricao}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Status</p>
+                    <p className="text-yellow-400 text-sm font-bold uppercase">{requisicaoParaCancelar.status}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-white mb-2">
+                  Motivo do Cancelamento *
+                </label>
+                <textarea
+                  value={motivoCancelamento}
+                  onChange={(e) => setMotivoCancelamento(e.target.value)}
+                  placeholder="Digite o motivo do cancelamento..."
+                  rows={4}
+                  disabled={cancelando}
+                  className="w-full bg-[#1A1A1A] border border-[#39FF14]/30 rounded-lg px-4 py-3 text-white placeholder-gray-500 focus:border-[#39FF14] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+
+              <div className="bg-red-500/10 rounded-lg p-4 mb-6 border border-red-500/30">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-white text-sm font-bold mb-1">Atenção</p>
+                    <p className="text-gray-400 text-xs leading-relaxed">
+                      Esta ação não pode ser desfeita. A requisição será marcada como cancelada e um comentário será registrado no histórico.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setMostrarModalCancelarRequisicao(false);
+                    setRequisicaoParaCancelar(null);
+                    setMotivoCancelamento('');
+                  }}
+                  disabled={cancelando}
+                  className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  Voltar
+                </button>
+                <button
+                  onClick={confirmarCancelamento}
+                  disabled={cancelando || !motivoCancelamento.trim()}
+                  className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {cancelando ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Cancelando...
+                    </>
+                  ) : (
+                    <>
+                      <X className="w-5 h-5" />
+                      Confirmar Cancelamento
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <SuccessModal
+        isOpen={mostrarSucessoRequisicao}
+        onClose={() => setMostrarSucessoRequisicao(false)}
+        title="Requisição Criada!"
+        message="A requisição foi criada com sucesso e a OS foi movida para 'Aguardando Peça'."
+      />
 
       <SuccessModal
         isOpen={mostrarSucessoMover}
