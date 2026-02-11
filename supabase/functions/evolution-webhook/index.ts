@@ -283,6 +283,20 @@ async function processMessage(
 
   console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100));
 
+  const { data: existingMsgEarly } = await supabase
+    .from("atom_connect_mensagens")
+    .select("id")
+    .eq("message_id", messageId)
+    .maybeSingle();
+
+  if (existingMsgEarly) {
+    console.log("Message already exists by ID (early check):", messageId);
+    return new Response(JSON.stringify({ success: true, duplicate: true }), {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+    });
+  }
+
   let { data: conversa, error: conversaError } = await supabase
     .from("atom_connect_conversas")
     .select("id, coluna_pipeline, mensagens_nao_lidas")
@@ -295,6 +309,27 @@ async function processMessage(
   }
 
   console.log("Existing conversation:", conversa ? conversa.id : "none");
+
+  if (conversa && fromMe) {
+    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
+    const { data: recentSentMsg } = await supabase
+      .from("atom_connect_mensagens")
+      .select("id")
+      .eq("conversa_id", conversa.id)
+      .eq("from_me", true)
+      .eq("conteudo", conteudo)
+      .gte("created_at", oneMinuteAgo)
+      .limit(1)
+      .maybeSingle();
+
+    if (recentSentMsg) {
+      console.log("Skipping duplicate sent message (same content within 1 min)");
+      return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
+    }
+  }
 
   if (!conversa) {
     const { data: firstColumn } = await supabase
@@ -356,41 +391,6 @@ async function processMessage(
 
     if (updateError) {
       console.error("Error updating conversation:", updateError);
-    }
-  }
-
-  const { data: existingMsg } = await supabase
-    .from("atom_connect_mensagens")
-    .select("id")
-    .eq("message_id", messageId)
-    .maybeSingle();
-
-  if (existingMsg) {
-    console.log("Message already exists by ID:", messageId);
-    return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
-      status: 200,
-      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-    });
-  }
-
-  if (fromMe) {
-    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
-    const { data: recentSentMsg } = await supabase
-      .from("atom_connect_mensagens")
-      .select("id")
-      .eq("conversa_id", conversa.id)
-      .eq("from_me", true)
-      .eq("conteudo", conteudo)
-      .gte("created_at", oneMinuteAgo)
-      .limit(1)
-      .maybeSingle();
-
-    if (recentSentMsg) {
-      console.log("Skipping duplicate sent message (same content within 1 min)");
-      return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
-        status: 200,
-        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-      });
     }
   }
 
