@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
+import { OSNotaFiscalTab } from './OSNotaFiscalTab';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
@@ -61,7 +62,7 @@ interface OSLPModalProps {
   modoSCACC?: boolean;
 }
 
-type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'anexos' | 'comentarios' | 'agendamento';
+type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false }: OSLPModalProps) {
   const { usuario } = useAuth();
@@ -4044,6 +4045,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 ...(os?.tipo_os === 'OW' ? [{ id: 'servicos', label: 'Serviços', icon: Wrench }] : []),
                 { id: 'checklist', label: 'Checklist', icon: CheckSquare },
                 ...(os?.tipo_os === 'OW' ? [{ id: 'pagamento', label: 'Pagamento', icon: DollarSign }] : []),
+                { id: 'nf', label: 'Nota Fiscal', icon: Receipt },
                 ...(os?.tipo_atendimento === 'IH' ? [{ id: 'agendamento', label: 'Agendamento', icon: Calendar }] : []),
                 { id: 'anexos', label: 'Anexos', icon: Paperclip },
                 { id: 'comentarios', label: 'Comentários', icon: MessageSquare }
@@ -5069,6 +5071,26 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   tipoReparo={os.tipo_reparo}
                   colunaKanban={os.coluna_kanban}
                   onSave={loadOS}
+                />
+              )}
+
+              {abaAtiva === 'nf' && (
+                <OSNotaFiscalTab
+                  osId={os.id}
+                  clienteNome={os.cliente_nome || ''}
+                  clienteDocumento={os.cliente_documento}
+                  clienteTelefone={os.cliente_telefone}
+                  clienteEmail={os.cliente_email}
+                  clienteEndereco={os.cliente_endereco}
+                  unidadeId={os.unidade_id}
+                  valorServicos={os.valor_servicos || 0}
+                  valorPecas={os.valor_pecas || 0}
+                  valorTotal={os.valor_total || 0}
+                  valorPago={os.valor_pago || 0}
+                  valorDesconto={os.valor_desconto || 0}
+                  tipoOs={os.tipo_os}
+                  isCortesia={os.is_cortesia}
+                  onReload={loadOS}
                 />
               )}
 
