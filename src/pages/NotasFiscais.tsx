@@ -50,6 +50,7 @@ interface NotaFiscal {
   os?: {
     numero_os_samsung: string | null;
     numero_os_interna: string | null;
+    tipo_os: string | null;
   };
   unidade?: {
     id: string;
@@ -78,6 +79,7 @@ export function NotasFiscais() {
 
   // Filtros
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'nfse' | 'nfe'>('todos');
+  const [tipoOsFiltro, setTipoOsFiltro] = useState<'todos' | 'LP' | 'OW'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [selectedUnidade, setSelectedUnidade] = useState<string>('');
   const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('mes');
@@ -121,7 +123,7 @@ export function NotasFiscais() {
 
   useEffect(() => {
     aplicarFiltros();
-  }, [notasFiscais, tipoFiltro, statusFiltro, selectedUnidade, periodoFiltro, searchTerm]);
+  }, [notasFiscais, tipoFiltro, tipoOsFiltro, statusFiltro, selectedUnidade, periodoFiltro, searchTerm]);
 
   const loadData = async () => {
     if (!user) return;
@@ -142,7 +144,7 @@ export function NotasFiscais() {
         .from('nf_emitidas')
         .select(`
           *,
-          os(numero_os_samsung, numero_os_interna),
+          os(numero_os_samsung, numero_os_interna, tipo_os),
           unidade:unidades(id, nome),
           emitido_por_usuario:usuarios!nf_emitidas_emitido_por_fkey(nome)
         `)
@@ -210,9 +212,14 @@ export function NotasFiscais() {
   const aplicarFiltros = () => {
     let filtered = [...notasFiscais];
 
-    // Filtro de tipo
+    // Filtro de tipo de NF
     if (tipoFiltro !== 'todos') {
       filtered = filtered.filter(nf => nf.tipo === tipoFiltro);
+    }
+
+    // Filtro de tipo de OS (LP/OW)
+    if (tipoOsFiltro !== 'todos') {
+      filtered = filtered.filter(nf => nf.os?.tipo_os === tipoOsFiltro);
     }
 
     // Filtro de status
@@ -472,7 +479,7 @@ export function NotasFiscais() {
           <h3 className="text-lg font-bold text-[#00D4FF]">Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           {/* Busca */}
           <div className="lg:col-span-2">
             <label className="block text-xs text-gray-400 mb-2">Buscar</label>
@@ -482,13 +489,13 @@ export function NotasFiscais() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Número, chave, tomador, OS..."
+                placeholder="Numero, chave, tomador, OS..."
                 className="neon-input w-full pl-10"
               />
             </div>
           </div>
 
-          {/* Tipo */}
+          {/* Tipo de NF */}
           <div>
             <label className="block text-xs text-gray-400 mb-2">Tipo de NF</label>
             <select
@@ -499,6 +506,20 @@ export function NotasFiscais() {
               <option value="todos">Todas</option>
               <option value="nfse">NFS-e</option>
               <option value="nfe">NF-e</option>
+            </select>
+          </div>
+
+          {/* Tipo de OS */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-2">Tipo de OS</label>
+            <select
+              value={tipoOsFiltro}
+              onChange={(e) => setTipoOsFiltro(e.target.value as any)}
+              className="neon-input w-full"
+            >
+              <option value="todos">Todas</option>
+              <option value="LP">LP (Garantia)</option>
+              <option value="OW">OW (Fora Garantia)</option>
             </select>
           </div>
 
@@ -519,16 +540,16 @@ export function NotasFiscais() {
             </select>
           </div>
 
-          {/* Período */}
+          {/* Periodo */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">Período</label>
+            <label className="block text-xs text-gray-400 mb-2">Periodo</label>
             <select
               value={periodoFiltro}
               onChange={(e) => setPeriodoFiltro(e.target.value as any)}
               className="neon-input w-full"
             >
-              <option value="mes">Este mês</option>
-              <option value="trimestre">Último trimestre</option>
+              <option value="mes">Este mes</option>
+              <option value="trimestre">Ultimo trimestre</option>
               <option value="ano">Este ano</option>
               <option value="todos">Todos</option>
             </select>
@@ -583,9 +604,23 @@ export function NotasFiscais() {
                       {nf.os && (
                         <div>
                           <p className="text-xs text-gray-500 uppercase">OS Vinculada</p>
-                          <p className="text-sm text-gray-200 font-mono">
-                            {nf.os.numero_os_samsung || nf.os.numero_os_interna || 'N/A'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-gray-200 font-mono">
+                              {nf.os.numero_os_samsung || nf.os.numero_os_interna || 'N/A'}
+                            </p>
+                            {nf.os.tipo_os && (
+                              <span
+                                className="px-1.5 py-0.5 rounded text-[10px] font-bold"
+                                style={{
+                                  backgroundColor: nf.os.tipo_os === 'LP' ? '#10B98120' : '#F9731620',
+                                  border: `1px solid ${nf.os.tipo_os === 'LP' ? '#10B981' : '#F97316'}`,
+                                  color: nf.os.tipo_os === 'LP' ? '#10B981' : '#F97316'
+                                }}
+                              >
+                                {nf.os.tipo_os}
+                              </span>
+                            )}
+                          </div>
                         </div>
                       )}
 

@@ -88,6 +88,7 @@ interface OSNotaFiscalTabProps {
   tipoOs?: string;
   isCortesia?: boolean;
   onReload?: () => void;
+  onClienteUpdate?: (dados: { nome: string; documento: string; telefone: string; email: string; endereco: string }) => void;
 }
 
 export function OSNotaFiscalTab({
@@ -100,7 +101,8 @@ export function OSNotaFiscalTab({
   unidadeId,
   tipoOs,
   isCortesia,
-  onReload
+  onReload,
+  onClienteUpdate
 }: OSNotaFiscalTabProps) {
   const [nfConfigs, setNfConfigs] = useState<NFConfig[]>([]);
   const [nfsEmitidas, setNfsEmitidas] = useState<NFEmitida[]>([]);
@@ -136,6 +138,16 @@ export function OSNotaFiscalTab({
   const [editingDescontoPecas, setEditingDescontoPecas] = useState(false);
   const [descontoServicosInput, setDescontoServicosInput] = useState('');
   const [descontoPecasInput, setDescontoPecasInput] = useState('');
+
+  const [editingCliente, setEditingCliente] = useState(false);
+  const [clienteForm, setClienteForm] = useState({
+    nome: clienteNome || '',
+    documento: clienteDocumento || '',
+    telefone: clienteTelefone || '',
+    email: clienteEmail || '',
+    endereco: clienteEndereco || ''
+  });
+  const [salvandoCliente, setSalvandoCliente] = useState(false);
 
   const isLpOrCortesia = tipoOs === 'LP' || isCortesia === true;
 
@@ -271,6 +283,33 @@ export function OSNotaFiscalTab({
       ncm: config.ncm || '',
       observacoes: config.observacoes_padrao || ''
     }));
+  };
+
+  const handleSalvarCliente = async () => {
+    setSalvandoCliente(true);
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({
+          cliente_nome: clienteForm.nome,
+          cliente_documento: clienteForm.documento,
+          cliente_telefone: clienteForm.telefone,
+          cliente_email: clienteForm.email,
+          cliente_endereco: clienteForm.endereco
+        })
+        .eq('id', osId);
+
+      if (error) throw error;
+
+      setMensagem({ tipo: 'success', texto: 'Dados do cliente atualizados!' });
+      setEditingCliente(false);
+      onClienteUpdate?.(clienteForm);
+      onReload?.();
+    } catch (error: any) {
+      setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar dados do cliente' });
+    } finally {
+      setSalvandoCliente(false);
+    }
   };
 
   const handleSelectNFeConfig = (configId: string) => {
@@ -666,34 +705,127 @@ export function OSNotaFiscalTab({
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="premium-card p-4 bg-gradient-to-br from-[#00D4FF]/5 to-transparent border border-[#00D4FF]/20">
-          <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider mb-3 flex items-center gap-2">
-            <User className="w-4 h-4" />
-            Tomador (Cliente)
-          </h4>
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-500">Nome:</span>
-              <span className="text-gray-200 font-medium">{clienteNome || 'Nao informado'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">CPF/CNPJ:</span>
-              <span className="text-gray-200 font-medium">{clienteDocumento || 'Nao informado'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Telefone:</span>
-              <span className="text-gray-200 font-medium">{clienteTelefone || 'Nao informado'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-500">Email:</span>
-              <span className="text-gray-200 font-medium truncate max-w-[200px]">{clienteEmail || 'Nao informado'}</span>
-            </div>
-            {clienteEndereco && (
-              <div className="pt-2 border-t border-gray-700">
-                <span className="text-gray-500 text-xs">Endereco:</span>
-                <p className="text-gray-300 text-xs mt-1">{clienteEndereco}</p>
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Tomador (Cliente)
+            </h4>
+            {!editingCliente ? (
+              <button
+                onClick={() => {
+                  setClienteForm({
+                    nome: clienteNome || '',
+                    documento: clienteDocumento || '',
+                    telefone: clienteTelefone || '',
+                    email: clienteEmail || '',
+                    endereco: clienteEndereco || ''
+                  });
+                  setEditingCliente(true);
+                }}
+                className="p-1.5 rounded hover:bg-[#00D4FF]/20 transition-colors"
+                title="Editar dados do cliente"
+              >
+                <Edit3 className="w-3.5 h-3.5 text-[#00D4FF]" />
+              </button>
+            ) : (
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleSalvarCliente}
+                  disabled={salvandoCliente}
+                  className="p-1.5 rounded hover:bg-[#39FF14]/20 transition-colors"
+                  title="Salvar"
+                >
+                  {salvandoCliente ? (
+                    <RefreshCw className="w-3.5 h-3.5 text-[#39FF14] animate-spin" />
+                  ) : (
+                    <Save className="w-3.5 h-3.5 text-[#39FF14]" />
+                  )}
+                </button>
+                <button
+                  onClick={() => setEditingCliente(false)}
+                  className="p-1.5 rounded hover:bg-[#FF0064]/20 transition-colors"
+                  title="Cancelar"
+                >
+                  <X className="w-3.5 h-3.5 text-[#FF0064]" />
+                </button>
               </div>
             )}
           </div>
+
+          {editingCliente ? (
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] text-gray-500 uppercase mb-1">Nome</label>
+                <input
+                  type="text"
+                  value={clienteForm.nome}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, nome: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded bg-gray-800 border border-[#00D4FF]/30 text-gray-200 text-sm focus:outline-none focus:border-[#00D4FF]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 uppercase mb-1">CPF/CNPJ</label>
+                <input
+                  type="text"
+                  value={clienteForm.documento}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, documento: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded bg-gray-800 border border-[#00D4FF]/30 text-gray-200 text-sm focus:outline-none focus:border-[#00D4FF]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 uppercase mb-1">Telefone</label>
+                <input
+                  type="text"
+                  value={clienteForm.telefone}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, telefone: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded bg-gray-800 border border-[#00D4FF]/30 text-gray-200 text-sm focus:outline-none focus:border-[#00D4FF]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 uppercase mb-1">Email</label>
+                <input
+                  type="email"
+                  value={clienteForm.email}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, email: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 rounded bg-gray-800 border border-[#00D4FF]/30 text-gray-200 text-sm focus:outline-none focus:border-[#00D4FF]"
+                />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 uppercase mb-1">Endereco</label>
+                <textarea
+                  value={clienteForm.endereco}
+                  onChange={(e) => setClienteForm(prev => ({ ...prev, endereco: e.target.value }))}
+                  rows={2}
+                  className="w-full px-2.5 py-1.5 rounded bg-gray-800 border border-[#00D4FF]/30 text-gray-200 text-sm focus:outline-none focus:border-[#00D4FF] resize-none"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-500">Nome:</span>
+                <span className="text-gray-200 font-medium">{clienteNome || 'Nao informado'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">CPF/CNPJ:</span>
+                <span className="text-gray-200 font-medium">{clienteDocumento || 'Nao informado'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Telefone:</span>
+                <span className="text-gray-200 font-medium">{clienteTelefone || 'Nao informado'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Email:</span>
+                <span className="text-gray-200 font-medium truncate max-w-[200px]">{clienteEmail || 'Nao informado'}</span>
+              </div>
+              {clienteEndereco && (
+                <div className="pt-2 border-t border-gray-700">
+                  <span className="text-gray-500 text-xs">Endereco:</span>
+                  <p className="text-gray-300 text-xs mt-1">{clienteEndereco}</p>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="premium-card p-4 bg-gradient-to-br from-[#FFA500]/5 to-transparent border border-[#FFA500]/20">
