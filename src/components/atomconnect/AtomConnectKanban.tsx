@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, AlertTriangle,
-  Plus, UserPlus, Link2
+  Plus, UserPlus, Link2, Building2, Filter, FileText, CalendarClock, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,6 +39,11 @@ interface PipelineColuna {
   is_final: boolean;
 }
 
+interface Unidade {
+  id: string;
+  nome: string;
+}
+
 interface Props {
   conversas: Conversa[];
   searchTerm: string;
@@ -53,16 +58,23 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
-  const { usuario, unidadeAtual } = useAuth();
+  const { usuario, unidadeAtual, unidades } = useAuth();
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [filterAtendente, setFilterAtendente] = useState<'all' | 'mine' | 'unassigned'>('all');
+  const [filterUnidade, setFilterUnidade] = useState<string>('all');
+  const [filterVendedor, setFilterVendedor] = useState<string>('all');
+  const [filterDiasSemRetorno, setFilterDiasSemRetorno] = useState<number | null>(null);
+  const [filterVinculadoOS, setFilterVinculadoOS] = useState<'all' | 'yes' | 'no'>('all');
+  const [showFilters, setShowFilters] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
+  const [allUnidades, setAllUnidades] = useState<Unidade[]>([]);
 
   useEffect(() => {
     loadColunas();
     loadAtendentes();
+    loadUnidades();
   }, []);
 
   const loadColunas = async () => {
@@ -74,14 +86,33 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
   };
 
   const loadAtendentes = async () => {
-    if (!unidadeAtual) return;
     const { data } = await supabase
       .from('usuarios')
-      .select('id, nome, foto_url')
-      .eq('unidade_id', unidadeAtual)
+      .select('id, nome, foto_url, unidade_id')
       .eq('ativo', true);
     if (data) setAtendentes(data);
   };
+
+  const loadUnidades = async () => {
+    if (unidades && unidades.length > 0) {
+      setAllUnidades(unidades);
+      return;
+    }
+    const { data } = await supabase
+      .from('unidades')
+      .select('id, nome')
+      .order('nome');
+    if (data) setAllUnidades(data);
+  };
+
+  const activeFiltersCount = useMemo(() => {
+    let count = 0;
+    if (filterUnidade !== 'all') count++;
+    if (filterVendedor !== 'all') count++;
+    if (filterDiasSemRetorno !== null) count++;
+    if (filterVinculadoOS !== 'all') count++;
+    return count;
+  }, [filterUnidade, filterVendedor, filterDiasSemRetorno, filterVinculadoOS]);
 
   const filteredConversas = useMemo(() => {
     let filtered = conversas;
@@ -101,8 +132,31 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
       filtered = filtered.filter(c => !c.atendente_id);
     }
 
+    if (filterUnidade !== 'all') {
+      filtered = filtered.filter(c => c.unidade_id === filterUnidade);
+    }
+
+    if (filterVendedor !== 'all') {
+      filtered = filtered.filter(c => c.atendente_id === filterVendedor);
+    }
+
+    if (filterDiasSemRetorno !== null) {
+      const cutoffDate = new Date();
+      cutoffDate.setDate(cutoffDate.getDate() - filterDiasSemRetorno);
+      filtered = filtered.filter(c => {
+        if (!c.ultima_resposta_cliente_at) return true;
+        return new Date(c.ultima_resposta_cliente_at) < cutoffDate;
+      });
+    }
+
+    if (filterVinculadoOS === 'yes') {
+      filtered = filtered.filter(c => c.os_id !== null);
+    } else if (filterVinculadoOS === 'no') {
+      filtered = filtered.filter(c => c.os_id === null);
+    }
+
     return filtered;
-  }, [conversas, searchTerm, filterAtendente, usuario]);
+  }, [conversas, searchTerm, filterAtendente, filterUnidade, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario]);
 
   const getConversasByColuna = (colunaId: string) => {
     return filteredConversas
@@ -173,6 +227,13 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
     onUpdateConversa();
   };
 
+  const clearAllFilters = () => {
+    setFilterUnidade('all');
+    setFilterVendedor('all');
+    setFilterDiasSemRetorno(null);
+    setFilterVinculadoOS('all');
+  };
+
   const totalConversas = filteredConversas.length;
 
   return (
@@ -197,6 +258,23 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             ))}
           </div>
 
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              showFilters || activeFiltersCount > 0
+                ? 'bg-cyan-500/15 text-cyan-400 border border-cyan-500/30'
+                : 'bg-white/[0.03] text-white/40 border border-white/[0.06] hover:text-white/60'
+            }`}
+          >
+            <Filter className="w-3 h-3" />
+            Filtros
+            {activeFiltersCount > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500 text-black">
+                {activeFiltersCount}
+              </span>
+            )}
+          </button>
+
           <div className="flex items-center gap-1.5 text-xs text-white/20">
             <div className="w-1.5 h-1.5 rounded-full bg-cyan-400/40" />
             {totalConversas} conversa{totalConversas !== 1 ? 's' : ''}
@@ -212,6 +290,87 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
           Nova Conversa
         </button>
       </div>
+
+      {/* Expanded Filters */}
+      <AnimatePresence>
+        {showFilters && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden border-b border-white/[0.04]"
+          >
+            <div className="px-5 py-3 flex items-center gap-4 flex-wrap">
+              <div className="flex items-center gap-2">
+                <Building2 className="w-3.5 h-3.5 text-white/30" />
+                <select
+                  value={filterUnidade}
+                  onChange={(e) => setFilterUnidade(e.target.value)}
+                  className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/40"
+                >
+                  <option value="all" className="bg-[#12122a]">Todas Unidades</option>
+                  {allUnidades.map(u => (
+                    <option key={u.id} value={u.id} className="bg-[#12122a]">{u.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <User className="w-3.5 h-3.5 text-white/30" />
+                <select
+                  value={filterVendedor}
+                  onChange={(e) => setFilterVendedor(e.target.value)}
+                  className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/40"
+                >
+                  <option value="all" className="bg-[#12122a]">Todos Atendentes</option>
+                  {atendentes.map(a => (
+                    <option key={a.id} value={a.id} className="bg-[#12122a]">{a.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <CalendarClock className="w-3.5 h-3.5 text-white/30" />
+                <select
+                  value={filterDiasSemRetorno ?? ''}
+                  onChange={(e) => setFilterDiasSemRetorno(e.target.value ? Number(e.target.value) : null)}
+                  className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/40"
+                >
+                  <option value="" className="bg-[#12122a]">Dias sem retorno</option>
+                  <option value="1" className="bg-[#12122a]">+1 dia sem retorno</option>
+                  <option value="3" className="bg-[#12122a]">+3 dias sem retorno</option>
+                  <option value="7" className="bg-[#12122a]">+7 dias sem retorno</option>
+                  <option value="15" className="bg-[#12122a]">+15 dias sem retorno</option>
+                  <option value="30" className="bg-[#12122a]">+30 dias sem retorno</option>
+                </select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <FileText className="w-3.5 h-3.5 text-white/30" />
+                <select
+                  value={filterVinculadoOS}
+                  onChange={(e) => setFilterVinculadoOS(e.target.value as 'all' | 'yes' | 'no')}
+                  className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/40"
+                >
+                  <option value="all" className="bg-[#12122a]">Vinculado a OS</option>
+                  <option value="yes" className="bg-[#12122a]">Com OS vinculada</option>
+                  <option value="no" className="bg-[#12122a]">Sem OS vinculada</option>
+                </select>
+              </div>
+
+              {activeFiltersCount > 0 && (
+                <button
+                  onClick={clearAllFilters}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-xs text-red-400 hover:bg-red-500/10 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                  Limpar filtros
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Kanban Board - fills remaining height */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden min-h-0">
