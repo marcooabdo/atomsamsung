@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSNotaFiscalTab } from './OSNotaFiscalTab';
-import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
@@ -456,111 +455,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
   };
 
-  const handleGerarPDF = async () => {
+  const handleGerarPDF = () => {
     if (!os) return;
-
-    setGerandoPDF(true);
-    try {
-      const { data: unidade } = await supabase
-        .from('unidades')
-        .select('nome, samsung_asccode, telefone')
-        .eq('id', os.unidade_id)
-        .maybeSingle();
-
-      const { data: pdfConfig } = await supabase
-        .from('configuracoes_pdf_os')
-        .select('*')
-        .eq('unidade_id', os.unidade_id)
-        .maybeSingle();
-
-      const { data: osPecas } = await supabase
-        .from('os_pecas')
-        .select('pn, descricao, quantidade, valor_unitario, valor_total, exibir_no_pdf')
-        .eq('os_id', os.id);
-
-      const { data: reqPecas } = await supabase
-        .from('requisicoes_pecas')
-        .select('pn, descricao, quantidade, exibir_no_pdf')
-        .eq('os_id', os.id)
-        .not('status', 'eq', 'cancelada');
-
-      const existingPNs = new Set((osPecas || []).map(p => p.pn));
-      const allOsPecas = [
-        ...(osPecas || []).map(p => ({ ...p, exibir_no_pdf: p.exibir_no_pdf !== false })),
-        ...(reqPecas || []).filter(p => !existingPNs.has(p.pn)).map(p => ({
-          pn: p.pn,
-          descricao: p.descricao,
-          quantidade: p.quantidade,
-          valor_unitario: 0,
-          valor_total: 0,
-          exibir_no_pdf: p.exibir_no_pdf !== false
-        }))
-      ];
-
-      const osData = {
-        numero_os_samsung: os.numero_os_samsung,
-        numero_os_interna: os.numero_os_interna,
-        cliente_nome: os.cliente_nome || '',
-        cliente_endereco: os.cliente_endereco,
-        cliente_numero: os.cliente_numero,
-        cliente_bairro: os.cliente_bairro,
-        cliente_cidade: os.cliente_cidade,
-        cliente_estado: os.cliente_estado,
-        cliente_cep: os.cliente_cep,
-        cliente_telefone: os.cliente_telefone,
-        cliente_celular: os.cliente_telefone_2,
-        cliente_email: os.cliente_email,
-        cliente_cpf_cnpj: os.cliente_documento,
-        aparelho_modelo: os.aparelho_modelo,
-        aparelho_linha: os.aparelho_linha,
-        aparelho_imei: os.aparelho_imei,
-        defeito_relatado: os.defeito_relatado,
-        diagnostico_tecnico: os.diagnostico_tecnico,
-        observacoes_internas: os.observacoes_internas,
-        descricao_reparo: os.descricao_reparo,
-        reparo_efetuado: os.reparo_efetuado,
-        acessorios: os.acessorios,
-        tipo_atendimento: os.tipo_atendimento as 'IH' | 'CI',
-        tipo_os: 'LP' as const,
-        tipo_orcamento: os.tipo_orcamento,
-        status_garantia: os.status_garantia,
-        data_abertura: os.data_abertura_samsung || os.created_at,
-        data_agendamento: os.data_agendamento,
-        data_compra: os.data_compra,
-        created_at: os.created_at,
-        unidade: {
-          nome: unidade?.nome || '',
-          samsung_asccode: unidade?.samsung_asccode || null,
-          telefone: unidade?.telefone || null
-        },
-        os_pecas: allOsPecas,
-        cotacoes_pecas: [],
-        cotacoes_servicos: [],
-        pagamentos: [],
-        valor_total: null,
-        valor_pago: null,
-        saldo_restante: null,
-        status_pagamento: null
-      };
-
-      const config = {
-        termo_orcamento: pdfConfig?.termo_orcamento || '',
-        termo_garantia: pdfConfig?.termo_garantia || '',
-        canais_atendimento: pdfConfig?.canais_atendimento || '',
-        observacoes_gerais: pdfConfig?.observacoes_gerais || '',
-        logo_url: pdfConfig?.logo_url || null,
-        rodape_personalizado: pdfConfig?.rodape_personalizado || null
-      };
-
-      const pdfBlob = await gerarPDFOrdemServico(osData, config, { ocultarValores: true });
-      const pdfUrl = URL.createObjectURL(pdfBlob);
-      window.open(pdfUrl, '_blank');
-    } catch (error) {
-      console.error('Erro ao gerar PDF:', error);
-      alert('Erro ao gerar PDF');
-    } finally {
-      setGerandoPDF(false);
-    }
+    window.open(`/os/print?osId=${os.id}`, '_blank');
   };
 
   const syncGSPN = async () => {
@@ -2387,8 +2284,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             {currentMode === 'view' && os && (
               <button
                 onClick={handleGerarPDF}
-                disabled={gerandoPDF}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all"
                 style={{
                   background: 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.05) 100%)',
                   border: '1px solid #3B82F6',
@@ -2397,11 +2293,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 }}
                 title="Gerar PDF da OS"
               >
-                {gerandoPDF ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <FileDown className="w-4 h-4" />
-                )}
+                <FileDown className="w-4 h-4" />
                 PDF
               </button>
             )}

@@ -188,7 +188,7 @@ export function OSNotaFiscalTab({
           .order('created_at', { ascending: true }),
         supabase
           .from('requisicoes_pecas')
-          .select('id, pn, descricao, quantidade, valor_peca, status')
+          .select('id, pn:codigo_peca, descricao, quantidade:quantidade_requisitada, valor_peca, status')
           .eq('os_id', osId)
           .not('status', 'eq', 'cancelada')
           .order('created_at', { ascending: true }),

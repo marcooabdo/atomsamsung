@@ -167,6 +167,30 @@ export function OSPrintView() {
         return;
       }
 
+      const { data: reqPecas } = await supabase
+        .from('requisicoes_pecas')
+        .select('pn, descricao, quantidade, exibir_no_pdf')
+        .eq('os_id', osId!)
+        .not('status', 'eq', 'cancelada');
+
+      const existingPNs = new Set([
+        ...(osData.os_pecas || []).map((p: any) => p.pn),
+        ...(osData.cotacoes_pecas || []).map((p: any) => p.pn)
+      ]);
+      const extraReqPecas = (reqPecas || [])
+        .filter((p: any) => !existingPNs.has(p.pn))
+        .map((p: any) => ({
+          pn: p.pn,
+          descricao: p.descricao,
+          quantidade: p.quantidade,
+          valor_unitario: 0,
+          valor_total: 0,
+          exibir_no_pdf: p.exibir_no_pdf !== false
+        }));
+      if (extraReqPecas.length > 0) {
+        osData.os_pecas = [...(osData.os_pecas || []), ...extraReqPecas];
+      }
+
       const { data: anexos } = await supabase
         .from('os_anexos')
         .select('id, nome_arquivo, url, tipo, exibir_no_pdf')
@@ -245,6 +269,8 @@ export function OSPrintView() {
       </div>
     );
   }
+
+  const isLP = os.tipo_os === 'LP';
 
   const allPecas = [
     ...(os.os_pecas || []),
@@ -463,8 +489,8 @@ export function OSPrintView() {
                       <th className="px-3 py-2 text-left font-semibold text-white text-xs">PN</th>
                       <th className="px-3 py-2 text-left font-semibold text-white text-xs">Descricao</th>
                       <th className="px-3 py-2 text-center font-semibold text-white text-xs">Qtd</th>
-                      <th className="px-3 py-2 text-right font-semibold text-white text-xs">Valor Unit.</th>
-                      <th className="px-3 py-2 text-right font-semibold text-white text-xs">Total</th>
+                      {!isLP && <th className="px-3 py-2 text-right font-semibold text-white text-xs">Valor Unit.</th>}
+                      {!isLP && <th className="px-3 py-2 text-right font-semibold text-white text-xs">Total</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -473,29 +499,35 @@ export function OSPrintView() {
                         <td className="border-b border-gray-200 px-3 py-1.5 text-gray-900 font-medium text-xs">{peca.pn}</td>
                         <td className="border-b border-gray-200 px-3 py-1.5 text-gray-900 text-xs">{peca.descricao}</td>
                         <td className="border-b border-gray-200 px-3 py-1.5 text-center text-gray-900 text-xs">{peca.quantidade}</td>
-                        <td className="border-b border-gray-200 px-3 py-1.5 text-right text-gray-900 text-xs">
-                          {formatCurrency(peca.valor_unitario || peca.valor_final_unitario)}
-                        </td>
-                        <td className="border-b border-gray-200 px-3 py-1.5 text-right text-gray-900 font-semibold text-xs">
-                          {formatCurrency(peca.valor_total || (peca.quantidade * (peca.valor_unitario || peca.valor_final_unitario || 0)))}
-                        </td>
+                        {!isLP && (
+                          <td className="border-b border-gray-200 px-3 py-1.5 text-right text-gray-900 text-xs">
+                            {formatCurrency(peca.valor_unitario || peca.valor_final_unitario)}
+                          </td>
+                        )}
+                        {!isLP && (
+                          <td className="border-b border-gray-200 px-3 py-1.5 text-right text-gray-900 font-semibold text-xs">
+                            {formatCurrency(peca.valor_total || (peca.quantidade * (peca.valor_unitario || peca.valor_final_unitario || 0)))}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
-                  <tfoot>
-                    <tr style={{ backgroundColor: ACCENT_LIGHT }}>
-                      <td colSpan={4} className="px-3 py-2 text-right font-bold text-xs" style={{ color: ACCENT }}>TOTAL PECAS:</td>
-                      <td className="px-3 py-2 text-right font-bold text-xs" style={{ color: ACCENT }}>
-                        {formatCurrency(pecas.reduce((sum, p) => sum + (p.valor_total || (p.quantidade * (p.valor_unitario || p.valor_final_unitario || 0))), 0))}
-                      </td>
-                    </tr>
-                  </tfoot>
+                  {!isLP && (
+                    <tfoot>
+                      <tr style={{ backgroundColor: ACCENT_LIGHT }}>
+                        <td colSpan={4} className="px-3 py-2 text-right font-bold text-xs" style={{ color: ACCENT }}>TOTAL PECAS:</td>
+                        <td className="px-3 py-2 text-right font-bold text-xs" style={{ color: ACCENT }}>
+                          {formatCurrency(pecas.reduce((sum, p) => sum + (p.valor_total || (p.quantidade * (p.valor_unitario || p.valor_final_unitario || 0))), 0))}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
               </div>
             )}
 
             {/* ===== SERVICOS ===== */}
-            {servicos.length > 0 && (
+            {!isLP && servicos.length > 0 && (
               <div className="mb-5">
                 <SectionTitle>Servicos Realizados</SectionTitle>
                 <table className="w-full text-sm border-collapse">
@@ -530,7 +562,7 @@ export function OSPrintView() {
             )}
 
             {/* ===== PAGAMENTOS ===== */}
-            {os.pagamentos && os.pagamentos.length > 0 && (
+            {!isLP && os.pagamentos && os.pagamentos.length > 0 && (
               <div className="mb-5">
                 <SectionTitle>Pagamentos</SectionTitle>
                 <table className="w-full text-sm border-collapse">
@@ -557,6 +589,7 @@ export function OSPrintView() {
             )}
 
             {/* ===== RESUMO FINANCEIRO ===== */}
+            {!isLP && (
             <div className="mb-5">
               <div className="rounded-lg overflow-hidden border" style={{ borderColor: ACCENT }}>
                 <div className="px-4 py-2 text-white text-xs font-bold uppercase tracking-wider" style={{ backgroundColor: ACCENT }}>
@@ -600,6 +633,7 @@ export function OSPrintView() {
                 </div>
               </div>
             </div>
+            )}
 
             {/* ===== FOTOS ===== */}
             {photoUrls.length > 0 && (
