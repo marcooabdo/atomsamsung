@@ -23,6 +23,7 @@ import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
 import { RegistroVendas } from './pages/RegistroVendas';
 import { OrcamentoPublico } from './pages/OrcamentoPublico';
 import CustomerIntelligence from './pages/CustomerIntelligence';
+import AtomConnect from './pages/AtomConnect';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -267,6 +268,15 @@ function AppContent() {
               <Layout>
                 <CustomerIntelligence />
               </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/atom-connect"
+          element={
+            <ProtectedRoute>
+              <AtomConnect />
             </ProtectedRoute>
           }
         />

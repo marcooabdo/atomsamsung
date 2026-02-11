@@ -24,7 +24,8 @@ import {
   Palette,
   Sparkles,
   ShoppingCart,
-  Users
+  Users,
+  Radio
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -37,6 +38,7 @@ const allMenuItems = [
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
+  { id: 'atom-connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
   { id: 'customer-intelligence', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
   { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
