@@ -5,7 +5,7 @@ import {
   CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare,
   MapPin, Calendar, Navigation, AlertTriangle, ExternalLink, Edit2,
   Trash2, Upload, File, ImageIcon as ImageLucide, GripVertical,
-  PanelRightClose, PanelRight, Search, Loader2
+  PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -78,6 +78,13 @@ interface PipelineColuna {
   cor: string;
 }
 
+interface Instancia {
+  id: string;
+  api_url: string;
+  api_key: string;
+  instance_name: string;
+}
+
 const EMOJI_LIST = [
   '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘',
   '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐',
@@ -90,6 +97,7 @@ const EMOJI_LIST = [
 const MIN_CHAT_WIDTH = 500;
 const MAX_CHAT_WIDTH = 1400;
 const DEFAULT_CHAT_WIDTH = 750;
+const CHAT_WIDTH_KEY = 'atom_connect_chat_width';
 
 export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unidadeId }: Props) {
   const { usuario, unidadeAtual } = useAuth();
@@ -110,7 +118,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [attachments, setAttachments] = useState<File[]>([]);
   const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
   const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string; name?: string } | null>(null);
-  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH);
+  const [chatWidth, setChatWidth] = useState(() => {
+    const saved = localStorage.getItem(CHAT_WIDTH_KEY);
+    return saved ? parseInt(saved, 10) : DEFAULT_CHAT_WIDTH;
+  });
   const [isResizing, setIsResizing] = useState(false);
   const [showVincularOS, setShowVincularOS] = useState(false);
   const [osSearchTerm, setOsSearchTerm] = useState('');
@@ -118,6 +129,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [searchingOS, setSearchingOS] = useState(false);
   const [clienteFoto, setClienteFoto] = useState<string | null>(conversa.cliente_foto_url);
   const [usersCache, setUsersCache] = useState<Record<string, string>>({});
+  const [instancia, setInstancia] = useState<Instancia | null>(null);
+  const [showFinalizarModal, setShowFinalizarModal] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -155,10 +168,36 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setLoading(false);
   }, [conversa.id, usersCache]);
 
+  const loadInstancia = useCallback(async () => {
+    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
+    if (!targetUnidadeId) return;
+
+    const { data } = await supabase
+      .from('atom_connect_instancias')
+      .select('id, api_url, api_key, instance_name')
+      .eq('unidade_id', targetUnidadeId)
+      .eq('status', 'connected')
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setInstancia(data);
+    } else {
+      const { data: anyInstancia } = await supabase
+        .from('atom_connect_instancias')
+        .select('id, api_url, api_key, instance_name')
+        .eq('status', 'connected')
+        .limit(1)
+        .maybeSingle();
+      if (anyInstancia) setInstancia(anyInstancia);
+    }
+  }, [conversa.unidade_id, unidadeId, unidadeAtual]);
+
   useEffect(() => {
     loadMensagens();
     loadColunas();
     loadAtendentes();
+    loadInstancia();
     if (conversa.os_id) {
       loadOSData();
     }
@@ -254,12 +293,80 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
+  const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string): Promise<string | null> => {
+    if (!instancia) {
+      console.error('Nenhuma instancia conectada');
+      return null;
+    }
+
+    try {
+      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
+      const jid = `${phoneNumber}@s.whatsapp.net`;
+
+      if (mediaUrl && mediaType) {
+        const mediaEndpoint = mediaType === 'image' ? 'sendMedia' :
+                              mediaType === 'audio' ? 'sendWhatsAppAudio' :
+                              mediaType === 'video' ? 'sendMedia' : 'sendMedia';
+
+        const response = await fetch(`${instancia.api_url}/message/${mediaEndpoint}/${instancia.instance_name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': instancia.api_key
+          },
+          body: JSON.stringify({
+            number: phoneNumber,
+            mediatype: mediaType,
+            media: mediaUrl,
+            caption: text || undefined
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Erro Evolution API (media):', errorText);
+          return null;
+        }
+
+        const result = await response.json();
+        return result.key?.id || result.messageId || null;
+      } else {
+        const response = await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': instancia.api_key
+          },
+          body: JSON.stringify({
+            number: phoneNumber,
+            text: text
+          })
+        });
+
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error('Erro Evolution API (text):', errorText);
+          return null;
+        }
+
+        const result = await response.json();
+        return result.key?.id || result.messageId || null;
+      }
+    } catch (error) {
+      console.error('Erro ao enviar via Evolution API:', error);
+      return null;
+    }
+  };
+
   const sendMessage = async () => {
     if ((!inputText.trim() && attachments.length === 0) || sending) return;
 
     setSending(true);
     const messageContent = inputText.trim();
     setInputText('');
+
+    const attendantName = usuario?.nome || '';
+    const messageWithName = attendantName ? `*${attendantName}:*\n${messageContent}` : messageContent;
 
     try {
       if (attachments.length > 0) {
@@ -282,17 +389,21 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           else if (file.type.startsWith('audio/')) tipo = 'audio';
           else if (file.type.startsWith('video/')) tipo = 'video';
 
+          const captionWithName = attendantName ? `*${attendantName}:*\n${file.name}` : file.name;
+          const evolutionMessageId = await sendToEvolutionAPI(captionWithName, publicUrl, tipo);
+
           await supabase
             .from('atom_connect_mensagens')
             .insert({
               conversa_id: conversa.id,
+              message_id: evolutionMessageId,
               from_me: true,
               tipo,
               conteudo: publicUrl,
               media_url: publicUrl,
               media_mimetype: file.type,
               caption: file.name,
-              status: 'sent',
+              status: evolutionMessageId ? 'sent' : 'failed',
               enviado_por: usuario?.id,
               is_bot: false
             });
@@ -302,14 +413,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       }
 
       if (messageContent) {
+        const evolutionMessageId = await sendToEvolutionAPI(messageWithName);
+
         const { error } = await supabase
           .from('atom_connect_mensagens')
           .insert({
             conversa_id: conversa.id,
+            message_id: evolutionMessageId,
             from_me: true,
             tipo: 'text',
             conteudo: messageContent,
-            status: 'sent',
+            status: evolutionMessageId ? 'sent' : 'failed',
             enviado_por: usuario?.id,
             is_bot: false
           });
@@ -376,6 +490,51 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     onUpdate();
   };
 
+  const finalizarContato = async (rating: number) => {
+    const ratingMessages: Record<number, string> = {
+      1: 'Obrigado pelo seu feedback. Lamentamos que sua experiencia nao tenha sido satisfatoria. Vamos trabalhar para melhorar!',
+      2: 'Agradecemos seu feedback! Ficamos felizes em saber que conseguimos ajudar. Estamos sempre buscando melhorar.',
+      3: 'Muito obrigado pela excelente avaliacao! Ficamos muito felizes em poder ajudar. Conte sempre conosco!'
+    };
+
+    const message = ratingMessages[rating];
+    const attendantName = usuario?.nome || '';
+    const messageWithName = attendantName ? `*${attendantName}:*\n${message}` : message;
+
+    await sendToEvolutionAPI(messageWithName);
+
+    await supabase
+      .from('atom_connect_mensagens')
+      .insert({
+        conversa_id: conversa.id,
+        from_me: true,
+        tipo: 'text',
+        conteudo: message,
+        status: 'sent',
+        enviado_por: usuario?.id,
+        is_bot: false,
+        metadata: { rating, finalized: true }
+      });
+
+    const { data: finalColumn } = await supabase
+      .from('atom_connect_pipeline_colunas')
+      .select('id')
+      .eq('is_final', true)
+      .limit(1)
+      .maybeSingle();
+
+    await supabase
+      .from('atom_connect_conversas')
+      .update({
+        coluna_pipeline: finalColumn?.id || 'finalizado_nps',
+        is_bot_ativo: false
+      })
+      .eq('id', conversa.id);
+
+    setShowFinalizarModal(false);
+    onUpdate();
+  };
+
   const handleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsResizing(true);
@@ -394,9 +553,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   const handleResizeEnd = useCallback(() => {
     setIsResizing(false);
+    localStorage.setItem(CHAT_WIDTH_KEY, chatWidth.toString());
     document.removeEventListener('mousemove', handleResizeMove);
     document.removeEventListener('mouseup', handleResizeEnd);
-  }, [handleResizeMove]);
+  }, [handleResizeMove, chatWidth]);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -464,7 +624,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         .from('os')
         .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
         .eq('unidade_id', targetUnidadeId)
-        .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%`)
+        .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`)
         .order('created_at', { ascending: false })
         .limit(15);
 
@@ -560,9 +720,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     const days = Math.floor(diff / 86400000);
 
     if (minutes < 1) return 'Agora';
-    if (minutes < 60) return `${minutes}min atras`;
-    if (hours < 24) return `${hours}h atras`;
-    if (days < 7) return `${days}d atras`;
+    if (minutes < 60) return `${minutes}min atr\u00e1s`;
+    if (hours < 24) return `${hours}h atr\u00e1s`;
+    if (days < 7) return `${days}d atr\u00e1s`;
     return date.toLocaleDateString('pt-BR');
   };
 
@@ -747,6 +907,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             >
               <ArrowRight className="w-3 h-3" />
               Transferir
+            </button>
+
+            <button
+              onClick={() => setShowFinalizarModal(true)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+            >
+              <CheckCircle2 className="w-3 h-3" />
+              Finalizar
             </button>
           </div>
         </div>
@@ -1049,7 +1217,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               <div className="flex flex-col items-center text-center">
                 {renderClientPhoto('lg')}
                 <p className="text-sm font-medium text-white mt-3">
-                  {conversa.cliente_nome || 'Nome nao informado'}
+                  {conversa.cliente_nome || 'Nome n\u00e3o informado'}
                 </p>
                 <p className="text-xs text-gray-400">{conversa.cliente_telefone}</p>
                 <p className="text-[10px] text-gray-500 mt-1">
@@ -1206,6 +1374,95 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </div>
               <button
                 onClick={() => setShowTransferModal(false)}
+                className="w-full mt-4 px-4 py-2 bg-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/20 transition-colors"
+              >
+                Cancelar
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Finalizar Modal */}
+      <AnimatePresence>
+        {showFinalizarModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-black/80 flex items-center justify-center z-50"
+            onClick={() => setShowFinalizarModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl p-6 w-96"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-white">Finalizar Atendimento</h3>
+                  <p className="text-xs text-gray-400">Como foi a experiencia do cliente?</p>
+                </div>
+              </div>
+
+              <p className="text-xs text-gray-400 mb-4">
+                Selecione uma avaliacao para enviar uma mensagem de encerramento personalizada ao cliente.
+              </p>
+
+              <div className="space-y-2">
+                <button
+                  onClick={() => finalizarContato(1)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors group"
+                >
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-red-400 fill-red-400" />
+                    <Star className="w-4 h-4 text-gray-600" />
+                    <Star className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-xs font-medium text-red-400">Insatisfeito</p>
+                    <p className="text-[10px] text-gray-500">Cliente nao ficou satisfeito</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => finalizarContato(2)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors group"
+                >
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
+                    <Star className="w-4 h-4 text-gray-600" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-xs font-medium text-yellow-400">Satisfeito</p>
+                    <p className="text-[10px] text-gray-500">Cliente ficou satisfeito</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => finalizarContato(3)}
+                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors group"
+                >
+                  <div className="flex items-center gap-1">
+                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
+                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
+                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="text-xs font-medium text-green-400">Muito Satisfeito</p>
+                    <p className="text-[10px] text-gray-500">Cliente ficou muito satisfeito</p>
+                  </div>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowFinalizarModal(false)}
                 className="w-full mt-4 px-4 py-2 bg-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/20 transition-colors"
               >
                 Cancelar

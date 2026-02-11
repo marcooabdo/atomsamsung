@@ -37,6 +37,11 @@ interface Props {
 
 type WhatsAppStatus = 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
 
+interface ExistingConversa {
+  id: string;
+  cliente_nome: string | null;
+}
+
 export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Props) {
   const { usuario, unidadeAtual, unidades } = useAuth();
   const [telefone, setTelefone] = useState('');
@@ -51,8 +56,10 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
   const [instancia, setInstancia] = useState<Instancia | null>(null);
   const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>('idle');
   const [whatsappError, setWhatsappError] = useState('');
+  const [existingConversa, setExistingConversa] = useState<ExistingConversa | null>(null);
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const whatsappCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const phoneCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadUnidades();
@@ -166,14 +173,58 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     }
   }, [instancia]);
 
+  const checkExistingConversation = useCallback(async (phone: string) => {
+    const formattedPhone = formatPhoneNumber(phone);
+    if (formattedPhone.length < 12 || !selectedUnidadeId) {
+      setExistingConversa(null);
+      return;
+    }
+
+    const { data } = await supabase
+      .from('atom_connect_conversas')
+      .select('id, cliente_nome')
+      .eq('cliente_telefone', formattedPhone)
+      .eq('unidade_id', selectedUnidadeId)
+      .maybeSingle();
+
+    setExistingConversa(data);
+  }, [selectedUnidadeId]);
+
+  const autoLinkOS = useCallback(async (phone: string) => {
+    if (!selectedUnidadeId || selectedOS) return;
+
+    const formattedPhone = formatPhoneNumber(phone);
+    const phoneWithoutDDI = phone.replace(/\D/g, '');
+
+    const { data: osMatch } = await supabase
+      .from('os')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban')
+      .eq('unidade_id', selectedUnidadeId)
+      .or(`cliente_telefone.eq.${formattedPhone},cliente_telefone.eq.${phoneWithoutDDI},cliente_telefone.ilike.%${phoneWithoutDDI}%`)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (osMatch) {
+      setSelectedOS(osMatch);
+      if (osMatch.cliente_nome && !nome) {
+        setNome(osMatch.cliente_nome);
+      }
+    }
+  }, [selectedUnidadeId, selectedOS, nome]);
+
   useEffect(() => {
     if (whatsappCheckTimeout.current) {
       clearTimeout(whatsappCheckTimeout.current);
+    }
+    if (phoneCheckTimeout.current) {
+      clearTimeout(phoneCheckTimeout.current);
     }
 
     const cleanPhone = telefone.replace(/\D/g, '');
     if (cleanPhone.length < 10) {
       setWhatsappStatus('idle');
+      setExistingConversa(null);
       return;
     }
 
@@ -181,12 +232,20 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       checkWhatsAppNumber(telefone);
     }, 800);
 
+    phoneCheckTimeout.current = setTimeout(() => {
+      checkExistingConversation(telefone);
+      autoLinkOS(telefone);
+    }, 500);
+
     return () => {
       if (whatsappCheckTimeout.current) {
         clearTimeout(whatsappCheckTimeout.current);
       }
+      if (phoneCheckTimeout.current) {
+        clearTimeout(phoneCheckTimeout.current);
+      }
     };
-  }, [telefone, checkWhatsAppNumber]);
+  }, [telefone, checkWhatsAppNumber, checkExistingConversation, autoLinkOS]);
 
   const searchOS = useCallback(async (term: string) => {
     if (!selectedUnidadeId) {
@@ -206,7 +265,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         .from('os')
         .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban')
         .eq('unidade_id', selectedUnidadeId)
-        .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%`)
+        .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`)
         .order('created_at', { ascending: false })
         .limit(15);
 
@@ -452,6 +511,24 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                   <Loader2 className="w-3 h-3 animate-spin" />
                   Verificando numero no WhatsApp...
                 </p>
+              )}
+              {existingConversa && (
+                <div className="mt-2 p-2.5 bg-yellow-500/10 border border-yellow-500/30 rounded-lg">
+                  <p className="text-xs text-yellow-400 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    <span>
+                      Este numero ja possui uma conversa ativa
+                      {existingConversa.cliente_nome && ` (${existingConversa.cliente_nome})`}
+                    </span>
+                  </p>
+                  <button
+                    onClick={() => onConversaCriada(existingConversa.id)}
+                    className="mt-2 w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded text-[11px] font-medium bg-yellow-500/20 text-yellow-400 hover:bg-yellow-500/30 transition-colors"
+                  >
+                    <MessageSquare className="w-3 h-3" />
+                    Abrir conversa existente
+                  </button>
+                </div>
               )}
               <p className="mt-1 text-[10px] text-white/30">
                 Digite apenas os numeros. O DDI +55 sera adicionado automaticamente.

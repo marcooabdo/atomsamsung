@@ -74,6 +74,14 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      if (remoteJid.endsWith("@lid") || remoteJid.includes("@lid")) {
+        console.log("Skipping lid format message (linked device)");
+        return new Response(JSON.stringify({ skip: "lid format message" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       const phoneNumber = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
       const fromMe = key.fromMe || false;
       const messageId = key.id || body.messageId || crypto.randomUUID();
