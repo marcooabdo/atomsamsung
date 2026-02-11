@@ -3,7 +3,7 @@ import {
   Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
   Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
   Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone,
-  Webhook
+  Webhook, Edit2, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -11,12 +11,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   accentColor: string;
+  unidadeId?: string;
 }
 
 interface Instancia {
   id: string;
   unidade_id: string;
   nome: string;
+  observacao: string | null;
   api_url: string;
   api_key: string;
   instance_name: string;
@@ -38,8 +40,9 @@ interface RespostaRapida {
 const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || '';
 const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
 
-export function AtomConnectSettings({ accentColor }: Props) {
+export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
+  const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([]);
@@ -50,13 +53,16 @@ export function AtomConnectSettings({ accentColor }: Props) {
   const [connectingInstance, setConnectingInstance] = useState<string | null>(null);
   const [qrCodeModal, setQrCodeModal] = useState<{ instancia: Instancia; qrCode: string } | null>(null);
   const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
+  const [editingInstance, setEditingInstance] = useState<Instancia | null>(null);
+  const [editForm, setEditForm] = useState({ nome: '', observacao: '' });
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const [newInstance, setNewInstance] = useState({
     nome: '',
     api_url: EVOLUTION_URL,
     api_key: EVOLUTION_API_KEY,
     instance_name: '',
-    unidade_id: unidadeAtual || ''
+    unidade_id: effectiveUnidadeId || ''
   });
 
   const [newResposta, setNewResposta] = useState({
@@ -68,7 +74,7 @@ export function AtomConnectSettings({ accentColor }: Props) {
 
   useEffect(() => {
     loadData();
-  }, [unidadeAtual]);
+  }, [effectiveUnidadeId]);
 
   const loadData = async () => {
     await Promise.all([loadInstancias(), loadRespostasRapidas()]);
@@ -81,8 +87,8 @@ export function AtomConnectSettings({ accentColor }: Props) {
       .select('*')
       .order('created_at');
 
-    if (unidadeAtual) {
-      query = query.eq('unidade_id', unidadeAtual);
+    if (effectiveUnidadeId) {
+      query = query.eq('unidade_id', effectiveUnidadeId);
     }
 
     const { data } = await query;
@@ -94,14 +100,49 @@ export function AtomConnectSettings({ accentColor }: Props) {
       .from('atom_connect_respostas_rapidas')
       .select('*');
 
-    if (unidadeAtual) {
-      query = query.or(`unidade_id.is.null,unidade_id.eq.${unidadeAtual}`);
+    if (effectiveUnidadeId) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${effectiveUnidadeId}`);
     } else {
       query = query.is('unidade_id', null);
     }
 
     const { data } = await query.order('titulo');
     if (data) setRespostasRapidas(data);
+  };
+
+  const openEditModal = (instancia: Instancia) => {
+    setEditForm({
+      nome: instancia.nome,
+      observacao: instancia.observacao || ''
+    });
+    setEditingInstance(instancia);
+  };
+
+  const saveInstanceEdit = async () => {
+    if (!editingInstance) return;
+    if (!editForm.nome.trim()) {
+      alert('O nome da conexao e obrigatorio');
+      return;
+    }
+
+    setSavingEdit(true);
+
+    const { error } = await supabase
+      .from('atom_connect_instancias')
+      .update({
+        nome: editForm.nome.trim(),
+        observacao: editForm.observacao.trim() || null
+      })
+      .eq('id', editingInstance.id);
+
+    if (error) {
+      alert('Erro ao salvar: ' + error.message);
+    } else {
+      setEditingInstance(null);
+      loadInstancias();
+    }
+
+    setSavingEdit(false);
   };
 
   const [creatingInstance, setCreatingInstance] = useState(false);
@@ -582,6 +623,11 @@ export function AtomConnectSettings({ accentColor }: Props) {
                               </span>
                             )}
                           </p>
+                          {instancia.observacao && (
+                            <p className="text-xs text-gray-500 mt-1 italic">
+                              {instancia.observacao}
+                            </p>
+                          )}
                           {instancia.phone_number && (
                             <div className="flex items-center gap-2 mt-1">
                               <Phone className="w-3 h-3 text-green-400" />
@@ -615,6 +661,13 @@ export function AtomConnectSettings({ accentColor }: Props) {
                             Conectar
                           </button>
                         )}
+                        <button
+                          onClick={() => openEditModal(instancia)}
+                          className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                          title="Editar conexao"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
                         <button
                           onClick={() => configureWebhook(instancia)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-cyan-500/20 hover:text-cyan-400 transition-colors"
@@ -1016,6 +1069,99 @@ export function AtomConnectSettings({ accentColor }: Props) {
                   className="px-6 py-2 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
                 >
                   Cancelar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Instance Modal */}
+      <AnimatePresence>
+        {editingInstance && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={() => setEditingInstance(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                    <Edit2 className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Editar Conexao</h3>
+                    <p className="text-xs text-gray-400">{editingInstance.instance_name}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setEditingInstance(null)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Nome da Conexao *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.nome}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Ex: WhatsApp Comercial"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Observacao
+                  </label>
+                  <textarea
+                    value={editForm.observacao}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, observacao: e.target.value }))}
+                    placeholder="Observacoes sobre esta conexao (opcional)"
+                    rows={3}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingInstance(null)}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveInstanceEdit}
+                  disabled={savingEdit}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingEdit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salvar
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>

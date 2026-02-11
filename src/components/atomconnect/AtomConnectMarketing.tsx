@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx';
 
 interface Props {
   accentColor: string;
+  unidadeId?: string;
 }
 
 interface Campanha {
@@ -40,8 +41,9 @@ interface Instancia {
   status: string;
 }
 
-export function AtomConnectMarketing({ accentColor }: Props) {
+export function AtomConnectMarketing({ accentColor, unidadeId }: Props) {
   const { usuario, unidadeAtual } = useAuth();
+  const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [loading, setLoading] = useState(true);

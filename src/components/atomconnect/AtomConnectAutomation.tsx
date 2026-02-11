@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 interface Props {
   accentColor: string;
+  unidadeId?: string;
 }
 
 interface Fluxo {
@@ -36,8 +37,9 @@ interface FluxoStep {
   };
 }
 
-export function AtomConnectAutomation({ accentColor }: Props) {
+export function AtomConnectAutomation({ accentColor, unidadeId }: Props) {
   const { unidadeAtual } = useAuth();
+  const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [fluxos, setFluxos] = useState<Fluxo[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditor, setShowEditor] = useState(false);

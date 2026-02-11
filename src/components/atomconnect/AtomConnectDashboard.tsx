@@ -9,9 +9,10 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, A
 
 interface Props {
   accentColor: string;
+  unidadeId?: string;
 }
 
-export function AtomConnectDashboard({ accentColor }: Props) {
+export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const { unidadeAtual } = useAuth();
   const [stats, setStats] = useState({
     totalConversas: 0,
@@ -24,12 +25,14 @@ export function AtomConnectDashboard({ accentColor }: Props) {
   const [loading, setLoading] = useState(true);
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes'>('hoje');
 
+  const effectiveUnidadeId = unidadeId || unidadeAtual;
+
   useEffect(() => {
     loadStats();
-  }, [unidadeAtual, periodo]);
+  }, [effectiveUnidadeId, periodo]);
 
   const loadStats = async () => {
-    if (!unidadeAtual) {
+    if (!effectiveUnidadeId) {
       setLoading(false);
       return;
     }
@@ -37,7 +40,7 @@ export function AtomConnectDashboard({ accentColor }: Props) {
     const { data: conversas } = await supabase
       .from('atom_connect_conversas')
       .select('*, atom_connect_pipeline_colunas(nome, cor)')
-      .eq('unidade_id', unidadeAtual);
+      .eq('unidade_id', effectiveUnidadeId);
 
     const { data: colunas } = await supabase
       .from('atom_connect_pipeline_colunas')

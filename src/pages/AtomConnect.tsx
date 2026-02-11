@@ -473,7 +473,7 @@ export default function AtomConnect() {
                 transition={{ duration: 0.15 }}
                 className="h-full"
               >
-                <AtomConnectDashboard accentColor={accentColor} />
+                <AtomConnectDashboard accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
               </motion.div>
             )}
             {activeTab === 'marketing' && (
@@ -485,7 +485,7 @@ export default function AtomConnect() {
                 transition={{ duration: 0.15 }}
                 className="h-full"
               >
-                <AtomConnectMarketing accentColor={accentColor} />
+                <AtomConnectMarketing accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
               </motion.div>
             )}
             {activeTab === 'automation' && (
@@ -497,7 +497,7 @@ export default function AtomConnect() {
                 transition={{ duration: 0.15 }}
                 className="h-full"
               >
-                <AtomConnectAutomation accentColor={accentColor} />
+                <AtomConnectAutomation accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
               </motion.div>
             )}
             {activeTab === 'settings' && (
@@ -509,7 +509,7 @@ export default function AtomConnect() {
                 transition={{ duration: 0.15 }}
                 className="h-full"
               >
-                <AtomConnectSettings accentColor={accentColor} />
+                <AtomConnectSettings accentColor={accentColor} unidadeId={selectedUnidadeFilter || unidadeAtual || undefined} />
               </motion.div>
             )}
           </AnimatePresence>

@@ -349,20 +349,21 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'linear-gradient(180deg, rgba(6,6,16,0.98) 0%, rgba(10,10,24,0.98) 100%)' }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-6"
+      onClick={onClose}
     >
       <motion.div
         initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
         exit={{ scale: 0.9, opacity: 0 }}
-        className="w-full h-full flex flex-col"
+        className="w-full max-w-lg bg-[#0d0d1e] rounded-2xl border border-white/[0.08] flex flex-col max-h-[90vh]"
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex-shrink-0 h-14 px-6 flex items-center justify-between border-b border-white/[0.06]">
+        <div className="flex-shrink-0 px-5 py-4 flex items-center justify-between border-b border-white/[0.06]">
           <div className="flex items-center gap-3">
             <div
-              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              className="w-9 h-9 rounded-lg flex items-center justify-center"
               style={{ background: `${accentColor}20` }}
             >
               <MessageSquare className="w-4 h-4" style={{ color: accentColor }} />
@@ -382,14 +383,14 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto p-8 space-y-6">
+          <div className="p-5 space-y-4">
             {/* Unidade */}
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider">
                 Unidade *
               </label>
               <div className="relative">
-                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                 <select
                   value={selectedUnidadeId}
                   onChange={(e) => {
@@ -397,7 +398,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                     setSelectedOS(null);
                     setOsResults([]);
                   }}
-                  className="w-full pl-12 pr-4 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white focus:outline-none focus:border-cyan-500/40 appearance-none cursor-pointer hover:bg-white/[0.05] transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/40 appearance-none cursor-pointer hover:bg-white/[0.05] transition-colors"
                 >
                   <option value="" className="bg-[#12122a]">Selecione uma unidade</option>
                   {allUnidades.map(u => (
@@ -409,12 +410,12 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
 
             {/* Telefone */}
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider">
                 Telefone do Cliente *
               </label>
               <div className="relative">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
-                <div className="absolute left-12 top-1/2 -translate-y-1/2 text-sm text-white/40 font-medium">
+                <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
+                <div className="absolute left-9 top-1/2 -translate-y-1/2 text-sm text-white/40 font-medium">
                   +55
                 </div>
                 <input
@@ -422,9 +423,9 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value.replace(/\D/g, ''))}
                   placeholder="11999999999"
-                  className="w-full pl-24 pr-12 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
+                  className="w-full pl-20 pr-10 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
                 />
-                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
                   {getWhatsAppStatusIcon()}
                 </div>
               </div>
@@ -452,45 +453,45 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                   Verificando numero no WhatsApp...
                 </p>
               )}
-              <p className="mt-1 text-[11px] text-white/30">
+              <p className="mt-1 text-[10px] text-white/30">
                 Digite apenas os numeros. O DDI +55 sera adicionado automaticamente.
               </p>
             </div>
 
             {/* Nome */}
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider">
                 Nome do Cliente
               </label>
               <div className="relative">
-                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                 <input
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   placeholder="Nome do cliente (opcional)"
-                  className="w-full pl-12 pr-4 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
+                  className="w-full pl-10 pr-4 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
                 />
               </div>
             </div>
 
             {/* Vincular OS */}
             <div>
-              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+              <label className="block text-[11px] font-medium text-white/50 mb-1.5 uppercase tracking-wider">
                 Vincular a OS (Opcional)
               </label>
               <div className="relative">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/20" />
                 <input
                   type="text"
                   value={osSearch}
                   onChange={(e) => setOsSearch(e.target.value)}
                   placeholder="Digite OS Interna, Samsung, cliente ou telefone..."
                   disabled={!selectedUnidadeId}
-                  className="w-full pl-12 pr-12 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 disabled:opacity-50 transition-colors"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white/[0.03] border border-white/[0.08] rounded-lg text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 disabled:opacity-50 transition-colors"
                 />
                 {searchingOS && (
-                  <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
+                  <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
                 )}
               </div>
 
@@ -499,31 +500,28 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
               )}
 
               {osResults.length > 0 && (
-                <div className="mt-2 max-h-64 overflow-y-auto bg-[#0d0d1e] rounded-xl border border-white/[0.08]">
+                <div className="mt-2 max-h-48 overflow-y-auto bg-[#080814] rounded-lg border border-white/[0.08]">
                   {osResults.map(os => (
                     <button
                       key={os.id}
                       onClick={() => selectOS(os)}
-                      className="w-full flex items-start gap-3 p-4 hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-0 text-left"
+                      className="w-full flex items-start gap-2 p-3 hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-0 text-left"
                     >
-                      <FileText className="w-5 h-5 text-white/30 mt-0.5 flex-shrink-0" />
+                      <FileText className="w-4 h-4 text-white/30 mt-0.5 flex-shrink-0" />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           {os.numero_os_interna && (
-                            <span className="text-xs font-medium text-cyan-400">
+                            <span className="text-[11px] font-medium text-cyan-400">
                               OS: {os.numero_os_interna}
                             </span>
                           )}
                           {os.numero_os_samsung && (
-                            <span className="text-xs text-orange-400">Samsung: {os.numero_os_samsung}</span>
+                            <span className="text-[11px] text-orange-400">Samsung: {os.numero_os_samsung}</span>
                           )}
                         </div>
-                        <p className="text-sm text-white/80 truncate mt-1">{os.cliente_nome}</p>
+                        <p className="text-xs text-white/80 truncate">{os.cliente_nome}</p>
                         {os.cliente_telefone && (
-                          <p className="text-xs text-white/40">{os.cliente_telefone}</p>
-                        )}
-                        {os.defeito_reclamado && (
-                          <p className="text-xs text-white/30 truncate mt-1">{os.defeito_reclamado}</p>
+                          <p className="text-[10px] text-white/40">{os.cliente_telefone}</p>
                         )}
                       </div>
                     </button>
@@ -532,23 +530,23 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
               )}
 
               {osSearch && osSearch.length >= 2 && !searchingOS && osResults.length === 0 && selectedUnidadeId && (
-                <p className="text-xs text-white/40 mt-2">Nenhuma OS encontrada para "{osSearch}"</p>
+                <p className="text-[11px] text-white/40 mt-2">Nenhuma OS encontrada para "{osSearch}"</p>
               )}
 
               {selectedOS && (
-                <div className="mt-3 flex items-center gap-3 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
-                  <Link2 className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
+                  <Link2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
                   <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-cyan-400">
+                    <span className="text-xs font-medium text-cyan-400">
                       OS: {selectedOS.numero_os_interna || selectedOS.numero_os_samsung}
                     </span>
-                    <span className="text-sm text-white/50 ml-2">{selectedOS.cliente_nome}</span>
+                    <span className="text-xs text-white/50 ml-2">{selectedOS.cliente_nome}</span>
                   </div>
                   <button
                     onClick={() => setSelectedOS(null)}
-                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                    className="p-1 hover:bg-white/10 rounded transition-colors"
                   >
-                    <X className="w-4 h-4 text-white/40" />
+                    <X className="w-3 h-3 text-white/40" />
                   </button>
                 </div>
               )}
@@ -557,22 +555,22 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         </div>
 
         {/* Footer */}
-        <div className="flex-shrink-0 px-6 py-4 border-t border-white/[0.06] flex items-center justify-between">
-          <p className="text-xs text-white/30">
-            {!instancia && 'Nenhuma instancia WhatsApp conectada'}
+        <div className="flex-shrink-0 px-5 py-3 border-t border-white/[0.06] flex items-center justify-between">
+          <p className="text-[10px] text-white/30">
+            {!instancia && 'Nenhuma instancia conectada'}
             {instancia && `Conectado: ${instancia.instance_name}`}
           </p>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="px-6 py-3 rounded-xl text-sm font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors"
+              className="px-4 py-2 rounded-lg text-xs font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={handleCreate}
               disabled={!canCreate || creating}
-              className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex items-center gap-1.5 px-5 py-2 rounded-lg text-xs font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
                 backgroundColor: canCreate && !creating ? accentColor : 'rgba(255,255,255,0.1)',
                 color: canCreate && !creating ? '#000' : 'rgba(255,255,255,0.5)'
@@ -580,12 +578,12 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
             >
               {creating ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                   Criando...
                 </>
               ) : (
                 <>
-                  <MessageSquare className="w-4 h-4" />
+                  <MessageSquare className="w-3.5 h-3.5" />
                   Iniciar Conversa
                 </>
               )}
