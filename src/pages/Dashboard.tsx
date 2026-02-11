@@ -157,10 +157,15 @@ export function Dashboard() {
 
       const cotacoesAprovadas = cotacoes.filter(c => c.status === 'aprovada');
       const cotacoesReprovadas = cotacoes.filter(c => c.status === 'reprovada' || c.status === 'reprovada_refeita');
-      const totalOrcamentosFinalizados = cotacoesAprovadas.length + cotacoesReprovadas.length;
+
+      const osOWAprovadas = osList.filter(os => os.tipo_os === 'OW' && os.orcamento_aprovado === true);
+      const osOWReprovadas = osList.filter(os => os.tipo_os === 'OW' && os.orcamento_aprovado_reprovado_em !== null && os.orcamento_aprovado !== true);
+
+      const totalOrcamentosFinalizados = cotacoesAprovadas.length + cotacoesReprovadas.length + osOWAprovadas.length + osOWReprovadas.length;
+      const totalAprovados = cotacoesAprovadas.length + osOWAprovadas.length;
 
       const taxaAprovacao = totalOrcamentosFinalizados > 0
-        ? (cotacoesAprovadas.length / totalOrcamentosFinalizados) * 100
+        ? (totalAprovados / totalOrcamentosFinalizados) * 100
         : 0;
 
       let cotacoesPendentesQuery = supabase
@@ -286,7 +291,24 @@ export function Dashboard() {
         const { data: cotacoesData } = await cotacoesQuery;
         const cotacoesList = cotacoesData || [];
 
-        const performanceList: PerformanceOS[] = cotacoesList.map(cotacao => {
+        let osQuery = supabase
+          .from('os')
+          .select('*')
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`)
+          .eq('tipo_os', 'OW')
+          .not('orcamento_aprovado_em', 'is', null);
+
+        if (!canSeeAllUnits && unidadeFilter) {
+          osQuery = osQuery.eq('unidade_id', unidadeFilter);
+        } else if (selectedUnidade) {
+          osQuery = osQuery.eq('unidade_id', selectedUnidade);
+        }
+
+        const { data: osData } = await osQuery;
+        const osOWList = osData || [];
+
+        const performanceListCotacoes: PerformanceOS[] = cotacoesList.map(cotacao => {
           const inicio = new Date(cotacao.created_at);
           const fim = cotacao.aprovada_em
             ? new Date(cotacao.aprovada_em)
@@ -304,7 +326,7 @@ export function Dashboard() {
 
           return {
             id: cotacao.id,
-            numero_os: cotacao.numero_cotacao,
+            numero_os: `Cotacao #${cotacao.numero_cotacao}`,
             tipo_os: cotacao.tipo_os,
             cliente_nome: cotacao.cliente_nome || 'Cliente nao informado',
             created_at: cotacao.created_at,
@@ -316,7 +338,37 @@ export function Dashboard() {
           };
         });
 
-        setPerformanceOSList(performanceList);
+        const performanceListOS: PerformanceOS[] = osOWList.map(os => {
+          const inicio = new Date(os.created_at);
+          const fim = os.orcamento_aprovado_em
+            ? new Date(os.orcamento_aprovado_em)
+            : os.orcamento_aprovado_reprovado_em
+            ? new Date(os.orcamento_aprovado_reprovado_em)
+            : new Date();
+          const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
+
+          let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
+          if (os.orcamento_aprovado === true) {
+            status_final = 'aprovado';
+          } else if (os.orcamento_aprovado_reprovado_em !== null && os.orcamento_aprovado !== true) {
+            status_final = 'reprovado';
+          }
+
+          return {
+            id: os.id,
+            numero_os: os.numero_os_samsung || os.numero_os_interna || 'S/N',
+            tipo_os: os.tipo_os,
+            cliente_nome: os.cliente_nome || 'Cliente nao informado',
+            created_at: os.created_at,
+            data_fechamento: os.orcamento_aprovado_em || os.orcamento_aprovado_reprovado_em,
+            coluna_kanban: os.coluna_kanban,
+            tempo_resolucao_dias: dias,
+            valor_total: os.valor_total || 0,
+            status_final
+          };
+        });
+
+        setPerformanceOSList([...performanceListCotacoes, ...performanceListOS]);
       } else {
         let query = supabase
           .from('os')
