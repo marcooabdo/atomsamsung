@@ -134,6 +134,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [editClienteNome, setEditClienteNome] = useState(conversa.cliente_nome || '');
   const [savingCliente, setSavingCliente] = useState(false);
+  const [regrasFinalizacao, setRegrasFinalizacao] = useState<any[]>([]);
+  const [loadingRegras, setLoadingRegras] = useState(false);
+  const [sendingAvaliacao, setSendingAvaliacao] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -556,32 +559,69 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     onUpdate();
   };
 
-  const finalizarContato = async (rating: number) => {
-    const ratingMessages: Record<number, string> = {
-      1: 'Obrigado pelo seu feedback. Lamentamos que sua experiencia nao tenha sido satisfatoria. Vamos trabalhar para melhorar!',
-      2: 'Agradecemos seu feedback! Ficamos felizes em saber que conseguimos ajudar. Estamos sempre buscando melhorar.',
-      3: 'Muito obrigado pela excelente avaliacao! Ficamos muito felizes em poder ajudar. Conte sempre conosco!'
-    };
+  const loadRegrasFinalizacao = async () => {
+    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
+    if (!targetUnidadeId) return;
 
-    const message = ratingMessages[rating];
-    const attendantName = usuario?.nome || '';
-    const messageWithName = attendantName ? `*${attendantName}:*\n${message}` : message;
+    setLoadingRegras(true);
+    const { data } = await supabase
+      .from('atom_connect_regras_finalizacao')
+      .select('*')
+      .eq('unidade_id', targetUnidadeId)
+      .eq('ativo', true)
+      .order('is_default', { ascending: false });
 
-    await sendToEvolutionAPI(messageWithName);
+    if (data) {
+      setRegrasFinalizacao(data);
+    }
+    setLoadingRegras(false);
+  };
 
-    await supabase
-      .from('atom_connect_mensagens')
-      .insert({
-        conversa_id: conversa.id,
-        from_me: true,
-        tipo: 'text',
-        conteudo: message,
-        status: 'sent',
-        enviado_por: usuario?.id,
-        is_bot: false,
-        metadata: { rating, finalized: true }
-      });
+  const enviarAvaliacaoParaCliente = async (regra: any) => {
+    if (!instancia) {
+      alert('Nenhuma instancia conectada');
+      return;
+    }
 
+    setSendingAvaliacao(true);
+
+    try {
+      await sendToEvolutionAPI(regra.mensagem_avaliacao);
+
+      await supabase
+        .from('atom_connect_mensagens')
+        .insert({
+          conversa_id: conversa.id,
+          from_me: true,
+          tipo: 'text',
+          conteudo: regra.mensagem_avaliacao,
+          status: 'sent',
+          enviado_por: usuario?.id,
+          is_bot: false,
+          metadata: { tipo: 'avaliacao_request', regra_id: regra.id }
+        });
+
+      await supabase
+        .from('atom_connect_conversas')
+        .update({
+          aguardando_avaliacao: true,
+          regra_finalizacao_id: regra.id,
+          avaliacao_enviada_at: new Date().toISOString()
+        })
+        .eq('id', conversa.id);
+
+      setShowFinalizarModal(false);
+      onUpdate();
+      loadMensagens();
+    } catch (error) {
+      console.error('Erro ao enviar avaliacao:', error);
+      alert('Erro ao enviar mensagem de avaliacao');
+    } finally {
+      setSendingAvaliacao(false);
+    }
+  };
+
+  const finalizarDiretamente = async () => {
     const { data: finalColumn } = await supabase
       .from('atom_connect_pipeline_colunas')
       .select('id')
@@ -593,7 +633,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       .from('atom_connect_conversas')
       .update({
         coluna_pipeline: finalColumn?.id || 'finalizado_nps',
-        is_bot_ativo: false
+        is_bot_ativo: false,
+        aguardando_avaliacao: false
       })
       .eq('id', conversa.id);
 
@@ -983,7 +1024,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             </button>
 
             <button
-              onClick={() => setShowFinalizarModal(true)}
+              onClick={() => {
+                loadRegrasFinalizacao();
+                setShowFinalizarModal(true);
+              }}
               className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
             >
               <CheckCircle2 className="w-3 h-3" />
@@ -1482,76 +1526,103 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-6 w-96"
+              className="bg-[#1A1A2E] rounded-xl p-6 w-[420px] max-h-[80vh] overflow-hidden flex flex-col"
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-4">
-                <div className="w-10 h-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}20` }}>
+                  <CheckCircle2 className="w-5 h-5" style={{ color: accentColor }} />
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-white">Finalizar Atendimento</h3>
-                  <p className="text-xs text-gray-400">Como foi a experiencia do cliente?</p>
+                  <p className="text-xs text-gray-400">Enviar pesquisa de satisfacao ao cliente</p>
                 </div>
               </div>
 
-              <p className="text-xs text-gray-400 mb-4">
-                Selecione uma avaliacao para enviar uma mensagem de encerramento personalizada ao cliente.
-              </p>
+              {loadingRegras ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+                </div>
+              ) : regrasFinalizacao.length === 0 ? (
+                <div className="text-center py-6">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-600" />
+                  <p className="text-sm text-gray-400 mb-2">Nenhuma regra de avaliacao configurada</p>
+                  <p className="text-xs text-gray-500 mb-4">Configure regras em Configuracoes &gt; Finalizacao</p>
+                  <button
+                    onClick={finalizarDiretamente}
+                    className="px-4 py-2 rounded-lg text-xs font-medium transition-colors"
+                    style={{ backgroundColor: accentColor, color: '#000' }}
+                  >
+                    Finalizar sem avaliacao
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-gray-400 mb-4">
+                    Selecione uma regra para enviar a mensagem de avaliacao ao cliente:
+                  </p>
 
-              <div className="space-y-2">
-                <button
-                  onClick={() => finalizarContato(1)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 transition-colors group"
-                >
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-red-400 fill-red-400" />
-                    <Star className="w-4 h-4 text-gray-600" />
-                    <Star className="w-4 h-4 text-gray-600" />
+                  <div className="flex-1 overflow-y-auto space-y-2 max-h-[300px]">
+                    {regrasFinalizacao.map(regra => (
+                      <button
+                        key={regra.id}
+                        onClick={() => enviarAvaliacaoParaCliente(regra)}
+                        disabled={sendingAvaliacao}
+                        className="w-full text-left p-3 rounded-lg border transition-colors hover:bg-white/[0.05] disabled:opacity-50"
+                        style={{ borderColor: regra.is_default ? `${accentColor}40` : 'rgba(255,255,255,0.1)' }}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-white">{regra.nome}</p>
+                              {regra.is_default && (
+                                <span
+                                  className="text-[9px] px-1.5 py-0.5 rounded font-medium"
+                                  style={{ backgroundColor: `${accentColor}20`, color: accentColor }}
+                                >
+                                  PADRAO
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-gray-500 mt-0.5">
+                              {regra.opcoes?.length || 0} opcoes de resposta
+                            </p>
+                          </div>
+                          <Star className="w-4 h-4 text-gray-500 flex-shrink-0 mt-0.5" />
+                        </div>
+                        <div className="mt-2 p-2 bg-black/30 rounded text-[10px] text-gray-400 line-clamp-2 whitespace-pre-wrap">
+                          {regra.mensagem_avaliacao?.substring(0, 120)}...
+                        </div>
+                      </button>
+                    ))}
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-medium text-red-400">Insatisfeito</p>
-                    <p className="text-[10px] text-gray-500">Cliente nao ficou satisfeito</p>
-                  </div>
-                </button>
 
-                <button
-                  onClick={() => finalizarContato(2)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/20 hover:bg-yellow-500/20 transition-colors group"
-                >
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                    <Star className="w-4 h-4 text-yellow-400 fill-yellow-400" />
-                    <Star className="w-4 h-4 text-gray-600" />
+                  <div className="mt-4 pt-3 border-t border-white/10">
+                    <button
+                      onClick={finalizarDiretamente}
+                      className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/10 transition-colors"
+                    >
+                      Finalizar sem pedir avaliacao
+                    </button>
                   </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-medium text-yellow-400">Satisfeito</p>
-                    <p className="text-[10px] text-gray-500">Cliente ficou satisfeito</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => finalizarContato(3)}
-                  className="w-full flex items-center gap-3 p-3 rounded-lg bg-green-500/10 border border-green-500/20 hover:bg-green-500/20 transition-colors group"
-                >
-                  <div className="flex items-center gap-1">
-                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
-                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
-                    <Star className="w-4 h-4 text-green-400 fill-green-400" />
-                  </div>
-                  <div className="flex-1 text-left">
-                    <p className="text-xs font-medium text-green-400">Muito Satisfeito</p>
-                    <p className="text-[10px] text-gray-500">Cliente ficou muito satisfeito</p>
-                  </div>
-                </button>
-              </div>
+                </>
+              )}
 
               <button
                 onClick={() => setShowFinalizarModal(false)}
-                className="w-full mt-4 px-4 py-2 bg-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/20 transition-colors"
+                className="w-full mt-3 px-4 py-2 bg-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/20 transition-colors"
               >
                 Cancelar
               </button>
+
+              {sendingAvaliacao && (
+                <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-xl">
+                  <div className="text-center">
+                    <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" style={{ color: accentColor }} />
+                    <p className="text-sm text-white">Enviando avaliacao...</p>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </motion.div>
         )}

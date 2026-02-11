@@ -435,9 +435,135 @@ async function processMessage(
     console.log("Message inserted successfully");
   }
 
+  if (!fromMe && tipo === "text" && conteudo) {
+    await processRatingResponse(supabase, conversa.id, conteudo.trim(), instancia);
+  }
+
   console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${conteudo.substring(0, 50)} ===`);
   return new Response(JSON.stringify({ success: true, conversa_id: conversa.id }), {
     status: 200,
     headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
   });
+}
+
+async function processRatingResponse(
+  supabase: any,
+  conversaId: string,
+  messageContent: string,
+  instancia: { id: string; unidade_id: string }
+) {
+  const { data: conversa } = await supabase
+    .from("atom_connect_conversas")
+    .select("id, cliente_telefone, aguardando_avaliacao, regra_finalizacao_id")
+    .eq("id", conversaId)
+    .maybeSingle();
+
+  if (!conversa || !conversa.aguardando_avaliacao || !conversa.regra_finalizacao_id) {
+    return;
+  }
+
+  console.log("=== PROCESSING RATING RESPONSE ===");
+  console.log("Conversation waiting for rating:", conversa.id);
+
+  const { data: regra } = await supabase
+    .from("atom_connect_regras_finalizacao")
+    .select("*")
+    .eq("id", conversa.regra_finalizacao_id)
+    .maybeSingle();
+
+  if (!regra || !regra.opcoes) {
+    console.log("No finalization rule found");
+    return;
+  }
+
+  const opcoes = regra.opcoes as Array<{
+    valor: string;
+    label: string;
+    resposta: string;
+    acao: string;
+    nps_score: number;
+  }>;
+
+  const normalizedContent = messageContent.toLowerCase().trim();
+  const matchedOption = opcoes.find(
+    (op) => op.valor.toLowerCase() === normalizedContent || op.label.toLowerCase() === normalizedContent
+  );
+
+  if (!matchedOption) {
+    console.log("No matching option found for:", normalizedContent);
+    return;
+  }
+
+  console.log("Matched option:", matchedOption.label, "| NPS:", matchedOption.nps_score);
+
+  const { data: instanciaData } = await supabase
+    .from("atom_connect_instancias")
+    .select("api_url, api_key, instance_name")
+    .eq("unidade_id", instancia.unidade_id)
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+
+  if (instanciaData && matchedOption.resposta) {
+    try {
+      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, "");
+      const response = await fetch(
+        `${instanciaData.api_url}/message/sendText/${instanciaData.instance_name}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            apikey: instanciaData.api_key,
+          },
+          body: JSON.stringify({
+            number: phoneNumber,
+            text: matchedOption.resposta,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        console.log("Rating response message sent successfully");
+
+        await supabase.from("atom_connect_mensagens").insert({
+          conversa_id: conversa.id,
+          from_me: true,
+          tipo: "text",
+          conteudo: matchedOption.resposta,
+          status: "sent",
+          is_bot: true,
+          metadata: { tipo: "avaliacao_response", nps_score: matchedOption.nps_score },
+        });
+      }
+    } catch (error) {
+      console.error("Error sending rating response:", error);
+    }
+  }
+
+  const updateData: Record<string, any> = {
+    aguardando_avaliacao: false,
+    nps_score: matchedOption.nps_score,
+    nps_comentario: messageContent,
+  };
+
+  if (matchedOption.acao === "finalizar") {
+    const { data: finalColumn } = await supabase
+      .from("atom_connect_pipeline_colunas")
+      .select("id")
+      .eq("is_final", true)
+      .limit(1)
+      .maybeSingle();
+
+    if (finalColumn) {
+      updateData.coluna_pipeline = finalColumn.id;
+    }
+    updateData.is_bot_ativo = false;
+  }
+
+  await supabase
+    .from("atom_connect_conversas")
+    .update(updateData)
+    .eq("id", conversa.id);
+
+  console.log("Conversation rating processed:", matchedOption.label, "| Action:", matchedOption.acao);
 }

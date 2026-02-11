@@ -3,11 +3,13 @@ import {
   Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
   Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
   Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone,
-  Webhook, Edit2, X, Columns, ChevronLeft, ChevronRight, Palette, GripVertical
+  Webhook, Edit2, X, Columns, ChevronLeft, ChevronRight, Palette, GripVertical,
+  Flag
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { RegrasFinalizacaoManager } from './RegrasFinalizacaoManager';
 
 interface Props {
   accentColor: string;
@@ -52,7 +54,7 @@ const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
 export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
-  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline'>('instances');
+  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([]);
   const [loading, setLoading] = useState(true);
@@ -713,6 +715,20 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
               Pipeline
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('finalization')}
+            className={`py-3 border-b-2 text-sm font-medium transition-colors ${
+              activeTab === 'finalization'
+                ? 'border-current text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+            style={{ borderColor: activeTab === 'finalization' ? accentColor : undefined }}
+          >
+            <div className="flex items-center gap-2">
+              <Flag className="w-4 h-4" />
+              Finalizacao
+            </div>
+          </button>
         </div>
       </div>
 
@@ -1069,6 +1085,18 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                 ))}
               </div>
             )}
+          </div>
+        )}
+
+        {activeTab === 'finalization' && effectiveUnidadeId && (
+          <RegrasFinalizacaoManager accentColor={accentColor} unidadeId={effectiveUnidadeId} />
+        )}
+
+        {activeTab === 'finalization' && !effectiveUnidadeId && (
+          <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <Flag className="w-16 h-16 mb-4 opacity-50" />
+            <p className="text-lg">Selecione uma unidade</p>
+            <p className="text-sm mt-2">Para configurar regras de finalizacao, selecione uma unidade primeiro</p>
           </div>
         )}
       </div>
