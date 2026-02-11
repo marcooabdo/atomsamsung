@@ -16,6 +16,10 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showJustificativaModal, setShowJustificativaModal] = useState(false);
+  const [justificativaText, setJustificativaText] = useState('');
+  const [checklistToRemove, setChecklistToRemove] = useState<{ id: string; nome: string } | null>(null);
+  const [removendo, setRemovendo] = useState(false);
 
   useEffect(() => {
     loadChecklists();
@@ -115,36 +119,49 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
     }
   };
 
-  const handleRemoverChecklist = async (vinculoId: string) => {
+  const handleRemoverChecklist = (vinculoId: string) => {
     const vinculo = checklistsVinculados.find(v => v.id === vinculoId);
     if (!vinculo) return;
 
     const template = vinculo.checklist_template;
     const nomeChecklist = template?.nome || 'Checklist';
 
-    const justificativa = prompt(`Por que você está removendo o checklist "${nomeChecklist}"?\n\nJustificativa:`);
+    setChecklistToRemove({ id: vinculoId, nome: nomeChecklist });
+    setJustificativaText('');
+    setShowJustificativaModal(true);
+  };
 
-    if (!justificativa || justificativa.trim() === '') {
-      alert('Justificativa é obrigatória para remover um checklist.');
+  const confirmarRemocao = async () => {
+    if (!checklistToRemove) return;
+
+    if (!justificativaText.trim() || justificativaText.trim().length < 10) {
+      alert('A justificativa deve ter no mínimo 10 caracteres.');
       return;
     }
 
+    setRemovendo(true);
     try {
       await supabase
         .from('os_checklist_vinculados')
         .delete()
-        .eq('id', vinculoId);
+        .eq('id', checklistToRemove.id);
 
       await loadChecklists();
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `${usuario?.nome} REMOVEU o checklist ADM "${nomeChecklist}"\n\nJustificativa: ${justificativa}`,
+        comentario: `${usuario?.nome} REMOVEU o checklist ADM "${checklistToRemove.nome}"\n\nJustificativa: ${justificativaText}`,
         is_system: true
       });
+
+      setShowJustificativaModal(false);
+      setChecklistToRemove(null);
+      setJustificativaText('');
     } catch (error) {
       alert('Erro ao remover checklist');
+    } finally {
+      setRemovendo(false);
     }
   };
 
@@ -451,6 +468,89 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showJustificativaModal && checklistToRemove && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-red-500/20 flex items-center justify-center">
+                  <Trash2 className="w-6 h-6 text-red-400" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-bold text-white">Remover Checklist</h3>
+                  <p className="text-sm text-gray-400">Por que você está removendo este checklist?</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowJustificativaModal(false);
+                    setChecklistToRemove(null);
+                    setJustificativaText('');
+                  }}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="bg-[#1A1A1A] rounded-lg p-4 mb-4 border border-red-500/20">
+                <p className="text-white font-bold mb-2">"{checklistToRemove.nome}"</p>
+                <p className="text-gray-400 text-xs">
+                  Esta ação não pode ser desfeita. Uma justificativa será registrada no histórico da OS.
+                </p>
+              </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-white mb-2">
+                  Justificativa *
+                </label>
+                <textarea
+                  value={justificativaText}
+                  onChange={(e) => setJustificativaText(e.target.value)}
+                  placeholder="Descreva o motivo da remoção (mínimo 10 caracteres)..."
+                  rows={4}
+                  className="w-full px-4 py-3 bg-[#0a0f1a] border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-[#00D4FF] focus:outline-none resize-none"
+                  disabled={removendo}
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  {justificativaText.length} / 10 caracteres mínimos
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowJustificativaModal(false);
+                    setChecklistToRemove(null);
+                    setJustificativaText('');
+                  }}
+                  disabled={removendo}
+                  className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarRemocao}
+                  disabled={removendo || justificativaText.trim().length < 10}
+                  className="flex-1 px-6 py-3 bg-red-500 text-white rounded-lg font-bold hover:bg-red-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                >
+                  {removendo ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Removendo...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-5 h-5" />
+                      Confirmar Remoção
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>
