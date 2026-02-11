@@ -1,10 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   MessageSquare, Users, BarChart3, Settings, Zap, Bell, Search,
-  Filter, Plus, Phone, Bot, Clock, DollarSign, Package, Wrench,
-  CheckCircle, MapPin, Star, ChevronRight, MoreVertical, Send,
-  Paperclip, Mic, Image, Smile, AlertTriangle, UserPlus, ArrowRight,
-  Calendar, Navigation, X, Volume2, VolumeX, Megaphone, GitBranch
+  Plus, AlertTriangle, ArrowRight,
+  X, Volume2, VolumeX, Megaphone, GitBranch
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -232,154 +230,148 @@ export default function AtomConnect() {
     <div className="h-full flex flex-col bg-[#0A0A0F] overflow-hidden">
       <audio ref={audioRef} src="/notification.mp3" preload="auto" />
 
-      {/* Header */}
-      <header className="flex-shrink-0 h-16 border-b border-white/10 bg-black/40 backdrop-blur-xl flex items-center justify-between px-6">
-        <div className="flex items-center gap-4">
+      {/* Header with integrated horizontal tabs */}
+      <header className="flex-shrink-0 border-b border-white/10 bg-black/40 backdrop-blur-xl">
+        {/* Top bar */}
+        <div className="h-14 flex items-center justify-between px-4">
           <div className="flex items-center gap-3">
             <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
               style={{
                 background: `linear-gradient(135deg, ${accentColor}20, ${accentColor}40)`,
-                boxShadow: `0 0 20px ${accentColor}30`
+                boxShadow: `0 0 15px ${accentColor}30`
               }}
             >
-              <Zap className="w-5 h-5" style={{ color: accentColor }} />
+              <Zap className="w-4 h-4" style={{ color: accentColor }} />
             </div>
             <div>
-              <h1 className="text-lg font-bold text-white">ATOM CONNECT</h1>
-              <p className="text-xs text-gray-500">Central de Atendimento</p>
+              <h1 className="text-sm font-bold text-white leading-tight">ATOM CONNECT</h1>
+              <p className="text-[10px] text-gray-500">Central de Atendimento</p>
             </div>
           </div>
-        </div>
 
-        <div className="flex items-center gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-            <input
-              type="text"
-              placeholder="Buscar cliente ou telefone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-64 pl-10 pr-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
-            />
-          </div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-500" />
+              <input
+                type="text"
+                placeholder="Buscar cliente ou telefone..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-56 pl-9 pr-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-xs text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+              />
+            </div>
 
-          {/* Sound Toggle */}
-          <button
-            onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-          >
-            {soundEnabled ? (
-              <Volume2 className="w-5 h-5 text-gray-400" />
-            ) : (
-              <VolumeX className="w-5 h-5 text-gray-500" />
-            )}
-          </button>
-
-          {/* Notifications */}
-          <div className="relative">
             <button
-              onClick={() => setShowNotifications(!showNotifications)}
-              className="relative p-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              onClick={() => setSoundEnabled(!soundEnabled)}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
             >
-              <Bell className="w-5 h-5 text-gray-400" />
-              {unreadCount > 0 && (
-                <span
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full text-xs font-bold flex items-center justify-center text-black"
-                  style={{ backgroundColor: accentColor }}
-                >
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </span>
+              {soundEnabled ? (
+                <Volume2 className="w-4 h-4 text-gray-400" />
+              ) : (
+                <VolumeX className="w-4 h-4 text-gray-500" />
               )}
             </button>
 
-            <AnimatePresence>
-              {showNotifications && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                  className="absolute right-0 top-12 w-80 max-h-96 overflow-y-auto bg-[#1A1A2E] border border-white/10 rounded-xl shadow-2xl z-50"
-                >
-                  <div className="p-3 border-b border-white/10">
-                    <h3 className="font-semibold text-white">Notificacoes</h3>
-                  </div>
-                  {notifications.length === 0 ? (
-                    <div className="p-6 text-center text-gray-500">
-                      Nenhuma notificacao
-                    </div>
-                  ) : (
-                    notifications.map(n => (
-                      <div
-                        key={n.id}
-                        className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
-                        onClick={() => handleNotificationClick(n)}
-                      >
-                        <div className="flex items-start gap-3">
-                          <div
-                            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
-                            style={{ backgroundColor: `${accentColor}20` }}
-                          >
-                            {n.type === 'message' ? (
-                              <MessageSquare className="w-4 h-4" style={{ color: accentColor }} />
-                            ) : n.type === 'transfer' ? (
-                              <ArrowRight className="w-4 h-4" style={{ color: accentColor }} />
-                            ) : (
-                              <AlertTriangle className="w-4 h-4 text-red-400" />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium text-white truncate">{n.title}</p>
-                            <p className="text-xs text-gray-400 truncate">{n.message}</p>
-                            <p className="text-xs text-gray-600 mt-1">
-                              {n.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </p>
-                          </div>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              dismissNotification(n.id);
-                            }}
-                            className="p-1 hover:bg-white/10 rounded"
-                          >
-                            <X className="w-3 h-3 text-gray-500" />
-                          </button>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+            <div className="relative">
+              <button
+                onClick={() => setShowNotifications(!showNotifications)}
+                className="relative p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              >
+                <Bell className="w-4 h-4 text-gray-400" />
+                {unreadCount > 0 && (
+                  <span
+                    className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center text-black"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
+              </button>
 
-          {/* User */}
-          <div className="flex items-center gap-3 pl-4 border-l border-white/10">
-            <div className="text-right">
-              <p className="text-sm font-medium text-white">{usuario?.nome}</p>
-              <p className="text-xs text-gray-500">{unidades?.find(u => u.id === unidadeAtual)?.nome || 'Unidade'}</p>
+              <AnimatePresence>
+                {showNotifications && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                    className="absolute right-0 top-10 w-80 max-h-96 overflow-y-auto bg-[#1A1A2E] border border-white/10 rounded-xl shadow-2xl z-50"
+                  >
+                    <div className="p-3 border-b border-white/10">
+                      <h3 className="font-semibold text-white text-sm">Notificacoes</h3>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-gray-500 text-sm">
+                        Nenhuma notificacao
+                      </div>
+                    ) : (
+                      notifications.map(n => (
+                        <div
+                          key={n.id}
+                          className="p-3 border-b border-white/5 hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={() => handleNotificationClick(n)}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div
+                              className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${accentColor}20` }}
+                            >
+                              {n.type === 'message' ? (
+                                <MessageSquare className="w-4 h-4" style={{ color: accentColor }} />
+                              ) : n.type === 'transfer' ? (
+                                <ArrowRight className="w-4 h-4" style={{ color: accentColor }} />
+                              ) : (
+                                <AlertTriangle className="w-4 h-4 text-red-400" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium text-white truncate">{n.title}</p>
+                              <p className="text-xs text-gray-400 truncate">{n.message}</p>
+                              <p className="text-xs text-gray-600 mt-1">
+                                {n.timestamp.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                dismissNotification(n.id);
+                              }}
+                              className="p-1 hover:bg-white/10 rounded"
+                            >
+                              <X className="w-3 h-3 text-gray-500" />
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
-            <div
-              className="w-10 h-10 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center"
-              style={{ border: `2px solid ${accentColor}` }}
-            >
-              {usuario?.foto_url ? (
-                <img src={usuario.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
-              ) : (
-                <span className="text-sm font-bold" style={{ color: accentColor }}>
-                  {usuario?.nome?.charAt(0)}
-                </span>
-              )}
+
+            <div className="flex items-center gap-2 pl-3 border-l border-white/10">
+              <div className="text-right">
+                <p className="text-xs font-medium text-white">{usuario?.nome}</p>
+                <p className="text-[10px] text-gray-500">{unidades?.find(u => u.id === unidadeAtual)?.nome || 'Unidade'}</p>
+              </div>
+              <div
+                className="w-8 h-8 rounded-full bg-gradient-to-br from-white/10 to-white/5 flex items-center justify-center"
+                style={{ border: `2px solid ${accentColor}` }}
+              >
+                {usuario?.foto_url ? (
+                  <img src={usuario.foto_url} alt="" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold" style={{ color: accentColor }}>
+                    {usuario?.nome?.charAt(0)}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>
-      </header>
 
-      {/* Main Content */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar */}
-        <nav className="w-20 flex-shrink-0 border-r border-white/10 bg-black/20 flex flex-col items-center py-4 gap-2">
+        {/* Horizontal Tabs */}
+        <div className="flex items-center gap-1 px-4">
           {tabs.map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -387,45 +379,36 @@ export default function AtomConnect() {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className={`relative w-14 h-14 rounded-xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
-                  isActive ? 'bg-white/10' : 'hover:bg-white/5'
+                className={`relative flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all duration-200 rounded-t-lg ${
+                  isActive ? 'text-white' : 'text-gray-500 hover:text-gray-300'
                 }`}
-                style={isActive ? {
-                  boxShadow: `0 0 20px ${accentColor}20`,
-                  border: `1px solid ${accentColor}40`
-                } : undefined}
+                style={isActive ? { color: accentColor } : undefined}
               >
-                <Icon
-                  className="w-5 h-5"
-                  style={{ color: isActive ? accentColor : '#6B7280' }}
-                />
-                <span
-                  className="text-[10px] font-medium"
-                  style={{ color: isActive ? accentColor : '#6B7280' }}
-                >
-                  {tab.label}
-                </span>
+                <Icon className="w-4 h-4" />
+                {tab.label}
                 {isActive && (
                   <motion.div
-                    layoutId="activeTab"
-                    className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r"
+                    layoutId="activeTabIndicator"
+                    className="absolute bottom-0 left-2 right-2 h-0.5 rounded-full"
                     style={{ backgroundColor: accentColor }}
                   />
                 )}
               </button>
             );
           })}
-        </nav>
+        </div>
+      </header>
 
-        {/* Content Area */}
+      {/* Main Content - full height */}
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <main className="flex-1 overflow-hidden">
           <AnimatePresence mode="wait">
             {activeTab === 'kanban' && (
               <motion.div
                 key="kanban"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="h-full"
               >
                 <AtomConnectKanban
@@ -443,9 +426,9 @@ export default function AtomConnect() {
             {activeTab === 'dashboard' && (
               <motion.div
                 key="dashboard"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="h-full"
               >
                 <AtomConnectDashboard accentColor={accentColor} />
@@ -454,9 +437,9 @@ export default function AtomConnect() {
             {activeTab === 'marketing' && (
               <motion.div
                 key="marketing"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="h-full"
               >
                 <AtomConnectMarketing accentColor={accentColor} />
@@ -465,9 +448,9 @@ export default function AtomConnect() {
             {activeTab === 'automation' && (
               <motion.div
                 key="automation"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="h-full"
               >
                 <AtomConnectAutomation accentColor={accentColor} />
@@ -476,9 +459,9 @@ export default function AtomConnect() {
             {activeTab === 'settings' && (
               <motion.div
                 key="settings"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 className="h-full"
               >
                 <AtomConnectSettings accentColor={accentColor} />
@@ -511,7 +494,6 @@ export default function AtomConnect() {
         </AnimatePresence>
       </div>
 
-      {/* Toast Notifications */}
       <AtomConnectNotification
         notifications={notifications}
         onDismiss={dismissNotification}

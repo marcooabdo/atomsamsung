@@ -183,7 +183,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
   return (
     <div className="h-full flex flex-col">
       {/* Filter Bar */}
-      <div className="flex-shrink-0 px-6 py-4 border-b border-white/10 flex items-center justify-between">
+      <div className="flex-shrink-0 px-4 py-3 border-b border-white/10 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
             <button
@@ -231,8 +231,8 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
       </div>
 
       {/* Kanban Board */}
-      <div className="flex-1 overflow-x-auto overflow-y-hidden px-6 pb-6">
-        <div className="flex gap-4 h-full">
+      <div className="flex-1 overflow-x-auto overflow-y-hidden px-4 pb-4 pt-4 min-h-0">
+        <div className="flex gap-3 h-full">
           {colunas.map(coluna => {
             const Icon = ICON_MAP[coluna.icone] || MessageSquare;
             const columnConversas = getConversasByColuna(coluna.id);

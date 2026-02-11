@@ -14,6 +14,7 @@ interface Props {
 
 interface Instancia {
   id: string;
+  unidade_id: string;
   nome: string;
   api_url: string;
   api_key: string;
@@ -37,7 +38,7 @@ const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || '';
 const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
 
 export function AtomConnectSettings({ accentColor }: Props) {
-  const { unidadeAtual } = useAuth();
+  const { unidadeAtual, unidades } = useAuth();
   const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([]);
@@ -53,7 +54,8 @@ export function AtomConnectSettings({ accentColor }: Props) {
     nome: '',
     api_url: EVOLUTION_URL,
     api_key: EVOLUTION_API_KEY,
-    instance_name: ''
+    instance_name: '',
+    unidade_id: unidadeAtual || ''
   });
 
   const [newResposta, setNewResposta] = useState({
@@ -73,14 +75,16 @@ export function AtomConnectSettings({ accentColor }: Props) {
   };
 
   const loadInstancias = async () => {
-    if (!unidadeAtual) return;
-
-    const { data } = await supabase
+    let query = supabase
       .from('atom_connect_instancias')
       .select('*')
-      .eq('unidade_id', unidadeAtual)
       .order('created_at');
 
+    if (unidadeAtual) {
+      query = query.eq('unidade_id', unidadeAtual);
+    }
+
+    const { data } = await query;
     if (data) setInstancias(data);
   };
 
@@ -98,8 +102,8 @@ export function AtomConnectSettings({ accentColor }: Props) {
   const [createError, setCreateError] = useState<string | null>(null);
 
   const createInstancia = async () => {
-    if (!newInstance.nome || !newInstance.instance_name) {
-      alert('Preencha o nome e o identificador da instancia');
+    if (!newInstance.nome || !newInstance.instance_name || !newInstance.unidade_id) {
+      alert('Preencha todos os campos obrigatorios');
       return;
     }
 
@@ -116,7 +120,7 @@ export function AtomConnectSettings({ accentColor }: Props) {
       const { data: instanciaData, error } = await supabase
         .from('atom_connect_instancias')
         .insert({
-          unidade_id: unidadeAtual,
+          unidade_id: newInstance.unidade_id,
           nome: newInstance.nome,
           api_url: newInstance.api_url || EVOLUTION_URL,
           api_key: newInstance.api_key || EVOLUTION_API_KEY,
@@ -129,7 +133,7 @@ export function AtomConnectSettings({ accentColor }: Props) {
       if (error) throw error;
 
       setShowNewInstance(false);
-      setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '' });
+      setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
       loadInstancias();
 
       if (instanciaData) {
@@ -152,7 +156,7 @@ export function AtomConnectSettings({ accentColor }: Props) {
           .single();
 
         setShowNewInstance(false);
-        setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '' });
+        setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
         loadInstancias();
 
         if (instanciaData) {
@@ -491,7 +495,14 @@ export function AtomConnectSettings({ accentColor }: Props) {
                         </div>
                         <div>
                           <h3 className="font-semibold text-white text-lg">{instancia.nome}</h3>
-                          <p className="text-sm text-gray-400">{instancia.instance_name}</p>
+                          <p className="text-sm text-gray-400">
+                            {instancia.instance_name}
+                            {unidades?.find(u => u.id === instancia.unidade_id) && (
+                              <span className="ml-2 px-2 py-0.5 rounded text-xs bg-white/10 text-gray-300">
+                                {unidades.find(u => u.id === instancia.unidade_id)?.nome}
+                              </span>
+                            )}
+                          </p>
                           {instancia.phone_number && (
                             <div className="flex items-center gap-2 mt-1">
                               <Phone className="w-3 h-3 text-green-400" />
@@ -717,6 +728,23 @@ export function AtomConnectSettings({ accentColor }: Props) {
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                   />
                   <p className="text-xs text-gray-500 mt-1">Use apenas letras minusculas, numeros e hifens</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Unidade *</label>
+                  <select
+                    value={newInstance.unidade_id}
+                    onChange={(e) => setNewInstance(prev => ({ ...prev, unidade_id: e.target.value }))}
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-white/20"
+                  >
+                    <option value="" className="bg-[#1A1A2E]">Selecione a unidade</option>
+                    {(unidades || []).map(u => (
+                      <option key={u.id} value={u.id} className="bg-[#1A1A2E]">
+                        {u.nome}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">A instancia sera vinculada a esta unidade</p>
                 </div>
 
                 {EVOLUTION_URL && (

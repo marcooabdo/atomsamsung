@@ -30,7 +30,10 @@ export function AtomConnectDashboard({ accentColor }: Props) {
   }, [unidadeAtual, periodo]);
 
   const loadStats = async () => {
-    if (!unidadeAtual) return;
+    if (!unidadeAtual) {
+      setLoading(false);
+      return;
+    }
 
     const { data: conversas } = await supabase
       .from('atom_connect_conversas')

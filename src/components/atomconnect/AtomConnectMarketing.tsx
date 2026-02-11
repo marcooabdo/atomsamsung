@@ -56,7 +56,10 @@ export function AtomConnectMarketing({ accentColor }: Props) {
   }, [unidadeAtual]);
 
   const loadCampanhas = async () => {
-    if (!unidadeAtual) return;
+    if (!unidadeAtual) {
+      setLoading(false);
+      return;
+    }
 
     const { data, error } = await supabase
       .from('atom_connect_campanhas')
