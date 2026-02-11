@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
   Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
-  Save, MessageSquare, Zap
+  Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -33,6 +33,9 @@ interface RespostaRapida {
   midia_url: string | null;
 }
 
+const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || '';
+const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
+
 export function AtomConnectSettings({ accentColor }: Props) {
   const { unidadeAtual } = useAuth();
   const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline'>('instances');
@@ -42,11 +45,14 @@ export function AtomConnectSettings({ accentColor }: Props) {
   const [showNewInstance, setShowNewInstance] = useState(false);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [connectingInstance, setConnectingInstance] = useState<string | null>(null);
+  const [qrCodeModal, setQrCodeModal] = useState<{ instancia: Instancia; qrCode: string } | null>(null);
+  const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
 
   const [newInstance, setNewInstance] = useState({
     nome: '',
-    api_url: '',
-    api_key: '',
+    api_url: EVOLUTION_URL,
+    api_key: EVOLUTION_API_KEY,
     instance_name: ''
   });
 
@@ -88,22 +94,76 @@ export function AtomConnectSettings({ accentColor }: Props) {
     if (data) setRespostasRapidas(data);
   };
 
+  const [creatingInstance, setCreatingInstance] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
   const createInstancia = async () => {
-    if (!newInstance.nome || !newInstance.api_url || !newInstance.api_key || !newInstance.instance_name) {
-      alert('Preencha todos os campos');
+    if (!newInstance.nome || !newInstance.instance_name) {
+      alert('Preencha o nome e o identificador da instancia');
       return;
     }
 
-    await supabase
-      .from('atom_connect_instancias')
-      .insert({
-        unidade_id: unidadeAtual,
-        ...newInstance
-      });
+    setCreatingInstance(true);
+    setCreateError(null);
 
-    setShowNewInstance(false);
-    setNewInstance({ nome: '', api_url: '', api_key: '', instance_name: '' });
-    loadInstancias();
+    try {
+      const evolutionResult = await createEvolutionInstance(newInstance.instance_name);
+
+      if (evolutionResult.error) {
+        throw new Error(evolutionResult.error);
+      }
+
+      const { data: instanciaData, error } = await supabase
+        .from('atom_connect_instancias')
+        .insert({
+          unidade_id: unidadeAtual,
+          nome: newInstance.nome,
+          api_url: newInstance.api_url || EVOLUTION_URL,
+          api_key: newInstance.api_key || EVOLUTION_API_KEY,
+          instance_name: newInstance.instance_name,
+          status: 'disconnected'
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setShowNewInstance(false);
+      setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '' });
+      loadInstancias();
+
+      if (instanciaData) {
+        setTimeout(() => getQRCode(instanciaData), 500);
+      }
+    } catch (error: any) {
+      console.error('Erro ao criar instancia:', error);
+      if (error.message?.includes('already')) {
+        const { data: instanciaData } = await supabase
+          .from('atom_connect_instancias')
+          .insert({
+            unidade_id: unidadeAtual,
+            nome: newInstance.nome,
+            api_url: newInstance.api_url || EVOLUTION_URL,
+            api_key: newInstance.api_key || EVOLUTION_API_KEY,
+            instance_name: newInstance.instance_name,
+            status: 'disconnected'
+          })
+          .select()
+          .single();
+
+        setShowNewInstance(false);
+        setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '' });
+        loadInstancias();
+
+        if (instanciaData) {
+          setTimeout(() => getQRCode(instanciaData), 500);
+        }
+      } else {
+        setCreateError(error.message || 'Erro ao criar instancia');
+      }
+    } finally {
+      setCreatingInstance(false);
+    }
   };
 
   const deleteInstancia = async (id: string) => {
@@ -146,6 +206,7 @@ export function AtomConnectSettings({ accentColor }: Props) {
   };
 
   const getQRCode = async (instancia: Instancia) => {
+    setConnectingInstance(instancia.id);
     try {
       const response = await fetch(`${instancia.api_url}/instance/connect/${instancia.instance_name}`, {
         headers: { 'apikey': instancia.api_key }
@@ -157,10 +218,99 @@ export function AtomConnectSettings({ accentColor }: Props) {
           .from('atom_connect_instancias')
           .update({ qr_code: data.base64, status: 'connecting' })
           .eq('id', instancia.id);
-        loadInstancias();
+
+        setQrCodeModal({ instancia, qrCode: data.base64 });
+        startQRPolling(instancia);
+      } else if (data.code) {
+        const qrBase64 = `data:image/png;base64,${data.code}`;
+        await supabase
+          .from('atom_connect_instancias')
+          .update({ qr_code: qrBase64, status: 'connecting' })
+          .eq('id', instancia.id);
+
+        setQrCodeModal({ instancia, qrCode: qrBase64 });
+        startQRPolling(instancia);
       }
     } catch (error) {
       console.error('Erro ao obter QR Code:', error);
+      alert('Erro ao gerar QR Code. Verifique se a instancia existe na Evolution API.');
+    } finally {
+      setConnectingInstance(null);
+    }
+  };
+
+  const startQRPolling = (instancia: Instancia) => {
+    if (qrPollingRef.current) {
+      clearInterval(qrPollingRef.current);
+    }
+
+    qrPollingRef.current = setInterval(async () => {
+      try {
+        const response = await fetch(`${instancia.api_url}/instance/connectionState/${instancia.instance_name}`, {
+          headers: { 'apikey': instancia.api_key }
+        });
+
+        const data = await response.json();
+
+        if (data.state === 'open') {
+          await supabase
+            .from('atom_connect_instancias')
+            .update({
+              status: 'connected',
+              phone_number: data.instance?.phoneNumber || null,
+              qr_code: null
+            })
+            .eq('id', instancia.id);
+
+          if (qrPollingRef.current) {
+            clearInterval(qrPollingRef.current);
+            qrPollingRef.current = null;
+          }
+          setQrCodeModal(null);
+          loadInstancias();
+        }
+      } catch (error) {
+        console.error('Erro ao verificar conexao:', error);
+      }
+    }, 3000);
+  };
+
+  const stopQRPolling = () => {
+    if (qrPollingRef.current) {
+      clearInterval(qrPollingRef.current);
+      qrPollingRef.current = null;
+    }
+    setQrCodeModal(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (qrPollingRef.current) {
+        clearInterval(qrPollingRef.current);
+      }
+    };
+  }, []);
+
+  const createEvolutionInstance = async (instanceName: string) => {
+    try {
+      const response = await fetch(`${EVOLUTION_URL}/instance/create`, {
+        method: 'POST',
+        headers: {
+          'apikey': EVOLUTION_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          instanceName,
+          qrcode: true,
+          integration: 'WHATSAPP-BAILEYS'
+        })
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error('Erro ao criar instancia:', error);
+      throw error;
     }
   };
 
@@ -264,49 +414,89 @@ export function AtomConnectSettings({ accentColor }: Props) {
             </div>
 
             {instancias.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-                <Smartphone className="w-16 h-16 mb-4 opacity-50" />
-                <p className="text-lg">Nenhuma instancia configurada</p>
-                <p className="text-sm mt-2">Adicione sua primeira instancia do Evolution API</p>
+              <div className="flex flex-col items-center justify-center py-16 text-gray-500">
+                <div className="w-24 h-24 rounded-full bg-gradient-to-br from-green-500/20 to-green-500/5 flex items-center justify-center mb-6">
+                  <Phone className="w-12 h-12 text-green-400" />
+                </div>
+                <p className="text-xl font-semibold text-white mb-2">Conecte seu WhatsApp</p>
+                <p className="text-sm text-gray-400 text-center max-w-md mb-6">
+                  Configure uma instancia do Evolution API para comecar a receber e enviar mensagens do WhatsApp
+                </p>
+                <button
+                  onClick={() => setShowNewInstance(true)}
+                  className="flex items-center gap-3 px-6 py-3 rounded-xl text-base font-semibold transition-all transform hover:scale-105"
+                  style={{
+                    backgroundColor: accentColor,
+                    color: '#000',
+                    boxShadow: `0 0 30px ${accentColor}40`
+                  }}
+                >
+                  <QrCode className="w-5 h-5" />
+                  Conectar WhatsApp
+                </button>
               </div>
             ) : (
               <div className="grid gap-4">
                 {instancias.map(instancia => (
                   <div
                     key={instancia.id}
-                    className="p-6 rounded-xl bg-white/5 border border-white/10"
+                    className="p-6 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors"
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-4">
                         <div
-                          className={`w-12 h-12 rounded-xl flex items-center justify-center ${
+                          className={`w-14 h-14 rounded-xl flex items-center justify-center ${
                             instancia.status === 'connected'
-                              ? 'bg-green-500/20'
+                              ? 'bg-green-500/20 ring-2 ring-green-500/30'
                               : instancia.status === 'connecting'
-                              ? 'bg-yellow-500/20'
-                              : 'bg-red-500/20'
+                              ? 'bg-yellow-500/20 ring-2 ring-yellow-500/30'
+                              : 'bg-red-500/20 ring-2 ring-red-500/30'
                           }`}
                         >
                           {instancia.status === 'connected' ? (
-                            <Wifi className="w-6 h-6 text-green-400" />
+                            <CheckCircle2 className="w-7 h-7 text-green-400" />
                           ) : instancia.status === 'connecting' ? (
-                            <RefreshCw className="w-6 h-6 text-yellow-400 animate-spin" />
+                            <Loader2 className="w-7 h-7 text-yellow-400 animate-spin" />
                           ) : (
-                            <WifiOff className="w-6 h-6 text-red-400" />
+                            <XCircle className="w-7 h-7 text-red-400" />
                           )}
                         </div>
                         <div>
-                          <h3 className="font-semibold text-white">{instancia.nome}</h3>
+                          <h3 className="font-semibold text-white text-lg">{instancia.nome}</h3>
                           <p className="text-sm text-gray-400">{instancia.instance_name}</p>
                           {instancia.phone_number && (
-                            <p className="text-xs text-green-400 mt-1">
-                              Conectado: {instancia.phone_number}
-                            </p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Phone className="w-3 h-3 text-green-400" />
+                              <span className="text-sm text-green-400 font-medium">
+                                {instancia.phone_number}
+                              </span>
+                            </div>
+                          )}
+                          {instancia.status === 'disconnected' && (
+                            <span className="text-xs text-red-400">Desconectado</span>
                           )}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
+                        {instancia.status === 'disconnected' && (
+                          <button
+                            onClick={() => getQRCode(instancia)}
+                            disabled={connectingInstance === instancia.id}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all"
+                            style={{
+                              backgroundColor: accentColor,
+                              color: '#000'
+                            }}
+                          >
+                            {connectingInstance === instancia.id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <QrCode className="w-4 h-4" />
+                            )}
+                            Conectar
+                          </button>
+                        )}
                         <button
                           onClick={() => checkConnectionStatus(instancia)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
@@ -314,15 +504,6 @@ export function AtomConnectSettings({ accentColor }: Props) {
                         >
                           <RefreshCw className="w-4 h-4" />
                         </button>
-                        {instancia.status === 'disconnected' && (
-                          <button
-                            onClick={() => getQRCode(instancia)}
-                            className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
-                            title="Gerar QR Code"
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </button>
-                        )}
                         <button
                           onClick={() => deleteInstancia(instancia.id)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
@@ -472,64 +653,82 @@ export function AtomConnectSettings({ accentColor }: Props) {
               className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-white mb-4">Nova Instancia WhatsApp</h3>
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-500/20 mb-4">
+                  <Phone className="w-7 h-7 text-green-400" />
+                </div>
+                <h3 className="text-xl font-bold text-white">Conectar WhatsApp</h3>
+                <p className="text-sm text-gray-400 mt-1">Configure sua instancia do Evolution API</p>
+              </div>
+
+              {createError && (
+                <div className="mb-4 p-3 bg-red-500/20 border border-red-500/30 rounded-lg flex items-center gap-2 text-sm text-red-400">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                  {createError}
+                </div>
+              )}
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Nome</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Nome da Conexao</label>
                   <input
                     type="text"
                     value={newInstance.nome}
                     onChange={(e) => setNewInstance(prev => ({ ...prev, nome: e.target.value }))}
-                    placeholder="Ex: WhatsApp Principal"
+                    placeholder="Ex: WhatsApp Comercial"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">URL da API Evolution</label>
-                  <input
-                    type="text"
-                    value={newInstance.api_url}
-                    onChange={(e) => setNewInstance(prev => ({ ...prev, api_url: e.target.value }))}
-                    placeholder="https://sua-api.com"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">API Key</label>
-                  <input
-                    type="password"
-                    value={newInstance.api_key}
-                    onChange={(e) => setNewInstance(prev => ({ ...prev, api_key: e.target.value }))}
-                    placeholder="Sua chave de API"
-                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-400 mb-2">Nome da Instancia</label>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">Identificador da Instancia</label>
                   <input
                     type="text"
                     value={newInstance.instance_name}
-                    onChange={(e) => setNewInstance(prev => ({ ...prev, instance_name: e.target.value }))}
-                    placeholder="Nome configurado na Evolution"
+                    onChange={(e) => setNewInstance(prev => ({ ...prev, instance_name: e.target.value.toLowerCase().replace(/[^a-z0-9-_]/g, '') }))}
+                    placeholder="Ex: whatsapp-comercial"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Use apenas letras minusculas, numeros e hifens</p>
                 </div>
+
+                {EVOLUTION_URL && (
+                  <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-sm text-green-400">
+                      <CheckCircle2 className="w-4 h-4" />
+                      API Evolution configurada
+                    </div>
+                    <p className="text-xs text-gray-400 mt-1 truncate">{EVOLUTION_URL}</p>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-end gap-3 mt-6">
+              <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setShowNewInstance(false)}
-                  className="px-4 py-2 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                  onClick={() => {
+                    setShowNewInstance(false);
+                    setCreateError(null);
+                  }}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={createInstancia}
-                  className="px-6 py-2 rounded-lg text-sm font-medium transition-colors"
+                  disabled={creatingInstance}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
                   style={{ backgroundColor: accentColor, color: '#000' }}
                 >
-                  Salvar
+                  {creatingInstance ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <QrCode className="w-4 h-4" />
+                      Criar e Conectar
+                    </>
+                  )}
                 </button>
               </div>
             </motion.div>
@@ -602,6 +801,79 @@ export function AtomConnectSettings({ accentColor }: Props) {
                   style={{ backgroundColor: accentColor, color: '#000' }}
                 >
                   Salvar
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {qrCodeModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-6"
+            onClick={stopQRPolling}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-gradient-to-br from-[#1A1A2E] to-[#0F0F1A] rounded-2xl w-full max-w-lg p-8 border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="text-center mb-6">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-500/20 mb-4">
+                  <Phone className="w-8 h-8 text-green-400" />
+                </div>
+                <h3 className="text-2xl font-bold text-white mb-2">Conectar WhatsApp</h3>
+                <p className="text-gray-400">
+                  Escaneie o QR Code abaixo com seu WhatsApp para conectar
+                </p>
+              </div>
+
+              <div className="flex justify-center mb-6">
+                <div className="p-4 bg-white rounded-2xl shadow-2xl">
+                  <img
+                    src={qrCodeModal.qrCode}
+                    alt="QR Code WhatsApp"
+                    className="w-64 h-64"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-6">
+                <Loader2 className="w-4 h-4 animate-spin" style={{ color: accentColor }} />
+                <span>Aguardando conexao...</span>
+              </div>
+
+              <div className="bg-white/5 rounded-xl p-4 mb-6">
+                <h4 className="text-sm font-medium text-white mb-3">Como conectar:</h4>
+                <ol className="text-sm text-gray-400 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs flex-shrink-0" style={{ color: accentColor }}>1</span>
+                    Abra o WhatsApp no seu celular
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs flex-shrink-0" style={{ color: accentColor }}>2</span>
+                    Toque em Menu ou Configuracoes e selecione Aparelhos conectados
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs flex-shrink-0" style={{ color: accentColor }}>3</span>
+                    Toque em Conectar um aparelho e aponte a camera para o QR Code
+                  </li>
+                </ol>
+              </div>
+
+              <div className="flex justify-center">
+                <button
+                  onClick={stopQRPolling}
+                  className="px-6 py-2 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
                 </button>
               </div>
             </motion.div>
