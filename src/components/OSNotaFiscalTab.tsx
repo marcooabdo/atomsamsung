@@ -53,7 +53,8 @@ interface PecaItem {
   gi_postado_em: string | null;
   devolvida_em: string | null;
   usada_em: string | null;
-  source: 'os_pecas' | 'cotacoes_pecas';
+  exibir_no_pdf?: boolean;
+  source: 'os_pecas' | 'cotacoes_pecas' | 'requisicoes_pecas';
 }
 
 interface ServicoItem {
@@ -158,7 +159,7 @@ export function OSNotaFiscalTab({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [configsRes, unidadeRes, nfsRes, osPecasRes, cotPecasRes, osServicosRes, cotServicosRes, osRes] = await Promise.all([
+      const [configsRes, unidadeRes, nfsRes, osPecasRes, cotPecasRes, reqPecasRes, osServicosRes, cotServicosRes, osRes] = await Promise.all([
         supabase
           .from('nf_configuracoes')
           .select('*')
@@ -177,13 +178,19 @@ export function OSNotaFiscalTab({
           .order('created_at', { ascending: false }),
         supabase
           .from('os_pecas')
-          .select('id, pn, descricao, quantidade, valor_unitario, valor_total, status, gi_postado_em, devolvida_em, usada_em')
+          .select('id, pn, descricao, quantidade, valor_unitario, valor_total, status, gi_postado_em, devolvida_em, usada_em, exibir_no_pdf')
           .eq('os_id', osId)
           .order('created_at', { ascending: true }),
         supabase
           .from('cotacoes_pecas')
-          .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
+          .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total, exibir_no_pdf')
           .eq('os_id', osId)
+          .order('created_at', { ascending: true }),
+        supabase
+          .from('requisicoes_pecas')
+          .select('id, pn, descricao, quantidade, valor_peca, status')
+          .eq('os_id', osId)
+          .not('status', 'eq', 'cancelada')
           .order('created_at', { ascending: true }),
         supabase
           .from('os_servicos')
@@ -216,6 +223,7 @@ export function OSNotaFiscalTab({
         ...p,
         valor_unitario: p.valor_unitario || 0,
         valor_total: p.valor_total || 0,
+        exibir_no_pdf: p.exibir_no_pdf !== false,
         source: 'os_pecas' as const
       }));
       const cotPecasMapped: PecaItem[] = (cotPecasRes.data || [])
@@ -231,10 +239,29 @@ export function OSNotaFiscalTab({
           gi_postado_em: null,
           devolvida_em: null,
           usada_em: null,
+          exibir_no_pdf: p.exibir_no_pdf !== false,
           source: 'cotacoes_pecas' as const
         }));
 
-      const allPecas = [...osPecasMapped, ...cotPecasMapped].filter(p =>
+      const allExistingPNs = new Set([...osPecasIds, ...(cotPecasRes.data || []).map((p: any) => p.pn)]);
+      const reqPecasMapped: PecaItem[] = (reqPecasRes.data || [])
+        .filter((p: any) => !allExistingPNs.has(p.pn))
+        .map((p: any) => ({
+          id: p.id,
+          pn: p.pn,
+          descricao: p.descricao,
+          quantidade: p.quantidade || 1,
+          valor_unitario: p.valor_peca || 0,
+          valor_total: (p.valor_peca || 0) * (p.quantidade || 1),
+          status: p.status,
+          gi_postado_em: null,
+          devolvida_em: null,
+          usada_em: null,
+          exibir_no_pdf: true,
+          source: 'requisicoes_pecas' as const
+        }));
+
+      const allPecas = [...osPecasMapped, ...cotPecasMapped, ...reqPecasMapped].filter(p =>
         !p.devolvida_em &&
         p.status !== 'devolvida' &&
         p.status !== 'cancelada'
@@ -344,20 +371,29 @@ export function OSNotaFiscalTab({
         const peca = pecas.find(p => p.id === editingId);
         if (!peca) return;
         const table = peca.source;
-        const updateData = peca.source === 'os_pecas'
-          ? {
-              descricao: editValues.descricao,
-              valor_unitario: editValues.valor_unitario,
-              quantidade: editValues.quantidade,
-              valor_total: newTotal,
-              valor_gspn: editValues.valor_unitario
-            }
-          : {
-              descricao: editValues.descricao,
-              valor_final_unitario: editValues.valor_unitario,
-              quantidade: editValues.quantidade,
-              valor_total: newTotal
-            };
+        let updateData: Record<string, any>;
+        if (peca.source === 'os_pecas') {
+          updateData = {
+            descricao: editValues.descricao,
+            valor_unitario: editValues.valor_unitario,
+            quantidade: editValues.quantidade,
+            valor_total: newTotal,
+            valor_gspn: editValues.valor_unitario
+          };
+        } else if (peca.source === 'requisicoes_pecas') {
+          updateData = {
+            descricao: editValues.descricao,
+            valor_peca: editValues.valor_unitario,
+            quantidade: editValues.quantidade
+          };
+        } else {
+          updateData = {
+            descricao: editValues.descricao,
+            valor_final_unitario: editValues.valor_unitario,
+            quantidade: editValues.quantidade,
+            valor_total: newTotal
+          };
+        }
         const { error } = await supabase.from(table).update(updateData).eq('id', editingId);
         if (error) throw error;
       } else {

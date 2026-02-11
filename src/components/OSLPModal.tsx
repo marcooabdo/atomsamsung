@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSNotaFiscalTab } from './OSNotaFiscalTab';
+import { gerarPDFOrdemServicoLP } from '../lib/pdfOS';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
@@ -192,6 +193,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [quantidadeServico, setQuantidadeServico] = useState(1);
   const [buscaServico, setBuscaServico] = useState('');
   const [syncingGSPN, setSyncingGSPN] = useState(false);
+  const [gerandoPDF, setGerandoPDF] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
@@ -451,6 +453,104 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setCurrentJob(data);
     } else {
       setCurrentJob(null);
+    }
+  };
+
+  const handleGerarPDF = async () => {
+    if (!os) return;
+
+    setGerandoPDF(true);
+    try {
+      const { data: unidade } = await supabase
+        .from('unidades')
+        .select('nome, samsung_asccode, telefone')
+        .eq('id', os.unidade_id)
+        .maybeSingle();
+
+      const { data: pdfConfig } = await supabase
+        .from('configuracoes_pdf_os')
+        .select('*')
+        .eq('unidade_id', os.unidade_id)
+        .maybeSingle();
+
+      const { data: osPecas } = await supabase
+        .from('os_pecas')
+        .select('pn, descricao, quantidade, exibir_no_pdf')
+        .eq('os_id', os.id);
+
+      const { data: reqPecas } = await supabase
+        .from('requisicoes_pecas')
+        .select('pn, descricao, quantidade')
+        .eq('os_id', os.id)
+        .not('status', 'eq', 'cancelada');
+
+      const { data: anexos } = await supabase
+        .from('os_anexos')
+        .select('nome_arquivo, url, tipo, exibir_no_pdf')
+        .eq('os_id', os.id)
+        .eq('exibir_no_pdf', true);
+
+      const existingPNs = new Set((osPecas || []).map(p => p.pn));
+      const allPecas = [
+        ...(osPecas || []).map(p => ({ ...p, exibir_no_pdf: p.exibir_no_pdf !== false })),
+        ...(reqPecas || []).filter(p => !existingPNs.has(p.pn)).map(p => ({ ...p, exibir_no_pdf: true }))
+      ];
+
+      const osDataLP = {
+        numero_os_samsung: os.numero_os_samsung,
+        numero_os_interna: os.numero_os_interna,
+        cliente_nome: os.cliente_nome || '',
+        cliente_endereco: os.cliente_endereco,
+        cliente_numero: os.cliente_numero,
+        cliente_bairro: os.cliente_bairro,
+        cliente_cidade: os.cliente_cidade,
+        cliente_estado: os.cliente_estado,
+        cliente_cep: os.cliente_cep,
+        cliente_telefone: os.cliente_telefone,
+        cliente_celular: os.cliente_telefone_2,
+        cliente_email: os.cliente_email,
+        cliente_cpf_cnpj: os.cliente_documento,
+        aparelho_modelo: os.aparelho_modelo,
+        aparelho_linha: os.aparelho_linha,
+        aparelho_imei: os.aparelho_imei,
+        defeito_relatado: os.defeito_relatado,
+        diagnostico_tecnico: os.diagnostico_tecnico,
+        observacoes_internas: os.observacoes_internas,
+        descricao_reparo: os.descricao_reparo,
+        reparo_efetuado: os.reparo_efetuado,
+        acessorios: os.acessorios,
+        tipo_atendimento: os.tipo_atendimento as 'IH' | 'CI',
+        status_garantia: os.status_garantia,
+        data_abertura: os.data_abertura_samsung || os.created_at,
+        data_agendamento: os.data_agendamento,
+        data_compra: os.data_compra,
+        created_at: os.created_at,
+        unidade: {
+          nome: unidade?.nome || '',
+          samsung_asccode: unidade?.samsung_asccode || null,
+          telefone: unidade?.telefone || null
+        },
+        pecas: allPecas,
+        anexos: anexos || []
+      };
+
+      const config = {
+        termo_orcamento: pdfConfig?.termo_orcamento || '',
+        termo_garantia: pdfConfig?.termo_garantia || '',
+        canais_atendimento: pdfConfig?.canais_atendimento || '',
+        observacoes_gerais: pdfConfig?.observacoes_gerais || '',
+        logo_url: pdfConfig?.logo_url || null,
+        rodape_personalizado: pdfConfig?.rodape_personalizado || null
+      };
+
+      const pdfBlob = await gerarPDFOrdemServicoLP(osDataLP, config);
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+      window.open(pdfUrl, '_blank');
+    } catch (error) {
+      console.error('Erro ao gerar PDF:', error);
+      alert('Erro ao gerar PDF');
+    } finally {
+      setGerandoPDF(false);
     }
   };
 
@@ -2273,6 +2373,28 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   </div>
                 )}
               </div>
+            )}
+
+            {currentMode === 'view' && os && (
+              <button
+                onClick={handleGerarPDF}
+                disabled={gerandoPDF}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59,130,246,0.2) 0%, rgba(59,130,246,0.05) 100%)',
+                  border: '1px solid #3B82F6',
+                  color: '#3B82F6',
+                  boxShadow: '0 0 10px rgba(59,130,246,0.2)'
+                }}
+                title="Gerar PDF da OS"
+              >
+                {gerandoPDF ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <FileDown className="w-4 h-4" />
+                )}
+                PDF
+              </button>
             )}
 
             {currentMode === 'view' && os?.numero_os_samsung && (
@@ -4573,7 +4695,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 codigo: r.codigo_peca,
                                 quantidade: r.quantidade_requisitada,
                                 valor_unitario: r.valor_peca,
-                                valor_total: (r.valor_peca || 0) * r.quantidade_requisitada
+                                valor_total: (r.valor_peca || 0) * r.quantidade_requisitada,
+                                exibir_no_pdf: r.exibir_no_pdf !== false
                               },
                               requisicao: r.status !== 'devolvida' && r.status !== 'reprovada' && r.status !== 'cancelada' ? r : null,
                               requisicaoDevolvida: r.status === 'devolvida' || r.status === 'reprovada' ? r : null,
@@ -4665,6 +4788,43 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                       <p className="text-xs font-bold text-[#39FF14]">
                                         Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                       </p>
+                                      <button
+                                        onClick={async () => {
+                                          const currentValue = peca.exibir_no_pdf !== false;
+                                          const newValue = !currentValue;
+                                          try {
+                                            if (requisicao) {
+                                              await supabase
+                                                .from('requisicoes_pecas')
+                                                .update({ exibir_no_pdf: newValue })
+                                                .eq('id', requisicao.id);
+                                            } else if (tipo === 'os_peca') {
+                                              await supabase
+                                                .from('os_pecas')
+                                                .update({ exibir_no_pdf: newValue })
+                                                .eq('id', peca.id);
+                                            } else if (tipo === 'cotacao') {
+                                              await supabase
+                                                .from('cotacoes_pecas')
+                                                .update({ exibir_no_pdf: newValue })
+                                                .eq('id', peca.id);
+                                            }
+                                            await loadOSData();
+                                          } catch (error) {
+                                            console.error('Erro ao atualizar exibir_no_pdf:', error);
+                                          }
+                                        }}
+                                        className="flex items-center gap-1 px-2 py-1 rounded text-xs transition-all"
+                                        style={{
+                                          backgroundColor: peca.exibir_no_pdf !== false ? 'rgba(59,130,246,0.2)' : 'rgba(100,100,100,0.2)',
+                                          border: peca.exibir_no_pdf !== false ? '1px solid #3B82F6' : '1px solid #666',
+                                          color: peca.exibir_no_pdf !== false ? '#3B82F6' : '#888'
+                                        }}
+                                        title={peca.exibir_no_pdf !== false ? 'Aparece no PDF' : 'Oculto no PDF'}
+                                      >
+                                        {peca.exibir_no_pdf !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                        PDF
+                                      </button>
                                     </div>
                                     {(requisicao || requisicaoDevolvida) && (
                                       <p className="text-xs text-gray-500 mt-2">
@@ -5151,6 +5311,31 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
+                                <button
+                                  onClick={async () => {
+                                    const currentValue = anexo.exibir_no_pdf !== false;
+                                    const newValue = !currentValue;
+                                    try {
+                                      await supabase
+                                        .from('os_anexos')
+                                        .update({ exibir_no_pdf: newValue })
+                                        .eq('id', anexo.id);
+                                      await loadAnexos();
+                                    } catch (error) {
+                                      console.error('Erro ao atualizar exibir_no_pdf:', error);
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-all"
+                                  style={{
+                                    backgroundColor: anexo.exibir_no_pdf !== false ? 'rgba(59,130,246,0.2)' : 'rgba(100,100,100,0.2)',
+                                    border: anexo.exibir_no_pdf !== false ? '1px solid #3B82F6' : '1px solid #666',
+                                    color: anexo.exibir_no_pdf !== false ? '#3B82F6' : '#888'
+                                  }}
+                                  title={anexo.exibir_no_pdf !== false ? 'Aparece no PDF' : 'Oculto no PDF'}
+                                >
+                                  {anexo.exibir_no_pdf !== false ? <Eye className="w-3 h-3" /> : <EyeOff className="w-3 h-3" />}
+                                  PDF
+                                </button>
                                 <button
                                   onClick={() => handleAbrirAnexo(anexo)}
                                   className="neon-button flex items-center gap-2 text-xs px-3 py-1.5"
