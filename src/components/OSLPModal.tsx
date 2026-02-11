@@ -4678,7 +4678,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                               }
 
                                               // Recarrega dados
-                                              await loadOSData();
+                                              await loadPecas();
                                             } catch (error) {
                                               alert('Erro ao atualizar valor da peça');
                                             }
@@ -4711,7 +4711,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', peca.id);
                                             }
-                                            await loadOSData();
+                                            await loadPecas();
                                           } catch (error) {
                                             console.error('Erro ao atualizar exibir_no_pdf:', error);
                                           }
