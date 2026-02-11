@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, AlertTriangle,
-  Plus, UserPlus, Link2, Building2, Filter, FileText, CalendarClock, X
+  Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -39,10 +39,6 @@ interface PipelineColuna {
   is_final: boolean;
 }
 
-interface Unidade {
-  id: string;
-  nome: string;
-}
 
 interface Props {
   conversas: Conversa[];
@@ -58,23 +54,20 @@ const ICON_MAP: Record<string, any> = {
 };
 
 export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
-  const { usuario, unidadeAtual, unidades } = useAuth();
+  const { usuario } = useAuth();
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [filterAtendente, setFilterAtendente] = useState<'all' | 'mine' | 'unassigned'>('all');
-  const [filterUnidade, setFilterUnidade] = useState<string>('all');
   const [filterVendedor, setFilterVendedor] = useState<string>('all');
   const [filterDiasSemRetorno, setFilterDiasSemRetorno] = useState<number | null>(null);
   const [filterVinculadoOS, setFilterVinculadoOS] = useState<'all' | 'yes' | 'no'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
-  const [allUnidades, setAllUnidades] = useState<Unidade[]>([]);
 
   useEffect(() => {
     loadColunas();
     loadAtendentes();
-    loadUnidades();
   }, []);
 
   const loadColunas = async () => {
@@ -93,26 +86,13 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
     if (data) setAtendentes(data);
   };
 
-  const loadUnidades = async () => {
-    if (unidades && unidades.length > 0) {
-      setAllUnidades(unidades);
-      return;
-    }
-    const { data } = await supabase
-      .from('unidades')
-      .select('id, nome')
-      .order('nome');
-    if (data) setAllUnidades(data);
-  };
-
   const activeFiltersCount = useMemo(() => {
     let count = 0;
-    if (filterUnidade !== 'all') count++;
     if (filterVendedor !== 'all') count++;
     if (filterDiasSemRetorno !== null) count++;
     if (filterVinculadoOS !== 'all') count++;
     return count;
-  }, [filterUnidade, filterVendedor, filterDiasSemRetorno, filterVinculadoOS]);
+  }, [filterVendedor, filterDiasSemRetorno, filterVinculadoOS]);
 
   const filteredConversas = useMemo(() => {
     let filtered = conversas;
@@ -130,10 +110,6 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
       filtered = filtered.filter(c => c.atendente_id === usuario?.id);
     } else if (filterAtendente === 'unassigned') {
       filtered = filtered.filter(c => !c.atendente_id);
-    }
-
-    if (filterUnidade !== 'all') {
-      filtered = filtered.filter(c => c.unidade_id === filterUnidade);
     }
 
     if (filterVendedor !== 'all') {
@@ -156,7 +132,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
     }
 
     return filtered;
-  }, [conversas, searchTerm, filterAtendente, filterUnidade, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario]);
+  }, [conversas, searchTerm, filterAtendente, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario]);
 
   const getConversasByColuna = (colunaId: string) => {
     return filteredConversas
@@ -228,7 +204,6 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
   };
 
   const clearAllFilters = () => {
-    setFilterUnidade('all');
     setFilterVendedor('all');
     setFilterDiasSemRetorno(null);
     setFilterVinculadoOS('all');
@@ -301,20 +276,6 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
             className="overflow-hidden border-b border-white/[0.04]"
           >
             <div className="px-5 py-3 flex items-center gap-4 flex-wrap">
-              <div className="flex items-center gap-2">
-                <Building2 className="w-3.5 h-3.5 text-white/30" />
-                <select
-                  value={filterUnidade}
-                  onChange={(e) => setFilterUnidade(e.target.value)}
-                  className="bg-white/[0.05] border border-white/[0.08] rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-cyan-500/40"
-                >
-                  <option value="all" className="bg-[#12122a]">Todas Unidades</option>
-                  {allUnidades.map(u => (
-                    <option key={u.id} value={u.id} className="bg-[#12122a]">{u.nome}</option>
-                  ))}
-                </select>
-              </div>
-
               <div className="flex items-center gap-2">
                 <User className="w-3.5 h-3.5 text-white/30" />
                 <select
