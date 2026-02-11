@@ -16,6 +16,7 @@ import { GIModal } from './agendamento/GIModal';
 import { AtomConnectChat } from './atomconnect/AtomConnectChat';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
+import { SuccessModal } from './SuccessModal';
 import type { Database } from '../lib/database.types';
 
 interface WhatsAppConversa {
@@ -155,6 +156,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [colunaDestino, setColunaDestino] = useState<{ id: string; label: string } | null>(null);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
+  const [mostrarSucessoMover, setMostrarSucessoMover] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
 
@@ -2506,10 +2508,8 @@ Não haverá cobrança ao cliente.`
 
       if (error) throw error;
 
-      alert('OS movida com sucesso!');
       setMostrarMoverPara(false);
-      onReload?.();
-      onClose();
+      setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);
     } finally {
@@ -5189,6 +5189,17 @@ Não haverá cobrança ao cliente.`
           </div>
         </div>
       )}
+
+      <SuccessModal
+        isOpen={mostrarSucessoMover}
+        onClose={() => {
+          setMostrarSucessoMover(false);
+          onReload?.();
+          onClose();
+        }}
+        title="Sucesso"
+        message="OS movida com sucesso!"
+      />
     </div>
   );
 }

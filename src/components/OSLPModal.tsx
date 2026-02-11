@@ -10,6 +10,7 @@ import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
 import { OSChecklistTab } from './OSChecklistTab';
 import { AtomConnectChat } from './atomconnect/AtomConnectChat';
+import { SuccessModal } from './SuccessModal';
 import type { Database } from '../lib/database.types';
 
 interface WhatsAppConversa {
@@ -110,6 +111,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [colunaDestino, setColunaDestino] = useState<{ id: string; label: string } | null>(null);
   const [mostrarModalDevolucao, setMostrarModalDevolucao] = useState(false);
   const [requisicaoSelecionada, setRequisicaoSelecionada] = useState<RequisicaoPeca | null>(null);
+  const [mostrarSucessoMover, setMostrarSucessoMover] = useState(false);
   const [mostrarModalCancelarGI, setMostrarModalCancelarGI] = useState(false);
   const [requisicaoCancelarGI, setRequisicaoCancelarGI] = useState<RequisicaoPeca | null>(null);
   const [mostrarModalSucesso, setMostrarModalSucesso] = useState(false);
@@ -2328,10 +2330,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (error) throw error;
 
-      alert('OS movida com sucesso!');
       setMostrarMoverPara(false);
-      onReload?.();
-      onClose();
+      setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);
     } finally {
@@ -6684,6 +6684,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           </div>
         </div>
       )}
+
+      <SuccessModal
+        isOpen={mostrarSucessoMover}
+        onClose={() => {
+          setMostrarSucessoMover(false);
+          onReload?.();
+          onClose();
+        }}
+        title="Sucesso"
+        message="OS movida com sucesso!"
+      />
     </div>
   );
 }
