@@ -7,6 +7,9 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
+const processedMessages = new Set<string>();
+const MESSAGE_CACHE_TTL = 30000;
+
 function normalizeEvent(rawEvent: string): string {
   return rawEvent
     .toLowerCase()
@@ -53,6 +56,91 @@ function hasActualContent(msg: any, body: any, data: any): boolean {
   return false;
 }
 
+function getExtensionFromMimetype(mimetype: string): string {
+  const mimeMap: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/webp": "webp",
+    "audio/ogg": "ogg",
+    "audio/mpeg": "mp3",
+    "audio/mp4": "m4a",
+    "audio/opus": "opus",
+    "audio/aac": "aac",
+    "audio/ogg; codecs=opus": "ogg",
+    "video/mp4": "mp4",
+    "video/3gpp": "3gp",
+    "application/pdf": "pdf",
+  };
+  return mimeMap[mimetype] || "bin";
+}
+
+async function fetchAndUploadMedia(
+  supabase: any,
+  instancia: { api_url: string; api_key: string; instance_name: string },
+  messageId: string,
+  mimetype: string,
+  conversaId: string
+): Promise<string | null> {
+  try {
+    const response = await fetch(
+      `${instancia.api_url}/chat/getBase64FromMediaMessage/${instancia.instance_name}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: instancia.api_key,
+        },
+        body: JSON.stringify({
+          message: { key: { id: messageId } },
+          convertToMp4: false,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Failed to fetch media from Evolution API:", response.status);
+      return null;
+    }
+
+    const result = await response.json();
+    const base64Data = result.base64 || result.data;
+
+    if (!base64Data) {
+      console.error("No base64 data in response");
+      return null;
+    }
+
+    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
+    const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
+
+    const extension = getExtensionFromMimetype(mimetype);
+    const fileName = `${conversaId}/${messageId}.${extension}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from("atom-connect")
+      .upload(fileName, binaryData, {
+        contentType: mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("atom-connect")
+      .getPublicUrl(fileName);
+
+    console.log("Media uploaded successfully:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("Error fetching/uploading media:", error);
+    return null;
+  }
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, {
@@ -62,7 +150,7 @@ Deno.serve(async (req: Request) => {
   }
 
   if (req.method === "GET") {
-    return new Response(JSON.stringify({ status: "ok", service: "evolution-webhook", version: "3.0" }), {
+    return new Response(JSON.stringify({ status: "ok", service: "evolution-webhook", version: "4.0" }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -76,7 +164,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     console.log("=== WEBHOOK RECEIVED ===");
-    console.log("Full payload:", JSON.stringify(body).substring(0, 2000));
+    console.log("Payload:", JSON.stringify(body).substring(0, 1500));
 
     const rawEvent = body.event || body.type || body.action || "";
     const event = normalizeEvent(rawEvent);
@@ -84,10 +172,9 @@ Deno.serve(async (req: Request) => {
     const instance = body.instance || body.instanceName || data?.instance || body.sender?.instance;
 
     console.log("Event:", event, "| Raw:", rawEvent);
-    console.log("Instance:", JSON.stringify(instance));
 
     if (event.includes("messages.update") || event === "message.update") {
-      console.log("Processing message STATUS UPDATE (not a new message)");
+      console.log("Processing message STATUS UPDATE");
       const updates = Array.isArray(data) ? data : [data];
 
       for (const update of updates) {
@@ -100,14 +187,10 @@ Deno.serve(async (req: Request) => {
           if (status === 3) newStatus = "delivered";
           if (status === 4) newStatus = "read";
 
-          const { error } = await supabase
+          await supabase
             .from("atom_connect_mensagens")
             .update({ status: newStatus })
             .eq("message_id", messageId);
-
-          if (!error) {
-            console.log("Updated message status:", messageId, "->", newStatus);
-          }
         }
       }
 
@@ -119,7 +202,7 @@ Deno.serve(async (req: Request) => {
 
     const isMessageEvent =
       event.includes("messages.upsert") ||
-      (event.includes("message") && !event.includes("update")) ||
+      (event.includes("message") && !event.includes("update") && !event.includes("ack")) ||
       body.message ||
       body.data?.message ||
       body.data?.key;
@@ -130,29 +213,31 @@ Deno.serve(async (req: Request) => {
       const message = body.message || data.message || data;
       const key = body.key || message?.key || data?.key || {};
       const rawRemoteJid = key.remoteJid || body.remoteJid || data?.remoteJid || "";
+      const messageId = key.id || body.messageId || "";
 
-      console.log("Raw RemoteJid:", rawRemoteJid);
-      console.log("Key:", JSON.stringify(key));
-
-      if (rawRemoteJid.endsWith("@g.us")) {
-        console.log("Skipping group message");
-        return new Response(JSON.stringify({ skip: "group_message" }), {
+      if (!messageId) {
+        console.log("No message ID, skipping");
+        return new Response(JSON.stringify({ skip: "no_message_id" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@lid")) {
-        console.log("Skipping lid format message (linked device internal)");
-        return new Response(JSON.stringify({ skip: "lid_format" }), {
+      const cacheKey = `${messageId}`;
+      if (processedMessages.has(cacheKey)) {
+        console.log("Message already in processing cache:", cacheKey);
+        return new Response(JSON.stringify({ skip: "in_cache" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      if (rawRemoteJid.includes("@broadcast")) {
-        console.log("Skipping broadcast message");
-        return new Response(JSON.stringify({ skip: "broadcast" }), {
+      processedMessages.add(cacheKey);
+      setTimeout(() => processedMessages.delete(cacheKey), MESSAGE_CACHE_TTL);
+
+      if (rawRemoteJid.endsWith("@g.us") || rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@broadcast")) {
+        console.log("Skipping group/lid/broadcast message");
+        return new Response(JSON.stringify({ skip: "not_personal" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -160,12 +245,10 @@ Deno.serve(async (req: Request) => {
 
       const phoneNumber = cleanPhoneNumber(rawRemoteJid);
       const fromMe = key.fromMe === true;
-      const messageId = key.id || body.messageId || crypto.randomUUID();
 
-      console.log("Cleaned phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
+      console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
 
       if (!phoneNumber || phoneNumber.length < 8) {
-        console.log("Invalid phone number, skipping:", phoneNumber);
         return new Response(JSON.stringify({ skip: "invalid_phone" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -175,7 +258,6 @@ Deno.serve(async (req: Request) => {
       const msg = message?.message || body?.message?.message || data?.message || {};
 
       if (isProtocolMessage(msg)) {
-        console.log("Skipping protocol message (status update, reaction, etc)");
         return new Response(JSON.stringify({ skip: "protocol_message" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -183,17 +265,15 @@ Deno.serve(async (req: Request) => {
       }
 
       if (!hasActualContent(msg, body, data)) {
-        console.log("No actual content found, skipping (probably status update or empty message)");
         return new Response(JSON.stringify({ skip: "no_content" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const messageStubType = message?.messageStubType || data?.messageStubType || body?.messageStubType;
+      const messageStubType = message?.messageStubType || data?.messageStubType;
       if (messageStubType) {
-        console.log("Skipping stub message type:", messageStubType);
-        return new Response(JSON.stringify({ skip: "stub_message", type: messageStubType }), {
+        return new Response(JSON.stringify({ skip: "stub_message" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
@@ -201,43 +281,33 @@ Deno.serve(async (req: Request) => {
 
       const instanceName = typeof instance === "string"
         ? instance
-        : instance?.instanceName || instance?.name || body.instanceName || body.sender?.instance || "";
+        : instance?.instanceName || instance?.name || body.instanceName || "";
 
-      console.log("Looking up instance:", instanceName);
-
-      const { data: instancia, error: instanciaError } = await supabase
+      const { data: instancia } = await supabase
         .from("atom_connect_instancias")
-        .select("id, unidade_id")
+        .select("id, unidade_id, api_url, api_key, instance_name")
         .eq("instance_name", instanceName)
         .maybeSingle();
 
-      if (instanciaError) {
-        console.error("DB error looking up instance:", instanciaError);
-      }
+      let targetInstancia = instancia;
 
-      if (!instancia) {
-        const { data: allInstancias } = await supabase
+      if (!targetInstancia) {
+        const { data: fallbackInstancia } = await supabase
           .from("atom_connect_instancias")
-          .select("id, instance_name, unidade_id");
-        console.log("Instance not found:", instanceName, "| Available:", JSON.stringify(allInstancias));
+          .select("id, unidade_id, api_url, api_key, instance_name")
+          .limit(1)
+          .maybeSingle();
 
-        if (allInstancias && allInstancias.length === 1) {
-          console.log("Only one instance available, using it as fallback");
-          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, allInstancias[0]);
+        if (!fallbackInstancia) {
+          return new Response(JSON.stringify({ error: "no_instance" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         }
-
-        if (allInstancias && allInstancias.length > 0) {
-          console.log("Multiple instances available, using first as fallback");
-          return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, allInstancias[0]);
-        }
-
-        return new Response(JSON.stringify({ error: "instance_not_found", instanceName }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+        targetInstancia = fallbackInstancia;
       }
 
-      return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, instancia);
+      return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, targetInstancia);
     }
 
     if (event.includes("connection") || event.includes("status")) {
@@ -246,8 +316,6 @@ Deno.serve(async (req: Request) => {
         ? instance
         : instance?.instanceName || instance?.name || body.instanceName || "";
       const isConnected = state === "open" || state === "connected";
-
-      console.log("Connection update:", instanceName, state, isConnected);
 
       if (instanceName) {
         await supabase
@@ -267,34 +335,29 @@ Deno.serve(async (req: Request) => {
         : instance?.instanceName || instance?.name || body.instanceName || "";
 
       if (base64 && instanceName) {
-        console.log("Updating QR code for:", instanceName);
         await supabase
           .from("atom_connect_instancias")
-          .update({
-            qr_code: base64,
-            status: "connecting",
-          })
+          .update({ qr_code: base64, status: "connecting" })
           .eq("instance_name", instanceName);
       }
     }
 
     if (event.includes("presence") || event.includes("composing") || event.includes("recording") || event.includes("paused")) {
       console.log("Processing presence event:", event);
-      const remoteJid = data.remoteJid || data.id || body.remoteJid || "";
+      const remoteJid = data.remoteJid || data.id || body.remoteJid || body.participant || "";
       const presenceState = data.presence || data.state || body.presence || event.split(".").pop() || "";
 
       if (remoteJid && !remoteJid.endsWith("@g.us")) {
         const phoneNumber = cleanPhoneNumber(remoteJid);
-        console.log("Presence update for:", phoneNumber, "| State:", presenceState);
 
         const { data: conversa } = await supabase
           .from("atom_connect_conversas")
-          .select("id, unidade_id")
+          .select("id")
           .eq("cliente_telefone", phoneNumber)
           .maybeSingle();
 
         if (conversa) {
-          let typingStatus = null;
+          let typingStatus: string | null = null;
           if (presenceState === "composing" || event.includes("composing")) {
             typingStatus = "typing";
           } else if (presenceState === "recording" || event.includes("recording")) {
@@ -335,19 +398,31 @@ async function processMessage(
   phoneNumber: string,
   fromMe: boolean,
   messageId: string,
-  instancia: { id: string; unidade_id: string }
+  instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string }
 ) {
   console.log("=== PROCESSING MESSAGE ===");
-  console.log("Phone:", phoneNumber, "| FromMe:", fromMe);
-  console.log("Instancia:", JSON.stringify(instancia));
+
+  const { data: existingMsg } = await supabase
+    .from("atom_connect_mensagens")
+    .select("id")
+    .eq("message_id", messageId)
+    .maybeSingle();
+
+  if (existingMsg) {
+    console.log("Message already exists in DB:", messageId);
+    return new Response(JSON.stringify({ success: true, duplicate: true }), {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+    });
+  }
 
   const msg = message?.message || body?.message?.message || data?.message || {};
 
   let tipo = "text";
   let conteudo = "";
   let caption = null;
-  let mediaUrl = null;
-  let mediaMimetype = null;
+  let mediaMimetype: string | null = null;
+  let hasMedia = false;
 
   if (msg.conversation) {
     conteudo = msg.conversation;
@@ -356,31 +431,31 @@ async function processMessage(
   } else if (msg.imageMessage) {
     tipo = "image";
     caption = msg.imageMessage.caption;
-    mediaMimetype = msg.imageMessage.mimetype;
-    mediaUrl = msg.imageMessage.url;
+    mediaMimetype = msg.imageMessage.mimetype || "image/jpeg";
     conteudo = caption || "[Imagem]";
+    hasMedia = true;
   } else if (msg.audioMessage) {
     tipo = "audio";
-    mediaMimetype = msg.audioMessage.mimetype;
-    mediaUrl = msg.audioMessage.url;
+    mediaMimetype = msg.audioMessage.mimetype || "audio/ogg; codecs=opus";
     conteudo = msg.audioMessage.ptt ? "[Audio]" : "[Audio]";
+    hasMedia = true;
   } else if (msg.videoMessage) {
     tipo = "video";
     caption = msg.videoMessage.caption;
-    mediaMimetype = msg.videoMessage.mimetype;
-    mediaUrl = msg.videoMessage.url;
+    mediaMimetype = msg.videoMessage.mimetype || "video/mp4";
     conteudo = caption || "[Video]";
+    hasMedia = true;
   } else if (msg.documentMessage) {
     tipo = "document";
     caption = msg.documentMessage.fileName;
-    mediaMimetype = msg.documentMessage.mimetype;
-    mediaUrl = msg.documentMessage.url;
+    mediaMimetype = msg.documentMessage.mimetype || "application/octet-stream";
     conteudo = caption || "[Documento]";
+    hasMedia = true;
   } else if (msg.stickerMessage) {
     tipo = "sticker";
-    mediaMimetype = msg.stickerMessage.mimetype;
-    mediaUrl = msg.stickerMessage.url;
+    mediaMimetype = msg.stickerMessage.mimetype || "image/webp";
     conteudo = "[Sticker]";
+    hasMedia = true;
   } else if (msg.locationMessage) {
     tipo = "location";
     conteudo = `${msg.locationMessage.degreesLatitude},${msg.locationMessage.degreesLongitude}`;
@@ -398,67 +473,24 @@ async function processMessage(
   }
 
   if (!conteudo || conteudo.trim() === "") {
-    console.log("Empty content after extraction, skipping message");
     return new Response(JSON.stringify({ skip: "empty_content" }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
     });
   }
 
-  console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100));
+  console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100), "| HasMedia:", hasMedia);
 
-  const { data: existingMsgEarly } = await supabase
-    .from("atom_connect_mensagens")
-    .select("id")
-    .eq("message_id", messageId)
-    .maybeSingle();
-
-  if (existingMsgEarly) {
-    console.log("Message already exists by ID:", messageId);
-    return new Response(JSON.stringify({ success: true, duplicate: true }), {
-      status: 200,
-      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-    });
-  }
-
-  let { data: conversa, error: conversaError } = await supabase
+  let { data: conversa } = await supabase
     .from("atom_connect_conversas")
     .select("id, coluna_pipeline, mensagens_nao_lidas")
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
 
-  if (conversaError) {
-    console.error("Error fetching conversation:", conversaError);
-  }
-
-  console.log("Existing conversation:", conversa ? conversa.id : "none");
-
-  if (conversa && fromMe) {
-    const oneMinuteAgo = new Date(Date.now() - 60000).toISOString();
-    const { data: recentSentMsg } = await supabase
-      .from("atom_connect_mensagens")
-      .select("id")
-      .eq("conversa_id", conversa.id)
-      .eq("from_me", true)
-      .eq("conteudo", conteudo)
-      .gte("created_at", oneMinuteAgo)
-      .limit(1)
-      .maybeSingle();
-
-    if (recentSentMsg) {
-      console.log("Skipping duplicate sent message (same content within 1 min)");
-      return new Response(JSON.stringify({ success: true, duplicate: true, conversa_id: conversa.id }), {
-        status: 200,
-        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-      });
-    }
-  }
-
   if (!conversa) {
     if (fromMe) {
-      console.log("No existing conversation and fromMe=true, skipping");
-      return new Response(JSON.stringify({ success: true, skip: "no_conversation_for_sent" }), {
+      return new Response(JSON.stringify({ skip: "no_conversation_for_sent" }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       });
@@ -471,11 +503,7 @@ async function processMessage(
       .limit(1)
       .maybeSingle();
 
-    const pipelineColumnId = firstColumn?.id || "bot_triagem";
-    console.log("First column:", pipelineColumnId);
-
     const pushName = message?.pushName || data?.pushName || body?.pushName || body?.senderName || phoneNumber;
-    console.log("Creating new conversation for:", phoneNumber, "| Name:", pushName);
 
     const { data: newConversa, error: insertError } = await supabase
       .from("atom_connect_conversas")
@@ -484,7 +512,7 @@ async function processMessage(
         instancia_id: instancia.id,
         cliente_telefone: phoneNumber,
         cliente_nome: pushName,
-        coluna_pipeline: pipelineColumnId,
+        coluna_pipeline: firstColumn?.id || "bot_triagem",
         is_bot_ativo: true,
         ultima_mensagem: conteudo,
         ultima_mensagem_at: new Date().toISOString(),
@@ -498,17 +526,18 @@ async function processMessage(
 
     if (insertError) {
       console.error("Error creating conversation:", insertError);
-      return new Response(JSON.stringify({ error: "create_conversation_failed", details: insertError }), {
+      return new Response(JSON.stringify({ error: "create_conversation_failed" }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       });
     }
-    console.log("Conversation created:", newConversa.id);
     conversa = newConversa;
   } else {
     const updateData: Record<string, any> = {
       ultima_mensagem: conteudo,
       ultima_mensagem_at: new Date().toISOString(),
+      cliente_digitando: null,
+      cliente_digitando_at: null,
     };
 
     if (!fromMe) {
@@ -516,17 +545,18 @@ async function processMessage(
       updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
     }
 
-    const { error: updateError } = await supabase
+    await supabase
       .from("atom_connect_conversas")
       .update(updateData)
       .eq("id", conversa.id);
-
-    if (updateError) {
-      console.error("Error updating conversation:", updateError);
-    }
   }
 
-  console.log("Inserting message:", messageId, "| FromMe:", fromMe);
+  let mediaUrl: string | null = null;
+  if (hasMedia && mediaMimetype && !fromMe) {
+    console.log("Fetching media for message:", messageId);
+    mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
+  }
+
   const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
     conversa_id: conversa.id,
     message_id: messageId,
@@ -542,15 +572,13 @@ async function processMessage(
 
   if (msgError) {
     console.error("Error inserting message:", msgError);
-  } else {
-    console.log("Message inserted successfully");
   }
 
   if (!fromMe && tipo === "text" && conteudo) {
     await processRatingResponse(supabase, conversa.id, conteudo.trim(), instancia);
   }
 
-  console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${conteudo.substring(0, 50)} ===`);
+  console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${tipo} ===`);
   return new Response(JSON.stringify({ success: true, conversa_id: conversa.id }), {
     status: 200,
     headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -561,7 +589,7 @@ async function processRatingResponse(
   supabase: any,
   conversaId: string,
   messageContent: string,
-  instancia: { id: string; unidade_id: string }
+  instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string }
 ) {
   const { data: conversa } = await supabase
     .from("atom_connect_conversas")
@@ -573,19 +601,13 @@ async function processRatingResponse(
     return;
   }
 
-  console.log("=== PROCESSING RATING RESPONSE ===");
-  console.log("Conversation waiting for rating:", conversa.id);
-
   const { data: regra } = await supabase
     .from("atom_connect_regras_finalizacao")
     .select("*")
     .eq("id", conversa.regra_finalizacao_id)
     .maybeSingle();
 
-  if (!regra || !regra.opcoes) {
-    console.log("No finalization rule found");
-    return;
-  }
+  if (!regra || !regra.opcoes) return;
 
   const opcoes = regra.opcoes as Array<{
     valor: string;
@@ -600,31 +622,18 @@ async function processRatingResponse(
     (op) => op.valor.toLowerCase() === normalizedContent || op.label.toLowerCase() === normalizedContent
   );
 
-  if (!matchedOption) {
-    console.log("No matching option found for:", normalizedContent);
-    return;
-  }
+  if (!matchedOption) return;
 
-  console.log("Matched option:", matchedOption.label, "| NPS:", matchedOption.nps_score);
-
-  const { data: instanciaData } = await supabase
-    .from("atom_connect_instancias")
-    .select("api_url, api_key, instance_name")
-    .eq("unidade_id", instancia.unidade_id)
-    .eq("status", "connected")
-    .limit(1)
-    .maybeSingle();
-
-  if (instanciaData && matchedOption.resposta) {
+  if (matchedOption.resposta) {
     try {
       const phoneForSend = conversa.cliente_telefone.replace(/\D/g, "");
-      const response = await fetch(
-        `${instanciaData.api_url}/message/sendText/${instanciaData.instance_name}`,
+      await fetch(
+        `${instancia.api_url}/message/sendText/${instancia.instance_name}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            apikey: instanciaData.api_key,
+            apikey: instancia.api_key,
           },
           body: JSON.stringify({
             number: phoneForSend,
@@ -633,19 +642,14 @@ async function processRatingResponse(
         }
       );
 
-      if (response.ok) {
-        console.log("Rating response message sent successfully");
-
-        await supabase.from("atom_connect_mensagens").insert({
-          conversa_id: conversa.id,
-          from_me: true,
-          tipo: "text",
-          conteudo: matchedOption.resposta,
-          status: "sent",
-          is_bot: true,
-          metadata: { tipo: "avaliacao_response", nps_score: matchedOption.nps_score },
-        });
-      }
+      await supabase.from("atom_connect_mensagens").insert({
+        conversa_id: conversa.id,
+        from_me: true,
+        tipo: "text",
+        conteudo: matchedOption.resposta,
+        status: "sent",
+        is_bot: true,
+      });
     } catch (error) {
       console.error("Error sending rating response:", error);
     }
@@ -675,6 +679,4 @@ async function processRatingResponse(
     .from("atom_connect_conversas")
     .update(updateData)
     .eq("id", conversa.id);
-
-  console.log("Conversation rating processed:", matchedOption.label, "| Action:", matchedOption.acao);
 }
