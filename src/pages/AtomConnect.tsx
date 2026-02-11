@@ -517,24 +517,16 @@ export default function AtomConnect() {
 
         <AnimatePresence>
           {showChat && selectedConversa && (
-            <motion.div
-              initial={{ x: '100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="flex-1 border-l border-white/[0.06] min-w-0"
-              style={{ background: '#0A0A16', maxWidth: '75%' }}
-            >
-              <AtomConnectChat
-                conversa={selectedConversa}
-                onClose={() => {
-                  setShowChat(false);
-                  setSelectedConversa(null);
-                }}
-                onUpdate={loadConversas}
-                accentColor={accentColor}
-              />
-            </motion.div>
+            <AtomConnectChat
+              conversa={selectedConversa}
+              onClose={() => {
+                setShowChat(false);
+                setSelectedConversa(null);
+              }}
+              onUpdate={loadConversas}
+              accentColor={accentColor}
+              unidadeId={selectedUnidadeFilter || unidadeAtual || undefined}
+            />
           )}
         </AnimatePresence>
       </div>
