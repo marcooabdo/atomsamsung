@@ -7,9 +7,6 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const processedMessages = new Set<string>();
-const MESSAGE_CACHE_TTL = 30000;
-
 function normalizeEvent(rawEvent: string): string {
   return rawEvent
     .toLowerCase()
@@ -200,15 +197,10 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const isMessageEvent =
-      event.includes("messages.upsert") ||
-      (event.includes("message") && !event.includes("update") && !event.includes("ack")) ||
-      body.message ||
-      body.data?.message ||
-      body.data?.key;
+    const isMessageUpsert = event.includes("messages.upsert");
 
-    if (isMessageEvent) {
-      console.log("Processing as NEW MESSAGE event");
+    if (isMessageUpsert) {
+      console.log("Processing as NEW MESSAGE event (messages.upsert)");
 
       const message = body.message || data.message || data;
       const key = body.key || message?.key || data?.key || {};
@@ -222,18 +214,6 @@ Deno.serve(async (req: Request) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-
-      const cacheKey = `${messageId}`;
-      if (processedMessages.has(cacheKey)) {
-        console.log("Message already in processing cache:", cacheKey);
-        return new Response(JSON.stringify({ skip: "in_cache" }), {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-
-      processedMessages.add(cacheKey);
-      setTimeout(() => processedMessages.delete(cacheKey), MESSAGE_CACHE_TTL);
 
       if (rawRemoteJid.endsWith("@g.us") || rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@broadcast")) {
         console.log("Skipping group/lid/broadcast message");
@@ -402,14 +382,13 @@ async function processMessage(
 ) {
   console.log("=== PROCESSING MESSAGE ===");
 
-  const { data: existingMsg } = await supabase
+  const { count: existingCount } = await supabase
     .from("atom_connect_mensagens")
-    .select("id")
-    .eq("message_id", messageId)
-    .maybeSingle();
+    .select("id", { count: "exact", head: true })
+    .eq("message_id", messageId);
 
-  if (existingMsg) {
-    console.log("Message already exists in DB:", messageId);
+  if (existingCount && existingCount > 0) {
+    console.log("DUPLICATE blocked - message already in DB:", messageId);
     return new Response(JSON.stringify({ success: true, duplicate: true }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
