@@ -249,25 +249,25 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <div className="flex-shrink-0 p-4 border-b border-white/10 bg-black/20">
+      <div className="flex-shrink-0 p-5 border-b border-white/10 bg-black/20">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-4">
             <div
-              className="w-12 h-12 rounded-full flex items-center justify-center"
+              className="w-14 h-14 rounded-full flex items-center justify-center"
               style={{ backgroundColor: conversa.cliente_foto_url ? 'transparent' : `${accentColor}20` }}
             >
               {conversa.cliente_foto_url ? (
                 <img src={conversa.cliente_foto_url} alt="" className="w-full h-full rounded-full object-cover" />
               ) : (
-                <User className="w-6 h-6" style={{ color: accentColor }} />
+                <User className="w-7 h-7" style={{ color: accentColor }} />
               )}
             </div>
             <div>
-              <h3 className="font-semibold text-white">
+              <h3 className="text-base font-semibold text-white">
                 {conversa.cliente_nome || conversa.cliente_telefone}
               </h3>
-              <p className="text-xs text-gray-400 flex items-center gap-1">
-                <Phone className="w-3 h-3" />
+              <p className="text-sm text-gray-400 flex items-center gap-1.5">
+                <Phone className="w-3.5 h-3.5" />
                 {conversa.cliente_telefone}
               </p>
             </div>
@@ -356,15 +356,15 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
       <div className="flex-1 flex overflow-hidden">
         {/* Messages */}
         <div className="flex-1 flex flex-col">
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {loading ? (
               <div className="flex items-center justify-center h-full">
-                <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
+                <div className="w-10 h-10 border-2 border-white/20 border-t-white rounded-full animate-spin" />
               </div>
             ) : mensagens.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-full text-gray-500">
-                <MessageSquare className="w-12 h-12 mb-3 opacity-50" />
-                <p className="text-sm">Nenhuma mensagem ainda</p>
+                <MessageSquare className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-base">Nenhuma mensagem ainda</p>
               </div>
             ) : (
               mensagens.map((msg, index) => (
@@ -375,7 +375,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                   className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                    className={`max-w-[75%] rounded-2xl px-4 py-3 ${
                       msg.from_me
                         ? 'rounded-br-md'
                         : 'rounded-bl-md'
@@ -386,14 +386,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                     }}
                   >
                     {msg.is_bot && (
-                      <div className="flex items-center gap-1 text-xs text-purple-400 mb-1">
-                        <Bot className="w-3 h-3" />
+                      <div className="flex items-center gap-1.5 text-xs text-purple-400 mb-2">
+                        <Bot className="w-3.5 h-3.5" />
                         Bot
                       </div>
                     )}
 
                     {msg.tipo === 'text' && (
-                      <p className="text-sm text-white whitespace-pre-wrap">{msg.conteudo}</p>
+                      <p className="text-[15px] text-white whitespace-pre-wrap leading-relaxed">{msg.conteudo}</p>
                     )}
 
                     {msg.tipo === 'image' && (
@@ -446,8 +446,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                       </div>
                     )}
 
-                    <div className="flex items-center justify-end gap-1 mt-1">
-                      <span className="text-[10px] text-gray-500">
+                    <div className="flex items-center justify-end gap-1.5 mt-2">
+                      <span className="text-[11px] text-gray-500">
                         {formatTime(msg.created_at)}
                       </span>
                       {msg.from_me && getStatusIcon(msg.status)}
@@ -460,9 +460,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
           </div>
 
           {/* Input */}
-          <div className="flex-shrink-0 p-4 border-t border-white/10 bg-black/20">
+          <div className="flex-shrink-0 p-5 border-t border-white/10 bg-black/20">
             <div className="flex items-center gap-3">
-              <button className="p-2 rounded-lg hover:bg-white/10 transition-colors">
+              <button className="p-2.5 rounded-lg hover:bg-white/10 transition-colors">
                 <Paperclip className="w-5 h-5 text-gray-400" />
               </button>
               <div className="flex-1 relative">
@@ -473,7 +473,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   placeholder="Digite uma mensagem..."
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-xl text-[15px] text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                 />
               </div>
               {inputText.trim() ? (
@@ -502,11 +502,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
           {showContextPanel && (
             <motion.div
               initial={{ width: 0, opacity: 0 }}
-              animate={{ width: 240, opacity: 1 }}
+              animate={{ width: 320, opacity: 1 }}
               exit={{ width: 0, opacity: 0 }}
               className="border-l border-white/10 overflow-hidden"
             >
-              <div className="w-60 h-full overflow-y-auto p-4 space-y-4">
+              <div className="w-80 h-full overflow-y-auto p-4 space-y-4">
                 {/* Client Info */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-semibold text-gray-400 uppercase">Cliente</h4>

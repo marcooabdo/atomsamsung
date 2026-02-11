@@ -461,8 +461,8 @@ export default function AtomConnect() {
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="w-[420px] flex-shrink-0 border-l border-white/[0.06]"
-              style={{ background: '#0A0A16' }}
+              className="flex-1 border-l border-white/[0.06] min-w-0"
+              style={{ background: '#0A0A16', maxWidth: '75%' }}
             >
               <AtomConnectChat
                 conversa={selectedConversa}
