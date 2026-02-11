@@ -24,8 +24,7 @@ import {
   Palette,
   Sparkles,
   ShoppingCart,
-  Users,
-  Calculator
+  Users
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -36,7 +35,6 @@ const allMenuItems = [
   { id: 'gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
   { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
-  { id: 'cotacoes', label: 'Cotacoes', icon: Calculator, path: '/cotacoes' },
   { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },

@@ -6,7 +6,6 @@ import { Layout } from './components/Layout';
 import { MobileLayout } from './components/MobileLayout';
 import { Dashboard } from './pages/Dashboard';
 import { Kanban } from './pages/Kanban';
-import { Cotacoes } from './pages/Cotacoes';
 import { Estoque } from './pages/Estoque';
 import { Chat } from './pages/Chat';
 import { Financeiro } from './pages/Financeiro';
@@ -144,17 +143,6 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <Kanban />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/cotacoes"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <Cotacoes />
               </Layout>
             </ProtectedRoute>
           }
