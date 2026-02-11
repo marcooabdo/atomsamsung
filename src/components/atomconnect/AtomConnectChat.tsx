@@ -3,7 +3,8 @@ import {
   X, Send, Paperclip, Mic, Image as ImageIcon, Smile, Phone, Video,
   MoreVertical, User, Link2, FileText, Play, Pause, Download, Check,
   CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare,
-  MapPin, Calendar, Navigation, AlertTriangle, ExternalLink
+  MapPin, Calendar, Navigation, AlertTriangle, ExternalLink, Edit2,
+  Trash2, Copy, Reply, RotateCcw, Upload, File, ImageIcon as ImageLucide
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -48,6 +49,7 @@ interface Mensagem {
   enviado_por: string | null;
   is_bot: boolean;
   created_at: string;
+  edited_at?: string | null;
 }
 
 interface Props {
@@ -63,6 +65,15 @@ interface PipelineColuna {
   cor: string;
 }
 
+const EMOJI_LIST = [
+  '😀', '😃', '😄', '😁', '😅', '😂', '🤣', '😊', '😇', '🙂', '🙃', '😉', '😌', '😍', '🥰', '😘',
+  '😗', '😙', '😚', '😋', '😛', '😜', '🤪', '😝', '🤑', '🤗', '🤭', '🤫', '🤔', '🤐', '🤨', '😐',
+  '😑', '😶', '😏', '😒', '🙄', '😬', '🤥', '😌', '😔', '😪', '🤤', '😴', '😷', '🤒', '🤕', '🤢',
+  '👍', '👎', '👌', '✌️', '🤞', '🤟', '🤘', '🤙', '👋', '🖐️', '✋', '👊', '✊', '🤛', '🤜', '🙏',
+  '❤️', '🧡', '💛', '💚', '💙', '💜', '🖤', '🤍', '🤎', '💔', '❣️', '💕', '💞', '💓', '💗', '💖',
+  '✅', '❌', '⚠️', '🔴', '🟢', '🔵', '⭐', '🌟', '💯', '🎉', '🎊', '🔥', '💪', '🙌', '👏', '🤝'
+];
+
 export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Props) {
   const { usuario, unidadeAtual } = useAuth();
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
@@ -75,8 +86,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
   const [showContextPanel, setShowContextPanel] = useState(true);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<Mensagem | null>(null);
+  const [editText, setEditText] = useState('');
+  const [selectedMessage, setSelectedMessage] = useState<string | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [attachments, setAttachments] = useState<File[]>([]);
+  const [showAttachmentPreview, setShowAttachmentPreview] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<{ url: string; type: string; name?: string } | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const loadMensagens = useCallback(async () => {
     const { data, error } = await supabase
@@ -107,15 +127,23 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
       .on(
         'postgres_changes',
         {
-          event: 'INSERT',
+          event: '*',
           schema: 'public',
           table: 'atom_connect_mensagens',
           filter: `conversa_id=eq.${conversa.id}`
         },
         (payload) => {
-          const newMsg = payload.new as Mensagem;
-          setMensagens(prev => [...prev, newMsg]);
-          scrollToBottom();
+          if (payload.eventType === 'INSERT') {
+            const newMsg = payload.new as Mensagem;
+            setMensagens(prev => [...prev, newMsg]);
+            scrollToBottom();
+          } else if (payload.eventType === 'UPDATE') {
+            const updatedMsg = payload.new as Mensagem;
+            setMensagens(prev => prev.map(m => m.id === updatedMsg.id ? updatedMsg : m));
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = payload.old.id;
+            setMensagens(prev => prev.filter(m => m.id !== deletedId));
+          }
         }
       )
       .subscribe();
@@ -142,11 +170,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
   };
 
   const loadAtendentes = async () => {
-    if (!unidadeAtual) return;
+    const unidadeId = conversa.unidade_id || unidadeAtual;
+    if (!unidadeId) return;
     const { data } = await supabase
       .from('usuarios')
-      .select('id, nome, foto_url')
-      .eq('unidade_id', unidadeAtual)
+      .select('id, nome, foto_url, cargo')
+      .eq('unidade_id', unidadeId)
       .eq('ativo', true);
     if (data) setAtendentes(data);
   };
@@ -172,34 +201,99 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
   };
 
   const sendMessage = async () => {
-    if (!inputText.trim() || sending) return;
+    if ((!inputText.trim() && attachments.length === 0) || sending) return;
 
     setSending(true);
     const messageContent = inputText.trim();
     setInputText('');
 
     try {
-      const { error } = await supabase
-        .from('atom_connect_mensagens')
-        .insert({
-          conversa_id: conversa.id,
-          from_me: true,
-          tipo: 'text',
-          conteudo: messageContent,
-          status: 'sent',
-          enviado_por: usuario?.id,
-          is_bot: false
-        });
+      if (attachments.length > 0) {
+        for (const file of attachments) {
+          const fileExt = file.name.split('.').pop();
+          const fileName = `${conversa.id}/${Date.now()}.${fileExt}`;
 
-      if (error) throw error;
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('atom-connect')
+            .upload(fileName, file);
 
-      // TODO: Send via Evolution API
+          if (uploadError) throw uploadError;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('atom-connect')
+            .getPublicUrl(fileName);
+
+          let tipo = 'document';
+          if (file.type.startsWith('image/')) tipo = 'image';
+          else if (file.type.startsWith('audio/')) tipo = 'audio';
+          else if (file.type.startsWith('video/')) tipo = 'video';
+
+          await supabase
+            .from('atom_connect_mensagens')
+            .insert({
+              conversa_id: conversa.id,
+              from_me: true,
+              tipo,
+              conteudo: publicUrl,
+              media_url: publicUrl,
+              media_mimetype: file.type,
+              caption: file.name,
+              status: 'sent',
+              enviado_por: usuario?.id,
+              is_bot: false
+            });
+        }
+        setAttachments([]);
+        setShowAttachmentPreview(false);
+      }
+
+      if (messageContent) {
+        const { error } = await supabase
+          .from('atom_connect_mensagens')
+          .insert({
+            conversa_id: conversa.id,
+            from_me: true,
+            tipo: 'text',
+            conteudo: messageContent,
+            status: 'sent',
+            enviado_por: usuario?.id,
+            is_bot: false
+          });
+
+        if (error) throw error;
+      }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
     } finally {
       setSending(false);
       inputRef.current?.focus();
     }
+  };
+
+  const editMessage = async (msgId: string, newContent: string) => {
+    if (!newContent.trim()) return;
+
+    await supabase
+      .from('atom_connect_mensagens')
+      .update({
+        conteudo: newContent.trim(),
+        edited_at: new Date().toISOString()
+      })
+      .eq('id', msgId);
+
+    setEditingMessage(null);
+    setEditText('');
+  };
+
+  const deleteMessage = async (msgId: string) => {
+    if (!confirm('Deseja realmente apagar esta mensagem?')) return;
+
+    await supabase
+      .from('atom_connect_mensagens')
+      .delete()
+      .eq('id', msgId);
+
+    setSelectedMessage(null);
   };
 
   const changeColumn = async (colunaId: string) => {
@@ -230,15 +324,85 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
     onUpdate();
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) {
+      setAttachments(prev => [...prev, ...files]);
+      setShowAttachmentPreview(true);
+    }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setAttachments(prev => [...prev, ...files]);
+      setShowAttachmentPreview(true);
+    }
+  };
+
+  const removeAttachment = (index: number) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+    if (attachments.length <= 1) {
+      setShowAttachmentPreview(false);
+    }
+  };
+
+  const addEmoji = (emoji: string) => {
+    setInputText(prev => prev + emoji);
+    setShowEmojiPicker(false);
+    inputRef.current?.focus();
+  };
+
+  const downloadMedia = (url: string, filename: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const currentColuna = colunas.find(c => c.id === conversa.coluna_pipeline);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'pending': return <Clock className="w-3 h-3 text-gray-500" />;
-      case 'sent': return <Check className="w-3 h-3 text-gray-500" />;
-      case 'delivered': return <CheckCheck className="w-3 h-3 text-gray-500" />;
-      case 'read': return <CheckCheck className="w-3 h-3 text-blue-500" />;
-      default: return null;
+      case 'pending':
+        return <Clock className="w-3.5 h-3.5 text-gray-500" />;
+      case 'sent':
+        return <Check className="w-3.5 h-3.5 text-gray-500" />;
+      case 'delivered':
+        return <CheckCheck className="w-3.5 h-3.5 text-gray-500" />;
+      case 'read':
+        return <CheckCheck className="w-3.5 h-3.5 text-blue-500" />;
+      case 'failed':
+        return <AlertTriangle className="w-3.5 h-3.5 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending': return 'Enviando...';
+      case 'sent': return 'Enviada';
+      case 'delivered': return 'Entregue';
+      case 'read': return 'Visualizada';
+      case 'failed': return 'Falhou';
+      default: return '';
     }
   };
 
@@ -246,14 +410,52 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
     return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatLastSeen = (dateStr: string | null) => {
+    if (!dateStr) return 'Nunca';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
+
+    if (minutes < 1) return 'Agora';
+    if (minutes < 60) return `${minutes}min atras`;
+    if (hours < 24) return `${hours}h atras`;
+    if (days < 7) return `${days}d atras`;
+    return date.toLocaleDateString('pt-BR');
+  };
+
+  const getFileIcon = (mimetype: string) => {
+    if (mimetype?.startsWith('image/')) return <ImageLucide className="w-6 h-6" />;
+    if (mimetype?.startsWith('video/')) return <Video className="w-6 h-6" />;
+    if (mimetype?.startsWith('audio/')) return <Mic className="w-6 h-6" />;
+    return <File className="w-6 h-6" />;
+  };
+
   return (
-    <div className="h-full flex flex-col">
+    <div
+      className="h-full flex flex-col relative"
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
+      {isDragging && (
+        <div className="absolute inset-0 bg-black/80 z-50 flex items-center justify-center border-2 border-dashed rounded-xl" style={{ borderColor: accentColor }}>
+          <div className="text-center">
+            <Upload className="w-16 h-16 mx-auto mb-4" style={{ color: accentColor }} />
+            <p className="text-xl font-semibold text-white">Solte os arquivos aqui</p>
+            <p className="text-sm text-gray-400 mt-2">Imagens, documentos, audios e videos</p>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex-shrink-0 p-5 border-b border-white/10 bg-black/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div
-              className="w-14 h-14 rounded-full flex items-center justify-center"
+              className="w-14 h-14 rounded-full flex items-center justify-center relative"
               style={{ backgroundColor: conversa.cliente_foto_url ? 'transparent' : `${accentColor}20` }}
             >
               {conversa.cliente_foto_url ? (
@@ -261,6 +463,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
               ) : (
                 <User className="w-7 h-7" style={{ color: accentColor }} />
               )}
+              <span className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-[#0A0A16] rounded-full" />
             </div>
             <div>
               <h3 className="text-base font-semibold text-white">
@@ -269,6 +472,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
               <p className="text-sm text-gray-400 flex items-center gap-1.5">
                 <Phone className="w-3.5 h-3.5" />
                 {conversa.cliente_telefone}
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Visto por ultimo: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
               </p>
             </div>
           </div>
@@ -367,90 +573,197 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                 <p className="text-base">Nenhuma mensagem ainda</p>
               </div>
             ) : (
-              mensagens.map((msg, index) => (
+              mensagens.map((msg) => (
                 <motion.div
                   key={msg.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'}`}
+                  className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'} group`}
                 >
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-3 ${
-                      msg.from_me
-                        ? 'rounded-br-md'
-                        : 'rounded-bl-md'
-                    }`}
-                    style={{
-                      backgroundColor: msg.from_me ? `${accentColor}30` : 'rgba(255,255,255,0.1)',
-                      border: msg.from_me ? `1px solid ${accentColor}40` : '1px solid rgba(255,255,255,0.1)'
-                    }}
-                  >
-                    {msg.is_bot && (
-                      <div className="flex items-center gap-1.5 text-xs text-purple-400 mb-2">
-                        <Bot className="w-3.5 h-3.5" />
-                        Bot
+                  <div className="relative">
+                    {/* Message Actions */}
+                    {msg.from_me && (
+                      <div className={`absolute -left-24 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity`}>
+                        {msg.tipo === 'text' && (
+                          <button
+                            onClick={() => {
+                              setEditingMessage(msg);
+                              setEditText(msg.conteudo || '');
+                            }}
+                            className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+                            title="Editar"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-gray-400" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => deleteMessage(msg.id)}
+                          className="p-1.5 rounded-lg bg-white/10 hover:bg-red-500/20 transition-colors"
+                          title="Apagar"
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-gray-400 hover:text-red-400" />
+                        </button>
                       </div>
                     )}
 
-                    {msg.tipo === 'text' && (
-                      <p className="text-[15px] text-white whitespace-pre-wrap leading-relaxed">{msg.conteudo}</p>
-                    )}
+                    <div
+                      className={`max-w-[75%] min-w-[120px] rounded-2xl px-4 py-3 ${
+                        msg.from_me
+                          ? 'rounded-br-md'
+                          : 'rounded-bl-md'
+                      }`}
+                      style={{
+                        backgroundColor: msg.from_me ? `${accentColor}30` : 'rgba(255,255,255,0.1)',
+                        border: msg.from_me ? `1px solid ${accentColor}40` : '1px solid rgba(255,255,255,0.1)'
+                      }}
+                    >
+                      {msg.is_bot && (
+                        <div className="flex items-center gap-1.5 text-xs text-purple-400 mb-2">
+                          <Bot className="w-3.5 h-3.5" />
+                          Bot
+                        </div>
+                      )}
 
-                    {msg.tipo === 'image' && (
-                      <div className="space-y-2">
-                        <img
-                          src={msg.media_url || msg.conteudo || ''}
-                          alt=""
-                          className="max-w-full rounded-lg"
-                        />
-                        {msg.caption && (
-                          <p className="text-sm text-white">{msg.caption}</p>
+                      {editingMessage?.id === msg.id ? (
+                        <div className="space-y-2">
+                          <input
+                            type="text"
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            className="w-full px-3 py-2 bg-black/30 border border-white/20 rounded-lg text-sm text-white focus:outline-none"
+                            autoFocus
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => editMessage(msg.id, editText)}
+                              className="px-3 py-1 rounded-lg text-xs font-medium"
+                              style={{ backgroundColor: accentColor, color: 'black' }}
+                            >
+                              Salvar
+                            </button>
+                            <button
+                              onClick={() => {
+                                setEditingMessage(null);
+                                setEditText('');
+                              }}
+                              className="px-3 py-1 rounded-lg text-xs bg-white/10 text-gray-400"
+                            >
+                              Cancelar
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          {msg.tipo === 'text' && (
+                            <p className="text-[15px] text-white whitespace-pre-wrap leading-relaxed">{msg.conteudo}</p>
+                          )}
+
+                          {msg.tipo === 'image' && (
+                            <div className="space-y-2">
+                              <div className="relative group/img">
+                                <img
+                                  src={msg.media_url || msg.conteudo || ''}
+                                  alt=""
+                                  className="max-w-full max-h-80 rounded-lg cursor-pointer"
+                                  onClick={() => setPreviewMedia({ url: msg.media_url || msg.conteudo || '', type: 'image' })}
+                                />
+                                <button
+                                  onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'image.jpg')}
+                                  className="absolute top-2 right-2 p-2 rounded-lg bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                >
+                                  <Download className="w-4 h-4 text-white" />
+                                </button>
+                              </div>
+                              {msg.caption && (
+                                <p className="text-sm text-white">{msg.caption}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {msg.tipo === 'audio' && (
+                            <div className="flex items-center gap-3 min-w-[200px]">
+                              <button className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 transition-colors">
+                                <Play className="w-5 h-5 text-white" />
+                              </button>
+                              <div className="flex-1 h-1.5 bg-white/20 rounded-full">
+                                <div className="h-full w-0 bg-white rounded-full" />
+                              </div>
+                              <span className="text-xs text-gray-400">0:00</span>
+                              <button
+                                onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'audio.mp3')}
+                                className="p-1.5 hover:bg-white/10 rounded-lg transition-colors"
+                              >
+                                <Download className="w-4 h-4 text-gray-400" />
+                              </button>
+                            </div>
+                          )}
+
+                          {msg.tipo === 'document' && (
+                            <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg min-w-[240px]">
+                              <div className="w-12 h-12 rounded-lg bg-white/10 flex items-center justify-center text-gray-400">
+                                {getFileIcon(msg.media_mimetype || '')}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-white truncate font-medium">{msg.caption || 'Documento'}</p>
+                                <p className="text-xs text-gray-500">{msg.media_mimetype}</p>
+                              </div>
+                              <button
+                                onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'documento')}
+                                className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                              >
+                                <Download className="w-5 h-5 text-gray-400" />
+                              </button>
+                            </div>
+                          )}
+
+                          {msg.tipo === 'video' && (
+                            <div className="space-y-2">
+                              <div className="relative group/vid">
+                                <video
+                                  src={msg.media_url || ''}
+                                  className="max-w-full max-h-80 rounded-lg"
+                                  controls
+                                />
+                                <button
+                                  onClick={() => downloadMedia(msg.media_url || '', msg.caption || 'video.mp4')}
+                                  className="absolute top-2 right-2 p-2 rounded-lg bg-black/50 opacity-0 group-hover/vid:opacity-100 transition-opacity"
+                                >
+                                  <Download className="w-4 h-4 text-white" />
+                                </button>
+                              </div>
+                              {msg.caption && (
+                                <p className="text-sm text-white">{msg.caption}</p>
+                              )}
+                            </div>
+                          )}
+
+                          {msg.tipo === 'location' && (
+                            <div className="space-y-2">
+                              <div className="w-full h-32 bg-white/5 rounded-lg flex items-center justify-center">
+                                <MapPin className="w-8 h-8 text-gray-400" />
+                              </div>
+                              <button className="flex items-center gap-2 text-xs text-blue-400 hover:underline">
+                                <ExternalLink className="w-3 h-3" />
+                                Abrir no Maps
+                              </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+
+                      <div className="flex items-center justify-end gap-2 mt-2">
+                        {msg.edited_at && (
+                          <span className="text-[10px] text-gray-500 italic">editada</span>
+                        )}
+                        <span className="text-[11px] text-gray-500">
+                          {formatTime(msg.created_at)}
+                        </span>
+                        {msg.from_me && (
+                          <div className="flex items-center gap-0.5" title={getStatusText(msg.status)}>
+                            {getStatusIcon(msg.status)}
+                          </div>
                         )}
                       </div>
-                    )}
-
-                    {msg.tipo === 'audio' && (
-                      <div className="flex items-center gap-3 min-w-[200px]">
-                        <button className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                          <Play className="w-4 h-4 text-white" />
-                        </button>
-                        <div className="flex-1 h-1 bg-white/20 rounded-full">
-                          <div className="h-full w-0 bg-white rounded-full" />
-                        </div>
-                        <span className="text-xs text-gray-400">0:00</span>
-                      </div>
-                    )}
-
-                    {msg.tipo === 'document' && (
-                      <div className="flex items-center gap-3 p-2 bg-white/5 rounded-lg">
-                        <FileText className="w-8 h-8 text-gray-400" />
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm text-white truncate">{msg.caption || 'Documento'}</p>
-                          <p className="text-xs text-gray-500">{msg.media_mimetype}</p>
-                        </div>
-                        <button className="p-2 hover:bg-white/10 rounded-lg transition-colors">
-                          <Download className="w-4 h-4 text-gray-400" />
-                        </button>
-                      </div>
-                    )}
-
-                    {msg.tipo === 'location' && (
-                      <div className="space-y-2">
-                        <div className="w-full h-32 bg-white/5 rounded-lg flex items-center justify-center">
-                          <MapPin className="w-8 h-8 text-gray-400" />
-                        </div>
-                        <button className="flex items-center gap-2 text-xs text-blue-400 hover:underline">
-                          <ExternalLink className="w-3 h-3" />
-                          Abrir no Maps
-                        </button>
-                      </div>
-                    )}
-
-                    <div className="flex items-center justify-end gap-1.5 mt-2">
-                      <span className="text-[11px] text-gray-500">
-                        {formatTime(msg.created_at)}
-                      </span>
-                      {msg.from_me && getStatusIcon(msg.status)}
                     </div>
                   </div>
                 </motion.div>
@@ -459,12 +772,92 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
             <div ref={messagesEndRef} />
           </div>
 
+          {/* Attachment Preview */}
+          <AnimatePresence>
+            {showAttachmentPreview && attachments.length > 0 && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="border-t border-white/10 bg-black/40 p-4"
+              >
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                  {attachments.map((file, index) => (
+                    <div key={index} className="relative flex-shrink-0">
+                      {file.type.startsWith('image/') ? (
+                        <img
+                          src={URL.createObjectURL(file)}
+                          alt={file.name}
+                          className="w-20 h-20 object-cover rounded-lg"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-white/10 rounded-lg flex flex-col items-center justify-center p-2">
+                          {getFileIcon(file.type)}
+                          <span className="text-[10px] text-gray-400 mt-1 truncate w-full text-center">{file.name}</span>
+                        </div>
+                      )}
+                      <button
+                        onClick={() => removeAttachment(index)}
+                        className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center"
+                      >
+                        <X className="w-3 h-3 text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* Input */}
           <div className="flex-shrink-0 p-5 border-t border-white/10 bg-black/20">
             <div className="flex items-center gap-3">
-              <button className="p-2.5 rounded-lg hover:bg-white/10 transition-colors">
+              <input
+                type="file"
+                ref={fileInputRef}
+                onChange={handleFileSelect}
+                multiple
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-lg hover:bg-white/10 transition-colors"
+              >
                 <Paperclip className="w-5 h-5 text-gray-400" />
               </button>
+
+              <div className="relative">
+                <button
+                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                  className="p-2.5 rounded-lg hover:bg-white/10 transition-colors"
+                >
+                  <Smile className="w-5 h-5 text-gray-400" />
+                </button>
+
+                <AnimatePresence>
+                  {showEmojiPicker && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: 10 }}
+                      className="absolute bottom-full left-0 mb-2 w-80 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl p-3 z-50"
+                    >
+                      <div className="grid grid-cols-8 gap-1 max-h-48 overflow-y-auto">
+                        {EMOJI_LIST.map((emoji, i) => (
+                          <button
+                            key={i}
+                            onClick={() => addEmoji(emoji)}
+                            className="w-8 h-8 flex items-center justify-center text-xl hover:bg-white/10 rounded-lg transition-colors"
+                          >
+                            {emoji}
+                          </button>
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
               <div className="flex-1 relative">
                 <input
                   ref={inputRef}
@@ -476,7 +869,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                   className="w-full px-5 py-3.5 bg-white/5 border border-white/10 rounded-xl text-[15px] text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                 />
               </div>
-              {inputText.trim() ? (
+              {inputText.trim() || attachments.length > 0 ? (
                 <button
                   onClick={sendMessage}
                   disabled={sending}
@@ -525,6 +918,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
                       {conversa.cliente_nome || 'Nome nao informado'}
                     </p>
                     <p className="text-xs text-gray-400">{conversa.cliente_telefone}</p>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Ultima resposta: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
+                    </p>
                   </div>
                 </div>
 
@@ -655,37 +1051,83 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor }: Pr
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-6 w-80 max-h-96 overflow-y-auto"
+              className="bg-[#1A1A2E] rounded-xl p-6 w-96 max-h-[80vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-lg font-semibold text-white mb-4">Transferir Atendimento</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Transferir Atendimento</h3>
+              <p className="text-sm text-gray-400 mb-4">Selecione um atendente da unidade para transferir</p>
+
               <div className="space-y-2">
-                {atendentes
-                  .filter(a => a.id !== usuario?.id)
-                  .map(atendente => (
-                    <button
-                      key={atendente.id}
-                      onClick={() => transferConversa(atendente.id)}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                    >
-                      <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
-                        {atendente.foto_url ? (
-                          <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <User className="w-5 h-5 text-gray-400" />
-                        )}
-                      </div>
-                      <span className="text-sm text-white">{atendente.nome}</span>
-                    </button>
-                  ))}
+                {atendentes.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-4">Nenhum atendente disponivel</p>
+                ) : (
+                  atendentes
+                    .filter(a => a.id !== usuario?.id)
+                    .map(atendente => (
+                      <button
+                        key={atendente.id}
+                        onClick={() => transferConversa(atendente.id)}
+                        className="w-full flex items-center gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                      >
+                        <div className="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center overflow-hidden">
+                          {atendente.foto_url ? (
+                            <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <User className="w-6 h-6 text-gray-400" />
+                          )}
+                        </div>
+                        <div className="flex-1 text-left">
+                          <p className="text-sm font-medium text-white">{atendente.nome}</p>
+                          {atendente.cargo && (
+                            <p className="text-xs text-gray-500">{atendente.cargo}</p>
+                          )}
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-gray-500" />
+                      </button>
+                    ))
+                )}
               </div>
               <button
                 onClick={() => setShowTransferModal(false)}
-                className="w-full mt-4 px-4 py-2 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                className="w-full mt-4 px-4 py-2.5 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
               >
                 Cancelar
               </button>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Media Preview Modal */}
+      <AnimatePresence>
+        {previewMedia && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/90 flex items-center justify-center z-[100]"
+            onClick={() => setPreviewMedia(null)}
+          >
+            <button
+              onClick={() => setPreviewMedia(null)}
+              className="absolute top-4 right-4 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              <X className="w-6 h-6 text-white" />
+            </button>
+            <button
+              onClick={() => downloadMedia(previewMedia.url, previewMedia.name || 'download')}
+              className="absolute top-4 right-16 p-2 rounded-lg bg-white/10 hover:bg-white/20 transition-colors"
+            >
+              <Download className="w-6 h-6 text-white" />
+            </button>
+            {previewMedia.type === 'image' && (
+              <img
+                src={previewMedia.url}
+                alt=""
+                className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </motion.div>
         )}
       </AnimatePresence>
