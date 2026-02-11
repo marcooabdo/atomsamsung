@@ -42,6 +42,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [vendedorSearch, setVendedorSearch] = useState('');
   const [showAprovarModal, setShowAprovarModal] = useState(false);
   const [showReprovarSuccessModal, setShowReprovarSuccessModal] = useState(false);
+  const [showConfirmAprovarModal, setShowConfirmAprovarModal] = useState(false);
 
   const podeEditarVendedor = () => {
     if (!os.vendedor_responsavel_id) return true;
@@ -384,9 +385,12 @@ Assistencia Tecnica Samsung`;
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showVendedorDropdown]);
 
-  const handleAprovarOrcamento = async () => {
-    if (!confirm('Confirma a APROVACAO do orcamento? A OS sera movida para "Orcamento Aprovado".')) return;
+  const handleAprovarOrcamento = () => {
+    setShowConfirmAprovarModal(true);
+  };
 
+  const confirmarAprovacao = async () => {
+    setShowConfirmAprovarModal(false);
     setProcessando(true);
     try {
       const valorAtual = os.valor_total || 0;
@@ -1542,6 +1546,54 @@ Assistencia Tecnica Samsung`;
                   <p>Nenhum vendedor encontrado</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showConfirmAprovarModal && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+          <div className="premium-card w-full max-w-lg">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-[#39FF14]/20 flex items-center justify-center">
+                  <ThumbsUp className="w-6 h-6 text-[#39FF14]" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Confirmar Aprovação</h3>
+                  <p className="text-sm text-gray-400">Esta ação não pode ser desfeita</p>
+                </div>
+              </div>
+
+              <div className="bg-[#1A1A1A] rounded-lg p-4 mb-6 border border-[#39FF14]/20">
+                <p className="text-white text-sm leading-relaxed">
+                  Confirma a <span className="text-[#39FF14] font-bold">APROVAÇÃO</span> do orçamento?
+                </p>
+                <p className="text-gray-400 text-xs mt-2">
+                  A OS será movida para a coluna "Orçamento Aprovado"
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowConfirmAprovarModal(false)}
+                  disabled={processando}
+                  className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarAprovacao}
+                  disabled={processando}
+                  className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50"
+                  style={{
+                    background: 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)',
+                    color: '#000'
+                  }}
+                >
+                  {processando ? 'Aprovando...' : 'Confirmar Aprovação'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
