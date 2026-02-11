@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  X, Search, Phone, User, FileText, Link2, MessageSquare, Loader2, Building2
+  X, Search, Phone, User, FileText, Link2, MessageSquare, Loader2, Building2,
+  Minimize2, Maximize2, CheckCircle, XCircle, AlertCircle
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 
 interface OS {
   id: string;
@@ -21,11 +22,20 @@ interface Unidade {
   nome: string;
 }
 
+interface Instancia {
+  id: string;
+  api_url: string;
+  api_key: string;
+  instance_name: string;
+}
+
 interface Props {
   accentColor: string;
   onClose: () => void;
   onConversaCriada: (conversaId: string) => void;
 }
+
+type WhatsAppStatus = 'idle' | 'checking' | 'valid' | 'invalid' | 'error';
 
 export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Props) {
   const { usuario, unidadeAtual, unidades } = useAuth();
@@ -38,10 +48,15 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
   const [searchingOS, setSearchingOS] = useState(false);
   const [creating, setCreating] = useState(false);
   const [allUnidades, setAllUnidades] = useState<Unidade[]>([]);
+  const [instancia, setInstancia] = useState<Instancia | null>(null);
+  const [whatsappStatus, setWhatsappStatus] = useState<WhatsAppStatus>('idle');
+  const [whatsappError, setWhatsappError] = useState('');
   const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const whatsappCheckTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     loadUnidades();
+    loadInstancia();
   }, []);
 
   useEffect(() => {
@@ -66,9 +81,115 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     }
   };
 
+  const loadInstancia = async () => {
+    const { data } = await supabase
+      .from('atom_connect_instancias')
+      .select('id, api_url, api_key, instance_name')
+      .eq('status', 'connected')
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      setInstancia(data);
+    }
+  };
+
+  const formatPhoneNumber = (phone: string): string => {
+    let cleanPhone = phone.replace(/\D/g, '');
+
+    if (cleanPhone.startsWith('55') && cleanPhone.length >= 12) {
+      return cleanPhone;
+    }
+
+    if (cleanPhone.length === 11 || cleanPhone.length === 10) {
+      return '55' + cleanPhone;
+    }
+
+    return cleanPhone;
+  };
+
+  const checkWhatsAppNumber = useCallback(async (phone: string) => {
+    const formattedPhone = formatPhoneNumber(phone);
+
+    if (formattedPhone.length < 12) {
+      setWhatsappStatus('idle');
+      return;
+    }
+
+    if (!instancia) {
+      setWhatsappStatus('error');
+      setWhatsappError('Nenhuma instancia conectada');
+      return;
+    }
+
+    setWhatsappStatus('checking');
+    setWhatsappError('');
+
+    try {
+      const response = await fetch(`${instancia.api_url}/chat/whatsappNumbers/${instancia.instance_name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': instancia.api_key
+        },
+        body: JSON.stringify({
+          numbers: [formattedPhone]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Erro ao verificar numero');
+      }
+
+      const result = await response.json();
+      console.log('WhatsApp check result:', result);
+
+      if (result && Array.isArray(result) && result.length > 0) {
+        const numberResult = result[0];
+        if (numberResult.exists === true || numberResult.jid) {
+          setWhatsappStatus('valid');
+          if (numberResult.name) {
+            setNome(prev => prev || numberResult.name);
+          }
+        } else {
+          setWhatsappStatus('invalid');
+          setWhatsappError('Numero nao possui WhatsApp');
+        }
+      } else {
+        setWhatsappStatus('invalid');
+        setWhatsappError('Numero nao encontrado no WhatsApp');
+      }
+    } catch (error) {
+      console.error('Erro ao verificar WhatsApp:', error);
+      setWhatsappStatus('error');
+      setWhatsappError('Nao foi possivel verificar o numero');
+    }
+  }, [instancia]);
+
+  useEffect(() => {
+    if (whatsappCheckTimeout.current) {
+      clearTimeout(whatsappCheckTimeout.current);
+    }
+
+    const cleanPhone = telefone.replace(/\D/g, '');
+    if (cleanPhone.length < 10) {
+      setWhatsappStatus('idle');
+      return;
+    }
+
+    whatsappCheckTimeout.current = setTimeout(() => {
+      checkWhatsAppNumber(telefone);
+    }, 800);
+
+    return () => {
+      if (whatsappCheckTimeout.current) {
+        clearTimeout(whatsappCheckTimeout.current);
+      }
+    };
+  }, [telefone, checkWhatsAppNumber]);
+
   const searchOS = useCallback(async (term: string) => {
     if (!selectedUnidadeId) {
-      console.log('Nenhuma unidade selecionada para buscar OS');
       setOsResults([]);
       return;
     }
@@ -79,7 +200,6 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     }
 
     setSearchingOS(true);
-    console.log('Buscando OS com termo:', term, 'na unidade:', selectedUnidadeId);
 
     try {
       const { data, error } = await supabase
@@ -90,15 +210,12 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         .order('created_at', { ascending: false })
         .limit(15);
 
-      if (error) {
-        console.error('Erro ao buscar OS:', error);
-        setOsResults([]);
+      if (!error && data) {
+        setOsResults(data);
       } else {
-        console.log('OS encontradas:', data?.length || 0, data);
-        setOsResults(data || []);
+        setOsResults([]);
       }
     } catch (err) {
-      console.error('Erro inesperado na busca:', err);
       setOsResults([]);
     } finally {
       setSearchingOS(false);
@@ -135,13 +252,18 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
   };
 
   const handleCreate = async () => {
-    const cleanPhone = telefone.replace(/\D/g, '');
-    if (cleanPhone.length < 10) {
-      alert('Informe um telefone valido');
+    const formattedPhone = formatPhoneNumber(telefone);
+
+    if (formattedPhone.length < 12) {
+      alert('Informe um telefone valido com DDD');
       return;
     }
     if (!selectedUnidadeId) {
       alert('Selecione uma unidade');
+      return;
+    }
+    if (whatsappStatus === 'invalid') {
+      alert('Este numero nao possui WhatsApp cadastrado');
       return;
     }
 
@@ -151,12 +273,11 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       const { data: existing } = await supabase
         .from('atom_connect_conversas')
         .select('id')
-        .eq('cliente_telefone', cleanPhone)
+        .eq('cliente_telefone', formattedPhone)
         .eq('unidade_id', selectedUnidadeId)
         .maybeSingle();
 
       if (existing) {
-        console.log('Conversa ja existe, abrindo:', existing.id);
         onConversaCriada(existing.id);
         setCreating(false);
         return;
@@ -169,13 +290,11 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         .limit(1)
         .maybeSingle();
 
-      console.log('Primeira coluna encontrada:', firstColumn);
-
       const { data: newConversa, error } = await supabase
         .from('atom_connect_conversas')
         .insert({
           unidade_id: selectedUnidadeId,
-          cliente_telefone: cleanPhone,
+          cliente_telefone: formattedPhone,
           cliente_nome: nome || null,
           os_id: selectedOS?.id || null,
           coluna_pipeline: firstColumn?.id || 'bot_triagem',
@@ -195,15 +314,9 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         return;
       }
 
-      if (!newConversa) {
-        console.error('Nenhuma conversa retornada');
-        alert('Erro ao criar conversa');
-        setCreating(false);
-        return;
+      if (newConversa) {
+        onConversaCriada(newConversa.id);
       }
-
-      console.log('Conversa criada com sucesso:', newConversa.id);
-      onConversaCriada(newConversa.id);
     } catch (err) {
       console.error('Erro inesperado ao criar conversa:', err);
       alert('Erro inesperado ao criar conversa');
@@ -211,176 +324,273 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     }
   };
 
+  const getWhatsAppStatusIcon = () => {
+    switch (whatsappStatus) {
+      case 'checking':
+        return <Loader2 className="w-4 h-4 text-cyan-400 animate-spin" />;
+      case 'valid':
+        return <CheckCircle className="w-4 h-4 text-green-400" />;
+      case 'invalid':
+        return <XCircle className="w-4 h-4 text-red-400" />;
+      case 'error':
+        return <AlertCircle className="w-4 h-4 text-yellow-400" />;
+      default:
+        return null;
+    }
+  };
+
+  const canCreate = telefone.replace(/\D/g, '').length >= 10 &&
+                    selectedUnidadeId &&
+                    whatsappStatus !== 'invalid' &&
+                    whatsappStatus !== 'checking';
+
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
-      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'linear-gradient(180deg, rgba(6,6,16,0.98) 0%, rgba(10,10,24,0.98) 100%)' }}
     >
       <motion.div
-        initial={{ scale: 0.95, opacity: 0 }}
+        initial={{ scale: 0.9, opacity: 0 }}
         animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.95, opacity: 0 }}
-        className="bg-[#12122a] rounded-xl w-full max-w-lg border border-white/10 shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
+        exit={{ scale: 0.9, opacity: 0 }}
+        className="w-full h-full flex flex-col"
       >
-        <div className="p-5 border-b border-white/10 flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-white">Nova Conversa</h3>
-          <button onClick={onClose} className="p-1.5 hover:bg-white/10 rounded-lg transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
-          </button>
-        </div>
-
-        <div className="p-5 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Unidade *</label>
-            <div className="relative">
-              <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <select
-                value={selectedUnidadeId}
-                onChange={(e) => {
-                  setSelectedUnidadeId(e.target.value);
-                  setSelectedOS(null);
-                  setOsResults([]);
-                }}
-                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-cyan-500/40 appearance-none cursor-pointer"
-              >
-                <option value="" className="bg-[#12122a]">Selecione uma unidade</option>
-                {allUnidades.map(u => (
-                  <option key={u.id} value={u.id} className="bg-[#12122a]">{u.nome}</option>
-                ))}
-              </select>
+        {/* Header */}
+        <div className="flex-shrink-0 h-14 px-6 flex items-center justify-between border-b border-white/[0.06]">
+          <div className="flex items-center gap-3">
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center"
+              style={{ background: `${accentColor}20` }}
+            >
+              <MessageSquare className="w-4 h-4" style={{ color: accentColor }} />
+            </div>
+            <div>
+              <h1 className="text-sm font-semibold text-white">Nova Conversa</h1>
+              <p className="text-[10px] text-white/40">Iniciar atendimento via WhatsApp</p>
             </div>
           </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Telefone *</label>
-            <div className="relative">
-              <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
-                placeholder="5511999999999"
-                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Nome do Cliente</label>
-            <div className="relative">
-              <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Nome do cliente"
-                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-400 mb-1.5">Vincular a OS (opcional)</label>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
-              <input
-                type="text"
-                value={osSearch}
-                onChange={(e) => setOsSearch(e.target.value)}
-                placeholder="Digite OS Interna, Samsung, cliente ou telefone..."
-                disabled={!selectedUnidadeId}
-                className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40 disabled:opacity-50"
-              />
-              {searchingOS && (
-                <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 animate-spin" />
-              )}
-            </div>
-
-            {!selectedUnidadeId && osSearch && (
-              <p className="text-xs text-yellow-500 mt-1">Selecione uma unidade primeiro</p>
-            )}
-
-            {osResults.length > 0 && (
-              <div className="mt-1.5 max-h-48 overflow-y-auto bg-[#0d0d1e] rounded-lg border border-white/10">
-                {osResults.map(os => (
-                  <button
-                    key={os.id}
-                    onClick={() => selectOS(os)}
-                    className="w-full flex items-start gap-3 p-3 hover:bg-white/5 transition-colors border-b border-white/5 last:border-0 text-left"
-                  >
-                    <FileText className="w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0" />
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        {os.numero_os_interna && (
-                          <span className="text-xs font-medium text-cyan-400">
-                            OS: {os.numero_os_interna}
-                          </span>
-                        )}
-                        {os.numero_os_samsung && (
-                          <span className="text-xs text-orange-400">Samsung: {os.numero_os_samsung}</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-gray-300 truncate mt-0.5">{os.cliente_nome}</p>
-                      {os.cliente_telefone && (
-                        <p className="text-xs text-gray-500">{os.cliente_telefone}</p>
-                      )}
-                      {os.defeito_reclamado && (
-                        <p className="text-xs text-gray-600 truncate">{os.defeito_reclamado}</p>
-                      )}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {osSearch && osSearch.length >= 2 && !searchingOS && osResults.length === 0 && selectedUnidadeId && (
-              <p className="text-xs text-gray-500 mt-1">Nenhuma OS encontrada para "{osSearch}"</p>
-            )}
-
-            {selectedOS && (
-              <div className="mt-2 flex items-center gap-2 px-3 py-2 bg-cyan-500/10 border border-cyan-500/20 rounded-lg">
-                <Link2 className="w-4 h-4 text-cyan-400 flex-shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <span className="text-xs font-medium text-cyan-400">
-                    OS: {selectedOS.numero_os_interna || selectedOS.numero_os_samsung}
-                  </span>
-                  <span className="text-xs text-gray-400 ml-2">{selectedOS.cliente_nome}</span>
-                </div>
-                <button
-                  onClick={() => setSelectedOS(null)}
-                  className="p-0.5 hover:bg-white/10 rounded"
-                >
-                  <X className="w-3 h-3 text-gray-400" />
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="p-5 border-t border-white/10 flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+            className="p-2 rounded-lg hover:bg-white/[0.06] transition-colors"
           >
-            Cancelar
+            <X className="w-5 h-5 text-white/40" />
           </button>
-          <button
-            onClick={handleCreate}
-            disabled={creating || !telefone.replace(/\D/g, '') || !selectedUnidadeId}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
-            style={{ backgroundColor: accentColor, color: '#000' }}
-          >
-            {creating ? (
-              <Loader2 className="w-4 h-4 animate-spin" />
-            ) : (
-              <MessageSquare className="w-4 h-4" />
-            )}
-            Iniciar Conversa
-          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-2xl mx-auto p-8 space-y-6">
+            {/* Unidade */}
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+                Unidade *
+              </label>
+              <div className="relative">
+                <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <select
+                  value={selectedUnidadeId}
+                  onChange={(e) => {
+                    setSelectedUnidadeId(e.target.value);
+                    setSelectedOS(null);
+                    setOsResults([]);
+                  }}
+                  className="w-full pl-12 pr-4 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white focus:outline-none focus:border-cyan-500/40 appearance-none cursor-pointer hover:bg-white/[0.05] transition-colors"
+                >
+                  <option value="" className="bg-[#12122a]">Selecione uma unidade</option>
+                  {allUnidades.map(u => (
+                    <option key={u.id} value={u.id} className="bg-[#12122a]">{u.nome}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Telefone */}
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+                Telefone do Cliente *
+              </label>
+              <div className="relative">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <div className="absolute left-12 top-1/2 -translate-y-1/2 text-sm text-white/40 font-medium">
+                  +55
+                </div>
+                <input
+                  type="text"
+                  value={telefone}
+                  onChange={(e) => setTelefone(e.target.value.replace(/\D/g, ''))}
+                  placeholder="11999999999"
+                  className="w-full pl-24 pr-12 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
+                />
+                <div className="absolute right-4 top-1/2 -translate-y-1/2">
+                  {getWhatsAppStatusIcon()}
+                </div>
+              </div>
+              {whatsappStatus === 'valid' && (
+                <p className="mt-2 text-xs text-green-400 flex items-center gap-1">
+                  <CheckCircle className="w-3 h-3" />
+                  Numero verificado no WhatsApp
+                </p>
+              )}
+              {whatsappStatus === 'invalid' && (
+                <p className="mt-2 text-xs text-red-400 flex items-center gap-1">
+                  <XCircle className="w-3 h-3" />
+                  {whatsappError || 'Este numero nao possui WhatsApp'}
+                </p>
+              )}
+              {whatsappStatus === 'error' && (
+                <p className="mt-2 text-xs text-yellow-400 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {whatsappError || 'Nao foi possivel verificar'}
+                </p>
+              )}
+              {whatsappStatus === 'checking' && (
+                <p className="mt-2 text-xs text-cyan-400 flex items-center gap-1">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Verificando numero no WhatsApp...
+                </p>
+              )}
+              <p className="mt-1 text-[11px] text-white/30">
+                Digite apenas os numeros. O DDI +55 sera adicionado automaticamente.
+              </p>
+            </div>
+
+            {/* Nome */}
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+                Nome do Cliente
+              </label>
+              <div className="relative">
+                <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <input
+                  type="text"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  placeholder="Nome do cliente (opcional)"
+                  className="w-full pl-12 pr-4 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Vincular OS */}
+            <div>
+              <label className="block text-xs font-medium text-white/50 mb-2 uppercase tracking-wider">
+                Vincular a OS (Opcional)
+              </label>
+              <div className="relative">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-white/20" />
+                <input
+                  type="text"
+                  value={osSearch}
+                  onChange={(e) => setOsSearch(e.target.value)}
+                  placeholder="Digite OS Interna, Samsung, cliente ou telefone..."
+                  disabled={!selectedUnidadeId}
+                  className="w-full pl-12 pr-12 py-4 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/40 disabled:opacity-50 transition-colors"
+                />
+                {searchingOS && (
+                  <Loader2 className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
+                )}
+              </div>
+
+              {!selectedUnidadeId && osSearch && (
+                <p className="text-xs text-yellow-500 mt-2">Selecione uma unidade primeiro</p>
+              )}
+
+              {osResults.length > 0 && (
+                <div className="mt-2 max-h-64 overflow-y-auto bg-[#0d0d1e] rounded-xl border border-white/[0.08]">
+                  {osResults.map(os => (
+                    <button
+                      key={os.id}
+                      onClick={() => selectOS(os)}
+                      className="w-full flex items-start gap-3 p-4 hover:bg-white/[0.04] transition-colors border-b border-white/[0.04] last:border-0 text-left"
+                    >
+                      <FileText className="w-5 h-5 text-white/30 mt-0.5 flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          {os.numero_os_interna && (
+                            <span className="text-xs font-medium text-cyan-400">
+                              OS: {os.numero_os_interna}
+                            </span>
+                          )}
+                          {os.numero_os_samsung && (
+                            <span className="text-xs text-orange-400">Samsung: {os.numero_os_samsung}</span>
+                          )}
+                        </div>
+                        <p className="text-sm text-white/80 truncate mt-1">{os.cliente_nome}</p>
+                        {os.cliente_telefone && (
+                          <p className="text-xs text-white/40">{os.cliente_telefone}</p>
+                        )}
+                        {os.defeito_reclamado && (
+                          <p className="text-xs text-white/30 truncate mt-1">{os.defeito_reclamado}</p>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {osSearch && osSearch.length >= 2 && !searchingOS && osResults.length === 0 && selectedUnidadeId && (
+                <p className="text-xs text-white/40 mt-2">Nenhuma OS encontrada para "{osSearch}"</p>
+              )}
+
+              {selectedOS && (
+                <div className="mt-3 flex items-center gap-3 px-4 py-3 bg-cyan-500/10 border border-cyan-500/20 rounded-xl">
+                  <Link2 className="w-5 h-5 text-cyan-400 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <span className="text-sm font-medium text-cyan-400">
+                      OS: {selectedOS.numero_os_interna || selectedOS.numero_os_samsung}
+                    </span>
+                    <span className="text-sm text-white/50 ml-2">{selectedOS.cliente_nome}</span>
+                  </div>
+                  <button
+                    onClick={() => setSelectedOS(null)}
+                    className="p-1 hover:bg-white/10 rounded-lg transition-colors"
+                  >
+                    <X className="w-4 h-4 text-white/40" />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex-shrink-0 px-6 py-4 border-t border-white/[0.06] flex items-center justify-between">
+          <p className="text-xs text-white/30">
+            {!instancia && 'Nenhuma instancia WhatsApp conectada'}
+            {instancia && `Conectado: ${instancia.instance_name}`}
+          </p>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onClose}
+              className="px-6 py-3 rounded-xl text-sm font-medium text-white/50 hover:text-white/80 hover:bg-white/[0.04] transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleCreate}
+              disabled={!canCreate || creating}
+              className="flex items-center gap-2 px-8 py-3 rounded-xl text-sm font-semibold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: canCreate && !creating ? accentColor : 'rgba(255,255,255,0.1)',
+                color: canCreate && !creating ? '#000' : 'rgba(255,255,255,0.5)'
+              }}
+            >
+              {creating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Criando...
+                </>
+              ) : (
+                <>
+                  <MessageSquare className="w-4 h-4" />
+                  Iniciar Conversa
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>
