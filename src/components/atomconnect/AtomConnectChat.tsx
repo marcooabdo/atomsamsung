@@ -117,6 +117,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [osSearchResults, setOsSearchResults] = useState<OS[]>([]);
   const [searchingOS, setSearchingOS] = useState(false);
   const [clienteFoto, setClienteFoto] = useState<string | null>(conversa.cliente_foto_url);
+  const [usersCache, setUsersCache] = useState<Record<string, string>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -134,9 +135,25 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
     if (!error && data) {
       setMensagens(data);
+
+      const senderIds = [...new Set(data.filter(m => m.enviado_por).map(m => m.enviado_por))];
+      if (senderIds.length > 0) {
+        const idsToLoad = senderIds.filter(id => id && !usersCache[id]);
+        if (idsToLoad.length > 0) {
+          const { data: users } = await supabase
+            .from('usuarios')
+            .select('id, nome')
+            .in('id', idsToLoad);
+          if (users) {
+            const newCache = { ...usersCache };
+            users.forEach(u => { newCache[u.id] = u.nome; });
+            setUsersCache(newCache);
+          }
+        }
+      }
     }
     setLoading(false);
-  }, [conversa.id]);
+  }, [conversa.id, usersCache]);
 
   useEffect(() => {
     loadMensagens();
@@ -205,7 +222,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       .select('id, nome, foto_url, cargo')
       .eq('unidade_id', targetUnidadeId)
       .eq('ativo', true);
-    if (data) setAtendentes(data);
+
+    if (data) {
+      const newCache = { ...usersCache };
+      data.forEach(u => { newCache[u.id] = u.nome; });
+      if (usuario?.id && usuario?.nome) {
+        newCache[usuario.id] = usuario.nome;
+      }
+      setUsersCache(newCache);
+      setAtendentes(data);
+    }
   };
 
   const loadOSData = async () => {
@@ -780,6 +806,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                       <div className="flex items-center gap-1 text-[10px] text-purple-400 mb-1">
                         <Bot className="w-3 h-3" />
                         Bot
+                      </div>
+                    )}
+
+                    {msg.from_me && msg.enviado_por && usersCache[msg.enviado_por] && !msg.is_bot && (
+                      <div className="text-[11px] font-semibold mb-1" style={{ color: accentColor }}>
+                        {usersCache[msg.enviado_por]}:
                       </div>
                     )}
 

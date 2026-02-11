@@ -3,7 +3,7 @@ import {
   Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
   Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
   Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone,
-  Webhook, Edit2, X
+  Webhook, Edit2, X, Columns, ChevronLeft, ChevronRight, Palette, GripVertical
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -35,6 +35,15 @@ interface RespostaRapida {
   atalho: string;
   conteudo: string;
   midia_url: string | null;
+}
+
+interface PipelineColuna {
+  id: string;
+  nome: string;
+  cor: string;
+  ordem: number;
+  unidade_id: string | null;
+  conversas_count?: number;
 }
 
 const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || '';
@@ -72,12 +81,24 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   });
   const [showNewResposta, setShowNewResposta] = useState(false);
 
+  const [pipelineColunas, setPipelineColunas] = useState<PipelineColuna[]>([]);
+  const [showNewColuna, setShowNewColuna] = useState(false);
+  const [newColuna, setNewColuna] = useState({ nome: '', cor: '#00D4FF' });
+  const [editingColuna, setEditingColuna] = useState<PipelineColuna | null>(null);
+  const [editColunaForm, setEditColunaForm] = useState({ nome: '', cor: '' });
+  const [savingColuna, setSavingColuna] = useState(false);
+
+  const PRESET_COLORS = [
+    '#00D4FF', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
+    '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#06b6d4'
+  ];
+
   useEffect(() => {
     loadData();
   }, [effectiveUnidadeId]);
 
   const loadData = async () => {
-    await Promise.all([loadInstancias(), loadRespostasRapidas()]);
+    await Promise.all([loadInstancias(), loadRespostasRapidas(), loadPipelineColunas()]);
     setLoading(false);
   };
 
@@ -108,6 +129,141 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
     const { data } = await query.order('titulo');
     if (data) setRespostasRapidas(data);
+  };
+
+  const loadPipelineColunas = async () => {
+    const { data: colunas } = await supabase
+      .from('atom_connect_pipeline_colunas')
+      .select('*')
+      .order('ordem');
+
+    if (colunas) {
+      const colunasWithCount = await Promise.all(
+        colunas.map(async (col) => {
+          let query = supabase
+            .from('atom_connect_conversas')
+            .select('id', { count: 'exact', head: true })
+            .eq('coluna_pipeline', col.id);
+
+          if (effectiveUnidadeId) {
+            query = query.eq('unidade_id', effectiveUnidadeId);
+          }
+
+          const { count } = await query;
+          return { ...col, conversas_count: count || 0 };
+        })
+      );
+      setPipelineColunas(colunasWithCount);
+    }
+  };
+
+  const createColuna = async () => {
+    if (!newColuna.nome.trim()) {
+      alert('Digite um nome para a coluna');
+      return;
+    }
+
+    setSavingColuna(true);
+
+    const maxOrdem = pipelineColunas.length > 0
+      ? Math.max(...pipelineColunas.map(c => c.ordem))
+      : 0;
+
+    const { error } = await supabase
+      .from('atom_connect_pipeline_colunas')
+      .insert({
+        nome: newColuna.nome.trim(),
+        cor: newColuna.cor,
+        ordem: maxOrdem + 1,
+        unidade_id: effectiveUnidadeId || null
+      });
+
+    if (error) {
+      alert('Erro ao criar coluna: ' + error.message);
+    } else {
+      setShowNewColuna(false);
+      setNewColuna({ nome: '', cor: '#00D4FF' });
+      loadPipelineColunas();
+    }
+
+    setSavingColuna(false);
+  };
+
+  const openEditColunaModal = (coluna: PipelineColuna) => {
+    setEditColunaForm({
+      nome: coluna.nome,
+      cor: coluna.cor
+    });
+    setEditingColuna(coluna);
+  };
+
+  const saveColuna = async () => {
+    if (!editingColuna) return;
+    if (!editColunaForm.nome.trim()) {
+      alert('O nome da coluna e obrigatorio');
+      return;
+    }
+
+    setSavingColuna(true);
+
+    const { error } = await supabase
+      .from('atom_connect_pipeline_colunas')
+      .update({
+        nome: editColunaForm.nome.trim(),
+        cor: editColunaForm.cor
+      })
+      .eq('id', editingColuna.id);
+
+    if (error) {
+      alert('Erro ao salvar: ' + error.message);
+    } else {
+      setEditingColuna(null);
+      loadPipelineColunas();
+    }
+
+    setSavingColuna(false);
+  };
+
+  const deleteColuna = async (coluna: PipelineColuna) => {
+    if ((coluna.conversas_count || 0) > 0) {
+      alert('Nao e possivel excluir uma coluna que possui conversas. Mova as conversas para outra coluna primeiro.');
+      return;
+    }
+
+    if (!confirm(`Tem certeza que deseja excluir a coluna "${coluna.nome}"?`)) return;
+
+    const { error } = await supabase
+      .from('atom_connect_pipeline_colunas')
+      .delete()
+      .eq('id', coluna.id);
+
+    if (error) {
+      alert('Erro ao excluir: ' + error.message);
+    } else {
+      loadPipelineColunas();
+    }
+  };
+
+  const moveColuna = async (coluna: PipelineColuna, direction: 'left' | 'right') => {
+    const currentIndex = pipelineColunas.findIndex(c => c.id === coluna.id);
+    const targetIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+
+    if (targetIndex < 0 || targetIndex >= pipelineColunas.length) return;
+
+    const targetColuna = pipelineColunas[targetIndex];
+
+    await Promise.all([
+      supabase
+        .from('atom_connect_pipeline_colunas')
+        .update({ ordem: targetColuna.ordem })
+        .eq('id', coluna.id),
+      supabase
+        .from('atom_connect_pipeline_colunas')
+        .update({ ordem: coluna.ordem })
+        .eq('id', targetColuna.id)
+    ]);
+
+    loadPipelineColunas();
   };
 
   const openEditModal = (instancia: Instancia) => {
@@ -543,6 +699,20 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
               Respostas Rapidas
             </div>
           </button>
+          <button
+            onClick={() => setActiveTab('pipeline')}
+            className={`py-3 border-b-2 text-sm font-medium transition-colors ${
+              activeTab === 'pipeline'
+                ? 'border-current text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+            style={{ borderColor: activeTab === 'pipeline' ? accentColor : undefined }}
+          >
+            <div className="flex items-center gap-2">
+              <Columns className="w-4 h-4" />
+              Pipeline
+            </div>
+          </button>
         </div>
       </div>
 
@@ -812,7 +982,286 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
             )}
           </div>
         )}
+
+        {activeTab === 'pipeline' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Colunas do Pipeline</h3>
+                <p className="text-sm text-gray-400">Gerencie as colunas do seu pipeline de atendimento</p>
+              </div>
+              <button
+                onClick={() => setShowNewColuna(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: `${accentColor}20`,
+                  color: accentColor,
+                  border: `1px solid ${accentColor}40`
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Nova Coluna
+              </button>
+            </div>
+
+            {pipelineColunas.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <Columns className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg">Nenhuma coluna configurada</p>
+                <p className="text-sm mt-2">Crie colunas para organizar seu pipeline</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {pipelineColunas.map((coluna, index) => (
+                  <div
+                    key={coluna.id}
+                    className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors"
+                  >
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => moveColuna(coluna, 'left')}
+                        disabled={index === 0}
+                        className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Mover para esquerda"
+                      >
+                        <ChevronLeft className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => moveColuna(coluna, 'right')}
+                        disabled={index === pipelineColunas.length - 1}
+                        className="p-1.5 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title="Mover para direita"
+                      >
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: coluna.cor }}
+                    />
+
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-white">{coluna.nome}</h4>
+                      <p className="text-xs text-gray-400">
+                        {coluna.conversas_count || 0} conversa{(coluna.conversas_count || 0) !== 1 ? 's' : ''}
+                      </p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => openEditColunaModal(coluna)}
+                        className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                        title="Editar coluna"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => deleteColuna(coluna)}
+                        disabled={(coluna.conversas_count || 0) > 0}
+                        className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                        title={(coluna.conversas_count || 0) > 0 ? 'Nao e possivel excluir - possui conversas' : 'Excluir coluna'}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
+
+      {/* New Coluna Modal */}
+      <AnimatePresence>
+        {showNewColuna && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={() => setShowNewColuna(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                    <Columns className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Nova Coluna</h3>
+                </div>
+                <button
+                  onClick={() => setShowNewColuna(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Nome da Coluna *
+                  </label>
+                  <input
+                    type="text"
+                    value={newColuna.nome}
+                    onChange={(e) => setNewColuna(prev => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Ex: Aguardando Resposta"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Cor
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setNewColuna(prev => ({ ...prev, cor: color }))}
+                        className={`w-8 h-8 rounded-full transition-all ${
+                          newColuna.cor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1A2E]' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowNewColuna(false)}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createColuna}
+                  disabled={savingColuna}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingColuna ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Criar Coluna
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Coluna Modal */}
+      <AnimatePresence>
+        {editingColuna && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={() => setEditingColuna(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                    <Edit2 className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Editar Coluna</h3>
+                </div>
+                <button
+                  onClick={() => setEditingColuna(null)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Nome da Coluna *
+                  </label>
+                  <input
+                    type="text"
+                    value={editColunaForm.nome}
+                    onChange={(e) => setEditColunaForm(prev => ({ ...prev, nome: e.target.value }))}
+                    placeholder="Ex: Aguardando Resposta"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Cor
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setEditColunaForm(prev => ({ ...prev, cor: color }))}
+                        className={`w-8 h-8 rounded-full transition-all ${
+                          editColunaForm.cor === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1A2E]' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingColuna(null)}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveColuna}
+                  disabled={savingColuna}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingColuna ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salvar
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* New Instance Modal */}
       <AnimatePresence>
