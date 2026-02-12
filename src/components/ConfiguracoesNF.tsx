@@ -1013,6 +1013,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                             onChange={(e) => setForm(prev => ({ ...prev, nfse_trib_issqn: e.target.value }))}
                             className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024]"
                           >
+                            <option value="0">0 - Reserva</option>
                             <option value="1">1 - Exigivel</option>
                             <option value="2">2 - Nao Incidencia</option>
                             <option value="3">3 - Isencao</option>
