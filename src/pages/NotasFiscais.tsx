@@ -71,6 +71,14 @@ interface Stats {
   quantidade_mes: number;
 }
 
+const getStorageUrl = (path: string | null): string | null => {
+  if (!path) return null;
+  if (path.startsWith('http')) return path;
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+  return `${supabaseUrl}/storage/v1/object/public/nf-emitidas/${cleanPath}`;
+};
+
 export function NotasFiscais() {
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -746,7 +754,7 @@ export function NotasFiscais() {
 
                     {nf.pdf_url && (
                       <a
-                        href={nf.pdf_url}
+                        href={getStorageUrl(nf.pdf_url) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="neon-button p-2"
@@ -763,7 +771,7 @@ export function NotasFiscais() {
 
                     {nf.xml_url && (
                       <a
-                        href={nf.xml_url}
+                        href={getStorageUrl(nf.xml_url) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="neon-button p-2"
@@ -945,7 +953,7 @@ export function NotasFiscais() {
                   <div className="flex gap-3">
                     {notaDetalhes.pdf_url && (
                       <a
-                        href={notaDetalhes.pdf_url}
+                        href={getStorageUrl(notaDetalhes.pdf_url) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="neon-button px-4 py-2 flex items-center gap-2"
@@ -961,7 +969,7 @@ export function NotasFiscais() {
                     )}
                     {notaDetalhes.xml_url && (
                       <a
-                        href={notaDetalhes.xml_url}
+                        href={getStorageUrl(notaDetalhes.xml_url) || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="neon-button px-4 py-2 flex items-center gap-2"
