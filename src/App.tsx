@@ -17,6 +17,7 @@ import { SkywalkerProvider } from './contexts/SkywalkerContext';
 import { NotasFiscais } from './pages/NotasFiscais';
 import { GIA } from './pages/GIA';
 import { OSPrintView } from './pages/OSPrintView';
+import EtiquetaEditor from './pages/EtiquetaEditor';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
@@ -86,6 +87,7 @@ function AppContent() {
         <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
 
         <Route path="/orcamento/:token" element={<OrcamentoPublico />} />
+        <Route path="/etiqueta-editor" element={<EtiquetaEditor />} />
 
         <Route
           path="/os/print"
