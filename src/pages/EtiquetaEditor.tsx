@@ -548,6 +548,7 @@ export default function EtiquetaEditor() {
     };
 
     if (el.tipo === 'texto') {
+      const hasMultipleLines = conteudo.includes('\n');
       return (
         <div
           key={el.id}
@@ -564,14 +565,15 @@ export default function EtiquetaEditor() {
               textAlign: el.alinhamento || 'left',
               backgroundColor: el.fundo_cor || 'transparent',
               display: 'flex',
-              alignItems: 'center',
+              alignItems: hasMultipleLines ? 'flex-start' : 'center',
               justifyContent: el.alinhamento === 'center' ? 'center' : el.alinhamento === 'right' ? 'flex-end' : 'flex-start',
               overflow: 'hidden',
-              whiteSpace: 'nowrap',
-              textOverflow: 'ellipsis',
-              padding: '0 2px',
+              whiteSpace: hasMultipleLines ? 'pre-wrap' : 'nowrap',
+              textOverflow: hasMultipleLines ? 'clip' : 'ellipsis',
+              padding: '2px',
               boxSizing: 'border-box',
               borderRadius: el.fundo_cor ? '2px' : undefined,
+              wordBreak: 'break-word'
             }}
           >
             {conteudo}
@@ -680,14 +682,17 @@ export default function EtiquetaEditor() {
         }
 
         if (el.tipo === 'texto') {
+          const hasMultipleLines = conteudo.includes('\n');
+          const formattedContent = conteudo.replace(/\n/g, '<br>');
           return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.largura}mm;height:${el.altura}mm;
             font-size:${el.fonte_tamanho}pt;font-weight:${el.fonte_negrito ? 'bold' : 'normal'};
             color:${el.cor};text-align:${el.alinhamento || 'left'};
             background:${el.fundo_cor || 'transparent'};
-            display:flex;align-items:center;justify-content:${el.alinhamento === 'center' ? 'center' : el.alinhamento === 'right' ? 'flex-end' : 'flex-start'};
-            overflow:hidden;white-space:nowrap;padding:0 1mm;box-sizing:border-box;
+            display:flex;align-items:${hasMultipleLines ? 'flex-start' : 'center'};justify-content:${el.alinhamento === 'center' ? 'center' : el.alinhamento === 'right' ? 'flex-end' : 'flex-start'};
+            overflow:hidden;white-space:${hasMultipleLines ? 'pre-wrap' : 'nowrap'};padding:1mm;box-sizing:border-box;
+            word-break:break-word;
             ${el.fundo_cor ? 'border-radius:1mm;' : ''}">
-            ${conteudo}
+            ${formattedContent}
           </div>`;
         }
 
@@ -883,13 +888,27 @@ export default function EtiquetaEditor() {
 
               {(elementoAtual.tipo === 'texto' || elementoAtual.tipo === 'codigo_barras') && (
                 <div>
-                  <label className="text-[10px] text-gray-500">Conteudo</label>
-                  <input
-                    type="text"
-                    value={elementoAtual.conteudo}
-                    onChange={(e) => atualizarElemento(elementoAtual.id, { conteudo: e.target.value })}
-                    className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-xs"
-                  />
+                  <label className="text-[10px] text-gray-500">Conteudo {elementoAtual.tipo === 'texto' && <span className="text-gray-600">(SHIFT+ENTER = nova linha)</span>}</label>
+                  {elementoAtual.tipo === 'texto' ? (
+                    <textarea
+                      value={elementoAtual.conteudo}
+                      onChange={(e) => atualizarElemento(elementoAtual.id, { conteudo: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && !e.shiftKey) {
+                          e.preventDefault();
+                        }
+                      }}
+                      className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-xs min-h-[60px] resize-y"
+                      placeholder="Digite o texto. Use SHIFT+ENTER para nova linha."
+                    />
+                  ) : (
+                    <input
+                      type="text"
+                      value={elementoAtual.conteudo}
+                      onChange={(e) => atualizarElemento(elementoAtual.id, { conteudo: e.target.value })}
+                      className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-xs"
+                    />
+                  )}
                 </div>
               )}
 
