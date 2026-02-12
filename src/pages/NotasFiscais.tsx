@@ -225,6 +225,23 @@ export function NotasFiscais() {
     setStatsNFe(nfeStats);
   };
 
+  const handleRetry = async (nf: NotaFiscal) => {
+    try {
+      const { error } = await supabase
+        .from('nf_emitidas')
+        .update({ status: 'pendente' })
+        .eq('id', nf.id);
+
+      if (error) throw error;
+
+      setRetryNota({ ...nf, status: 'pendente' });
+      setShowRetryModal(true);
+      setNotaDetalhes(null);
+    } catch (error) {
+      console.error('Erro ao preparar reenvio:', error);
+    }
+  };
+
   const aplicarFiltros = () => {
     let filtered = [...notasFiscais];
 
@@ -745,8 +762,7 @@ export function NotasFiscais() {
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          setRetryNota(nf);
-                          setShowRetryModal(true);
+                          handleRetry(nf);
                         }}
                         className="neon-button p-2"
                         style={{
@@ -1004,11 +1020,7 @@ export function NotasFiscais() {
               {notaDetalhes.status === 'erro' && (
                 <div className="pt-4 border-t border-gray-700">
                   <button
-                    onClick={() => {
-                      setRetryNota(notaDetalhes);
-                      setShowRetryModal(true);
-                      setNotaDetalhes(null);
-                    }}
+                    onClick={() => handleRetry(notaDetalhes)}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
                     style={{
                       backgroundColor: '#FFBF0020',
