@@ -174,17 +174,21 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
         setOrcamentoLink(link);
         setLinkExpiresAt(expiresAt);
 
-        await supabase.from('os_comentarios').insert({
-          os_id: osData.id,
-          usuario_id: usuario?.id,
-          comentario: `🔗 Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente\nValido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
-          is_system: false
-        });
+        try {
+          await supabase.from('os_comentarios').insert({
+            os_id: osData.id,
+            usuario_id: usuario?.id,
+            comentario: `Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente. Valido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
+            is_system: false
+          });
+        } catch (commentErr) {
+          console.error('Erro ao adicionar comentario:', commentErr);
+        }
 
-        // Recarregar para garantir que o estado está sincronizado
         await loadExistingLink();
       } else {
-        console.error('RPC não retornou dados');
+        console.error('RPC nao retornou dados');
+        throw new Error('Falha ao gerar link');
       }
     } catch (err: any) {
       console.error('Erro ao gerar link:', err);

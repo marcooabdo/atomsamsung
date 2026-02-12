@@ -102,6 +102,7 @@ export function OrcamentoPublico() {
     endereco: string | null;
   } | null>(null);
   const [selectedFoto, setSelectedFoto] = useState<string | null>(null);
+  const [cameraReady, setCameraReady] = useState(false);
 
   useEffect(() => {
     if (!token) {
@@ -111,6 +112,22 @@ export function OrcamentoPublico() {
     }
     loadOrcamento();
   }, [token]);
+
+  useEffect(() => {
+    if (showCamera && stream && videoRef.current && !selfieCapturada) {
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play().then(() => {
+          setCameraReady(true);
+        }).catch(console.error);
+      };
+    }
+    return () => {
+      if (!showCamera && stream) {
+        stream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [showCamera, stream, selfieCapturada]);
 
   const loadOrcamento = async () => {
     try {
@@ -177,78 +194,95 @@ export function OrcamentoPublico() {
     }
 
     setCapturandoLocalizacao(true);
-    try {
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
-      });
 
-      let endereco: string | null = null;
-      try {
-        const geoResponse = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`
+    const captureLocation = (): Promise<GeolocationPosition | null> => {
+      return new Promise((resolve) => {
+        if (!navigator.geolocation) {
+          resolve(null);
+          return;
+        }
+
+        navigator.geolocation.getCurrentPosition(
+          (position) => resolve(position),
+          () => resolve(null),
+          {
+            enableHighAccuracy: true,
+            timeout: 15000,
+            maximumAge: 0
+          }
         );
-        const geoData = await geoResponse.json();
-        endereco = geoData.display_name || null;
-      } catch {}
-
-      setLocalizacaoCapturada({
-        latitude: position.coords.latitude,
-        longitude: position.coords.longitude,
-        endereco
       });
+    };
+
+    try {
+      const position = await captureLocation();
+
+      if (position) {
+        let endereco: string | null = null;
+        try {
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${position.coords.latitude}&lon=${position.coords.longitude}`,
+            { headers: { 'User-Agent': 'OrcamentoApp/1.0' } }
+          );
+          const geoData = await geoResponse.json();
+          endereco = geoData.display_name || null;
+        } catch {}
+
+        setLocalizacaoCapturada({
+          latitude: position.coords.latitude,
+          longitude: position.coords.longitude,
+          endereco
+        });
+      } else {
+        setLocalizacaoCapturada(null);
+      }
 
       setCapturandoLocalizacao(false);
       abrirCamera();
     } catch {
       setCapturandoLocalizacao(false);
       setLocalizacaoCapturada(null);
-      if (confirm('Nao foi possivel obter sua localizacao. Deseja continuar mesmo assim?')) {
-        abrirCamera();
-      }
+      abrirCamera();
     }
   };
 
   const abrirCamera = async () => {
     try {
+      setCameraReady(false);
       const mediaStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user', width: 1280, height: 720 },
+        video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } },
         audio: false
       });
 
       setStream(mediaStream);
       setShowCamera(true);
-
-      if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
-        videoRef.current.play();
-      }
-    } catch {
-      alert('Nao foi possivel acessar a camera. Por favor, permita o acesso a camera.');
+    } catch (err) {
+      console.error('Erro ao acessar camera:', err);
+      alert('Nao foi possivel acessar a camera. Por favor, permita o acesso a camera nas configuracoes do seu navegador.');
     }
   };
 
   const tirarSelfie = () => {
-    if (videoRef.current && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const video = videoRef.current;
+    if (!cameraReady || !videoRef.current || !canvasRef.current) {
+      return;
+    }
 
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
+    const canvas = canvasRef.current;
+    const video = videoRef.current;
 
-      const context = canvas.getContext('2d');
-      if (context) {
-        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setSelfieCapturada(dataUrl);
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
 
-        if (stream) {
-          stream.getTracks().forEach(track => track.stop());
-          setStream(null);
-        }
+    const context = canvas.getContext('2d');
+    if (context) {
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+      setSelfieCapturada(dataUrl);
+      setCameraReady(false);
+
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        setStream(null);
       }
     }
   };
@@ -1081,6 +1115,14 @@ export function OrcamentoPublico() {
                     muted
                     className="w-full h-full object-cover transform scale-x-[-1]"
                   />
+                  {!cameraReady && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/50">
+                      <div className="text-center">
+                        <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-2" />
+                        <p className="text-white text-sm">Iniciando camera...</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex gap-3">
@@ -1091,6 +1133,7 @@ export function OrcamentoPublico() {
                         setStream(null);
                       }
                       setShowCamera(false);
+                      setCameraReady(false);
                     }}
                     className="flex-1 py-3 rounded-lg font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition-all"
                   >
@@ -1098,10 +1141,11 @@ export function OrcamentoPublico() {
                   </button>
                   <button
                     onClick={tirarSelfie}
-                    className="flex-1 py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+                    disabled={!cameraReady}
+                    className="flex-1 py-3 rounded-lg font-bold text-white bg-blue-600 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <Camera className="w-5 h-5" />
-                    Tirar Foto
+                    {cameraReady ? 'Tirar Foto' : 'Aguarde...'}
                   </button>
                 </div>
               </div>
