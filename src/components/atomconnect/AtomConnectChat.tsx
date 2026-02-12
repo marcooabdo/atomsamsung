@@ -949,15 +949,23 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
 
     setSearchingOS(true);
+    const numericTerm = term.replace(/\D/g, '');
 
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('os')
         .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
-        .eq('unidade_id', targetUnidadeId)
-        .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`)
+        .eq('unidade_id', targetUnidadeId);
+
+      if (numericTerm && numericTerm.length >= 2) {
+        query = query.or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,numero_os_samsung.ilike.%${numericTerm}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${numericTerm}%,cliente_telefone_2.ilike.%${numericTerm}%,cliente_cpf_cnpj.ilike.%${numericTerm}%`);
+      } else {
+        query = query.or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
-        .limit(15);
+        .limit(20);
 
       if (!error && data) {
         setOsSearchResults(data);
@@ -974,16 +982,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if (!targetUnidadeId || !conversa.cliente_telefone) return;
 
     const phone = conversa.cliente_telefone.replace(/\D/g, '');
-    if (phone.length < 10) return;
+    if (phone.length < 8) return;
 
     const phoneWithout55 = phone.startsWith('55') ? phone.slice(2) : phone;
+    const last8Digits = phone.slice(-8);
 
     try {
       const { data } = await supabase
         .from('os')
         .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
         .eq('unidade_id', targetUnidadeId)
-        .or(`cliente_telefone.ilike.%${phoneWithout55}%,cliente_telefone.ilike.%${phone}%`)
+        .or(`cliente_telefone.ilike.%${phoneWithout55}%,cliente_telefone.ilike.%${phone}%,cliente_telefone.ilike.%${last8Digits}%,cliente_telefone_2.ilike.%${phoneWithout55}%,cliente_telefone_2.ilike.%${phone}%,cliente_telefone_2.ilike.%${last8Digits}%`)
         .order('created_at', { ascending: false })
         .limit(10);
 

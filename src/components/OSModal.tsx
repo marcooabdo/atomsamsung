@@ -443,6 +443,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .maybeSingle();
 
       if (existingConversa) {
+        if (!existingConversa.os_id && os.id) {
+          await supabase
+            .from('atom_connect_conversas')
+            .update({ os_id: os.id })
+            .eq('id', existingConversa.id);
+          existingConversa.os_id = os.id;
+        }
         setWhatsAppConversa(existingConversa as WhatsAppConversa);
         setShowWhatsAppChat(true);
         setLoadingWhatsApp(false);
