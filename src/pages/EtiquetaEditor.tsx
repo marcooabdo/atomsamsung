@@ -3,9 +3,9 @@ import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import JsBarcode from 'jsbarcode';
 import {
-  Printer, Save, FolderOpen, Plus, Trash2, Type, BarChart3, Image as ImageIcon,
-  Move, Settings, Minus, Square, RotateCw, Copy, AlignLeft, AlignCenter, AlignRight,
-  Bold, ChevronDown, Eye, Star, X, Check, Loader2, Download, Upload
+  Printer, Save, FolderOpen, Plus, Trash2, Type, BarChart3,
+  Minus, Square, Copy, AlignLeft, AlignCenter, AlignRight,
+  Bold, ChevronDown, Star, X, Loader2
 } from 'lucide-react';
 
 interface ElementoEtiqueta {
@@ -69,6 +69,8 @@ const VARIAVEIS_DISPONIVEIS = [
 
 const MM_TO_PX = 3.78;
 
+type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
+
 export default function EtiquetaEditor() {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -86,11 +88,14 @@ export default function EtiquetaEditor() {
   const [previewIndex, setPreviewIndex] = useState(0);
   const [zoom, setZoom] = useState(2);
   const [isDragging, setIsDragging] = useState(false);
+  const [isResizing, setIsResizing] = useState(false);
+  const [resizeHandle, setResizeHandle] = useState<ResizeHandle>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [initialSize, setInitialSize] = useState({ width: 0, height: 0, x: 0, y: 0, fontSize: 0 });
+  const [resizeStart, setResizeStart] = useState({ x: 0, y: 0 });
   const [unidadeId, setUnidadeId] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
-  const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -276,6 +281,10 @@ export default function EtiquetaEditor() {
   const definirComoPadrao = async (templateId: string) => {
     await supabase
       .from('etiquetas_templates')
+      .update({ is_padrao: false })
+      .eq('unidade_id', unidadeId);
+    await supabase
+      .from('etiquetas_templates')
       .update({ is_padrao: true })
       .eq('id', templateId);
     await loadTemplates();
@@ -344,16 +353,114 @@ export default function EtiquetaEditor() {
     }
   };
 
+  const handleResizeStart = (e: React.MouseEvent, elId: string, handle: ResizeHandle) => {
+    e.stopPropagation();
+    e.preventDefault();
+    setElementoSelecionado(elId);
+    setIsResizing(true);
+    setResizeHandle(handle);
+
+    const el = elementos.find(e => e.id === elId);
+    if (el && canvasRef.current) {
+      const rect = canvasRef.current.getBoundingClientRect();
+      setResizeStart({
+        x: (e.clientX - rect.left) / zoom / MM_TO_PX,
+        y: (e.clientY - rect.top) / zoom / MM_TO_PX
+      });
+      setInitialSize({
+        width: el.largura,
+        height: el.altura,
+        x: el.x,
+        y: el.y,
+        fontSize: el.fonte_tamanho
+      });
+    }
+  };
+
   const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!isDragging || !elementoSelecionado || !canvasRef.current) return;
+    if (!canvasRef.current) return;
+
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = Math.max(0, Math.min(larguraMm - 5, (e.clientX - rect.left) / zoom / MM_TO_PX - dragOffset.x));
-    const y = Math.max(0, Math.min(alturaMm - 5, (e.clientY - rect.top) / zoom / MM_TO_PX - dragOffset.y));
-    atualizarElemento(elementoSelecionado, { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 });
-  }, [isDragging, elementoSelecionado, dragOffset, larguraMm, alturaMm, zoom]);
+    const currentX = (e.clientX - rect.left) / zoom / MM_TO_PX;
+    const currentY = (e.clientY - rect.top) / zoom / MM_TO_PX;
+
+    if (isDragging && elementoSelecionado && !isResizing) {
+      const x = Math.max(0, Math.min(larguraMm - 5, currentX - dragOffset.x));
+      const y = Math.max(0, Math.min(alturaMm - 5, currentY - dragOffset.y));
+      atualizarElemento(elementoSelecionado, {
+        x: Math.round(x * 10) / 10,
+        y: Math.round(y * 10) / 10
+      });
+    }
+
+    if (isResizing && elementoSelecionado && resizeHandle) {
+      const el = elementos.find(e => e.id === elementoSelecionado);
+      if (!el) return;
+
+      const deltaX = currentX - resizeStart.x;
+      const deltaY = currentY - resizeStart.y;
+
+      let newWidth = initialSize.width;
+      let newHeight = initialSize.height;
+      let newX = initialSize.x;
+      let newY = initialSize.y;
+
+      switch (resizeHandle) {
+        case 'e':
+          newWidth = Math.max(5, initialSize.width + deltaX);
+          break;
+        case 'w':
+          newWidth = Math.max(5, initialSize.width - deltaX);
+          newX = initialSize.x + (initialSize.width - newWidth);
+          break;
+        case 's':
+          newHeight = Math.max(3, initialSize.height + deltaY);
+          break;
+        case 'n':
+          newHeight = Math.max(3, initialSize.height - deltaY);
+          newY = initialSize.y + (initialSize.height - newHeight);
+          break;
+        case 'se':
+          newWidth = Math.max(5, initialSize.width + deltaX);
+          newHeight = Math.max(3, initialSize.height + deltaY);
+          break;
+        case 'sw':
+          newWidth = Math.max(5, initialSize.width - deltaX);
+          newX = initialSize.x + (initialSize.width - newWidth);
+          newHeight = Math.max(3, initialSize.height + deltaY);
+          break;
+        case 'ne':
+          newWidth = Math.max(5, initialSize.width + deltaX);
+          newHeight = Math.max(3, initialSize.height - deltaY);
+          newY = initialSize.y + (initialSize.height - newHeight);
+          break;
+        case 'nw':
+          newWidth = Math.max(5, initialSize.width - deltaX);
+          newX = initialSize.x + (initialSize.width - newWidth);
+          newHeight = Math.max(3, initialSize.height - deltaY);
+          newY = initialSize.y + (initialSize.height - newHeight);
+          break;
+      }
+
+      const scaleFactorW = newWidth / initialSize.width;
+      const scaleFactorH = newHeight / initialSize.height;
+      const scaleFactor = Math.max(scaleFactorW, scaleFactorH);
+      const newFontSize = Math.max(4, Math.round(initialSize.fontSize * scaleFactor * 10) / 10);
+
+      atualizarElemento(elementoSelecionado, {
+        x: Math.round(newX * 10) / 10,
+        y: Math.round(newY * 10) / 10,
+        largura: Math.round(newWidth * 10) / 10,
+        altura: Math.round(newHeight * 10) / 10,
+        fonte_tamanho: el.tipo === 'texto' || el.tipo === 'codigo_barras' ? newFontSize : el.fonte_tamanho
+      });
+    }
+  }, [isDragging, isResizing, elementoSelecionado, dragOffset, resizeHandle, resizeStart, initialSize, larguraMm, alturaMm, zoom, elementos]);
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    setIsResizing(false);
+    setResizeHandle(null);
   };
 
   const substituirVariaveis = (texto: string, dados: LabelData): string => {
@@ -372,9 +479,62 @@ export default function EtiquetaEditor() {
       .replace(/\{\{unidade_nome\}\}/g, dados.unidade_nome || '');
   };
 
+  const renderResizeHandles = (elId: string) => {
+    if (elementoSelecionado !== elId) return null;
+
+    const handleStyle = (cursor: string): React.CSSProperties => ({
+      position: 'absolute',
+      width: '8px',
+      height: '8px',
+      backgroundColor: '#00D4FF',
+      border: '1px solid #0099CC',
+      cursor,
+      zIndex: 10
+    });
+
+    return (
+      <>
+        <div
+          style={{ ...handleStyle('nw-resize'), top: '-4px', left: '-4px' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'nw')}
+        />
+        <div
+          style={{ ...handleStyle('n-resize'), top: '-4px', left: '50%', transform: 'translateX(-50%)' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'n')}
+        />
+        <div
+          style={{ ...handleStyle('ne-resize'), top: '-4px', right: '-4px' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'ne')}
+        />
+        <div
+          style={{ ...handleStyle('e-resize'), top: '50%', right: '-4px', transform: 'translateY(-50%)' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'e')}
+        />
+        <div
+          style={{ ...handleStyle('se-resize'), bottom: '-4px', right: '-4px' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'se')}
+        />
+        <div
+          style={{ ...handleStyle('s-resize'), bottom: '-4px', left: '50%', transform: 'translateX(-50%)' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 's')}
+        />
+        <div
+          style={{ ...handleStyle('sw-resize'), bottom: '-4px', left: '-4px' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'sw')}
+        />
+        <div
+          style={{ ...handleStyle('w-resize'), top: '50%', left: '-4px', transform: 'translateY(-50%)' }}
+          onMouseDown={(e) => handleResizeStart(e, elId, 'w')}
+        />
+      </>
+    );
+  };
+
   const renderElemento = (el: ElementoEtiqueta, dados?: LabelData, isPreview = false) => {
     const conteudo = dados ? substituirVariaveis(el.conteudo, dados) : el.conteudo;
-    const estilo: React.CSSProperties = {
+    const isSelected = elementoSelecionado === el.id && !isPreview;
+
+    const containerStyle: React.CSSProperties = {
       position: 'absolute',
       left: `${el.x * MM_TO_PX}px`,
       top: `${el.y * MM_TO_PX}px`,
@@ -383,33 +543,40 @@ export default function EtiquetaEditor() {
       transform: el.rotacao ? `rotate(${el.rotacao}deg)` : undefined,
       cursor: isPreview ? 'default' : 'move',
       userSelect: 'none',
+      outline: isSelected ? '2px solid #00D4FF' : 'none',
+      outlineOffset: '1px'
     };
 
     if (el.tipo === 'texto') {
       return (
         <div
           key={el.id}
-          style={{
-            ...estilo,
-            color: el.cor,
-            fontSize: `${el.fonte_tamanho}pt`,
-            fontWeight: el.fonte_negrito ? 'bold' : 'normal',
-            textAlign: el.alinhamento || 'left',
-            backgroundColor: el.fundo_cor || 'transparent',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: el.alinhamento === 'center' ? 'center' : el.alinhamento === 'right' ? 'flex-end' : 'flex-start',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis',
-            padding: '0 2px',
-            boxSizing: 'border-box',
-            borderRadius: el.fundo_cor ? '2px' : undefined,
-          }}
-          className={!isPreview && elementoSelecionado === el.id ? 'ring-2 ring-cyan-400' : ''}
+          style={containerStyle}
           onMouseDown={!isPreview ? (e) => handleMouseDown(e, el.id) : undefined}
         >
-          {conteudo}
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              color: el.cor,
+              fontSize: `${el.fonte_tamanho}pt`,
+              fontWeight: el.fonte_negrito ? 'bold' : 'normal',
+              textAlign: el.alinhamento || 'left',
+              backgroundColor: el.fundo_cor || 'transparent',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: el.alinhamento === 'center' ? 'center' : el.alinhamento === 'right' ? 'flex-end' : 'flex-start',
+              overflow: 'hidden',
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              padding: '0 2px',
+              boxSizing: 'border-box',
+              borderRadius: el.fundo_cor ? '2px' : undefined,
+            }}
+          >
+            {conteudo}
+          </div>
+          {!isPreview && renderResizeHandles(el.id)}
         </div>
       );
     }
@@ -418,11 +585,16 @@ export default function EtiquetaEditor() {
       return (
         <div
           key={el.id}
-          style={estilo}
-          className={!isPreview && elementoSelecionado === el.id ? 'ring-2 ring-cyan-400' : ''}
+          style={containerStyle}
           onMouseDown={!isPreview ? (e) => handleMouseDown(e, el.id) : undefined}
         >
-          <BarcodeRenderer value={conteudo} width={el.largura * MM_TO_PX} height={el.altura * MM_TO_PX} />
+          <BarcodeRenderer
+            value={conteudo}
+            width={el.largura * MM_TO_PX}
+            height={el.altura * MM_TO_PX}
+            fontSize={el.fonte_tamanho}
+          />
+          {!isPreview && renderResizeHandles(el.id)}
         </div>
       );
     }
@@ -432,13 +604,14 @@ export default function EtiquetaEditor() {
         <div
           key={el.id}
           style={{
-            ...estilo,
+            ...containerStyle,
             backgroundColor: el.cor,
             height: `${(el.borda_largura || 1) * MM_TO_PX}px`,
           }}
-          className={!isPreview && elementoSelecionado === el.id ? 'ring-2 ring-cyan-400' : ''}
           onMouseDown={!isPreview ? (e) => handleMouseDown(e, el.id) : undefined}
-        />
+        >
+          {!isPreview && renderResizeHandles(el.id)}
+        </div>
       );
     }
 
@@ -447,26 +620,31 @@ export default function EtiquetaEditor() {
         <div
           key={el.id}
           style={{
-            ...estilo,
+            ...containerStyle,
             backgroundColor: el.fundo_cor || 'transparent',
             border: `${el.borda_largura || 1}px solid ${el.borda_cor || el.cor}`,
           }}
-          className={!isPreview && elementoSelecionado === el.id ? 'ring-2 ring-cyan-400' : ''}
           onMouseDown={!isPreview ? (e) => handleMouseDown(e, el.id) : undefined}
-        />
+        >
+          {!isPreview && renderResizeHandles(el.id)}
+        </div>
       );
     }
 
     if (el.tipo === 'imagem' && el.imagem_url) {
       return (
-        <img
+        <div
           key={el.id}
-          src={el.imagem_url}
-          style={estilo}
-          className={!isPreview && elementoSelecionado === el.id ? 'ring-2 ring-cyan-400' : ''}
+          style={containerStyle}
           onMouseDown={!isPreview ? (e) => handleMouseDown(e, el.id) : undefined}
-          alt=""
-        />
+        >
+          <img
+            src={el.imagem_url}
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+            alt=""
+          />
+          {!isPreview && renderResizeHandles(el.id)}
+        </div>
       );
     }
 
@@ -477,22 +655,23 @@ export default function EtiquetaEditor() {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
 
-    const labelsHtml = dadosEtiqueta.map((dados, idx) => {
+    const labelsHtml = dadosEtiqueta.map((dados) => {
       const elementsHtml = elementos.map(el => {
         const conteudo = substituirVariaveis(el.conteudo, dados);
 
         if (el.tipo === 'codigo_barras') {
           const canvas = document.createElement('canvas');
           try {
+            const barcodeHeight = Math.max(20, el.altura * MM_TO_PX * 0.6);
             JsBarcode(canvas, conteudo || 'ERRO', {
               format: 'CODE128',
-              width: 1.5,
-              height: el.altura * MM_TO_PX * 0.7,
+              width: Math.max(1, el.largura / 20),
+              height: barcodeHeight,
               displayValue: true,
-              fontSize: 8,
+              fontSize: Math.max(8, el.fonte_tamanho),
               margin: 2
             });
-            return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.largura}mm;height:${el.altura}mm;text-align:center;">
+            return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.largura}mm;height:${el.altura}mm;display:flex;align-items:center;justify-content:center;">
               <img src="${canvas.toDataURL()}" style="max-width:100%;max-height:100%;" />
             </div>`;
           } catch {
@@ -558,7 +737,6 @@ export default function EtiquetaEditor() {
 
   return (
     <div className="min-h-screen bg-[#0D0D1A] text-white flex flex-col">
-      {/* Header */}
       <div className="bg-[#1A1A2E] border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-cyan-400">Editor de Etiquetas</h1>
@@ -596,11 +774,9 @@ export default function EtiquetaEditor() {
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Sidebar - Ferramentas */}
         <div className="w-64 bg-[#1A1A2E] border-r border-white/10 p-4 flex flex-col gap-4 overflow-y-auto">
-          {/* Dimensoes */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase">Dimensoes</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase">Dimensoes da Etiqueta</h3>
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-[10px] text-gray-500">Largura (mm)</label>
@@ -623,9 +799,8 @@ export default function EtiquetaEditor() {
             </div>
           </div>
 
-          {/* Adicionar Elementos */}
           <div className="space-y-2">
-            <h3 className="text-xs font-semibold text-gray-400 uppercase">Adicionar</h3>
+            <h3 className="text-xs font-semibold text-gray-400 uppercase">Adicionar Elemento</h3>
             <div className="grid grid-cols-2 gap-1">
               <button
                 onClick={() => adicionarElemento('texto')}
@@ -654,7 +829,6 @@ export default function EtiquetaEditor() {
             </div>
           </div>
 
-          {/* Variaveis */}
           <div className="space-y-2">
             <button
               onClick={() => setShowVariaveis(!showVariaveis)}
@@ -685,7 +859,6 @@ export default function EtiquetaEditor() {
             )}
           </div>
 
-          {/* Propriedades do Elemento Selecionado */}
           {elementoAtual && (
             <div className="space-y-2 border-t border-white/10 pt-4">
               <div className="flex items-center justify-between">
@@ -742,7 +915,7 @@ export default function EtiquetaEditor() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500">Largura</label>
+                  <label className="text-[10px] text-gray-500">Largura (mm)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -752,7 +925,7 @@ export default function EtiquetaEditor() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] text-gray-500">Altura</label>
+                  <label className="text-[10px] text-gray-500">Altura (mm)</label>
                   <input
                     type="number"
                     step="0.5"
@@ -767,7 +940,7 @@ export default function EtiquetaEditor() {
                 <>
                   <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <label className="text-[10px] text-gray-500">Tamanho</label>
+                      <label className="text-[10px] text-gray-500">Tamanho Fonte</label>
                       <input
                         type="number"
                         value={elementoAtual.fonte_tamanho}
@@ -831,6 +1004,18 @@ export default function EtiquetaEditor() {
                 </>
               )}
 
+              {elementoAtual.tipo === 'codigo_barras' && (
+                <div>
+                  <label className="text-[10px] text-gray-500">Tamanho do Texto</label>
+                  <input
+                    type="number"
+                    value={elementoAtual.fonte_tamanho}
+                    onChange={(e) => atualizarElemento(elementoAtual.id, { fonte_tamanho: Number(e.target.value) })}
+                    className="w-full px-2 py-1 bg-white/5 border border-white/10 rounded text-xs"
+                  />
+                </div>
+              )}
+
               <div>
                 <label className="text-[10px] text-gray-500">Rotacao</label>
                 <div className="flex items-center gap-2">
@@ -842,17 +1027,16 @@ export default function EtiquetaEditor() {
                     onChange={(e) => atualizarElemento(elementoAtual.id, { rotacao: Number(e.target.value) })}
                     className="flex-1"
                   />
-                  <span className="text-xs w-10">{elementoAtual.rotacao}°</span>
+                  <span className="text-xs w-10">{elementoAtual.rotacao}</span>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Lista de Elementos */}
           <div className="space-y-2 border-t border-white/10 pt-4">
             <h3 className="text-xs font-semibold text-gray-400 uppercase">Elementos ({elementos.length})</h3>
             <div className="space-y-1 max-h-32 overflow-y-auto">
-              {elementos.map((el, idx) => (
+              {elementos.map((el) => (
                 <button
                   key={el.id}
                   onClick={() => setElementoSelecionado(el.id)}
@@ -869,12 +1053,14 @@ export default function EtiquetaEditor() {
               ))}
             </div>
           </div>
+
+          <div className="p-3 bg-cyan-500/10 border border-cyan-500/20 rounded-lg text-[10px] text-cyan-300">
+            <strong>Dica:</strong> Arraste os quadrados azuis nos cantos e laterais para redimensionar. O texto e codigo de barras escalam automaticamente.
+          </div>
         </div>
 
-        {/* Canvas Area */}
         <div className="flex-1 bg-[#0D0D1A] p-8 overflow-auto flex items-center justify-center">
           <div className="flex flex-col items-center gap-4">
-            {/* Zoom Controls */}
             <div className="flex items-center gap-2 text-sm">
               <button onClick={() => setZoom(Math.max(1, zoom - 0.5))} className="p-1 hover:bg-white/10 rounded">
                 <Minus className="w-4 h-4" />
@@ -885,27 +1071,31 @@ export default function EtiquetaEditor() {
               </button>
             </div>
 
-            {/* Canvas */}
             <div
               ref={canvasRef}
               className="bg-white relative shadow-2xl"
               style={{
                 width: `${larguraMm * MM_TO_PX * zoom}px`,
                 height: `${alturaMm * MM_TO_PX * zoom}px`,
-                transform: `scale(${zoom})`,
-                transformOrigin: 'center center',
               }}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
               onMouseLeave={handleMouseUp}
               onClick={() => setElementoSelecionado(null)}
             >
-              <div style={{ transform: `scale(${1/zoom})`, transformOrigin: 'top left', width: `${larguraMm * MM_TO_PX * zoom}px`, height: `${alturaMm * MM_TO_PX * zoom}px` }}>
+              <div
+                style={{
+                  transform: `scale(${zoom})`,
+                  transformOrigin: 'top left',
+                  width: `${larguraMm * MM_TO_PX}px`,
+                  height: `${alturaMm * MM_TO_PX}px`,
+                  position: 'relative'
+                }}
+              >
                 {elementos.map(el => renderElemento(el, dadosEtiqueta[previewIndex]))}
               </div>
             </div>
 
-            {/* Preview Navigation */}
             {dadosEtiqueta.length > 1 && (
               <div className="flex items-center gap-2 text-sm">
                 <button
@@ -929,7 +1119,6 @@ export default function EtiquetaEditor() {
         </div>
       </div>
 
-      {/* Modal Templates */}
       {showTemplates && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#1A1A2E] rounded-xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-hidden">
@@ -998,7 +1187,6 @@ export default function EtiquetaEditor() {
         </div>
       )}
 
-      {/* Modal Salvar */}
       {showSaveModal && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-[#1A1A2E] rounded-xl border border-white/10 w-full max-w-md p-6">
@@ -1045,25 +1233,33 @@ export default function EtiquetaEditor() {
   );
 }
 
-function BarcodeRenderer({ value, width, height }: { value: string; width: number; height: number }) {
+function BarcodeRenderer({ value, width, height, fontSize }: { value: string; width: number; height: number; fontSize: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
     if (canvasRef.current && value) {
       try {
+        const barcodeWidth = Math.max(1, width / 60);
+        const barcodeHeight = Math.max(20, height * 0.65);
+
         JsBarcode(canvasRef.current, value, {
           format: 'CODE128',
-          width: 1.5,
-          height: height * 0.7,
+          width: barcodeWidth,
+          height: barcodeHeight,
           displayValue: true,
-          fontSize: 8,
-          margin: 2
+          fontSize: Math.max(8, fontSize),
+          margin: 2,
+          textMargin: 2
         });
       } catch {
         // erro silencioso
       }
     }
-  }, [value, height]);
+  }, [value, width, height, fontSize]);
 
-  return <canvas ref={canvasRef} style={{ maxWidth: '100%', maxHeight: '100%' }} />;
+  return (
+    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <canvas ref={canvasRef} style={{ maxWidth: '100%', maxHeight: '100%' }} />
+    </div>
+  );
 }
