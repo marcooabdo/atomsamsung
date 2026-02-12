@@ -940,6 +940,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   const [osSuggestions, setOsSuggestions] = useState<OS[]>([]);
+  const [osRecentes, setOsRecentes] = useState<OS[]>([]);
 
   const searchOS = useCallback(async (term: string) => {
     const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
@@ -1004,13 +1005,35 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   }, [conversa.unidade_id, conversa.cliente_telefone, unidadeId, unidadeAtual]);
 
+  const loadOsRecentes = useCallback(async () => {
+    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
+    if (!targetUnidadeId) return;
+
+    try {
+      const { data } = await supabase
+        .from('os')
+        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
+        .eq('unidade_id', targetUnidadeId)
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (data) {
+        setOsRecentes(data);
+      }
+    } catch {
+      setOsRecentes([]);
+    }
+  }, [conversa.unidade_id, unidadeId, unidadeAtual]);
+
   useEffect(() => {
     if (showVincularOS) {
       loadOsSuggestionsByPhone();
+      loadOsRecentes();
     } else {
       setOsSuggestions([]);
+      setOsRecentes([]);
     }
-  }, [showVincularOS, loadOsSuggestionsByPhone]);
+  }, [showVincularOS, loadOsSuggestionsByPhone, loadOsRecentes]);
 
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -2176,6 +2199,40 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     <div className="px-1 pt-2">
                       <p className="text-[10px] text-gray-500">Ou digite para buscar por numero da OS, nome ou CPF</p>
                     </div>
+                  </>
+                ) : osRecentes.length > 0 ? (
+                  <>
+                    <div className="flex items-center gap-2 px-1 py-1.5">
+                      <FileText className="w-3.5 h-3.5 text-gray-400" />
+                      <span className="text-[11px] font-medium text-gray-400">OS Recentes</span>
+                    </div>
+                    {osRecentes.map(os => (
+                      <button
+                        key={os.id}
+                        onClick={() => vincularOS(os)}
+                        className="w-full flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-left"
+                      >
+                        <FileText className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {os.numero_os_interna && (
+                              <span className="text-xs font-semibold text-cyan-400">
+                                #{os.numero_os_interna}
+                              </span>
+                            )}
+                            {os.numero_os_samsung && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/20 text-orange-400">
+                                Samsung: {os.numero_os_samsung}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-sm text-white truncate mt-1">{os.cliente_nome}</p>
+                          {os.cliente_telefone && (
+                            <p className="text-[10px] text-gray-500">{os.cliente_telefone}</p>
+                          )}
+                        </div>
+                      </button>
+                    ))}
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-full text-gray-500">

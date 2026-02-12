@@ -295,12 +295,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         nfse_codigo_nbs: (config as any).nfse_codigo_nbs || '',
         nfse_codigo_municipio_prestacao: (config as any).nfse_codigo_municipio_prestacao || '',
         nfse_descricao_servico: (config as any).nfse_descricao_servico || '',
-        nfse_trib_issqn: (() => {
-          const val = (config as any).nfse_trib_issqn;
-          const result = (val !== null && val !== undefined) ? String(val) : '1';
-          console.log('🔍 Carregando tribISSQN - DB:', val, '→ Form:', result);
-          return result;
-        })(),
+        nfse_trib_issqn: ((config as any).nfse_trib_issqn !== null && (config as any).nfse_trib_issqn !== undefined) ? String((config as any).nfse_trib_issqn) : '1',
         nfse_codigo_municipio_ibge: (config as any).nfse_codigo_municipio_ibge || '',
         iss_aliquota: String(config.iss_aliquota || 0),
         iss_retido: config.iss_retido || false,
@@ -373,9 +368,6 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
     setMensagem(null);
 
     try {
-      const nfse_trib_issqn_value = form.nfse_trib_issqn !== '' ? parseInt(form.nfse_trib_issqn) : 1;
-      console.log('🔍 Salvando tribISSQN - Form:', form.nfse_trib_issqn, '→ Valor final:', nfse_trib_issqn_value);
-
       const payload: any = {
         nome: form.nome.trim(),
         tipo: form.tipo,
@@ -386,7 +378,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         nfse_codigo_nbs: form.nfse_codigo_nbs || null,
         nfse_codigo_municipio_prestacao: form.nfse_codigo_municipio_prestacao || null,
         nfse_descricao_servico: form.nfse_descricao_servico || null,
-        nfse_trib_issqn: nfse_trib_issqn_value,
+        nfse_trib_issqn: form.nfse_trib_issqn !== '' ? parseInt(form.nfse_trib_issqn) : 1,
         nfse_codigo_municipio_ibge: form.nfse_codigo_municipio_ibge || null,
         codigo_servico: form.codigo_servico || null,
         cnae: form.cnae || null,
