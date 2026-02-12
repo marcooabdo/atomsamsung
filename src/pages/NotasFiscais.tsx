@@ -758,7 +758,7 @@ export function NotasFiscais() {
                       <Eye className="w-4 h-4" />
                     </button>
 
-                    {nf.status === 'erro' && (
+                    {(nf.status === 'erro' || nf.status === 'pendente') && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -766,11 +766,11 @@ export function NotasFiscais() {
                         }}
                         className="neon-button p-2"
                         style={{
-                          backgroundColor: '#FFBF0020',
-                          borderColor: '#FFBF00',
-                          color: '#FFBF00'
+                          backgroundColor: nf.status === 'erro' ? '#FFBF0020' : '#00D4FF20',
+                          borderColor: nf.status === 'erro' ? '#FFBF00' : '#00D4FF',
+                          color: nf.status === 'erro' ? '#FFBF00' : '#00D4FF'
                         }}
-                        title="Tentar novamente"
+                        title={nf.status === 'erro' ? 'Tentar novamente' : 'Reenviar'}
                       >
                         <RefreshCw className="w-4 h-4" />
                       </button>
@@ -1017,20 +1017,20 @@ export function NotasFiscais() {
                 </div>
               )}
 
-              {notaDetalhes.status === 'erro' && (
+              {(notaDetalhes.status === 'erro' || notaDetalhes.status === 'pendente') && (
                 <div className="pt-4 border-t border-gray-700">
                   <button
                     onClick={() => handleRetry(notaDetalhes)}
                     className="w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg font-bold text-sm uppercase tracking-wider transition-all"
                     style={{
-                      backgroundColor: '#FFBF0020',
-                      border: '2px solid #FFBF00',
-                      color: '#FFBF00',
-                      boxShadow: '0 0 15px rgba(255,191,0,0.2)'
+                      backgroundColor: notaDetalhes.status === 'erro' ? '#FFBF0020' : '#00D4FF20',
+                      border: `2px solid ${notaDetalhes.status === 'erro' ? '#FFBF00' : '#00D4FF'}`,
+                      color: notaDetalhes.status === 'erro' ? '#FFBF00' : '#00D4FF',
+                      boxShadow: `0 0 15px ${notaDetalhes.status === 'erro' ? 'rgba(255,191,0,0.2)' : 'rgba(0,212,255,0.2)'}`
                     }}
                   >
                     <RefreshCw className="w-4 h-4" />
-                    Tentar Novamente
+                    {notaDetalhes.status === 'erro' ? 'Tentar Novamente' : 'Reenviar'}
                   </button>
                 </div>
               )}
