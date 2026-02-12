@@ -348,11 +348,24 @@ export function EmitirNFSeModal({
 
       if (nfseId) {
         try {
-          await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfse', {
+          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+          const emitResponse = await fetch(`${supabaseUrl}/functions/v1/emit-nfse`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabaseAnonKey}`,
+            },
             body: JSON.stringify({ nfse_id: nfseId })
           });
+
+          const emitResult = await emitResponse.json();
+          console.log('Resultado da emissao:', emitResult);
+
+          if (!emitResponse.ok) {
+            console.error('Erro na resposta do servidor de emissao:', emitResult);
+          }
         } catch (fetchErr) {
           console.error('Erro ao notificar servidor de emissao:', fetchErr);
         }
