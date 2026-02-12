@@ -65,7 +65,9 @@ export default function AtomConnect() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [showUnidadeFilter, setShowUnidadeFilter] = useState(false);
-  const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(unidadeAtual || null);
+
+  const canFilterUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(canFilterUnits ? null : (unidadeAtual || null));
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastNotifiedRef = useRef<Record<string, number>>({});
   const selectedConversaRef = useRef<Conversa | null>(null);
@@ -372,68 +374,79 @@ export default function AtomConnect() {
           {/* Unit Filter - Center - ALWAYS VISIBLE */}
           <div className="absolute left-1/2 -translate-x-1/2">
             <div className="relative">
-              <button
-                onClick={() => setShowUnidadeFilter(!showUnidadeFilter)}
-                className="flex items-center gap-3 px-6 py-2.5 rounded-xl border-2 border-cyan-400/60 bg-gradient-to-r from-cyan-500/25 to-cyan-600/25 text-cyan-300 hover:from-cyan-500/35 hover:to-cyan-600/35 hover:border-cyan-400/80 transition-all shadow-lg animate-pulse"
-                style={{ boxShadow: '0 0 25px rgba(0, 212, 255, 0.5), inset 0 0 20px rgba(0, 212, 255, 0.15)' }}
-              >
-                <Building2 className="w-5 h-5" />
-                <span className="text-sm font-bold tracking-wide">
-                  {selectedUnidadeFilter && unidades
-                    ? unidades.find(u => u.id === selectedUnidadeFilter)?.nome || 'FILTRO DE UNIDADES'
-                    : 'TODAS AS UNIDADES'}
-                </span>
-                <ChevronDown className="w-4 h-4" />
-              </button>
-
-              <AnimatePresence>
-                {showUnidadeFilter && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 8, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: 8, scale: 0.96 }}
-                    className="absolute left-1/2 -translate-x-1/2 top-14 w-72 max-h-80 overflow-y-auto rounded-xl border-2 border-cyan-400/40 shadow-2xl z-50"
-                    style={{
-                      background: 'linear-gradient(180deg, #12122a, #0d0d1e)',
-                      boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)'
-                    }}
+              {canFilterUnits ? (
+                <>
+                  <button
+                    onClick={() => setShowUnidadeFilter(!showUnidadeFilter)}
+                    className="flex items-center gap-3 px-6 py-2.5 rounded-xl border-2 border-cyan-400/60 bg-gradient-to-r from-cyan-500/25 to-cyan-600/25 text-cyan-300 hover:from-cyan-500/35 hover:to-cyan-600/35 hover:border-cyan-400/80 transition-all shadow-lg animate-pulse"
+                    style={{ boxShadow: '0 0 25px rgba(0, 212, 255, 0.5), inset 0 0 20px rgba(0, 212, 255, 0.15)' }}
                   >
-                    <button
-                      onClick={() => {
-                        setSelectedUnidadeFilter(null);
-                        setShowUnidadeFilter(false);
-                      }}
-                      className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.08] transition-colors ${
-                        !selectedUnidadeFilter ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
-                      }`}
-                    >
-                      <Building2 className="w-5 h-5" />
-                      <span className="text-sm font-bold">TODAS AS UNIDADES</span>
-                    </button>
-                    {unidades && unidades.length > 0 ? (
-                      unidades.map(unidade => (
+                    <Building2 className="w-5 h-5" />
+                    <span className="text-sm font-bold tracking-wide">
+                      {selectedUnidadeFilter && unidades
+                        ? unidades.find(u => u.id === selectedUnidadeFilter)?.nome || 'FILTRO DE UNIDADES'
+                        : 'TODAS AS UNIDADES'}
+                    </span>
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+
+                  <AnimatePresence>
+                    {showUnidadeFilter && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 8, scale: 0.96 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.96 }}
+                        className="absolute left-1/2 -translate-x-1/2 top-14 w-72 max-h-80 overflow-y-auto rounded-xl border-2 border-cyan-400/40 shadow-2xl z-50"
+                        style={{
+                          background: 'linear-gradient(180deg, #12122a, #0d0d1e)',
+                          boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)'
+                        }}
+                      >
                         <button
-                          key={unidade.id}
                           onClick={() => {
-                            setSelectedUnidadeFilter(unidade.id);
+                            setSelectedUnidadeFilter(null);
                             setShowUnidadeFilter(false);
                           }}
                           className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.08] transition-colors ${
-                            selectedUnidadeFilter === unidade.id ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
+                            !selectedUnidadeFilter ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
                           }`}
                         >
                           <Building2 className="w-5 h-5" />
-                          <span className="text-sm font-medium">{unidade.nome}</span>
+                          <span className="text-sm font-bold">TODAS AS UNIDADES</span>
                         </button>
-                      ))
-                    ) : (
-                      <div className="px-4 py-3.5 text-white/50 text-sm text-center">
-                        Nenhuma unidade disponível
-                      </div>
+                        {unidades && unidades.length > 0 ? (
+                          unidades.map(unidade => (
+                            <button
+                              key={unidade.id}
+                              onClick={() => {
+                                setSelectedUnidadeFilter(unidade.id);
+                                setShowUnidadeFilter(false);
+                              }}
+                              className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.08] transition-colors ${
+                                selectedUnidadeFilter === unidade.id ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
+                              }`}
+                            >
+                              <Building2 className="w-5 h-5" />
+                              <span className="text-sm font-medium">{unidade.nome}</span>
+                            </button>
+                          ))
+                        ) : (
+                          <div className="px-4 py-3.5 text-white/50 text-sm text-center">
+                            Nenhuma unidade disponivel
+                          </div>
+                        )}
+                      </motion.div>
                     )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                  </AnimatePresence>
+                </>
+              ) : (
+                <div className="flex items-center gap-3 px-6 py-2.5 rounded-xl border-2 border-cyan-400/30 bg-cyan-500/10 text-cyan-300">
+                  <Building2 className="w-5 h-5" />
+                  <span className="text-sm font-bold tracking-wide">
+                    {unidades?.find(u => u.id === unidadeAtual)?.nome || 'Sua Unidade'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 

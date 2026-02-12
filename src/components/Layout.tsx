@@ -1,7 +1,8 @@
-import { ReactNode, useState, useEffect } from 'react';
+import { ReactNode, useState, useEffect, useMemo } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import { ProfileModal } from './ProfileModal';
@@ -33,34 +34,35 @@ interface LayoutProps {
 }
 
 const allMenuItems = [
-  { id: 'gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
-  { id: 'dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
-  { id: 'kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
-  { id: 'estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
-  { id: 'chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
-  { id: 'atom-connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
-  { id: 'otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
-  { id: 'customer-intelligence', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
-  { id: 'registro-vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
-  { id: 'skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
-  { id: 'financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
-  { id: 'notas-fiscais', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
-  { id: 'ofs', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
-  { id: 'configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes', onlyFor: ['master', 'diretoria', 'gerente'] },
+  { id: 'gia', permKey: 'menu_gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
+  { id: 'dashboard', permKey: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
+  { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
+  { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
+  { id: 'chat', permKey: 'menu_chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
+  { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
+  { id: 'otimizador', permKey: 'menu_otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
+  { id: 'customer-intelligence', permKey: 'menu_ci', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
+  { id: 'registro-vendas', permKey: 'menu_vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
+  { id: 'skywalker', permKey: 'menu_skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
+  { id: 'financeiro', permKey: 'menu_financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
+  { id: 'notas-fiscais', permKey: 'menu_nf', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
+  { id: 'ofs', permKey: 'menu_cotacoes', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
+  { id: 'configuracoes', permKey: 'menu_configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes' },
 ];
 
 export function Layout({ children }: LayoutProps) {
   const { usuario, signOut, updateUsuario } = useAuth();
   const { themeInfo } = useTheme();
+  const { hasPermission, loading: permissionsLoading } = usePermissions();
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [unreadConversations, setUnreadConversations] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
 
-  const menuItems = allMenuItems.filter(item => {
-    if (!item.onlyFor) return true;
-    return usuario && item.onlyFor.includes(usuario.tipo);
-  });
+  const menuItems = useMemo(() => {
+    if (permissionsLoading) return allMenuItems;
+    return allMenuItems.filter(item => hasPermission(item.permKey));
+  }, [permissionsLoading, hasPermission]);
 
   useEffect(() => {
     if (!usuario?.id) return;
