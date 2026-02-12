@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   MessageSquare, Users, BarChart3, Settings, Zap, Bell, Search,
   AlertTriangle, ArrowRight,
@@ -51,6 +52,7 @@ interface Notification {
 export default function AtomConnect() {
   const { usuario, unidadeAtual, unidades } = useAuth();
   const { theme } = useTheme();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [selectedConversa, setSelectedConversa] = useState<Conversa | null>(null);
@@ -68,6 +70,7 @@ export default function AtomConnect() {
   const lastNotifiedRef = useRef<Record<string, number>>({});
   const selectedConversaRef = useRef<Conversa | null>(null);
   const lastNotificationTimeRef = useRef<Record<string, number>>({});
+  const deepLinkProcessedRef = useRef(false);
 
   const loadConversas = useCallback(async () => {
     let query = supabase
@@ -95,6 +98,78 @@ export default function AtomConnect() {
   useEffect(() => {
     loadConversas();
   }, [loadConversas]);
+
+  useEffect(() => {
+    if (deepLinkProcessedRef.current || loading) return;
+    const osId = searchParams.get('os_id');
+    const phone = searchParams.get('phone');
+    if (!osId || !phone) return;
+
+    deepLinkProcessedRef.current = true;
+    setSearchParams({}, { replace: true });
+
+    (async () => {
+      const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
+      const targetUnidade = selectedUnidadeFilter || unidadeAtual || usuario?.unidade_id;
+
+      const { data: existing } = await supabase
+        .from('atom_connect_conversas')
+        .select('*')
+        .eq('cliente_telefone', formattedPhone)
+        .eq('unidade_id', targetUnidade!)
+        .maybeSingle();
+
+      if (existing) {
+        if (!existing.os_id) {
+          await supabase
+            .from('atom_connect_conversas')
+            .update({ os_id: osId })
+            .eq('id', existing.id);
+          existing.os_id = osId;
+        }
+        setSelectedConversa(existing);
+        setShowChat(true);
+        await loadConversas();
+        return;
+      }
+
+      const { data: osInfo } = await supabase
+        .from('os')
+        .select('id, cliente_nome')
+        .eq('id', osId)
+        .maybeSingle();
+
+      const { data: firstColumn } = await supabase
+        .from('atom_connect_pipeline_colunas')
+        .select('id')
+        .order('ordem', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      const { data: newConversa } = await supabase
+        .from('atom_connect_conversas')
+        .insert({
+          unidade_id: targetUnidade!,
+          cliente_telefone: formattedPhone,
+          cliente_nome: osInfo?.cliente_nome || null,
+          os_id: osId,
+          coluna_pipeline: firstColumn?.id || 'bot_triagem',
+          atendente_id: usuario?.id || null,
+          is_bot_ativo: false,
+          tipo_atendimento: 'whatsapp',
+          prioridade: 'normal',
+          ultima_mensagem_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+
+      if (newConversa) {
+        setSelectedConversa(newConversa);
+        setShowChat(true);
+        await loadConversas();
+      }
+    })();
+  }, [searchParams, loading, selectedUnidadeFilter, unidadeAtual, usuario]);
 
   useEffect(() => {
     selectedConversaRef.current = selectedConversa;

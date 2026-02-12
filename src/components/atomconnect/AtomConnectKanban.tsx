@@ -95,7 +95,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
   }, [filterVendedor, filterDiasSemRetorno, filterVinculadoOS]);
 
   const filteredConversas = useMemo(() => {
-    let filtered = conversas;
+    let filtered = conversas.filter(c => c.ultima_mensagem);
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();

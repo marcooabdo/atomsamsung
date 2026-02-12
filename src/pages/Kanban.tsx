@@ -1,5 +1,6 @@
 // v2.0.2 - Fixed os_pecas and cotacoes_pecas foreign keys
 import { useEffect, useState, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase, formatTipoAtendimentoShort } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
@@ -10,7 +11,7 @@ import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -106,6 +107,7 @@ const COLUNAS_IH = [
 
 export function Kanban() {
   const { user, usuario } = useAuth();
+  const navigate = useNavigate();
   const [osData, setOsData] = useState<Record<string, OS[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2372,17 +2374,36 @@ export function Kanban() {
                               </div>
                               <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
                             </div>
-                            {os.alerta_divergencia_gspn && (
-                              <div className="p-1 rounded-md flex-shrink-0" style={{
-                                backgroundColor: 'rgba(255,0,100,0.15)',
-                                border: '1px solid rgba(255,0,100,0.4)'
-                              }}>
-                                <AlertCircle
-                                  className="w-3 h-3 text-[#FF0064]"
-                                  style={{ filter: 'drop-shadow(0 0 4px rgba(255, 0, 100, 0.8))' }}
-                                />
-                              </div>
-                            )}
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {os.cliente_telefone && (
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const phone = os.cliente_telefone!.replace(/\D/g, '');
+                                    navigate(`/atom-connect?os_id=${os.id}&phone=${phone}`);
+                                  }}
+                                  className="p-1 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
+                                    border: '1px solid rgba(0,212,255,0.3)',
+                                  }}
+                                  title="Abrir conversa no Atom Connect"
+                                >
+                                  <MessageCircle className="w-3 h-3 text-cyan-400" style={{ filter: 'drop-shadow(0 0 3px #00D4FF)' }} />
+                                </button>
+                              )}
+                              {os.alerta_divergencia_gspn && (
+                                <div className="p-1 rounded-md flex-shrink-0" style={{
+                                  backgroundColor: 'rgba(255,0,100,0.15)',
+                                  border: '1px solid rgba(255,0,100,0.4)'
+                                }}>
+                                  <AlertCircle
+                                    className="w-3 h-3 text-[#FF0064]"
+                                    style={{ filter: 'drop-shadow(0 0 4px rgba(255, 0, 100, 0.8))' }}
+                                  />
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           <div className="space-y-1.5 text-xs">
