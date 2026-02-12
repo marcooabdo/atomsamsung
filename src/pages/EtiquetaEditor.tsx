@@ -5,7 +5,7 @@ import JsBarcode from 'jsbarcode';
 import {
   Printer, Save, FolderOpen, Plus, Trash2, Type, BarChart3,
   Minus, Square, Copy, AlignLeft, AlignCenter, AlignRight,
-  Bold, ChevronDown, Star, X, Loader2
+  Bold, ChevronDown, Star, X, Loader2, Image as ImageIcon, Upload
 } from 'lucide-react';
 
 interface ElementoEtiqueta {
@@ -95,7 +95,9 @@ export default function EtiquetaEditor() {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0 });
   const [unidadeId, setUnidadeId] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const init = async () => {
@@ -304,6 +306,11 @@ export default function EtiquetaEditor() {
   };
 
   const adicionarElemento = (tipo: ElementoEtiqueta['tipo']) => {
+    if (tipo === 'imagem') {
+      fileInputRef.current?.click();
+      return;
+    }
+
     const novoId = `el-${Date.now()}`;
     const novo: ElementoEtiqueta = {
       id: novoId,
@@ -321,6 +328,81 @@ export default function EtiquetaEditor() {
     };
     setElementos([...elementos, novo]);
     setElementoSelecionado(novoId);
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !unidadeId) return;
+
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${unidadeId}/${Date.now()}.${fileExt}`;
+
+      const { data, error } = await supabase.storage
+        .from('etiquetas-imagens')
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) {
+        if (error.message.includes('not found')) {
+          const { error: bucketError } = await supabase.storage.createBucket('etiquetas-imagens', {
+            public: true,
+            fileSizeLimit: 5242880
+          });
+
+          if (!bucketError) {
+            const { data: retryData, error: retryError } = await supabase.storage
+              .from('etiquetas-imagens')
+              .upload(fileName, file);
+
+            if (retryError) throw retryError;
+            data.path = retryData.path;
+          } else {
+            throw bucketError;
+          }
+        } else {
+          throw error;
+        }
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('etiquetas-imagens')
+        .getPublicUrl(data.path);
+
+      const novoId = `el-${Date.now()}`;
+      const novo: ElementoEtiqueta = {
+        id: novoId,
+        tipo: 'imagem',
+        x: 5,
+        y: 5,
+        largura: 15,
+        altura: 15,
+        conteudo: '',
+        fonte_tamanho: 10,
+        fonte_negrito: false,
+        rotacao: 0,
+        cor: '#000000',
+        imagem_url: publicUrl
+      };
+      setElementos([...elementos, novo]);
+      setElementoSelecionado(novoId);
+    } catch (error) {
+      console.error('Erro ao fazer upload:', error);
+      alert('Erro ao fazer upload da imagem. Tente novamente.');
+    } finally {
+      setUploadingImage(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
   };
 
   const atualizarElemento = (id: string, updates: Partial<ElementoEtiqueta>) => {
@@ -705,6 +787,12 @@ export default function EtiquetaEditor() {
             background:${el.fundo_cor || 'transparent'};border:${el.borda_largura || 0.3}mm solid ${el.borda_cor || el.cor};"></div>`;
         }
 
+        if (el.tipo === 'imagem' && el.imagem_url) {
+          return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.largura}mm;height:${el.altura}mm;">
+            <img src="${el.imagem_url}" style="width:100%;height:100%;object-fit:contain;" />
+          </div>`;
+        }
+
         return '';
       }).join('');
 
@@ -820,6 +908,13 @@ export default function EtiquetaEditor() {
                 <BarChart3 className="w-3 h-3" /> Barras
               </button>
               <button
+                onClick={() => adicionarElemento('imagem')}
+                disabled={uploadingImage}
+                className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs disabled:opacity-50"
+              >
+                {uploadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />} Imagem
+              </button>
+              <button
                 onClick={() => adicionarElemento('linha')}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs"
               >
@@ -832,6 +927,13 @@ export default function EtiquetaEditor() {
                 <Square className="w-3 h-3" /> Retangulo
               </button>
             </div>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="hidden"
+            />
           </div>
 
           <div className="space-y-2">
@@ -885,6 +987,68 @@ export default function EtiquetaEditor() {
                   </button>
                 </div>
               </div>
+
+              {elementoAtual.tipo === 'imagem' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] text-gray-500">Imagem</label>
+                  {elementoAtual.imagem_url && (
+                    <div className="relative w-full h-24 bg-white/5 rounded overflow-hidden">
+                      <img
+                        src={elementoAtual.imagem_url}
+                        alt="Preview"
+                        className="w-full h-full object-contain"
+                      />
+                    </div>
+                  )}
+                  <button
+                    onClick={() => {
+                      const input = document.createElement('input');
+                      input.type = 'file';
+                      input.accept = 'image/*';
+                      input.onchange = async (e) => {
+                        const file = (e.target as HTMLInputElement).files?.[0];
+                        if (!file || !unidadeId) return;
+
+                        setUploadingImage(true);
+                        try {
+                          const fileExt = file.name.split('.').pop();
+                          const fileName = `${unidadeId}/${Date.now()}.${fileExt}`;
+
+                          const { data, error } = await supabase.storage
+                            .from('etiquetas-imagens')
+                            .upload(fileName, file);
+
+                          if (error) throw error;
+
+                          const { data: { publicUrl } } = supabase.storage
+                            .from('etiquetas-imagens')
+                            .getPublicUrl(data.path);
+
+                          atualizarElemento(elementoAtual.id, { imagem_url: publicUrl });
+                        } catch (error) {
+                          console.error('Erro ao fazer upload:', error);
+                          alert('Erro ao fazer upload da imagem.');
+                        } finally {
+                          setUploadingImage(false);
+                        }
+                      };
+                      input.click();
+                    }}
+                    disabled={uploadingImage}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-cyan-500/20 text-cyan-400 rounded hover:bg-cyan-500/30 text-xs disabled:opacity-50"
+                  >
+                    {uploadingImage ? (
+                      <>
+                        <Loader2 className="w-3 h-3 animate-spin" /> Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <Upload className="w-3 h-3" /> {elementoAtual.imagem_url ? 'Trocar' : 'Enviar'} Imagem
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
               {(elementoAtual.tipo === 'texto' || elementoAtual.tipo === 'codigo_barras') && (
                 <div>
@@ -1065,6 +1229,7 @@ export default function EtiquetaEditor() {
                 >
                   {el.tipo === 'texto' && <Type className="w-3 h-3" />}
                   {el.tipo === 'codigo_barras' && <BarChart3 className="w-3 h-3" />}
+                  {el.tipo === 'imagem' && <ImageIcon className="w-3 h-3" />}
                   {el.tipo === 'linha' && <Minus className="w-3 h-3" />}
                   {el.tipo === 'retangulo' && <Square className="w-3 h-3" />}
                   <span className="truncate flex-1">{el.conteudo || el.tipo}</span>
