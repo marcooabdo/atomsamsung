@@ -4397,6 +4397,12 @@ Não haverá cobrança ao cliente.`
                 os.cliente_estado,
                 os.cliente_cep
               ].filter(Boolean).join(', ')}
+              clienteLogradouro={os.cliente_logradouro}
+              clienteNumero={os.cliente_numero}
+              clienteBairro={os.cliente_bairro}
+              clienteCep={os.cliente_cep}
+              clienteCidade={os.cliente_cidade}
+              clienteCidadeIbge={null}
               unidadeId={os.unidade_id}
               valorServicos={os.valor_servicos || 0}
               valorPecas={os.valor_pecas || 0}

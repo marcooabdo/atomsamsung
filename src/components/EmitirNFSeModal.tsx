@@ -144,7 +144,7 @@ export function EmitirNFSeModal({
         tomadorCidadeIbge: clienteCidadeIbge || prev.tomadorCidadeIbge,
       }));
     }
-  }, [isOpen, valorServicos, clienteNome, clienteDocumento]);
+  }, [isOpen, valorServicos, clienteNome, clienteDocumento, clienteLogradouro, clienteNumero, clienteBairro, clienteCep, clienteCidadeIbge]);
 
   const loadData = async () => {
     setLoading(true);
