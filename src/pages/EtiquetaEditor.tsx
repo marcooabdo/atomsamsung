@@ -377,23 +377,64 @@ export default function EtiquetaEditor() {
         .from('etiquetas-imagens')
         .getPublicUrl(data.path);
 
-      const novoId = `el-${Date.now()}`;
-      const novo: ElementoEtiqueta = {
-        id: novoId,
-        tipo: 'imagem',
-        x: 5,
-        y: 5,
-        largura: 15,
-        altura: 15,
-        conteudo: '',
-        fonte_tamanho: 10,
-        fonte_negrito: false,
-        rotacao: 0,
-        cor: '#000000',
-        imagem_url: publicUrl
+      console.log('URL da imagem gerada:', publicUrl);
+
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+
+      img.onload = () => {
+        console.log('Imagem carregada com sucesso:', img.width, 'x', img.height);
+        const aspectRatio = img.width / img.height;
+        let largura = 30;
+        let altura = 30;
+
+        if (aspectRatio > 1) {
+          altura = largura / aspectRatio;
+        } else {
+          largura = altura * aspectRatio;
+        }
+
+        const novoId = `el-${Date.now()}`;
+        const novo: ElementoEtiqueta = {
+          id: novoId,
+          tipo: 'imagem',
+          x: 5,
+          y: 5,
+          largura: Math.round(largura * 10) / 10,
+          altura: Math.round(altura * 10) / 10,
+          conteudo: '',
+          fonte_tamanho: 10,
+          fonte_negrito: false,
+          rotacao: 0,
+          cor: '#000000',
+          imagem_url: publicUrl
+        };
+        setElementos(prev => [...prev, novo]);
+        setElementoSelecionado(novoId);
       };
-      setElementos([...elementos, novo]);
-      setElementoSelecionado(novoId);
+
+      img.onerror = (e) => {
+        console.error('Erro ao carregar dimensões da imagem:', e);
+        const novoId = `el-${Date.now()}`;
+        const novo: ElementoEtiqueta = {
+          id: novoId,
+          tipo: 'imagem',
+          x: 5,
+          y: 5,
+          largura: 30,
+          altura: 30,
+          conteudo: '',
+          fonte_tamanho: 10,
+          fonte_negrito: false,
+          rotacao: 0,
+          cor: '#000000',
+          imagem_url: publicUrl
+        };
+        setElementos(prev => [...prev, novo]);
+        setElementoSelecionado(novoId);
+      };
+
+      img.src = publicUrl + '?t=' + Date.now();
     } catch (error) {
       console.error('Erro ao fazer upload:', error);
       alert('Erro ao fazer upload da imagem. Tente novamente.');
@@ -724,8 +765,16 @@ export default function EtiquetaEditor() {
         >
           <img
             src={el.imagem_url}
-            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
-            alt=""
+            style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
+            alt="Imagem da etiqueta"
+            crossOrigin="anonymous"
+            onLoad={() => console.log('Imagem renderizada no canvas')}
+            onError={(e) => {
+              console.error('Erro ao renderizar imagem no canvas:', el.imagem_url);
+              const target = e.currentTarget as HTMLImageElement;
+              target.style.border = '2px solid red';
+              target.alt = 'Erro ao carregar';
+            }}
           />
           {!isPreview && renderResizeHandles(el.id)}
         </div>
@@ -789,7 +838,7 @@ export default function EtiquetaEditor() {
 
         if (el.tipo === 'imagem' && el.imagem_url) {
           return `<div style="position:absolute;left:${el.x}mm;top:${el.y}mm;width:${el.largura}mm;height:${el.altura}mm;">
-            <img src="${el.imagem_url}" style="width:100%;height:100%;object-fit:contain;" />
+            <img src="${el.imagem_url}" style="width:100%;height:100%;object-fit:contain;display:block;" crossorigin="anonymous" alt="Imagem" />
           </div>`;
         }
 
@@ -992,11 +1041,19 @@ export default function EtiquetaEditor() {
                 <div className="space-y-2">
                   <label className="text-[10px] text-gray-500">Imagem</label>
                   {elementoAtual.imagem_url && (
-                    <div className="relative w-full h-24 bg-white/5 rounded overflow-hidden">
+                    <div className="relative w-full h-24 bg-white/5 rounded overflow-hidden border border-white/10">
                       <img
                         src={elementoAtual.imagem_url}
                         alt="Preview"
                         className="w-full h-full object-contain"
+                        crossOrigin="anonymous"
+                        onLoad={() => console.log('Preview carregado:', elementoAtual.imagem_url)}
+                        onError={(e) => {
+                          console.error('Erro ao carregar preview da imagem:', elementoAtual.imagem_url);
+                          const target = e.currentTarget as HTMLImageElement;
+                          target.style.opacity = '0.3';
+                          target.alt = 'Erro ao carregar';
+                        }}
                       />
                     </div>
                   )}
