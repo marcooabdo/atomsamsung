@@ -38,6 +38,7 @@ interface NFEmitida {
   erro_mensagem: string | null;
   pdf_url: string | null;
   xml_url: string | null;
+  nuvem_fiscal_id: string | null;
   tentativas: number | null;
   nf_config: { nome: string } | null;
 }
@@ -185,7 +186,7 @@ export function OSNotaFiscalTab({
           .maybeSingle(),
         supabase
           .from('nf_emitidas')
-          .select('*, nf_config:nf_configuracoes(nome)')
+          .select('*, nuvem_fiscal_id, nf_config:nf_configuracoes(nome)')
           .eq('os_id', osId)
           .order('created_at', { ascending: false }),
         supabase
@@ -1406,69 +1407,81 @@ export function OSNotaFiscalTab({
           </h4>
 
           <div className="space-y-2">
-            {nfsEmitidas.map(nf => (
-              <div
-                key={nf.id}
-                className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
-              >
-                <div className="flex items-center gap-3 flex-1 min-w-0">
-                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
-                    nf.tipo === 'nfse'
-                      ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
-                      : 'bg-[#FFA500]/15 text-[#FFA500] border border-[#FFA500]/30'
-                  }`}>
-                    {nf.tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
-                  </span>
-                  {getStatusBadge(nf.status)}
-                  <span className="text-sm text-gray-300 truncate">
-                    {nf.numero ? `#${nf.numero}` : ''}
-                    {nf.nf_config?.nome ? ` - ${nf.nf_config.nome}` : ''}
-                  </span>
-                  <span className="text-sm font-bold text-white ml-auto mr-3">
-                    {formatCurrency(nf.valor_total)}
-                  </span>
-                </div>
+            {nfsEmitidas.map(nf => {
+              const pdfLink = nf.pdf_url || (nf.nuvem_fiscal_id ? `https://api.nuvemfiscal.com.br/nfse/${nf.nuvem_fiscal_id}/pdf` : null);
+              const xmlLink = nf.xml_url || (nf.nuvem_fiscal_id ? `https://api.nuvemfiscal.com.br/nfse/${nf.nuvem_fiscal_id}/xml` : null);
 
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {nf.status === 'erro' && (
-                    <button
-                      onClick={() => {
-                        if (nf.tipo === 'nfse') {
-                          setRetryNfId(nf.id);
-                          setShowNFSeModal(true);
-                        }
-                      }}
-                      className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30 transition-colors"
-                    >
-                      <RefreshCw className="w-3 h-3" />
-                      Tentar Novamente
-                    </button>
-                  )}
-                  {nf.pdf_url && (
-                    <a
-                      href={nf.pdf_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded hover:bg-[#39FF14]/20 transition-colors"
-                      title="Download PDF"
-                    >
-                      <Download className="w-4 h-4 text-[#39FF14]" />
-                    </a>
-                  )}
-                  {nf.xml_url && (
-                    <a
-                      href={nf.xml_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded hover:bg-[#FFBF00]/20 transition-colors"
-                      title="Download XML"
-                    >
-                      <FileText className="w-4 h-4 text-[#FFBF00]" />
-                    </a>
-                  )}
+              return (
+                <div
+                  key={nf.id}
+                  className="flex items-center justify-between p-3 rounded-lg bg-gray-800/50 border border-gray-700 hover:border-gray-600 transition-colors"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-bold ${
+                      nf.tipo === 'nfse'
+                        ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/30'
+                        : 'bg-[#FFA500]/15 text-[#FFA500] border border-[#FFA500]/30'
+                    }`}>
+                      {nf.tipo === 'nfse' ? 'NFS-e' : 'NF-e'}
+                    </span>
+                    {getStatusBadge(nf.status)}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-sm text-gray-300 truncate">
+                        {nf.numero ? `#${nf.numero}` : ''}
+                        {nf.nf_config?.nome ? ` - ${nf.nf_config.nome}` : ''}
+                      </span>
+                      {nf.nuvem_fiscal_id && (
+                        <span className="text-[10px] text-gray-500 font-mono truncate">
+                          ID: {nf.nuvem_fiscal_id}
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-sm font-bold text-white ml-auto mr-3">
+                      {formatCurrency(nf.valor_total)}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {nf.status === 'erro' && (
+                      <button
+                        onClick={() => {
+                          if (nf.tipo === 'nfse') {
+                            setRetryNfId(nf.id);
+                            setShowNFSeModal(true);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30 transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Tentar Novamente
+                      </button>
+                    )}
+                    {pdfLink && (
+                      <a
+                        href={pdfLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded hover:bg-[#39FF14]/20 transition-colors"
+                        title="Download PDF"
+                      >
+                        <Download className="w-4 h-4 text-[#39FF14]" />
+                      </a>
+                    )}
+                    {xmlLink && (
+                      <a
+                        href={xmlLink}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded hover:bg-[#FFBF00]/20 transition-colors"
+                        title="Download XML"
+                      >
+                        <FileText className="w-4 h-4 text-[#FFBF00]" />
+                      </a>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
 
             {nfsEmitidas.some(nf => nf.status === 'erro' && nf.erro_mensagem) && (
               <div className="mt-2 p-3 bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg">
