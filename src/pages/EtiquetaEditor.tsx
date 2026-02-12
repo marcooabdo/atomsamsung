@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import JsBarcode from 'jsbarcode';
 import {
   Printer, Save, FolderOpen, Plus, Trash2, Type, BarChart3,
@@ -73,6 +74,7 @@ type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
 
 export default function EtiquetaEditor() {
   const [searchParams] = useSearchParams();
+  const { usuario, unidadeSelecionada } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -93,26 +95,15 @@ export default function EtiquetaEditor() {
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [initialSize, setInitialSize] = useState({ width: 0, height: 0, x: 0, y: 0, fontSize: 0 });
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0 });
-  const [unidadeId, setUnidadeId] = useState<string | null>(null);
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const unidadeId = unidadeSelecionada || usuario?.unidade_id || null;
+
   useEffect(() => {
     const init = async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (user) {
-        const { data: usuario } = await supabase
-          .from('usuarios')
-          .select('unidade_id')
-          .eq('id', user.id)
-          .single();
-        if (usuario?.unidade_id) {
-          setUnidadeId(usuario.unidade_id);
-        }
-      }
-
       const dadosParam = searchParams.get('dados');
       if (dadosParam) {
         try {
@@ -243,7 +234,12 @@ export default function EtiquetaEditor() {
   };
 
   const salvarTemplate = async (comoNovo = false) => {
-    if (!unidadeId) return;
+    console.log('salvarTemplate chamado', { comoNovo, unidadeId, nomeTemplate });
+    if (!unidadeId) {
+      console.log('Sem unidadeId, abortando');
+      alert('Selecione uma unidade primeiro');
+      return;
+    }
     setSaving(true);
 
     const templateData = {
