@@ -1442,7 +1442,7 @@ export function OSNotaFiscalTab({
                   </div>
 
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {nf.status === 'erro' && (
+                    {(nf.status === 'erro' || nf.status === 'pendente') && (
                       <button
                         onClick={() => {
                           if (nf.tipo === 'nfse') {
@@ -1450,10 +1450,14 @@ export function OSNotaFiscalTab({
                             setShowNFSeModal(true);
                           }
                         }}
-                        className="flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30 transition-colors"
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold transition-colors ${
+                          nf.status === 'erro'
+                            ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30'
+                            : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 hover:bg-[#00D4FF]/30'
+                        }`}
                       >
                         <RefreshCw className="w-3 h-3" />
-                        Tentar Novamente
+                        {nf.status === 'erro' ? 'Tentar Novamente' : 'Reprocessar'}
                       </button>
                     )}
                     {pdfLink && (
