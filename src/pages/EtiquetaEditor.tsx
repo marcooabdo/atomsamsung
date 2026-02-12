@@ -307,6 +307,7 @@ export default function EtiquetaEditor() {
 
   const adicionarElemento = (tipo: ElementoEtiqueta['tipo']) => {
     if (tipo === 'imagem') {
+      console.log('Clicando no input de imagem...', fileInputRef.current);
       fileInputRef.current?.click();
       return;
     }
@@ -331,14 +332,21 @@ export default function EtiquetaEditor() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    console.log('handleImageUpload chamado');
     const file = e.target.files?.[0];
-    if (!file || !unidadeId) return;
+    console.log('Arquivo selecionado:', file?.name, 'Unidade:', unidadeId);
+
+    if (!file || !unidadeId) {
+      console.log('Saindo: file ou unidadeId vazio');
+      return;
+    }
 
     if (!file.type.startsWith('image/')) {
       alert('Por favor, selecione apenas arquivos de imagem');
       return;
     }
 
+    console.log('Iniciando upload...');
     setUploadingImage(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -956,13 +964,12 @@ export default function EtiquetaEditor() {
               >
                 <BarChart3 className="w-3 h-3" /> Barras
               </button>
-              <button
-                onClick={() => adicionarElemento('imagem')}
-                disabled={uploadingImage}
-                className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs disabled:opacity-50"
+              <label
+                htmlFor="etiqueta-image-upload"
+                className={`flex items-center gap-1.5 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs cursor-pointer ${uploadingImage ? 'opacity-50 pointer-events-none' : ''}`}
               >
                 {uploadingImage ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImageIcon className="w-3 h-3" />} Imagem
-              </button>
+              </label>
               <button
                 onClick={() => adicionarElemento('linha')}
                 className="flex items-center gap-1.5 px-2 py-1.5 rounded bg-white/5 hover:bg-white/10 text-xs"
@@ -977,10 +984,15 @@ export default function EtiquetaEditor() {
               </button>
             </div>
             <input
+              id="etiqueta-image-upload"
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={handleImageUpload}
+              onChange={(e) => {
+                console.log('Input onChange disparado', e.target.files);
+                handleImageUpload(e);
+              }}
+              onClick={() => console.log('Input onClick')}
               className="hidden"
             />
           </div>
