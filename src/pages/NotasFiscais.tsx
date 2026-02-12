@@ -39,6 +39,13 @@ interface NotaFiscal {
   tomador_nome: string | null;
   tomador_documento: string | null;
   tomador_endereco: string | null;
+  tomador_telefone: string | null;
+  tomador_email: string | null;
+  tomador_logradouro: string | null;
+  tomador_numero: string | null;
+  tomador_bairro: string | null;
+  tomador_cep: string | null;
+  tomador_cidade_ibge: string | null;
   protocolo: string | null;
   pdf_url: string | null;
   xml_url: string | null;
@@ -47,6 +54,7 @@ interface NotaFiscal {
   tentativas: number | null;
   payload_json: any;
   created_at: string;
+  os_id?: string | null;
   os?: {
     numero_os_samsung: string | null;
     numero_os_interna: string | null;
@@ -1031,12 +1039,20 @@ export function NotasFiscais() {
             setShowRetryModal(false);
             setRetryNota(null);
           }}
-          osId={retryNota.os ? undefined : undefined}
+          osId={retryNota.os_id || undefined}
           unidadeId={retryNota.unidade.id}
           clienteNome={retryNota.tomador_nome || ''}
           clienteDocumento={retryNota.tomador_documento}
+          clienteTelefone={retryNota.tomador_telefone}
+          clienteEmail={retryNota.tomador_email}
           clienteEndereco={retryNota.tomador_endereco}
+          clienteLogradouro={retryNota.tomador_logradouro}
+          clienteNumero={retryNota.tomador_numero}
+          clienteBairro={retryNota.tomador_bairro}
+          clienteCep={retryNota.tomador_cep}
+          clienteCidadeIbge={retryNota.tomador_cidade_ibge}
           valorServicos={retryNota.valor_servicos || retryNota.valor_total}
+          descricaoServico={(retryNota as any).payload_json?.infDPS?.serv?.cServ?.xDescServ}
           existingNfId={retryNota.id}
         />
       )}
