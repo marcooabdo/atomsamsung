@@ -378,7 +378,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         nfse_codigo_nbs: form.nfse_codigo_nbs || null,
         nfse_codigo_municipio_prestacao: form.nfse_codigo_municipio_prestacao || null,
         nfse_descricao_servico: form.nfse_descricao_servico || null,
-        nfse_trib_issqn: parseInt(form.nfse_trib_issqn) || 1,
+        nfse_trib_issqn: form.nfse_trib_issqn !== '' ? parseInt(form.nfse_trib_issqn) : 1,
         nfse_codigo_municipio_ibge: form.nfse_codigo_municipio_ibge || null,
         codigo_servico: form.codigo_servico || null,
         cnae: form.cnae || null,
