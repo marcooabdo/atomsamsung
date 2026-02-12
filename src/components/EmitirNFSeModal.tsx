@@ -318,6 +318,8 @@ export function EmitirNFSeModal({
         tentativas: 1
       };
 
+      let nfseId: string | null = null;
+
       if (existingNfId) {
         const { error } = await supabase
           .from('nf_emitidas')
@@ -330,14 +332,30 @@ export function EmitirNFSeModal({
           .eq('id', existingNfId);
 
         if (error) throw error;
+        nfseId = existingNfId;
         setMensagem({ tipo: 'success', texto: 'NFS-e reenviada para processamento!' });
       } else {
-        const { error } = await supabase
+        const { data: inserted, error } = await supabase
           .from('nf_emitidas')
-          .insert(insertData);
+          .insert(insertData)
+          .select('id')
+          .single();
 
         if (error) throw error;
+        nfseId = inserted?.id || null;
         setMensagem({ tipo: 'success', texto: 'NFS-e Nacional registrada! Aguardando processamento do servidor emissor.' });
+      }
+
+      if (nfseId) {
+        try {
+          await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nfse_id: nfseId })
+          });
+        } catch (fetchErr) {
+          console.error('Erro ao notificar servidor de emissao:', fetchErr);
+        }
       }
 
       onSuccess?.();
