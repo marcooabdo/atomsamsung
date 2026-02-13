@@ -8,6 +8,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
+import { ModalProvider } from '../contexts/ModalContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AtomConnectKanban } from '../components/atomconnect/AtomConnectKanban';
 import { AtomConnectChat } from '../components/atomconnect/AtomConnectChat';
@@ -349,7 +350,8 @@ export default function AtomConnect() {
   const accentColor = '#00D4FF';
 
   return (
-    <div className="-m-6 h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #060610 0%, #0A0A18 50%, #080814 100%)' }}>
+    <ModalProvider>
+      <div className="-m-6 h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #060610 0%, #0A0A18 50%, #080814 100%)' }}>
       <audio ref={audioRef} src="/notification.mp3" preload="auto" />
 
       {/* Top Bar */}
@@ -677,6 +679,7 @@ export default function AtomConnect() {
           />
         )}
       </AnimatePresence>
-    </div>
+      </div>
+    </ModalProvider>
   );
 }
