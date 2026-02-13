@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth, AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import { ModalProvider } from './contexts/ModalContext';
 import { Login } from './pages/Login';
 import { Layout } from './components/Layout';
 import { MobileLayout } from './components/MobileLayout';
@@ -295,7 +296,9 @@ function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <AppContent />
+        <ModalProvider>
+          <AppContent />
+        </ModalProvider>
       </AuthProvider>
     </ThemeProvider>
   );
