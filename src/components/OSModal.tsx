@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 import { OSChecklistTab } from './OSChecklistTab';
 import { DevolucaoModal } from './DevolucaoModal';
 import { CancelarGIModal } from './CancelarGIModal';
@@ -111,6 +112,7 @@ type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | '
 
 export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' }: OSModalProps) {
   const { usuario } = useAuth();
+  const { showAlert } = useModal();
   const [os, setOS] = useState<OS | null>(null);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
@@ -632,7 +634,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       onReload?.();
       setServicosSalvos(true);
     } catch (err: any) {
-      alert('Erro ao salvar servicos: ' + err.message);
+      showAlert({ message: 'Erro ao salvar servicos: ' + err.message, type: 'error' });
     } finally {
       setSalvandoServicos(false);
     }
@@ -939,13 +941,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const handleSalvarValorGSPN = async (pecaId: string) => {
     const valorEditado = editandoValorGSPN[pecaId];
     if (!valorEditado) {
-      alert('Digite um valor válido');
+      showAlert({ message: 'Digite um valor válido', type: 'warning' });
       return;
     }
 
     const valorNum = parseFloat(valorEditado);
     if (isNaN(valorNum) || valorNum <= 0) {
-      alert('Valor inválido');
+      showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
     }
 
@@ -993,7 +995,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       await loadComentarios();
     } catch (error) {
       console.error('Erro ao salvar valor GSPN:', error);
-      alert('Erro ao salvar valor GSPN');
+      showAlert({ message: 'Erro ao salvar valor GSPN', type: 'error' });
     } finally {
       setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: false }));
     }
@@ -1001,13 +1003,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
   const handleAdicionarPecaOW = async () => {
     if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || !novaPecaValorGSPN) {
-      alert('Preencha todos os campos obrigatorios');
+      showAlert({ message: 'Preencha todos os campos obrigatorios', type: 'warning' });
       return;
     }
 
     const valorGSPNNum = parseFloat(novaPecaValorGSPN);
     if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
-      alert('Valor invalido');
+      showAlert({ message: 'Valor invalido', type: 'warning' });
       return;
     }
 
@@ -1051,9 +1053,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       await loadPecas();
       await loadComentarios();
-      alert(`Peca adicionada com sucesso!${isSCACC && quantidade > 1 ? ` (${quantidade} unidades)` : ''}`);
+      showAlert({ message: `Peca adicionada com sucesso!${isSCACC && quantidade > 1 ? ` (${quantidade} unidades)` : ''}`, type: 'success' });
     } catch (error: any) {
-      alert(`Erro ao adicionar peca: ${error.message}`);
+      showAlert({ message: `Erro ao adicionar peca: ${error.message}`, type: 'error' });
     } finally {
       setAdicionandoPecaOW(false);
     }
@@ -1123,7 +1125,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       loadAnexos();
       loadComentarios();
     } catch (error: any) {
-      alert(`Erro ao adicionar anexo: ${error.message}`);
+      showAlert({ message: `Erro ao adicionar anexo: ${error.message}`, type: 'error' });
     } finally {
       setUploadingAnexo(false);
     }
@@ -1204,12 +1206,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
   const syncGSPN = async () => {
     if (!os?.numero_os_samsung) {
-      alert('Esta OS não possui número Samsung para sincronizar');
+      showAlert({ message: 'Esta OS não possui número Samsung para sincronizar', type: 'warning' });
       return;
     }
 
     if (currentJob?.is_running) {
-      alert('Já existe uma sincronização em andamento para esta OS');
+      showAlert({ message: 'Já existe uma sincronização em andamento para esta OS', type: 'info' });
       return;
     }
 
@@ -1222,12 +1224,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .single();
 
       if (!unidadeData) {
-        alert('Unidade não encontrada');
+        showAlert({ message: 'Unidade não encontrada', type: 'error' });
         return;
       }
 
       if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
+        showAlert({ message: 'Unidade sem configuração Samsung (ASC Code ou Token não configurados)', type: 'warning' });
         return;
       }
 
@@ -1281,10 +1283,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         startPolling();
         if (onReload) onReload();
       } else {
-        alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
+        showAlert({ message: `Erro na sincronização: ${result.message || 'Erro desconhecido'}`, type: 'error' });
       }
     } catch (error) {
-      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      showAlert({ message: `Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, type: 'error' });
     } finally {
       setSyncingGSPN(false);
     }
@@ -1295,12 +1297,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
     // Validação: não permitir para SC/ACC
     if (os.tipo_os === 'SC / ACC') {
-      alert('Não é possível adicionar número Samsung para OS do tipo SC / ACC');
+      showAlert({ message: 'Não é possível adicionar número Samsung para OS do tipo SC / ACC', type: 'warning' });
       return;
     }
 
     if (!numeroSamsungTemp.trim()) {
-      alert('Digite um número de OS Samsung válido');
+      showAlert({ message: 'Digite um número de OS Samsung válido', type: 'warning' });
       return;
     }
 
@@ -1313,13 +1315,13 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       if (error) throw error;
 
-      alert('Número da OS Samsung atualizado com sucesso!');
+      showAlert({ message: 'Número da OS Samsung atualizado com sucesso!', type: 'success' });
       setEditandoNumeroSamsung(false);
       await loadOS();
       if (onReload) onReload();
     } catch (error) {
       console.error('Erro ao salvar número Samsung:', error);
-      alert('Erro ao salvar número da OS Samsung');
+      showAlert({ message: 'Erro ao salvar número da OS Samsung', type: 'error' });
     } finally {
       setSalvandoNumeroSamsung(false);
     }
@@ -1336,7 +1338,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     );
 
     if (!motivo || motivo.trim() === '') {
-      alert('É obrigatório informar o motivo.');
+      showAlert({ message: 'É obrigatório informar o motivo.', type: 'warning' });
       return;
     }
 

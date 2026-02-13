@@ -1018,34 +1018,8 @@ export function Kanban() {
       // IMPORTANTE: Se não há peças ativas, permite mover para qualquer coluna
       // (incluindo voltar para cotações/orcamentos_rejeitados)
       if (pecasAtivas.length > 0 && !colunasPermitidas.includes(targetColumn)) {
-        const statusLabels: Record<string, string> = {
-          pedido_feito: '🚚 Pedido Ativo',
-          atendida: '✅ Peça Atendida',
-          em_uso: '🔧 Em Uso',
-          gi_postada: '📦 GI Pendente'
-        };
-
-        const listaPecas = pecasAtivas
-          .map(p => {
-            const statusLabel = statusLabels[p.status] || p.status;
-            return `• ${p.codigo_peca || 'N/A'} - ${statusLabel}${p.numero_pedido_samsung ? ` (Pedido #${p.numero_pedido_samsung})` : ''}`;
-          })
-          .join('\n');
-
-        alert(
-          `⚠️ MOVIMENTAÇÃO BLOQUEADA\n\n` +
-          `Esta OS possui ${pecasAtivas.length} peça(s) em processo ativo:\n\n${listaPecas}\n\n` +
-          `Para desbloquear:\n` +
-          `• Pedido Ativo: Cancele em Estoque → Transferências\n` +
-          `• Peça Atendida: Técnico deve postar GI ou devolver\n` +
-          `• Em Uso: Técnico deve postar GI ou devolver\n` +
-          `• GI Pendente: Estoque deve aprovar/reprovar em Devoluções\n\n` +
-          `Ou mova para:\n` +
-          `• Rotas (Preta, Vermelha, Azul, Verde, Rosa, Amarela, Laranja)\n` +
-          `• Em Rota IH, Reparo Concluído, Em Reparo CI\n` +
-          `• Aguardando Peça, Peça em Trânsito, Peça Disponível\n` +
-          `• Aguardando Fechamento, Fechar OS`
-        );
+        setPecasAtivasData(pecasAtivas);
+        setShowPecasAtivasBlock(true);
         setDraggedCard(null);
         return;
       }

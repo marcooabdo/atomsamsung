@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
 import { OSAgendamentoTab } from './OSAgendamentoTab';
 import { OSNotaFiscalTab } from './OSNotaFiscalTab';
@@ -88,6 +89,7 @@ type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | '
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false }: OSLPModalProps) {
   const { usuario } = useAuth();
+  const { showAlert } = useModal();
   const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
   const [currentMode, setCurrentMode] = useState<'create' | 'view'>(mode);
   const [os, setOS] = useState<OS | null>(null);
@@ -507,12 +509,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const syncGSPN = async () => {
     if (!os?.numero_os_samsung) {
-      alert('Esta OS não possui número Samsung para sincronizar');
+      showAlert({ message: 'Esta OS não possui número Samsung para sincronizar', type: 'warning' });
       return;
     }
 
     if (currentJob?.is_running) {
-      alert('Já existe uma sincronização em andamento para esta OS');
+      showAlert({ message: 'Já existe uma sincronização em andamento para esta OS', type: 'info' });
       return;
     }
 
@@ -526,13 +528,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .single();
 
       if (!unidadeData) {
-        alert('Unidade não encontrada');
+        showAlert({ message: 'Unidade não encontrada', type: 'error' });
         setSyncingGSPN(false);
         return;
       }
 
       if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
+        showAlert({ message: 'Unidade sem configuração Samsung (ASC Code ou Token não configurados)', type: 'warning' });
         setSyncingGSPN(false);
         return;
       }
@@ -553,7 +555,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (!response.ok) {
         const result = await response.json();
-        alert(`Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`);
+        showAlert({ message: `Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`, type: 'error' });
         setSyncingGSPN(false);
       } else {
         setSyncingGSPN(false);
@@ -588,7 +590,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         setTimeout(checkJob, 2000);
       }
     } catch (error) {
-      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+      showAlert({ message: `Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, type: 'error' });
       setSyncingGSPN(false);
     }
   };
@@ -616,7 +618,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         setClienteComplemento(endereco.complemento || '');
       }
     } catch (error) {
-      alert('Erro ao buscar CEP. Verifique o CEP digitado ou preencha manualmente.');
+      showAlert({ message: 'Erro ao buscar CEP. Verifique o CEP digitado ou preencha manualmente.', type: 'warning' });
     } finally {
       setBuscandoCEP(false);
     }
@@ -1083,7 +1085,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const handleAdicionarServico = async () => {
     if (!servicoSelecionado) {
-      alert('Selecione um serviço');
+      showAlert({ message: 'Selecione um serviço', type: 'warning' });
       return;
     }
 
@@ -1100,14 +1102,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         });
 
         await loadServicos();
-        alert('Serviço adicionado com sucesso!');
+        showAlert({ message: 'Serviço adicionado com sucesso!', type: 'success' });
       }
 
       setMostrarModalServico(false);
       setServicoSelecionado(null);
       setQuantidadeServico(1);
     } catch (error) {
-      alert('Erro ao adicionar serviço');
+      showAlert({ message: 'Erro ao adicionar serviço', type: 'error' });
     }
   };
 
@@ -1320,13 +1322,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const handleCriarOS = async () => {
     if (!unidadeId || !clienteNome || !defeitoRelatado) {
-      alert('Preencha os campos obrigatórios: Unidade, Nome do Cliente e Defeito Relatado');
+      showAlert({ message: 'Preencha os campos obrigatórios: Unidade, Nome do Cliente e Defeito Relatado', type: 'warning' });
       return;
     }
 
     // Validação específica para OS IH: cidade obrigatória
     if (tipoAtendimento === 'IH' && !clienteCidade?.trim()) {
-      alert('Para OS do tipo IH (In-Home), a cidade do cliente é obrigatória para roteamento.');
+      showAlert({ message: 'Para OS do tipo IH (In-Home), a cidade do cliente é obrigatória para roteamento.', type: 'warning' });
       return;
     }
 
@@ -1339,7 +1341,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .maybeSingle();
 
       if (osExistente) {
-        alert(`Já existe uma OS cadastrada com o número Samsung ${numeroOSSamsung}.\n\nOS Interna: ${osExistente.numero_os_interna || 'N/A'}`);
+        showAlert({ message: `Já existe uma OS cadastrada com o número Samsung ${numeroOSSamsung}.\n\nOS Interna: ${osExistente.numero_os_interna || 'N/A'}`, type: 'warning' });
         return;
       }
     }
@@ -1703,7 +1705,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     } catch (error: any) {
       console.error('Erro ao criar OS:', error);
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
-      alert(`Erro ao criar OS ${tipoOS}:\n\n${errorMessage}`);
+      showAlert({ message: `Erro ao criar OS ${tipoOS}:\n\n${errorMessage}`, type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -1788,7 +1790,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setMostrarSucessoRequisicao(true);
     } catch (error) {
       console.error('Erro ao requisitar peça:', error);
-      alert('Erro ao requisitar peça');
+      showAlert({ message: 'Erro ao requisitar peça', type: 'error' });
     } finally {
       setRequisitando(false);
     }
@@ -1834,7 +1836,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setMostrarConfirmacaoRequisicaoManual(false);
       setDadosRequisicaoManual(null);
     } catch (error: any) {
-      alert(`Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`);
+      showAlert({ message: `Erro ao criar requisição: ${error.message || 'Erro desconhecido'}`, type: 'error' });
     } finally {
       setRequisitandoManual(false);
     }
@@ -1843,7 +1845,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const handleRequisitarNovamente = async (peca: any, requisicaoAnterior: any) => {
     const motivo = prompt('Informe o motivo para requisitar novamente esta peça:');
     if (!motivo || !motivo.trim()) {
-      alert('É necessário informar o motivo da nova requisição');
+      showAlert({ message: 'É necessário informar o motivo da nova requisição', type: 'warning' });
       return;
     }
 
@@ -1883,14 +1885,14 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         is_system: true
       });
 
-      alert('Nova requisição criada com sucesso!');
+      showAlert({ message: 'Nova requisição criada com sucesso!', type: 'success' });
       await loadPecas();
       await loadRequisicoes();
       await loadComentarios();
       await loadOS();
       onReload?.();
     } catch (error: any) {
-      alert(`Erro ao criar nova requisição: ${error.message}`);
+      showAlert({ message: `Erro ao criar nova requisição: ${error.message}`, type: 'error' });
     }
   };
 
@@ -1902,7 +1904,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const confirmarCancelamento = async () => {
     if (!requisicaoParaCancelar || !motivoCancelamento.trim()) {
-      alert('É necessário informar o motivo do cancelamento');
+      showAlert({ message: 'É necessário informar o motivo do cancelamento', type: 'warning' });
       return;
     }
 
