@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, User, AlertCircle, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useModal } from '../contexts/ModalContext';
 
 interface IniciarReparoModalProps {
   osId: string;
@@ -21,6 +22,7 @@ export function IniciarReparoModal({
   onClose,
   onSuccess
 }: IniciarReparoModalProps) {
+  const { showAlert } = useModal();
   const [usuarios, setUsuarios] = useState<any[]>([]);
   const [selectedTecnicoId, setSelectedTecnicoId] = useState<string>('');
   const [motivo, setMotivo] = useState('');
@@ -56,7 +58,7 @@ export function IniciarReparoModal({
 
   const handleIniciarReparo = async () => {
     if (!selectedTecnicoId) {
-      alert('Por favor, selecione um técnico');
+      showAlert({ message: 'Por favor, selecione um técnico', type: 'warning' });
       return;
     }
 
@@ -109,7 +111,7 @@ export function IniciarReparoModal({
       onClose();
     } catch (error) {
       console.error('Erro ao iniciar reparo:', error);
-      alert('Erro ao iniciar reparo. Tente novamente.');
+      showAlert({ message: 'Erro ao iniciar reparo. Tente novamente.', type: 'error' });
     } finally {
       setLoading(false);
     }
@@ -117,7 +119,7 @@ export function IniciarReparoModal({
 
   const handleAlterarTecnico = async () => {
     if (!selectedTecnicoId || !motivo.trim()) {
-      alert('Selecione um técnico e informe o motivo da alteração');
+      showAlert({ message: 'Selecione um técnico e informe o motivo da alteração', type: 'warning' });
       return;
     }
 
@@ -154,7 +156,7 @@ export function IniciarReparoModal({
       onClose();
     } catch (error) {
       console.error('Erro ao alterar técnico:', error);
-      alert('Erro ao alterar técnico. Tente novamente.');
+      showAlert({ message: 'Erro ao alterar técnico. Tente novamente.', type: 'error' });
     } finally {
       setLoading(false);
     }

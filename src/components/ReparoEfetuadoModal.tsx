@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Wrench, CheckCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 
 interface ReparoEfetuadoModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface ReparoEfetuadoModalProps {
 
 export function ReparoEfetuadoModal({ isOpen, osId, osNumero, onClose, onSuccess }: ReparoEfetuadoModalProps) {
   const { usuario } = useAuth();
+  const { showAlert } = useModal();
   const [reparo, setReparo] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +24,7 @@ export function ReparoEfetuadoModal({ isOpen, osId, osNumero, onClose, onSuccess
     e.preventDefault();
 
     if (!reparo.trim()) {
-      alert('Por favor, descreva o reparo efetuado.');
+      showAlert({ message: 'Por favor, descreva o reparo efetuado.', type: 'warning' });
       return;
     }
 
@@ -53,7 +55,7 @@ export function ReparoEfetuadoModal({ isOpen, osId, osNumero, onClose, onSuccess
       onSuccess();
       handleClose();
     } catch (error: any) {
-      alert(`Erro ao salvar reparo: ${error.message}`);
+      showAlert({ message: `Erro ao salvar reparo: ${error.message}`, type: 'error' });
     } finally {
       setLoading(false);
     }

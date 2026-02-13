@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, CheckCircle, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 
 interface AnaliseConcluidaModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface AnaliseConcluidaModalProps {
 
 export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSuccess }: AnaliseConcluidaModalProps) {
   const { usuario } = useAuth();
+  const { showAlert } = useModal();
   const [analise, setAnalise] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -22,7 +24,7 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
     e.preventDefault();
 
     if (!analise.trim()) {
-      alert('Por favor, descreva a análise realizada.');
+      showAlert({ message: 'Por favor, descreva a análise realizada.', type: 'warning' });
       return;
     }
 
@@ -78,11 +80,11 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
 
       if (osError) throw osError;
 
-      alert(`Analise registrada!\n\n${mensagemMovimentacao}`);
+      showAlert({ message: `Analise registrada!\n\n${mensagemMovimentacao}`, type: 'success' });
       onSuccess();
       handleClose();
     } catch (error: any) {
-      alert(`Erro ao salvar análise: ${error.message}`);
+      showAlert({ message: `Erro ao salvar análise: ${error.message}`, type: 'error' });
     } finally {
       setLoading(false);
     }
