@@ -59,6 +59,11 @@ export function RegrasJogoTab() {
     return n ? n.nome : nivelId;
   };
 
+  const getNivelColor = (nivelId: string) => {
+    const n = niveis.find(nv => nv.id === nivelId);
+    return n?.cor || 'var(--text-accent)';
+  };
+
   const handleSavePilar = async () => {
     if (!pilarForm.nome.trim()) return;
     const maxOrdem = pilares.reduce((m, p) => Math.max(m, p.ordem), 0);
@@ -215,6 +220,7 @@ export function RegrasJogoTab() {
         getTimeColor={getTimeColor}
         getMetricaLabel={getMetricaLabel}
         getNivelName={getNivelName}
+        getNivelColor={getNivelColor}
       />
 
       <PromocaoRebaixamentoSection
@@ -255,7 +261,7 @@ export function RegrasJogoTab() {
   );
 }
 
-function PilaresSection({ pilares, regrasEstrelas, times, niveis, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, showEditPilarModal, setShowEditPilarModal, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel, getNivelName }: any) {
+function PilaresSection({ pilares, regrasEstrelas, times, niveis, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, showEditPilarModal, setShowEditPilarModal, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel, getNivelName, getNivelColor }: any) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -370,7 +376,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, niveis, expandedPilar,
                               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: getTimeColor(regra.time) + '20', color: getTimeColor(regra.time) }}>
                                 {getTimeName(regra.time)}
                               </span>
-                              <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)', opacity: 0.8 }}>
+                              <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: getNivelColor(regra.nivel_id) + '20', color: getNivelColor(regra.nivel_id) }}>
                                 {getNivelName(regra.nivel_id)}
                               </span>
                               <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
