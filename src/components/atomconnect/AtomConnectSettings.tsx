@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useModal } from '../../contexts/ModalContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { RegrasFinalizacaoManager } from './RegrasFinalizacaoManager';
 
@@ -53,6 +54,7 @@ const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
 
 export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
+  const { showAlert, showConfirm } = useModal();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
@@ -161,7 +163,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const createColuna = async () => {
     if (!newColuna.nome.trim()) {
-      alert('Digite um nome para a coluna');
+      showAlert({
+        type: 'warning',
+        title: 'Campo Obrigatório',
+        message: 'Digite um nome para a coluna'
+      });
       return;
     }
 
@@ -181,7 +187,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       });
 
     if (error) {
-      alert('Erro ao criar coluna: ' + error.message);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Criar Coluna',
+        message: error.message
+      });
     } else {
       setShowNewColuna(false);
       setNewColuna({ nome: '', cor: '#00D4FF' });
@@ -202,7 +212,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const saveColuna = async () => {
     if (!editingColuna) return;
     if (!editColunaForm.nome.trim()) {
-      alert('O nome da coluna e obrigatorio');
+      showAlert({
+        type: 'warning',
+        title: 'Campo Obrigatório',
+        message: 'O nome da coluna é obrigatório'
+      });
       return;
     }
 
@@ -217,7 +231,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       .eq('id', editingColuna.id);
 
     if (error) {
-      alert('Erro ao salvar: ' + error.message);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: error.message
+      });
     } else {
       setEditingColuna(null);
       loadPipelineColunas();
@@ -228,11 +246,22 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const deleteColuna = async (coluna: PipelineColuna) => {
     if ((coluna.conversas_count || 0) > 0) {
-      alert('Nao e possivel excluir uma coluna que possui conversas. Mova as conversas para outra coluna primeiro.');
+      showAlert({
+        type: 'warning',
+        title: 'Ação Não Permitida',
+        message: 'Não é possível excluir uma coluna que possui conversas. Mova as conversas para outra coluna primeiro.'
+      });
       return;
     }
 
-    if (!confirm(`Tem certeza que deseja excluir a coluna "${coluna.nome}"?`)) return;
+    const confirmed = await showConfirm({
+      title: 'Confirmar Exclusão',
+      message: `Tem certeza que deseja excluir a coluna "${coluna.nome}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from('atom_connect_pipeline_colunas')
@@ -240,8 +269,17 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       .eq('id', coluna.id);
 
     if (error) {
-      alert('Erro ao excluir: ' + error.message);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Excluir',
+        message: error.message
+      });
     } else {
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: 'Coluna excluída com sucesso!'
+      });
       loadPipelineColunas();
     }
   };
@@ -279,7 +317,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const saveInstanceEdit = async () => {
     if (!editingInstance) return;
     if (!editForm.nome.trim()) {
-      alert('O nome da conexao e obrigatorio');
+      showAlert({
+        type: 'warning',
+        title: 'Campo Obrigatório',
+        message: 'O nome da conexão é obrigatório'
+      });
       return;
     }
 
@@ -294,7 +336,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       .eq('id', editingInstance.id);
 
     if (error) {
-      alert('Erro ao salvar: ' + error.message);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: error.message
+      });
     } else {
       setEditingInstance(null);
       loadInstancias();
@@ -308,7 +354,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const createInstancia = async () => {
     if (!newInstance.nome || !newInstance.instance_name || !newInstance.unidade_id) {
-      alert('Preencha todos os campos obrigatorios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos Obrigatórios',
+        message: 'Preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -376,9 +426,31 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   };
 
   const deleteInstancia = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta instancia?')) return;
-    await supabase.from('atom_connect_instancias').delete().eq('id', id);
-    loadInstancias();
+    const confirmed = await showConfirm({
+      title: 'Confirmar Exclusão',
+      message: 'Tem certeza que deseja excluir esta instância? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('atom_connect_instancias').delete().eq('id', id);
+
+    if (error) {
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Excluir',
+        message: error.message
+      });
+    } else {
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: 'Instância excluída com sucesso!'
+      });
+      loadInstancias();
+    }
   };
 
   const checkConnectionStatus = async (instancia: Instancia) => {
@@ -451,7 +523,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       }
     } catch (error) {
       console.error('Erro ao obter QR Code:', error);
-      alert('Erro ao gerar QR Code. Verifique se a instancia existe na Evolution API.');
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Gerar QR Code',
+        message: 'Verifique se a instância existe na Evolution API.'
+      });
     } finally {
       setConnectingInstance(null);
     }
@@ -617,10 +693,18 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         .eq('id', instancia.id);
 
       loadInstancias();
-      alert('Webhook configurado com sucesso!');
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: 'Webhook configurado com sucesso!'
+      });
     } catch (error) {
       console.error('Erro ao configurar webhook:', error);
-      alert('Erro ao configurar webhook');
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Configurar',
+        message: 'Erro ao configurar webhook'
+      });
     }
   };
 
@@ -632,7 +716,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const createRespostaRapida = async () => {
     if (!newResposta.titulo || !newResposta.atalho || !newResposta.conteudo) {
-      alert('Preencha todos os campos');
+      showAlert({
+        type: 'warning',
+        title: 'Campos Obrigatórios',
+        message: 'Preencha todos os campos'
+      });
       return;
     }
 
@@ -649,9 +737,31 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   };
 
   const deleteRespostaRapida = async (id: string) => {
-    if (!confirm('Excluir esta resposta rapida?')) return;
-    await supabase.from('atom_connect_respostas_rapidas').delete().eq('id', id);
-    loadRespostasRapidas();
+    const confirmed = await showConfirm({
+      title: 'Confirmar Exclusão',
+      message: 'Tem certeza que deseja excluir esta resposta rápida?',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
+
+    const { error } = await supabase.from('atom_connect_respostas_rapidas').delete().eq('id', id);
+
+    if (error) {
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Excluir',
+        message: error.message
+      });
+    } else {
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: 'Resposta rápida excluída com sucesso!'
+      });
+      loadRespostasRapidas();
+    }
   };
 
   if (loading) {
