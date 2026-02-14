@@ -5,7 +5,7 @@ import { supabase } from '../../lib/supabase';
 import { ConfirmDeleteModal } from './ConfirmDeleteModal';
 
 export function RegrasJogoTab() {
-  const { pilares, regrasEstrelas, regrasPromocao, bonificacoes, times, loadPilares, loadRegrasEstrelas, loadRegrasPromocao, loadBonificacoes } = useSkywalker();
+  const { pilares, regrasEstrelas, regrasPromocao, bonificacoes, times, niveis, loadPilares, loadRegrasEstrelas, loadRegrasPromocao, loadBonificacoes } = useSkywalker();
 
   const [expandedPilar, setExpandedPilar] = useState<string | null>(null);
   const [showNovoPilar, setShowNovoPilar] = useState(false);
@@ -29,7 +29,7 @@ export function RegrasJogoTab() {
   const defaultPilar = { nome: '', descricao: '', tipo_metrica: 'quantidade', time_aplicavel: [] as string[], max_estrelas: 3, meta_front_office: 10, meta_inside_sales: 10 };
   const [pilarForm, setPilarForm] = useState(defaultPilar);
 
-  const defaultRegra = { pilar_id: '', time: '', valor_minimo: 0, valor_maximo: null as number | null, estrelas: 1 };
+  const defaultRegra = { pilar_id: '', time: '', nivel_id: '', valor_minimo: 0, valor_maximo: null as number | null, estrelas: 1 };
   const [regraForm, setRegraForm] = useState(defaultRegra);
 
   const defaultRegraPromocao = { tipo: 'promocao' as const, nome: '', descricao: '', condicao: '', obrigatorio: false };
@@ -52,6 +52,11 @@ export function RegrasJogoTab() {
     if (tipo === 'percentual') return `${valor}%`;
     if (tipo === 'valor') return `R$ ${valor}`;
     return valor.toString();
+  };
+
+  const getNivelName = (nivelId: string) => {
+    const n = niveis.find(nv => nv.id === nivelId);
+    return n ? n.nome : nivelId;
   };
 
   const handleSavePilar = async () => {
@@ -100,9 +105,9 @@ export function RegrasJogoTab() {
   };
 
   const handleSaveRegra = async () => {
-    if (!regraForm.pilar_id) return;
+    if (!regraForm.pilar_id || !regraForm.nivel_id) return;
     if (editingRegraId) {
-      await supabase.from('skywalker_regras_estrelas').update({ time: regraForm.time, valor_minimo: regraForm.valor_minimo, valor_maximo: regraForm.valor_maximo, estrelas: regraForm.estrelas }).eq('id', editingRegraId);
+      await supabase.from('skywalker_regras_estrelas').update({ time: regraForm.time, nivel_id: regraForm.nivel_id, valor_minimo: regraForm.valor_minimo, valor_maximo: regraForm.valor_maximo, estrelas: regraForm.estrelas }).eq('id', editingRegraId);
     } else {
       await supabase.from('skywalker_regras_estrelas').insert({ ...regraForm, ativo: true });
     }
@@ -183,6 +188,7 @@ export function RegrasJogoTab() {
         pilares={pilares}
         regrasEstrelas={regrasEstrelas}
         times={times}
+        niveis={niveis}
         expandedPilar={expandedPilar}
         setExpandedPilar={setExpandedPilar}
         showNovoPilar={showNovoPilar}
@@ -208,6 +214,7 @@ export function RegrasJogoTab() {
         getTimeName={getTimeName}
         getTimeColor={getTimeColor}
         getMetricaLabel={getMetricaLabel}
+        getNivelName={getNivelName}
       />
 
       <PromocaoRebaixamentoSection
@@ -248,7 +255,7 @@ export function RegrasJogoTab() {
   );
 }
 
-function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, showEditPilarModal, setShowEditPilarModal, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel }: any) {
+function PilaresSection({ pilares, regrasEstrelas, times, niveis, expandedPilar, setExpandedPilar, showNovoPilar, setShowNovoPilar, showEditPilarModal, setShowEditPilarModal, editingPilarId, setEditingPilarId, pilarForm, setPilarForm, defaultPilar, handleSavePilar, handleDeletePilar, showNovaRegra, setShowNovaRegra, editingRegraId, setEditingRegraId, regraForm, setRegraForm, defaultRegra, handleSaveRegra, handleDeleteRegra, getTimeName, getTimeColor, getMetricaLabel, getNivelName }: any) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -321,7 +328,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Regras de Estrelas</span>
                     <button
-                      onClick={() => { setRegraForm({ ...defaultRegra, pilar_id: pilar.id, time: times[0]?.codigo || '' }); setShowNovaRegra(pilar.id); setEditingRegraId(null); }}
+                      onClick={() => { setRegraForm({ ...defaultRegra, pilar_id: pilar.id, time: times[0]?.codigo || '', nivel_id: niveis[0]?.id || '' }); setShowNovaRegra(pilar.id); setEditingRegraId(null); }}
                       className="flex items-center gap-1 px-3 py-1.5 rounded text-sm"
                       style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)', opacity: 0.85 }}
                     >
@@ -338,6 +345,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
                       onCancel={() => setShowNovaRegra(null)}
                       pilar={pilar}
                       times={times}
+                      niveis={niveis}
                     />
                   )}
 
@@ -354,12 +362,16 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
                             onCancel={() => setEditingRegraId(null)}
                             pilar={pilar}
                             times={times}
+                            niveis={niveis}
                           />
                         ) : (
                           <div className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
                             <div className="flex items-center gap-4">
                               <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: getTimeColor(regra.time) + '20', color: getTimeColor(regra.time) }}>
                                 {getTimeName(regra.time)}
+                              </span>
+                              <span className="px-2 py-0.5 rounded text-xs font-medium" style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)', opacity: 0.8 }}>
+                                {getNivelName(regra.nivel_id)}
                               </span>
                               <span className="text-sm" style={{ color: 'var(--text-primary)' }}>
                                 {getMetricaLabel(pilar.tipo_metrica, regra.valor_minimo)}
@@ -373,7 +385,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, expandedPilar, setExpa
                                 ))}
                                 {regra.estrelas === 0 && <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>0</span>}
                               </div>
-                              <button onClick={() => { setEditingRegraId(regra.id); setRegraForm({ pilar_id: regra.pilar_id, time: regra.time, valor_minimo: regra.valor_minimo, valor_maximo: regra.valor_maximo, estrelas: regra.estrelas }); }} className="p-1" style={{ color: 'var(--text-secondary)' }}>
+                              <button onClick={() => { setEditingRegraId(regra.id); setRegraForm({ pilar_id: regra.pilar_id, time: regra.time, nivel_id: regra.nivel_id, valor_minimo: regra.valor_minimo, valor_maximo: regra.valor_maximo, estrelas: regra.estrelas }); }} className="p-1" style={{ color: 'var(--text-secondary)' }}>
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
                               <button onClick={() => handleDeleteRegra(regra.id)} className="p-1" style={{ color: 'var(--text-secondary)' }}>
@@ -540,13 +552,18 @@ function PilarForm({ form, setForm, onSave, onCancel, isEditing, times }: any) {
   );
 }
 
-function RegraInlineForm({ form, setForm, onSave, onCancel, pilar, times }: any) {
+function RegraInlineForm({ form, setForm, onSave, onCancel, pilar, times, niveis }: any) {
   return (
     <div className="rounded-lg p-3" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-accent)' }}>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-2">
+      <div className="grid grid-cols-1 md:grid-cols-6 gap-2">
         <select value={form.time} onChange={(e) => setForm({ ...form, time: e.target.value })} className="rounded px-2 py-1.5 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
           {times.map((t: any) => (
             <option key={t.id} value={t.codigo}>{t.nome}</option>
+          ))}
+        </select>
+        <select value={form.nivel_id} onChange={(e) => setForm({ ...form, nivel_id: e.target.value })} className="rounded px-2 py-1.5 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
+          {niveis.map((n: any) => (
+            <option key={n.id} value={n.id}>{n.nome}</option>
           ))}
         </select>
         <input type="number" value={form.valor_minimo} onChange={(e) => setForm({ ...form, valor_minimo: Number(e.target.value) })} className="rounded px-2 py-1.5 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Min" />
