@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { X, DollarSign } from 'lucide-react';
+import { useModal } from '../../contexts/ModalContext';
 
 interface ModalRegistrarValorGSPNProps {
   requisicao: any;
@@ -10,13 +11,18 @@ interface ModalRegistrarValorGSPNProps {
 export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: ModalRegistrarValorGSPNProps) {
   const [valorGSPN, setValorGSPN] = useState('');
   const [loading, setLoading] = useState(false);
+  const { showAlert } = useModal();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const valor = parseFloat(valorGSPN);
     if (isNaN(valor) || valor <= 0) {
-      alert('Digite um valor válido');
+      showAlert({
+        type: 'error',
+        title: 'Valor Inválido',
+        message: 'Digite um valor válido maior que zero'
+      });
       return;
     }
 
@@ -24,7 +30,11 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
     try {
       await onConfirm(valor);
     } catch (error) {
-      alert('Erro ao registrar valor');
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: 'Erro ao registrar valor. Tente novamente.'
+      });
     } finally {
       setLoading(false);
     }

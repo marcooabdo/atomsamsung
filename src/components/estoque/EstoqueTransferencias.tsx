@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
 import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2 } from 'lucide-react';
+import { useModal } from '../../contexts/ModalContext';
 import { ModalSelecionarID } from './ModalSelecionarID';
 import { ModalPedirPeca } from './ModalPedirPeca';
 import { ModalRegistrarValorGSPN } from './ModalRegistrarValorGSPN';
@@ -26,6 +27,7 @@ interface RequisicaoAgrupada {
 }
 
 export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransferenciasProps) {
+  const { showAlert, showConfirm } = useModal();
   const [requisicoesAgrupadas, setRequisicoesAgrupadas] = useState<RequisicaoAgrupada[]>([]);
   const [pedidosAtivos, setPedidosAtivos] = useState<RequisicaoAgrupada[]>([]);
   const [loading, setLoading] = useState(true);
@@ -208,7 +210,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const handleReprovarRequisicao = async (requisicao: any) => {
     const motivo = prompt('Digite o motivo da reprovação da requisição:');
     if (!motivo || !motivo.trim()) {
-      alert('É necessário informar o motivo da reprovação');
+      showAlert({
+        type: 'warning',
+        title: 'Motivo Obrigatório',
+        message: 'É necessário informar o motivo da reprovação'
+      });
       return;
     }
 
@@ -246,10 +252,10 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      alert('Requisição reprovada com sucesso!');
+      showAlert({ type: 'success', title: 'Sucesso', message: 'Requisição reprovada com sucesso!' });
       await loadData();
     } catch (error) {
-      alert('Erro ao reprovar requisição');
+      showAlert({ type: 'error', title: 'Erro', message: 'Erro ao reprovar requisição. Tente novamente.' });
     }
   };
 
@@ -271,14 +277,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
       if (requisicaoExistente && requisicaoExistente.id !== requisicao.id) {
         const osNumero = requisicaoExistente.os?.numero_os_samsung || requisicaoExistente.os?.numero_os_interna || 'N/A';
-        alert(
-          `❌ ERRO: Esta peça já está vinculada a outra requisição!\n\n` +
-          `OS: ${osNumero}\n` +
-          `Peça: ${requisicaoExistente.descricao}\n` +
-          `Status: ${requisicaoExistente.status.toUpperCase()}\n\n` +
-          `Não é possível vincular a mesma peça física a múltiplas requisições.\n` +
-          `Selecione outro ID disponível.`
-        );
+        showAlert({
+          type: 'error',
+          title: 'Peça Já Vinculada',
+          message: `Esta peça já está vinculada a outra requisição!\n\nOS: ${osNumero}\nPeça: ${requisicaoExistente.descricao}\nStatus: ${requisicaoExistente.status.toUpperCase()}\n\nNão é possível vincular a mesma peça física a múltiplas requisições. Selecione outro ID disponível.`
+        });
         return;
       }
 
@@ -440,15 +443,19 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           ? 'Transferência confirmada! Todas as peças foram vinculadas. OS movida para "Peça Disponível".'
           : `Transferência confirmada! Todas as peças foram vinculadas. OS movida automaticamente para "${mensagemDestino}".`;
 
-        alert(mensagemAlerta);
+        showAlert({
+          type: 'success',
+          title: 'Sucesso',
+          message: mensagemAlerta
+        });
       } else {
-        alert('Transferência confirmada com sucesso!');
+        showAlert({ type: 'success', title: 'Sucesso', message: 'Transferência confirmada com sucesso!' });
       }
 
       setModalSelecionarID(null);
       await loadData();
     } catch (error) {
-      alert('Erro ao confirmar transferência');
+      showAlert({ type: 'error', title: 'Erro', message: 'Erro ao confirmar transferência. Tente novamente.' });
     }
   };
 
@@ -465,7 +472,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           .maybeSingle();
 
         if (requisicaoExistente && requisicaoExistente.id !== requisicao.id) {
-          alert(`Uma das pecas selecionadas ja esta vinculada a outra requisicao.`);
+          showAlert({ type: 'error', title: 'Erro', message: 'Uma das peças selecionadas já está vinculada a outra requisição.' });
           return;
         }
       }
@@ -526,11 +533,15 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      alert(`${pecaIds.length} pecas vinculadas com sucesso!`);
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: `${pecaIds.length} peças vinculadas com sucesso!`
+      });
       setModalSelecionarID(null);
       await loadData();
     } catch (error) {
-      alert('Erro ao confirmar transferencia em lote');
+      showAlert({ type: 'error', title: 'Erro', message: 'Erro ao confirmar transferência em lote. Tente novamente.' });
     }
   };
 
@@ -562,7 +573,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      alert('Valor GSPN registrado com sucesso!');
+      showAlert({ type: 'success', title: 'Sucesso', message: 'Valor GSPN registrado com sucesso!' });
       setModalRegistrarValor(null);
       await loadData();
     } catch (error) {
@@ -653,10 +664,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       });
 
       const alertMsg = `Pedido cancelado! Status voltou para PENDENTE.${mensagemMovimentacao}`;
-      alert(alertMsg);
+      showAlert({
+        type: 'success',
+        title: 'Pedido Cancelado',
+        message: alertMsg
+      });
       await loadData();
     } catch (error) {
-      alert('Erro ao refazer pedido');
+      showAlert({ type: 'error', title: 'Erro', message: 'Erro ao refazer pedido. Tente novamente.' });
     }
   };
 
@@ -704,7 +719,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      alert('Pedido criado com justificativa registrada! OS movida para "Peça em Trânsito".');
+      showAlert({ type: 'success', title: 'Sucesso', message: 'Pedido criado com justificativa registrada! OS movida para "Peça em Trânsito".' });
       setModalJustificativa(null);
       await loadData();
     } catch (error) {
@@ -770,7 +785,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      alert(`Pedido criado com sucesso!${mensagemMovimentacao ? ' OS movida para "Peça em Trânsito".' : ''}`);
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: `Pedido criado com sucesso!${mensagemMovimentacao ? ' OS movida para "Peça em Trânsito".' : ''}`
+      });
       setModalPedirPeca(null);
       await loadData();
     } catch (error) {

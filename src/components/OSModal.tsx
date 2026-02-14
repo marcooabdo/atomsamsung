@@ -1697,7 +1697,7 @@ Não haverá cobrança ao cliente.`
         throw new Error('OS ainda existe no banco após tentativa de deleção');
       }
 
-      alert('✅ OS removida com sucesso! Orçamento disponível em Cotações para edição.');
+      showAlert({ type: 'success', title: 'Sucesso', message: 'OS removida com sucesso! Orçamento disponível em Cotações para edição.' });
       setRefazendoOrcamento(false);
       onClose();
       onReload();
@@ -1848,7 +1848,7 @@ Não haverá cobrança ao cliente.`
   const handleRequisitarNovamente = async (peca: OSPeca, requisicaoReprovada: any) => {
     const motivo = prompt('Informe o motivo para requisitar novamente esta peça:');
     if (!motivo || !motivo.trim()) {
-      alert('É necessário informar o motivo da nova requisição');
+      showAlert({ type: 'warning', title: 'Motivo Obrigatório', message: 'É necessário informar o motivo da nova requisição' });
       return;
     }
 
@@ -2130,7 +2130,7 @@ Não haverá cobrança ao cliente.`
   const handleCancelarRequisicao = async (requisicao: RequisicaoPeca) => {
     const motivo = prompt('Digite o motivo do cancelamento:');
     if (!motivo || !motivo.trim()) {
-      alert('É necessário informar o motivo do cancelamento');
+      showAlert({ type: 'warning', title: 'Motivo Obrigatório', message: 'É necessário informar o motivo do cancelamento' });
       return;
     }
 
@@ -2186,7 +2186,7 @@ Não haverá cobrança ao cliente.`
       await loadComentarios();
 
 
-      alert('Requisição cancelada com sucesso!');
+      showAlert({ type: 'success', title: 'Sucesso', message: 'Requisição cancelada com sucesso!' });
       onReload?.();
     } catch (error) {
       alert(`Erro ao cancelar requisição: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
@@ -2468,7 +2468,7 @@ Não haverá cobrança ao cliente.`
       setOS({ ...os, diagnostico_tecnico: texto });
       setEditandoDiagnostico(false);
     } catch (error: any) {
-      alert(`Erro ao salvar: ${error.message}`);
+      showAlert({ type: 'error', title: 'Erro ao Salvar', message: `Erro ao salvar: ${error.message}` });
     } finally {
       setSalvandoDiagnostico(false);
     }
@@ -2497,7 +2497,7 @@ Não haverá cobrança ao cliente.`
       setOS({ ...os, reparo_efetuado: texto });
       setEditandoReparo(false);
     } catch (error: any) {
-      alert(`Erro ao salvar: ${error.message}`);
+      showAlert({ type: 'error', title: 'Erro ao Salvar', message: `Erro ao salvar: ${error.message}` });
     } finally {
       setSalvandoReparo(false);
     }
