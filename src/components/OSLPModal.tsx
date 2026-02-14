@@ -4563,8 +4563,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </h3>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className={`text-xs uppercase ${!os.aparelho_linha ? 'text-red-400' : 'text-gray-500'}`}>
-                          Linha {!os.aparelho_linha && <span className="text-red-500">*</span>}
+                        <label className="text-xs uppercase text-gray-500">
+                          Linha
                         </label>
                         <select
                           value={os.aparelho_linha || ''}
@@ -4577,7 +4577,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                               .eq('id', os.id);
                             if (!error && onReload) onReload();
                           }}
-                          className={`neon-input w-full mt-1 text-sm ${!os.aparelho_linha ? 'border-red-500 ring-1 ring-red-500' : ''}`}
+                          className="neon-input w-full mt-1 text-sm"
                         >
                           <option value="">Selecione a linha...</option>
                           <option value="DA - WSM / Kitchen">DA - WSM / Kitchen</option>
@@ -4590,7 +4590,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           <option value="MX - Tablet">MX - Tablet</option>
                         </select>
                         {!os.aparelho_linha && (
-                          <p className="text-xs text-red-400 mt-1">Selecione a linha do aparelho</p>
+                          <p className="text-xs text-blue-400 mt-1 flex items-center gap-1">
+                            <AlertCircle className="w-3 h-3" />
+                            Necessário para filtrar serviços disponíveis
+                          </p>
                         )}
                       </div>
                       <div>
