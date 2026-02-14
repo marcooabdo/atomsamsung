@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useModal } from '../contexts/ModalContext';
 
 interface Venda {
   id: string;
@@ -45,6 +46,7 @@ interface Unidade {
 
 export function RegistroVendas() {
   const { usuario } = useAuth();
+  const { showAlert, showConfirm } = useModal();
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -160,7 +162,11 @@ export function RegistroVendas() {
   const handleSave = async () => {
     if (!formData.numero_venda || !formData.cliente_nome || !formData.produto_nome ||
         !formData.vendedor_id || !formData.preco || !formData.unidade_id) {
-      alert('Por favor, preencha todos os campos obrigatórios');
+      showAlert({
+        type: 'warning',
+        title: 'Campos Obrigatórios',
+        message: 'Por favor, preencha todos os campos obrigatórios'
+      });
       return;
     }
 
@@ -198,12 +204,23 @@ export function RegistroVendas() {
       handleCloseModal();
       loadVendas();
     } else {
-      alert('Erro ao salvar venda: ' + error.message);
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Salvar',
+        message: `Erro ao salvar venda: ${error.message}`
+      });
     }
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Tem certeza que deseja excluir esta venda?')) return;
+    const confirmed = await showConfirm({
+      title: 'Confirmar Exclusão',
+      message: 'Tem certeza que deseja excluir esta venda? Esta ação não pode ser desfeita.',
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
 
     const { error } = await supabase
       .from('vendas')
@@ -211,7 +228,18 @@ export function RegistroVendas() {
       .eq('id', id);
 
     if (!error) {
+      showAlert({
+        type: 'success',
+        title: 'Sucesso',
+        message: 'Venda excluída com sucesso!'
+      });
       loadVendas();
+    } else {
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: `Erro ao excluir venda: ${error.message}`
+      });
     }
   };
 
