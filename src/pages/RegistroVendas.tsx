@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
+import { buscarCEP, formatarCEP } from '../lib/cep';
 
 interface Venda {
   id: string;
@@ -10,7 +11,13 @@ interface Venda {
   cliente_nome: string;
   cliente_documento: string | null;
   cliente_contato: string | null;
-  cliente_endereco: string | null;
+  cliente_cep: string | null;
+  cliente_logradouro: string | null;
+  cliente_numero: string | null;
+  cliente_complemento: string | null;
+  cliente_bairro: string | null;
+  cliente_cidade: string | null;
+  cliente_estado: string | null;
   cliente_data_nascimento: string | null;
   cliente_telefone: string | null;
   produto_nome: string;
@@ -67,6 +74,7 @@ export function RegistroVendas() {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [buscandoCep, setBuscandoCep] = useState(false);
 
   const isGestor = usuario?.tipo && ['master', 'diretor', 'gerente', 'administrador'].includes(usuario.tipo);
 
@@ -82,7 +90,13 @@ export function RegistroVendas() {
     cliente_nome: '',
     cliente_documento: '',
     cliente_contato: '',
-    cliente_endereco: '',
+    cliente_cep: '',
+    cliente_logradouro: '',
+    cliente_numero: '',
+    cliente_complemento: '',
+    cliente_bairro: '',
+    cliente_cidade: '',
+    cliente_estado: '',
     cliente_data_nascimento: '',
     cliente_telefone: '',
     produto_nome: '',
@@ -149,7 +163,13 @@ export function RegistroVendas() {
         cliente_nome: venda.cliente_nome,
         cliente_documento: venda.cliente_documento || '',
         cliente_contato: venda.cliente_contato || '',
-        cliente_endereco: venda.cliente_endereco || '',
+        cliente_cep: venda.cliente_cep || '',
+        cliente_logradouro: venda.cliente_logradouro || '',
+        cliente_numero: venda.cliente_numero || '',
+        cliente_complemento: venda.cliente_complemento || '',
+        cliente_bairro: venda.cliente_bairro || '',
+        cliente_cidade: venda.cliente_cidade || '',
+        cliente_estado: venda.cliente_estado || '',
         cliente_data_nascimento: venda.cliente_data_nascimento || '',
         cliente_telefone: venda.cliente_telefone || '',
         produto_nome: venda.produto_nome,
@@ -169,7 +189,13 @@ export function RegistroVendas() {
         cliente_nome: '',
         cliente_documento: '',
         cliente_contato: '',
-        cliente_endereco: '',
+        cliente_cep: '',
+        cliente_logradouro: '',
+        cliente_numero: '',
+        cliente_complemento: '',
+        cliente_bairro: '',
+        cliente_cidade: '',
+        cliente_estado: '',
         cliente_data_nascimento: '',
         cliente_telefone: '',
         produto_nome: '',
@@ -189,6 +215,39 @@ export function RegistroVendas() {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedVenda(null);
+  };
+
+  const handleBuscarCEP = async (cep: string) => {
+    const cepLimpo = cep.replace(/\D/g, '');
+    if (cepLimpo.length !== 8) return;
+
+    setBuscandoCep(true);
+    try {
+      const endereco = await buscarCEP(cepLimpo);
+      if (endereco) {
+        setFormData({
+          ...formData,
+          cliente_cep: formatarCEP(cepLimpo),
+          cliente_logradouro: endereco.logradouro || '',
+          cliente_bairro: endereco.bairro || '',
+          cliente_cidade: endereco.localidade || '',
+          cliente_estado: endereco.uf || ''
+        });
+        showAlert({
+          type: 'success',
+          title: 'CEP Encontrado',
+          message: 'Endereço preenchido automaticamente!'
+        });
+      }
+    } catch (error: any) {
+      showAlert({
+        type: 'error',
+        title: 'Erro ao Buscar CEP',
+        message: error.message || 'CEP não encontrado'
+      });
+    } finally {
+      setBuscandoCep(false);
+    }
   };
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -296,7 +355,13 @@ export function RegistroVendas() {
       cliente_nome: formData.cliente_nome,
       cliente_documento: formData.cliente_documento || null,
       cliente_contato: formData.cliente_contato || null,
-      cliente_endereco: formData.cliente_endereco || null,
+      cliente_cep: formData.cliente_cep || null,
+      cliente_logradouro: formData.cliente_logradouro || null,
+      cliente_numero: formData.cliente_numero || null,
+      cliente_complemento: formData.cliente_complemento || null,
+      cliente_bairro: formData.cliente_bairro || null,
+      cliente_cidade: formData.cliente_cidade || null,
+      cliente_estado: formData.cliente_estado || null,
       cliente_data_nascimento: formData.cliente_data_nascimento || null,
       cliente_telefone: formData.cliente_telefone || null,
       produto_nome: formData.produto_nome,
@@ -799,16 +864,119 @@ export function RegistroVendas() {
                   </div>
                 </div>
 
-                <div className="mt-4">
-                  <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Endereço Completo</label>
-                  <input
-                    type="text"
-                    value={formData.cliente_endereco}
-                    onChange={(e) => setFormData({ ...formData, cliente_endereco: e.target.value })}
-                    placeholder="Rua, Número, Complemento, Bairro, Cidade - Estado"
-                    className="w-full rounded-lg px-3 py-2 text-sm"
-                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-                  />
+                <div className="mt-4 space-y-4">
+                  <h4 className="text-sm font-medium flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                    <MapPin className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
+                    Endereço
+                  </h4>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>CEP</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_cep}
+                        onChange={(e) => {
+                          const valor = formatarCEP(e.target.value);
+                          setFormData({ ...formData, cliente_cep: valor });
+                          if (valor.replace(/\D/g, '').length === 8) {
+                            handleBuscarCEP(valor);
+                          }
+                        }}
+                        placeholder="00000-000"
+                        maxLength={9}
+                        disabled={buscandoCep}
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Logradouro</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_logradouro}
+                        onChange={(e) => setFormData({ ...formData, cliente_logradouro: e.target.value })}
+                        placeholder="Rua, Avenida..."
+                        disabled={buscandoCep}
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Número</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_numero}
+                        onChange={(e) => setFormData({ ...formData, cliente_numero: e.target.value })}
+                        placeholder="123"
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Complemento</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_complemento}
+                        onChange={(e) => setFormData({ ...formData, cliente_complemento: e.target.value })}
+                        placeholder="Apto, Bloco, Sala..."
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Bairro</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_bairro}
+                        onChange={(e) => setFormData({ ...formData, cliente_bairro: e.target.value })}
+                        disabled={buscandoCep}
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Cidade</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_cidade}
+                        onChange={(e) => setFormData({ ...formData, cliente_cidade: e.target.value })}
+                        disabled={buscandoCep}
+                        className="w-full rounded-lg px-3 py-2 text-sm"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Estado</label>
+                      <input
+                        type="text"
+                        value={formData.cliente_estado}
+                        onChange={(e) => setFormData({ ...formData, cliente_estado: e.target.value })}
+                        placeholder="UF"
+                        maxLength={2}
+                        disabled={buscandoCep}
+                        className="w-full rounded-lg px-3 py-2 text-sm uppercase"
+                        style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                      />
+                    </div>
+                  </div>
+
+                  {buscandoCep && (
+                    <div className="flex items-center gap-2 text-sm" style={{ color: 'var(--text-accent)' }}>
+                      <div className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin" style={{ borderColor: 'var(--text-accent)', borderTopColor: 'transparent' }} />
+                      Buscando CEP...
+                    </div>
+                  )}
                 </div>
               </div>
 
