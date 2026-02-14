@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -10,6 +10,9 @@ interface Venda {
   cliente_nome: string;
   cliente_documento: string | null;
   cliente_contato: string | null;
+  cliente_endereco: string | null;
+  cliente_data_nascimento: string | null;
+  cliente_telefone: string | null;
   produto_nome: string;
   produto_tipo: string | null;
   vendedor_id: string;
@@ -20,6 +23,11 @@ interface Venda {
   criado_por: string | null;
   enviado_skywalker: boolean;
   data_envio_skywalker: string | null;
+  avaliacao_url: string | null;
+  avaliacao_validada: boolean;
+  avaliacao_validada_por: string | null;
+  avaliacao_validada_em: string | null;
+  avaliacao_observacoes: string | null;
   log_skywalker: any[];
   observacoes: string | null;
   created_at: string;
@@ -29,6 +37,9 @@ interface Venda {
     email: string;
   };
   unidade?: {
+    nome: string;
+  };
+  validador?: {
     nome: string;
   };
 }
@@ -51,9 +62,13 @@ export function RegistroVendas() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showValidationModal, setShowValidationModal] = useState(false);
   const [selectedVenda, setSelectedVenda] = useState<Venda | null>(null);
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+
+  const isGestor = usuario?.tipo && ['master', 'diretor', 'gerente', 'administrador'].includes(usuario.tipo);
 
   const [filtros, setFiltros] = useState({
     busca: '',
@@ -67,6 +82,9 @@ export function RegistroVendas() {
     cliente_nome: '',
     cliente_documento: '',
     cliente_contato: '',
+    cliente_endereco: '',
+    cliente_data_nascimento: '',
+    cliente_telefone: '',
     produto_nome: '',
     produto_tipo: '',
     vendedor_id: '',
@@ -74,7 +92,12 @@ export function RegistroVendas() {
     tipo_venda: 'store_plus' as 'store_plus' | 'smb' | 'seguro_care',
     status: 'pendente' as 'pendente' | 'concluido' | 'cancelado',
     unidade_id: '',
-    observacoes: ''
+    observacoes: '',
+    avaliacao_url: ''
+  });
+
+  const [validationData, setValidationData] = useState({
+    avaliacao_observacoes: ''
   });
 
   useEffect(() => {
@@ -90,7 +113,8 @@ export function RegistroVendas() {
       .select(`
         *,
         vendedor:usuarios!vendedor_id(nome, email),
-        unidade:unidades(nome)
+        unidade:unidades(nome),
+        validador:usuarios!avaliacao_validada_por(nome)
       `)
       .order('created_at', { ascending: false });
 
@@ -125,6 +149,9 @@ export function RegistroVendas() {
         cliente_nome: venda.cliente_nome,
         cliente_documento: venda.cliente_documento || '',
         cliente_contato: venda.cliente_contato || '',
+        cliente_endereco: venda.cliente_endereco || '',
+        cliente_data_nascimento: venda.cliente_data_nascimento || '',
+        cliente_telefone: venda.cliente_telefone || '',
         produto_nome: venda.produto_nome,
         produto_tipo: venda.produto_tipo || '',
         vendedor_id: venda.vendedor_id,
@@ -132,7 +159,8 @@ export function RegistroVendas() {
         tipo_venda: venda.tipo_venda,
         status: venda.status,
         unidade_id: venda.unidade_id,
-        observacoes: venda.observacoes || ''
+        observacoes: venda.observacoes || '',
+        avaliacao_url: venda.avaliacao_url || ''
       });
     } else {
       setSelectedVenda(null);
@@ -141,6 +169,9 @@ export function RegistroVendas() {
         cliente_nome: '',
         cliente_documento: '',
         cliente_contato: '',
+        cliente_endereco: '',
+        cliente_data_nascimento: '',
+        cliente_telefone: '',
         produto_nome: '',
         produto_tipo: '',
         vendedor_id: '',
@@ -148,7 +179,8 @@ export function RegistroVendas() {
         tipo_venda: 'store_plus',
         status: 'pendente',
         unidade_id: usuario?.unidade_id || '',
-        observacoes: ''
+        observacoes: '',
+        avaliacao_url: ''
       });
     }
     setShowModal(true);
@@ -157,6 +189,95 @@ export function RegistroVendas() {
   const handleCloseModal = () => {
     setShowModal(false);
     setSelectedVenda(null);
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      showAlert({
+        type: 'warning',
+        title: 'Arquivo muito grande',
+        message: 'O arquivo deve ter no máximo 5MB'
+      });
+      return;
+    }
+
+    setUploadingFile(true);
+
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+      const filePath = `${usuario?.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('vendas-avaliacoes')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('vendas-avaliacoes')
+        .getPublicUrl(filePath);
+
+      setFormData({ ...formData, avaliacao_url: filePath });
+
+      showAlert({
+        type: 'success',
+        title: 'Upload concluído',
+        message: 'Arquivo de avaliação enviado com sucesso!'
+      });
+    } catch (error: any) {
+      showAlert({
+        type: 'error',
+        title: 'Erro no Upload',
+        message: `Erro ao enviar arquivo: ${error.message}`
+      });
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleOpenValidationModal = (venda: Venda) => {
+    setSelectedVenda(venda);
+    setValidationData({
+      avaliacao_observacoes: venda.avaliacao_observacoes || ''
+    });
+    setShowValidationModal(true);
+  };
+
+  const handleValidateAvaliacao = async (validar: boolean) => {
+    if (!selectedVenda) return;
+
+    const { error } = await supabase
+      .from('vendas')
+      .update({
+        avaliacao_validada: validar,
+        avaliacao_validada_por: validar ? usuario?.id : null,
+        avaliacao_validada_em: validar ? new Date().toISOString() : null,
+        avaliacao_observacoes: validationData.avaliacao_observacoes || null
+      })
+      .eq('id', selectedVenda.id);
+
+    if (!error) {
+      showAlert({
+        type: 'success',
+        title: validar ? 'Avaliação Validada' : 'Validação Removida',
+        message: validar
+          ? 'A avaliação foi validada e a pontuação foi registrada no Skywalker!'
+          : 'A validação foi removida e a pontuação foi revertida.'
+      });
+      setShowValidationModal(false);
+      setSelectedVenda(null);
+      loadVendas();
+    } else {
+      showAlert({
+        type: 'error',
+        title: 'Erro',
+        message: `Erro ao processar validação: ${error.message}`
+      });
+    }
   };
 
   const handleSave = async () => {
@@ -175,6 +296,9 @@ export function RegistroVendas() {
       cliente_nome: formData.cliente_nome,
       cliente_documento: formData.cliente_documento || null,
       cliente_contato: formData.cliente_contato || null,
+      cliente_endereco: formData.cliente_endereco || null,
+      cliente_data_nascimento: formData.cliente_data_nascimento || null,
+      cliente_telefone: formData.cliente_telefone || null,
       produto_nome: formData.produto_nome,
       produto_tipo: formData.produto_tipo || null,
       vendedor_id: formData.vendedor_id,
@@ -183,6 +307,7 @@ export function RegistroVendas() {
       status: formData.status,
       unidade_id: formData.unidade_id,
       observacoes: formData.observacoes || null,
+      avaliacao_url: formData.avaliacao_url || null,
       criado_por: usuario?.id
     };
 
@@ -434,6 +559,7 @@ export function RegistroVendas() {
                 <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Tipo</th>
                 <th className="px-4 py-3 text-right text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Valor</th>
                 <th className="px-4 py-3 text-left text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                <th className="px-4 py-3 text-center text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Avaliação</th>
                 <th className="px-4 py-3 text-center text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Skywalker</th>
                 <th className="px-4 py-3 text-center text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Ações</th>
               </tr>
@@ -481,6 +607,28 @@ export function RegistroVendas() {
                   </td>
                   <td className="px-4 py-3">
                     {getStatusBadge(venda.status)}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    {venda.avaliacao_url ? (
+                      venda.avaliacao_validada ? (
+                        <div className="flex items-center justify-center gap-1">
+                          <Star className="w-4 h-4 fill-current" style={{ color: '#FBBF24' }} />
+                          <span className="text-xs font-medium" style={{ color: '#FBBF24' }}>Validada</span>
+                        </div>
+                      ) : isGestor ? (
+                        <button
+                          onClick={() => handleOpenValidationModal(venda)}
+                          className="px-2 py-1 rounded text-xs font-medium transition-colors"
+                          style={{ backgroundColor: '#F59E0B20', color: '#F59E0B' }}
+                        >
+                          Validar
+                        </button>
+                      ) : (
+                        <span className="text-xs" style={{ color: '#F59E0B' }}>Pendente</span>
+                      )
+                    ) : (
+                      <span className="text-xs" style={{ color: '#6B7280' }}>-</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     {venda.enviado_skywalker ? (
@@ -591,7 +739,7 @@ export function RegistroVendas() {
 
               <div>
                 <h3 className="font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Dados do Cliente</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                   <div>
                     <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Nome do Cliente *</label>
                     <input
@@ -604,6 +752,31 @@ export function RegistroVendas() {
                   </div>
 
                   <div>
+                    <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Telefone</label>
+                    <input
+                      type="text"
+                      value={formData.cliente_telefone}
+                      onChange={(e) => setFormData({ ...formData, cliente_telefone: e.target.value })}
+                      placeholder="(00) 00000-0000"
+                      className="w-full rounded-lg px-3 py-2 text-sm"
+                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Data de Nascimento</label>
+                    <input
+                      type="date"
+                      value={formData.cliente_data_nascimento}
+                      onChange={(e) => setFormData({ ...formData, cliente_data_nascimento: e.target.value })}
+                      className="w-full rounded-lg px-3 py-2 text-sm"
+                      style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
                     <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Documento (CPF/CNPJ)</label>
                     <input
                       type="text"
@@ -615,7 +788,7 @@ export function RegistroVendas() {
                   </div>
 
                   <div>
-                    <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Contato</label>
+                    <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>E-mail / Contato Adicional</label>
                     <input
                       type="text"
                       value={formData.cliente_contato}
@@ -624,6 +797,18 @@ export function RegistroVendas() {
                       style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
                     />
                   </div>
+                </div>
+
+                <div className="mt-4">
+                  <label className="block text-sm mb-1" style={{ color: 'var(--text-secondary)' }}>Endereço Completo</label>
+                  <input
+                    type="text"
+                    value={formData.cliente_endereco}
+                    onChange={(e) => setFormData({ ...formData, cliente_endereco: e.target.value })}
+                    placeholder="Rua, Número, Complemento, Bairro, Cidade - Estado"
+                    className="w-full rounded-lg px-3 py-2 text-sm"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                  />
                 </div>
               </div>
 
@@ -697,6 +882,58 @@ export function RegistroVendas() {
                       <option value="cancelado">Cancelado</option>
                     </select>
                   </div>
+                </div>
+              </div>
+
+              <div>
+                <h3 className="font-medium mb-3" style={{ color: 'var(--text-primary)' }}>Upload de Avaliação (Opcional)</h3>
+                <div className="rounded-lg p-4" style={{ backgroundColor: '#FBBF2415', border: '1px solid #FBBF2440' }}>
+                  <div className="flex items-start gap-3 mb-3">
+                    <Star className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#FBBF24' }} />
+                    <div>
+                      <p className="font-medium text-sm mb-1" style={{ color: '#FBBF24' }}>Google Reviews e Avaliações</p>
+                      <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                        Faça upload do comprovante de avaliação (print do Google Reviews, etc). Após validação por um gestor,
+                        será contabilizada 1 estrela no Skywalker para o vendedor.
+                      </p>
+                    </div>
+                  </div>
+
+                  {formData.avaliacao_url ? (
+                    <div className="flex items-center justify-between p-3 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4" style={{ color: '#10B981' }} />
+                        <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Arquivo enviado</span>
+                      </div>
+                      <button
+                        onClick={() => setFormData({ ...formData, avaliacao_url: '' })}
+                        className="text-sm px-2 py-1 rounded hover:bg-opacity-10 transition-colors"
+                        style={{ color: '#EF4444' }}
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="block">
+                      <div className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-all hover:border-accent"
+                        style={{ borderColor: 'var(--border-primary)' }}>
+                        <Upload className="w-8 h-8 mx-auto mb-2" style={{ color: 'var(--text-secondary)' }} />
+                        <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>
+                          {uploadingFile ? 'Enviando...' : 'Clique para selecionar arquivo'}
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                          PNG, JPG, PDF (máx. 5MB)
+                        </p>
+                      </div>
+                      <input
+                        type="file"
+                        accept="image/png,image/jpeg,image/jpg,image/webp,application/pdf"
+                        onChange={handleFileUpload}
+                        disabled={uploadingFile}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
                 </div>
               </div>
 
@@ -859,6 +1096,116 @@ export function RegistroVendas() {
                   </p>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showValidationModal && selectedVenda && isGestor && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="rounded-xl max-w-2xl w-full" style={{ backgroundColor: 'var(--bg-card)' }}>
+            <div className="flex items-center justify-between p-6 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                Validar Avaliação
+              </h2>
+              <button onClick={() => setShowValidationModal(false)} className="p-2 rounded-lg hover:bg-opacity-10 transition-colors" style={{ color: 'var(--text-secondary)' }}>
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              <div className="rounded-lg p-4" style={{ backgroundColor: '#FBBF2415', border: '1px solid #FBBF2440' }}>
+                <div className="flex items-start gap-3">
+                  <Star className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#FBBF24' }} />
+                  <div>
+                    <p className="font-medium text-sm mb-1" style={{ color: '#FBBF24' }}>Informações da Venda</p>
+                    <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="font-medium">Cliente:</span> {selectedVenda.cliente_nome}
+                    </p>
+                    <p className="text-sm mb-2" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="font-medium">Vendedor:</span> {selectedVenda.vendedor?.nome}
+                    </p>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      <span className="font-medium">Produto:</span> {selectedVenda.produto_nome}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedVenda.avaliacao_url && (
+                <div>
+                  <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                    Comprovante de Avaliação
+                  </p>
+                  <div className="rounded-lg p-3 flex items-center gap-2" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+                    <FileText className="w-4 h-4" style={{ color: '#10B981' }} />
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Arquivo enviado</span>
+                    <button
+                      onClick={() => {
+                        const url = supabase.storage.from('vendas-avaliacoes').getPublicUrl(selectedVenda.avaliacao_url!).data.publicUrl;
+                        window.open(url, '_blank');
+                      }}
+                      className="ml-auto text-xs px-2 py-1 rounded"
+                      style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+                    >
+                      Visualizar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-primary)' }}>
+                  Observações da Validação (Opcional)
+                </label>
+                <textarea
+                  value={validationData.avaliacao_observacoes}
+                  onChange={(e) => setValidationData({ ...validationData, avaliacao_observacoes: e.target.value })}
+                  rows={3}
+                  placeholder="Adicione observações sobre a validação..."
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              <div className="rounded-lg p-4" style={{ backgroundColor: '#10B98115', border: '1px solid #10B98140' }}>
+                <div className="flex items-start gap-3">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
+                  <div>
+                    <p className="font-medium text-sm mb-1" style={{ color: '#10B981' }}>Integração com Skywalker</p>
+                    <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                      Ao validar esta avaliação, será registrada automaticamente 1 estrela no Skywalker para o vendedor {selectedVenda.vendedor?.nome}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 p-6 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+              {selectedVenda.avaliacao_validada && (
+                <button
+                  onClick={() => handleValidateAvaliacao(false)}
+                  className="px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                  style={{ backgroundColor: '#EF444420', color: '#EF4444' }}
+                >
+                  Remover Validação
+                </button>
+              )}
+              <button
+                onClick={() => setShowValidationModal(false)}
+                className="px-4 py-2 rounded-lg font-medium text-sm transition-colors"
+                style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleValidateAvaliacao(true)}
+                disabled={selectedVenda.avaliacao_validada}
+                className="px-6 py-2 rounded-lg font-medium text-sm transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+                style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+              >
+                {selectedVenda.avaliacao_validada ? 'Já Validada' : 'Validar Avaliação'}
+              </button>
             </div>
           </div>
         </div>
