@@ -89,7 +89,7 @@ type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | '
 
 export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false }: OSLPModalProps) {
   const { usuario } = useAuth();
-  const { showAlert } = useModal();
+  const { showAlert, showInfo, showSuccess, showError, showConfirm } = useModal();
   const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
   const [currentMode, setCurrentMode] = useState<'create' | 'view'>(mode);
   const [os, setOS] = useState<OS | null>(null);
@@ -5618,10 +5618,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             </div>
             <div className="flex gap-4 justify-end">
               <button
-                onClick={() => {
+                onClick={async () => {
                   const temDados = pecasAdicionadas.length > 0 || servicosAdicionados.length > 0 || requisicoesTemporarias.length > 0 || pagamentosTemporarios.length > 0 || checklistsSelecionados.length > 0 || anexosTemporarios.length > 0 || comentariosTemporarios.length > 0 || clienteNome || defeitoRelatado;
                   if (temDados) {
-                    const confirmar = confirm('Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
+                    const confirmar = await showConfirm('Confirmar Cancelamento', 'Tem certeza que deseja cancelar? Todos os dados preenchidos serão perdidos.');
                     if (!confirmar) return;
                   }
                   onClose();
