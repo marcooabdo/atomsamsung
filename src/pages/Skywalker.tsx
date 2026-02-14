@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck } from 'lucide-react';
+import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck, Edit2 } from 'lucide-react';
 import { useSkywalker } from '../contexts/SkywalkerContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -333,6 +333,7 @@ function ProfissionaisTab() {
     time_id: '',
     nivel_atual_id: ''
   });
+  const [editProfissional, setEditProfissional] = useState<any>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<{ show: boolean; id: string; nome: string }>({ show: false, id: '', nome: '' });
 
   useEffect(() => {
@@ -363,6 +364,39 @@ function ProfissionaisTab() {
     if (!error) {
       setShowNovo(false);
       setNovoProfissional({ usuario_id: '', unidade_id: '', time: 'front_office', time_id: '', nivel_atual_id: '' });
+      loadProfissionais();
+    }
+  };
+
+  const handleEdit = (prof: any) => {
+    setEditProfissional({
+      id: prof.id,
+      usuario_id: prof.usuario_id,
+      unidade_id: prof.unidade_id,
+      time: prof.time,
+      time_id: prof.time_id,
+      nivel_atual_id: prof.nivel_atual_id,
+      meses_consecutivos_validos: prof.meses_consecutivos_validos,
+      ativo: prof.ativo
+    });
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editProfissional) return;
+    const { error } = await supabase
+      .from('skywalker_profissionais')
+      .update({
+        unidade_id: editProfissional.unidade_id,
+        time: editProfissional.time,
+        time_id: editProfissional.time_id || null,
+        nivel_atual_id: editProfissional.nivel_atual_id,
+        meses_consecutivos_validos: editProfissional.meses_consecutivos_validos,
+        ativo: editProfissional.ativo
+      })
+      .eq('id', editProfissional.id);
+
+    if (!error) {
+      setEditProfissional(null);
       loadProfissionais();
     }
   };
@@ -488,9 +522,14 @@ function ProfissionaisTab() {
                   <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{prof.unidade?.nome}</p>
                 </div>
               </div>
-              <button onClick={() => handleDelete(prof.id, prof.usuario?.nome || 'Profissional')} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
-                <Trash2 className="w-4 h-4" />
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleEdit(prof)} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-accent)' }}>
+                  <Edit2 className="w-4 h-4" />
+                </button>
+                <button onClick={() => handleDelete(prof.id, prof.usuario?.nome || 'Profissional')} className="p-1.5 rounded opacity-50 hover:opacity-100 transition-opacity" style={{ color: 'var(--text-secondary)' }}>
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <span
@@ -517,6 +556,108 @@ function ProfissionaisTab() {
         <div className="text-center py-16">
           <Users className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
           <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional cadastrado</p>
+        </div>
+      )}
+
+      {editProfissional && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="w-full max-w-2xl rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <h3 className="text-lg font-bold mb-4" style={{ color: 'var(--text-primary)' }}>
+              Editar Profissional
+            </h3>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Usuario</label>
+                <p className="text-sm px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}>
+                  {usuarios.find(u => u.id === editProfissional.usuario_id)?.nome || 'Usuario nao encontrado'}
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Unidade</label>
+                <select
+                  value={editProfissional.unidade_id}
+                  onChange={(e) => setEditProfissional({ ...editProfissional, unidade_id: e.target.value })}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">Selecione...</option>
+                  {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Time</label>
+                <select
+                  value={editProfissional.time_id}
+                  onChange={(e) => {
+                    const t = times.find(t => t.id === e.target.value);
+                    setEditProfissional({ ...editProfissional, time_id: e.target.value, time: t?.codigo || 'front_office' });
+                  }}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                >
+                  <option value="">Selecione...</option>
+                  {times.map(t => <option key={t.id} value={t.id}>{t.nome}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Nivel Atual</label>
+                <select
+                  value={editProfissional.nivel_atual_id}
+                  onChange={(e) => setEditProfissional({ ...editProfissional, nivel_atual_id: e.target.value })}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                >
+                  {niveis.map(n => <option key={n.id} value={n.id}>{n.nome}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Meses Consecutivos Validos</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={editProfissional.meses_consecutivos_validos}
+                  onChange={(e) => setEditProfissional({ ...editProfissional, meses_consecutivos_validos: parseInt(e.target.value) || 0 })}
+                  className="w-full rounded-lg px-3 py-2 text-sm"
+                  style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="edit-ativo"
+                  checked={editProfissional.ativo}
+                  onChange={(e) => setEditProfissional({ ...editProfissional, ativo: e.target.checked })}
+                  className="rounded"
+                />
+                <label htmlFor="edit-ativo" className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                  Profissional ativo no programa
+                </label>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setEditProfissional(null)}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="px-4 py-2 rounded-lg text-sm font-medium"
+                style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+              >
+                Salvar Alteracoes
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
