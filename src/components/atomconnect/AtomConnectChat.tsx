@@ -149,6 +149,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showGroupMembers, setShowGroupMembers] = useState(false);
+  const [groupMembers, setGroupMembers] = useState<{ phone: string; name: string | null; role: string; foto_url: string | null }[]>([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -295,6 +298,132 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       fetchClientPhoto();
     }
   }, [instancia, fetchClientPhoto]);
+
+  useEffect(() => {
+    if (!conversa.is_group || !instancia) return;
+    const name = conversa.cliente_nome || "";
+    const isNumericId = !name || /^(Grupo\s+)?\d{10,}$/.test(name.trim());
+    if (!isNumericId) return;
+
+    const groupJid = conversa.group_jid || `${conversa.cliente_telefone}@g.us`;
+    (async () => {
+      try {
+        const resp = await fetch(
+          `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+            body: JSON.stringify({ groupJid }),
+          }
+        );
+        if (resp.ok) {
+          const info = await resp.json();
+          const resolved = info.subject || info.name || info.desc || "";
+          if (resolved) {
+            await supabase
+              .from("atom_connect_conversas")
+              .update({ cliente_nome: resolved })
+              .eq("id", conversa.id);
+            onUpdate();
+          }
+        }
+      } catch (e) {
+        console.error("Failed to resolve group name:", e);
+      }
+    })();
+  }, [conversa.id, conversa.is_group, instancia]);
+
+  const fetchGroupMembers = async () => {
+    if (!instancia || !conversa.is_group) return;
+    setLoadingMembers(true);
+    const groupJid = conversa.group_jid || `${conversa.cliente_telefone}@g.us`;
+
+    try {
+      const { data: cached } = await supabase
+        .from("atom_connect_grupo_membros")
+        .select("phone, name, role, foto_url")
+        .eq("conversa_id", conversa.id);
+
+      if (cached && cached.length > 0) {
+        setGroupMembers(cached);
+        setShowGroupMembers(true);
+        setLoadingMembers(false);
+
+        (async () => {
+          try {
+            const resp = await fetch(
+              `${instancia.api_url}/group/participants/${instancia.instance_name}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+                body: JSON.stringify({ groupJid }),
+              }
+            );
+            if (resp.ok) {
+              const result = await resp.json();
+              const participants = result.participants || result || [];
+              if (Array.isArray(participants) && participants.length > 0) {
+                const members = participants.map((p: any) => ({
+                  phone: (p.id || p.jid || p.number || "").replace("@s.whatsapp.net", ""),
+                  name: p.name || p.pushName || p.notify || null,
+                  role: p.admin || p.role || "member",
+                  foto_url: p.profilePictureUrl || p.imgUrl || null,
+                }));
+                setGroupMembers(members);
+
+                for (const m of members) {
+                  await supabase
+                    .from("atom_connect_grupo_membros")
+                    .upsert(
+                      { conversa_id: conversa.id, phone: m.phone, name: m.name, role: m.role, foto_url: m.foto_url, updated_at: new Date().toISOString() },
+                      { onConflict: "conversa_id,phone" }
+                    );
+                }
+              }
+            }
+          } catch {}
+        })();
+        return;
+      }
+
+      const resp = await fetch(
+        `${instancia.api_url}/group/participants/${instancia.instance_name}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+          body: JSON.stringify({ groupJid }),
+        }
+      );
+
+      if (resp.ok) {
+        const result = await resp.json();
+        const participants = result.participants || result || [];
+        if (Array.isArray(participants)) {
+          const members = participants.map((p: any) => ({
+            phone: (p.id || p.jid || p.number || "").replace("@s.whatsapp.net", ""),
+            name: p.name || p.pushName || p.notify || null,
+            role: p.admin || p.role || "member",
+            foto_url: p.profilePictureUrl || p.imgUrl || null,
+          }));
+          setGroupMembers(members);
+          setShowGroupMembers(true);
+
+          for (const m of members) {
+            await supabase
+              .from("atom_connect_grupo_membros")
+              .upsert(
+                { conversa_id: conversa.id, phone: m.phone, name: m.name, role: m.role, foto_url: m.foto_url, updated_at: new Date().toISOString() },
+                { onConflict: "conversa_id,phone" }
+              );
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Failed to fetch group members:", e);
+    } finally {
+      setLoadingMembers(false);
+    }
+  };
 
   useEffect(() => {
     const channel = supabase
@@ -1275,20 +1404,29 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         {/* Header */}
         <div className="flex-shrink-0 p-4 border-b border-white/10 bg-black/20">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div
+              className={`flex items-center gap-3 ${conversa.is_group ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+              onClick={() => conversa.is_group && fetchGroupMembers()}
+            >
               <div className="relative">
                 {renderClientPhoto('md')}
-                <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0A0A16] rounded-full" />
+                {!conversa.is_group && (
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0A0A16] rounded-full" />
+                )}
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
                   {conversa.is_group && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
                   {conversa.cliente_nome || conversa.cliente_telefone}
                 </h3>
-                {!conversa.is_group && (
+                {!conversa.is_group ? (
                 <p className="text-xs text-gray-400 flex items-center gap-1">
                   <Phone className="w-3 h-3" />
                   {conversa.cliente_telefone}
+                </p>
+                ) : (
+                <p className="text-[10px] text-gray-500 mt-0.5">
+                  {loadingMembers ? 'Carregando...' : 'Toque para ver participantes'}
                 </p>
                 )}
                 {typingStatus ? (
@@ -2369,6 +2507,97 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
       {/* Media Preview Modal */}
       <AnimatePresence>
+        {showGroupMembers && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100]"
+            onClick={() => setShowGroupMembers(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-[400px] max-h-[80vh] overflow-hidden flex flex-col border border-white/10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}20` }}>
+                    <Users className="w-5 h-5" style={{ color: accentColor }} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-semibold text-white">
+                      {conversa.cliente_nome || 'Grupo'}
+                    </h3>
+                    <p className="text-[11px] text-gray-400">
+                      {groupMembers.length} participante{groupMembers.length !== 1 ? 's' : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowGroupMembers(false)}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-3 space-y-1">
+                {loadingMembers ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="w-6 h-6 animate-spin" style={{ color: accentColor }} />
+                  </div>
+                ) : groupMembers.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500 text-sm">
+                    Nenhum participante encontrado
+                  </div>
+                ) : (
+                  [...groupMembers]
+                    .sort((a, b) => {
+                      const order: Record<string, number> = { superadmin: 0, admin: 1, member: 2 };
+                      return (order[a.role] ?? 2) - (order[b.role] ?? 2);
+                    })
+                    .map((member) => (
+                    <div
+                      key={member.phone}
+                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors"
+                    >
+                      <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 bg-white/5 overflow-hidden">
+                        {member.foto_url ? (
+                          <img src={member.foto_url} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <User className="w-4 h-4 text-gray-500" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white truncate">
+                          {member.name || member.phone}
+                        </p>
+                        {member.name && (
+                          <p className="text-[11px] text-gray-500">{member.phone}</p>
+                        )}
+                      </div>
+                      {(member.role === 'admin' || member.role === 'superadmin') && (
+                        <span
+                          className="text-[10px] px-2 py-0.5 rounded-full font-medium flex-shrink-0"
+                          style={{
+                            backgroundColor: member.role === 'superadmin' ? `${accentColor}20` : 'rgba(234,179,8,0.15)',
+                            color: member.role === 'superadmin' ? accentColor : '#EAB308',
+                          }}
+                        >
+                          {member.role === 'superadmin' ? 'Dono' : 'Admin'}
+                        </span>
+                      )}
+                    </div>
+                  ))
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+
         {previewMedia && (
           <motion.div
             initial={{ opacity: 0 }}

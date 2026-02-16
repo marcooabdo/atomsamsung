@@ -410,6 +410,43 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (event.includes("groups") && (event.includes("upsert") || event.includes("update"))) {
+      console.log("Processing GROUPS event:", event);
+      const groupData = Array.isArray(data) ? data : [data];
+      const instanceName = typeof instance === "string"
+        ? instance
+        : instance?.instanceName || instance?.name || body.instanceName || "";
+
+      const { data: inst } = await supabase
+        .from("atom_connect_instancias")
+        .select("id, unidade_id")
+        .eq("instance_name", instanceName)
+        .maybeSingle();
+
+      if (inst) {
+        for (const g of groupData) {
+          const jid = g.id || g.jid || g.groupJid || "";
+          const subject = g.subject || g.name || g.desc || "";
+          if (!jid || !subject) continue;
+
+          const phone = jid.replace("@g.us", "");
+          await supabase
+            .from("atom_connect_conversas")
+            .update({ cliente_nome: subject })
+            .eq("cliente_telefone", phone)
+            .eq("unidade_id", inst.unidade_id)
+            .eq("is_group", true);
+
+          console.log("Updated group name:", phone, "->", subject);
+        }
+      }
+
+      return new Response(JSON.stringify({ success: true, type: "groups_upsert" }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (event.includes("qrcode") || event.includes("qr")) {
       const base64 = data.qrcode?.base64 || data.base64 || body.qrcode;
       const instanceName = typeof instance === "string"
@@ -576,7 +613,7 @@ async function processMessage(
 
   let { data: conversa } = await supabase
     .from("atom_connect_conversas")
-    .select("id, coluna_pipeline, mensagens_nao_lidas")
+    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group")
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
@@ -598,8 +635,29 @@ async function processMessage(
       .limit(1)
       .maybeSingle();
 
+    let groupName = groupInfo.groupSubject;
+    if (groupInfo.isGroup && !groupName) {
+      try {
+        const groupInfoResp = await fetch(
+          `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+            body: JSON.stringify({ groupJid: groupInfo.groupJid }),
+          }
+        );
+        if (groupInfoResp.ok) {
+          const gInfo = await groupInfoResp.json();
+          groupName = gInfo.subject || gInfo.name || gInfo.desc || "";
+          console.log("Fetched group name from API:", groupName);
+        }
+      } catch (e) {
+        console.error("Failed to fetch group info:", e);
+      }
+    }
+
     const pushName = groupInfo.isGroup
-      ? (groupInfo.groupSubject || `Grupo ${phoneNumber}`)
+      ? (groupName || `Grupo ${phoneNumber}`)
       : (message?.pushName || data?.pushName || body?.pushName || body?.senderName || phoneNumber);
 
     const insertData: Record<string, any> = {
@@ -706,8 +764,34 @@ async function processMessage(
       cliente_digitando_at: null,
     };
 
-    if (groupInfo.isGroup && groupInfo.groupSubject && !conversa.cliente_nome) {
-      updateData.cliente_nome = groupInfo.groupSubject;
+    if (groupInfo.isGroup) {
+      const currentName = conversa.cliente_nome || "";
+      const nameIsNumericId = !currentName || /^(Grupo\s+)?\d{10,}$/.test(currentName.trim());
+
+      if (groupInfo.groupSubject) {
+        if (nameIsNumericId) updateData.cliente_nome = groupInfo.groupSubject;
+      } else if (nameIsNumericId) {
+        try {
+          const gResp = await fetch(
+            `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+              body: JSON.stringify({ groupJid: groupInfo.groupJid }),
+            }
+          );
+          if (gResp.ok) {
+            const gData = await gResp.json();
+            const resolved = gData.subject || gData.name || gData.desc || "";
+            if (resolved) {
+              updateData.cliente_nome = resolved;
+              console.log("Resolved group name on update:", resolved);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to resolve group name:", e);
+        }
+      }
     }
 
     if (!fromMe) {
