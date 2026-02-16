@@ -406,7 +406,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
-  const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string): Promise<string | null> => {
+  const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string, mimeType?: string, fileName?: string): Promise<string | null> => {
     if (!instancia) {
       console.error('Nenhuma instancia conectada');
       return null;
@@ -414,14 +414,32 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
     try {
       const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
-      const jid = `${phoneNumber}@s.whatsapp.net`;
 
       if (mediaUrl && mediaType) {
-        const mediaEndpoint = mediaType === 'image' ? 'sendMedia' :
-                              mediaType === 'audio' ? 'sendWhatsAppAudio' :
-                              mediaType === 'video' ? 'sendMedia' : 'sendMedia';
+        if (mediaType === 'audio') {
+          const response = await fetch(`${instancia.api_url}/message/sendWhatsAppAudio/${instancia.instance_name}`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'apikey': instancia.api_key
+            },
+            body: JSON.stringify({
+              number: phoneNumber,
+              audio: mediaUrl
+            })
+          });
 
-        const response = await fetch(`${instancia.api_url}/message/${mediaEndpoint}/${instancia.instance_name}`, {
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Erro Evolution API (audio):', errorText);
+            return null;
+          }
+
+          const result = await response.json();
+          return result.key?.id || result.messageId || null;
+        }
+
+        const response = await fetch(`${instancia.api_url}/message/sendMedia/${instancia.instance_name}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -430,8 +448,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           body: JSON.stringify({
             number: phoneNumber,
             mediatype: mediaType,
+            mimetype: mimeType || (mediaType === 'image' ? 'image/png' : mediaType === 'video' ? 'video/mp4' : 'application/octet-stream'),
             media: mediaUrl,
-            caption: text || undefined
+            caption: text || undefined,
+            fileName: fileName || undefined
           })
         });
 
@@ -516,7 +536,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           else if (file.type.startsWith('video/')) tipo = 'video';
 
           const captionWithName = attendantName ? `*${attendantName}:*\n${file.name}` : file.name;
-          const evolutionMessageId = await sendToEvolutionAPI(captionWithName, publicUrl, tipo);
+          const evolutionMessageId = await sendToEvolutionAPI(captionWithName, publicUrl, tipo, file.type, file.name);
 
           const { error: insertError } = await supabase
             .from('atom_connect_mensagens')
