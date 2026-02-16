@@ -70,6 +70,7 @@ export default function AtomConnect() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [showNovaConversa, setShowNovaConversa] = useState(false);
   const [showUnidadeFilter, setShowUnidadeFilter] = useState(false);
+  const [deepSearchIds, setDeepSearchIds] = useState<string[]>([]);
 
   const canFilterUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(canFilterUnits ? null : (unidadeAtual || null));
@@ -105,6 +106,30 @@ export default function AtomConnect() {
   useEffect(() => {
     loadConversas();
   }, [loadConversas]);
+
+  useEffect(() => {
+    if (!searchTerm || searchTerm.length < 3) {
+      setDeepSearchIds([]);
+      return;
+    }
+    const timeout = setTimeout(async () => {
+      try {
+        const { data } = await supabase
+          .from('atom_connect_mensagens')
+          .select('conversa_id')
+          .ilike('conteudo', `%${searchTerm}%`)
+          .limit(50);
+
+        if (data) {
+          const ids = [...new Set(data.map(m => m.conversa_id))];
+          setDeepSearchIds(ids);
+        }
+      } catch {
+        setDeepSearchIds([]);
+      }
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (deepLinkProcessedRef.current || loading) return;
@@ -450,11 +475,19 @@ export default function AtomConnect() {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3 h-3 text-white/20" />
               <input
                 type="text"
-                placeholder="Buscar cliente..."
+                placeholder="Nome, telefone, OS, mensagem..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-48 pl-8 pr-3 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.06] transition-all"
+                className="w-56 pl-8 pr-8 py-1.5 bg-white/[0.04] border border-white/[0.06] rounded-lg text-[11px] text-white placeholder-white/20 focus:outline-none focus:border-cyan-500/30 focus:bg-white/[0.06] transition-all"
               />
+              {searchTerm && (
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded hover:bg-white/10"
+                >
+                  <X className="w-3 h-3 text-white/30" />
+                </button>
+              )}
             </div>
 
             <button
@@ -579,6 +612,7 @@ export default function AtomConnect() {
                 <AtomConnectKanban
                   conversas={conversas}
                   searchTerm={searchTerm}
+                  deepSearchIds={deepSearchIds}
                   onSelectConversa={(c) => {
                     setSelectedConversa(c);
                     setShowChat(true);

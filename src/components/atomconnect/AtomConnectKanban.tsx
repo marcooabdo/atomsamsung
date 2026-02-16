@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, Users, AlertTriangle,
@@ -47,6 +47,7 @@ interface PipelineColuna {
 interface Props {
   conversas: Conversa[];
   searchTerm: string;
+  deepSearchIds?: string[];
   onSelectConversa: (c: Conversa) => void;
   onUpdateConversa: () => void;
   onNovaConversa: () => void;
@@ -57,7 +58,7 @@ const ICON_MAP: Record<string, any> = {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star, MessageSquare
 };
 
-export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
+export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
   const { usuario } = useAuth();
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
@@ -68,11 +69,33 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
   const [filterVinculadoOS, setFilterVinculadoOS] = useState<'all' | 'yes' | 'no'>('all');
   const [showFilters, setShowFilters] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
+  const [osMap, setOsMap] = useState<Record<string, { numero_os_interna?: string; numero_os_samsung?: string }>>({});
+
+  const loadOsData = useCallback(async () => {
+    const osIds = conversas.filter(c => c.os_id).map(c => c.os_id!);
+    if (osIds.length === 0) { setOsMap({}); return; }
+
+    const unique = [...new Set(osIds)];
+    const { data } = await supabase
+      .from('os')
+      .select('id, numero_os_interna, numero_os_samsung')
+      .in('id', unique);
+
+    if (data) {
+      const map: Record<string, { numero_os_interna?: string; numero_os_samsung?: string }> = {};
+      data.forEach(os => { map[os.id] = os; });
+      setOsMap(map);
+    }
+  }, [conversas]);
 
   useEffect(() => {
     loadColunas();
     loadAtendentes();
   }, []);
+
+  useEffect(() => {
+    loadOsData();
+  }, [loadOsData]);
 
   const loadColunas = async () => {
     const { data } = await supabase
@@ -103,11 +126,18 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(c =>
-        c.cliente_nome?.toLowerCase().includes(term) ||
-        c.cliente_telefone.includes(term) ||
-        c.ultima_mensagem?.toLowerCase().includes(term)
-      );
+      filtered = filtered.filter(c => {
+        if (c.cliente_nome?.toLowerCase().includes(term)) return true;
+        if (c.cliente_telefone.includes(term)) return true;
+        if (c.ultima_mensagem?.toLowerCase().includes(term)) return true;
+        if (c.os_id && osMap[c.os_id]) {
+          const os = osMap[c.os_id];
+          if (os.numero_os_interna?.toLowerCase().includes(term)) return true;
+          if (os.numero_os_samsung?.toLowerCase().includes(term)) return true;
+        }
+        if (deepSearchIds.includes(c.id)) return true;
+        return false;
+      });
     }
 
     if (filterAtendente === 'mine') {
@@ -136,7 +166,7 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
     }
 
     return filtered;
-  }, [conversas, searchTerm, filterAtendente, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario]);
+  }, [conversas, searchTerm, filterAtendente, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario, osMap, deepSearchIds]);
 
   const getConversasByColuna = (colunaId: string) => {
     return filteredConversas
@@ -454,6 +484,12 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                               <p className="text-[11px] text-white/30 flex items-center gap-0.5 mt-0.5">
                                 <Phone className="w-3 h-3" />
                                 {conversa.cliente_telefone}
+                              </p>
+                              )}
+                              {conversa.os_id && osMap[conversa.os_id] && (
+                              <p className="text-[10px] text-blue-400/70 flex items-center gap-0.5 mt-0.5 truncate">
+                                <FileText className="w-3 h-3 flex-shrink-0" />
+                                OS #{osMap[conversa.os_id].numero_os_interna || osMap[conversa.os_id].numero_os_samsung}
                               </p>
                               )}
                             </div>
