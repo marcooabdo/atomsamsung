@@ -72,6 +72,7 @@ interface Props {
   onUpdate: () => void;
   accentColor: string;
   unidadeId?: string;
+  fillParent?: boolean;
 }
 
 interface PipelineColuna {
@@ -102,7 +103,7 @@ const MAX_CHAT_WIDTH = 1400;
 const DEFAULT_CHAT_WIDTH = 750;
 const CHAT_WIDTH_KEY = 'atom_connect_chat_width';
 
-export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unidadeId }: Props) {
+export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unidadeId, fillParent }: Props) {
   const { usuario, unidadeAtual } = useAuth();
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -113,7 +114,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [osData, setOsData] = useState<OS | null>(null);
   const [showTransferModal, setShowTransferModal] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
-  const [showContextPanel, setShowContextPanel] = useState(true);
+  const [showContextPanel, setShowContextPanel] = useState(!fillParent);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [editingMessage, setEditingMessage] = useState<Mensagem | null>(null);
   const [editText, setEditText] = useState('');
@@ -1218,12 +1219,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   return (
     <motion.div
       ref={chatContainerRef}
-      initial={{ x: '100%' }}
-      animate={{ x: 0 }}
-      exit={{ x: '100%' }}
-      transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-      className="h-full flex border-l border-white/[0.06] relative"
-      style={{
+      initial={fillParent ? { opacity: 0 } : { x: '100%' }}
+      animate={fillParent ? { opacity: 1 } : { x: 0 }}
+      exit={fillParent ? { opacity: 0 } : { x: '100%' }}
+      transition={fillParent ? { duration: 0.15 } : { type: 'spring', damping: 25, stiffness: 200 }}
+      className={`h-full flex relative ${fillParent ? 'w-full' : 'border-l border-white/[0.06]'}`}
+      style={fillParent ? { background: '#0A0A16' } : {
         background: '#0A0A16',
         width: chatWidth,
         minWidth: MIN_CHAT_WIDTH,
@@ -1233,15 +1234,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      {/* Resize Handle */}
-      <div
-        className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-50 group ${isResizing ? 'bg-cyan-500' : 'hover:bg-cyan-500/50'}`}
-        onMouseDown={handleResizeStart}
-      >
-        <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-4 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-          <GripVertical className="w-4 h-4 text-cyan-400" />
+      {!fillParent && (
+        <div
+          className={`absolute left-0 top-0 bottom-0 w-1 cursor-col-resize z-50 group ${isResizing ? 'bg-cyan-500' : 'hover:bg-cyan-500/50'}`}
+          onMouseDown={handleResizeStart}
+        >
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-4 h-12 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+            <GripVertical className="w-4 h-4 text-cyan-400" />
+          </div>
         </div>
-      </div>
+      )}
 
       {isDragging && (
         <div

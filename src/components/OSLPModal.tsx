@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -824,14 +825,27 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     setWhatsAppError(null);
 
     try {
-      const { data: existingConversa } = await supabase
+      const phoneDigits = formattedPhone.replace(/\D/g, '');
+      const phoneWithout55 = phoneDigits.startsWith('55') ? phoneDigits.slice(2) : phoneDigits;
+      const last8 = phoneDigits.slice(-8);
+
+      const { data: matchingConversas } = await supabase
         .from('atom_connect_conversas')
         .select('*')
-        .eq('cliente_telefone', formattedPhone)
         .eq('unidade_id', os.unidade_id)
-        .maybeSingle();
+        .or(`cliente_telefone.like.%${last8},cliente_telefone.like.%${phoneWithout55}%,cliente_telefone.eq.${formattedPhone}`)
+        .order('ultima_mensagem_at', { ascending: false });
+
+      const existingConversa = matchingConversas?.[0] || null;
 
       if (existingConversa) {
+        if (!existingConversa.os_id && os.id) {
+          await supabase
+            .from('atom_connect_conversas')
+            .update({ os_id: os.id })
+            .eq('id', existingConversa.id);
+          existingConversa.os_id = os.id;
+        }
         setWhatsAppConversa(existingConversa as WhatsAppConversa);
         setShowWhatsAppChat(true);
         setLoadingWhatsApp(false);
@@ -6732,23 +6746,46 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         </div>
       )}
 
-      {/* WhatsApp Chat Modal */}
-      {showWhatsAppChat && whatsAppConversa && os && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
-          <div className="w-full max-w-4xl h-[85vh] bg-[#0A0A16] rounded-xl overflow-hidden flex">
-            <AtomConnectChat
-              conversa={whatsAppConversa}
-              onClose={() => {
+      {/* WhatsApp Chat Panel */}
+      <AnimatePresence>
+        {showWhatsAppChat && whatsAppConversa && os && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
+              onClick={() => {
                 setShowWhatsAppChat(false);
                 setWhatsAppConversa(null);
               }}
-              onUpdate={() => {}}
-              accentColor="#25D366"
-              unidadeId={os.unidade_id}
             />
-          </div>
-        </div>
-      )}
+            <motion.div
+              initial={{ x: '100%', opacity: 0.8 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: '100%', opacity: 0.8 }}
+              transition={{ type: 'spring', damping: 28, stiffness: 300, mass: 0.8 }}
+              className="fixed top-0 right-0 bottom-0 z-[71] flex flex-col w-full sm:w-[480px] md:w-[560px] lg:w-[640px] shadow-2xl"
+              style={{ background: '#0A0A16' }}
+            >
+              <div className="h-full flex overflow-hidden w-full">
+                <AtomConnectChat
+                  conversa={whatsAppConversa}
+                  onClose={() => {
+                    setShowWhatsAppChat(false);
+                    setWhatsAppConversa(null);
+                  }}
+                  onUpdate={() => {}}
+                  accentColor="#25D366"
+                  unidadeId={os.unidade_id}
+                  fillParent
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       {mostrarConfirmacaoRequisicao && pecaParaRequisitar && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
