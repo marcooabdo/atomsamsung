@@ -234,11 +234,14 @@ Deno.serve(async (req: Request) => {
 
     if (event.includes("messages.update") || event === "message.update") {
       console.log("Processing message STATUS UPDATE");
+      console.log("Full update payload:", JSON.stringify(data, null, 2));
       const updates = Array.isArray(data) ? data : [data];
 
       for (const update of updates) {
-        const messageId = update.key?.id || update.id;
+        const messageId = update.key?.id || update.id || update.messageId || update.message?.id;
         const status = update.update?.status || update.status;
+
+        console.log(`Message ID: ${messageId}, Raw Status: ${status}`);
 
         if (messageId && status !== undefined) {
           let newStatus = "sent";
@@ -246,10 +249,24 @@ Deno.serve(async (req: Request) => {
           if (status === 3) newStatus = "delivered";
           if (status === 4) newStatus = "read";
 
-          await supabase
+          console.log(`Updating message ${messageId} to status: ${newStatus}`);
+
+          const { data: result, error } = await supabase
             .from("atom_connect_mensagens")
             .update({ status: newStatus })
-            .eq("message_id", messageId);
+            .eq("message_id", messageId)
+            .select();
+
+          if (error) {
+            console.error(`Error updating message ${messageId}:`, error);
+          } else {
+            console.log(`Successfully updated message ${messageId}. Rows affected:`, result?.length || 0);
+            if (result?.length === 0) {
+              console.warn(`No message found with message_id: ${messageId}`);
+            }
+          }
+        } else {
+          console.warn(`Invalid update data - messageId: ${messageId}, status: ${status}`);
         }
       }
 
