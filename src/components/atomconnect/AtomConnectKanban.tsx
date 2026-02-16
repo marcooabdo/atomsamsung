@@ -26,6 +26,9 @@ interface Conversa {
   prioridade: string;
   tags: string[];
   is_group?: boolean;
+  group_jid?: string | null;
+  cliente_digitando?: string | null;
+  cliente_digitando_at?: string | null;
   created_at: string;
 }
 
