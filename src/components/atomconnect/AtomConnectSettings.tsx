@@ -626,7 +626,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
               'messages.upsert',
               'messages.update',
               'connection.update',
-              'qrcode.updated'
+              'qrcode.updated',
+              'groups.upsert',
+              'groups.update'
             ]
           }
         })
@@ -650,7 +652,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
               'MESSAGES_UPSERT',
               'MESSAGES_UPDATE',
               'CONNECTION_UPDATE',
-              'QRCODE_UPDATED'
+              'QRCODE_UPDATED',
+              'GROUPS_UPSERT',
+              'GROUPS_UPDATE'
             ]
           })
         });
@@ -682,7 +686,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
             'MESSAGES_UPSERT',
             'MESSAGES_UPDATE',
             'CONNECTION_UPDATE',
-            'QRCODE_UPDATED'
+            'QRCODE_UPDATED',
+            'GROUPS_UPSERT',
+            'GROUPS_UPDATE'
           ]
         })
       });

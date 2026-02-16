@@ -230,36 +230,59 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       return;
     }
 
-    if (!instancia || conversa.is_group) return;
+    if (!instancia) return;
 
     try {
-      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
-      const response = await fetch(`${instancia.api_url}/chat/fetchProfilePictureUrl/${instancia.instance_name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': instancia.api_key
-        },
-        body: JSON.stringify({
-          number: phoneNumber
-        })
-      });
+      if (conversa.is_group) {
+        const groupJid = conversa.group_jid || `${conversa.cliente_telefone}@g.us`;
+        const response = await fetch(`${instancia.api_url}/chat/fetchProfilePictureUrl/${instancia.instance_name}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': instancia.api_key },
+          body: JSON.stringify({ number: groupJid })
+        });
 
-      if (response.ok) {
-        const result = await response.json();
-        const photoUrl = result.profilePictureUrl || result.picture || result.url;
-        if (photoUrl) {
-          setClienteFoto(photoUrl);
-          await supabase
-            .from('atom_connect_conversas')
-            .update({ cliente_foto_url: photoUrl })
-            .eq('id', conversa.id);
+        if (response.ok) {
+          const result = await response.json();
+          const photoUrl = result.profilePictureUrl || result.picture || result.url;
+          if (photoUrl) {
+            setClienteFoto(photoUrl);
+            await supabase.from('atom_connect_conversas').update({ cliente_foto_url: photoUrl }).eq('id', conversa.id);
+            return;
+          }
+        }
+
+        const respGet = await fetch(`${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}?groupJid=${encodeURIComponent(groupJid)}`, {
+          headers: { 'apikey': instancia.api_key }
+        });
+        if (respGet.ok) {
+          const gInfo = await respGet.json();
+          const pic = gInfo.profilePictureUrl || gInfo.pictureUrl || gInfo.imgUrl;
+          if (pic) {
+            setClienteFoto(pic);
+            await supabase.from('atom_connect_conversas').update({ cliente_foto_url: pic }).eq('id', conversa.id);
+          }
+        }
+      } else {
+        const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
+        const response = await fetch(`${instancia.api_url}/chat/fetchProfilePictureUrl/${instancia.instance_name}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'apikey': instancia.api_key },
+          body: JSON.stringify({ number: phoneNumber })
+        });
+
+        if (response.ok) {
+          const result = await response.json();
+          const photoUrl = result.profilePictureUrl || result.picture || result.url;
+          if (photoUrl) {
+            setClienteFoto(photoUrl);
+            await supabase.from('atom_connect_conversas').update({ cliente_foto_url: photoUrl }).eq('id', conversa.id);
+          }
         }
       }
     } catch (error) {
       console.error('Erro ao buscar foto do perfil:', error);
     }
-  }, [conversa.id, conversa.cliente_telefone, conversa.cliente_foto_url, instancia]);
+  }, [conversa.id, conversa.cliente_telefone, conversa.cliente_foto_url, conversa.is_group, conversa.group_jid, instancia]);
 
   const saveClienteNome = async () => {
     if (!editClienteNome.trim()) return;
@@ -294,7 +317,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   }, [conversa.id]);
 
   useEffect(() => {
-    if (instancia && !conversa.cliente_foto_url) {
+    if (instancia) {
       fetchClientPhoto();
     }
   }, [instancia, fetchClientPhoto]);
@@ -308,30 +331,91 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     const groupJid = conversa.group_jid || `${conversa.cliente_telefone}@g.us`;
     (async () => {
       try {
-        const resp = await fetch(
-          `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json", apikey: instancia.api_key },
-            body: JSON.stringify({ groupJid }),
-          }
+        let resolved = "";
+
+        const respGet = await fetch(
+          `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}?groupJid=${encodeURIComponent(groupJid)}`,
+          { headers: { apikey: instancia.api_key } }
         );
-        if (resp.ok) {
-          const info = await resp.json();
-          const resolved = info.subject || info.name || info.desc || "";
-          if (resolved) {
-            await supabase
-              .from("atom_connect_conversas")
-              .update({ cliente_nome: resolved })
-              .eq("id", conversa.id);
-            onUpdate();
+        if (respGet.ok) {
+          const info = await respGet.json();
+          const data = Array.isArray(info) ? info[0] : info;
+          resolved = data?.subject || data?.name || data?.desc || "";
+        }
+
+        if (!resolved) {
+          const respPost = await fetch(
+            `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+              body: JSON.stringify({ groupJid }),
+            }
+          );
+          if (respPost.ok) {
+            const info = await respPost.json();
+            const data = Array.isArray(info) ? info[0] : info;
+            resolved = data?.subject || data?.name || data?.desc || "";
           }
+        }
+
+        if (resolved) {
+          await supabase
+            .from("atom_connect_conversas")
+            .update({ cliente_nome: resolved })
+            .eq("id", conversa.id);
+          onUpdate();
         }
       } catch (e) {
         console.error("Failed to resolve group name:", e);
       }
     })();
   }, [conversa.id, conversa.is_group, instancia]);
+
+  const parseParticipants = (raw: any) => {
+    const list = raw?.participants || (Array.isArray(raw) ? raw : []);
+    if (!Array.isArray(list)) return [];
+    return list.map((p: any) => ({
+      phone: (p.id || p.jid || p.number || "").replace("@s.whatsapp.net", "").replace("@lid", ""),
+      name: p.name || p.pushName || p.notify || null,
+      role: p.admin === "superadmin" ? "superadmin" : p.admin === "admin" ? "admin" : (p.role || "member"),
+      foto_url: p.profilePictureUrl || p.imgUrl || null,
+    })).filter((m: any) => m.phone);
+  };
+
+  const fetchParticipantsFromAPI = async (groupJid: string) => {
+    const url = `${instancia!.api_url}/group/participants/${instancia!.instance_name}`;
+    const headers: Record<string, string> = { apikey: instancia!.api_key };
+
+    let resp = await fetch(`${url}?groupJid=${encodeURIComponent(groupJid)}`, { headers });
+    if (resp.ok) {
+      const result = await resp.json();
+      const members = parseParticipants(result);
+      if (members.length > 0) return members;
+    }
+
+    resp = await fetch(url, {
+      method: "POST",
+      headers: { ...headers, "Content-Type": "application/json" },
+      body: JSON.stringify({ groupJid }),
+    });
+    if (resp.ok) {
+      const result = await resp.json();
+      return parseParticipants(result);
+    }
+    return [];
+  };
+
+  const saveParticipantsToCache = async (members: { phone: string; name: string | null; role: string; foto_url: string | null }[]) => {
+    for (const m of members) {
+      await supabase
+        .from("atom_connect_grupo_membros")
+        .upsert(
+          { conversa_id: conversa.id, phone: m.phone, name: m.name, role: m.role, foto_url: m.foto_url, updated_at: new Date().toISOString() },
+          { onConflict: "conversa_id,phone" }
+        );
+    }
+  };
 
   const fetchGroupMembers = async () => {
     if (!instancia || !conversa.is_group) return;
@@ -351,79 +435,53 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
         (async () => {
           try {
-            const resp = await fetch(
-              `${instancia.api_url}/group/participants/${instancia.instance_name}`,
-              {
-                method: "POST",
-                headers: { "Content-Type": "application/json", apikey: instancia.api_key },
-                body: JSON.stringify({ groupJid }),
-              }
-            );
-            if (resp.ok) {
-              const result = await resp.json();
-              const participants = result.participants || result || [];
-              if (Array.isArray(participants) && participants.length > 0) {
-                const members = participants.map((p: any) => ({
-                  phone: (p.id || p.jid || p.number || "").replace("@s.whatsapp.net", ""),
-                  name: p.name || p.pushName || p.notify || null,
-                  role: p.admin || p.role || "member",
-                  foto_url: p.profilePictureUrl || p.imgUrl || null,
-                }));
-                setGroupMembers(members);
-
-                for (const m of members) {
-                  await supabase
-                    .from("atom_connect_grupo_membros")
-                    .upsert(
-                      { conversa_id: conversa.id, phone: m.phone, name: m.name, role: m.role, foto_url: m.foto_url, updated_at: new Date().toISOString() },
-                      { onConflict: "conversa_id,phone" }
-                    );
-                }
-              }
+            const members = await fetchParticipantsFromAPI(groupJid);
+            if (members.length > 0) {
+              setGroupMembers(members);
+              await saveParticipantsToCache(members);
             }
           } catch {}
         })();
         return;
       }
 
-      const resp = await fetch(
-        `${instancia.api_url}/group/participants/${instancia.instance_name}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json", apikey: instancia.api_key },
-          body: JSON.stringify({ groupJid }),
-        }
-      );
-
-      if (resp.ok) {
-        const result = await resp.json();
-        const participants = result.participants || result || [];
-        if (Array.isArray(participants)) {
-          const members = participants.map((p: any) => ({
-            phone: (p.id || p.jid || p.number || "").replace("@s.whatsapp.net", ""),
-            name: p.name || p.pushName || p.notify || null,
-            role: p.admin || p.role || "member",
-            foto_url: p.profilePictureUrl || p.imgUrl || null,
-          }));
-          setGroupMembers(members);
-          setShowGroupMembers(true);
-
-          for (const m of members) {
-            await supabase
-              .from("atom_connect_grupo_membros")
-              .upsert(
-                { conversa_id: conversa.id, phone: m.phone, name: m.name, role: m.role, foto_url: m.foto_url, updated_at: new Date().toISOString() },
-                { onConflict: "conversa_id,phone" }
-              );
-          }
-        }
+      const members = await fetchParticipantsFromAPI(groupJid);
+      if (members.length > 0) {
+        setGroupMembers(members);
+        setShowGroupMembers(true);
+        await saveParticipantsToCache(members);
+      } else {
+        setShowGroupMembers(true);
       }
     } catch (e) {
       console.error("Failed to fetch group members:", e);
+      setShowGroupMembers(true);
     } finally {
       setLoadingMembers(false);
     }
   };
+
+  useEffect(() => {
+    if (conversa.is_group && instancia) {
+      const groupJid = conversa.group_jid || `${conversa.cliente_telefone}@g.us`;
+      (async () => {
+        try {
+          const { data: cached } = await supabase
+            .from("atom_connect_grupo_membros")
+            .select("phone, name, role, foto_url")
+            .eq("conversa_id", conversa.id);
+          if (cached && cached.length > 0) {
+            setGroupMembers(cached);
+          }
+          const members = await fetchParticipantsFromAPI(groupJid);
+          if (members.length > 0) {
+            setGroupMembers(members);
+            await saveParticipantsToCache(members);
+          }
+        } catch {}
+      })();
+    }
+  }, [conversa.id, conversa.is_group, instancia]);
 
   useEffect(() => {
     const channel = supabase
@@ -1402,7 +1460,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 </p>
                 ) : (
                 <p className="text-[10px] text-gray-500 mt-0.5">
-                  {loadingMembers ? 'Carregando...' : 'Toque para ver participantes'}
+                  {loadingMembers ? 'Carregando...' : groupMembers.length > 0 ? `${groupMembers.length} participantes - toque para ver` : 'Toque para ver participantes'}
                 </p>
                 )}
                 {osData && (

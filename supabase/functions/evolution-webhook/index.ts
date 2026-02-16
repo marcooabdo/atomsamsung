@@ -636,24 +636,64 @@ async function processMessage(
       .maybeSingle();
 
     let groupName = groupInfo.groupSubject;
-    if (groupInfo.isGroup && !groupName) {
-      try {
-        const groupInfoResp = await fetch(
-          `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
-          {
+    let groupPhotoUrl: string | null = null;
+
+    if (groupInfo.isGroup) {
+      const gJid = groupInfo.groupJid;
+      let gData: any = null;
+
+      if (!groupName) {
+        try {
+          const respGet = await fetch(
+            `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}?groupJid=${encodeURIComponent(gJid)}`,
+            { headers: { apikey: instancia.api_key } }
+          );
+          if (respGet.ok) {
+            const raw = await respGet.json();
+            gData = Array.isArray(raw) ? raw[0] : raw;
+            groupName = gData?.subject || gData?.name || gData?.desc || "";
+          }
+        } catch {}
+
+        if (!groupName) {
+          try {
+            const respPost = await fetch(
+              `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+                body: JSON.stringify({ groupJid: gJid }),
+              }
+            );
+            if (respPost.ok) {
+              const raw = await respPost.json();
+              gData = Array.isArray(raw) ? raw[0] : raw;
+              groupName = gData?.subject || gData?.name || gData?.desc || "";
+            }
+          } catch {}
+        }
+      }
+
+      if (gData) {
+        groupPhotoUrl = gData.profilePictureUrl || gData.pictureUrl || gData.imgUrl || null;
+      }
+
+      if (!groupPhotoUrl) {
+        try {
+          const picResp = await fetch(`${instancia.api_url}/chat/fetchProfilePictureUrl/${instancia.instance_name}`, {
             method: "POST",
             headers: { "Content-Type": "application/json", apikey: instancia.api_key },
-            body: JSON.stringify({ groupJid: groupInfo.groupJid }),
+            body: JSON.stringify({ number: gJid }),
+          });
+          if (picResp.ok) {
+            const picData = await picResp.json();
+            groupPhotoUrl = picData.profilePictureUrl || picData.picture || picData.url || null;
           }
-        );
-        if (groupInfoResp.ok) {
-          const gInfo = await groupInfoResp.json();
-          groupName = gInfo.subject || gInfo.name || gInfo.desc || "";
-          console.log("Fetched group name from API:", groupName);
-        }
-      } catch (e) {
-        console.error("Failed to fetch group info:", e);
+        } catch {}
       }
+
+      if (groupName) console.log("Resolved group name:", groupName);
+      if (groupPhotoUrl) console.log("Resolved group photo:", groupPhotoUrl);
     }
 
     const pushName = groupInfo.isGroup
@@ -676,6 +716,10 @@ async function processMessage(
       is_group: groupInfo.isGroup,
       group_jid: groupInfo.groupJid,
     };
+
+    if (groupPhotoUrl) {
+      insertData.cliente_foto_url = groupPhotoUrl;
+    }
 
     const { data: newConversa, error: insertError } = await supabase
       .from("atom_connect_conversas")
@@ -771,25 +815,41 @@ async function processMessage(
       if (groupInfo.groupSubject) {
         if (nameIsNumericId) updateData.cliente_nome = groupInfo.groupSubject;
       } else if (nameIsNumericId) {
+        let resolved = "";
+        const gJid = groupInfo.groupJid;
         try {
-          const gResp = await fetch(
-            `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
-            {
-              method: "POST",
-              headers: { "Content-Type": "application/json", apikey: instancia.api_key },
-              body: JSON.stringify({ groupJid: groupInfo.groupJid }),
-            }
+          const respGet = await fetch(
+            `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}?groupJid=${encodeURIComponent(gJid)}`,
+            { headers: { apikey: instancia.api_key } }
           );
-          if (gResp.ok) {
-            const gData = await gResp.json();
-            const resolved = gData.subject || gData.name || gData.desc || "";
-            if (resolved) {
-              updateData.cliente_nome = resolved;
-              console.log("Resolved group name on update:", resolved);
-            }
+          if (respGet.ok) {
+            const raw = await respGet.json();
+            const d = Array.isArray(raw) ? raw[0] : raw;
+            resolved = d?.subject || d?.name || d?.desc || "";
           }
-        } catch (e) {
-          console.error("Failed to resolve group name:", e);
+        } catch {}
+
+        if (!resolved) {
+          try {
+            const respPost = await fetch(
+              `${instancia.api_url}/group/findGroupInfos/${instancia.instance_name}`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+                body: JSON.stringify({ groupJid: gJid }),
+              }
+            );
+            if (respPost.ok) {
+              const raw = await respPost.json();
+              const d = Array.isArray(raw) ? raw[0] : raw;
+              resolved = d?.subject || d?.name || d?.desc || "";
+            }
+          } catch {}
+        }
+
+        if (resolved) {
+          updateData.cliente_nome = resolved;
+          console.log("Resolved group name on update:", resolved);
         }
       }
     }
