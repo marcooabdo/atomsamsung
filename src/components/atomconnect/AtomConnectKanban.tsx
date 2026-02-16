@@ -488,7 +488,14 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                             ) : (
                               <button
                                 onClick={(e) => assignToMe(conversa, e)}
-                                className="flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] text-white/20 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all opacity-0 group-hover:opacity-100"
+                                className="flex items-center gap-0.5 px-2 py-0.5 rounded text-[10px] font-semibold transition-all"
+                                style={{
+                                  color: '#00D4FF',
+                                  backgroundColor: 'rgba(0, 212, 255, 0.12)',
+                                  border: '1px solid rgba(0, 212, 255, 0.25)',
+                                  textShadow: '0 0 8px rgba(0, 212, 255, 0.5)',
+                                  boxShadow: '0 0 6px rgba(0, 212, 255, 0.15)'
+                                }}
                               >
                                 <UserPlus className="w-2.5 h-2.5" />
                                 Assumir

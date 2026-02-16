@@ -3,7 +3,7 @@ import {
   X, Send, Paperclip, Mic, Smile, Phone, Video,
   User, Link2, FileText, Play, Download, Check,
   CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare,
-  MapPin, Calendar, Navigation, AlertTriangle, ExternalLink, Edit2,
+  MapPin, Calendar, AlertTriangle, ExternalLink, Edit2,
   Trash2, Upload, File, ImageIcon as ImageLucide, GripVertical,
   PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2
 } from 'lucide-react';
@@ -892,6 +892,18 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     inputRef.current?.focus();
   };
 
+  const isValidMediaUrl = (url: string | null | undefined): boolean => {
+    if (!url) return false;
+    return url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:');
+  };
+
+  const getMediaUrl = (msg: Mensagem): string | null => {
+    const url = msg.media_url || null;
+    if (isValidMediaUrl(url)) return url;
+    if (isValidMediaUrl(msg.conteudo)) return msg.conteudo;
+    return null;
+  };
+
   const getExtensionFromMimetype = (mimetype: string | null): string => {
     if (!mimetype) return '';
     const mimeMap: Record<string, string> = {
@@ -904,6 +916,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       'audio/mp4': '.m4a',
       'audio/opus': '.opus',
       'audio/aac': '.aac',
+      'audio/ogg; codecs=opus': '.ogg',
       'video/mp4': '.mp4',
       'video/3gpp': '.3gp',
       'application/pdf': '.pdf',
@@ -911,15 +924,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '.docx',
       'application/vnd.ms-excel': '.xls',
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': '.xlsx',
-      'image/webp': '.webp',
     };
     return mimeMap[mimetype] || '';
   };
 
   const downloadMedia = async (url: string, filename: string, mimetype?: string | null) => {
+    if (!isValidMediaUrl(url)) return;
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, { mode: 'cors' });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const blob = await response.blob();
+      if (blob.size === 0) throw new Error('Empty blob');
       const extension = getExtensionFromMimetype(mimetype || blob.type);
       let finalFilename = filename;
       if (extension && !filename.includes('.')) {
@@ -933,9 +948,15 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(blobUrl);
-    } catch (error) {
-      console.error('Erro ao baixar arquivo:', error);
-      window.open(url, '_blank');
+    } catch {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
     }
   };
 
@@ -944,7 +965,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   const searchOS = useCallback(async (term: string) => {
     const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
-    if (!targetUnidadeId || !term || term.length < 2) {
+    if (!targetUnidadeId || !term || term.length < 1) {
       setOsSearchResults([]);
       return;
     }
@@ -1015,7 +1036,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
         .eq('unidade_id', targetUnidadeId)
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(200);
 
       if (data) {
         setOsRecentes(data);
@@ -1037,7 +1058,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      if (osSearchTerm.length >= 2) {
+      if (osSearchTerm.length >= 1) {
         searchOS(osSearchTerm);
       } else {
         setOsSearchResults([]);
@@ -1434,101 +1455,133 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           <p className="text-sm text-white whitespace-pre-wrap">{msg.conteudo}</p>
                         )}
 
-                        {msg.tipo === 'image' && (
-                          <div className="space-y-1">
-                            <div className="relative group/img">
+                        {msg.tipo === 'image' && (() => {
+                          const mediaUrl = getMediaUrl(msg);
+                          return mediaUrl ? (
+                            <div className="space-y-1">
+                              <div className="relative group/img">
+                                <img
+                                  src={mediaUrl}
+                                  alt=""
+                                  className="max-w-full max-h-64 rounded cursor-pointer object-contain bg-black/20"
+                                  onClick={() => setPreviewMedia({ url: mediaUrl, type: 'image', name: msg.caption || 'imagem', mimetype: msg.media_mimetype || undefined })}
+                                  onError={(e) => {
+                                    const target = e.target as HTMLImageElement;
+                                    target.style.display = 'none';
+                                    target.nextElementSibling?.classList.remove('hidden');
+                                  }}
+                                />
+                                <div className="hidden w-full h-32 bg-white/5 rounded flex-col items-center justify-center">
+                                  <ImageLucide className="w-8 h-8 text-gray-500 mb-2" />
+                                  <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                                </div>
+                                <button
+                                  onClick={() => downloadMedia(mediaUrl, msg.caption || 'imagem', msg.media_mimetype)}
+                                  className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity"
+                                >
+                                  <Download className="w-3 h-3 text-white" />
+                                </button>
+                              </div>
+                              {msg.caption && msg.caption !== '[Imagem]' && <p className="text-xs text-white">{msg.caption}</p>}
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
+                              <ImageLucide className="w-5 h-5 text-gray-500" />
+                              <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                            </div>
+                          );
+                        })()}
+
+                        {msg.tipo === 'sticker' && (() => {
+                          const mediaUrl = getMediaUrl(msg);
+                          return mediaUrl ? (
+                            <div className="space-y-1">
                               <img
-                                src={msg.media_url || msg.conteudo || ''}
-                                alt=""
-                                className="max-w-full max-h-64 rounded cursor-pointer object-contain bg-black/20"
-                                onClick={() => setPreviewMedia({ url: msg.media_url || msg.conteudo || '', type: 'image', name: msg.caption || 'imagem', mimetype: msg.media_mimetype || undefined })}
+                                src={mediaUrl}
+                                alt="Sticker"
+                                className="max-w-[150px] max-h-[150px] object-contain"
                                 onError={(e) => {
                                   const target = e.target as HTMLImageElement;
-                                  target.style.display = 'none';
-                                  target.nextElementSibling?.classList.remove('hidden');
+                                  target.className = 'hidden';
                                 }}
                               />
-                              <div className="hidden w-full h-32 bg-white/5 rounded flex-col items-center justify-center">
-                                <ImageLucide className="w-8 h-8 text-gray-500 mb-2" />
-                                <span className="text-xs text-gray-400">Imagem indisponivel</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-gray-400">[Figurinha]</span>
+                          );
+                        })()}
+
+                        {msg.tipo === 'audio' && (() => {
+                          const mediaUrl = getMediaUrl(msg);
+                          return mediaUrl ? (
+                            <div className="flex items-center gap-2 min-w-[220px] p-1 bg-white/5 rounded-lg">
+                              <audio
+                                ref={(el) => { audioRefs.current[msg.id] = el; }}
+                                src={mediaUrl}
+                                className="w-full h-8"
+                                controls
+                                controlsList="nodownload"
+                                preload="metadata"
+                                style={{ filter: 'invert(1)', opacity: 0.7 }}
+                              />
+                              <button
+                                onClick={() => downloadMedia(mediaUrl, msg.caption || 'audio', msg.media_mimetype)}
+                                className="p-1.5 hover:bg-white/10 rounded flex-shrink-0"
+                                title="Baixar audio"
+                              >
+                                <Download className="w-3.5 h-3.5 text-gray-400" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
+                              <Mic className="w-5 h-5 text-gray-500" />
+                              <span className="text-xs text-gray-400">Audio indisponivel</span>
+                            </div>
+                          );
+                        })()}
+
+                        {msg.tipo === 'document' && (() => {
+                          const mediaUrl = getMediaUrl(msg);
+                          return (
+                            <div className="flex items-center gap-2 p-2 bg-white/5 rounded min-w-[200px]">
+                              <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-gray-400">
+                                {getFileIcon(msg.media_mimetype || '')}
                               </div>
-                              <button
-                                onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'imagem', msg.media_mimetype)}
-                                className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/img:opacity-100 transition-opacity"
-                              >
-                                <Download className="w-3 h-3 text-white" />
-                              </button>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs text-white truncate font-medium">{msg.caption || 'Documento'}</p>
+                                <p className="text-[10px] text-gray-500">{msg.media_mimetype}</p>
+                              </div>
+                              {mediaUrl && (
+                                <button onClick={() => downloadMedia(mediaUrl, msg.caption || 'documento', msg.media_mimetype)} className="p-1.5 hover:bg-white/10 rounded">
+                                  <Download className="w-4 h-4 text-gray-400" />
+                                </button>
+                              )}
                             </div>
-                            {msg.caption && msg.caption !== '[Imagem]' && <p className="text-xs text-white">{msg.caption}</p>}
-                          </div>
-                        )}
+                          );
+                        })()}
 
-                        {msg.tipo === 'sticker' && (
-                          <div className="space-y-1">
-                            <img
-                              src={msg.media_url || msg.conteudo || ''}
-                              alt="Sticker"
-                              className="max-w-[150px] max-h-[150px] object-contain"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = '';
-                                target.alt = '[Figurinha]';
-                                target.className = 'hidden';
-                              }}
-                            />
-                          </div>
-                        )}
-
-                        {msg.tipo === 'audio' && (
-                          <div className="flex items-center gap-2 min-w-[220px] p-1 bg-white/5 rounded-lg">
-                            <audio
-                              ref={(el) => { audioRefs.current[msg.id] = el; }}
-                              src={msg.media_url || msg.conteudo || ''}
-                              className="w-full h-8"
-                              controls
-                              controlsList="nodownload"
-                              preload="metadata"
-                              style={{ filter: 'invert(1)', opacity: 0.7 }}
-                            />
-                            <button
-                              onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'audio', msg.media_mimetype)}
-                              className="p-1.5 hover:bg-white/10 rounded flex-shrink-0"
-                              title="Baixar audio"
-                            >
-                              <Download className="w-3.5 h-3.5 text-gray-400" />
-                            </button>
-                          </div>
-                        )}
-
-                        {msg.tipo === 'document' && (
-                          <div className="flex items-center gap-2 p-2 bg-white/5 rounded min-w-[200px]">
-                            <div className="w-10 h-10 rounded bg-white/10 flex items-center justify-center text-gray-400">
-                              {getFileIcon(msg.media_mimetype || '')}
+                        {msg.tipo === 'video' && (() => {
+                          const mediaUrl = getMediaUrl(msg);
+                          return mediaUrl ? (
+                            <div className="space-y-1">
+                              <div className="relative group/vid">
+                                <video src={mediaUrl} className="max-w-full max-h-64 rounded" controls />
+                                <button
+                                  onClick={() => downloadMedia(mediaUrl, msg.caption || 'video', msg.media_mimetype)}
+                                  className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/vid:opacity-100 transition-opacity"
+                                >
+                                  <Download className="w-3 h-3 text-white" />
+                                </button>
+                              </div>
+                              {msg.caption && msg.caption !== '[Video]' && <p className="text-xs text-white">{msg.caption}</p>}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-xs text-white truncate font-medium">{msg.caption || 'Documento'}</p>
-                              <p className="text-[10px] text-gray-500">{msg.media_mimetype}</p>
+                          ) : (
+                            <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
+                              <Video className="w-5 h-5 text-gray-500" />
+                              <span className="text-xs text-gray-400">Video indisponivel</span>
                             </div>
-                            <button onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'documento', msg.media_mimetype)} className="p-1.5 hover:bg-white/10 rounded">
-                              <Download className="w-4 h-4 text-gray-400" />
-                            </button>
-                          </div>
-                        )}
-
-                        {msg.tipo === 'video' && (
-                          <div className="space-y-1">
-                            <div className="relative group/vid">
-                              <video src={msg.media_url || msg.conteudo || ''} className="max-w-full max-h-64 rounded" controls />
-                              <button
-                                onClick={() => downloadMedia(msg.media_url || msg.conteudo || '', msg.caption || 'video', msg.media_mimetype)}
-                                className="absolute top-1 right-1 p-1.5 rounded bg-black/50 opacity-0 group-hover/vid:opacity-100 transition-opacity"
-                              >
-                                <Download className="w-3 h-3 text-white" />
-                              </button>
-                            </div>
-                            {msg.caption && msg.caption !== '[Video]' && <p className="text-xs text-white">{msg.caption}</p>}
-                          </div>
-                        )}
+                          );
+                        })()}
 
                         {msg.tipo === 'location' && (
                           <div className="space-y-1">
@@ -1842,10 +1895,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     <Zap className="w-3.5 h-3.5" />
                     Disparar Fluxo
                   </button>
-                  <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 transition-colors">
-                    <Navigation className="w-3.5 h-3.5" />
-                    Enviar Localizacao
-                  </button>
                 </div>
               </div>
             </div>
@@ -2118,7 +2167,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </div>
 
               <div className="flex-1 overflow-y-auto space-y-1.5 min-h-[200px]">
-                {osSearchTerm.length >= 2 ? (
+                {osSearchTerm.length >= 1 ? (
                   searchingOS ? (
                     <div className="flex items-center justify-center h-full">
                       <Loader2 className="w-6 h-6 text-cyan-400 animate-spin" />

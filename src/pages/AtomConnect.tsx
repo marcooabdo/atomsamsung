@@ -272,12 +272,6 @@ export default function AtomConnect() {
       audioRef.current.play().catch(() => {});
     }
 
-    if (Notification.permission === 'granted') {
-      new Notification(notification.title, {
-        body: notification.message,
-        icon: '/2_-_icone_branco_com_fundo_preto.png'
-      });
-    }
   };
 
   const showTransferNotification = async (transfer: any) => {
@@ -319,11 +313,6 @@ export default function AtomConnect() {
     setNotifications(prev => prev.filter(n => n.id !== id));
   };
 
-  useEffect(() => {
-    if (Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
-  }, []);
 
   const handleNovaConversaCriada = async (conversaId: string) => {
     setShowNovaConversa(false);
