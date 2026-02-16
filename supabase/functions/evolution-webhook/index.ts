@@ -649,6 +649,31 @@ async function processMessage(
     if (!fromMe) {
       updateData.ultima_resposta_cliente_at = new Date().toISOString();
       updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
+
+      const { data: currentColumn } = await supabase
+        .from("atom_connect_pipeline_colunas")
+        .select("is_final")
+        .eq("id", conversa.coluna_pipeline)
+        .maybeSingle();
+
+      if (currentColumn?.is_final) {
+        console.log("Conversation in final column, moving back to first column");
+        const { data: firstColumn } = await supabase
+          .from("atom_connect_pipeline_colunas")
+          .select("id")
+          .order("ordem", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (firstColumn) {
+          updateData.coluna_pipeline = firstColumn.id;
+          updateData.is_bot_ativo = true;
+          updateData.atendente_id = null;
+          updateData.aguardando_avaliacao = false;
+          updateData.regra_finalizacao_id = null;
+          console.log("Moved to column:", firstColumn.id);
+        }
+      }
     }
 
     await supabase

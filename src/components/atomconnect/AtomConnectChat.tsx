@@ -78,6 +78,7 @@ interface PipelineColuna {
   id: string;
   nome: string;
   cor: string;
+  is_final?: boolean;
 }
 
 interface Instancia {
@@ -357,7 +358,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const loadColunas = async () => {
     const { data } = await supabase
       .from('atom_connect_pipeline_colunas')
-      .select('id, nome, cor')
+      .select('id, nome, cor, is_final')
       .order('ordem');
     if (data) setColunas(data);
   };
@@ -646,16 +647,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setSendingAvaliacao(true);
 
     try {
-      await sendToEvolutionAPI(regra.mensagem_avaliacao);
+      const evolutionMessageId = await sendToEvolutionAPI(regra.mensagem_avaliacao);
 
       await supabase
         .from('atom_connect_mensagens')
         .insert({
           conversa_id: conversa.id,
+          message_id: evolutionMessageId,
           from_me: true,
           tipo: 'text',
           conteudo: regra.mensagem_avaliacao,
-          status: 'sent',
+          status: evolutionMessageId ? 'sent' : 'failed',
           enviado_por: usuario?.id,
           is_bot: false,
           metadata: { tipo: 'avaliacao_request', regra_id: regra.id }
@@ -1349,16 +1351,26 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               Transferir
             </button>
 
-            <button
-              onClick={() => {
-                loadRegrasFinalizacao();
-                setShowFinalizarModal(true);
-              }}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
-            >
-              <CheckCircle2 className="w-3 h-3" />
-              Finalizar
-            </button>
+            {currentColuna?.is_final ? (
+              <button
+                disabled
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-red-500/20 text-red-400 cursor-not-allowed"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                Finalizado
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  loadRegrasFinalizacao();
+                  setShowFinalizarModal(true);
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                Finalizar
+              </button>
+            )}
           </div>
         </div>
 
