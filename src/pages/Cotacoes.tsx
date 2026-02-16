@@ -907,6 +907,26 @@ export function Cotacoes() {
 
       if (error) throw error;
 
+      if (whatsAppCotacao.os_id) {
+        try {
+          const response = await fetch('https://fiberless-uncourageously-lesli.ngrok-free.dev/webhook/enviar-orcamento', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ os_id: whatsAppCotacao.os_id }),
+          });
+
+          if (response.ok) {
+            console.log('GIA acionada! O cliente receberá o link no WhatsApp.');
+          } else {
+            console.error('Erro GIA:', await response.text());
+          }
+        } catch (webhookError) {
+          console.error('Erro ao acionar GIA:', webhookError);
+        }
+      }
+
       setShowWhatsAppModal(false);
       setWhatsAppCotacao(null);
       setWhatsAppPecas([]);

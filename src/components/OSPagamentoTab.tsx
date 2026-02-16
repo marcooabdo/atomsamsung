@@ -326,6 +326,24 @@ Assistencia Tecnica Samsung`;
         is_system: true
       });
 
+      try {
+        const response = await fetch('https://fiberless-uncourageously-lesli.ngrok-free.dev/webhook/enviar-orcamento', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ os_id: osId }),
+        });
+
+        if (response.ok) {
+          console.log('GIA acionada! O cliente receberá o link no WhatsApp.');
+        } else {
+          console.error('Erro GIA:', await response.text());
+        }
+      } catch (webhookError) {
+        console.error('Erro ao acionar GIA:', webhookError);
+      }
+
       setShowWhatsAppModal(false);
       onUpdate();
       alert('Orcamento marcado como enviado!');
