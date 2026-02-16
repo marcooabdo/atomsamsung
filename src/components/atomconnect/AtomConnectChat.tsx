@@ -146,6 +146,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [uploadError, setUploadError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
   const inputRef = useRef<HTMLInputElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -166,10 +167,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     if (!error && data) {
       setMensagens(data);
       setTimeout(() => {
-        if (messagesEndRef.current) {
-          messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
-      }, 100);
+      }, 150);
 
       const senderIds = [...new Set(data.filter(m => m.enviado_por).map(m => m.enviado_por))];
       if (senderIds.length > 0) {
@@ -352,7 +353,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   }, [mensagens]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   const loadColunas = async () => {
@@ -1375,7 +1378,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
           {loading ? (
             <div className="flex items-center justify-center h-full">
               <div className="w-8 h-8 border-2 border-white/20 border-t-white rounded-full animate-spin" />
