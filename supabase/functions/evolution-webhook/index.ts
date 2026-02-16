@@ -72,6 +72,55 @@ function getExtensionFromMimetype(mimetype: string): string {
   return mimeMap[mimetype] || "bin";
 }
 
+async function uploadBase64ToStorage(
+  supabase: any,
+  base64Data: string,
+  mimetype: string,
+  conversaId: string,
+  messageId: string
+): Promise<string | null> {
+  try {
+    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
+    if (!cleanBase64 || cleanBase64.length < 100) {
+      console.error("Base64 data too short or empty, length:", cleanBase64?.length);
+      return null;
+    }
+
+    const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
+    if (binaryData.length === 0) {
+      console.error("Decoded binary data is empty");
+      return null;
+    }
+
+    const extension = getExtensionFromMimetype(mimetype);
+    const fileName = `${conversaId}/${messageId}.${extension}`;
+
+    console.log("Uploading to storage:", fileName, "| size:", binaryData.length, "bytes");
+
+    const { error: uploadError } = await supabase.storage
+      .from("atom-connect")
+      .upload(fileName, binaryData, {
+        contentType: mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      console.error("Upload error:", uploadError);
+      return null;
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from("atom-connect")
+      .getPublicUrl(fileName);
+
+    console.log("Media uploaded successfully:", publicUrl);
+    return publicUrl;
+  } catch (error) {
+    console.error("Error uploading base64 to storage:", error);
+    return null;
+  }
+}
+
 async function fetchAndUploadMedia(
   supabase: any,
   instancia: { api_url: string; api_key: string; instance_name: string },
@@ -104,34 +153,11 @@ async function fetchAndUploadMedia(
     const base64Data = result.base64 || result.data;
 
     if (!base64Data) {
-      console.error("No base64 data in response");
+      console.error("No base64 data in API response");
       return null;
     }
 
-    const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
-    const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
-
-    const extension = getExtensionFromMimetype(mimetype);
-    const fileName = `${conversaId}/${messageId}.${extension}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from("atom-connect")
-      .upload(fileName, binaryData, {
-        contentType: mimetype,
-        upsert: true,
-      });
-
-    if (uploadError) {
-      console.error("Upload error:", uploadError);
-      return null;
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from("atom-connect")
-      .getPublicUrl(fileName);
-
-    console.log("Media uploaded successfully:", publicUrl);
-    return publicUrl;
+    return await uploadBase64ToStorage(supabase, base64Data, mimetype, conversaId, messageId);
   } catch (error) {
     console.error("Error fetching/uploading media:", error);
     return null;
@@ -460,6 +486,17 @@ async function processMessage(
 
   console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100), "| HasMedia:", hasMedia);
 
+  if (hasMedia) {
+    const b64Keys = [];
+    if (data?.base64) b64Keys.push("data.base64");
+    if (message?.base64) b64Keys.push("message.base64");
+    if (body?.data?.base64) b64Keys.push("body.data.base64");
+    if (body?.base64) b64Keys.push("body.base64");
+    console.log("Base64 found in:", b64Keys.length > 0 ? b64Keys.join(", ") : "NONE - will use API fallback");
+    const topKeys = Object.keys(data || {}).filter(k => k !== "message").join(", ");
+    console.log("Data top-level keys (excl message):", topKeys);
+  }
+
   let { data: conversa } = await supabase
     .from("atom_connect_conversas")
     .select("id, coluna_pipeline, mensagens_nao_lidas")
@@ -517,9 +554,20 @@ async function processMessage(
   }
 
   let mediaUrl: string | null = null;
-  if (hasMedia && mediaMimetype && !fromMe) {
-    console.log("Fetching media for message:", messageId);
-    mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
+  if (hasMedia && mediaMimetype) {
+    const inlineBase64 = data?.base64 || message?.base64 || body?.data?.base64 || body?.base64;
+
+    if (inlineBase64) {
+      console.log("Using inline base64 from webhook payload, length:", String(inlineBase64).length);
+      mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
+    }
+
+    if (!mediaUrl && !fromMe) {
+      console.log("Falling back to API fetch for media:", messageId);
+      mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
+    }
+
+    console.log("Media result:", mediaUrl ? "SUCCESS" : "FAILED");
   }
 
   const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
