@@ -818,6 +818,37 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     onUpdate();
   };
 
+  const toggleBot = async (status: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('atom_connect_conversas')
+        .update({ is_bot_ativo: status })
+        .eq('id', conversa.id);
+
+      if (error) throw error;
+
+      await supabase
+        .from('atom_connect_mensagens')
+        .insert({
+          conversa_id: conversa.id,
+          message_id: `system-${Date.now()}`,
+          from_me: true,
+          tipo: 'text',
+          conteudo: status
+            ? '🤖 GIA ativada! O bot voltará a responder automaticamente.'
+            : '👤 Modo humano ativado! O bot foi pausado para atendimento manual.',
+          status: 'sent',
+          enviado_por: usuario?.id,
+          is_bot: false
+        });
+
+      onUpdate();
+    } catch (error: any) {
+      console.error('Erro ao alternar bot:', error);
+      alert(`Erro ao alternar bot: ${error.message}`);
+    }
+  };
+
   const transferConversa = async (toUserId: string) => {
     await supabase
       .from('atom_connect_transferencias')
@@ -1545,12 +1576,18 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </AnimatePresence>
             </div>
 
-            {conversa.is_bot_ativo && (
-              <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-purple-500/20 text-purple-400">
-                <Bot className="w-3 h-3" />
-                Bot
-              </span>
-            )}
+            <button
+              onClick={() => toggleBot(!conversa.is_bot_ativo)}
+              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+                conversa.is_bot_ativo
+                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
+                  : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
+              }`}
+              title={conversa.is_bot_ativo ? 'Desativar GIA (modo humano)' : 'Ativar GIA (modo automático)'}
+            >
+              <Bot className="w-3 h-3" />
+              {conversa.is_bot_ativo ? 'GIA Ativa' : 'GIA Pausada'}
+            </button>
 
             {osData && (
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-blue-500/20 text-blue-400">
