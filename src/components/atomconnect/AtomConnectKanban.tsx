@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
-  Phone, MessageSquare, User, AlertTriangle,
+  Phone, MessageSquare, User, Users, AlertTriangle,
   Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
@@ -25,6 +25,7 @@ interface Conversa {
   tipo_atendimento: string;
   prioridade: string;
   tags: string[];
+  is_group?: boolean;
   created_at: string;
 }
 
@@ -430,23 +431,28 @@ export function AtomConnectKanban({ conversas, searchTerm, onSelectConversa, onU
                             >
                               {conversa.cliente_foto_url ? (
                                 <img src={conversa.cliente_foto_url} alt="" className="w-full h-full rounded-full object-cover" />
+                              ) : conversa.is_group ? (
+                                <Users className="w-3.5 h-3.5" style={{ color: coluna.cor }} />
                               ) : (
                                 <User className="w-3.5 h-3.5" style={{ color: coluna.cor }} />
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
-                                <h4 className="text-xs font-medium text-white/85 truncate">
+                                <h4 className="text-xs font-medium text-white/85 truncate flex items-center gap-1">
+                                  {conversa.is_group && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
                                   {conversa.cliente_nome || conversa.cliente_telefone}
                                 </h4>
                                 <span className="text-[10px] text-white/20 ml-1 flex-shrink-0">
                                   {getTimeAgo(conversa.ultima_mensagem_at)}
                                 </span>
                               </div>
+                              {!conversa.is_group && (
                               <p className="text-[11px] text-white/30 flex items-center gap-0.5 mt-0.5">
                                 <Phone className="w-3 h-3" />
                                 {conversa.cliente_telefone}
                               </p>
+                              )}
                             </div>
                           </div>
 

@@ -305,18 +305,24 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      if (rawRemoteJid.endsWith("@g.us") || rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@broadcast")) {
-        console.log("Skipping group/lid/broadcast message");
+      if (rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@broadcast")) {
+        console.log("Skipping lid/broadcast message");
         return new Response(JSON.stringify({ skip: "not_personal" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      const phoneNumber = cleanPhoneNumber(rawRemoteJid);
+      const isGroup = rawRemoteJid.endsWith("@g.us");
+      const phoneNumber = isGroup ? rawRemoteJid.replace("@g.us", "") : cleanPhoneNumber(rawRemoteJid);
       const fromMe = key.fromMe === true;
 
-      console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId);
+      const participant = key.participant || data?.participant || "";
+      const senderPhone = participant ? cleanPhoneNumber(participant) : "";
+      const senderName = message?.pushName || data?.pushName || body?.pushName || "";
+      const groupSubject = data?.groupName || data?.subject || body?.groupName || "";
+
+      console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId, "| IsGroup:", isGroup, senderPhone ? `| Sender: ${senderName} (${senderPhone})` : "");
 
       if (!phoneNumber || phoneNumber.length < 8) {
         return new Response(JSON.stringify({ skip: "invalid_phone" }), {
@@ -377,7 +383,13 @@ Deno.serve(async (req: Request) => {
         targetInstancia = fallbackInstancia;
       }
 
-      return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, targetInstancia);
+      return await processMessage(supabase, message, data, body, phoneNumber, fromMe, messageId, targetInstancia, {
+        isGroup,
+        groupJid: isGroup ? rawRemoteJid : null,
+        senderPhone,
+        senderName,
+        groupSubject,
+      });
     }
 
     if (event.includes("connection") || event.includes("status")) {
@@ -468,7 +480,8 @@ async function processMessage(
   phoneNumber: string,
   fromMe: boolean,
   messageId: string,
-  instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string }
+  instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string },
+  groupInfo: { isGroup: boolean; groupJid: string | null; senderPhone: string; senderName: string; groupSubject: string } = { isGroup: false, groupJid: null, senderPhone: "", senderName: "", groupSubject: "" }
 ) {
   console.log("=== PROCESSING MESSAGE ===");
 
@@ -571,7 +584,7 @@ async function processMessage(
   let isNewConversa = false;
 
   if (!conversa) {
-    if (fromMe) {
+    if (fromMe && !groupInfo.isGroup) {
       return new Response(JSON.stringify({ skip: "no_conversation_for_sent" }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -585,24 +598,30 @@ async function processMessage(
       .limit(1)
       .maybeSingle();
 
-    const pushName = message?.pushName || data?.pushName || body?.pushName || body?.senderName || phoneNumber;
+    const pushName = groupInfo.isGroup
+      ? (groupInfo.groupSubject || `Grupo ${phoneNumber}`)
+      : (message?.pushName || data?.pushName || body?.pushName || body?.senderName || phoneNumber);
+
+    const insertData: Record<string, any> = {
+      unidade_id: instancia.unidade_id,
+      instancia_id: instancia.id,
+      cliente_telefone: phoneNumber,
+      cliente_nome: pushName,
+      coluna_pipeline: firstColumn?.id || "bot_triagem",
+      is_bot_ativo: groupInfo.isGroup ? false : true,
+      ultima_mensagem: conteudo,
+      ultima_mensagem_at: new Date().toISOString(),
+      ultima_resposta_cliente_at: fromMe ? null : new Date().toISOString(),
+      mensagens_nao_lidas: fromMe ? 0 : 1,
+      tipo_atendimento: "whatsapp",
+      prioridade: "normal",
+      is_group: groupInfo.isGroup,
+      group_jid: groupInfo.groupJid,
+    };
 
     const { data: newConversa, error: insertError } = await supabase
       .from("atom_connect_conversas")
-      .insert({
-        unidade_id: instancia.unidade_id,
-        instancia_id: instancia.id,
-        cliente_telefone: phoneNumber,
-        cliente_nome: pushName,
-        coluna_pipeline: firstColumn?.id || "bot_triagem",
-        is_bot_ativo: true,
-        ultima_mensagem: conteudo,
-        ultima_mensagem_at: new Date().toISOString(),
-        ultima_resposta_cliente_at: new Date().toISOString(),
-        mensagens_nao_lidas: 1,
-        tipo_atendimento: "whatsapp",
-        prioridade: "normal",
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -642,7 +661,7 @@ async function processMessage(
     console.log("Media result:", mediaUrl ? "SUCCESS" : "FAILED");
   }
 
-  const { error: msgError } = await supabase.from("atom_connect_mensagens").insert({
+  const msgInsertData: Record<string, any> = {
     conversa_id: conversa.id,
     message_id: messageId,
     from_me: fromMe,
@@ -653,7 +672,16 @@ async function processMessage(
     media_mimetype: mediaMimetype,
     status: fromMe ? "sent" : "delivered",
     is_bot: false,
-  });
+  };
+
+  if (groupInfo.isGroup && groupInfo.senderName) {
+    msgInsertData.sender_name = groupInfo.senderName;
+  }
+  if (groupInfo.isGroup && groupInfo.senderPhone) {
+    msgInsertData.sender_phone = groupInfo.senderPhone;
+  }
+
+  const { error: msgError } = await supabase.from("atom_connect_mensagens").insert(msgInsertData);
 
   if (msgError) {
     if (msgError.code === "23505" || msgError.message?.includes("unique") || msgError.message?.includes("duplicate")) {
@@ -667,39 +695,49 @@ async function processMessage(
   }
 
   if (!isNewConversa) {
+    const previewMsg = groupInfo.isGroup && groupInfo.senderName && !fromMe
+      ? `${groupInfo.senderName.split(" ")[0]}: ${conteudo}`
+      : conteudo;
+
     const updateData: Record<string, any> = {
-      ultima_mensagem: conteudo,
+      ultima_mensagem: previewMsg,
       ultima_mensagem_at: new Date().toISOString(),
       cliente_digitando: null,
       cliente_digitando_at: null,
     };
 
+    if (groupInfo.isGroup && groupInfo.groupSubject && !conversa.cliente_nome) {
+      updateData.cliente_nome = groupInfo.groupSubject;
+    }
+
     if (!fromMe) {
       updateData.ultima_resposta_cliente_at = new Date().toISOString();
       updateData.mensagens_nao_lidas = (conversa.mensagens_nao_lidas || 0) + 1;
 
-      const { data: currentColumn } = await supabase
-        .from("atom_connect_pipeline_colunas")
-        .select("is_final")
-        .eq("id", conversa.coluna_pipeline)
-        .maybeSingle();
-
-      if (currentColumn?.is_final) {
-        console.log("Conversation in final column, moving back to first column");
-        const { data: firstColumn } = await supabase
+      if (!groupInfo.isGroup) {
+        const { data: currentColumn } = await supabase
           .from("atom_connect_pipeline_colunas")
-          .select("id")
-          .order("ordem", { ascending: true })
-          .limit(1)
+          .select("is_final")
+          .eq("id", conversa.coluna_pipeline)
           .maybeSingle();
 
-        if (firstColumn) {
-          updateData.coluna_pipeline = firstColumn.id;
-          updateData.is_bot_ativo = true;
-          updateData.atendente_id = null;
-          updateData.aguardando_avaliacao = false;
-          updateData.regra_finalizacao_id = null;
-          console.log("Moved to column:", firstColumn.id);
+        if (currentColumn?.is_final) {
+          console.log("Conversation in final column, moving back to first column");
+          const { data: firstColumn } = await supabase
+            .from("atom_connect_pipeline_colunas")
+            .select("id")
+            .order("ordem", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          if (firstColumn) {
+            updateData.coluna_pipeline = firstColumn.id;
+            updateData.is_bot_ativo = true;
+            updateData.atendente_id = null;
+            updateData.aguardando_avaliacao = false;
+            updateData.regra_finalizacao_id = null;
+            console.log("Moved to column:", firstColumn.id);
+          }
         }
       }
     }

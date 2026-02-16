@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   X, Send, Paperclip, Mic, Smile, Phone, Video,
-  User, Link2, FileText, Play, Download, Check,
+  User, Users, Link2, FileText, Play, Download, Check,
   CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare,
   MapPin, Calendar, AlertTriangle, ExternalLink, Edit2,
   Trash2, Upload, File, ImageIcon as ImageLucide, GripVertical,
@@ -35,6 +35,8 @@ interface Conversa {
   endereco_visita?: string;
   cliente_digitando?: string | null;
   cliente_digitando_at?: string | null;
+  is_group?: boolean;
+  group_jid?: string | null;
   created_at: string;
 }
 
@@ -51,6 +53,8 @@ interface Mensagem {
   status: string;
   enviado_por: string | null;
   is_bot: boolean;
+  sender_name?: string | null;
+  sender_phone?: string | null;
   created_at: string;
   edited_at?: string | null;
 }
@@ -223,7 +227,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       return;
     }
 
-    if (!instancia) return;
+    if (!instancia || conversa.is_group) return;
 
     try {
       const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
@@ -414,7 +418,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
 
     try {
-      const phoneNumber = conversa.cliente_telefone.replace(/\D/g, '');
+      const phoneNumber = conversa.is_group && conversa.group_jid
+        ? conversa.group_jid
+        : conversa.cliente_telefone.replace(/\D/g, '');
 
       if (mediaUrl && mediaType) {
         if (mediaType === 'audio') {
@@ -1211,7 +1217,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         className={`${sizeClasses[size]} rounded-full flex items-center justify-center`}
         style={{ backgroundColor: `${accentColor}20` }}
       >
-        <User className={iconSizes[size]} style={{ color: accentColor }} />
+        {conversa.is_group ? (
+          <Users className={iconSizes[size]} style={{ color: accentColor }} />
+        ) : (
+          <User className={iconSizes[size]} style={{ color: accentColor }} />
+        )}
       </div>
     );
   };
@@ -1271,13 +1281,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0A0A16] rounded-full" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">
+                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                  {conversa.is_group && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
                   {conversa.cliente_nome || conversa.cliente_telefone}
                 </h3>
+                {!conversa.is_group && (
                 <p className="text-xs text-gray-400 flex items-center gap-1">
                   <Phone className="w-3 h-3" />
                   {conversa.cliente_telefone}
                 </p>
+                )}
                 {typingStatus ? (
                   <p className="text-[10px] mt-0.5 flex items-center gap-1" style={{ color: accentColor }}>
                     <span className="flex gap-0.5">
@@ -1460,6 +1473,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     {msg.from_me && msg.enviado_por && usersCache[msg.enviado_por] && !msg.is_bot && (
                       <div className="text-[11px] font-semibold mb-1" style={{ color: accentColor }}>
                         {usersCache[msg.enviado_por]}:
+                      </div>
+                    )}
+
+                    {conversa.is_group && !msg.from_me && msg.sender_name && (
+                      <div className="text-[11px] font-semibold mb-1 text-emerald-400">
+                        {msg.sender_name}
                       </div>
                     )}
 
