@@ -164,6 +164,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
     if (!error && data) {
       setMensagens(data);
+      setTimeout(() => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ behavior: 'instant' });
+        }
+      }, 100);
 
       const senderIds = [...new Set(data.filter(m => m.enviado_por).map(m => m.enviado_por))];
       if (senderIds.length > 0) {
