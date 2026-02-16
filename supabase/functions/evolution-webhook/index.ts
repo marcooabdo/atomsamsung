@@ -238,16 +238,26 @@ Deno.serve(async (req: Request) => {
       const updates = Array.isArray(data) ? data : [data];
 
       for (const update of updates) {
-        const messageId = update.key?.id || update.id || update.messageId || update.message?.id;
-        const status = update.update?.status || update.status;
+        const messageId = update.keyId || update.key?.id || update.id || update.messageId || update.message?.id;
+        const rawStatus = update.update?.status ?? update.status;
 
-        console.log(`Message ID: ${messageId}, Raw Status: ${status}`);
+        console.log(`Message ID: ${messageId}, Raw Status: ${rawStatus}, Type: ${typeof rawStatus}`);
 
-        if (messageId && status !== undefined) {
+        if (messageId && rawStatus !== undefined && rawStatus !== null) {
           let newStatus = "sent";
-          if (status === 2) newStatus = "sent";
-          if (status === 3) newStatus = "delivered";
-          if (status === 4) newStatus = "read";
+
+          if (typeof rawStatus === "number") {
+            if (rawStatus === 2) newStatus = "sent";
+            if (rawStatus === 3) newStatus = "delivered";
+            if (rawStatus === 4) newStatus = "read";
+            if (rawStatus === 5) newStatus = "read";
+          } else if (typeof rawStatus === "string") {
+            const upper = rawStatus.toUpperCase();
+            if (upper === "PENDING" || upper === "ERROR") newStatus = "pending";
+            if (upper === "SERVER_ACK") newStatus = "sent";
+            if (upper === "DELIVERY_ACK") newStatus = "delivered";
+            if (upper === "READ" || upper === "PLAYED") newStatus = "read";
+          }
 
           console.log(`Updating message ${messageId} to status: ${newStatus}`);
 
@@ -260,13 +270,14 @@ Deno.serve(async (req: Request) => {
           if (error) {
             console.error(`Error updating message ${messageId}:`, error);
           } else {
-            console.log(`Successfully updated message ${messageId}. Rows affected:`, result?.length || 0);
+            console.log(`Updated ${result?.length || 0} rows for message ${messageId}`);
             if (result?.length === 0) {
               console.warn(`No message found with message_id: ${messageId}`);
             }
           }
         } else {
-          console.warn(`Invalid update data - messageId: ${messageId}, status: ${status}`);
+          console.warn(`Invalid update - messageId: ${messageId}, status: ${rawStatus}`);
+          console.warn(`Full update object keys: ${Object.keys(update).join(", ")}`);
         }
       }
 
