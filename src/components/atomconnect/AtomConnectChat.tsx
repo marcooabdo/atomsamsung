@@ -776,6 +776,28 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           console.error('Text message insert error:', error);
         }
       }
+
+      if (conversa.is_bot_ativo) {
+        await supabase
+          .from('atom_connect_conversas')
+          .update({ is_bot_ativo: false })
+          .eq('id', conversa.id);
+
+        await supabase
+          .from('atom_connect_mensagens')
+          .insert({
+            conversa_id: conversa.id,
+            message_id: `system-bot-off-${Date.now()}`,
+            from_me: true,
+            tipo: 'text',
+            conteudo: '👤 Atendimento humano iniciado! A GIA foi pausada automaticamente.',
+            status: 'sent',
+            enviado_por: usuario?.id,
+            is_bot: false
+          });
+
+        onUpdate();
+      }
     } catch (error) {
       console.error('Erro ao enviar mensagem:', error);
       setUploadError('Erro ao enviar mensagem. Tente novamente.');
@@ -1578,15 +1600,15 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
             <button
               onClick={() => toggleBot(!conversa.is_bot_ativo)}
-              className={`flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
                 conversa.is_bot_ativo
-                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30'
-                  : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
+                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 text-[10px]'
+                  : 'bg-orange-500/30 text-orange-300 hover:bg-orange-500/40 text-xs border-2 border-orange-500/50 animate-pulse shadow-lg shadow-orange-500/20'
               }`}
-              title={conversa.is_bot_ativo ? 'Desativar GIA (modo humano)' : 'Ativar GIA (modo automático)'}
+              title={conversa.is_bot_ativo ? 'Desativar GIA (modo humano)' : 'ATIVAR GIA - Clique para reativar o atendimento automático'}
             >
-              <Bot className="w-3 h-3" />
-              {conversa.is_bot_ativo ? 'GIA Ativa' : 'GIA Pausada'}
+              <Bot className={conversa.is_bot_ativo ? 'w-3 h-3' : 'w-4 h-4'} />
+              {conversa.is_bot_ativo ? 'GIA Ativa' : 'LIGAR GIA'}
             </button>
 
             {osData && (
@@ -1626,6 +1648,35 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             )}
           </div>
         </div>
+
+        {/* GIA Desligada Alert */}
+        {!conversa.is_bot_ativo && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mx-4 mt-3 p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border-2 border-orange-500/40 shadow-lg"
+          >
+            <div className="flex items-center gap-3">
+              <div className="flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-orange-500/30 flex items-center justify-center border-2 border-orange-500/50 animate-pulse">
+                  <Bot className="w-5 h-5 text-orange-300" />
+                </div>
+              </div>
+              <div className="flex-1">
+                <h4 className="text-sm font-bold text-orange-200 mb-0.5">GIA DESLIGADA - Atendimento Manual Ativo</h4>
+                <p className="text-xs text-orange-300/80">
+                  Não esqueça de reativar a GIA quando terminar o atendimento para voltar ao modo automático
+                </p>
+              </div>
+              <button
+                onClick={() => toggleBot(true)}
+                className="flex-shrink-0 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-500 text-white text-xs font-bold hover:from-purple-500 hover:to-purple-400 transition-all shadow-md hover:shadow-lg"
+              >
+                Ligar GIA
+              </button>
+            </div>
+          </motion.div>
+        )}
 
         {/* Messages */}
         <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-3">
