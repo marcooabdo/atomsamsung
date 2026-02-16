@@ -53,6 +53,42 @@ function hasActualContent(msg: any, body: any, data: any): boolean {
   return false;
 }
 
+function findBase64InPayload(obj: any, maxDepth = 3, currentPath = ""): { path: string; value: string } | null {
+  if (!obj || typeof obj !== "object" || maxDepth <= 0) return null;
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (
+      (key === "base64" || key === "mediaBase64" || key === "media") &&
+      typeof val === "string" &&
+      val.length > 100
+    ) {
+      return { path: currentPath ? `${currentPath}.${key}` : key, value: val };
+    }
+    if (typeof val === "object" && val !== null && !Array.isArray(val)) {
+      const found = findBase64InPayload(val, maxDepth - 1, currentPath ? `${currentPath}.${key}` : key);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function safeLogPayload(body: any): string {
+  try {
+    const sanitized = JSON.parse(JSON.stringify(body, (key, value) => {
+      if ((key === "base64" || key === "mediaBase64" || key === "media") && typeof value === "string" && value.length > 200) {
+        return `[BASE64_DATA length=${value.length}]`;
+      }
+      if (key === "jpegThumbnail" && typeof value === "string" && value.length > 100) {
+        return `[THUMBNAIL length=${value.length}]`;
+      }
+      return value;
+    }));
+    return JSON.stringify(sanitized).substring(0, 3000);
+  } catch {
+    return "[ERROR serializing payload]";
+  }
+}
+
 function getExtensionFromMimetype(mimetype: string): string {
   const mimeMap: Record<string, string> = {
     "image/jpeg": "jpg",
@@ -98,7 +134,7 @@ async function uploadBase64ToStorage(
     console.log("Uploading to storage:", fileName, "| size:", binaryData.length, "bytes");
 
     const { error: uploadError } = await supabase.storage
-      .from("atom-connect")
+      .from("atom-connect-media")
       .upload(fileName, binaryData, {
         contentType: mimetype,
         upsert: true,
@@ -110,7 +146,7 @@ async function uploadBase64ToStorage(
     }
 
     const { data: { publicUrl } } = supabase.storage
-      .from("atom-connect")
+      .from("atom-connect-media")
       .getPublicUrl(fileName);
 
     console.log("Media uploaded successfully:", publicUrl);
@@ -187,7 +223,7 @@ Deno.serve(async (req: Request) => {
 
     const body = await req.json();
     console.log("=== WEBHOOK RECEIVED ===");
-    console.log("Payload:", JSON.stringify(body).substring(0, 1500));
+    console.log("Payload:", safeLogPayload(body));
 
     const rawEvent = body.event || body.type || body.action || "";
     const event = normalizeEvent(rawEvent);
@@ -555,10 +591,18 @@ async function processMessage(
 
   let mediaUrl: string | null = null;
   if (hasMedia && mediaMimetype) {
-    const inlineBase64 = data?.base64 || message?.base64 || body?.data?.base64 || body?.base64;
+    let inlineBase64 = data?.base64 || message?.base64 || body?.data?.base64 || body?.base64;
+
+    if (!inlineBase64) {
+      const found = findBase64InPayload(body);
+      if (found) {
+        console.log("Base64 found via recursive search at:", found.path, "length:", found.value.length);
+        inlineBase64 = found.value;
+      }
+    }
 
     if (inlineBase64) {
-      console.log("Using inline base64 from webhook payload, length:", String(inlineBase64).length);
+      console.log("Using inline base64, length:", String(inlineBase64).length);
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
     }
 

@@ -483,7 +483,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           console.log('Uploading file:', fileName, 'Type:', file.type, 'Size:', file.size);
 
           const { error: storageError, data: uploadData } = await supabase.storage
-            .from('atom-connect')
+            .from('atom-connect-media')
             .upload(fileName, file, {
               contentType: file.type || 'application/octet-stream',
               upsert: true
@@ -496,7 +496,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           }
 
           const { data: { publicUrl } } = supabase.storage
-            .from('atom-connect')
+            .from('atom-connect-media')
             .getPublicUrl(fileName);
 
           console.log('File uploaded, public URL:', publicUrl);
@@ -793,7 +793,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       const fileName = `${conversa.id}/${Date.now()}.webm`;
 
       const { error: uploadError } = await supabase.storage
-        .from('atom-connect')
+        .from('atom-connect-media')
         .upload(fileName, audioBlob, { contentType: 'audio/webm' });
 
       if (uploadError) {
@@ -804,7 +804,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       }
 
       const { data: { publicUrl } } = supabase.storage
-        .from('atom-connect')
+        .from('atom-connect-media')
         .getPublicUrl(fileName);
 
       const attendantName = usuario?.nome || '';
