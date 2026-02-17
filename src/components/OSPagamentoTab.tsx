@@ -367,7 +367,7 @@ Assistencia Tecnica Samsung`;
         const baseUrl = window.location.origin;
         const link = `${baseUrl}/orcamento/${token}`;
         setApprovalLink(link);
-        onReload?.();
+        onUpdate();
         return link;
       }
     } catch (error: any) {
