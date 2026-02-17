@@ -19,6 +19,15 @@ import {
   Radio,
   Eye,
   Flame,
+  MessageCircle,
+  ExternalLink,
+  Hash,
+  X,
+  Phone,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  FileText,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { BOARD_CONFIG, ACTIVE_SECTORS, type SectorKey } from '../config/boardConfig';
@@ -34,6 +43,11 @@ interface MuralTarefa {
   gia_responsavel: string;
   concluido_por: string | null;
   concluido_at: string | null;
+  whatsapp_phone?: string | null;
+  os_id?: string | null;
+  os_numero?: string | null;
+  gia_source?: string | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 function formatTime(dateStr: string): string {
@@ -46,6 +60,13 @@ function formatTime(dateStr: string): string {
   const diffH = Math.floor(diffMin / 60);
   if (diffH < 24) return `${diffH}h`;
   return date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+}
+
+function formatFullDate(dateStr: string): string {
+  return new Date(dateStr).toLocaleString('pt-BR', {
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  });
 }
 
 function LiveClock() {
@@ -219,6 +240,303 @@ function StatCard({ label, value, icon: Icon, color, pulse }: StatCardProps) {
   );
 }
 
+type BadgeConfig = {
+  label: string;
+  bg: string;
+  border: string;
+  color: string;
+  glow: string | null;
+};
+
+function getTaskBadge(titulo = '', descricao = ''): BadgeConfig {
+  const text = `${titulo} ${descricao}`.toLowerCase();
+  if (/orçamento|cotação|orcamento|cotacao/.test(text))
+    return { label: 'ORÇAMENTO', bg: 'rgba(234,179,8,0.18)', border: 'rgba(234,179,8,0.5)', color: '#FACC15', glow: 'rgba(234,179,8,0.3)' };
+  if (/aprovado|pix/.test(text))
+    return { label: 'APROVADO', bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.55)', color: '#34D399', glow: 'rgba(52,211,153,0.3)' };
+  if (/status|( os )|\bos\b/.test(text))
+    return { label: 'ACOMPANHAMENTO', bg: 'rgba(6,182,212,0.15)', border: 'rgba(6,182,212,0.5)', color: '#22D3EE', glow: 'rgba(6,182,212,0.25)' };
+  if (/garantia/.test(text))
+    return { label: 'GARANTIA', bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.5)', color: '#C084FC', glow: 'rgba(168,85,247,0.25)' };
+  return { label: 'TRIAGEM', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.25)', color: '#64748B', glow: null };
+}
+
+function openWhatsApp(phone: string) {
+  const digits = phone.replace(/\D/g, '');
+  const num = digits.startsWith('55') ? digits : `55${digits}`;
+  window.open(`https://wa.me/${num}`, '_blank');
+}
+
+interface TaskDetailModalProps {
+  task: MuralTarefa;
+  accentColor: string;
+  onClose: () => void;
+  onComplete: (id: string) => void;
+  completing: boolean;
+}
+
+function TaskDetailModal({ task, accentColor, onClose, onComplete, completing }: TaskDetailModalProps) {
+  const isAlta = task.prioridade === 'alta';
+  const badge = getTaskBadge(task.titulo, task.descricao);
+  const isConnect = task.gia_source === 'CONNECT' || task.whatsapp_phone;
+  const borderColor = isAlta ? '#EF4444' : accentColor;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        style={{ background: 'rgba(0,0,0,0.75)', backdropFilter: 'blur(8px)' }}
+        onClick={onClose}
+      >
+        <motion.div
+          initial={{ opacity: 0, scale: 0.93, y: 16 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.93, y: 16 }}
+          transition={{ type: 'spring', stiffness: 340, damping: 28 }}
+          className="relative w-full max-w-lg rounded-2xl overflow-hidden"
+          style={{
+            background: 'linear-gradient(145deg, rgba(10,15,35,0.98), rgba(5,8,20,0.99))',
+            border: `1px solid ${borderColor}40`,
+            boxShadow: `0 0 60px ${borderColor}18, 0 24px 80px rgba(0,0,0,0.7)`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div
+            className="absolute top-0 left-0 right-0 h-px"
+            style={{ background: `linear-gradient(90deg, transparent, ${borderColor}90, transparent)` }}
+          />
+          <div
+            className="absolute left-0 top-0 bottom-0 w-0.5"
+            style={{ background: `linear-gradient(180deg, transparent, ${borderColor}, transparent)` }}
+          />
+
+          <div className="p-5">
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div
+                  className="inline-flex items-center px-2 py-1 rounded-md"
+                  style={{
+                    background: badge.bg, border: `1px solid ${badge.border}`,
+                    boxShadow: badge.glow ? `0 0 10px ${badge.glow}` : 'none',
+                  }}
+                >
+                  <span className="text-[9px] font-black tracking-widest" style={{ color: badge.color, fontFamily: 'monospace' }}>
+                    {badge.label}
+                  </span>
+                </div>
+
+                {isAlta && (
+                  <div
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                    style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.4)' }}
+                  >
+                    <Flame className="w-2.5 h-2.5 text-red-400 animate-pulse" />
+                    <span className="text-[9px] font-black text-red-400 tracking-widest" style={{ fontFamily: 'monospace' }}>ALTA</span>
+                  </div>
+                )}
+
+                {task.os_numero && (
+                  <div
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                    style={{ background: `${accentColor}12`, border: `1px solid ${accentColor}35` }}
+                  >
+                    <Hash className="w-2.5 h-2.5" style={{ color: accentColor }} />
+                    <span className="text-[9px] font-black tracking-wider" style={{ color: accentColor, fontFamily: 'monospace' }}>
+                      OS {task.os_numero}
+                    </span>
+                  </div>
+                )}
+
+                {isConnect && (
+                  <div
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md"
+                    style={{ background: 'rgba(37,211,102,0.12)', border: '1px solid rgba(37,211,102,0.3)' }}
+                  >
+                    <MessageCircle className="w-2.5 h-2.5 text-[#25D366]" />
+                    <span className="text-[9px] font-black text-[#25D366] tracking-wider" style={{ fontFamily: 'monospace' }}>CONNECT</span>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={onClose}
+                className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10"
+                style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+              >
+                <X className="w-3.5 h-3.5 text-slate-400" />
+              </button>
+            </div>
+
+            <h2 className="text-base font-black leading-snug mb-4" style={{ color: isAlta ? '#FCA5A5' : '#F1F5F9' }}>
+              {task.titulo}
+            </h2>
+
+            {task.descricao && (
+              <div
+                className="rounded-xl p-3.5 mb-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+              >
+                <div className="flex items-center gap-1.5 mb-2">
+                  <FileText className="w-3 h-3 text-slate-600" />
+                  <span className="text-[9px] font-mono text-slate-600 uppercase tracking-widest">Descrição</span>
+                </div>
+                <p className="text-[12px] text-slate-300 leading-relaxed">{task.descricao}</p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 gap-2 mb-4">
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-1">Agente</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-4 h-4 rounded-md flex items-center justify-center" style={{ background: `${accentColor}20` }}>
+                    <Bot className="w-2.5 h-2.5" style={{ color: accentColor }} />
+                  </div>
+                  <span className="text-[11px] font-bold" style={{ color: accentColor }}>{task.gia_responsavel}</span>
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-1">Criada em</p>
+                <div className="flex items-center gap-1.5">
+                  <Clock className="w-3 h-3 text-slate-500" />
+                  <span className="text-[11px] font-mono text-slate-300">{formatFullDate(task.created_at)}</span>
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-1">Setor</p>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full" style={{ background: accentColor }} />
+                  <span className="text-[11px] font-bold text-slate-300">{task.setor}</span>
+                </div>
+              </div>
+
+              <div
+                className="rounded-xl p-3"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-1">Prioridade</p>
+                <div className="flex items-center gap-1.5">
+                  {isAlta ? (
+                    <Flame className="w-3 h-3 text-red-400" />
+                  ) : (
+                    <Info className="w-3 h-3 text-slate-500" />
+                  )}
+                  <span className={`text-[11px] font-bold ${isAlta ? 'text-red-400' : 'text-slate-400'}`}>
+                    {isAlta ? 'ALTA' : 'NORMAL'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {task.whatsapp_phone && (
+              <div
+                className="rounded-xl p-3 mb-3 flex items-center justify-between"
+                style={{ background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)' }}
+              >
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3.5 h-3.5 text-[#25D366]" />
+                  <span className="text-[11px] font-mono text-[#25D366]">{task.whatsapp_phone}</span>
+                </div>
+                <button
+                  onClick={() => openWhatsApp(task.whatsapp_phone!)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wider transition-all hover:scale-[1.02] active:scale-95"
+                  style={{
+                    background: 'rgba(37,211,102,0.18)',
+                    border: '1px solid rgba(37,211,102,0.4)',
+                    color: '#25D366',
+                    boxShadow: '0 0 12px rgba(37,211,102,0.2)',
+                  }}
+                >
+                  <MessageCircle className="w-3 h-3" />
+                  ABRIR CHAT
+                </button>
+              </div>
+            )}
+
+            {task.os_id && (
+              <div
+                className="rounded-xl p-3 mb-3 flex items-center justify-between"
+                style={{ background: `${accentColor}08`, border: `1px solid ${accentColor}25` }}
+              >
+                <div className="flex items-center gap-2">
+                  <Hash className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                  <span className="text-[11px] font-mono" style={{ color: accentColor }}>
+                    OS #{task.os_numero || task.os_id?.slice(0, 8)}
+                  </span>
+                </div>
+                <a
+                  href={`/kanban?os=${task.os_id}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wider transition-all hover:scale-[1.02] active:scale-95"
+                  style={{
+                    background: `${accentColor}18`,
+                    border: `1px solid ${accentColor}40`,
+                    color: accentColor,
+                    boxShadow: `0 0 12px ${accentColor}20`,
+                  }}
+                >
+                  <ExternalLink className="w-3 h-3" />
+                  VER OS
+                </a>
+              </div>
+            )}
+
+            {task.metadata && Object.keys(task.metadata).length > 0 && (
+              <div
+                className="rounded-xl p-3 mb-3"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}
+              >
+                <p className="text-[9px] font-mono text-slate-600 uppercase tracking-widest mb-2">Dados extras</p>
+                <pre className="text-[10px] font-mono text-slate-500 overflow-auto max-h-24">
+                  {JSON.stringify(task.metadata, null, 2)}
+                </pre>
+              </div>
+            )}
+
+            <div className="flex gap-2 mt-2">
+              <button
+                onClick={onClose}
+                className="flex-1 py-2.5 rounded-xl text-[11px] font-black tracking-wider transition-all hover:bg-white/10"
+                style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#64748B' }}
+              >
+                FECHAR
+              </button>
+              <button
+                onClick={() => { onComplete(task.id); onClose(); }}
+                disabled={completing}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[11px] font-black tracking-wider transition-all disabled:opacity-40"
+                style={{
+                  background: completing ? 'rgba(255,255,255,0.04)' : `linear-gradient(135deg, ${accentColor}28, ${accentColor}12)`,
+                  border: `1px solid ${accentColor}50`,
+                  color: accentColor,
+                  boxShadow: completing ? 'none' : `0 0 18px ${accentColor}22`,
+                }}
+              >
+                {completing ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {completing ? 'SALVANDO...' : 'MARCAR CONCLUÍDA'}
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
 interface TaskCardProps {
   task: MuralTarefa;
   onComplete: (id: string) => void;
@@ -229,138 +547,208 @@ interface TaskCardProps {
 
 function TaskCard({ task, onComplete, completing, accentColor, index }: TaskCardProps) {
   const isAlta = task.prioridade === 'alta';
+  const [hovered, setHovered] = useState(false);
+  const [showModal, setShowModal] = useState(false);
+  const badge = getTaskBadge(task.titulo, task.descricao);
+  const isConnect = task.gia_source === 'CONNECT' || !!task.whatsapp_phone;
+  const borderColor = isAlta ? 'rgba(239,68,68,0.4)' : hovered ? `${accentColor}45` : `${accentColor}20`;
+
+  function handleWhatsAppClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (task.whatsapp_phone) openWhatsApp(task.whatsapp_phone);
+  }
+
+  function handleCompleteClick(e: React.MouseEvent) {
+    e.stopPropagation();
+    onComplete(task.id);
+  }
 
   return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: -16, scale: 0.96 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.88, x: 60, filter: 'blur(4px)' }}
-      transition={{ duration: 0.35, type: 'spring', stiffness: 280, damping: 22, delay: index * 0.04 }}
-      className="relative rounded-xl overflow-hidden group"
-      style={{
-        background: isAlta
-          ? 'linear-gradient(135deg, rgba(239,68,68,0.06), rgba(10,15,30,0.9))'
-          : 'linear-gradient(135deg, rgba(15,23,42,0.9), rgba(8,12,24,0.95))',
-        border: `1px solid ${isAlta ? 'rgba(239,68,68,0.35)' : 'rgba(255,255,255,0.07)'}`,
-        boxShadow: isAlta
-          ? '0 4px 24px rgba(239,68,68,0.12), inset 0 1px 0 rgba(239,68,68,0.1)'
-          : '0 2px 16px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03)',
-      }}
-    >
-      {isAlta && (
-        <>
-          <div
-            className="absolute top-0 left-0 right-0 h-px animate-pulse"
-            style={{ background: 'linear-gradient(90deg, transparent 0%, #EF4444 50%, transparent 100%)' }}
-          />
-          <div
-            className="absolute left-0 top-0 bottom-0 w-px"
-            style={{ background: 'linear-gradient(180deg, transparent, #EF4444, transparent)' }}
-          />
-        </>
-      )}
-
-      <div
-        className="absolute right-0 top-0 bottom-0 w-px opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: `linear-gradient(180deg, transparent, ${accentColor}, transparent)` }}
-      />
-
-      <div className="p-4">
-        <div className="flex items-start justify-between gap-2 mb-2.5">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {isAlta ? (
-              <Flame
-                className="w-3.5 h-3.5 flex-shrink-0 animate-pulse"
-                style={{ color: '#EF4444', filter: 'drop-shadow(0 0 6px rgba(239,68,68,1))' }}
-              />
-            ) : (
-              <ChevronRight className="w-3 h-3 flex-shrink-0 opacity-30" style={{ color: accentColor }} />
-            )}
-            <p
-              className="text-[13px] font-bold leading-snug"
-              style={{ color: isAlta ? '#FCA5A5' : '#E2E8F0' }}
-            >
-              {task.titulo}
-            </p>
-          </div>
-
-          <span
-            className="flex-shrink-0 text-[9px] font-black px-2 py-0.5 rounded tracking-widest uppercase"
-            style={{
-              background: isAlta ? 'rgba(239,68,68,0.18)' : `${accentColor}12`,
-              color: isAlta ? '#F87171' : accentColor,
-              border: `1px solid ${isAlta ? 'rgba(239,68,68,0.3)' : `${accentColor}30`}`,
-            }}
-          >
-            {isAlta ? '!! ALTA' : 'NORMAL'}
-          </span>
-        </div>
-
-        {task.descricao && (
-          <p className="text-[11px] text-slate-500 leading-relaxed mb-3 pl-5 line-clamp-2 border-l border-slate-700/50">
-            {task.descricao}
-          </p>
-        )}
-
+    <>
+      <motion.div
+        layout
+        initial={{ opacity: 0, y: -12, scale: 0.96 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.88, x: 60, filter: 'blur(4px)' }}
+        transition={{ duration: 0.3, type: 'spring', stiffness: 300, damping: 24, delay: index * 0.03 }}
+        className="relative rounded-xl overflow-hidden cursor-pointer select-none"
+        style={{
+          background: isAlta
+            ? 'linear-gradient(145deg, rgba(30,8,8,0.95), rgba(10,5,20,0.97))'
+            : hovered
+              ? 'linear-gradient(145deg, rgba(14,22,48,0.97), rgba(7,11,26,0.99))'
+              : 'linear-gradient(145deg, rgba(10,15,35,0.92), rgba(5,8,20,0.96))',
+          border: `1px solid ${borderColor}`,
+          boxShadow: hovered
+            ? isAlta ? '0 4px 20px rgba(239,68,68,0.18)' : `0 4px 20px ${accentColor}14`
+            : isAlta ? '0 2px 12px rgba(239,68,68,0.1)' : '0 2px 10px rgba(0,0,0,0.4)',
+          transform: hovered ? 'translateY(-2px)' : 'translateY(0)',
+          transition: 'all 0.2s cubic-bezier(0.4,0,0.2,1)',
+        }}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        onClick={() => setShowModal(true)}
+      >
         <div
-          className="flex items-center justify-between pt-2.5"
-          style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}
-        >
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div
-                className="w-4 h-4 rounded-full flex items-center justify-center"
-                style={{ background: `${accentColor}20`, border: `1px solid ${accentColor}40` }}
-              >
-                <Bot className="w-2.5 h-2.5" style={{ color: accentColor }} />
-              </div>
-              <span className="text-[10px] font-semibold" style={{ color: accentColor }}>
-                {task.gia_responsavel}
+          className="absolute top-0 left-0 right-0 h-px"
+          style={{
+            background: isAlta
+              ? 'linear-gradient(90deg, transparent 0%, rgba(239,68,68,0.75) 50%, transparent 100%)'
+              : `linear-gradient(90deg, transparent 0%, ${accentColor}${hovered ? '70' : '40'} 50%, transparent 100%)`,
+            transition: 'background 0.2s ease',
+          }}
+        />
+        <div
+          className="absolute left-0 top-0 bottom-0 w-0.5"
+          style={{
+            background: isAlta
+              ? 'linear-gradient(180deg, transparent, rgba(239,68,68,0.7), transparent)'
+              : `linear-gradient(180deg, transparent, ${accentColor}${hovered ? '60' : '30'}, transparent)`,
+            transition: 'background 0.2s ease',
+          }}
+        />
+
+        <div className="px-3 py-2.5">
+          <div className="flex items-center justify-between gap-1.5 mb-2">
+            <div
+              className="inline-flex items-center px-1.5 py-0.5 rounded"
+              style={{
+                background: badge.bg,
+                border: `1px solid ${badge.border}`,
+                boxShadow: badge.glow && hovered ? `0 0 8px ${badge.glow}` : 'none',
+                transition: 'box-shadow 0.2s ease',
+              }}
+            >
+              <span className="text-[8px] font-black tracking-[0.1em]" style={{ color: badge.color, fontFamily: 'monospace' }}>
+                {badge.label}
               </span>
             </div>
-            <div className="flex items-center gap-1 text-slate-600">
-              <Clock className="w-2.5 h-2.5" />
-              <span className="text-[10px] font-mono">{formatTime(task.created_at)}</span>
+
+            <div className="flex items-center gap-1.5">
+              {isAlta && (
+                <div className="flex items-center gap-1">
+                  <Flame className="w-2.5 h-2.5 text-red-400 animate-pulse" style={{ filter: 'drop-shadow(0 0 3px #EF4444)' }} />
+                  <span className="text-[8px] font-black text-red-400 tracking-widest" style={{ fontFamily: 'monospace' }}>ALTA</span>
+                </div>
+              )}
+
+              {task.os_numero && (
+                <div
+                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded"
+                  style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}28` }}
+                >
+                  <Hash className="w-2 h-2" style={{ color: accentColor }} />
+                  <span className="text-[8px] font-black tracking-wider" style={{ color: accentColor, fontFamily: 'monospace' }}>
+                    {task.os_numero}
+                  </span>
+                </div>
+              )}
+
+              {isConnect && (
+                <button
+                  onClick={handleWhatsAppClick}
+                  title={task.whatsapp_phone ? `Abrir WhatsApp: ${task.whatsapp_phone}` : 'WhatsApp'}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded transition-all active:scale-90"
+                  style={{
+                    background: hovered ? 'rgba(37,211,102,0.18)' : 'rgba(37,211,102,0.1)',
+                    border: '1px solid rgba(37,211,102,0.3)',
+                    boxShadow: hovered ? '0 0 8px rgba(37,211,102,0.25)' : 'none',
+                    transition: 'all 0.18s ease',
+                  }}
+                >
+                  <MessageCircle className="w-2.5 h-2.5 text-[#25D366]" />
+                  <span className="text-[8px] font-black text-[#25D366] tracking-wider" style={{ fontFamily: 'monospace' }}>WHATSAPP</span>
+                </button>
+              )}
             </div>
           </div>
 
-          <button
-            onClick={() => onComplete(task.id)}
-            disabled={completing}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-black tracking-wider uppercase transition-all duration-200 disabled:opacity-40"
+          <p
+            className="text-[12px] font-bold leading-snug mb-0"
             style={{
-              background: completing
-                ? 'rgba(255,255,255,0.04)'
-                : `linear-gradient(135deg, ${accentColor}22, ${accentColor}08)`,
-              border: `1px solid ${accentColor}45`,
-              color: accentColor,
-            }}
-            onMouseEnter={(e) => {
-              if (!completing) {
-                (e.currentTarget as HTMLButtonElement).style.background = `linear-gradient(135deg, ${accentColor}35, ${accentColor}18)`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = `0 0 12px ${accentColor}35, 0 0 4px ${accentColor}20`;
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!completing) {
-                (e.currentTarget as HTMLButtonElement).style.background = `linear-gradient(135deg, ${accentColor}22, ${accentColor}08)`;
-                (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
-              }
+              color: isAlta ? '#FCA5A5' : hovered ? '#F1F5F9' : '#CBD5E1',
+              transition: 'color 0.2s ease',
+              overflow: 'hidden',
+              display: '-webkit-box',
+              WebkitLineClamp: 2,
+              WebkitBoxOrient: 'vertical',
             }}
           >
-            {completing ? (
-              <RefreshCw className="w-3 h-3 animate-spin" />
-            ) : (
-              <CheckCircle2 className="w-3 h-3" />
-            )}
-            {completing ? 'OK...' : 'CONCLUIR'}
-          </button>
+            {task.titulo}
+          </p>
+
+          {task.descricao && (
+            <p
+              className="text-[10px] leading-relaxed mt-1.5 pl-2"
+              style={{
+                color: hovered ? '#475569' : '#334155',
+                borderLeft: `1px solid ${hovered ? `${accentColor}30` : 'rgba(255,255,255,0.06)'}`,
+                transition: 'all 0.2s ease',
+                overflow: 'hidden',
+                display: '-webkit-box',
+                WebkitLineClamp: 1,
+                WebkitBoxOrient: 'vertical',
+              }}
+            >
+              {task.descricao}
+            </p>
+          )}
+
+          <div
+            className="flex items-center justify-between mt-2 pt-2"
+            style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1">
+                <Bot className="w-2.5 h-2.5 opacity-60" style={{ color: accentColor }} />
+                <span className="text-[9px] font-mono" style={{ color: accentColor, opacity: 0.8 }}>
+                  {task.gia_responsavel?.replace('GIA ', '')}
+                </span>
+              </div>
+              <div className="flex items-center gap-1 text-slate-700">
+                <Clock className="w-2 h-2" />
+                <span className="text-[9px] font-mono">{formatTime(task.created_at)}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={handleCompleteClick}
+              disabled={completing}
+              className="flex items-center gap-1 px-2 py-1 rounded-md text-[9px] font-black tracking-wider uppercase transition-all disabled:opacity-40 active:scale-95"
+              style={{
+                background: hovered ? `${accentColor}22` : `${accentColor}12`,
+                border: `1px solid ${hovered ? `${accentColor}45` : `${accentColor}25`}`,
+                color: accentColor,
+                boxShadow: hovered ? `0 0 10px ${accentColor}20` : 'none',
+                transition: 'all 0.18s ease',
+                fontFamily: 'monospace',
+              }}
+            >
+              {completing ? (
+                <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+              ) : (
+                <CheckCircle2 className="w-2.5 h-2.5" />
+              )}
+              {completing ? 'OK' : 'OK'}
+            </button>
+          </div>
         </div>
-      </div>
-    </motion.div>
+      </motion.div>
+
+      {showModal && (
+        <TaskDetailModal
+          task={task}
+          accentColor={accentColor}
+          onClose={() => setShowModal(false)}
+          onComplete={onComplete}
+          completing={completing}
+        />
+      )}
+    </>
   );
 }
+
+const COLUMN_CAPACITY = 100;
 
 interface SectorColumnProps {
   sectorKey: SectorKey;
@@ -378,6 +766,9 @@ function SectorColumn({ sectorKey, tasks, completingId, onComplete }: SectorColu
     const age = Date.now() - new Date(t.created_at).getTime();
     return age < 30000;
   });
+
+  const pct = Math.min((tasks.length / COLUMN_CAPACITY) * 100, 100);
+  const isOverloaded = tasks.length > COLUMN_CAPACITY;
 
   return (
     <div
@@ -478,7 +869,16 @@ function SectorColumn({ sectorKey, tasks, completingId, onComplete }: SectorColu
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 cyber-scrollbar min-h-[180px]">
+      <div
+        className="flex-1 overflow-y-auto p-3 space-y-2 min-h-[180px]"
+        style={{ scrollbarWidth: 'thin', scrollbarColor: `${config.accentColor}18 transparent` }}
+      >
+        <style>{`
+          .sector-scroll::-webkit-scrollbar { width: 2px; }
+          .sector-scroll::-webkit-scrollbar-track { background: transparent; }
+          .sector-scroll::-webkit-scrollbar-thumb { background: ${config.accentColor}25; border-radius: 999px; }
+          .sector-scroll::-webkit-scrollbar-thumb:hover { background: ${config.accentColor}50; }
+        `}</style>
         <AnimatePresence mode="popLayout">
           {tasks.length === 0 ? (
             <motion.div
@@ -519,20 +919,31 @@ function SectorColumn({ sectorKey, tasks, completingId, onComplete }: SectorColu
       </div>
 
       <div
-        className="px-3 py-2 flex items-center justify-between flex-shrink-0"
+        className="px-3 py-2 flex items-center justify-between flex-shrink-0 gap-2"
         style={{ borderTop: `1px solid ${config.accentColor}12`, background: 'rgba(0,0,0,0.3)' }}
       >
-        <div className="h-1 flex-1 rounded-full overflow-hidden mr-2" style={{ background: 'rgba(255,255,255,0.05)' }}>
+        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
           {tasks.length > 0 && (
             <motion.div
               className="h-full rounded-full"
               initial={{ width: 0 }}
-              animate={{ width: `${Math.min((tasks.length / 10) * 100, 100)}%` }}
-              style={{ background: `linear-gradient(90deg, ${config.accentColor}80, ${config.accentColor})` }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.5, ease: 'easeOut' }}
+              style={{
+                background: isOverloaded
+                  ? 'linear-gradient(90deg, #EF444480, #EF4444)'
+                  : `linear-gradient(90deg, ${config.accentColor}80, ${config.accentColor})`,
+                boxShadow: isOverloaded ? '0 0 6px rgba(239,68,68,0.4)' : `0 0 6px ${config.accentColor}40`,
+              }}
             />
           )}
         </div>
-        <span className="text-[9px] font-mono text-slate-600">{tasks.length}/10</span>
+        <span
+          className="text-[9px] font-mono flex-shrink-0"
+          style={{ color: isOverloaded ? '#EF4444' : '#334155', fontFamily: 'monospace' }}
+        >
+          {tasks.length}/{COLUMN_CAPACITY}
+        </span>
       </div>
     </div>
   );
@@ -635,7 +1046,6 @@ export function MuralMissoes() {
         style={{ background: 'linear-gradient(90deg, transparent 0%, #00D4FF 30%, #39FF14 70%, transparent 100%)' }}
       />
 
-      {/* Header */}
       <div
         className="relative z-10 flex-shrink-0 px-6 py-3 flex items-center justify-between"
         style={{
@@ -740,7 +1150,6 @@ export function MuralMissoes() {
         </div>
       </div>
 
-      {/* Alert Bar */}
       <AnimatePresence>
         {highPriorityCount > 0 && (
           <motion.div
@@ -771,7 +1180,6 @@ export function MuralMissoes() {
         )}
       </AnimatePresence>
 
-      {/* GIA Agents Load Bar */}
       <div
         className="relative z-10 flex-shrink-0 px-4 py-2.5 flex items-center gap-3 overflow-x-auto"
         style={{
@@ -806,7 +1214,6 @@ export function MuralMissoes() {
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="relative z-10 flex-1 overflow-hidden p-4">
         {loading ? (
           <div className="h-full flex items-center justify-center">
@@ -849,7 +1256,6 @@ export function MuralMissoes() {
         )}
       </div>
 
-      {/* Footer */}
       <div
         className="relative z-10 flex-shrink-0 px-6 py-2 flex items-center justify-between"
         style={{
@@ -873,7 +1279,6 @@ export function MuralMissoes() {
           <span className="text-[#39FF14] opacity-60">v2.0-realtime</span>
         </div>
       </div>
-
     </div>
   );
 }
