@@ -26,6 +26,7 @@ import { RegistroVendas } from './pages/RegistroVendas';
 import { OrcamentoPublico } from './pages/OrcamentoPublico';
 import CustomerIntelligence from './pages/CustomerIntelligence';
 import AtomConnect from './pages/AtomConnect';
+import { MuralMissoes } from './pages/MuralMissoes';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -281,6 +282,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <AtomConnect />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mural-missoes"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <MuralMissoes />
               </Layout>
             </ProtectedRoute>
           }

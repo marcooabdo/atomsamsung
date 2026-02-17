@@ -26,7 +26,8 @@ import {
   Sparkles,
   ShoppingCart,
   Users,
-  Radio
+  Radio,
+  Target
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -35,6 +36,7 @@ interface LayoutProps {
 
 const allMenuItems = [
   { id: 'gia', permKey: 'menu_gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
+  { id: 'mural-missoes', permKey: 'menu_gia', label: 'ATOM Command Center', icon: Target, path: '/mural-missoes', glow: true },
   { id: 'dashboard', permKey: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
