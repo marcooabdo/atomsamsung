@@ -19,6 +19,7 @@ import { AtomConnectChat } from './atomconnect/AtomConnectChat';
 import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import { SuccessModal } from './SuccessModal';
+import { ConvertTipoOSModal } from './ConvertTipoOSModal';
 import type { Database } from '../lib/database.types';
 
 interface WhatsAppConversa {
@@ -183,6 +184,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [servicosCadastrados, setServicosCadastrados] = useState<any[]>([]);
   const [mostrarModalServico, setMostrarModalServico] = useState(false);
   const [buscaServico, setBuscaServico] = useState('');
+  const [mostrarModalConvertTipo, setMostrarModalConvertTipo] = useState(false);
   const [servicosSalvos, setServicosSalvos] = useState(false);
   const [salvandoServicos, setSalvandoServicos] = useState(false);
 
@@ -2624,6 +2626,21 @@ Não haverá cobrança ao cliente.`
                 >
                   <FileDown className="w-4 h-4" />
                   PDF
+                </button>
+
+                <button
+                  onClick={() => setMostrarModalConvertTipo(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all hover:bg-purple-500/20"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.05) 100%)',
+                    border: '1px solid #a855f7',
+                    color: '#a855f7',
+                    boxShadow: '0 0 10px rgba(168,85,247,0.2)'
+                  }}
+                  title="Converter Tipo de OS"
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  CONVERTER TIPO
                 </button>
 
                 {os.tipo_atendimento === 'CI' && os.tipo_orcamento !== 'samsung_contigo' && os.tipo_orcamento !== 'acessorios' && (
@@ -5358,6 +5375,18 @@ Não haverá cobrança ao cliente.`
         title="Sucesso"
         message="OS movida com sucesso!"
       />
+
+      {mostrarModalConvertTipo && os && (
+        <ConvertTipoOSModal
+          os={os}
+          onClose={() => setMostrarModalConvertTipo(false)}
+          onSuccess={() => {
+            setMostrarModalConvertTipo(false);
+            loadOS();
+            onReload?.();
+          }}
+        />
+      )}
     </div>
   );
 }
