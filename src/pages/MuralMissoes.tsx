@@ -13,8 +13,6 @@ import {
   Target,
   Shield,
   Cpu,
-  Network,
-  TrendingUp,
   ChevronRight,
   Layers,
   Database,
@@ -92,45 +90,94 @@ function GlowOrb({ color, size, top, left, blur }: { color: string; size: number
   );
 }
 
-interface GIAAgentBadgeProps {
+interface GIAAgentLoadProps {
   name: string;
   color: string;
-  active?: boolean;
+  taskCount: number;
+  maxLoad: number;
+  highCount: number;
 }
 
-function GIAAgentBadge({ name, color, active }: GIAAgentBadgeProps) {
+function GIAAgentLoad({ name, color, taskCount, maxLoad, highCount }: GIAAgentLoadProps) {
+  const pct = Math.min((taskCount / maxLoad) * 100, 100);
+  const isOverloaded = pct >= 80;
+  const isActive = taskCount > 0;
+  const shortName = name.replace('GIA ', '');
+
   return (
     <div
-      className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold tracking-wider"
+      className="flex flex-col gap-1 px-3 py-2 rounded-xl flex-shrink-0"
       style={{
-        background: active ? `${color}20` : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${active ? `${color}50` : 'rgba(255,255,255,0.08)'}`,
-        color: active ? color : '#475569',
+        background: isActive ? `${color}08` : 'rgba(255,255,255,0.03)',
+        border: `1px solid ${isActive ? `${color}25` : 'rgba(255,255,255,0.06)'}`,
+        minWidth: 90,
       }}
     >
-      <div
-        className={`w-1.5 h-1.5 rounded-full ${active ? 'animate-pulse' : ''}`}
-        style={{ background: active ? color : '#334155' }}
-      />
-      {name}
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <div
+            className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isActive ? (isOverloaded ? 'animate-pulse' : '') : ''}`}
+            style={{ background: isActive ? color : '#1E293B', boxShadow: isActive ? `0 0 4px ${color}` : 'none' }}
+          />
+          <span
+            className="text-[10px] font-black tracking-wider"
+            style={{ color: isActive ? color : '#334155' }}
+          >
+            {shortName}
+          </span>
+        </div>
+        {highCount > 0 && (
+          <span
+            className="text-[8px] font-black px-1 rounded animate-pulse"
+            style={{ background: 'rgba(239,68,68,0.2)', color: '#F87171', border: '1px solid rgba(239,68,68,0.3)' }}
+          >
+            {highCount}!
+          </span>
+        )}
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-1 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          {isActive && (
+            <motion.div
+              className="h-full rounded-full"
+              initial={{ width: 0 }}
+              animate={{ width: `${pct}%` }}
+              transition={{ duration: 0.6, ease: 'easeOut' }}
+              style={{
+                background: isOverloaded
+                  ? `linear-gradient(90deg, ${color}, #EF4444)`
+                  : `linear-gradient(90deg, ${color}80, ${color})`,
+                boxShadow: isActive ? `0 0 4px ${color}60` : 'none',
+              }}
+            />
+          )}
+        </div>
+        <span
+          className="text-[9px] font-mono tabular-nums flex-shrink-0"
+          style={{ color: isActive ? color : '#1E293B' }}
+        >
+          {taskCount}/{maxLoad}
+        </span>
+      </div>
     </div>
   );
 }
 
 const GIA_AGENTS = [
-  { name: 'GIA Prime', color: '#00D4FF' },
-  { name: 'GIA Connect', color: '#39FF14' },
-  { name: 'GIA Sales', color: '#FF6B35' },
-  { name: 'GIA Stock', color: '#00D4FF' },
-  { name: 'GIA Fiscal', color: '#FFA500' },
-  { name: 'GIA Audit', color: '#39FF14' },
-  { name: 'GIA Tech', color: '#00D4FF' },
-  { name: 'GIA Logistics', color: '#39FF14' },
-  { name: 'GIA Monitor', color: '#FF2D78' },
-  { name: 'GIA Growth', color: '#FF6B35' },
-  { name: 'GIA ESI', color: '#00D4FF' },
-  { name: 'GIA Warranty', color: '#FFA500' },
-  { name: 'GIA Skywalker', color: '#A78BFA' },
+  { name: 'GIA Prime', color: '#00D4FF', maxLoad: 8 },
+  { name: 'GIA Connect', color: '#39FF14', maxLoad: 6 },
+  { name: 'GIA Sales', color: '#FF6B35', maxLoad: 5 },
+  { name: 'GIA Stock', color: '#00D4FF', maxLoad: 6 },
+  { name: 'GIA Fiscal', color: '#FFA500', maxLoad: 4 },
+  { name: 'GIA Audit', color: '#39FF14', maxLoad: 5 },
+  { name: 'GIA Tech', color: '#00D4FF', maxLoad: 7 },
+  { name: 'GIA Logistics', color: '#39FF14', maxLoad: 5 },
+  { name: 'GIA Monitor', color: '#FF2D78', maxLoad: 4 },
+  { name: 'GIA Growth', color: '#FF6B35', maxLoad: 4 },
+  { name: 'GIA ESI', color: '#00D4FF', maxLoad: 3 },
+  { name: 'GIA Warranty', color: '#FFA500', maxLoad: 4 },
+  { name: 'GIA Skywalker', color: '#A78BFA', maxLoad: 3 },
 ];
 
 interface StatCardProps {
@@ -491,53 +538,6 @@ function SectorColumn({ sectorKey, tasks, completingId, onComplete }: SectorColu
   );
 }
 
-function EcossistemaModal({ onClose }: { onClose: () => void }) {
-  return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
-      onClick={onClose}
-    >
-      <motion.div
-        initial={{ scale: 0.9, y: 20 }}
-        animate={{ scale: 1, y: 0 }}
-        exit={{ scale: 0.9, y: 20 }}
-        className="relative max-w-5xl w-full rounded-2xl overflow-hidden"
-        style={{
-          border: '1px solid rgba(0,212,255,0.3)',
-          boxShadow: '0 0 60px rgba(0,212,255,0.15)',
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="absolute top-0 left-0 right-0 h-px"
-          style={{ background: 'linear-gradient(90deg, transparent, #00D4FF, #39FF14, transparent)' }}
-        />
-        <div className="px-6 py-4 flex items-center justify-between" style={{ background: 'rgba(7,10,22,0.98)', borderBottom: '1px solid rgba(0,212,255,0.15)' }}>
-          <div className="flex items-center gap-3">
-            <Network className="w-5 h-5 text-[#00D4FF]" />
-            <span className="text-sm font-black text-[#00D4FF] tracking-widest uppercase">Ecossistema GIA — Group Global</span>
-          </div>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors text-xs font-bold px-3 py-1 rounded border border-slate-700 hover:border-slate-500">
-            FECHAR
-          </button>
-        </div>
-        <div style={{ background: 'rgba(7,10,22,0.98)' }}>
-          <img
-            src="/ECOSSISTEMA_GIA.png"
-            alt="Ecossistema GIA"
-            className="w-full object-contain"
-            style={{ maxHeight: '75vh' }}
-          />
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-}
-
 export function MuralMissoes() {
   const [tasks, setTasks] = useState<MuralTarefa[]>([]);
   const [loading, setLoading] = useState(true);
@@ -545,8 +545,6 @@ export function MuralMissoes() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [completedCount, setCompletedCount] = useState(0);
   const [newTaskFlash, setNewTaskFlash] = useState(false);
-  const [showEcossistema, setShowEcossistema] = useState(false);
-  const [activeAgents, setActiveAgents] = useState<string[]>([]);
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const sortTasks = (list: MuralTarefa[]) =>
@@ -564,10 +562,7 @@ export function MuralMissoes() {
       .order('created_at', { ascending: true });
 
     if (!error && data) {
-      const sorted = sortTasks(data as MuralTarefa[]);
-      setTasks(sorted);
-      const agents = [...new Set(sorted.map((t) => t.gia_responsavel))];
-      setActiveAgents(agents);
+      setTasks(sortTasks(data as MuralTarefa[]));
     }
     setLoading(false);
   }, []);
@@ -581,11 +576,7 @@ export function MuralMissoes() {
         if (payload.eventType === 'INSERT') {
           const newTask = payload.new as MuralTarefa;
           if (newTask.status === 'pendente') {
-            setTasks((prev) => {
-              const sorted = sortTasks([...prev, newTask]);
-              setActiveAgents([...new Set(sorted.map((t) => t.gia_responsavel))]);
-              return sorted;
-            });
+            setTasks((prev) => sortTasks([...prev, newTask]));
             setNewTaskFlash(true);
             if (flashTimeout.current) clearTimeout(flashTimeout.current);
             flashTimeout.current = setTimeout(() => setNewTaskFlash(false), 4000);
@@ -593,11 +584,7 @@ export function MuralMissoes() {
         } else if (payload.eventType === 'UPDATE') {
           const updated = payload.new as MuralTarefa;
           if (updated.status === 'concluido') {
-            setTasks((prev) => {
-              const next = prev.filter((t) => t.id !== updated.id);
-              setActiveAgents([...new Set(next.map((t) => t.gia_responsavel))]);
-              return next;
-            });
+            setTasks((prev) => prev.filter((t) => t.id !== updated.id));
             setCompletedCount((c) => c + 1);
           } else {
             setTasks((prev) => sortTasks(prev.map((t) => (t.id === updated.id ? updated : t))));
@@ -695,31 +682,6 @@ export function MuralMissoes() {
             </div>
           </div>
 
-          <div className="h-8 w-px bg-slate-800" />
-
-          <button
-            onClick={() => setShowEcossistema(true)}
-            className="flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-200 group"
-            style={{
-              background: 'rgba(0,212,255,0.06)',
-              border: '1px solid rgba(0,212,255,0.15)',
-            }}
-            onMouseEnter={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,212,255,0.12)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0,212,255,0.35)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = '0 0 16px rgba(0,212,255,0.15)';
-            }}
-            onMouseLeave={(e) => {
-              (e.currentTarget as HTMLButtonElement).style.background = 'rgba(0,212,255,0.06)';
-              (e.currentTarget as HTMLButtonElement).style.borderColor = 'rgba(0,212,255,0.15)';
-              (e.currentTarget as HTMLButtonElement).style.boxShadow = 'none';
-            }}
-          >
-            <Network className="w-3.5 h-3.5 text-[#00D4FF]" />
-            <span className="text-[10px] font-bold text-[#00D4FF] tracking-wider uppercase">Ecossistema GIA</span>
-            <ChevronRight className="w-3 h-3 text-[#00D4FF] opacity-60 group-hover:translate-x-0.5 transition-transform" />
-          </button>
-
           <AnimatePresence>
             {newTaskFlash && (
               <motion.div
@@ -809,27 +771,38 @@ export function MuralMissoes() {
         )}
       </AnimatePresence>
 
-      {/* GIA Agents Bar */}
+      {/* GIA Agents Load Bar */}
       <div
-        className="relative z-10 flex-shrink-0 px-6 py-2 flex items-center gap-3 overflow-x-auto"
+        className="relative z-10 flex-shrink-0 px-4 py-2.5 flex items-center gap-3 overflow-x-auto"
         style={{
-          background: 'rgba(3,5,16,0.7)',
+          background: 'rgba(3,5,16,0.75)',
           borderBottom: '1px solid rgba(255,255,255,0.04)',
         }}
       >
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0 pr-3" style={{ borderRight: '1px solid rgba(255,255,255,0.06)' }}>
           <Cpu className="w-3 h-3 text-slate-600" />
-          <span className="text-[9px] text-slate-600 font-mono uppercase tracking-widest">Agentes Ativos:</span>
+          <div>
+            <p className="text-[9px] text-slate-500 font-mono uppercase tracking-widest leading-none">Carga</p>
+            <p className="text-[9px] text-slate-600 font-mono leading-none">Agentes</p>
+          </div>
         </div>
         <div className="flex items-center gap-2 flex-nowrap">
-          {GIA_AGENTS.map((agent) => (
-            <GIAAgentBadge
-              key={agent.name}
-              name={agent.name}
-              color={agent.color}
-              active={activeAgents.some((a) => a.toLowerCase().includes(agent.name.toLowerCase().replace('gia ', '')))}
-            />
-          ))}
+          {GIA_AGENTS.map((agent) => {
+            const agentTasks = tasks.filter((t) =>
+              t.gia_responsavel?.toLowerCase().includes(agent.name.toLowerCase().replace('gia ', ''))
+            );
+            const highTasks = agentTasks.filter((t) => t.prioridade === 'alta').length;
+            return (
+              <GIAAgentLoad
+                key={agent.name}
+                name={agent.name}
+                color={agent.color}
+                taskCount={agentTasks.length}
+                maxLoad={agent.maxLoad}
+                highCount={highTasks}
+              />
+            );
+          })}
         </div>
       </div>
 
@@ -872,87 +845,6 @@ export function MuralMissoes() {
                 onComplete={handleComplete}
               />
             ))}
-
-            {/* Ecossistema Panel */}
-            <div
-              className="flex-shrink-0 w-72 flex flex-col rounded-2xl overflow-hidden cursor-pointer group"
-              style={{
-                background: 'rgba(7,10,22,0.7)',
-                border: '1px solid rgba(0,212,255,0.12)',
-                backdropFilter: 'blur(20px)',
-              }}
-              onClick={() => setShowEcossistema(true)}
-            >
-              <div
-                className="px-4 py-3.5 flex-shrink-0 flex items-center gap-3"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.08), transparent)',
-                  borderBottom: '1px solid rgba(0,212,255,0.12)',
-                }}
-              >
-                <div
-                  className="w-9 h-9 rounded-xl flex items-center justify-center"
-                  style={{
-                    background: 'rgba(0,212,255,0.1)',
-                    border: '1px solid rgba(0,212,255,0.25)',
-                  }}
-                >
-                  <Network className="w-4 h-4 text-[#00D4FF]" style={{ width: 18, height: 18 }} />
-                </div>
-                <div>
-                  <h3 className="text-sm font-black tracking-widest text-[#00D4FF] uppercase">
-                    Ecossistema
-                  </h3>
-                  <p className="text-[9px] text-slate-600 uppercase tracking-widest font-mono">
-                    GIA Intelligence Map
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex-1 relative overflow-hidden">
-                <img
-                  src="/ECOSSISTEMA_GIA.png"
-                  alt="Ecossistema GIA"
-                  className="w-full h-full object-cover opacity-60 group-hover:opacity-80 transition-opacity duration-300"
-                  style={{ objectPosition: 'top center' }}
-                />
-                <div
-                  className="absolute inset-0"
-                  style={{
-                    background: 'linear-gradient(to bottom, rgba(7,10,22,0.1), rgba(7,10,22,0.75))',
-                  }}
-                />
-                <div className="absolute bottom-0 left-0 right-0 p-4 flex flex-col items-center gap-2">
-                  <div className="flex flex-wrap gap-1 justify-center">
-                    {['GIA Prime', 'GIA Connect', 'GIA Stock', 'GIA Fiscal', 'GIA Audit', 'GIA Tech'].map((g) => (
-                      <span
-                        key={g}
-                        className="text-[8px] px-1.5 py-0.5 rounded font-bold tracking-wider"
-                        style={{
-                          background: 'rgba(0,212,255,0.12)',
-                          color: '#00D4FF',
-                          border: '1px solid rgba(0,212,255,0.2)',
-                        }}
-                      >
-                        {g}
-                      </span>
-                    ))}
-                  </div>
-                  <div
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-lg w-full justify-center"
-                    style={{
-                      background: 'rgba(0,212,255,0.1)',
-                      border: '1px solid rgba(0,212,255,0.25)',
-                    }}
-                  >
-                    <TrendingUp className="w-3 h-3 text-[#00D4FF]" />
-                    <span className="text-[10px] font-bold text-[#00D4FF] tracking-wider">
-                      VER ECOSSISTEMA COMPLETO
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </div>
         )}
       </div>
@@ -982,9 +874,6 @@ export function MuralMissoes() {
         </div>
       </div>
 
-      <AnimatePresence>
-        {showEcossistema && <EcossistemaModal onClose={() => setShowEcossistema(false)} />}
-      </AnimatePresence>
     </div>
   );
 }
