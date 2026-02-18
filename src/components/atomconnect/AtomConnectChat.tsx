@@ -497,7 +497,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         (payload) => {
           if (payload.eventType === 'INSERT') {
             const newMsg = payload.new as Mensagem;
-            setMensagens(prev => [...prev, newMsg]);
+            setMensagens(prev => {
+              const alreadyExists = prev.some(m => m.id === newMsg.id || (newMsg.message_id && m.message_id === newMsg.message_id));
+              if (alreadyExists) return prev;
+              return [...prev, newMsg];
+            });
             scrollToBottom();
             if (!newMsg.from_me) {
               setTypingStatus(null);
@@ -1352,15 +1356,29 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'pending':
-        return <Clock className="w-3.5 h-3.5 text-gray-500" />;
+        return <Clock className="w-3 h-3" style={{ color: 'rgba(156,163,175,0.7)' }} />;
       case 'sent':
-        return <Check className="w-3.5 h-3.5 text-gray-500" />;
+        return (
+          <svg width="14" height="10" viewBox="0 0 14 10" fill="none">
+            <path d="M1 5L4.5 8.5L13 1" stroke="rgba(156,163,175,0.8)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        );
       case 'delivered':
-        return <CheckCheck className="w-3.5 h-3.5 text-gray-500" />;
+        return (
+          <svg width="18" height="10" viewBox="0 0 18 10" fill="none">
+            <path d="M1 5L4.5 8.5L13 1" stroke="rgba(156,163,175,0.8)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M5 5L8.5 8.5L17 1" stroke="rgba(156,163,175,0.8)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        );
       case 'read':
-        return <CheckCheck className="w-3.5 h-3.5 text-blue-500" />;
+        return (
+          <svg width="18" height="10" viewBox="0 0 18 10" fill="none">
+            <path d="M1 5L4.5 8.5L13 1" stroke="#34d399" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+            <path d="M5 5L8.5 8.5L17 1" stroke="#34d399" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+        );
       case 'failed':
-        return <AlertTriangle className="w-3.5 h-3.5 text-red-500" />;
+        return <AlertTriangle className="w-3 h-3 text-red-400" />;
       default:
         return null;
     }

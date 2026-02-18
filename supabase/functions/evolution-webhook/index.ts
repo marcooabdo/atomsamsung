@@ -275,10 +275,10 @@ Deno.serve(async (req: Request) => {
           else if (rawStatus >= 4) newStatus = "read";
         } else if (typeof rawStatus === "string") {
           const upper = rawStatus.toUpperCase();
-          if (upper === "PENDING" || upper === "ERROR") newStatus = "pending";
-          else if (upper === "SERVER_ACK" || upper === "SENT") newStatus = "sent";
-          else if (upper === "DELIVERY_ACK" || upper === "DELIVERED") newStatus = "delivered";
-          else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED") newStatus = "read";
+          if (upper === "PENDING" || upper === "ERROR" || upper === "0" || upper === "1") newStatus = "pending";
+          else if (upper === "SERVER_ACK" || upper === "SENT" || upper === "2") newStatus = "sent";
+          else if (upper === "DELIVERY_ACK" || upper === "DELIVERED" || upper === "3") newStatus = "delivered";
+          else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED" || upper === "4" || upper === "5") newStatus = "read";
         }
 
         console.log(`Updating message ${messageId} to status: ${newStatus}`);
