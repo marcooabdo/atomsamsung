@@ -581,79 +581,82 @@ export function OrcamentoPublico() {
 
           {/* Black top banner */}
           <div style={{ background: '#060608' }}>
-            <div className="px-5 sm:px-6 py-4 sm:py-5">
-              <div className="flex items-center gap-4">
-                {/* Samsung Smart Xperience logo */}
+            <div className="px-4 sm:px-6 pt-5 pb-4">
+              {/* Row 1: logo + nome + badge OS */}
+              <div className="flex items-start gap-3">
+                {/* Logo */}
                 <div className="flex-shrink-0">
                   <img
                     src="/PERFIL.jpg"
                     alt="Samsung Smart Xperience - Group Global"
                     className="rounded-xl object-cover"
-                    style={{ width: '64px', height: '64px' }}
+                    style={{ width: '56px', height: '56px' }}
                   />
                 </div>
 
-                {/* Company info */}
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-semibold tracking-[0.15em] uppercase mb-0.5" style={{ color: '#4b5563' }}>
+                {/* Nome + CNPJ */}
+                <div className="flex-1 min-w-0 pt-0.5">
+                  <p className="text-xs font-medium uppercase tracking-widest mb-1" style={{ color: '#6b7280', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
                     Orçamento Oficial
                   </p>
-                  <h2 className="text-base sm:text-lg font-bold leading-tight truncate" style={{ color: '#f3f4f6' }}>
+                  <h2 className="font-bold leading-snug" style={{ color: '#ffffff', fontSize: '15px', fontFamily: 'system-ui, -apple-system, sans-serif', whiteSpace: 'normal', wordBreak: 'break-word' }}>
                     {os.unidade?.nome || 'Smart Center Samsung'}
                   </h2>
                   {os.unidade?.cnpj && (
-                    <p className="text-xs font-mono mt-0.5" style={{ color: '#6b7280' }}>
-                      CNPJ: {os.unidade.cnpj}
+                    <p className="text-xs mt-1" style={{ color: '#9ca3af', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      CNPJ {os.unidade.cnpj}
                     </p>
                   )}
                 </div>
 
-                {/* OS number badge */}
-                <div className="flex-shrink-0 text-right">
-                  <div className="rounded-lg px-3 py-2" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <p className="text-xs font-semibold tracking-widest uppercase" style={{ color: '#4b5563' }}>
-                      {os.numero_os_samsung ? 'OS Samsung' : 'O.S. Interna'}
+                {/* OS badge — compacto */}
+                <div className="flex-shrink-0 text-right pt-0.5">
+                  <div className="rounded-lg px-2.5 py-2" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <p className="text-xs font-semibold uppercase tracking-wide" style={{ color: '#9ca3af', fontSize: '10px', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      {os.numero_os_samsung ? 'OS Samsung' : 'O.S.'}
                     </p>
-                    <p className="text-sm font-bold font-mono mt-0.5" style={{ color: '#e2e8f0' }}>
+                    <p className="font-bold font-mono mt-0.5" style={{ color: '#f1f5f9', fontSize: '13px' }}>
                       {os.numero_os_samsung ? os.numero_os_samsung : `#${os.numero_os_interna}`}
                     </p>
                     {os.numero_os_samsung && (
-                      <p className="text-xs font-mono mt-0.5" style={{ color: '#374151' }}>
-                        Int: #{os.numero_os_interna}
+                      <p className="font-mono mt-0.5" style={{ color: '#6b7280', fontSize: '10px' }}>
+                        #{os.numero_os_interna}
                       </p>
                     )}
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Company details strip */}
-            {os.unidade && (
-              <div className="px-5 sm:px-6 pb-4">
-                <div className="rounded-lg px-4 py-3 flex flex-wrap gap-x-5 gap-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              {/* Row 2: endereço + telefone + data */}
+              {os.unidade && (
+                <div className="mt-3 rounded-lg px-3 py-2.5 flex flex-col gap-1.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
                   {(os.unidade.rua || os.unidade.cidade) && (
-                    <span className="flex items-center gap-1.5 text-xs" style={{ color: '#6b7280' }}>
-                      <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: '#374151' }} />
-                      {[
-                        os.unidade.rua && os.unidade.numero ? `${os.unidade.rua}, ${os.unidade.numero}` : os.unidade.rua,
-                        os.unidade.bairro,
-                        os.unidade.cidade && os.unidade.uf ? `${os.unidade.cidade}/${os.unidade.uf}` : os.unidade.cidade
-                      ].filter(Boolean).join(' — ')}
+                    <span className="flex items-start gap-2 text-xs" style={{ color: '#9ca3af', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      <MapPin className="w-3 h-3 flex-shrink-0 mt-0.5" style={{ color: '#6b7280' }} />
+                      <span>
+                        {[
+                          os.unidade.rua && os.unidade.numero ? `${os.unidade.rua}, ${os.unidade.numero}` : os.unidade.rua,
+                          os.unidade.bairro,
+                          os.unidade.cidade && os.unidade.uf ? `${os.unidade.cidade} — ${os.unidade.uf}` : os.unidade.cidade
+                        ].filter(Boolean).join(', ')}
+                      </span>
                     </span>
                   )}
-                  {os.unidade.telefone && (
-                    <span className="flex items-center gap-1.5 text-xs" style={{ color: '#6b7280' }}>
-                      <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#374151' }} />
-                      {os.unidade.telefone}
+                  <div className="flex items-center justify-between gap-3">
+                    {os.unidade.telefone && (
+                      <span className="flex items-center gap-2 text-xs" style={{ color: '#9ca3af', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                        <Phone className="w-3 h-3 flex-shrink-0" style={{ color: '#6b7280' }} />
+                        {os.unidade.telefone}
+                      </span>
+                    )}
+                    <span className="flex items-center gap-1.5 text-xs ml-auto" style={{ color: '#6b7280', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+                      <Calendar className="w-3 h-3 flex-shrink-0" />
+                      {new Date(os.data_abertura).toLocaleDateString('pt-BR')}
                     </span>
-                  )}
-                  <span className="flex items-center gap-1.5 text-xs ml-auto" style={{ color: '#374151' }}>
-                    <Calendar className="w-3 h-3 flex-shrink-0" />
-                    {new Date(os.data_abertura).toLocaleDateString('pt-BR')}
-                  </span>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
 
             {/* Blue accent line */}
             <div className="h-px" style={{ background: 'linear-gradient(90deg, transparent 0%, #1d4ed8 30%, #06b6d4 60%, transparent 100%)' }} />
@@ -924,6 +927,19 @@ export function OrcamentoPublico() {
                     R$ {cotacao.valor_liquido.toFixed(2)}
                   </span>
                 </div>
+
+                {!jaRespondido && (
+                  <div className="mt-4 flex items-center gap-2.5 rounded-xl px-4 py-3" style={{ background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+                    <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center" style={{ background: '#0ea5e9' }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/>
+                      </svg>
+                    </div>
+                    <p className="text-xs leading-snug" style={{ color: '#0369a1' }}>
+                      Role a página até o final para visualizar os <strong>termos</strong> e os <strong>botões de aprovação ou rejeição</strong> do orçamento.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           </div>
