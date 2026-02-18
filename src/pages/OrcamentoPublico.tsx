@@ -531,7 +531,7 @@ export function OrcamentoPublico() {
           <p className="text-slate-500 mb-4">{error || 'O link de orçamento não foi encontrado ou expirou.'}</p>
           {isExpired && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
-              <p className="text-sm text-amber-700">Este link expirou. Entre em contato com a assistência técnica para solicitar um novo link.</p>
+              <p className="text-sm text-amber-700">Este link expirou. Entre em contato com o Smart Center para solicitar um novo link.</p>
             </div>
           )}
         </div>
