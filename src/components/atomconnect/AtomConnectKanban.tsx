@@ -511,7 +511,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                               {conversa.is_bot_ativo && (
                                 <span className="flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] bg-violet-500/15 text-violet-400">
                                   <Bot className="w-3 h-3" />
-                                  Bot
+                                  GIA
                                 </span>
                               )}
                               {conversa.os_id && (

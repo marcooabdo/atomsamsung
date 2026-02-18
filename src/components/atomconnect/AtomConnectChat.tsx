@@ -1732,7 +1732,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     {msg.is_bot && (
                       <div className="flex items-center gap-1 text-[10px] text-purple-400 mb-1">
                         <Bot className="w-3 h-3" />
-                        Bot
+                        {msg.sender_name || 'GIA'}
                       </div>
                     )}
 
@@ -1742,7 +1742,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                       </div>
                     )}
 
-                    {conversa.is_group && !msg.from_me && msg.sender_name && (
+                    {conversa.is_group && !msg.from_me && !msg.is_bot && msg.sender_name && (
                       <div className="text-[11px] font-semibold mb-1 text-emerald-400">
                         {msg.sender_name}
                       </div>
