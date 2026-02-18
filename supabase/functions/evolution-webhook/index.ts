@@ -540,26 +540,58 @@ async function processMessage(
 ) {
   console.log("=== PROCESSING MESSAGE ===");
 
-  const { data: existingMsg } = await supabase
-    .from("atom_connect_mensagens")
-    .select("id, status")
-    .eq("message_id", messageId)
-    .maybeSingle();
+  // 1. Deduplication by message_id (primary check)
+  if (messageId) {
+    const { data: existingMsg } = await supabase
+      .from("atom_connect_mensagens")
+      .select("id, status, message_id")
+      .eq("message_id", messageId)
+      .maybeSingle();
 
-  if (existingMsg) {
-    if (fromMe && existingMsg.status === "pending") {
+    if (existingMsg) {
+      if (fromMe && existingMsg.status === "pending") {
+        await supabase
+          .from("atom_connect_mensagens")
+          .update({ status: "sent" })
+          .eq("id", existingMsg.id);
+        console.log("DUPLICATE fromMe - updated pending->sent:", messageId);
+      } else {
+        console.log("DUPLICATE blocked - message already in DB:", messageId);
+      }
+      return new Response(JSON.stringify({ success: true, duplicate: true }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  // 2. For fromMe messages: check if a recent null-message_id row matches (echo of bot/attendant message)
+  // This handles cases where the bot/attendant inserted without a message_id and then the Evolution echo arrives
+  if (fromMe && messageId) {
+    const cutoff = new Date(Date.now() - 60000).toISOString(); // within last 60s
+    const { data: echoMsg } = await supabase
+      .from("atom_connect_mensagens")
+      .select("id, status, message_id")
+      .eq("conversa_id", (await supabase.from("atom_connect_conversas").select("id").eq("cliente_telefone", phoneNumber).maybeSingle()).data?.id)
+      .eq("from_me", true)
+      .is("message_id", null)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (echoMsg) {
+      // Update the existing null-message_id row with the real message_id and status
       await supabase
         .from("atom_connect_mensagens")
-        .update({ status: "sent" })
-        .eq("id", existingMsg.id);
-      console.log("DUPLICATE fromMe - updated pending->sent:", messageId);
-    } else {
-      console.log("DUPLICATE blocked - message already in DB:", messageId);
+        .update({ message_id: messageId, status: "sent" })
+        .eq("id", echoMsg.id);
+      console.log("Echo fromMe - linked real message_id to existing row:", messageId, "->", echoMsg.id);
+      return new Response(JSON.stringify({ success: true, linked: true }), {
+        status: 200,
+        headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+      });
     }
-    return new Response(JSON.stringify({ success: true, duplicate: true }), {
-      status: 200,
-      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
-    });
   }
 
   const msg = message?.message || body?.message?.message || data?.message || {};
