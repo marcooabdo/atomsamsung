@@ -358,6 +358,16 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // Skip incoming messages without pushName — these are duplicate "delivered" events from Evolution API
+      // that carry no sender info. The real event with pushName arrives milliseconds earlier.
+      if (!fromMe && !isGroup && !senderName) {
+        console.log("Skipping incoming message without pushName (duplicate delivered event):", messageId);
+        return new Response(JSON.stringify({ skip: "no_push_name" }), {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
       if (!hasActualContent(msg, body, data)) {
         return new Response(JSON.stringify({ skip: "no_content" }), {
           status: 200,
