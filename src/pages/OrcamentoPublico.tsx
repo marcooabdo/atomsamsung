@@ -292,7 +292,7 @@ export function OrcamentoPublico() {
       if (yPos + height > pageHeight - 20) { doc.addPage(); yPos = 20; }
     };
 
-    const acaoTitulo = selectedAction === 'aprovado' ? 'APROVACAO' : selectedAction === 'rejeitado' ? 'REJEICAO' : 'NEGOCIACAO';
+    const acaoTitulo = selectedAction === 'aprovado' ? 'APROVAÇÃO' : selectedAction === 'rejeitado' ? 'REJEIÇÃO' : 'NEGOCIAÇÃO';
     const corHeader = selectedAction === 'aprovado' ? [34, 197, 94] : selectedAction === 'rejeitado' ? [239, 68, 68] : [245, 158, 11];
 
     doc.setFillColor(30, 64, 175);
@@ -300,12 +300,12 @@ export function OrcamentoPublico() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
-    doc.text(`COMPROVANTE DE ${acaoTitulo} DE ORCAMENTO`, pageWidth / 2, 15, { align: 'center' });
+    doc.text(`COMPROVANTE DE ${acaoTitulo} DE ORÇAMENTO`, pageWidth / 2, 15, { align: 'center' });
     doc.setFontSize(11);
     doc.text(`OS #${data?.os.numero_os_interna || ''}`, pageWidth / 2, 25, { align: 'center' });
 
     yPos = 45;
-    doc.setTextColor(0, 0, 0);
+    doc.setTextColor(255, 255, 255);
 
     if (data?.os.unidade) {
       addText(data.os.unidade.nome, 12, 'bold');
