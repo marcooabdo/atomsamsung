@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2 } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -3283,6 +3283,26 @@ Não haverá cobrança ao cliente.`
                     </div>
                   </div>
                 </div>
+
+                {(os as any).nps_score != null && (
+                  <div className="mt-4 p-3 rounded-lg border border-white/10 bg-white/[0.03]">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Star className="w-4 h-4 text-yellow-400" />
+                      <span className="text-xs font-semibold text-gray-300 uppercase tracking-wider">NPS do Cliente</span>
+                      <span className={`ml-auto text-xs font-bold px-2 py-0.5 rounded-full ${
+                        (os as any).nps_score >= 4 ? 'bg-green-500/20 text-green-400' :
+                        (os as any).nps_score === 3 ? 'bg-yellow-500/20 text-yellow-400' :
+                        'bg-red-500/20 text-red-400'
+                      }`}>
+                        {(os as any).nps_score >= 4 ? 'Satisfeito' : (os as any).nps_score === 3 ? 'Neutro' : 'Insatisfeito'}
+                        {' — '}{(os as any).nps_score}/5
+                      </span>
+                    </div>
+                    {(os as any).nps_comentario && (
+                      <p className="text-xs text-gray-400 mt-1 italic">"{(os as any).nps_comentario}"</p>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

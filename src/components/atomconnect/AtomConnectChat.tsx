@@ -37,6 +37,8 @@ interface Conversa {
   cliente_digitando_at?: string | null;
   is_group?: boolean;
   group_jid?: string | null;
+  nps_score?: number | null;
+  nps_comentario?: string | null;
   created_at: string;
 }
 
@@ -958,23 +960,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   const finalizarDiretamente = async () => {
-    const { data: finalColumn } = await supabase
-      .from('atom_connect_pipeline_colunas')
-      .select('id')
-      .eq('is_final', true)
-      .limit(1)
-      .maybeSingle();
+    const semNPS = !conversa.nps_score;
 
     await supabase
       .from('atom_connect_conversas')
       .update({
-        coluna_pipeline: finalColumn?.id || 'finalizado_nps',
-        is_bot_ativo: false,
+        coluna_pipeline: 'finalizado_nps',
+        is_bot_ativo: semNPS,
         aguardando_avaliacao: false
       })
       .eq('id', conversa.id);
 
-    setShowFinalizarModal(false);
     onUpdate();
   };
 
@@ -1654,10 +1650,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </button>
             ) : (
               <button
-                onClick={() => {
-                  loadRegrasFinalizacao();
-                  setShowFinalizarModal(true);
-                }}
+                onClick={finalizarDiretamente}
                 className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-green-500/20 text-green-400 hover:bg-green-500/30 transition-colors"
               >
                 <CheckCircle2 className="w-3 h-3" />
