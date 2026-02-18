@@ -363,9 +363,9 @@ export function OrcamentoPublico() {
     if (data?.os.aparelho_imei) addText(`IMEI: ${data.os.aparelho_imei}`);
     yPos += 5;
 
-    addText('DEFEITO E DIAGNOSTICO', 11, 'bold');
+    addText('DEFEITO E DIAGNÓSTICO', 11, 'bold');
     addText(`Defeito: ${data?.os.defeito_relatado || 'Nao informado'}`);
-    if (data?.os.diagnostico_tecnico) addText(`Diagnostico: ${data.os.diagnostico_tecnico}`);
+    if (data?.os.diagnostico_tecnico) addText(`Diagnóstico: ${data.os.diagnostico_tecnico}`);
     yPos += 5;
 
     if (data?.os.cotacao) {
@@ -620,7 +620,7 @@ export function OrcamentoPublico() {
       <div className="min-h-screen bg-white flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="w-12 h-12 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Carregando orcamento...</p>
+          <p className="text-gray-600">Carregando orçamento...</p>
         </div>
       </div>
     );
@@ -764,7 +764,7 @@ export function OrcamentoPublico() {
             <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
               <div className="flex items-center gap-2 mb-3 pb-2 border-b border-gray-200">
                 <FileText className="w-5 h-5 text-blue-600" />
-                <h3 className="font-bold text-gray-800 text-sm uppercase">Defeito e Diagnostico</h3>
+                <h3 className="font-bold text-gray-800 text-sm uppercase">Defeito e Diagnóstico</h3>
               </div>
               <div className="space-y-3 text-sm">
                 <div>
@@ -773,7 +773,7 @@ export function OrcamentoPublico() {
                 </div>
                 {os.diagnostico_tecnico && (
                   <div>
-                    <p className="text-gray-500 font-medium mb-1">Diagnostico Tecnico:</p>
+                    <p className="text-gray-500 font-medium mb-1">Diagnóstico Técnico:</p>
                     <p className="text-gray-800 bg-white p-2 rounded border border-gray-100">{os.diagnostico_tecnico}</p>
                   </div>
                 )}
@@ -784,7 +784,7 @@ export function OrcamentoPublico() {
               <div className="border border-gray-200 rounded-lg overflow-hidden">
                 <div className="bg-blue-600 text-white px-4 py-2 flex items-center gap-2">
                   <Package className="w-5 h-5" />
-                  <h3 className="font-bold text-sm uppercase">Detalhes do Orcamento</h3>
+                  <h3 className="font-bold text-sm uppercase">Detalhes do Orçamento</h3>
                 </div>
 
                 {os.cotacao.cotacoes_pecas && os.cotacao.cotacoes_pecas.length > 0 && (
@@ -995,7 +995,7 @@ export function OrcamentoPublico() {
               </div>
             ) : (
               <div className="border-t border-gray-200 pt-6">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">O que voce decide?</h3>
+                <h3 className="text-lg font-bold text-gray-800 mb-4 text-center">O que você decide?</h3>
 
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-4">
                   <button

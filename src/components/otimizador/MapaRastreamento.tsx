@@ -140,7 +140,7 @@ export default function MapaRastreamento() {
             Mapa de Rastreamento
           </h2>
           <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>
-            {tecnicos.filter(t => t.presence_status === 'online').length} tecnico(s) online | {agenda.length} atendimentos hoje
+            {tecnicos.filter(t => t.presence_status === 'online').length} técnico(s) online | {agenda.length} atendimentos hoje
           </p>
         </div>
 
@@ -250,7 +250,7 @@ export default function MapaRastreamento() {
                     <strong>OS {selectedMarker.data.numero_os}</strong><br/>
                     <span style={{ fontSize: 12 }}>{selectedMarker.data.cliente_nome}</span><br/>
                     <span style={{ fontSize: 11, color: '#666' }}>{selectedMarker.data.cliente_cidade}</span><br/>
-                    <span style={{ fontSize: 11 }}>Tecnico: {selectedMarker.data.tecnico_nome}</span><br/>
+                    <span style={{ fontSize: 11 }}>Técnico: {selectedMarker.data.tecnico_nome}</span><br/>
                     <span style={{ fontSize: 11, color: statusColor(selectedMarker.data.status) }}>
                       {selectedMarker.data.status === 'concluido' ? 'Concluido' : selectedMarker.data.status === 'em_atendimento' ? 'Em atendimento' : 'Agendado'}
                     </span>
@@ -280,7 +280,7 @@ export default function MapaRastreamento() {
                 </div>
               </div>
             ))}
-            {filteredTecnicos.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--text-secondary)' }}>Nenhum tecnico com posicao</p>}
+            {filteredTecnicos.length === 0 && <p className="text-xs text-center py-4" style={{ color: 'var(--text-secondary)' }}>Nenhum técnico com posição</p>}
           </div>
         </div>
 

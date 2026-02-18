@@ -148,7 +148,7 @@ export default function Analytics() {
         <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-4">
             <Users className="w-5 h-5" style={{ color: '#06B6D4' }} />
-            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>OSs por Tecnico</h3>
+            <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>OSs por Técnico</h3>
           </div>
           <ResponsiveContainer width="100%" height={280}>
             <BarChart data={data.osPorTecnico}>

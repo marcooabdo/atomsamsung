@@ -1552,7 +1552,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       await supabase.from('os_comentarios').insert({
         os_id: os.id,
         usuario_id: usuario?.id,
-        comentario: `OS criada para DIAGNOSTICO. Tecnico deve analisar e adicionar pecas necessarias.`
+        comentario: `OS criada para DIAGNÓSTICO. Técnico deve analisar e adicionar peças necessárias.`
       });
 
       const osInfo = os.numero_os_interna
@@ -1571,7 +1571,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       onSave();
       handleClose();
     } catch (error: any) {
-      alert(`Erro ao enviar para diagnostico: ${error.message || 'Erro desconhecido'}`);
+      alert(`Erro ao enviar para diagnóstico: ${error.message || 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }

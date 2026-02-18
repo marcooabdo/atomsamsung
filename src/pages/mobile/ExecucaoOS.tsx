@@ -356,7 +356,7 @@ export function ExecucaoOS() {
         .insert({
           os_id: agendamento.os_id,
           usuario_id: usuario?.id,
-          comentario: `CHECK-IN REALIZADO\nData/Hora: ${checkinTime.toLocaleString('pt-BR')}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
+          comentario: `CHECK-IN REALIZADO\nData/Hora: ${checkinTime.toLocaleString('pt-BR')}\nCoordenadas: ${latitude}, ${longitude}\nEndereço do Técnico: ${enderecoTecnico}`,
           is_system: true
         });
 
@@ -760,7 +760,7 @@ export function ExecucaoOS() {
           .insert({
             os_id: agendamento.os_id,
             usuario_id: usuario?.id,
-            comentario: `CHECK-OUT REALIZADO\nData/Hora: ${checkoutTime.toLocaleString('pt-BR')}\nResultado: ${resultado === 'sucesso' ? 'Reparo com Sucesso' : resultado === 'improdutiva' ? 'Improdutiva/Revisita' : 'Peça com Defeito'}\nCoordenadas: ${latitude}, ${longitude}\nEndereco do Tecnico: ${enderecoTecnico}`,
+            comentario: `CHECK-OUT REALIZADO\nData/Hora: ${checkoutTime.toLocaleString('pt-BR')}\nResultado: ${resultado === 'sucesso' ? 'Reparo com Sucesso' : resultado === 'improdutiva' ? 'Improdutiva/Revisita' : 'Peça com Defeito'}\nCoordenadas: ${latitude}, ${longitude}\nEndereço do Técnico: ${enderecoTecnico}`,
             is_system: true
           });
 
@@ -901,7 +901,7 @@ export function ExecucaoOS() {
                   <p className="text-white">{agendamento.os.endereco_completo}</p>
                 </div>
                 <div className="p-3 bg-gray-800 rounded-lg">
-                  <p className="text-gray-400 text-sm mb-1">Tipo de Servico</p>
+                  <p className="text-gray-400 text-sm mb-1">Tipo de Serviço</p>
                   <p className="text-white">{agendamento.os.tipo_servico}</p>
                 </div>
               </div>

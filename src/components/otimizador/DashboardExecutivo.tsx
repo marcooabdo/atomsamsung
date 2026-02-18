@@ -100,7 +100,7 @@ export default function DashboardExecutivo() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>Dashboard Executivo</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Visao em tempo real da operacao</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Visão em tempo real da operação</p>
         </div>
       </div>
 
@@ -152,7 +152,7 @@ export default function DashboardExecutivo() {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-              <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>OS por Tecnico (Top 10)</h3>
+              <h3 className="font-bold mb-4" style={{ color: 'var(--text-primary)' }}>OS por Técnico (Top 10)</h3>
               <ResponsiveContainer width="100%" height={280}>
                 <BarChart data={chartTecnicos} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--border-primary)" />

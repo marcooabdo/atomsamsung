@@ -460,9 +460,9 @@ export function Cotacoes() {
 
   const handleEnviarDiagnostico = async (id: string) => {
     const confirmacao = confirm(
-      'ENVIAR PARA DIAGNOSTICO\n\n' +
-      'Ao confirmar, uma OS sera criada no Kanban na coluna DIAGNOSTICO.\n\n' +
-      'O tecnico ira analisar o aparelho e adicionar as pecas necessarias.\n\n' +
+      'ENVIAR PARA DIAGNÓSTICO\n\n' +
+      'Ao confirmar, uma OS sera criada no Kanban na coluna DIAGNÓSTICO.\n\n' +
+      'O técnico irá analisar o aparelho e adicionar as peças necessárias.\n\n' +
       'Deseja continuar?'
     );
 
@@ -590,24 +590,24 @@ export function Cotacoes() {
       await supabase.from('cotacao_comentarios').insert({
         cotacao_id: id,
         usuario_id: usuario?.id,
-        texto: `Cotacao enviada para DIAGNOSTICO no Kanban por ${usuario?.nome || 'Sistema'}`,
+        texto: `Cotacao enviada para DIAGNÓSTICO no Kanban por ${usuario?.nome || 'Sistema'}`,
         is_system: true
       });
 
       await supabase.from('os_comentarios').insert({
         os_id: os.id,
         usuario_id: usuario?.id,
-        comentario: `OS criada para DIAGNOSTICO. Tecnico deve analisar e adicionar pecas necessarias.`
+        comentario: `OS criada para DIAGNÓSTICO. Técnico deve analisar e adicionar peças necessárias.`
       });
 
       loadCotacoes();
       alert(
-        'ENVIADO PARA DIAGNOSTICO!\n\n' +
-        `OS #${os.numero_os_samsung || 'N/A'} criada no Kanban na coluna DIAGNOSTICO.\n\n` +
-        'O tecnico ira analisar o aparelho e adicionar as pecas.'
+        'ENVIADO PARA DIAGNÓSTICO!\n\n' +
+        `OS #${os.numero_os_samsung || 'N/A'} criada no Kanban na coluna DIAGNÓSTICO.\n\n` +
+        'O técnico irá analisar o aparelho e adicionar as peças.'
       );
     } catch (error: any) {
-      alert(`Erro ao enviar para diagnostico: ${error.message || 'Erro desconhecido'}`);
+      alert(`Erro ao enviar para diagnóstico: ${error.message || 'Erro desconhecido'}`);
     }
   };
 

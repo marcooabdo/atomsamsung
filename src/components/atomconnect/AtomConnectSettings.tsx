@@ -966,7 +966,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                         <button
                           onClick={() => openEditModal(instancia)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
-                          title="Editar conexao"
+                          title="Editar conexão"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -980,7 +980,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                         <button
                           onClick={() => checkConnectionStatus(instancia)}
                           className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 transition-colors"
-                          title="Verificar conexao"
+                          title="Verificar conexão"
                         >
                           <RefreshCw className="w-4 h-4" />
                         </button>
@@ -1635,7 +1635,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
               <div className="flex items-center justify-center gap-2 text-sm text-gray-400 mb-6">
                 <Loader2 className="w-4 h-4 animate-spin" style={{ color: accentColor }} />
-                <span>Aguardando conexao...</span>
+                <span>Aguardando conexão...</span>
               </div>
 
               <div className="bg-white/5 rounded-xl p-4 mb-6">
@@ -1724,7 +1724,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                   <textarea
                     value={editForm.observacao}
                     onChange={(e) => setEditForm(prev => ({ ...prev, observacao: e.target.value }))}
-                    placeholder="Observacoes sobre esta conexao (opcional)"
+                    placeholder="Observações sobre esta conexão (opcional)"
                     rows={3}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none"
                   />

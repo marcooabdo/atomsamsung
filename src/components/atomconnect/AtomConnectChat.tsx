@@ -1862,7 +1862,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           ) : (
                             <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
                               <Mic className="w-5 h-5 text-gray-500" />
-                              <span className="text-xs text-gray-400">Audio indisponivel</span>
+                              <span className="text-xs text-gray-400">Áudio indisponível</span>
                             </div>
                           );
                         })()}
@@ -1905,7 +1905,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           ) : (
                             <div className="flex items-center gap-2 p-3 bg-white/5 rounded">
                               <Video className="w-5 h-5 text-gray-500" />
-                              <span className="text-xs text-gray-400">Video indisponivel</span>
+                              <span className="text-xs text-gray-400">Vídeo indisponível</span>
                             </div>
                           );
                         })()}
@@ -2136,7 +2136,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
               {/* OS Info */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ordem de Servico</h4>
+                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ordem de Serviço</h4>
                 {osData ? (
                   <div className="p-3 bg-white/5 rounded-lg space-y-2">
                     <div className="flex items-center justify-between">
@@ -2322,7 +2322,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               ) : regrasFinalizacao.length === 0 ? (
                 <div className="text-center py-6">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-                  <p className="text-sm text-gray-400 mb-2">Nenhuma regra de avaliacao configurada</p>
+                  <p className="text-sm text-gray-400 mb-2">Nenhuma regra de avaliação configurada</p>
                   <p className="text-xs text-gray-500 mb-4">Configure regras em Configuracoes &gt; Finalizacao</p>
                   <button
                     onClick={finalizarDiretamente}
@@ -2395,7 +2395,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 <div className="absolute inset-0 bg-black/60 flex items-center justify-center rounded-xl">
                   <div className="text-center">
                     <Loader2 className="w-8 h-8 animate-spin mx-auto mb-2" style={{ color: accentColor }} />
-                    <p className="text-sm text-white">Enviando avaliacao...</p>
+                    <p className="text-sm text-white">Enviando avaliação...</p>
                   </div>
                 </div>
               )}

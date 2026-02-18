@@ -186,11 +186,11 @@ export default function CustomerIntelligence() {
                 onChange={(e) => setPeriodoFiltro(e.target.value)}
                 className="pl-9 pr-8 py-2 rounded-xl bg-slate-800/50 border border-cyan-500/30 text-white text-sm focus:border-cyan-400 appearance-none cursor-pointer"
               >
-                <option value="mes">Ultimo Mes</option>
-                <option value="trimestre">Ultimo Trimestre</option>
-                <option value="semestre">Ultimo Semestre</option>
-                <option value="ano">Ultimo Ano</option>
-                <option value="todos">Todo Periodo</option>
+                <option value="mes">Último Mês</option>
+                <option value="trimestre">Último Trimestre</option>
+                <option value="semestre">Último Semestre</option>
+                <option value="ano">Último Ano</option>
+                <option value="todos">Todo Período</option>
               </select>
               <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-cyan-400 pointer-events-none" />
             </div>
@@ -198,7 +198,7 @@ export default function CustomerIntelligence() {
             <div className="flex items-center gap-1.5">
               <button
                 onClick={handleReport}
-                title="Abrir relatorio"
+                title="Abrir relatório"
                 className="p-2 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all"
               >
                 <Printer className="w-4 h-4" />

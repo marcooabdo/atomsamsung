@@ -80,13 +80,13 @@ export function TimesTab() {
             </div>
             {!editingId && (
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Codigo (identificador)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Código (identificador)</label>
                 <input type="text" value={form.codigo} onChange={(e) => setForm({ ...form, codigo: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: front_office" />
               </div>
             )}
             <div className={editingId ? '' : 'md:col-span-2'}>
               <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
-              <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descricao do time..." />
+              <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descrição do time..." />
             </div>
             <div>
               <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
@@ -162,12 +162,12 @@ export function TimesTab() {
                 <input type="text" value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: Front Office" />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Codigo (somente leitura)</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Código (somente leitura)</label>
                 <input type="text" value={form.codigo} disabled className="w-full rounded-lg px-3 py-2 text-sm opacity-60" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />
               </div>
               <div className="md:col-span-2">
                 <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Descricao</label>
-                <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descricao do time..." />
+                <textarea value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descrição do time..." />
               </div>
               <div>
                 <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Cor</label>
@@ -194,7 +194,7 @@ export function TimesTab() {
         onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
         onConfirm={confirmDelete}
         title="Excluir Time"
-        message={`Tem certeza que deseja excluir o time "${deleteConfirm.nome}"? Profissionais vinculados a este time poderao ser afetados. Esta acao nao pode ser desfeita.`}
+        message={`Tem certeza que deseja excluir o time "${deleteConfirm.nome}"? Profissionais vinculados a este time poderão ser afetados. Esta ação não pode ser desfeita.`}
       />
     </div>
   );

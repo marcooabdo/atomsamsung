@@ -237,7 +237,7 @@ function RankingTab() {
         {ranking.length === 0 && (
           <div className="text-center py-16">
             <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional no ranking deste mes</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional no ranking deste mês</p>
           </div>
         )}
       </div>
@@ -312,7 +312,7 @@ function OrcamentosRankingTab() {
         {orcamentosRanking.length === 0 && (
           <div className="text-center py-16">
             <FileCheck className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Nenhum orcamento aprovado neste mes</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum orçamento aprovado neste mês</p>
           </div>
         )}
       </div>
@@ -666,7 +666,7 @@ function ProfissionaisTab() {
         onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
         onConfirm={confirmDelete}
         title="Remover Profissional"
-        message={`Tem certeza que deseja remover "${deleteConfirm.nome}" do programa Skywalker? Todo o historico de desempenho sera mantido, mas o profissional nao participara mais das avaliacoes. Esta acao nao pode ser desfeita.`}
+        message={`Tem certeza que deseja remover "${deleteConfirm.nome}" do programa Skywalker? Todo o histórico de desempenho será mantido, mas o profissional não participará mais das avaliações. Esta ação não pode ser desfeita.`}
         confirmText="Remover"
       />
     </div>

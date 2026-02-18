@@ -136,7 +136,7 @@ export function OSPrintView() {
       loadData();
     } else {
       setLoading(false);
-      setError('ID da OS nao fornecido');
+      setError('ID da OS não fornecido');
     }
   }, [osId]);
 
@@ -162,7 +162,7 @@ export function OSPrintView() {
       }
 
       if (!osData) {
-        setError('Ordem de servico nao encontrada');
+        setError('Ordem de serviço não encontrada');
         setLoading(false);
         return;
       }
@@ -253,7 +253,7 @@ export function OSPrintView() {
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
           <Loader2 className="w-12 h-12 animate-spin text-blue-600 mx-auto mb-4" />
-          <p className="text-gray-600">Carregando ordem de servico...</p>
+          <p className="text-gray-600">Carregando ordem de serviço...</p>
         </div>
       </div>
     );
@@ -263,8 +263,8 @@ export function OSPrintView() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <p className="text-red-600 font-medium mb-2">{error || 'Ordem de servico nao encontrada'}</p>
-          <p className="text-gray-500 text-sm">OS ID: {osId || 'nao fornecido'}</p>
+          <p className="text-red-600 font-medium mb-2">{error || 'Ordem de serviço não encontrada'}</p>
+          <p className="text-gray-500 text-sm">OS ID: {osId || 'não fornecido'}</p>
         </div>
       </div>
     );
@@ -433,7 +433,7 @@ export function OSPrintView() {
                 </div>
                 <div className="grid grid-cols-3">
                   <div className="px-3 py-2 border-r border-gray-200">
-                    <InfoLabel>Tipo Servico</InfoLabel>
+                    <InfoLabel>Tipo Serviço</InfoLabel>
                     <InfoValue>{os.tipo_atendimento === 'IH' ? 'In Home' : 'Carry In'}</InfoValue>
                   </div>
                   <div className="px-3 py-2 border-r border-gray-200">
@@ -447,7 +447,7 @@ export function OSPrintView() {
                 </div>
                 {os.acessorios && (
                   <div className="px-3 py-2 border-t border-gray-200">
-                    <InfoLabel>Acessorios</InfoLabel>
+                    <InfoLabel>Acessórios</InfoLabel>
                     <InfoValue>{os.acessorios}</InfoValue>
                   </div>
                 )}
@@ -456,14 +456,14 @@ export function OSPrintView() {
 
             {/* ===== SERVICO ===== */}
             <div className="mb-5">
-              <SectionTitle>Informacoes do Servico</SectionTitle>
+              <SectionTitle>Informações do Serviço</SectionTitle>
               <div className="rounded-lg border border-gray-200 overflow-hidden">
                 <div className="px-3 py-2.5 border-b border-gray-200" style={{ backgroundColor: ACCENT_LIGHT }}>
                   <InfoLabel>Defeito Relatado</InfoLabel>
                   <p className="text-sm text-gray-900 whitespace-pre-wrap">{os.defeito_relatado || '-'}</p>
                 </div>
                 <div className="px-3 py-2.5 border-b border-gray-200">
-                  <InfoLabel>Diagnostico Tecnico</InfoLabel>
+                  <InfoLabel>Diagnóstico Técnico</InfoLabel>
                   <p className="text-sm text-gray-900 whitespace-pre-wrap">{os.diagnostico_tecnico || '-'}</p>
                 </div>
                 <div className="px-3 py-2.5 border-b border-gray-200" style={{ backgroundColor: ACCENT_LIGHT }}>
@@ -472,7 +472,7 @@ export function OSPrintView() {
                 </div>
                 {os.observacoes_internas && (
                   <div className="px-3 py-2.5">
-                    <InfoLabel>Observacoes</InfoLabel>
+                    <InfoLabel>Observações</InfoLabel>
                     <p className="text-sm text-gray-900 whitespace-pre-wrap">{os.observacoes_internas}</p>
                   </div>
                 )}
@@ -659,7 +659,7 @@ export function OSPrintView() {
             {/* ===== TERMOS ===== */}
             {config?.termo_orcamento && (
               <div className="mb-4 text-[10px] text-gray-500 leading-relaxed border-t border-gray-200 pt-3">
-                <p className="font-bold text-xs text-gray-700 mb-1">Termos do Orcamento:</p>
+                <p className="font-bold text-xs text-gray-700 mb-1">Termos do Orçamento:</p>
                 <div className="whitespace-pre-line">{config.termo_orcamento}</div>
               </div>
             )}

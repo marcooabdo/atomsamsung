@@ -581,8 +581,8 @@ export function NotasFiscais() {
               onChange={(e) => setPeriodoFiltro(e.target.value as any)}
               className="neon-input w-full"
             >
-              <option value="mes">Este mes</option>
-              <option value="trimestre">Ultimo trimestre</option>
+              <option value="mes">Este mês</option>
+              <option value="trimestre">Último trimestre</option>
               <option value="ano">Este ano</option>
               <option value="todos">Todos</option>
             </select>

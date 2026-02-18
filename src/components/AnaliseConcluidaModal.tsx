@@ -41,7 +41,7 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
 
       // Determinar a próxima coluna baseado nas regras de negócio
       let proximaColuna = 'negociacao_em_andamento';
-      let mensagemMovimentacao = 'OS movida para "Negociacao em Andamento"';
+      let mensagemMovimentacao = 'OS movida para "Negociação em Andamento"';
 
       // Verifica se deve pular a negociação (LP ou OW com cortesia)
       const devePularNegociacao = osData?.tipo_os === 'LP' ||
@@ -80,7 +80,7 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
 
       if (osError) throw osError;
 
-      showAlert({ message: `Analise registrada!\n\n${mensagemMovimentacao}`, type: 'success' });
+      showAlert({ message: `Análise registrada!\n\n${mensagemMovimentacao}`, type: 'success' });
       onSuccess();
       handleClose();
     } catch (error: any) {

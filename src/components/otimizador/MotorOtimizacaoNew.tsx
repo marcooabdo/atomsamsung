@@ -450,7 +450,7 @@ export default function MotorOtimizacaoNew() {
             tipo: 'deslocamento',
             horario_inicio: minutesToTime(deslocamentoInicio),
             horario_fim: minutesToTime(almocoMin),
-            descricao: `Deslocamento ate o almoco`,
+            descricao: `Deslocamento até o almoço`,
             distancia_km: Math.round(parada.distancia_km * (tempoAteAlmoco / parada.tempo_deslocamento_min) * 10) / 10,
             duracao_min: tempoAteAlmoco,
           });
@@ -892,14 +892,14 @@ export default function MotorOtimizacaoNew() {
               </h3>
               <div className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Tecnico</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Técnico</label>
                   <select
                     value={selectedTecnico}
                     onChange={(e) => setSelectedTecnico(e.target.value)}
                     className="w-full px-3 py-2.5 rounded-xl text-sm"
                     style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
                   >
-                    <option value="">Selecione um tecnico...</option>
+                    <option value="">Selecione um técnico...</option>
                     {tecnicosData.map((t: any) => <option key={t.id} value={t.id}>{t.nome}</option>)}
                   </select>
                 </div>

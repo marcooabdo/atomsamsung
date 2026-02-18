@@ -85,7 +85,7 @@ export function VisaoGeralTab() {
                 <span className="text-4xl font-bold" style={{ color: '#FBBF24' }}>{myStars}</span>
                 <span className="text-lg opacity-50" style={{ color: 'var(--text-secondary)' }}>/{metaStars}</span>
               </div>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>estrelas este mes</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>estrelas este mês</p>
             </div>
           </div>
         </div>
@@ -113,9 +113,9 @@ export function VisaoGeralTab() {
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <KPICard icon={Trophy} label="Ranking" value={myRankPos > 0 ? `#${myRankPos}` : '-'} sublabel={`de ${ranking.length}`} color="#FBBF24" />
-        <KPICard icon={Flame} label="Sequencia" value={`${myProfissional.meses_consecutivos_validos}`} sublabel="meses" color="#F97316" />
+        <KPICard icon={Flame} label="Sequência" value={`${myProfissional.meses_consecutivos_validos}`} sublabel="meses" color="#F97316" />
         <KPICard icon={metaAtingida ? CheckCircle2 : Target} label="Meta" value={metaAtingida ? 'Atingida' : `Faltam ${metaStars - myStars}`} sublabel={metaAtingida ? 'Parabens!' : 'estrelas'} color={metaAtingida ? '#10B981' : '#EF4444'} />
-        <KPICard icon={Award} label="Bonus" value={metaAtingida ? `R$ ${(myProfissional.nivel?.bonus_valor || 0).toLocaleString('pt-BR')}` : '-'} sublabel={metaAtingida ? 'este mes' : 'atinja a meta'} color="#8B5CF6" />
+        <KPICard icon={Award} label="Bônus" value={metaAtingida ? `R$ ${(myProfissional.nivel?.bonus_valor || 0).toLocaleString('pt-BR')}` : '-'} sublabel={metaAtingida ? 'este mês' : 'atinja a meta'} color="#8B5CF6" />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -152,7 +152,7 @@ export function VisaoGeralTab() {
             }) : (
               <div className="text-center py-8 rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
                 <Clock className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-secondary)' }} />
-                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nenhuma estrela calculada para este mes</p>
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nenhuma estrela calculada para este mês</p>
               </div>
             )}
           </div>
@@ -361,7 +361,7 @@ function AdminOverview({ onSelect }: { onSelect: (prof: Profissional) => void })
 
       {ranking.length > 0 && (
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-          <h4 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Top 5 do Mes</h4>
+          <h4 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Top 5 do Mês</h4>
           <div className="space-y-2">
             {ranking.slice(0, 5).map((r, idx) => (
               <div key={r.profissional_id} className="flex items-center gap-3 p-2 rounded-lg cursor-pointer hover:opacity-80" style={{ backgroundColor: idx === 0 ? '#FBBF2408' : 'transparent' }} onClick={() => {
@@ -439,7 +439,7 @@ function ProfissionalModal({ profissional, estrelas, onClose }: { profissional: 
             );
           })}
           {estrelas.length === 0 && (
-            <p className="text-center py-4 text-sm" style={{ color: 'var(--text-secondary)' }}>Sem dados para este mes</p>
+            <p className="text-center py-4 text-sm" style={{ color: 'var(--text-secondary)' }}>Sem dados para este mês</p>
           )}
         </div>
 

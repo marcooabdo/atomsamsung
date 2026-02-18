@@ -701,7 +701,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
               <div className="flex items-center gap-2">
                 <History className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-accent)' }}>Historico da Peca</h2>
+                <h2 className="text-lg font-bold" style={{ color: 'var(--text-accent)' }}>Histórico da Peça</h2>
               </div>
               <button
                 onClick={() => setShowHistory(null)}
@@ -713,7 +713,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
             {historicoData.length > 0 && historicoData[0].peca?.nf && (
               <div className="mx-4 mt-4 p-3 rounded-lg border" style={{ background: 'rgba(var(--accent-rgb), 0.04)', borderColor: 'var(--border-primary)' }}>
-                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Informacoes de Entrada</h3>
+                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Informações de Entrada</h3>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {historicoData[0].peca.id_numerico && (
                     <div>
@@ -753,12 +753,12 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
               {loadingHistorico ? (
                 <div className="text-center py-12">
                   <div className="w-10 h-10 border-3 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--border-primary)', borderTopColor: 'var(--text-accent)' }} />
-                  <p className="text-gray-400 text-sm">Carregando historico...</p>
+                  <p className="text-gray-400 text-sm">Carregando histórico...</p>
                 </div>
               ) : historicoData.length === 0 ? (
                 <div className="text-center py-12">
                   <History className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm">Nenhum historico encontrado</p>
+                  <p className="text-gray-400 text-sm">Nenhum histórico encontrado</p>
                 </div>
               ) : (
                 <div className="space-y-2">

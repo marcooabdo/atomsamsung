@@ -323,7 +323,7 @@ Assistencia Tecnica Samsung`;
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Orcamento enviado ao cliente (Versao ${novaVersao}) - Valor: R$ ${valorAtual.toFixed(2)}`,
+        comentario: `Orçamento enviado ao cliente (Versão ${novaVersao}) - Valor: R$ ${valorAtual.toFixed(2)}`,
         is_system: true
       });
 
@@ -347,9 +347,9 @@ Assistencia Tecnica Samsung`;
 
       setShowWhatsAppModal(false);
       onUpdate();
-      alert('Orcamento marcado como enviado!');
+      alert('Orçamento marcado como enviado!');
     } catch (error: any) {
-      alert(`Erro ao enviar orcamento: ${error.message}`);
+      alert(`Erro ao enviar orçamento: ${error.message}`);
     } finally {
       setProcessando(false);
     }
@@ -432,14 +432,14 @@ Assistencia Tecnica Samsung`;
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Orcamento APROVADO pelo cliente - Valor: R$ ${valorAtual.toFixed(2)}`,
+        comentario: `Orçamento APROVADO pelo cliente - Valor: R$ ${valorAtual.toFixed(2)}`,
         is_system: true
       });
 
       onUpdate();
       setShowAprovarModal(true);
     } catch (error: any) {
-      alert(`Erro ao aprovar orcamento: ${error.message}`);
+      alert(`Erro ao aprovar orçamento: ${error.message}`);
     } finally {
       setProcessando(false);
     }
@@ -459,7 +459,7 @@ Assistencia Tecnica Samsung`;
           coluna_kanban: 'orcamentos_rejeitados',
           orcamento_reprovado_em: new Date().toISOString(),
           orcamento_reprovado_por: usuario?.id,
-          observacoes_internas: `${os.observacoes_internas || ''}\n\n**ORCAMENTO REPROVADO:** ${motivoReprovacao}`,
+          observacoes_internas: `${os.observacoes_internas || ''}\n\n**ORÇAMENTO REPROVADO:** ${motivoReprovacao}`,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
@@ -469,7 +469,7 @@ Assistencia Tecnica Samsung`;
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Orcamento REPROVADO: ${motivoReprovacao}`,
+        comentario: `Orçamento REPROVADO: ${motivoReprovacao}`,
         is_system: true
       });
 
@@ -478,7 +478,7 @@ Assistencia Tecnica Samsung`;
       onUpdate();
       setShowReprovarSuccessModal(true);
     } catch (error: any) {
-      alert(`Erro ao reprovar orcamento: ${error.message}`);
+      alert(`Erro ao reprovar orçamento: ${error.message}`);
     } finally {
       setProcessando(false);
     }
@@ -690,13 +690,13 @@ Assistencia Tecnica Samsung`;
               </div>
               <div>
                 <h3 className="text-lg font-bold text-[#F59E0B]">NEGOCIACAO DE ORCAMENTO</h3>
-                <p className="text-xs text-gray-400">Envie, aprove ou reprove o orcamento</p>
+                <p className="text-xs text-gray-400">Envie, aprove ou reprove o orçamento</p>
               </div>
             </div>
             {os.versao_orcamento > 1 && (
               <span className="px-3 py-1.5 rounded-full text-xs font-bold bg-[#FF0064]/20 text-[#FF0064] border border-[#FF0064]/40 animate-pulse">
                 <AlertTriangle className="w-3 h-3 inline mr-1" />
-                {os.versao_orcamento}o ORCAMENTO
+                {os.versao_orcamento}º ORÇAMENTO
               </span>
             )}
           </div>
@@ -1350,10 +1350,10 @@ Assistencia Tecnica Samsung`;
 
                     <div className="p-3 bg-blue-500/10 border border-blue-500/30 rounded-lg">
                       <p className="text-[10px] text-blue-300 leading-relaxed">
-                        <strong>Como funciona:</strong> Ao acessar o link, o cliente podera visualizar o orcamento completo e:
+                        <strong>Como funciona:</strong> Ao acessar o link, o cliente poderá visualizar o orçamento completo e:
                       </p>
                       <ul className="text-[10px] text-blue-300 mt-2 ml-4 space-y-1">
-                        <li>✓ <strong>Aprovar</strong> o orcamento</li>
+                        <li>✓ <strong>Aprovar</strong> o orçamento</li>
                         <li>✓ <strong>Rejeitar</strong> com motivo</li>
                         <li>✓ <strong>Negociar</strong> enviando uma mensagem</li>
                       </ul>

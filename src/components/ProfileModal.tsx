@@ -266,7 +266,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   onChange={(e) => setBio(e.target.value)}
                   className="neon-input text-sm resize-none"
                   rows={3}
-                  placeholder="Uma breve descricao sobre voce..."
+                  placeholder="Uma breve descrição sobre você..."
                   maxLength={200}
                 />
                 <p className="text-right text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>{bio.length}/200</p>

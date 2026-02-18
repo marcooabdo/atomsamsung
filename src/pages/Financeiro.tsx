@@ -94,7 +94,7 @@ export function Financeiro() {
               onChange={(e) => setDataInicio(e.target.value)}
               className="neon-input text-sm"
             />
-            <span className="text-gray-500">ate</span>
+            <span className="text-gray-500">até</span>
             <input
               type="date"
               value={dataFim}

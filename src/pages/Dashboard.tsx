@@ -488,7 +488,7 @@ export function Dashboard() {
               className="px-3 py-2 bg-gray-800/80 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
             />
           </div>
-          <span className="text-gray-500">ate</span>
+          <span className="text-gray-500">até</span>
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-gray-500" />
             <input
@@ -670,7 +670,7 @@ export function Dashboard() {
             >
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-[#0EA5E9]" style={{ boxShadow: '0 0 4px rgba(14,165,233,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">OS em Analise</span>
+                <span className="text-xs font-medium text-gray-300">OS em Análise</span>
               </div>
               <span className="text-sm font-bold text-[#0EA5E9]">
                 {Math.floor(stats.osAbertas * 0.3)}

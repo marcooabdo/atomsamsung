@@ -136,7 +136,7 @@ export function NiveisBonusTab() {
                   </div>
                   <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{nivel.meses_consecutivos} meses</span>
                   {nivel.bonus_valor > 0 && (
-                    <span className="text-xs font-medium" style={{ color: '#10B981' }}>R$ {nivel.bonus_valor.toLocaleString('pt-BR')}/mes</span>
+                    <span className="text-xs font-medium" style={{ color: '#10B981' }}>R$ {nivel.bonus_valor.toLocaleString('pt-BR')}/mês</span>
                   )}
                 </div>
               </div>
@@ -219,7 +219,7 @@ export function NiveisBonusTab() {
         onClose={() => setDeleteConfirm({ show: false, id: '', nome: '' })}
         onConfirm={confirmDelete}
         title="Excluir Nivel"
-        message={`Tem certeza que deseja excluir o nivel "${deleteConfirm.nome}"? Profissionais neste nivel poderao ser afetados. Esta acao nao pode ser desfeita.`}
+        message={`Tem certeza que deseja excluir o nivel "${deleteConfirm.nome}"? Profissionais neste nível poderão ser afetados. Esta ação não pode ser desfeita.`}
       />
     </div>
   );

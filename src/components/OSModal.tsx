@@ -1962,8 +1962,8 @@ Não haverá cobrança ao cliente.`
 
     const confirmacao = confirm(
       'CONCLUIR ANALISE TECNICA\n\n' +
-      'Ao confirmar, a OS sera movida para a aba Cotacoes como "Refazer Orcamento".\n\n' +
-      'A cotacao ficara marcada como "Analise feita pelo tecnico" para facilitar o preenchimento.\n\n' +
+      'Ao confirmar, a OS será movida para a aba Cotações como "Refazer Orçamento".\n\n' +
+      'A cotação ficará marcada como "Análise feita pelo técnico" para facilitar o preenchimento.\n\n' +
       'Deseja continuar?'
     );
 
@@ -1984,14 +1984,14 @@ Não haverá cobrança ao cliente.`
       await supabase.from('cotacao_comentarios').insert({
         cotacao_id: os.cotacao_id,
         usuario_id: usuario?.id,
-        texto: `Analise tecnica concluida por ${usuario?.nome}. Pecas adicionadas pelo tecnico - pronto para precificar.`,
+        texto: `Análise técnica concluída por ${usuario?.nome}. Peças adicionadas pelo técnico - pronto para precificar.`,
         is_system: true
       });
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Analise tecnica concluida por ${usuario?.nome}. OS enviada para precificacao.`,
+        comentario: `Análise técnica concluída por ${usuario?.nome}. OS enviada para precificação.`,
         is_system: true
       });
 
@@ -2012,7 +2012,7 @@ Não haverá cobrança ao cliente.`
         );
       }, 100);
     } catch (error: any) {
-      alert(`Erro ao finalizar analise: ${error.message || 'Erro desconhecido'}`);
+      alert(`Erro ao finalizar análise: ${error.message || 'Erro desconhecido'}`);
       setFinalizandoAnalise(false);
     }
   };
@@ -3371,7 +3371,7 @@ Não haverá cobrança ao cliente.`
                           value={diagnosticoTemp}
                           onChange={(e) => setDiagnosticoTemp(e.target.value)}
                           className="neon-input w-full h-24 resize-none text-sm"
-                          placeholder="Descreva o diagnostico tecnico..."
+                          placeholder="Descreva o diagnóstico técnico..."
                         />
                         <div className="flex gap-2 justify-end">
                           <button onClick={() => setEditandoDiagnostico(false)} className="px-3 py-1 text-xs rounded border border-gray-600 text-gray-400 hover:bg-white/5">Cancelar</button>
@@ -3479,10 +3479,10 @@ Não haverá cobrança ao cliente.`
                           {pecas.length === 0 ? (
                             <span className="text-[#FFBF00]">
                               <AlertCircle className="w-3 h-3 inline mr-1" />
-                              ATENCAO: Adicione as pecas necessarias ANTES de concluir a analise. Se nao houver pecas, escreva isso no relato do diagnostico.
+                              ATENÇÃO: Adicione as peças necessárias ANTES de concluir a análise. Se não houver peças, escreva isso no relato do diagnóstico.
                             </span>
                           ) : (
-                            'Pecas adicionadas. Clique em "Analise Concluida" para finalizar o diagnostico e escrever o relato tecnico.'
+                            'Peças adicionadas. Clique em "Análise Concluída" para finalizar o diagnóstico e escrever o relato técnico.'
                           )}
                         </p>
                       </div>
@@ -4232,7 +4232,7 @@ Não haverá cobrança ao cliente.`
                   <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-[#00D4FF]/10 to-[#39FF14]/10 flex items-center justify-center mx-auto mb-4 border border-[#00D4FF]/20">
                     <Wrench className="w-10 h-10 text-[#00D4FF]/60" />
                   </div>
-                  <p className="text-gray-400 text-sm mb-6">Nenhum servico adicionado</p>
+                  <p className="text-gray-400 text-sm mb-6">Nenhum serviço adicionado</p>
                   <button
                     onClick={() => {
                       loadServicosCadastrados();
@@ -4927,7 +4927,7 @@ Não haverá cobrança ao cliente.`
                   </div>
                   <div>
                     <h3 className="text-xl font-bold text-[#00D4FF]">ADICIONAR SERVICO</h3>
-                    <p className="text-xs text-gray-400">Selecione um servico da lista</p>
+                    <p className="text-xs text-gray-400">Selecione um serviço da lista</p>
                   </div>
                 </div>
                 <button onClick={() => setMostrarModalServico(false)} className="text-gray-400 hover:text-white transition-colors">
@@ -4974,7 +4974,7 @@ Não haverá cobrança ao cliente.`
                     <div className="text-center py-12">
                       <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
                       <p className="text-gray-500 text-sm">
-                        {buscaServico ? 'Nenhum servico encontrado' : `Nenhum servico cadastrado para ${os.aparelho_linha}`}
+                        {buscaServico ? 'Nenhum serviço encontrado' : `Nenhum serviço cadastrado para ${os.aparelho_linha}`}
                       </p>
                       <p className="text-gray-600 text-xs mt-2">
                         {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos para esta linha em Configuracoes'}

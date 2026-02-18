@@ -790,7 +790,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                     value={form.nome}
                     onChange={(e) => setForm(prev => ({ ...prev, nome: e.target.value }))}
                     className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                    placeholder="Ex: Servico de Manutencao"
+                    placeholder="Ex: Serviço de Manutenção"
                   />
                 </div>
 
@@ -916,7 +916,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Codigo Servico (LC 116)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Código Serviço (LC 116)</label>
                         <input
                           type="text"
                           value={form.codigo_servico}
@@ -936,7 +936,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Codigo Tributario Municipal</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Código Tributário Municipal</label>
                         <input
                           type="text"
                           value={form.codigo_tributario_municipal}
@@ -946,7 +946,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Codigo NBS</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Código NBS</label>
                         <input
                           type="text"
                           value={form.codigo_nbs}
@@ -1021,7 +1021,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           </select>
                         </div>
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">cMun IBGE (Tomador Padrao)</label>
+                          <label className="block text-[10px] text-gray-500 mb-1">cMun IBGE (Tomador Padrão)</label>
                           <input
                             type="text"
                             value={form.nfse_codigo_municipio_ibge}
@@ -1031,7 +1031,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           />
                         </div>
                         <div className="md:col-span-3">
-                          <label className="block text-[10px] text-gray-500 mb-1">xDescServ (Descricao Padrao do Servico)</label>
+                          <label className="block text-[10px] text-gray-500 mb-1">xDescServ (Descrição Padrão do Serviço)</label>
                           <input
                             type="text"
                             value={form.nfse_descricao_servico}
@@ -2056,7 +2056,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                       onChange={(e) => setForm(prev => ({ ...prev, nfe_informacoes_fisco: e.target.value }))}
                       className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#FFA500] resize-none font-mono text-sm"
                       rows={3}
-                      placeholder="Informacoes adicionais de interesse do Fisco. Use variaveis como {cliente_nome}, {nota_numero}, etc."
+                      placeholder="Informações adicionais de interesse do Fisco. Use variáveis como {cliente_nome}, {nota_numero}, etc."
                     />
                   </div>
                 </>
@@ -2082,7 +2082,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   onChange={(e) => setForm(prev => ({ ...prev, observacoes_padrao: e.target.value }))}
                   className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] resize-none font-mono text-sm"
                   rows={3}
-                  placeholder="Texto que sera incluido automaticamente na nota fiscal. Use variaveis como {cliente_nome}, {nota_numero}, etc."
+                  placeholder="Texto que será incluído automaticamente na nota fiscal. Use variáveis como {cliente_nome}, {nota_numero}, etc."
                 />
                 <p className="text-xs text-gray-500 mt-2 flex items-start gap-1">
                   <Info className="w-3 h-3 mt-0.5 flex-shrink-0" />

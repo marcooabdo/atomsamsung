@@ -199,7 +199,7 @@ export function ConversationPanel({
             }}
             whileHover={{ scale: 1.05, borderColor: 'rgba(255,255,255,0.15)' }}
             whileTap={{ scale: 0.95 }}
-            title="Proximo"
+            title="Próximo"
           >
             <SkipForward className="w-4 h-4" />
           </motion.button>

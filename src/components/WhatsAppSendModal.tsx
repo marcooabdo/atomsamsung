@@ -438,7 +438,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                   <div className="pt-2 border-t border-blue-600/20">
                     <button
                       onClick={() => {
-                        if (confirm('Isto ira INVALIDAR o link atual e gerar um NOVO link. O link antigo nao funcionara mais. Deseja continuar?')) {
+                        if (confirm('Isto irá INVALIDAR o link atual e gerar um NOVO link. O link antigo não funcionará mais. Deseja continuar?')) {
                           handleGenerateLink(true);
                         }
                       }}
@@ -605,7 +605,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
               }}>
                 <div className="flex items-center gap-2 mb-2">
                   <Eye className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs text-green-400 font-medium">Pre-visualizacao</span>
+                  <span className="text-xs text-green-400 font-medium">Pré-visualização</span>
                 </div>
                 <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{renderPreview()}</p>
               </div>
@@ -629,7 +629,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                     )}
                   </div>
                   {result.isDryRun && (
-                    <p className="text-xs text-gray-400 mt-1">A mensagem foi registrada mas nao enviada (API WhatsApp nao configurada)</p>
+                    <p className="text-xs text-gray-400 mt-1">A mensagem foi registrada mas não enviada (API WhatsApp não configurada)</p>
                   )}
                 </div>
               )}
@@ -649,7 +649,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                 className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-400 transition-colors"
               >
                 <Clock className="w-3.5 h-3.5" />
-                {showLogs ? 'Ocultar historico' : `Historico de envios (${recentLogs.length})`}
+                {showLogs ? 'Ocultar histórico' : `Histórico de envios (${recentLogs.length})`}
               </button>
               {showLogs && (
                 <div className="mt-2 space-y-1.5">

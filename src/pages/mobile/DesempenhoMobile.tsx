@@ -176,7 +176,7 @@ export function DesempenhoMobile() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">{usuario?.nome}</h1>
-            <p className="text-cyan-400 text-sm">Tecnico IH</p>
+            <p className="text-cyan-400 text-sm">Técnico IH</p>
           </div>
         </div>
 

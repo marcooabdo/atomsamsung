@@ -461,7 +461,7 @@ export function AtomConnectMarketing({ accentColor, unidadeId }: Props) {
                     <textarea
                       value={newCampaign.template_texto}
                       onChange={(e) => setNewCampaign(prev => ({ ...prev, template_texto: e.target.value }))}
-                      placeholder="Ola {nome}, temos uma oferta especial para voce!"
+                      placeholder="Olá {nome}, temos uma oferta especial para você!"
                       rows={5}
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none"
                     />
@@ -489,7 +489,7 @@ export function AtomConnectMarketing({ accentColor, unidadeId }: Props) {
                       >
                         <option value="">Tipo</option>
                         <option value="image">Imagem</option>
-                        <option value="video">Video</option>
+                        <option value="video">Vídeo</option>
                         <option value="document">Documento</option>
                       </select>
                     </div>

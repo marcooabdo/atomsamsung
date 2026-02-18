@@ -658,7 +658,7 @@ export function EmitirNFSeModal({
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Valor do Servico *</label>
+                    <label className="block text-[10px] text-gray-500 mb-1">Valor do Serviço *</label>
                     <div className="relative">
                       <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                       <input
@@ -671,13 +671,13 @@ export function EmitirNFSeModal({
                     </div>
                   </div>
                   <div>
-                    <label className="block text-[10px] text-gray-500 mb-1">Descricao do Servico</label>
+                    <label className="block text-[10px] text-gray-500 mb-1">Descrição do Serviço</label>
                     <input
                       type="text"
                       value={form.descricaoServico}
                       onChange={(e) => setForm(prev => ({ ...prev, descricaoServico: e.target.value }))}
                       className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                      placeholder="Descricao do servico prestado..."
+                      placeholder="Descrição do serviço prestado..."
                     />
                   </div>
                 </div>
@@ -701,7 +701,7 @@ export function EmitirNFSeModal({
               >
                 <div>
                   <div className="flex items-center gap-4 text-sm">
-                    <span className="text-gray-400">Valor do Servico:</span>
+                    <span className="text-gray-400">Valor do Serviço:</span>
                     <span className="text-[#39FF14] font-bold text-xl">{formatCurrency(form.valorServicos)}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">

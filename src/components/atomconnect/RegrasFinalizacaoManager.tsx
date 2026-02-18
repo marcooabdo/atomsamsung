@@ -251,7 +251,7 @@ Digite o numero correspondente a sua avaliacao.`,
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-semibold text-white">Regras de Finalizacao</h3>
-          <p className="text-sm text-gray-400">Configure mensagens de avaliacao enviadas ao cliente</p>
+          <p className="text-sm text-gray-400">Configure mensagens de avaliação enviadas ao cliente</p>
         </div>
         <button
           onClick={openNewModal}
@@ -428,7 +428,7 @@ Digite o numero correspondente a sua avaliacao.`,
                     <h3 className="text-lg font-semibold text-white">
                       {editingRegra ? 'Editar Regra' : 'Nova Regra de Finalizacao'}
                     </h3>
-                    <p className="text-xs text-gray-400">Configure a mensagem de avaliacao</p>
+                    <p className="text-xs text-gray-400">Configure a mensagem de avaliação</p>
                   </div>
                 </div>
                 <button
@@ -466,12 +466,12 @@ Digite o numero correspondente a sua avaliacao.`,
 
                 <div>
                   <label className="block text-sm font-medium text-gray-400 mb-2">
-                    Mensagem de Avaliacao *
+                    Mensagem de Avaliação *
                   </label>
                   <textarea
                     value={form.mensagem_avaliacao}
                     onChange={(e) => setForm(prev => ({ ...prev, mensagem_avaliacao: e.target.value }))}
-                    placeholder="Digite a mensagem que sera enviada ao cliente..."
+                    placeholder="Digite a mensagem que será enviada ao cliente..."
                     rows={5}
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none"
                   />
@@ -509,7 +509,7 @@ Digite o numero correspondente a sua avaliacao.`,
                             >
                               {index + 1}
                             </span>
-                            <span className="text-sm font-medium text-white">Opcao {index + 1}</span>
+                            <span className="text-sm font-medium text-white">Opção {index + 1}</span>
                           </div>
                           <button
                             onClick={() => removeOpcao(index)}
@@ -531,7 +531,7 @@ Digite o numero correspondente a sua avaliacao.`,
                             />
                           </div>
                           <div>
-                            <label className="block text-[11px] text-gray-500 mb-1">Label (nome da opcao)</label>
+                            <label className="block text-[11px] text-gray-500 mb-1">Label (nome da opção)</label>
                             <input
                               type="text"
                               value={opcao.label}
@@ -555,7 +555,7 @@ Digite o numero correspondente a sua avaliacao.`,
 
                         <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <label className="block text-[11px] text-gray-500 mb-1">Acao apos resposta</label>
+                            <label className="block text-[11px] text-gray-500 mb-1">Ação após resposta</label>
                             <select
                               value={opcao.acao}
                               onChange={(e) => updateOpcao(index, 'acao', e.target.value)}

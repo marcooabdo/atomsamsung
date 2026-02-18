@@ -27,7 +27,7 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
           <div className="flex items-center gap-3">
             <Building2 className="w-5 h-5 text-red-400" />
             <div>
-              <p className="text-xs text-red-400 uppercase tracking-wider">Erro de Configuracao</p>
+              <p className="text-xs text-red-400 uppercase tracking-wider">Erro de Configuração</p>
               <p className="text-sm font-semibold text-red-300">Usuario sem unidade vinculada</p>
             </div>
           </div>

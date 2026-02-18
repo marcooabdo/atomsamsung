@@ -315,7 +315,7 @@ export default function AtomConnect() {
         id: crypto.randomUUID(),
         type: 'transfer',
         title: 'Atendimento Transferido',
-        message: `${conversa.cliente_nome || conversa.cliente_telefone} foi transferido para voce`,
+        message: `${conversa.cliente_nome || conversa.cliente_telefone} foi transferido para você`,
         conversaId: conversa.id,
         timestamp: new Date()
       };

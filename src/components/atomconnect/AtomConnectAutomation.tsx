@@ -377,7 +377,7 @@ export function AtomConnectAutomation({ accentColor, unidadeId }: Props) {
                       type="text"
                       value={newFluxo.descricao}
                       onChange={(e) => setNewFluxo(prev => ({ ...prev, descricao: e.target.value }))}
-                      placeholder="Descricao do fluxo"
+                      placeholder="Descrição do fluxo"
                       className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                     />
                   </div>

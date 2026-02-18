@@ -593,7 +593,7 @@ function GIAHeader({
         <button
           onClick={onToggleHistory}
           className="p-2 rounded-lg transition-colors hover:bg-white/5"
-          title="Historico"
+          title="Histórico"
         >
           <History className="w-3.5 h-3.5" style={{ color: '#4a5568' }} />
         </button>
@@ -602,7 +602,7 @@ function GIAHeader({
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ml-1 cursor-pointer group relative"
           style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
           onClick={onCheckConnections}
-          title="Verificar conexao"
+          title="Verificar conexão"
         >
           {connection.status === 'checking' ? (
             <>

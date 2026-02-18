@@ -186,7 +186,7 @@ export default function AgendaOperacional() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Agenda Operacional</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Calendario com timeline por tecnico</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Calendário com timeline por técnico</p>
         </div>
         <div className="flex items-center gap-2">
           <button

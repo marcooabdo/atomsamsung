@@ -341,7 +341,7 @@ export function ConfiguracoesPermissoes() {
               </div>
               {selectedPerfil === 'master' && (
                 <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                  <p className="text-xs text-red-400 font-medium">Acesso Total - Nao Editavel</p>
+                  <p className="text-xs text-red-400 font-medium">Acesso Total - Não Editável</p>
                 </div>
               )}
             </div>

@@ -104,8 +104,8 @@ export function ReparoEfetuadoModal({ isOpen, osId, osNumero, onClose, onSuccess
                 <p className="font-semibold text-[#2563EB] mb-2">Controle de Qualidade (OQC)</p>
                 <ul className="list-disc list-inside space-y-1 text-gray-400">
                   <li>Descreva o reparo realizado no aparelho</li>
-                  <li>Informe os componentes substituidos</li>
-                  <li>Apos salvar, a OS sera movida para OQC</li>
+                  <li>Informe os componentes substituídos</li>
+                  <li>Após salvar, a OS será movida para OQC</li>
                 </ul>
               </div>
             </div>
@@ -113,12 +113,12 @@ export function ReparoEfetuadoModal({ isOpen, osId, osNumero, onClose, onSuccess
 
           <div>
             <label className="block text-sm font-bold text-[#2563EB] mb-2">
-              Descricao do Reparo Efetuado *
+              Descrição do Reparo Efetuado *
             </label>
             <textarea
               value={reparo}
               onChange={(e) => setReparo(e.target.value)}
-              placeholder="Descreva em detalhes o reparo realizado, componentes substituidos, testes realizados..."
+              placeholder="Descreva em detalhes o reparo realizado, componentes substituídos, testes realizados..."
               className="neon-input w-full h-48 resize-none"
               required
             />

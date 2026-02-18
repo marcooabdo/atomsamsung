@@ -428,7 +428,7 @@ function PilaresSection({ pilares, regrasEstrelas, times, niveis, expandedPilar,
                   <option value="quantidade">Quantidade</option>
                   <option value="percentual">Percentual</option>
                   <option value="valor">Valor (R$)</option>
-                  <option value="binario">Sim/Nao</option>
+                  <option value="binario">Sim/Não</option>
                 </select>
               </div>
               <div className="md:col-span-2">
@@ -502,7 +502,7 @@ function PilarForm({ form, setForm, onSave, onCancel, isEditing, times }: any) {
             <option value="quantidade">Quantidade</option>
             <option value="percentual">Percentual</option>
             <option value="valor">Valor (R$)</option>
-            <option value="binario">Sim/Nao</option>
+            <option value="binario">Sim/Não</option>
           </select>
         </div>
         <div className="md:col-span-2">
@@ -652,9 +652,9 @@ function PromocaoRebaixamentoSection({ regrasPromocao, showNovaRegraPromocao, se
                 <textarea value={regraPromocaoForm.descricao} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, descricao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={3} placeholder="Descreva a condicao..." />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Codigo da Condicao *</label>
+                <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Código da Condição *</label>
                 <input type="text" value={regraPromocaoForm.condicao} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, condicao: e.target.value })} className="w-full rounded-lg px-3 py-2 text-sm font-mono" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Ex: meta_atingida, estrelas_minimas" />
-                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>Codigo usado no sistema para verificar a condicao</p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>Código usado no sistema para verificar a condição</p>
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
                 <input type="checkbox" checked={regraPromocaoForm.obrigatorio} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, obrigatorio: e.target.checked })} className="w-4 h-4" style={{ accentColor: tipoRegraPromocao === 'promocao' ? '#10B981' : '#EF4444' }} />
@@ -694,12 +694,12 @@ function RegraPromocaoCard({ title, icon, regras, tipo, accentColor, editingRegr
             {editingRegraPromocaoId === regra.id ? (
               <div className="rounded-lg p-3 space-y-2" style={{ backgroundColor: 'var(--bg-secondary)', border: `1px solid ${accentColor}50` }}>
                 <input type="text" value={regraPromocaoForm.nome} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, nome: e.target.value })} className="w-full rounded px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Nome" />
-                <textarea value={regraPromocaoForm.descricao || ''} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, descricao: e.target.value })} className="w-full rounded px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descricao" />
+                <textarea value={regraPromocaoForm.descricao || ''} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, descricao: e.target.value })} className="w-full rounded px-3 py-2 text-sm" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} rows={2} placeholder="Descrição" />
                 <input type="text" value={regraPromocaoForm.condicao} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, condicao: e.target.value })} className="w-full rounded px-3 py-2 text-sm font-mono" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} placeholder="Condicao" />
                 <div className="flex items-center justify-between">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input type="checkbox" checked={regraPromocaoForm.obrigatorio} onChange={(e) => setRegraPromocaoForm({ ...regraPromocaoForm, obrigatorio: e.target.checked })} className="w-4 h-4" style={{ accentColor }} />
-                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Obrigatorio</span>
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>Obrigatório</span>
                   </label>
                 </div>
                 <div className="flex gap-2">
@@ -716,7 +716,7 @@ function RegraPromocaoCard({ title, icon, regras, tipo, accentColor, editingRegr
                   </span>
                   {regra.descricao && <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{regra.descricao}</p>}
                   {regra.obrigatorio && (
-                    <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded" style={{ backgroundColor: '#F59E0B20', color: '#F59E0B' }}>Obrigatorio</span>
+                    <span className="inline-block mt-1 text-xs px-2 py-0.5 rounded" style={{ backgroundColor: '#F59E0B20', color: '#F59E0B' }}>Obrigatório</span>
                   )}
                 </div>
                 <div className="flex gap-1">

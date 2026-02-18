@@ -147,7 +147,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
               <Brain className="w-5 h-5 text-cyan-400" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">Analise Inteligente</h2>
+              <h2 className="text-lg font-bold text-white">Análise Inteligente</h2>
               <p className="text-xs text-gray-400">Powered by GPT-4o Mini</p>
             </div>
           </div>
@@ -175,7 +175,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
               }}>
                 <Sparkles className="w-10 h-10 text-cyan-400" />
               </div>
-              <p className="text-gray-300 mb-1 text-sm">Clique no botao abaixo para gerar uma analise completa</p>
+              <p className="text-gray-300 mb-1 text-sm">Clique no botão abaixo para gerar uma análise completa</p>
               <p className="text-gray-500 text-xs">dos dados operacionais do periodo selecionado</p>
             </div>
           )}
@@ -293,7 +293,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
             ) : (
               <>
                 {currentAnalysis ? <RefreshCw className="w-4 h-4 text-white" /> : <Brain className="w-4 h-4 text-white" />}
-                <span className="text-white">{currentAnalysis ? 'Nova Analise' : 'Gerar Analise'}</span>
+                <span className="text-white">{currentAnalysis ? 'Nova Análise' : 'Gerar Análise'}</span>
               </>
             )}
           </button>
