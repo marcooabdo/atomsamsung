@@ -822,9 +822,38 @@ async function processMessage(
     console.log("Media result:", mediaUrl ? "SUCCESS" : "FAILED");
   }
 
+  // Deduplication by content: if a recent message with same conversa_id, from_me, conteudo exists
+  // within last 30s and has no message_id (was inserted by a different event format), link the real message_id to it
+  const deduplicationCutoff = new Date(Date.now() - 30000).toISOString();
+  const { data: recentDupe } = await supabase
+    .from("atom_connect_mensagens")
+    .select("id, message_id, status")
+    .eq("conversa_id", conversa.id)
+    .eq("from_me", fromMe)
+    .eq("conteudo", conteudo)
+    .is("message_id", null)
+    .gte("created_at", deduplicationCutoff)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (recentDupe) {
+    const updateFields: Record<string, any> = { status: fromMe ? "sent" : "delivered" };
+    if (messageId) updateFields.message_id = messageId;
+    await supabase
+      .from("atom_connect_mensagens")
+      .update(updateFields)
+      .eq("id", recentDupe.id);
+    console.log("Content-dedup: linked message_id to existing row:", messageId, "->", recentDupe.id);
+    return new Response(JSON.stringify({ success: true, linked: true }), {
+      status: 200,
+      headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
+    });
+  }
+
   const msgInsertData: Record<string, any> = {
     conversa_id: conversa.id,
-    message_id: messageId,
+    message_id: messageId || null,
     from_me: fromMe,
     tipo,
     conteudo,
