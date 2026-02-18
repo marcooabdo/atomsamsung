@@ -145,6 +145,7 @@ export function OSNotaFiscalTab({
   const [mensagem, setMensagem] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [showNFSeModal, setShowNFSeModal] = useState(false);
   const [retryNfId, setRetryNfId] = useState<string | null>(null);
+  const [retryingNfId, setRetryingNfId] = useState<string | null>(null);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingType, setEditingType] = useState<'peca' | 'servico' | null>(null);
@@ -563,7 +564,7 @@ export function OSNotaFiscalTab({
     setMensagem(null);
 
     try {
-      const { error } = await supabase
+      const { data: inserted, error } = await supabase
         .from('nf_emitidas')
         .insert({
           os_id: osId,
@@ -581,10 +582,29 @@ export function OSNotaFiscalTab({
           tomador_endereco: clienteEndereco,
           observacoes: formNFe.observacoes,
           tentativas: 1
-        });
+        })
+        .select('id')
+        .single();
 
       if (error) throw error;
-      setMensagem({ tipo: 'success', texto: 'NF-e registrada! Aguardando processamento.' });
+
+      if (inserted?.id) {
+        try {
+          const nfeResponse = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ nfe_id: inserted.id })
+          });
+          if (!nfeResponse.ok) {
+            const errData = await nfeResponse.json().catch(() => ({}));
+            throw new Error(errData?.message || errData?.error || `Erro HTTP ${nfeResponse.status}`);
+          }
+          setMensagem({ tipo: 'success', texto: 'Emissao iniciada' });
+        } catch (fetchErr: any) {
+          setMensagem({ tipo: 'error', texto: fetchErr.message || 'Erro ao acionar servidor de emissao' });
+        }
+      }
+
       loadData();
     } catch (error: any) {
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao emitir NF-e' });
@@ -1448,10 +1468,36 @@ export function OSNotaFiscalTab({
                   <div className="flex items-center gap-2 flex-shrink-0">
                     {(nf.status === 'erro' || nf.status === 'pendente') && (
                       <button
-                        onClick={() => {
+                        disabled={retryingNfId === nf.id}
+                        onClick={async () => {
                           if (nf.tipo === 'nfse') {
                             setRetryNfId(nf.id);
                             setShowNFSeModal(true);
+                          } else {
+                            setRetryingNfId(nf.id);
+                            setMensagem(null);
+                            try {
+                              await supabase
+                                .from('nf_emitidas')
+                                .update({ status: 'pendente', erro_mensagem: null })
+                                .eq('id', nf.id);
+
+                              const nfeResponse = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ nfe_id: nf.id })
+                              });
+                              if (!nfeResponse.ok) {
+                                const errData = await nfeResponse.json().catch(() => ({}));
+                                throw new Error(errData?.message || errData?.error || `Erro HTTP ${nfeResponse.status}`);
+                              }
+                              setMensagem({ tipo: 'success', texto: 'Emissao iniciada' });
+                              loadData();
+                            } catch (err: any) {
+                              setMensagem({ tipo: 'error', texto: err.message || 'Erro ao reenviar NF-e' });
+                            } finally {
+                              setRetryingNfId(null);
+                            }
                           }
                         }}
                         className={`flex items-center gap-1 px-2.5 py-1.5 rounded text-xs font-bold transition-colors ${
@@ -1459,8 +1505,9 @@ export function OSNotaFiscalTab({
                             ? 'bg-[#FFBF00]/20 text-[#FFBF00] border border-[#FFBF00]/40 hover:bg-[#FFBF00]/30'
                             : 'bg-[#00D4FF]/20 text-[#00D4FF] border border-[#00D4FF]/40 hover:bg-[#00D4FF]/30'
                         }`}
+                        style={{ opacity: retryingNfId === nf.id ? 0.6 : 1 }}
                       >
-                        <RefreshCw className="w-3 h-3" />
+                        <RefreshCw className={`w-3 h-3 ${retryingNfId === nf.id ? 'animate-spin' : ''}`} />
                         {nf.status === 'erro' ? 'Tentar Novamente' : 'Reprocessar'}
                       </button>
                     )}

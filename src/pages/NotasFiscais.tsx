@@ -126,6 +126,8 @@ export function NotasFiscais() {
   const [notaDetalhes, setNotaDetalhes] = useState<NotaFiscal | null>(null);
   const [showRetryModal, setShowRetryModal] = useState(false);
   const [retryNota, setRetryNota] = useState<NotaFiscal | null>(null);
+  const [emittingId, setEmittingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
 
   useEffect(() => {
     loadData();
@@ -225,20 +227,76 @@ export function NotasFiscais() {
     setStatsNFe(nfeStats);
   };
 
+  const showToast = (tipo: 'success' | 'error', texto: string) => {
+    setToast({ tipo, texto });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const dispatchNFe = async (nfId: string) => {
+    const response = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nfe_id: nfId })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || err?.error || `Erro HTTP ${response.status}`);
+    }
+    return response.json();
+  };
+
+  const dispatchNFSe = async (nfId: string) => {
+    const response = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ nfse_id: nfId })
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err?.message || err?.error || `Erro HTTP ${response.status}`);
+    }
+    return response.json();
+  };
+
   const handleRetry = async (nf: NotaFiscal) => {
+    if (nf.tipo === 'nfse') {
+      try {
+        const { error } = await supabase
+          .from('nf_emitidas')
+          .update({ status: 'pendente' })
+          .eq('id', nf.id);
+
+        if (error) throw error;
+
+        setRetryNota({ ...nf, status: 'pendente' });
+        setShowRetryModal(true);
+        setNotaDetalhes(null);
+      } catch (error) {
+        console.error('Erro ao preparar reenvio:', error);
+      }
+      return;
+    }
+
+    // NFe: atualiza status e dispara endpoint diretamente
     try {
+      setEmittingId(nf.id);
+      setNotaDetalhes(null);
+
       const { error } = await supabase
         .from('nf_emitidas')
-        .update({ status: 'pendente' })
+        .update({ status: 'pendente', erro_mensagem: null })
         .eq('id', nf.id);
 
       if (error) throw error;
 
-      setRetryNota({ ...nf, status: 'pendente' });
-      setShowRetryModal(true);
-      setNotaDetalhes(null);
-    } catch (error) {
-      console.error('Erro ao preparar reenvio:', error);
+      await dispatchNFe(nf.id);
+      showToast('success', 'Emissao iniciada');
+      loadData();
+    } catch (err: any) {
+      console.error('Erro ao reenviar NF-e:', err);
+      showToast('error', err.message || 'Erro ao reenviar NF-e');
+    } finally {
+      setEmittingId(null);
     }
   };
 
@@ -764,15 +822,17 @@ export function NotasFiscais() {
                           e.stopPropagation();
                           handleRetry(nf);
                         }}
+                        disabled={emittingId === nf.id}
                         className="neon-button p-2"
                         style={{
                           backgroundColor: nf.status === 'erro' ? '#FFBF0020' : '#00D4FF20',
                           borderColor: nf.status === 'erro' ? '#FFBF00' : '#00D4FF',
-                          color: nf.status === 'erro' ? '#FFBF00' : '#00D4FF'
+                          color: nf.status === 'erro' ? '#FFBF00' : '#00D4FF',
+                          opacity: emittingId === nf.id ? 0.6 : 1
                         }}
                         title={nf.status === 'erro' ? 'Tentar novamente' : 'Reenviar'}
                       >
-                        <RefreshCw className="w-4 h-4" />
+                        <RefreshCw className={`w-4 h-4 ${emittingId === nf.id ? 'animate-spin' : ''}`} />
                       </button>
                     )}
 
@@ -1069,6 +1129,25 @@ export function NotasFiscais() {
           descricaoServico={(retryNota as any).payload_json?.infDPS?.serv?.cServ?.xDescServ}
           existingNfId={retryNota.id}
         />
+      )}
+
+      {toast && (
+        <div
+          className="fixed bottom-6 right-6 z-[9999] flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border text-sm font-semibold animate-fade-in"
+          style={{
+            backgroundColor: toast.tipo === 'success' ? '#39FF1415' : '#FF006415',
+            borderColor: toast.tipo === 'success' ? '#39FF1460' : '#FF006460',
+            color: toast.tipo === 'success' ? '#39FF14' : '#FF0064',
+            boxShadow: `0 0 20px ${toast.tipo === 'success' ? 'rgba(57,255,20,0.15)' : 'rgba(255,0,100,0.15)'}`
+          }}
+        >
+          {toast.tipo === 'success' ? (
+            <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          ) : (
+            <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          )}
+          {toast.texto}
+        </div>
       )}
     </div>
   );

@@ -362,26 +362,23 @@ export function EmitirNFSeModal({
 
       if (nfseId) {
         try {
-          const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-          const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-          const emitResponse = await fetch(`${supabaseUrl}/functions/v1/emit-nfse`, {
+          const nfseResponse = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfse', {
             method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabaseAnonKey}`,
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ nfse_id: nfseId })
           });
 
-          const emitResult = await emitResponse.json();
-          console.log('Resultado da emissao:', emitResult);
-
-          if (!emitResponse.ok) {
-            console.error('Erro na resposta do servidor de emissao:', emitResult);
+          if (!nfseResponse.ok) {
+            const errData = await nfseResponse.json().catch(() => ({}));
+            const errMsg = errData?.message || errData?.error || `Erro HTTP ${nfseResponse.status}`;
+            setMensagem({ tipo: 'error', texto: errMsg });
+            return;
           }
-        } catch (fetchErr) {
-          console.error('Erro ao notificar servidor de emissao:', fetchErr);
+
+          setMensagem({ tipo: 'success', texto: 'Emissao iniciada' });
+        } catch (fetchErr: any) {
+          setMensagem({ tipo: 'error', texto: fetchErr.message || 'Erro ao acionar servidor de emissao' });
+          return;
         }
       }
 
