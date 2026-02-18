@@ -217,14 +217,14 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     const { data: pecasData } = await supabase
-      .from('os_pecas')
-      .select('id, codigo, descricao, quantidade, valor_unitario, valor_total')
+      .from('cotacoes_pecas')
+      .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
       .eq('os_id', linkData.os_id)
       .or('exibir_no_pdf.eq.true,mostrar_no_pdf.eq.true');
 
     const { data: servicosData } = await supabase
-      .from('os_servicos')
-      .select('id, nome, descricao, valor, quantidade, valor_total')
+      .from('cotacoes_servicos')
+      .select('id, descricao, valor_unitario, quantidade, valor_total')
       .eq('os_id', linkData.os_id);
 
     const { data: anexosData } = await supabase
@@ -233,30 +233,37 @@ Deno.serve(async (req: Request) => {
       .eq('os_id', linkData.os_id)
       .eq('exibir_no_pdf', true);
 
+    const pecasMapped = (pecasData || []).map(p => ({
+      id: p.id,
+      codigo: p.pn,
+      descricao: p.descricao,
+      quantidade: p.quantidade,
+      valor_final_unitario: Number(p.valor_final_unitario || 0),
+      valor_total: Number(p.valor_total || 0)
+    }));
+
+    const servicosMapped = (servicosData || []).map(s => ({
+      id: s.id,
+      nome: s.descricao || 'Serviço',
+      descricao: '',
+      valor: Number(s.valor_unitario || 0),
+      quantidade: s.quantidade,
+      valor_total: Number(s.valor_total || 0)
+    }));
+
+    const valorPecasReal = pecasMapped.reduce((acc, p) => acc + p.valor_total, 0);
+    const valorServicosReal = servicosMapped.reduce((acc, s) => acc + s.valor_total, 0);
+
     const cotacao = {
       id: osData.id,
-      valor_pecas: Number(osData.valor_pecas || 0),
-      valor_servicos: Number(osData.valor_servicos || 0),
+      valor_pecas: valorPecasReal,
+      valor_servicos: valorServicosReal,
       desconto_tipo: osData.desconto_tipo,
       desconto_valor: Number(osData.desconto_valor || 0),
       valor_liquido: Number(osData.valor_total || 0),
       created_at: osData.created_at,
-      cotacoes_pecas: (pecasData || []).map(p => ({
-        id: p.id,
-        codigo: p.codigo,
-        descricao: p.descricao,
-        quantidade: p.quantidade,
-        valor_final_unitario: Number(p.valor_unitario || 0),
-        valor_total: Number(p.valor_total || 0)
-      })),
-      cotacoes_servicos: (servicosData || []).map(s => ({
-        id: s.id,
-        nome: s.nome,
-        descricao: s.descricao || '',
-        valor: Number(s.valor || 0),
-        quantidade: s.quantidade,
-        valor_total: Number(s.valor_total || 0)
-      }))
+      cotacoes_pecas: pecasMapped,
+      cotacoes_servicos: servicosMapped
     };
 
     const response = {
