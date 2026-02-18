@@ -908,6 +908,14 @@ export function Cotacoes() {
       if (error) throw error;
 
       if (whatsAppCotacao.os_id) {
+        await supabase
+          .from('os')
+          .update({
+            coluna_kanban: 'negociacao_em_andamento',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', whatsAppCotacao.os_id);
+
         try {
           const response = await fetch('https://fiberless-uncourageously-lesli.ngrok-free.dev/webhook/enviar-orcamento', {
             method: 'POST',

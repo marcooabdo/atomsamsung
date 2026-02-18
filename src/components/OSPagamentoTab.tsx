@@ -313,6 +313,7 @@ Assistencia Tecnica Samsung`;
           orcamento_enviado_por: usuario?.id,
           versao_orcamento: novaVersao,
           valor_orcamento_inicial: valorInicial === null ? valorAtual : valorInicial,
+          coluna_kanban: 'negociacao_em_andamento',
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
