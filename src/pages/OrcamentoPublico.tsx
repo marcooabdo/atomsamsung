@@ -60,11 +60,12 @@ interface OrcamentoData {
     unidade: {
       nome: string;
       telefone: string;
-      endereco: string;
+      rua?: string;
+      numero?: string;
+      bairro?: string;
       cidade: string;
       uf: string;
       cnpj?: string;
-      logo_url?: string;
     } | null;
     cotacao: {
       id: string;
@@ -630,10 +631,14 @@ export function OrcamentoPublico() {
             {os.unidade && (
               <div className="px-5 sm:px-6 pb-4">
                 <div className="rounded-lg px-4 py-3 flex flex-wrap gap-x-5 gap-y-2" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                  {(os.unidade.endereco || os.unidade.cidade) && (
+                  {(os.unidade.rua || os.unidade.cidade) && (
                     <span className="flex items-center gap-1.5 text-xs" style={{ color: '#6b7280' }}>
                       <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: '#374151' }} />
-                      {[os.unidade.endereco, os.unidade.cidade && os.unidade.uf ? `${os.unidade.cidade}/${os.unidade.uf}` : os.unidade.cidade].filter(Boolean).join(', ')}
+                      {[
+                        os.unidade.rua && os.unidade.numero ? `${os.unidade.rua}, ${os.unidade.numero}` : os.unidade.rua,
+                        os.unidade.bairro,
+                        os.unidade.cidade && os.unidade.uf ? `${os.unidade.cidade}/${os.unidade.uf}` : os.unidade.cidade
+                      ].filter(Boolean).join(' — ')}
                     </span>
                   )}
                   {os.unidade.telefone && (

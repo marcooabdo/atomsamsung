@@ -206,7 +206,7 @@ Deno.serve(async (req: Request) => {
 
     const { data: unidadeData } = await supabase
       .from('unidades')
-      .select('nome, telefone, endereco, cidade, uf, cnpj, logo_url')
+      .select('nome, telefone, rua, numero, bairro, cidade, uf, cnpj')
       .eq('id', osData.unidade_id)
       .maybeSingle();
 
