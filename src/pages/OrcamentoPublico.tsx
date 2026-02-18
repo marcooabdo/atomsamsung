@@ -574,54 +574,108 @@ export function OrcamentoPublico() {
       <div className="max-w-2xl mx-auto space-y-4">
 
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-700 to-blue-900 rounded-2xl shadow-xl overflow-hidden">
-          <div className="p-5 sm:p-7">
-            <div className="flex items-start justify-between gap-4">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="bg-white/20 rounded-lg px-2.5 py-1">
-                    <span className="text-blue-100 text-xs font-semibold tracking-wide uppercase">Orçamento</span>
+        <div className="rounded-2xl shadow-2xl overflow-hidden" style={{ border: '1px solid #1e293b' }}>
+
+          {/* Black top banner with logo */}
+          <div className="relative overflow-hidden" style={{ background: '#0a0a0a' }}>
+            {/* Subtle texture lines */}
+            <div className="absolute inset-0 opacity-5" style={{
+              backgroundImage: 'repeating-linear-gradient(90deg, #fff 0px, #fff 1px, transparent 1px, transparent 60px)',
+            }} />
+            <div className="relative px-5 sm:px-8 py-6 sm:py-8">
+              <div className="flex flex-col sm:flex-row items-center sm:items-start gap-5">
+                {/* Logo area */}
+                <div className="flex-shrink-0 flex items-center justify-center">
+                  {os.unidade?.logo_url ? (
+                    <img
+                      src={os.unidade.logo_url}
+                      alt={os.unidade.nome}
+                      className="h-20 sm:h-24 w-auto object-contain"
+                      style={{ filter: 'brightness(1.05)' }}
+                    />
+                  ) : (
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-16 h-16 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #1d4ed8, #1e40af)' }}>
+                        <ShieldCheck className="w-8 h-8 text-white" />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Company name + tagline */}
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-xs font-bold tracking-[0.2em] uppercase mb-1.5" style={{ color: '#6b7280' }}>
+                    Orçamento Oficial
+                  </p>
+                  <h2 className="text-xl sm:text-2xl font-bold leading-tight" style={{ color: '#f9fafb' }}>
+                    {os.unidade?.nome || 'Assistência Técnica'}
+                  </h2>
+                  <div className="flex items-center justify-center sm:justify-start gap-1.5 mt-1.5">
+                    <div className="w-1 h-1 rounded-full" style={{ background: '#3b82f6' }} />
+                    <span className="text-xs" style={{ color: '#9ca3af' }}>Centro Autorizado de Assistência Técnica</span>
+                    <div className="w-1 h-1 rounded-full" style={{ background: '#3b82f6' }} />
                   </div>
                 </div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-white leading-tight">
-                  #{os.numero_os_interna}
-                </h1>
-                <div className="flex items-center gap-1.5 mt-2">
-                  <Clock className="w-3.5 h-3.5 text-blue-300" />
-                  <span className="text-blue-200 text-sm">{new Date(os.data_abertura).toLocaleDateString('pt-BR')}</span>
+
+                {/* OS badge */}
+                <div className="flex-shrink-0 text-center">
+                  <div className="rounded-xl px-4 py-3" style={{ background: 'rgba(59,130,246,0.15)', border: '1px solid rgba(59,130,246,0.3)' }}>
+                    <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{ color: '#60a5fa' }}>O.S.</p>
+                    <p className="text-lg font-bold font-mono" style={{ color: '#f9fafb' }}>#{os.numero_os_interna}</p>
+                    <p className="text-xs mt-1" style={{ color: '#6b7280' }}>
+                      {new Date(os.data_abertura).toLocaleDateString('pt-BR')}
+                    </p>
+                  </div>
                 </div>
               </div>
-              {os.unidade?.logo_url ? (
-                <img src={os.unidade.logo_url} alt="Logo" className="h-14 sm:h-16 object-contain bg-white/10 rounded-xl p-2 flex-shrink-0" />
-              ) : (
-                <div className="bg-white/10 rounded-xl p-3 flex-shrink-0">
-                  <ShieldCheck className="w-8 h-8 text-white" />
-                </div>
-              )}
             </div>
 
-            {os.unidade && (
-              <div className="mt-4 pt-4 border-t border-white/20">
-                <p className="text-white font-semibold text-sm">{os.unidade.nome}</p>
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1">
-                  <span className="text-blue-200 text-xs flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />
-                    {os.unidade.cidade} - {os.unidade.uf}
-                  </span>
-                  <span className="text-blue-200 text-xs flex items-center gap-1">
-                    <Phone className="w-3 h-3" />
-                    {os.unidade.telefone}
-                  </span>
-                </div>
-              </div>
-            )}
+            {/* Thin accent line */}
+            <div className="h-0.5 w-full" style={{ background: 'linear-gradient(90deg, transparent, #3b82f6, #1d4ed8, #3b82f6, transparent)' }} />
           </div>
+
+          {/* Company info bar */}
+          {os.unidade && (
+            <div className="px-5 sm:px-8 py-4" style={{ background: '#111827' }}>
+              <div className="flex flex-wrap items-center justify-center sm:justify-start gap-x-6 gap-y-2">
+                {os.unidade.cnpj && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(55,65,81,1)' }}>
+                      <FileText className="w-3 h-3" style={{ color: '#6b7280' }} />
+                    </div>
+                    <div>
+                      <p className="text-xs" style={{ color: '#4b5563' }}>CNPJ</p>
+                      <p className="text-xs font-mono font-semibold" style={{ color: '#9ca3af' }}>{os.unidade.cnpj}</p>
+                    </div>
+                  </div>
+                )}
+                {(os.unidade.endereco || (os.unidade.cidade && os.unidade.uf)) && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(55,65,81,1)' }}>
+                      <MapPin className="w-3 h-3" style={{ color: '#6b7280' }} />
+                    </div>
+                    <p className="text-xs" style={{ color: '#9ca3af' }}>
+                      {[os.unidade.endereco, os.unidade.cidade && os.unidade.uf ? `${os.unidade.cidade}/${os.unidade.uf}` : null].filter(Boolean).join(' — ')}
+                    </p>
+                  </div>
+                )}
+                {os.unidade.telefone && (
+                  <div className="flex items-center gap-2">
+                    <div className="w-5 h-5 rounded flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(55,65,81,1)' }}>
+                      <Phone className="w-3 h-3" style={{ color: '#6b7280' }} />
+                    </div>
+                    <p className="text-xs font-semibold" style={{ color: '#9ca3af' }}>{os.unidade.telefone}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Status bar */}
           {jaRespondido && (
-            <div className={`px-5 sm:px-7 py-3 flex items-center gap-2 ${
-              link.status === 'aprovado' ? 'bg-green-500/90' :
-              link.status === 'rejeitado' ? 'bg-red-500/90' : 'bg-amber-500/90'
+            <div className={`px-5 sm:px-8 py-3 flex items-center gap-2 ${
+              link.status === 'aprovado' ? 'bg-green-600' :
+              link.status === 'rejeitado' ? 'bg-red-600' : 'bg-amber-500'
             }`}>
               {link.status === 'aprovado' && <><CheckCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Aprovado</span></>}
               {link.status === 'rejeitado' && <><XCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Rejeitado</span></>}
