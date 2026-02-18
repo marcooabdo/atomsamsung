@@ -216,16 +216,35 @@ Deno.serve(async (req: Request) => {
       .eq('unidade_id', osData.unidade_id)
       .maybeSingle();
 
-    const { data: pecasData } = await supabase
+    // Busca pecas de cotacoes_pecas (sem filtro de exibir_no_pdf para mostrar tudo)
+    const { data: cotacoesPecasData } = await supabase
       .from('cotacoes_pecas')
       .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
-      .eq('os_id', linkData.os_id)
-      .or('exibir_no_pdf.eq.true,mostrar_no_pdf.eq.true');
-
-    const { data: servicosData } = await supabase
-      .from('cotacoes_servicos')
-      .select('id, descricao, valor_unitario, quantidade, valor_total')
       .eq('os_id', linkData.os_id);
+
+    // Busca pecas de os_pecas (pecas GSPN / Samsung)
+    const { data: osPecasData } = await supabase
+      .from('os_pecas')
+      .select('id, pn, descricao, quantidade, valor_unitario, valor_total')
+      .eq('os_id', linkData.os_id);
+
+    const tipoOrcamento = osData.tipo_orcamento || 'normal';
+
+    // Busca servicos corretos conforme tipo de orçamento
+    let servicosData = null;
+    if (['samsung_contigo', 'acessorios'].includes(tipoOrcamento)) {
+      const { data } = await supabase
+        .from('os_servicos')
+        .select('id, descricao, valor_unitario, quantidade, valor_total')
+        .eq('os_id', linkData.os_id);
+      servicosData = data;
+    } else {
+      const { data } = await supabase
+        .from('cotacoes_servicos')
+        .select('id, descricao, valor_unitario, quantidade, valor_total')
+        .eq('os_id', linkData.os_id);
+      servicosData = data;
+    }
 
     const { data: anexosData } = await supabase
       .from('os_anexos')
@@ -233,26 +252,45 @@ Deno.serve(async (req: Request) => {
       .eq('os_id', linkData.os_id)
       .eq('exibir_no_pdf', true);
 
-    const pecasMapped = (pecasData || []).map(p => ({
+    // Mapear pecas de cotacoes_pecas
+    const pecasCotacoes = (cotacoesPecasData || []).map(p => ({
       id: p.id,
-      codigo: p.pn,
-      descricao: p.descricao,
-      quantidade: p.quantidade,
-      valor_final_unitario: Number(p.valor_final_unitario || 0),
-      valor_total: Number(p.valor_total || 0)
+      codigo: p.pn || '',
+      descricao: p.descricao || '',
+      quantidade: p.quantidade || 1,
+      valor_unitario: Number(p.valor_final_unitario || 0),
+      valor_total: Number(p.valor_total || 0),
+      fonte: 'cotacao'
     }));
+
+    // Mapear pecas de os_pecas (GSPN)
+    const pecasOs = (osPecasData || []).map(p => ({
+      id: p.id,
+      codigo: p.pn || '',
+      descricao: p.descricao || '',
+      quantidade: p.quantidade || 1,
+      valor_unitario: Number(p.valor_unitario || 0),
+      valor_total: Number(p.valor_total || 0),
+      fonte: 'os_pecas'
+    }));
+
+    // Combinar todas as pecas
+    const todasPecas = [...pecasCotacoes, ...pecasOs];
 
     const servicosMapped = (servicosData || []).map(s => ({
       id: s.id,
-      nome: s.descricao || 'Serviço',
+      nome: s.descricao || 'Servico',
       descricao: '',
       valor: Number(s.valor_unitario || 0),
-      quantidade: s.quantidade,
+      quantidade: s.quantidade || 1,
       valor_total: Number(s.valor_total || 0)
     }));
 
-    const valorPecasReal = pecasMapped.reduce((acc, p) => acc + p.valor_total, 0);
-    const valorServicosReal = servicosMapped.reduce((acc, s) => acc + s.valor_total, 0);
+    // Usar valores já calculados e salvos na OS (garantem consistência)
+    const valorPecasReal = Number(osData.valor_pecas || 0);
+    const valorServicosReal = Number(osData.valor_servicos || 0);
+    const valorDescontoReal = Number(osData.valor_desconto_calculado || 0);
+    const valorTotalReal = Number(osData.valor_total || 0);
 
     const cotacao = {
       id: osData.id,
@@ -260,9 +298,10 @@ Deno.serve(async (req: Request) => {
       valor_servicos: valorServicosReal,
       desconto_tipo: osData.desconto_tipo,
       desconto_valor: Number(osData.desconto_valor || 0),
-      valor_liquido: Number(osData.valor_total || 0),
+      valor_desconto_calculado: valorDescontoReal,
+      valor_liquido: valorTotalReal,
       created_at: osData.created_at,
-      cotacoes_pecas: pecasMapped,
+      cotacoes_pecas: todasPecas,
       cotacoes_servicos: servicosMapped
     };
 
