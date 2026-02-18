@@ -506,12 +506,12 @@ export function OrcamentoPublico() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #dbeafe 100%)', color: '#1e293b' }}>
         <div className="text-center">
           <div className="w-16 h-16 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <Loader2 className="w-8 h-8 text-white animate-spin" />
           </div>
-          <p className="text-slate-600 font-medium">Carregando orçamento...</p>
+          <p style={{color:'#475569'}} className="font-medium">Carregando orçamento...</p>
         </div>
       </div>
     );
@@ -520,13 +520,13 @@ export function OrcamentoPublico() {
   if (error || !data) {
     const isExpired = error?.toLowerCase().includes('expirado') || error?.toLowerCase().includes('expirou');
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center border border-red-100">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #dbeafe 100%)', color: '#1e293b' }}>
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center border border-red-100" style={{color:'#1e293b'}}>
           <div className="w-16 h-16 bg-red-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="w-8 h-8 text-red-500" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-800 mb-2">{isExpired ? 'Link Expirado' : 'Link Invalido'}</h1>
-          <p className="text-slate-500 mb-4">{error || 'O link de orcamento nao foi encontrado ou expirou.'}</p>
+          <h1 className="text-2xl font-bold text-slate-800 mb-2">{isExpired ? 'Link Expirado' : 'Link Inválido'}</h1>
+          <p className="text-slate-500 mb-4">{error || 'O link de orçamento não foi encontrado ou expirou.'}</p>
           {isExpired && (
             <div className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl">
               <p className="text-sm text-amber-700">Este link expirou. Entre em contato com a assistência técnica para solicitar um novo link.</p>
@@ -542,18 +542,18 @@ export function OrcamentoPublico() {
 
   if (showSuccess) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-green-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center border border-green-100">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)', color: '#1e293b' }}>
+        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full text-center border border-green-100" style={{color:'#1e293b'}}>
           <div className="w-20 h-20 bg-green-100 rounded-2xl flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-10 h-10 text-green-500" />
           </div>
           <h1 className="text-2xl font-bold text-slate-800 mb-3">Resposta Enviada!</h1>
           <p className="text-slate-500 mb-6">
-            {selectedAction === 'aprovado' && 'Obrigado por aprovar o orcamento! Em breve entraremos em contato para agendar o reparo.'}
-            {selectedAction === 'rejeitado' && 'Recebemos sua rejeicao. Entraremos em contato para entender melhor sua situacao.'}
+            {selectedAction === 'aprovado' && 'Obrigado por aprovar o orçamento! Em breve entraremos em contato para agendar o reparo.'}
+            {selectedAction === 'rejeitado' && 'Recebemos sua rejeição. Entraremos em contato para entender melhor sua situação.'}
             {selectedAction === 'negociando' && 'Recebemos sua mensagem. Vamos analisar e retornar em breve com uma proposta.'}
           </p>
-          <p className="text-sm text-slate-400">Voce pode fechar esta pagina com seguranca.</p>
+          <p className="text-sm text-slate-400">Você pode fechar esta página com segurança.</p>
         </div>
       </div>
     );
@@ -570,7 +570,7 @@ export function OrcamentoPublico() {
   const desconto = cotacao ? cotacao.valor_desconto_calculado : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50 py-4 px-3 sm:py-8 sm:px-4">
+    <div className="min-h-screen py-4 px-3 sm:py-8 sm:px-4" style={{ background: 'linear-gradient(135deg, #f1f5f9 0%, #e0e7ff 50%, #dbeafe 100%)', color: '#1e293b' }}>
       <div className="max-w-2xl mx-auto space-y-4">
 
         {/* Header */}
@@ -623,9 +623,9 @@ export function OrcamentoPublico() {
               link.status === 'aprovado' ? 'bg-green-500/90' :
               link.status === 'rejeitado' ? 'bg-red-500/90' : 'bg-amber-500/90'
             }`}>
-              {link.status === 'aprovado' && <><CheckCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orcamento Aprovado</span></>}
-              {link.status === 'rejeitado' && <><XCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orcamento Rejeitado</span></>}
-              {link.status === 'negociando' && <><MessageCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Em Negociacao</span></>}
+              {link.status === 'aprovado' && <><CheckCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Aprovado</span></>}
+              {link.status === 'rejeitado' && <><XCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Rejeitado</span></>}
+              {link.status === 'negociando' && <><MessageCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Em Negociação</span></>}
               {link.data_resposta && (
                 <span className="text-white/80 text-xs ml-auto">
                   {new Date(link.data_resposta).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -721,7 +721,7 @@ export function OrcamentoPublico() {
             <div>
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Defeito Relatado</p>
               <div className="bg-slate-50 rounded-xl p-3.5 text-sm text-slate-700 leading-relaxed border border-slate-100">
-                {os.defeito_relatado || 'Nao informado'}
+                {os.defeito_relatado || 'Não informado'}
               </div>
             </div>
             {os.diagnostico_tecnico && (
@@ -986,9 +986,9 @@ export function OrcamentoPublico() {
                 link.status === 'aprovado' ? 'text-green-800' :
                 link.status === 'rejeitado' ? 'text-red-800' : 'text-amber-800'
               }`}>
-                {link.status === 'aprovado' && 'Orcamento Aprovado'}
-                {link.status === 'rejeitado' && 'Orcamento Rejeitado'}
-                {link.status === 'negociando' && 'Em Negociacao'}
+                {link.status === 'aprovado' && 'Orçamento Aprovado'}
+                {link.status === 'rejeitado' && 'Orçamento Rejeitado'}
+                {link.status === 'negociando' && 'Em Negociação'}
               </p>
               <p className="text-sm text-slate-500 mt-0.5">
                 Respondido em {new Date(link.data_resposta!).toLocaleString('pt-BR')}
@@ -1053,7 +1053,7 @@ export function OrcamentoPublico() {
             {selectedAction && selectedAction !== 'aprovado' && (
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  {selectedAction === 'negociando' ? 'Sua proposta ou duvida:' : 'Motivo da rejeicao:'}
+                  {selectedAction === 'negociando' ? 'Sua proposta ou dúvida:' : 'Motivo da rejeição:'}
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 <textarea
@@ -1061,7 +1061,7 @@ export function OrcamentoPublico() {
                   onChange={(e) => setMensagem(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-slate-50 placeholder-slate-400"
                   rows={4}
-                  placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das pecas...' : 'Por favor, explique o motivo...'}
+                  placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das peças...' : 'Por favor, explique o motivo...'}
                 />
               </div>
             )}
@@ -1077,7 +1077,7 @@ export function OrcamentoPublico() {
                 }`}
               >
                 {capturandoLocalizacao ? (
-                  <><Loader2 className="w-5 h-5 animate-spin" /> Capturando localizacao...</>
+                  <><Loader2 className="w-5 h-5 animate-spin" /> Capturando localização...</>
                 ) : responding ? (
                   <><Loader2 className="w-5 h-5 animate-spin" /> Enviando...</>
                 ) : (
@@ -1085,7 +1085,7 @@ export function OrcamentoPublico() {
                     {selectedAction === 'aprovado' && <CheckCircle className="w-5 h-5" />}
                     {selectedAction === 'negociando' && <MessageCircle className="w-5 h-5" />}
                     {selectedAction === 'rejeitado' && <XCircle className="w-5 h-5" />}
-                    {selectedAction === 'aprovado' ? 'Confirmar Aprovacao' : selectedAction === 'negociando' ? 'Enviar Proposta' : 'Confirmar Rejeicao'}
+                    {selectedAction === 'aprovado' ? 'Confirmar Aprovação' : selectedAction === 'negociando' ? 'Enviar Proposta' : 'Confirmar Rejeição'}
                   </>
                 )}
               </button>
@@ -1095,7 +1095,7 @@ export function OrcamentoPublico() {
               <div className="flex items-center justify-center gap-1.5 mt-4">
                 <Clock className="w-3.5 h-3.5 text-slate-400" />
                 <p className="text-xs text-slate-400">
-                  Link valido ate {new Date(link.expires_at).toLocaleString('pt-BR')}
+                  Link válido até {new Date(link.expires_at).toLocaleString('pt-BR')}
                 </p>
               </div>
             )}
@@ -1105,7 +1105,7 @@ export function OrcamentoPublico() {
         {/* Footer */}
         <div className="text-center pb-6">
           <p className="text-xs text-slate-400">
-            Documento gerado eletronicamente. Em caso de duvidas, entre em contato com a assistencia tecnica.
+            Documento gerado eletronicamente. Em caso de dúvidas, entre em contato com a assistência técnica.
           </p>
         </div>
 
@@ -1115,7 +1115,7 @@ export function OrcamentoPublico() {
       {showCamera && !selfieCapturada && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
           <div className="max-w-lg w-full">
-            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl" style={{color:'#1e293b'}}>
               <div className="p-5 bg-gradient-to-r from-blue-600 to-blue-700">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <Camera className="w-5 h-5" /> Tire uma Selfie
@@ -1129,7 +1129,7 @@ export function OrcamentoPublico() {
                     <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                       <div className="text-center">
                         <Loader2 className="w-8 h-8 text-white animate-spin mx-auto mb-2" />
-                        <p className="text-white text-sm">Iniciando camera...</p>
+                        <p className="text-white text-sm">Iniciando câmera...</p>
                       </div>
                     </div>
                   )}
@@ -1159,7 +1159,7 @@ export function OrcamentoPublico() {
       {selfieCapturada && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4">
           <div className="max-w-lg w-full">
-            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl">
+            <div className="bg-white rounded-2xl overflow-hidden shadow-2xl" style={{color:'#1e293b'}}>
               <div className="p-5 bg-gradient-to-r from-green-500 to-green-600">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   <CheckCircle className="w-5 h-5" /> Foto Capturada!
