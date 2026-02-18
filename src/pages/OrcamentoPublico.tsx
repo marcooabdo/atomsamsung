@@ -688,7 +688,7 @@ export function OrcamentoPublico() {
               </div>
               {os.aparelho_numero_serie && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-0.5">Numero de Serie</p>
+                  <p className="text-xs text-slate-400 mb-0.5">Numero de Série</p>
                   <p className="text-slate-700 text-xs font-mono bg-slate-50 px-2 py-1 rounded">{os.aparelho_numero_serie}</p>
                 </div>
               )}
