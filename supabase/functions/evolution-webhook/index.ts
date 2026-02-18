@@ -232,52 +232,70 @@ Deno.serve(async (req: Request) => {
 
     console.log("Event:", event, "| Raw:", rawEvent);
 
-    if (event.includes("messages.update") || event === "message.update") {
+    if (event.includes("messages.update") || event === "message.update" || event.includes("message.ack")) {
       console.log("Processing message STATUS UPDATE");
       console.log("Full update payload:", JSON.stringify(data, null, 2));
-      const updates = Array.isArray(data) ? data : [data];
+
+      const rawUpdates = body.data ?? body;
+      const updates = Array.isArray(rawUpdates) ? rawUpdates : [rawUpdates];
 
       for (const update of updates) {
-        const messageId = update.keyId || update.key?.id || update.id || update.messageId || update.message?.id;
-        const rawStatus = update.update?.status ?? update.status;
+        const messageId =
+          update.key?.id ||
+          update.keyId ||
+          update.id ||
+          update.messageId ||
+          update.message?.key?.id ||
+          update.message?.id;
+
+        const rawStatus =
+          update.update?.status ??
+          update.status ??
+          update.ack ??
+          update.message?.status;
 
         console.log(`Message ID: ${messageId}, Raw Status: ${rawStatus}, Type: ${typeof rawStatus}`);
 
-        if (messageId && rawStatus !== undefined && rawStatus !== null) {
-          let newStatus = "sent";
+        if (!messageId) {
+          console.warn(`No messageId found. Keys: ${Object.keys(update).join(", ")}`);
+          continue;
+        }
 
-          if (typeof rawStatus === "number") {
-            if (rawStatus === 2) newStatus = "sent";
-            if (rawStatus === 3) newStatus = "delivered";
-            if (rawStatus === 4) newStatus = "read";
-            if (rawStatus === 5) newStatus = "read";
-          } else if (typeof rawStatus === "string") {
-            const upper = rawStatus.toUpperCase();
-            if (upper === "PENDING" || upper === "ERROR") newStatus = "pending";
-            if (upper === "SERVER_ACK") newStatus = "sent";
-            if (upper === "DELIVERY_ACK") newStatus = "delivered";
-            if (upper === "READ" || upper === "PLAYED") newStatus = "read";
-          }
+        if (rawStatus === undefined || rawStatus === null) {
+          console.warn(`No status found for message ${messageId}`);
+          continue;
+        }
 
-          console.log(`Updating message ${messageId} to status: ${newStatus}`);
+        let newStatus = "sent";
 
-          const { data: result, error } = await supabase
-            .from("atom_connect_mensagens")
-            .update({ status: newStatus })
-            .eq("message_id", messageId)
-            .select();
+        if (typeof rawStatus === "number") {
+          if (rawStatus === 0 || rawStatus === 1) newStatus = "pending";
+          else if (rawStatus === 2) newStatus = "sent";
+          else if (rawStatus === 3) newStatus = "delivered";
+          else if (rawStatus >= 4) newStatus = "read";
+        } else if (typeof rawStatus === "string") {
+          const upper = rawStatus.toUpperCase();
+          if (upper === "PENDING" || upper === "ERROR") newStatus = "pending";
+          else if (upper === "SERVER_ACK" || upper === "SENT") newStatus = "sent";
+          else if (upper === "DELIVERY_ACK" || upper === "DELIVERED") newStatus = "delivered";
+          else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED") newStatus = "read";
+        }
 
-          if (error) {
-            console.error(`Error updating message ${messageId}:`, error);
-          } else {
-            console.log(`Updated ${result?.length || 0} rows for message ${messageId}`);
-            if (result?.length === 0) {
-              console.warn(`No message found with message_id: ${messageId}`);
-            }
-          }
+        console.log(`Updating message ${messageId} to status: ${newStatus}`);
+
+        const { data: result, error } = await supabase
+          .from("atom_connect_mensagens")
+          .update({ status: newStatus })
+          .eq("message_id", messageId)
+          .select("id");
+
+        if (error) {
+          console.error(`Error updating message ${messageId}:`, error);
         } else {
-          console.warn(`Invalid update - messageId: ${messageId}, status: ${rawStatus}`);
-          console.warn(`Full update object keys: ${Object.keys(update).join(", ")}`);
+          console.log(`Updated ${result?.length || 0} rows for message ${messageId}`);
+          if (result?.length === 0) {
+            console.warn(`No message found with message_id: ${messageId}`);
+          }
         }
       }
 
@@ -522,13 +540,22 @@ async function processMessage(
 ) {
   console.log("=== PROCESSING MESSAGE ===");
 
-  const { count: existingCount } = await supabase
+  const { data: existingMsg } = await supabase
     .from("atom_connect_mensagens")
-    .select("id", { count: "exact", head: true })
-    .eq("message_id", messageId);
+    .select("id, status")
+    .eq("message_id", messageId)
+    .maybeSingle();
 
-  if (existingCount && existingCount > 0) {
-    console.log("DUPLICATE blocked - message already in DB:", messageId);
+  if (existingMsg) {
+    if (fromMe && existingMsg.status === "pending") {
+      await supabase
+        .from("atom_connect_mensagens")
+        .update({ status: "sent" })
+        .eq("id", existingMsg.id);
+      console.log("DUPLICATE fromMe - updated pending->sent:", messageId);
+    } else {
+      console.log("DUPLICATE blocked - message already in DB:", messageId);
+    }
     return new Response(JSON.stringify({ success: true, duplicate: true }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
