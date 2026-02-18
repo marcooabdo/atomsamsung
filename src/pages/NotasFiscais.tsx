@@ -1063,6 +1063,8 @@ export function NotasFiscais() {
           clienteBairro={retryNota.tomador_bairro}
           clienteCep={retryNota.tomador_cep}
           clienteCidadeIbge={retryNota.tomador_cidade_ibge}
+          clienteMunicipio={(retryNota as any).tomador_municipio}
+          clienteUF={(retryNota as any).tomador_uf}
           valorServicos={retryNota.valor_servicos || retryNota.valor_total}
           descricaoServico={(retryNota as any).payload_json?.infDPS?.serv?.cServ?.xDescServ}
           existingNfId={retryNota.id}

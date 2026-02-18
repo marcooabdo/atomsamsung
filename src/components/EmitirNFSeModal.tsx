@@ -54,6 +54,7 @@ export interface EmitirNFSeModalProps {
   clienteBairro?: string | null;
   clienteCep?: string | null;
   clienteCidadeIbge?: string | null;
+  clienteMunicipio?: string | null;
   clienteUF?: string | null;
   valorServicos: number;
   descricaoServico?: string;
@@ -72,6 +73,7 @@ interface FormState {
   tomadorBairro: string;
   tomadorCep: string;
   tomadorCidadeIbge: string;
+  tomadorMunicipio: string;
   tomadorUF: string;
   ambiente: number;
   cTribNac: string;
@@ -98,6 +100,7 @@ export function EmitirNFSeModal({
   clienteBairro,
   clienteCep,
   clienteCidadeIbge,
+  clienteMunicipio,
   clienteUF,
   valorServicos,
   descricaoServico,
@@ -122,6 +125,7 @@ export function EmitirNFSeModal({
     tomadorBairro: clienteBairro || '',
     tomadorCep: (clienteCep || '').replace(/\D/g, ''),
     tomadorCidadeIbge: clienteCidadeIbge || '',
+    tomadorMunicipio: clienteMunicipio || '',
     tomadorUF: clienteUF || '',
     ambiente: 2,
     cTribNac: '',
@@ -146,10 +150,11 @@ export function EmitirNFSeModal({
         tomadorBairro: clienteBairro || prev.tomadorBairro,
         tomadorCep: (clienteCep || '').replace(/\D/g, ''),
         tomadorCidadeIbge: clienteCidadeIbge || prev.tomadorCidadeIbge,
+        tomadorMunicipio: clienteMunicipio || prev.tomadorMunicipio,
         tomadorUF: clienteUF || prev.tomadorUF,
       }));
     }
-  }, [isOpen, valorServicos, clienteNome, clienteDocumento, clienteLogradouro, clienteNumero, clienteBairro, clienteCep, clienteCidadeIbge, clienteUF]);
+  }, [isOpen, valorServicos, clienteNome, clienteDocumento, clienteLogradouro, clienteNumero, clienteBairro, clienteCep, clienteCidadeIbge, clienteMunicipio, clienteUF]);
 
   const loadData = async () => {
     setLoading(true);
@@ -226,6 +231,7 @@ export function EmitirNFSeModal({
             endNac: {
               cMun: form.tomadorCidadeIbge || '0000000',
               CEP: form.tomadorCep.replace(/\D/g, '') || '00000000',
+              ...(form.tomadorMunicipio ? { xMun: form.tomadorMunicipio } : {}),
               ...(form.tomadorUF ? { UF: form.tomadorUF.toUpperCase().slice(0, 2) } : {})
             }
           }
@@ -319,6 +325,7 @@ export function EmitirNFSeModal({
         tomador_cidade_ibge: form.tomadorCidadeIbge || null,
         tomador_cep: form.tomadorCep || null,
         tomador_uf: form.tomadorUF || null,
+        tomador_municipio: form.tomadorMunicipio || null,
         tomador_logradouro: form.tomadorLogradouro || null,
         tomador_numero: form.tomadorNumero || null,
         observacoes: form.observacoes || null,
@@ -575,6 +582,16 @@ export function EmitirNFSeModal({
                           maxLength={7}
                         />
                       </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 mb-1">Municipio (xMun)</label>
+                      <input
+                        type="text"
+                        value={form.tomadorMunicipio}
+                        onChange={(e) => setForm(prev => ({ ...prev, tomadorMunicipio: e.target.value }))}
+                        className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                        placeholder="Belo Horizonte"
+                      />
                     </div>
                   </div>
                 </div>

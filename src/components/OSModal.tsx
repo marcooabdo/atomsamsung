@@ -4431,6 +4431,7 @@ Não haverá cobrança ao cliente.`
               clienteCep={os.cliente_cep}
               clienteCidade={os.cliente_cidade}
               clienteCidadeIbge={null}
+              clienteMunicipio={os.cliente_cidade}
               clienteUF={os.cliente_estado}
               unidadeId={os.unidade_id}
               valorServicos={os.valor_servicos || 0}
