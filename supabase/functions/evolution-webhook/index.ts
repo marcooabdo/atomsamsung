@@ -833,7 +833,8 @@ async function processMessage(
   }
 
   // Deduplication by content: if a recent message with same conversa_id, from_me, conteudo exists
-  // within last 30s and has no message_id (was inserted by a different event format), link the real message_id to it
+  // within last 30s, treat as duplicate. This catches Evolution API's double-fire events where
+  // the second event has a different messageId (delivered/ack event) but same content.
   const deduplicationCutoff = new Date(Date.now() - 30000).toISOString();
   const { data: recentDupe } = await supabase
     .from("atom_connect_mensagens")
@@ -841,20 +842,24 @@ async function processMessage(
     .eq("conversa_id", conversa.id)
     .eq("from_me", fromMe)
     .eq("conteudo", conteudo)
-    .is("message_id", null)
     .gte("created_at", deduplicationCutoff)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 
   if (recentDupe) {
-    const updateFields: Record<string, any> = { status: fromMe ? "sent" : "delivered" };
-    if (messageId) updateFields.message_id = messageId;
-    await supabase
-      .from("atom_connect_mensagens")
-      .update(updateFields)
-      .eq("id", recentDupe.id);
-    console.log("Content-dedup: linked message_id to existing row:", messageId, "->", recentDupe.id);
+    // If existing row has no message_id yet, link the real one and update status
+    const updateFields: Record<string, any> = {};
+    if (!recentDupe.message_id && messageId) updateFields.message_id = messageId;
+    if (fromMe && recentDupe.status === "pending") updateFields.status = "sent";
+    if (!fromMe && recentDupe.status !== "delivered") updateFields.status = "delivered";
+    if (Object.keys(updateFields).length > 0) {
+      await supabase
+        .from("atom_connect_mensagens")
+        .update(updateFields)
+        .eq("id", recentDupe.id);
+    }
+    console.log("Content-dedup: duplicate message blocked:", messageId, "-> existing:", recentDupe.id);
     return new Response(JSON.stringify({ success: true, linked: true }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
