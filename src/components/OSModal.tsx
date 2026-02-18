@@ -3851,47 +3851,54 @@ Não haverá cobrança ao cliente.`
                                     </div>
                                   )}
 
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs text-gray-500">Unit: R$</span>
-                                    <input
-                                      type="number"
-                                      step="0.01"
-                                      defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
-                                      onBlur={async (e) => {
-                                        const novoValor = parseFloat(e.target.value) || 0;
-                                        if (novoValor === peca.valor_unitario) return;
+                                  {(() => {
+                                    const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
+                                    const valorControladoPorMarkup = !ehCotacaoPeca && peca.valor_gspn > 0;
+                                    if (valorControladoPorMarkup) {
+                                      return null;
+                                    }
+                                    return (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">Unit: R$</span>
+                                        <input
+                                          type="number"
+                                          step="0.01"
+                                          defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
+                                          onBlur={async (e) => {
+                                            const novoValor = parseFloat(e.target.value) || 0;
+                                            if (novoValor === peca.valor_unitario) return;
 
-                                        try {
-                                          const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
+                                            try {
+                                              if (ehCotacaoPeca) {
+                                                const { error: updateError } = await supabase
+                                                  .from('cotacoes_pecas')
+                                                  .update({
+                                                    valor_final_unitario: novoValor,
+                                                    valor_total: novoValor * (peca.quantidade || 1)
+                                                  })
+                                                  .eq('id', peca.id);
+                                                if (updateError) throw updateError;
+                                              } else {
+                                                const { error: updateError } = await supabase
+                                                  .from('os_pecas')
+                                                  .update({
+                                                    valor_unitario: novoValor,
+                                                    valor_total: novoValor * (peca.quantidade || 1)
+                                                  })
+                                                  .eq('id', peca.id);
+                                                if (updateError) throw updateError;
+                                              }
 
-                                          if (ehCotacaoPeca) {
-                                            const { error: updateError } = await supabase
-                                              .from('cotacoes_pecas')
-                                              .update({
-                                                valor_final_unitario: novoValor,
-                                                valor_total: novoValor * (peca.quantidade || 1)
-                                              })
-                                              .eq('id', peca.id);
-                                            if (updateError) throw updateError;
-                                          } else {
-                                            const { error: updateError } = await supabase
-                                              .from('os_pecas')
-                                              .update({
-                                                valor_unitario: novoValor,
-                                                valor_total: novoValor * (peca.quantidade || 1)
-                                              })
-                                              .eq('id', peca.id);
-                                            if (updateError) throw updateError;
-                                          }
-
-                                          await loadOSData();
-                                        } catch (error: any) {
-                                          alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
-                                        }
-                                      }}
-                                      className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                                    />
-                                  </div>
+                                              await loadOSData();
+                                            } catch (error: any) {
+                                              alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
+                                            }
+                                          }}
+                                          className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                        />
+                                      </div>
+                                    );
+                                  })()}
                                   <p className="text-xs font-bold text-[#39FF14]">
                                     Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
                                   </p>
