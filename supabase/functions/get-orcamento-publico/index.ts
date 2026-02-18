@@ -327,6 +327,8 @@ Deno.serve(async (req: Request) => {
         diagnostico_tecnico: osData.diagnostico_tecnico,
         reparo_efetuado: osData.reparo_efetuado,
         data_abertura: osData.created_at,
+        numero_os_samsung: osData.numero_os_samsung || null,
+        tipo_orcamento: osData.tipo_orcamento || null,
         unidade: unidadeData,
         cotacao: cotacao,
         termos: pdfConfig || null,
