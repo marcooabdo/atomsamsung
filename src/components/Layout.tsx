@@ -1,4 +1,4 @@
-import { ReactNode, useState, useEffect, useMemo } from 'react';
+import { ReactNode, useState, useEffect, useMemo, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme, THEMES } from '../contexts/ThemeContext';
@@ -60,6 +60,9 @@ export function Layout({ children }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [unreadConversations, setUnreadConversations] = useState(0);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [tooltipTop, setTooltipTop] = useState(0);
+  const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const menuItems = useMemo(() => {
     if (permissionsLoading) return allMenuItems;
@@ -170,80 +173,163 @@ export function Layout({ children }: LayoutProps) {
               : undefined;
 
             return (
-              <Link
+              <div
                 key={item.id}
-                to={item.path}
-                className="group relative w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200"
-                style={{
-                  animationDelay: `${index * 40}ms`,
-                  background: hasGlow ? glowBg : (isActive ? `rgba(var(--accent-rgb), 0.1)` : 'transparent'),
-                  color: hasGlow ? '#A855F7' : (isActive ? 'var(--text-accent)' : 'var(--text-secondary)'),
-                  border: hasGlow
-                    ? `1px solid rgba(168, 85, 247, ${isActive ? '0.5' : '0.2'})`
-                    : (isActive ? '1px solid var(--border-primary)' : '1px solid transparent'),
-                  boxShadow: hasGlow && isActive
-                    ? '0 0 20px rgba(168, 85, 247, 0.25), 0 0 40px rgba(168, 85, 247, 0.1), inset 0 0 20px rgba(168, 85, 247, 0.08)'
-                    : hasGlow
-                      ? '0 0 10px rgba(168, 85, 247, 0.08)'
-                      : 'none',
-                  animation: hasGlow ? 'gia-neon-pulse 2.5s ease-in-out infinite' : 'none',
-                }}
+                className="relative"
                 onMouseEnter={(e) => {
-                  if (!isActive && !hasGlow) {
-                    e.currentTarget.style.background = 'var(--bg-hover)';
-                    e.currentTarget.style.color = 'var(--text-accent)';
-                  } else if (hasGlow && !isActive) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.06))';
-                    e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
-                    e.currentTarget.style.boxShadow = '0 0 20px rgba(168, 85, 247, 0.15)';
+                  if (!sidebarOpen) {
+                    if (hideTimeout.current) clearTimeout(hideTimeout.current);
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setTooltipTop(rect.top + rect.height / 2);
+                    setHoveredItem(item.id);
                   }
                 }}
-                onMouseLeave={(e) => {
-                  if (!isActive && !hasGlow) {
-                    e.currentTarget.style.background = 'transparent';
-                    e.currentTarget.style.color = 'var(--text-secondary)';
-                  } else if (hasGlow && !isActive) {
-                    e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(192, 132, 252, 0.03))';
-                    e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)';
-                    e.currentTarget.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.08)';
+                onMouseLeave={() => {
+                  if (!sidebarOpen) {
+                    hideTimeout.current = setTimeout(() => setHoveredItem(null), 80);
                   }
                 }}
-                title={!sidebarOpen ? item.label : ''}
               >
-                <div className="relative">
-                  <Icon className="w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" />
-                  {item.id === 'chat' && unreadConversations > 0 && (
+                <Link
+                  to={item.path}
+                  className="group relative w-full flex items-center gap-3.5 px-4 py-3 rounded-xl transition-all duration-200"
+                  style={{
+                    animationDelay: `${index * 40}ms`,
+                    background: hasGlow ? glowBg : (isActive ? `rgba(var(--accent-rgb), 0.1)` : 'transparent'),
+                    color: hasGlow ? '#A855F7' : (isActive ? 'var(--text-accent)' : 'var(--text-secondary)'),
+                    border: hasGlow
+                      ? `1px solid rgba(168, 85, 247, ${isActive ? '0.5' : '0.2'})`
+                      : (isActive ? '1px solid var(--border-primary)' : '1px solid transparent'),
+                    boxShadow: hasGlow && isActive
+                      ? '0 0 20px rgba(168, 85, 247, 0.25), 0 0 40px rgba(168, 85, 247, 0.1), inset 0 0 20px rgba(168, 85, 247, 0.08)'
+                      : hasGlow
+                        ? '0 0 10px rgba(168, 85, 247, 0.08)'
+                        : 'none',
+                    animation: hasGlow ? 'gia-neon-pulse 2.5s ease-in-out infinite' : 'none',
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive && !hasGlow) {
+                      e.currentTarget.style.background = 'var(--bg-hover)';
+                      e.currentTarget.style.color = 'var(--text-accent)';
+                    } else if (hasGlow && !isActive) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(192, 132, 252, 0.06))';
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.35)';
+                      e.currentTarget.style.boxShadow = '0 0 20px rgba(168, 85, 247, 0.15)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive && !hasGlow) {
+                      e.currentTarget.style.background = 'transparent';
+                      e.currentTarget.style.color = 'var(--text-secondary)';
+                    } else if (hasGlow && !isActive) {
+                      e.currentTarget.style.background = 'linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(192, 132, 252, 0.03))';
+                      e.currentTarget.style.borderColor = 'rgba(168, 85, 247, 0.2)';
+                      e.currentTarget.style.boxShadow = '0 0 10px rgba(168, 85, 247, 0.08)';
+                    }
+                  }}
+                >
+                  <div className="relative">
+                    <Icon className="w-5 h-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-110" />
+                    {item.id === 'chat' && unreadConversations > 0 && (
+                      <div
+                        className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] rounded-full flex items-center justify-center text-[9px] font-bold"
+                        style={{
+                          background: 'var(--text-accent)',
+                          color: 'var(--text-on-accent)',
+                          boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.5)`,
+                          padding: '0 3px'
+                        }}
+                      >
+                        {unreadConversations > 99 ? '99+' : unreadConversations}
+                      </div>
+                    )}
+                  </div>
+                  {sidebarOpen && (
+                    <span className={`text-sm tracking-wide transition-all duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
+                      {item.label}
+                    </span>
+                  )}
+                  {isActive && (
                     <div
-                      className="absolute -top-1.5 -right-1.5 min-w-[16px] h-[16px] rounded-full flex items-center justify-center text-[9px] font-bold"
+                      className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full"
                       style={{
                         background: 'var(--text-accent)',
-                        color: 'var(--text-on-accent)',
-                        boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.5)`,
-                        padding: '0 3px'
+                        boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.6)`
                       }}
-                    >
-                      {unreadConversations > 99 ? '99+' : unreadConversations}
-                    </div>
+                    />
                   )}
-                </div>
-                {sidebarOpen && (
-                  <span className={`text-sm tracking-wide transition-all duration-200 ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                    {item.label}
-                  </span>
-                )}
-                {isActive && (
-                  <div
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full"
-                    style={{
-                      background: 'var(--text-accent)',
-                      boxShadow: `0 0 8px rgba(var(--accent-rgb), 0.6)`
-                    }}
-                  />
-                )}
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </nav>
+
+        {!sidebarOpen && hoveredItem && (() => {
+          const item = menuItems.find(m => m.id === hoveredItem);
+          if (!item) return null;
+          const Icon = item.icon;
+          const isActive = location.pathname === item.path;
+          const hasGlow = 'glow' in item && item.glow;
+          return (
+            <div
+              style={{
+                position: 'fixed',
+                left: 84,
+                top: tooltipTop,
+                transform: 'translateY(-50%)',
+                zIndex: 9999,
+              }}
+              onMouseEnter={() => {
+                if (hideTimeout.current) clearTimeout(hideTimeout.current);
+              }}
+              onMouseLeave={() => {
+                hideTimeout.current = setTimeout(() => setHoveredItem(null), 80);
+              }}
+            >
+              <div
+                className="flex items-center gap-3 px-4 py-2.5 rounded-xl whitespace-nowrap text-sm font-semibold"
+                style={{
+                  background: 'var(--bg-card)',
+                  border: hasGlow
+                    ? '1px solid rgba(168, 85, 247, 0.45)'
+                    : isActive
+                      ? `1px solid rgba(var(--accent-rgb), 0.4)`
+                      : '1px solid var(--border-primary)',
+                  color: hasGlow ? '#A855F7' : isActive ? 'var(--text-accent)' : 'var(--text-primary)',
+                  boxShadow: hasGlow
+                    ? '0 8px 32px rgba(168,85,247,0.25), 0 2px 8px rgba(0,0,0,0.5)'
+                    : '0 8px 32px rgba(0,0,0,0.45), 0 2px 8px rgba(0,0,0,0.3)',
+                  backdropFilter: 'blur(20px)',
+                  minWidth: 180,
+                }}
+              >
+                <Icon className="w-4 h-4 flex-shrink-0" style={{ color: hasGlow ? '#A855F7' : 'var(--text-accent)' }} />
+                <span>{item.label}</span>
+                {item.id === 'chat' && unreadConversations > 0 && (
+                  <span
+                    className="ml-auto px-1.5 py-0.5 rounded-full text-[10px] font-bold"
+                    style={{ background: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+                  >
+                    {unreadConversations}
+                  </span>
+                )}
+              </div>
+              <div
+                style={{
+                  position: 'absolute',
+                  left: -5,
+                  top: '50%',
+                  transform: 'translateY(-50%) rotate(45deg)',
+                  width: 10,
+                  height: 10,
+                  background: 'var(--bg-card)',
+                  borderLeft: hasGlow ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid var(--border-primary)',
+                  borderBottom: hasGlow ? '1px solid rgba(168, 85, 247, 0.45)' : '1px solid var(--border-primary)',
+                }}
+              />
+            </div>
+          );
+        })()}
 
         <div className="flex-shrink-0 p-4 border-t" style={{ borderColor: 'var(--border-primary)' }}>
           {usuario && (
