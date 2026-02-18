@@ -32,6 +32,7 @@ interface Unidade {
   samsung_token: string | null;
   latitude: number | null;
   longitude: number | null;
+  crt: number | null;
   created_at: string;
 }
 
@@ -168,7 +169,8 @@ export function Configuracoes() {
     endereco: '',
     estado: '',
     samsung_asccode: '',
-    samsung_token: ''
+    samsung_token: '',
+    crt: '' as unknown as number
   });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
@@ -286,7 +288,8 @@ export function Configuracoes() {
             endereco: unidade.endereco || '',
             estado: unidade.estado || '',
             samsung_asccode: unidade.samsung_asccode || '',
-            samsung_token: unidade.samsung_token || ''
+            samsung_token: unidade.samsung_token || '',
+            crt: unidade.crt ?? ('' as unknown as number)
           });
           break;
         case 'usuarios':
@@ -331,7 +334,8 @@ export function Configuracoes() {
         endereco: '',
         estado: '',
         samsung_asccode: '',
-        samsung_token: ''
+        samsung_token: '',
+        crt: '' as unknown as number
       });
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
@@ -392,7 +396,8 @@ export function Configuracoes() {
             endereco: formUnidade.rua || null,
             estado: formUnidade.uf || null,
             samsung_asccode: formUnidade.samsung_asccode || null,
-            samsung_token: formUnidade.samsung_token || null
+            samsung_token: formUnidade.samsung_token || null,
+            crt: formUnidade.crt ? Number(formUnidade.crt) : null
           };
           if (editingId) {
             const { error } = await supabase.from('unidades').update(unidadeData).eq('id', editingId);
@@ -898,6 +903,21 @@ export function Configuracoes() {
                             className="neon-input"
                           />
                         </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-400 uppercase mb-2">CRT - Regime Tributário *</label>
+                        <select
+                          value={formUnidade.crt ?? ''}
+                          onChange={(e) => setFormUnidade({...formUnidade, crt: e.target.value as unknown as number})}
+                          className="neon-input"
+                          required
+                        >
+                          <option value="">Selecione o regime tributário</option>
+                          <option value="1">1 - Simples Nacional</option>
+                          <option value="2">2 - Simples Nacional, excesso sublimite de receita bruta</option>
+                          <option value="3">3 - Regime Normal (Lucro Presumido ou Real)</option>
+                          <option value="4">4 - MEI (Microempreendedor Individual)</option>
+                        </select>
                       </div>
                       <div>
                         <label className="block text-xs text-gray-400 uppercase mb-2">Telefone</label>
