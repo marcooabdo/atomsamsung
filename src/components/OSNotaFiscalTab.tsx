@@ -87,6 +87,7 @@ interface OSNotaFiscalTabProps {
   clienteCep?: string | null;
   clienteCidade?: string | null;
   clienteCidadeIbge?: string | null;
+  clienteUF?: string | null;
   unidadeId: string;
   valorServicos: number;
   valorPecas: number;
@@ -112,6 +113,7 @@ export function OSNotaFiscalTab({
   clienteCep,
   clienteCidade,
   clienteCidadeIbge,
+  clienteUF,
   unidadeId,
   tipoOs,
   isCortesia,
@@ -1523,6 +1525,7 @@ export function OSNotaFiscalTab({
           clienteBairro={clienteBairro}
           clienteCep={clienteCep}
           clienteCidadeIbge={clienteCidadeIbge}
+          clienteUF={clienteUF}
           valorServicos={valorServicosRestante}
           existingNfId={retryNfId}
         />

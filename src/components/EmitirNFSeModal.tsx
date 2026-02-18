@@ -54,6 +54,7 @@ export interface EmitirNFSeModalProps {
   clienteBairro?: string | null;
   clienteCep?: string | null;
   clienteCidadeIbge?: string | null;
+  clienteUF?: string | null;
   valorServicos: number;
   descricaoServico?: string;
   existingNfId?: string | null;
@@ -71,6 +72,7 @@ interface FormState {
   tomadorBairro: string;
   tomadorCep: string;
   tomadorCidadeIbge: string;
+  tomadorUF: string;
   ambiente: number;
   cTribNac: string;
   cNBS: string;
@@ -96,6 +98,7 @@ export function EmitirNFSeModal({
   clienteBairro,
   clienteCep,
   clienteCidadeIbge,
+  clienteUF,
   valorServicos,
   descricaoServico,
   existingNfId
@@ -119,6 +122,7 @@ export function EmitirNFSeModal({
     tomadorBairro: clienteBairro || '',
     tomadorCep: (clienteCep || '').replace(/\D/g, ''),
     tomadorCidadeIbge: clienteCidadeIbge || '',
+    tomadorUF: clienteUF || '',
     ambiente: 2,
     cTribNac: '',
     cNBS: '',
@@ -142,9 +146,10 @@ export function EmitirNFSeModal({
         tomadorBairro: clienteBairro || prev.tomadorBairro,
         tomadorCep: (clienteCep || '').replace(/\D/g, ''),
         tomadorCidadeIbge: clienteCidadeIbge || prev.tomadorCidadeIbge,
+        tomadorUF: clienteUF || prev.tomadorUF,
       }));
     }
-  }, [isOpen, valorServicos, clienteNome, clienteDocumento, clienteLogradouro, clienteNumero, clienteBairro, clienteCep, clienteCidadeIbge]);
+  }, [isOpen, valorServicos, clienteNome, clienteDocumento, clienteLogradouro, clienteNumero, clienteBairro, clienteCep, clienteCidadeIbge, clienteUF]);
 
   const loadData = async () => {
     setLoading(true);
@@ -220,7 +225,8 @@ export function EmitirNFSeModal({
             xBairro: form.tomadorBairro || 'NAO INFORMADO',
             endNac: {
               cMun: form.tomadorCidadeIbge || '0000000',
-              CEP: form.tomadorCep.replace(/\D/g, '') || '00000000'
+              CEP: form.tomadorCep.replace(/\D/g, '') || '00000000',
+              ...(form.tomadorUF ? { UF: form.tomadorUF.toUpperCase().slice(0, 2) } : {})
             }
           }
         },
@@ -312,6 +318,7 @@ export function EmitirNFSeModal({
         tomador_bairro: form.tomadorBairro || null,
         tomador_cidade_ibge: form.tomadorCidadeIbge || null,
         tomador_cep: form.tomadorCep || null,
+        tomador_uf: form.tomadorUF || null,
         tomador_logradouro: form.tomadorLogradouro || null,
         tomador_numero: form.tomadorNumero || null,
         observacoes: form.observacoes || null,
@@ -527,7 +534,7 @@ export function EmitirNFSeModal({
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-3 gap-3">
+                    <div className="grid grid-cols-4 gap-3">
                       <div>
                         <label className="block text-[10px] text-gray-500 mb-1">Bairro</label>
                         <input
@@ -545,6 +552,17 @@ export function EmitirNFSeModal({
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorCep: e.target.value.replace(/\D/g, '') }))}
                           className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono"
                           maxLength={8}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">UF *</label>
+                        <input
+                          type="text"
+                          value={form.tomadorUF}
+                          onChange={(e) => setForm(prev => ({ ...prev, tomadorUF: e.target.value.toUpperCase().slice(0, 2) }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono uppercase"
+                          maxLength={2}
+                          placeholder="SP"
                         />
                       </div>
                       <div>
