@@ -112,15 +112,28 @@ export function Skywalker() {
 }
 
 function RankingTab() {
-  const { ranking, mesReferencia, setMesReferencia, loadRanking, myProfissional } = useSkywalker();
+  const { ranking, mesReferencia, loadRanking } = useSkywalker();
   const { usuario } = useAuth();
-  const [mes, setMes] = useState(mesReferencia.slice(0, 7));
+  const [mesInicio, setMesInicio] = useState(mesReferencia.slice(0, 7));
+  const [mesFim, setMesFim] = useState(mesReferencia.slice(0, 7));
+
+  const isPeriodo = mesInicio !== mesFim;
 
   useEffect(() => {
-    loadRanking(mes + '-01');
-  }, [mes]);
+    const inicio = mesInicio + '-01';
+    const fim = mesFim + '-01';
+    if (mesInicio <= mesFim) {
+      loadRanking(inicio, fim);
+    }
+  }, [mesInicio, mesFim]);
 
   const myRank = ranking.findIndex(r => r.usuario_id === usuario?.id) + 1;
+
+  const formatMesLabel = (ym: string) => {
+    const [year, month] = ym.split('-');
+    const names = ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'];
+    return `${names[parseInt(month) - 1]}/${year}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -128,14 +141,38 @@ function RankingTab() {
         <h2 className="text-xl font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <Trophy className="w-5 h-5" style={{ color: '#FBBF24' }} />
           Ranking do Time
+          {isPeriodo && (
+            <span className="text-sm font-normal px-2 py-0.5 rounded-full" style={{ backgroundColor: '#FBBF2420', color: '#FBBF24' }}>
+              {formatMesLabel(mesInicio)} - {formatMesLabel(mesFim)}
+            </span>
+          )}
         </h2>
-        <input
-          type="month"
-          value={mes}
-          onChange={(e) => setMes(e.target.value)}
-          className="rounded-lg px-3 py-2 text-sm"
-          style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-        />
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>De</span>
+            <input
+              type="month"
+              value={mesInicio}
+              onChange={(e) => {
+                setMesInicio(e.target.value);
+                if (e.target.value > mesFim) setMesFim(e.target.value);
+              }}
+              className="text-sm bg-transparent outline-none"
+              style={{ color: 'var(--text-primary)', minWidth: 120 }}
+            />
+          </div>
+          <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Ate</span>
+            <input
+              type="month"
+              value={mesFim}
+              min={mesInicio}
+              onChange={(e) => setMesFim(e.target.value)}
+              className="text-sm bg-transparent outline-none"
+              style={{ color: 'var(--text-primary)', minWidth: 120 }}
+            />
+          </div>
+        </div>
       </div>
 
       {myRank > 0 && (
@@ -148,7 +185,7 @@ function RankingTab() {
               <div>
                 <p className="font-bold" style={{ color: 'var(--text-primary)' }}>Sua posicao no ranking</p>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  {ranking[myRank - 1]?.estrelas_total || 0} estrelas este mes
+                  {ranking[myRank - 1]?.estrelas_total || 0} estrelas {isPeriodo ? 'no periodo' : 'este mes'}
                 </p>
               </div>
             </div>

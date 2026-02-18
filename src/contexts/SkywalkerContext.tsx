@@ -172,7 +172,7 @@ interface SkywalkerContextType {
   loadRegrasPromocao: () => Promise<void>;
   loadBonificacoes: () => Promise<void>;
   loadTimes: () => Promise<void>;
-  loadRanking: (mes: string) => Promise<void>;
+  loadRanking: (mesInicio: string, mesFim?: string) => Promise<void>;
   loadEstrelasDoMes: (profissionalId: string, mes: string) => Promise<void>;
   loadOrcamentosRanking: (mes: string) => Promise<void>;
   isAdmin: boolean;
@@ -273,7 +273,9 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     if (data) setTimes(data as any);
   }, []);
 
-  const loadRanking = useCallback(async (mes: string) => {
+  const loadRanking = useCallback(async (mesInicio: string, mesFim?: string) => {
+    const mesFimEfetivo = mesFim || mesInicio;
+
     const { data: profs } = await supabase
       .from('skywalker_profissionais')
       .select(`
@@ -287,10 +289,13 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
 
     if (!profs) return;
 
-    const { data: estrelas } = await supabase
+    let estrelasQuery = supabase
       .from('skywalker_estrelas_mes')
       .select('profissional_id, estrelas_conquistadas')
-      .eq('mes_referencia', mes);
+      .gte('mes_referencia', mesInicio)
+      .lte('mes_referencia', mesFimEfetivo);
+
+    const { data: estrelas } = await estrelasQuery;
 
     const estrelasMap: Record<string, number> = {};
     (estrelas || []).forEach((e: any) => {
@@ -300,7 +305,8 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
     const { data: orcamentos } = await supabase
       .from('skywalker_orcamentos_aprovados')
       .select('usuario_id')
-      .eq('mes_referencia', mes);
+      .gte('mes_referencia', mesInicio)
+      .lte('mes_referencia', mesFimEfetivo);
 
     const orcMap: Record<string, number> = {};
     (orcamentos || []).forEach((o: any) => {
