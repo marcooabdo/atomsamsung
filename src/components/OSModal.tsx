@@ -3862,35 +3862,31 @@ Não haverá cobrança ao cliente.`
                                         if (novoValor === peca.valor_unitario) return;
 
                                         try {
-                                          // Se for de uma requisição, atualiza o valor_peca na tabela requisicoes_pecas
-                                          if (requisicao) {
-                                            await supabase
-                                              .from('requisicoes_pecas')
-                                              .update({ valor_peca: novoValor })
-                                              .eq('id', requisicao.id);
-                                          }
-                                          // Se for de os_pecas, atualiza o valor_unitario
-                                          else if (tipo === 'os_peca') {
-                                            await supabase
+                                          const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
+
+                                          if (ehCotacaoPeca) {
+                                            const { error: updateError } = await supabase
+                                              .from('cotacoes_pecas')
+                                              .update({
+                                                valor_final_unitario: novoValor,
+                                                valor_total: novoValor * (peca.quantidade || 1)
+                                              })
+                                              .eq('id', peca.id);
+                                            if (updateError) throw updateError;
+                                          } else {
+                                            const { error: updateError } = await supabase
                                               .from('os_pecas')
                                               .update({
                                                 valor_unitario: novoValor,
-                                                valor_total: novoValor * peca.quantidade
+                                                valor_total: novoValor * (peca.quantidade || 1)
                                               })
                                               .eq('id', peca.id);
-                                          }
-                                          // Se for de cotação, atualiza o valor_final_unitario
-                                          else if (tipo === 'cotacao') {
-                                            await supabase
-                                              .from('cotacoes_pecas')
-                                              .update({ valor_final_unitario: novoValor })
-                                              .eq('id', peca.id);
+                                            if (updateError) throw updateError;
                                           }
 
-                                          // Recarrega dados
                                           await loadOSData();
-                                        } catch (error) {
-                                          alert('Erro ao atualizar valor da peça');
+                                        } catch (error: any) {
+                                          alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
                                         }
                                       }}
                                       className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"

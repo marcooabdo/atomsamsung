@@ -576,6 +576,18 @@ Assistencia Tecnica Samsung`;
     return valorNumerico;
   };
 
+  const calcularValorFinal = () => {
+    const subtotal = calcularSubtotal();
+    const desconto = os.valor_desconto_calculado || 0;
+    return Math.max(subtotal - desconto, 0);
+  };
+
+  const calcularSaldoRestante = () => {
+    const valorFinal = calcularValorFinal();
+    const valorPago = os.valor_pago || 0;
+    return Math.max(valorFinal - valorPago, 0);
+  };
+
   return (
     <>
       <div className="space-y-4">
@@ -989,7 +1001,7 @@ Assistencia Tecnica Samsung`;
             <div>
               <p className="text-xs text-gray-400 uppercase mb-1">Valor Final</p>
               <p className="text-2xl font-bold text-[#00D4FF]">
-                R$ {(os.valor_total || 0).toFixed(2)}
+                R$ {calcularValorFinal().toFixed(2)}
               </p>
             </div>
             <div>
@@ -1004,7 +1016,7 @@ Assistencia Tecnica Samsung`;
             <div>
               <p className="text-xs text-gray-400 uppercase mb-1">Saldo Restante</p>
               <p className="text-2xl font-bold text-[#FFBF00]">
-                R$ {((os.saldo_restante) || 0).toFixed(2)}
+                R$ {calcularSaldoRestante().toFixed(2)}
               </p>
             </div>
             <button
