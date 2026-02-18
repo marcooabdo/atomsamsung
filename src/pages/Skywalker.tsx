@@ -160,32 +160,63 @@ function RankingTab() {
       )}
 
       {ranking.length >= 3 && (
-        <div className="grid grid-cols-3 gap-3">
-          {[1, 0, 2].map((idx) => {
-            const r = ranking[idx];
-            if (!r) return null;
-            const colors = ['#C0C0C0', '#FFD700', '#CD7F32'];
-            const sizes = ['h-28', 'h-36', 'h-24'];
-            return (
-              <div key={r.profissional_id} className="flex flex-col items-center">
-                <div
-                  className="w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold mb-2"
-                  style={{ backgroundColor: r.nivel_cor + '30', color: r.nivel_cor, border: `2px solid ${colors[idx]}` }}
-                >
-                  {r.nome.split(' ').map(n => n[0]).join('').substring(0, 2)}
+        <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+          <div className="flex items-end justify-center gap-3">
+            {[
+              { rankIdx: 1, pos: 2, color: '#C0C0C0', barHeight: 80, avatarSize: 'w-14 h-14', avatarText: 'text-base', crown: '🥈' },
+              { rankIdx: 0, pos: 1, color: '#FFD700', barHeight: 120, avatarSize: 'w-18 h-18', avatarText: 'text-xl', crown: '👑' },
+              { rankIdx: 2, pos: 3, color: '#CD7F32', barHeight: 60, avatarSize: 'w-13 h-13', avatarText: 'text-sm', crown: '🥉' },
+            ].map(({ rankIdx, pos, color, barHeight, crown }) => {
+              const r = ranking[rankIdx];
+              if (!r) return null;
+              const isFirst = pos === 1;
+              return (
+                <div key={r.profissional_id} className="flex flex-col items-center" style={{ flex: isFirst ? '0 0 38%' : '0 0 29%' }}>
+                  <span className="text-xl mb-1">{crown}</span>
+                  <div
+                    className={`${isFirst ? 'w-16 h-16' : 'w-13 h-13'} rounded-full flex items-center justify-center font-bold mb-2 transition-transform hover:scale-110`}
+                    style={{
+                      width: isFirst ? 64 : 52,
+                      height: isFirst ? 64 : 52,
+                      backgroundColor: r.nivel_cor + '25',
+                      color: r.nivel_cor,
+                      border: `3px solid ${color}`,
+                      boxShadow: `0 0 16px ${color}50`,
+                      fontSize: isFirst ? 18 : 14,
+                    }}
+                  >
+                    {r.nome.split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                  </div>
+                  <p className={`font-bold text-center ${isFirst ? 'text-sm' : 'text-xs'}`} style={{ color: 'var(--text-primary)' }}>
+                    {r.nome.split(' ')[0]}
+                  </p>
+                  <p className="text-xs text-center leading-tight mt-0.5 px-1" style={{ color: 'var(--text-secondary)', maxWidth: 100 }}>
+                    {r.unidade_nome}
+                  </p>
+                  <div className="flex items-center gap-1 mt-1.5">
+                    <Star className={`fill-current ${isFirst ? 'w-4 h-4' : 'w-3.5 h-3.5'}`} style={{ color: '#FBBF24' }} />
+                    <span className={`font-bold ${isFirst ? 'text-base' : 'text-sm'}`} style={{ color: '#FBBF24' }}>
+                      {r.estrelas_total}
+                    </span>
+                  </div>
+                  <div
+                    className="w-full mt-3 rounded-t-xl flex items-end justify-center pb-3 relative"
+                    style={{
+                      height: barHeight,
+                      background: `linear-gradient(to top, ${color}55, ${color}15)`,
+                      border: `1px solid ${color}40`,
+                      borderBottom: 'none',
+                    }}
+                  >
+                    <span className={`font-black ${isFirst ? 'text-3xl' : 'text-2xl'}`} style={{ color, textShadow: `0 0 12px ${color}80` }}>
+                      {pos}
+                    </span>
+                  </div>
                 </div>
-                <p className="font-bold text-sm text-center" style={{ color: 'var(--text-primary)' }}>{r.nome.split(' ')[0]}</p>
-                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{r.unidade_nome}</p>
-                <div className="flex items-center gap-1 mt-1">
-                  <Star className="w-4 h-4 fill-current" style={{ color: '#FBBF24' }} />
-                  <span className="font-bold" style={{ color: '#FBBF24' }}>{r.estrelas_total}</span>
-                </div>
-                <div className={`w-full ${sizes[idx]} mt-2 rounded-t-lg flex items-end justify-center pb-2`} style={{ background: `linear-gradient(to top, ${colors[idx]}40, ${colors[idx]}10)` }}>
-                  <span className="text-2xl font-bold" style={{ color: colors[idx] }}>{idx === 1 ? 1 : idx === 0 ? 2 : 3}</span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
+          <div className="h-2 rounded-b-xl mt-0" style={{ background: 'linear-gradient(to right, #C0C0C020, #FFD70040, #C0C0C020)' }} />
         </div>
       )}
 
