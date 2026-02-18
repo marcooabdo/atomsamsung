@@ -963,7 +963,7 @@ export function OrcamentoPublico() {
             {os.termos.termo_orcamento && (
               <div>
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5" /> Termos do Orcamento
+                  <FileText className="w-3.5 h-3.5" /> Termos do Orçamento
                 </h4>
                 <div className="text-xs text-slate-600 whitespace-pre-wrap bg-slate-50 p-3.5 rounded-xl border border-slate-100 leading-relaxed">
                   {os.termos.termo_orcamento}
@@ -983,7 +983,7 @@ export function OrcamentoPublico() {
             {os.termos.observacoes_gerais && (
               <div>
                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wide mb-2 flex items-center gap-1.5">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Observacoes
+                  <AlertCircle className="w-3.5 h-3.5 text-amber-500" /> Observações
                 </h4>
                 <div className="text-xs text-slate-600 whitespace-pre-wrap bg-amber-50 p-3.5 rounded-xl border border-amber-100 leading-relaxed">
                   {os.termos.observacoes_gerais}
@@ -1142,7 +1142,7 @@ export function OrcamentoPublico() {
         {/* Footer */}
         <div className="text-center pb-6">
           <p className="text-xs text-slate-400">
-            Documento gerado eletronicamente. Em caso de dúvidas, entre em contato com a assistência técnica.
+            Documento gerado eletronicamente. Em caso de dúvidas, entre em contato com o Smart Center.
           </p>
         </div>
 
