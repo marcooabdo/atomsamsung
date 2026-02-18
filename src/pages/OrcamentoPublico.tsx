@@ -598,7 +598,7 @@ export function OrcamentoPublico() {
                     Orçamento Oficial
                   </p>
                   <h2 className="text-base sm:text-lg font-bold leading-tight truncate" style={{ color: '#f3f4f6' }}>
-                    {os.unidade?.nome || 'Assistência Técnica'}
+                    {os.unidade?.nome || 'Smart Center'}
                   </h2>
                   {os.unidade?.cnpj && (
                     <p className="text-xs font-mono mt-0.5" style={{ color: '#6b7280' }}>
