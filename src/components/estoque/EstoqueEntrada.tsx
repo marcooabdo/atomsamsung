@@ -243,23 +243,52 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     e.target.value = '';
   };
 
+  const normalizePn = (pn: string) => pn.replace(/[-\s]/g, '').toUpperCase();
+
   const openPreviewModal = async (nfData: NFParsed, unidadeId: string) => {
     setScanningEffect(true);
     try {
       const pnsUnicos = [...new Set(nfData.produtos.map(p => p.pn))];
 
-      const { data: reqs } = await supabase
-        .from('requisicoes_pecas')
-        .select(`
-          id, os_id, codigo_peca,
-          os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
-        `)
-        .in('codigo_peca', pnsUnicos)
-        .in('status', ['pendente', 'pedido_feito'])
-        .eq('unidade_id', unidadeId);
+      const [reqsResult, osPecasResult] = await Promise.all([
+        supabase
+          .from('requisicoes_pecas')
+          .select(`
+            id, os_id, codigo_peca,
+            os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
+          `)
+          .in('status', ['pendente', 'pedido_feito'])
+          .eq('unidade_id', unidadeId),
+        supabase
+          .from('os_pecas')
+          .select(`
+            id, os_id, pn,
+            os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
+          `)
+          .eq('status', 'requisitada'),
+      ]);
 
-      const sortedReqs = ((reqs as unknown as RequisicaoPendente[]) || [])
-        .sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+      const xmlPnsNorm = new Set(pnsUnicos.map(normalizePn));
+
+      const reqs: RequisicaoPendente[] = (reqsResult.data as unknown as RequisicaoPendente[] || [])
+        .filter(r => xmlPnsNorm.has(normalizePn(r.codigo_peca)));
+
+      const fromOsPecas: RequisicaoPendente[] = ((osPecasResult.data as any[]) || [])
+        .filter((r: any) => r.os && xmlPnsNorm.has(normalizePn(r.pn)))
+        .map((r: any) => ({
+          id: r.id,
+          os_id: r.os_id,
+          codigo_peca: r.pn,
+          os: r.os,
+        }));
+
+      const existingOsIds = new Set(reqs.map(r => `${r.os_id}:${normalizePn(r.codigo_peca)}`));
+      const merged = [
+        ...reqs,
+        ...fromOsPecas.filter(r => !existingOsIds.has(`${r.os_id}:${normalizePn(r.codigo_peca)}`)),
+      ];
+
+      const sortedReqs = merged.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
 
       setRequisicoesDisponiveis(sortedReqs);
 
@@ -268,7 +297,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       nfData.produtos.forEach(prod => {
         for (let i = 0; i < prod.quantidade; i++) {
-          const reqMatchIndex = reqsDisponiveis.findIndex(r => r.codigo_peca === prod.pn);
+          const reqMatchIndex = reqsDisponiveis.findIndex(
+            r => normalizePn(r.codigo_peca) === normalizePn(prod.pn)
+          );
           let alocadaOsId = '';
           let alocadaReqId = '';
 
@@ -402,6 +433,45 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       for (const reqId of reqsParaAtualizar) {
         await supabase.from('requisicoes_pecas').update({ status: 'atendida' }).eq('id', reqId);
+      }
+
+      const { data: osData } = await supabase
+        .from('os')
+        .select('id, numero_os_interna')
+        .in('id', [...osParaMover]);
+
+      const osNumeroMap: Record<string, string> = {};
+      (osData || []).forEach((o: any) => { osNumeroMap[o.id] = o.numero_os_interna; });
+
+      for (const peca of pecasExpandidas) {
+        if (!peca.os_alocada_id) continue;
+
+        await supabase
+          .from('os_pecas')
+          .update({
+            descricao: peca.descricao,
+            valor_gspn: peca.valorComImpostos,
+            valor_unitario: peca.valorComImpostos,
+          })
+          .eq('os_id', peca.os_alocada_id)
+          .filter('pn', 'ilike', peca.pn.replace(/[-\s]/g, '%'));
+
+        const osNumero = osNumeroMap[peca.os_alocada_id] || peca.os_alocada_id;
+        const valorFormatado = peca.valorComImpostos.toLocaleString('pt-BR', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2,
+        });
+
+        await supabase.from('gia_mural_tarefas').insert({
+          gia_source: 'ESTOQUE',
+          titulo: `Custo Atualizado via NF - OS ${osNumero}`,
+          descricao: `GIA Stock informa: A peca ${peca.pn} (${peca.descricao}) entrou na NF ${nfRecord.numero_nf} com o custo de R$ ${valorFormatado}. O sistema recalculou automaticamente o markup e o valor total da OS. Favor conferir se o orcamento do cliente precisa de renegociacao.`,
+          prioridade: 'alta',
+          gia_responsavel: 'GIA Stock',
+          status: 'pendente',
+          os_id: peca.os_alocada_id,
+          os_numero: osNumero,
+        });
       }
 
       setSuccessMsg(
