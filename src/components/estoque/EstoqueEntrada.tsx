@@ -29,13 +29,15 @@ interface RequisicaoPendente {
   id: string;
   os_id: string;
   codigo_peca: string;
+  descricao?: string;
+  os_peca_id?: string | null;
   os: {
     numero_os_interna: string;
     numero_os_samsung: string | null;
     tipo_os: string;
-    data_abertura: string;
+    created_at: string;
     cliente_nome: string | null;
-  };
+  } | null;
 }
 
 interface PecaExpandida {
@@ -166,17 +168,19 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   };
 
   const getPriorityScore = (req: RequisicaoPendente): number => {
+    if (!req.os) return 0;
     let score = 0;
     if (req.os.tipo_os === 'LP') score += 100;
-    const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+    const daysOpen = (Date.now() - new Date(req.os.created_at).getTime()) / 86400000;
     if (daysOpen > 10) score += 50;
     if (req.os.tipo_os === 'IH') score += 10;
     return score;
   };
 
   const getPriorityTag = (req: RequisicaoPendente): keyof typeof PRIORITY_LABELS | null => {
+    if (!req.os) return null;
     if (req.os.tipo_os === 'LP') return 'LP';
-    const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+    const daysOpen = (Date.now() - new Date(req.os.created_at).getTime()) / 86400000;
     if (daysOpen > 10) return 'atrasada';
     if (req.os.tipo_os === 'IH') return 'IH';
     return null;
@@ -267,7 +271,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const { data: osData } = osIds.length > 0
         ? await supabase
             .from('os')
-            .select('id, numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome')
+            .select('id, numero_os_interna, numero_os_samsung, tipo_os, created_at, cliente_nome')
             .in('id', osIds)
         : { data: [] };
 
@@ -776,7 +780,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                           </option>
                           {osCompativeis.map(req => {
                             if (!req.os) return null;
-                            const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+                            const daysOpen = (Date.now() - new Date(req.os.created_at).getTime()) / 86400000;
                             const isAtrasada = daysOpen > 10;
                             const tipoLabel = req.os.tipo_os || '';
                             return (
