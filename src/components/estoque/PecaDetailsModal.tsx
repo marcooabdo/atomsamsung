@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
-import { useState } from 'react';
-import { X, MapPin, Printer } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, MapPin, Printer, Package, History, Link } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
 
@@ -16,6 +16,12 @@ interface Peca {
   localizacao: string | null;
   id_numerico: number | null;
   unidade_id: string;
+  os_id?: string | null;
+}
+
+interface PecaDetalhada extends Peca {
+  nf: { numero_nf: string; fornecedor: string } | null;
+  os: { numero_os_interna: string; numero_os_samsung: string | null } | null;
 }
 
 interface PecaDetailsModalProps {
@@ -39,10 +45,64 @@ interface LabelData {
   os_samsung?: string;
 }
 
+interface HistoricoItem {
+  id: string;
+  acao: string;
+  status_novo: string | null;
+  origem: string | null;
+  observacao: string | null;
+  created_at: string;
+  usuario: { nome: string } | null;
+}
+
+const STATUS_COLORS: Record<string, { label: string; color: string }> = {
+  disponivel: { label: 'Disponível', color: '#39FF14' },
+  reservada: { label: 'Reservada', color: '#FFBF00' },
+  vinculada_tecnico: { label: 'Com Técnico', color: '#00D4FF' },
+  em_rota: { label: 'Em Rota', color: '#00D4FF' },
+  em_uso: { label: 'Em Uso', color: '#FFBF00' },
+  usada: { label: 'Usada', color: '#6B7280' },
+  devolucao_pendente: { label: 'Devolução Pendente', color: '#FF0064' },
+  devolvida_nova: { label: 'Devolvida Nova', color: '#39FF14' },
+  devolvida_defeito: { label: 'Devolvida c/ Defeito', color: '#FF0064' },
+  usada_upc: { label: 'Usada UPC', color: '#6B7280' },
+};
+
 export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLocationSelector }: PecaDetailsModalProps) {
   const [generatingLabel, setGeneratingLabel] = useState(false);
   const [showLabelGenerator, setShowLabelGenerator] = useState(false);
   const [labelData, setLabelData] = useState<LabelData[]>([]);
+  const [pecaDetalhada, setPecaDetalhada] = useState<PecaDetalhada | null>(null);
+  const [historico, setHistorico] = useState<HistoricoItem[]>([]);
+  const [loadingHistorico, setLoadingHistorico] = useState(true);
+
+  useEffect(() => {
+    loadDetalhes();
+  }, [peca.id]);
+
+  const loadDetalhes = async () => {
+    setLoadingHistorico(true);
+    try {
+      const [detRes, histRes] = await Promise.all([
+        supabase
+          .from('estoque_pecas')
+          .select('*, nf:nf_id(numero_nf, fornecedor), os:os_id(numero_os_interna, numero_os_samsung)')
+          .eq('id', peca.id)
+          .maybeSingle(),
+        supabase
+          .from('estoque_historico')
+          .select('id, acao, status_novo, origem, observacao, created_at, usuario:usuario_id(nome)')
+          .eq('peca_id', peca.id)
+          .order('created_at', { ascending: false })
+          .limit(30),
+      ]);
+
+      if (detRes.data) setPecaDetalhada(detRes.data as unknown as PecaDetalhada);
+      setHistorico((histRes.data || []) as unknown as HistoricoItem[]);
+    } finally {
+      setLoadingHistorico(false);
+    }
+  };
 
   const handleAlterarLocalizacao = async () => {
     const { data } = await supabase
@@ -67,6 +127,11 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
       let osNumero = pecaCompleta?.requisicoes?.[0]?.os?.numero_os_interna || null;
       let osSamsung = pecaCompleta?.requisicoes?.[0]?.os?.numero_os_samsung || null;
+
+      if (!osNumero && pecaDetalhada?.os) {
+        osNumero = pecaDetalhada.os.numero_os_interna;
+        osSamsung = pecaDetalhada.os.numero_os_samsung;
+      }
 
       if (!osNumero) {
         const { data: osPeca } = await supabase
@@ -104,99 +169,220 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     }
   };
 
+  const statusCfg = STATUS_COLORS[peca.status] || { label: peca.status, color: '#6B7280' };
+  const osVinculada = pecaDetalhada?.os;
+  const osLabel = osVinculada
+    ? (osVinculada.numero_os_samsung || osVinculada.numero_os_interna)
+    : null;
+
   const modalContent = (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-      <div className="premium-card w-full max-w-2xl p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-[#00D4FF]">Detalhes da Peca</h2>
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+      <div
+        className="w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden rounded-xl"
+        style={{
+          background: '#0f172a',
+          border: '1px solid rgba(57,255,20,0.2)',
+          boxShadow: '0 0 40px rgba(57,255,20,0.1)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-[#39FF14]/15 shrink-0">
+          <div className="flex items-center gap-3">
+            <Package className="w-5 h-5 text-[#39FF14]" />
+            <h2 className="text-lg font-bold text-[#39FF14] tracking-wide uppercase">
+              Detalhes da Peça
+            </h2>
+            <span
+              className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider"
+              style={{
+                background: `${statusCfg.color}20`,
+                color: statusCfg.color,
+                border: `1px solid ${statusCfg.color}60`,
+              }}
+            >
+              {statusCfg.label}
+            </span>
+          </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
           >
-            <X className="w-6 h-6 text-gray-400" />
+            <X className="w-5 h-5 text-gray-400" />
           </button>
         </div>
 
-        <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm text-gray-500">ID</label>
-              <p className="text-[#39FF14] font-bold text-2xl">#{peca.id_numerico || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Part Number</label>
-              <p className="text-white font-mono">{peca.pn}</p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Descricao</label>
-              <p className="text-white">{peca.descricao || 'N/A'}</p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Status</label>
-              <p className="text-white capitalize">{peca.status}</p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Valor com Impostos</label>
-              <p className="text-[#39FF14] font-bold">
-                R$ {peca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-              </p>
-            </div>
-            <div>
-              <label className="text-sm text-gray-500">Condicao</label>
-              <p className="text-white capitalize">{peca.condicao}</p>
-            </div>
-            {peca.nf_delivery && (
-              <div className="col-span-2">
-                <label className="text-sm text-gray-500">Delivery</label>
-                <p className="text-[#00D4FF] font-bold text-lg">{peca.nf_delivery}</p>
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 space-y-5">
+
+          {/* OS Alocada highlight */}
+          {osLabel && (
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{
+                background: 'rgba(57,255,20,0.07)',
+                border: '1px solid rgba(57,255,20,0.35)',
+              }}
+            >
+              <Link className="w-4 h-4 text-[#39FF14] shrink-0" />
+              <div>
+                <p className="text-xs text-[#39FF14]/70 uppercase tracking-wider font-bold">OS Alocada</p>
+                <p className="text-[#39FF14] font-bold font-mono text-base">{osLabel}</p>
               </div>
-            )}
+            </div>
+          )}
+
+          {/* Main details grid */}
+          <div
+            className="rounded-xl p-5"
+            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">ID Único</p>
+                <p className="text-[#39FF14] font-bold text-2xl font-mono">#{peca.id_numerico || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Part Number</p>
+                <p className="text-white font-mono font-bold">{peca.pn}</p>
+              </div>
+              <div className="col-span-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Descrição</p>
+                <p className="text-gray-300">{peca.descricao || 'N/A'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Valor c/ Impostos</p>
+                <p className="text-[#39FF14] font-bold">
+                  R$ {peca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Condição</p>
+                <p className="text-gray-300 capitalize">{peca.condicao}</p>
+              </div>
+              {pecaDetalhada?.nf && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Nota Fiscal</p>
+                  <p className="text-[#00D4FF] font-mono font-bold">{pecaDetalhada.nf.numero_nf}</p>
+                </div>
+              )}
+              {pecaDetalhada?.nf?.fornecedor && (
+                <div>
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Fornecedor</p>
+                  <p className="text-gray-300 text-sm">{pecaDetalhada.nf.fornecedor}</p>
+                </div>
+              )}
+              {peca.nf_delivery && (
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Delivery</p>
+                  <p className="text-[#00D4FF] font-bold text-lg">{peca.nf_delivery}</p>
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="pt-4 border-t border-gray-700">
-            <h3 className="text-sm font-bold text-gray-400 uppercase mb-3">Localizacao Fisica</h3>
+          {/* Localização */}
+          <div>
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Localização Física</p>
             {peca.localizacao ? (
-              <div className="p-3 bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 text-white">
-                    <MapPin className="w-5 h-5 text-[#00D4FF]" />
-                    <span>{peca.localizacao}</span>
-                  </div>
-                  <button
-                    onClick={handleAlterarLocalizacao}
-                    className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/80"
-                  >
-                    Alterar
-                  </button>
+              <div
+                className="p-3 rounded-lg flex items-center justify-between"
+                style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)' }}
+              >
+                <div className="flex items-center gap-2 text-white">
+                  <MapPin className="w-4 h-4 text-[#00D4FF]" />
+                  <span className="font-mono text-sm">{peca.localizacao}</span>
                 </div>
+                <button
+                  onClick={handleAlterarLocalizacao}
+                  className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/70 transition-colors"
+                >
+                  Alterar
+                </button>
               </div>
             ) : (
               <button
                 onClick={handleAlterarLocalizacao}
-                className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-gray-400 text-sm transition-colors"
+                className="w-full p-3 rounded-lg text-gray-400 text-sm transition-colors flex items-center justify-center gap-2"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
               >
-                <MapPin className="w-4 h-4 inline mr-2" />
-                Definir localizacao no mapa
+                <MapPin className="w-4 h-4" />
+                Definir localização no mapa
               </button>
             )}
           </div>
 
-          <div className="pt-4 border-t border-gray-700 space-y-2">
-            <button
-              onClick={handleGerarEtiqueta}
-              disabled={generatingLabel}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors border border-[#39FF14]/30 disabled:opacity-50"
-            >
-              <Printer className="w-4 h-4" />
-              {generatingLabel ? 'Preparando...' : 'Gerar Etiqueta'}
-            </button>
-            <button
-              onClick={onClose}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              Fechar
-            </button>
+          {/* Histórico */}
+          <div>
+            <div className="flex items-center gap-2 mb-3">
+              <History className="w-4 h-4 text-[#00D4FF]" />
+              <p className="text-xs font-bold text-[#00D4FF] uppercase tracking-wider">Histórico de Movimentações</p>
+            </div>
+            {loadingHistorico ? (
+              <div className="flex justify-center py-6">
+                <div className="w-5 h-5 border-2 border-[#39FF14] border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : historico.length === 0 ? (
+              <p className="text-center text-gray-500 text-sm py-4">Nenhuma movimentação registrada</p>
+            ) : (
+              <div className="space-y-2 overflow-y-auto cyber-scrollbar max-h-52 pr-1">
+                {historico.map((h) => (
+                  <div
+                    key={h.id}
+                    className="flex gap-3 p-3 rounded-lg"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                  >
+                    <div
+                      className="w-2 h-2 rounded-full mt-1.5 shrink-0"
+                      style={{ background: '#39FF14', boxShadow: '0 0 6px #39FF14' }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-white">{h.acao}</span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(h.created_at).toLocaleString('pt-BR')}
+                        </span>
+                      </div>
+                      {h.status_novo && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Status: <span className="text-[#39FF14]">{h.status_novo}</span>
+                        </p>
+                      )}
+                      {h.observacao && (
+                        <p className="text-xs text-gray-500 mt-0.5 truncate">{h.observacao}</p>
+                      )}
+                      {h.usuario && (
+                        <p className="text-xs text-gray-600 mt-0.5">por {(h.usuario as any).nome}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
+        </div>
+
+        {/* Footer actions */}
+        <div className="shrink-0 border-t border-[#39FF14]/15 px-6 py-4 flex gap-3">
+          <button
+            onClick={handleGerarEtiqueta}
+            disabled={generatingLabel}
+            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+            style={{
+              background: 'rgba(57,255,20,0.1)',
+              border: '1px solid rgba(57,255,20,0.35)',
+              color: '#39FF14',
+            }}
+          >
+            <Printer className="w-4 h-4" />
+            {generatingLabel ? 'Preparando...' : 'Gerar Etiqueta'}
+          </button>
+          <button
+            onClick={onClose}
+            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-bold text-gray-300 transition-colors"
+            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+          >
+            Fechar
+          </button>
         </div>
       </div>
 

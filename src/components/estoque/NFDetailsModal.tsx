@@ -18,6 +18,11 @@ interface Peca {
   valor_com_impostos: number;
   status: string;
   data_entrada: string;
+  os_id: string | null;
+  os: {
+    numero_os_interna: string;
+    numero_os_samsung: string | null;
+  } | null;
 }
 
 interface NFDetails {
@@ -62,7 +67,7 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
 
       const { data: pecasData, error: pecasError } = await supabase
         .from('estoque_pecas')
-        .select('*')
+        .select('*, os:os_id(numero_os_interna, numero_os_samsung)')
         .eq('nf_id', nfId)
         .order('pn');
 
@@ -287,11 +292,23 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
                             </summary>
                             <div className="mt-3 space-y-2 pl-5">
                               {grupo.pecas.map((peca) => (
-                                <div key={peca.id} className="flex items-center justify-between text-xs">
-                                  <div className="flex items-center gap-2">
+                                <div key={peca.id} className="flex items-center justify-between gap-2 text-xs flex-wrap">
+                                  <div className="flex items-center gap-2 flex-wrap">
                                     <span className="px-2 py-1 bg-[#39FF14]/20 text-[#39FF14] rounded font-bold text-base">
                                       ID #{peca.id_numerico || 'N/A'}
                                     </span>
+                                    {peca.os && (
+                                      <span
+                                        className="px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider"
+                                        style={{
+                                          background: 'rgba(57,255,20,0.12)',
+                                          color: '#39FF14',
+                                          border: '1px solid rgba(57,255,20,0.45)',
+                                        }}
+                                      >
+                                        OS: {peca.os.numero_os_samsung || peca.os.numero_os_interna}
+                                      </span>
+                                    )}
                                   </div>
                                   {getStatusBadge(peca.status)}
                                 </div>
