@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -3759,7 +3759,23 @@ Não haverá cobrança ao cliente.`
                               )}
                               {requisicao && getStatusBadge(requisicao.status)}
                               {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
+                              {peca.alerta_preco_nf && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1" style={{
+                                  backgroundColor: '#FFBF0020',
+                                  color: '#FFBF00',
+                                  border: '1px solid #FFBF0060'
+                                }}>
+                                  <AlertTriangle className="w-3 h-3" />
+                                  Custo atualizado via NF
+                                </span>
+                              )}
                             </div>
+                            {peca.alerta_preco_nf && peca.valor_anterior_nf != null && (
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="line-through text-red-400 text-xs">De: R$ {Number(peca.valor_anterior_nf).toFixed(2)}</span>
+                                <span className="text-[#39FF14] text-sm font-bold">Por: R$ {Number(peca.valor_gspn || peca.valor_unitario || 0).toFixed(2)}</span>
+                              </div>
+                            )}
                             <div className="flex items-center gap-4">
                               <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
                               {requisicao?.peca_estoque?.id_numerico && (

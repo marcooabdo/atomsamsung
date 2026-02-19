@@ -465,16 +465,31 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const descricaoNova = peca.descricao;
         const valorNovo = peca.valorComImpostos;
         const changed = descricaoNova !== descricaoAntiga || Math.abs(valorNovo - valorAntigo) > 0.01;
+        const precoDivergente = Math.abs(valorNovo - valorAntigo) > 0.01;
 
         // Update os_peca by exact ID — DB trigger recalculates markup automatically
+        const updatePayload: Record<string, any> = {
+          descricao: descricaoNova,
+          valor_gspn: valorNovo,
+          editado_manualmente: false,
+        };
+
+        if (precoDivergente && valorAntigo > 0) {
+          updatePayload.valor_anterior_nf = valorAntigo;
+          updatePayload.alerta_preco_nf = true;
+        }
+
         await supabase
           .from('os_pecas')
-          .update({
-            descricao: descricaoNova,
-            valor_gspn: valorNovo,
-            editado_manualmente: false,
-          })
+          .update(updatePayload)
           .eq('id', peca.os_peca_id);
+
+        if (precoDivergente && valorAntigo > 0) {
+          await supabase
+            .from('os')
+            .update({ orcamento_pendente_reenvio: true })
+            .eq('id', peca.os_alocada_id);
+        }
 
         if (!changed) continue;
 

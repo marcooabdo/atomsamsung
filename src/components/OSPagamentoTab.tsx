@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock, Search } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
@@ -314,11 +314,17 @@ Assistencia Tecnica Samsung`;
           versao_orcamento: novaVersao,
           valor_orcamento_inicial: valorInicial === null ? valorAtual : valorInicial,
           coluna_kanban: 'negociacao_em_andamento',
+          orcamento_pendente_reenvio: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
 
       if (error) throw error;
+
+      await supabase
+        .from('os_pecas')
+        .update({ alerta_preco_nf: false, valor_anterior_nf: null })
+        .eq('os_id', osId);
 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
@@ -591,6 +597,26 @@ Assistencia Tecnica Samsung`;
   return (
     <>
       <div className="space-y-4">
+        {os.orcamento_pendente_reenvio && (
+          <div className="p-4 rounded-xl border-2 border-[#FFBF00] bg-[#FFBF00]/10 flex items-start gap-3">
+            <div className="w-10 h-10 rounded-full bg-[#FFBF00]/20 border border-[#FFBF00]/60 flex items-center justify-center flex-shrink-0">
+              <AlertTriangle className="w-5 h-5 text-[#FFBF00]" />
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-[#FFBF00] uppercase tracking-wide mb-1">
+                Atencao: Orcamento Desatualizado
+              </p>
+              <p className="text-xs text-[#FFBF00]/80 leading-relaxed">
+                O custo de uma ou mais pecas foi atualizado na entrada da Nota Fiscal. O valor total da OS foi recalculado automaticamente. E necessario gerar e enviar um <strong>NOVO ORCAMENTO</strong> para o cliente.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-[10px] text-[#FFBF00]/60 whitespace-nowrap">
+              <RefreshCw className="w-3 h-3" />
+              Reenvio necessario
+            </div>
+          </div>
+        )}
+
         {os.is_cortesia && (
           <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/20 to-[#10B981]/10 border-2 border-[#39FF14] animate-pulse">
             <div className="flex items-center gap-4">
