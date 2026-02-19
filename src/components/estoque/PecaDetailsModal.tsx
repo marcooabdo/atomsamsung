@@ -48,8 +48,10 @@ interface LabelData {
 interface HistoricoItem {
   id: string;
   acao: string;
+  status_anterior: string | null;
   status_novo: string | null;
   origem: string | null;
+  destino: string | null;
   observacao: string | null;
   created_at: string;
   usuario: { nome: string } | null;
@@ -91,7 +93,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           .maybeSingle(),
         supabase
           .from('estoque_historico')
-          .select('id, acao, status_novo, origem, observacao, created_at, usuario:usuario_id(nome)')
+          .select('id, acao, status_anterior, status_novo, origem, destino, observacao, created_at, usuario:usuario_id(nome)')
           .eq('peca_id', peca.id)
           .order('created_at', { ascending: false })
           .limit(30),
@@ -342,13 +344,26 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                           {new Date(h.created_at).toLocaleString('pt-BR')}
                         </span>
                       </div>
-                      {h.status_novo && (
+                      {(h.status_anterior || h.status_novo) && (
                         <p className="text-xs text-gray-400 mt-0.5">
-                          Status: <span className="text-[#39FF14]">{h.status_novo}</span>
+                          {h.status_anterior && (
+                            <span className="text-gray-500">{h.status_anterior} </span>
+                          )}
+                          {h.status_anterior && h.status_novo && <span className="text-gray-600">→ </span>}
+                          {h.status_novo && (
+                            <span className="text-[#39FF14]">{h.status_novo}</span>
+                          )}
+                        </p>
+                      )}
+                      {(h.origem || h.destino) && (
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {h.origem && <span className="text-gray-400">{h.origem}</span>}
+                          {h.origem && h.destino && <span className="text-gray-600"> → </span>}
+                          {h.destino && <span className="text-[#00D4FF]">{h.destino}</span>}
                         </p>
                       )}
                       {h.observacao && (
-                        <p className="text-xs text-gray-500 mt-0.5 truncate">{h.observacao}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{h.observacao}</p>
                       )}
                       {h.usuario && (
                         <p className="text-xs text-gray-600 mt-0.5">por {(h.usuario as any).nome}</p>
