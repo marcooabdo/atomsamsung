@@ -14,8 +14,9 @@ import {
   X,
 } from 'lucide-react';
 import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import type { MuralTarefa } from './types';
-import { formatFullDate, getTaskBadge, openWhatsApp } from './utils';
+import { formatFullDate, getTaskBadge } from './utils';
 
 interface TaskDetailModalProps {
   task: MuralTarefa;
@@ -26,10 +27,19 @@ interface TaskDetailModalProps {
 }
 
 export function TaskDetailModal({ task, accentColor, onClose, onComplete, completing }: TaskDetailModalProps) {
+  const navigate = useNavigate();
   const isAlta = task.prioridade === 'alta';
   const badge = getTaskBadge(task.titulo, task.descricao);
   const isConnect = task.gia_source === 'CONNECT' || !!task.whatsapp_phone;
   const borderColor = isAlta ? '#EF4444' : accentColor;
+
+  function handleOpenChat() {
+    const phone = task.whatsapp_phone!.replace(/\D/g, '');
+    const params = new URLSearchParams({ phone });
+    if (task.os_id) params.set('os_id', task.os_id);
+    onClose();
+    navigate(`/atom-connect?${params.toString()}`);
+  }
 
   const modalContent = (
     <motion.div
@@ -157,7 +167,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                 <span className="text-sm font-mono text-[#25D366]">{task.whatsapp_phone}</span>
               </div>
               <button
-                onClick={() => openWhatsApp(task.whatsapp_phone!)}
+                onClick={handleOpenChat}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black tracking-wider transition-all hover:scale-[1.02] active:scale-95 font-mono"
                 style={{ background: 'rgba(37,211,102,0.18)', border: '1px solid rgba(37,211,102,0.4)', color: '#25D366', boxShadow: '0 0 16px rgba(37,211,102,0.25)' }}
               >

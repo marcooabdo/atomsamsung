@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import { CheckCircle2, Clock, Flame, Hash, MessageCircle, RefreshCw } from 'lucide-react';
 import type { MuralTarefa } from './types';
-import { getTaskBadge, openWhatsApp, formatTime } from './utils';
+import { getTaskBadge, formatTime } from './utils';
 import { TaskDetailModal } from './TaskDetailModal';
 
 interface TaskCardProps {
@@ -14,6 +15,7 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, onComplete, completing, accentColor, index }: TaskCardProps) {
+  const navigate = useNavigate();
   const isAlta = task.prioridade === 'alta';
   const [hovered, setHovered] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -22,7 +24,11 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
 
   function handleWhatsAppClick(e: React.MouseEvent) {
     e.stopPropagation();
-    if (task.whatsapp_phone) openWhatsApp(task.whatsapp_phone);
+    if (!task.whatsapp_phone) return;
+    const phone = task.whatsapp_phone.replace(/\D/g, '');
+    const params = new URLSearchParams({ phone });
+    if (task.os_id) params.set('os_id', task.os_id);
+    navigate(`/atom-connect?${params.toString()}`);
   }
 
   function handleCompleteClick(e: React.MouseEvent) {
