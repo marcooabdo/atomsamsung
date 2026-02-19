@@ -1,7 +1,11 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { Upload, FileText, CheckCircle, AlertCircle, Package, Download, Eye, Trash2, Zap } from 'lucide-react';
+import {
+  Upload, FileText, CheckCircle, AlertCircle, Package,
+  Download, Eye, Trash2, Zap, X, Brain, ArrowRight,
+  Clock, Star, AlertTriangle, ChevronDown, Cpu
+} from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 
 interface EstoqueEntradaProps {
@@ -21,16 +25,16 @@ interface NF {
   created_at: string;
 }
 
-// Novos tipos para a Lógica Inteligente
 interface RequisicaoPendente {
   id: string;
   os_id: string;
   codigo_peca: string;
   os: {
     numero_os_interna: string;
-    numero_os_samsung: string;
+    numero_os_samsung: string | null;
     tipo_os: string;
     data_abertura: string;
+    cliente_nome: string | null;
   };
 }
 
@@ -40,37 +44,53 @@ interface PecaExpandida {
   descricao: string;
   valorUnitario: number;
   valorComImpostos: number;
-  os_alocada_id: string; // Vazio = OFS
+  os_alocada_id: string;
   requisicao_alocada_id: string;
 }
+
+interface NFParsed {
+  numeroNF: string;
+  chaveAcesso: string;
+  fornecedor: string;
+  dataEmissao: string;
+  valorTotal: number;
+  delivery: string | null;
+  xmlContent: string;
+  produtos: {
+    pn: string;
+    descricao: string;
+    quantidade: number;
+    valorUnitario: number;
+    valorComImpostos: number;
+  }[];
+}
+
+const PRIORITY_LABELS: Record<string, { label: string; color: string; bg: string; border: string }> = {
+  LP: { label: 'LP GARANTIA', color: '#FF0064', bg: 'rgba(255,0,100,0.12)', border: 'rgba(255,0,100,0.4)' },
+  atrasada: { label: 'ATRASADA', color: '#FFBF00', bg: 'rgba(255,191,0,0.12)', border: 'rgba(255,191,0,0.4)' },
+  IH: { label: 'IN-HOME', color: '#00D4FF', bg: 'rgba(0,212,255,0.12)', border: 'rgba(0,212,255,0.4)' },
+};
 
 export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntradaProps) {
   const { usuario } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [nfs, setNfs] = useState<NF[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [selectedNFId, setSelectedNFId] = useState<string | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [downloadingNFId, setDownloadingNFId] = useState<string | null>(null);
-  
-  // States da Prévia Inteligente
+  const [deletingNFId, setDeletingNFId] = useState<string | null>(null);
+
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
   const [pecasExpandidas, setPecasExpandidas] = useState<PecaExpandida[]>([]);
-  
-  const [previewData, setPreviewData] = useState<{
-    numeroNF: string;
-    chaveAcesso: string;
-    fornecedor: string;
-    dataEmissao: string;
-    valorTotal: number;
-    delivery: string | null;
-    xmlContent: string;
-  } | null>(null);
-  
-  const [xmlQueue, setXmlQueue] = useState<any[]>([]);
+  const [previewData, setPreviewData] = useState<NFParsed | null>(null);
+  const [xmlQueue, setXmlQueue] = useState<NFParsed[]>([]);
   const [currentFileIndex, setCurrentFileIndex] = useState(0);
   const [totalFiles, setTotalFiles] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [scanningEffect, setScanningEffect] = useState(false);
 
   useEffect(() => {
     loadNFs();
@@ -86,14 +106,14 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         .select('*')
         .eq('unidade_id', unidadeFilter)
         .order('created_at', { ascending: false })
-        .limit(10);
+        .limit(20);
 
       if (error) throw error;
       setNfs(data || []);
     } catch (err) {}
   };
 
-  const parseXML = (xmlText: string) => {
+  const parseXML = (xmlText: string): NFParsed => {
     const parser = new DOMParser();
     const xmlDoc = parser.parseFromString(xmlText, 'text/xml');
 
@@ -124,9 +144,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       if (deliveryMatch) delivery = deliveryMatch[1].trim();
     }
 
-    const produtos: any[] = [];
+    const produtos: NFParsed['produtos'] = [];
     const dets = xmlDoc.getElementsByTagName('det');
-    
+
     for (let i = 0; i < dets.length; i++) {
       const det = dets[i];
       const pn = getTextContent('cProd', det);
@@ -142,23 +162,24 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       produtos.push({ pn, descricao, quantidade, valorUnitario, valorComImpostos });
     }
 
-    return { numeroNF, chaveAcesso, fornecedor, dataEmissao, valorTotal, delivery, produtos };
+    return { numeroNF, chaveAcesso, fornecedor, dataEmissao, valorTotal, delivery, xmlContent: xmlText, produtos };
   };
 
-  // 🔥 MOTOR DE PRIORIDADE DA GIA STOCK
-  const sortRequisicoesPriority = (a: RequisicaoPendente, b: RequisicaoPendente) => {
-    const getScore = (req: RequisicaoPendente) => {
-      let score = 0;
-      if (req.os.tipo_os === 'LP') score += 100; // Garantia Local = Top Prioridade
-      
-      // Checar se tem mais de 10 dias
-      const daysOpen = (new Date().getTime() - new Date(req.os.data_abertura).getTime()) / (1000 * 3600 * 24);
-      if (daysOpen > 10) score += 50; // Atrasada
-      
-      if (req.os.tipo_os === 'IH') score += 10; // In-Home
-      return score;
-    };
-    return getScore(b) - getScore(a);
+  const getPriorityScore = (req: RequisicaoPendente): number => {
+    let score = 0;
+    if (req.os.tipo_os === 'LP') score += 100;
+    const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+    if (daysOpen > 10) score += 50;
+    if (req.os.tipo_os === 'IH') score += 10;
+    return score;
+  };
+
+  const getPriorityTag = (req: RequisicaoPendente): keyof typeof PRIORITY_LABELS | null => {
+    if (req.os.tipo_os === 'LP') return 'LP';
+    const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+    if (daysOpen > 10) return 'atrasada';
+    if (req.os.tipo_os === 'IH') return 'IH';
+    return null;
   };
 
   const handleXMLUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,10 +194,11 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
     setUploading(true);
     setError(null);
+    setSuccessMsg(null);
     setTotalFiles(files.length);
     setCurrentFileIndex(0);
 
-    const validXmls: Array<any> = [];
+    const validXmls: NFParsed[] = [];
     const errors: string[] = [];
 
     for (let i = 0; i < files.length; i++) {
@@ -203,55 +225,55 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           continue;
         }
 
-        validXmls.push({ ...nfData, xmlContent: text, fileName: file.name });
+        validXmls.push(nfData);
       } catch (err) {
         errors.push(`${file.name}: ${err instanceof Error ? err.message : 'Erro ao processar'}`);
       }
     }
 
-    if (errors.length > 0) setError(`Erros encontrados:\n${errors.join('\n')}`);
+    if (errors.length > 0) setError(errors.join('\n'));
 
     if (validXmls.length > 0) {
       setXmlQueue(validXmls);
-      await processarModalInteligente(validXmls[0], unidadeId);
+      await openPreviewModal(validXmls[0], unidadeId);
     } else {
       setUploading(false);
     }
+
     e.target.value = '';
   };
 
-  // 🔥 PROCESSAMENTO INTELIGENTE (Pré-Save)
-  const processarModalInteligente = async (nfData: any, unidadeId: string) => {
+  const openPreviewModal = async (nfData: NFParsed, unidadeId: string) => {
+    setScanningEffect(true);
     try {
-      const pnsUnicos = [...new Set(nfData.produtos.map((p: any) => p.pn))];
+      const pnsUnicos = [...new Set(nfData.produtos.map(p => p.pn))];
 
-      // Busca OSs precisando dessas peças
       const { data: reqs } = await supabase
         .from('requisicoes_pecas')
         .select(`
           id, os_id, codigo_peca,
-          os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura)
+          os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
         `)
         .in('codigo_peca', pnsUnicos)
         .in('status', ['pendente', 'pedido_feito'])
         .eq('unidade_id', unidadeId);
 
-      const sortedReqs = (reqs as unknown as RequisicaoPendente[] || []).sort(sortRequisicoesPriority);
+      const sortedReqs = ((reqs as unknown as RequisicaoPendente[]) || [])
+        .sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
+
       setRequisicoesDisponiveis(sortedReqs);
 
-      // Expande as peças (Se qtd = 3, gera 3 linhas no modal)
       const pecasParaAlocar: PecaExpandida[] = [];
       let reqsDisponiveis = [...sortedReqs];
 
-      nfData.produtos.forEach((prod: any) => {
+      nfData.produtos.forEach(prod => {
         for (let i = 0; i < prod.quantidade; i++) {
-          // Auto-Sugerir a OS mais prioritária se houver
           const reqMatchIndex = reqsDisponiveis.findIndex(r => r.codigo_peca === prod.pn);
           let alocadaOsId = '';
           let alocadaReqId = '';
 
           if (reqMatchIndex !== -1) {
-            const match = reqsDisponiveis.splice(reqMatchIndex, 1)[0]; // Remove da lista de auto-alocação
+            const match = reqsDisponiveis.splice(reqMatchIndex, 1)[0];
             alocadaOsId = match.os_id;
             alocadaReqId = match.id;
           }
@@ -263,7 +285,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             valorUnitario: prod.valorUnitario,
             valorComImpostos: prod.valorComImpostos,
             os_alocada_id: alocadaOsId,
-            requisicao_alocada_id: alocadaReqId
+            requisicao_alocada_id: alocadaReqId,
           });
         }
       });
@@ -275,13 +297,20 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       console.error(err);
     } finally {
       setUploading(false);
+      setScanningEffect(false);
     }
   };
 
   const handleAlocacaoChange = (id_temp: string, valueStr: string) => {
-    const [os_id, req_id] = valueStr.split('|');
-    setPecasExpandidas(prev => 
-      prev.map(p => p.id_temp === id_temp ? { ...p, os_alocada_id: os_id || '', requisicao_alocada_id: req_id || '' } : p)
+    const parts = valueStr.split('|');
+    const os_id = parts[0] || '';
+    const req_id = parts[1] || '';
+    setPecasExpandidas(prev =>
+      prev.map(p =>
+        p.id_temp === id_temp
+          ? { ...p, os_alocada_id: os_id, requisicao_alocada_id: req_id }
+          : p
+      )
     );
   };
 
@@ -290,11 +319,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     const unidadeId = selectedUnidade || usuario?.unidade_id;
     if (!unidadeId) return;
 
-    setUploading(true);
+    setIsSaving(true);
     setShowPreviewModal(false);
 
     try {
-      // 1. CRIA A NF
       const { data: nfRecord, error: nfError } = await supabase
         .from('estoque_nfs')
         .insert({
@@ -306,15 +334,15 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           delivery: previewData.delivery,
           xml_conteudo: previewData.xmlContent,
           unidade_id: unidadeId,
-          processada: true, // Já vamos salvar processada
+          processada: true,
           processada_em: new Date().toISOString(),
-          processada_por: usuario?.id
+          processada_por: usuario?.id,
         })
-        .select().single();
+        .select()
+        .single();
 
       if (nfError) throw nfError;
 
-      // 2. INSERE AS PEÇAS COM ALOCAÇÃO
       let contador = 0;
       const osParaMover = new Set<string>();
       const reqsParaAtualizar = new Set<string>();
@@ -322,10 +350,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const pecasToInsert = pecasExpandidas.map(peca => {
         contador++;
         const idUnico = `PC-${Date.now()}-${Math.random().toString(36).substring(2, 6).toUpperCase()}-${contador}`;
-        
+
         if (peca.os_alocada_id) {
           osParaMover.add(peca.os_alocada_id);
-          reqsParaAtualizar.add(peca.requisicao_alocada_id);
+          if (peca.requisicao_alocada_id) reqsParaAtualizar.add(peca.requisicao_alocada_id);
         }
 
         return {
@@ -336,8 +364,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           unidade_id: unidadeId,
           valor_com_impostos: peca.valorComImpostos,
           status: peca.os_alocada_id ? 'reservada' : 'disponivel',
-          os_id: peca.os_alocada_id || null, // Amarra a peça na OS!
-          data_entrada: new Date().toISOString()
+          os_id: peca.os_alocada_id || null,
+          data_entrada: new Date().toISOString(),
         };
       });
 
@@ -348,30 +376,27 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       if (pecasError) throw pecasError;
 
-      // 3. REGISTRA HISTÓRICO
       if (pecasInseridas && pecasInseridas.length > 0) {
         const historicoEntries = pecasInseridas.map(peca => ({
           peca_id: peca.id,
-          usuario_id: usuario.id,
+          usuario_id: usuario?.id,
           acao: peca.os_id ? 'Entrada e Alocação Automática' : 'Entrada de Estoque',
           status_novo: peca.status,
           origem: `NF ${nfRecord.numero_nf}`,
-          observacao: peca.os_id ? `Alocada diretamente na entrada para OS` : `Adicionada ao estoque livre (OFS)`
+          observacao: peca.os_id
+            ? `GIA Stock: Alocada na entrada para OS vinculada`
+            : `GIA Stock: Adicionada ao estoque livre (OFS)`,
         }));
         await supabase.from('estoque_historico').insert(historicoEntries);
       }
 
-      // 4. ATUALIZAÇÕES AUTOMÁTICAS GIA STOCK
-      // Mover OS para Em Reparo e atualizar a Requisição
       for (const osId of osParaMover) {
-        // Move Kanban
         await supabase.from('os').update({ coluna_kanban: 'em_reparo' }).eq('id', osId);
-        // Adiciona comentário
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
-          comentario: `🤖 GIA Stock: Peça recebida na NF ${nfRecord.numero_nf} e alocada automaticamente com sucesso. OS movida para Em Reparo.`,
-          is_system: true
+          comentario: `GIA Stock: Peca recebida na NF ${nfRecord.numero_nf} e alocada automaticamente com sucesso. OS movida para Em Reparo.`,
+          is_system: true,
         });
       }
 
@@ -379,24 +404,25 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         await supabase.from('requisicoes_pecas').update({ status: 'atendida' }).eq('id', reqId);
       }
 
-      alert(`✅ NF ${previewData.numeroNF} processada!\n\n📦 ${pecasToInsert.length} peças criadas.\n🔄 ${osParaMover.size} OSs atualizadas automaticamente e prontas para impressão de etiqueta!`);
+      setSuccessMsg(
+        `NF ${previewData.numeroNF} processada com sucesso! ${pecasToInsert.length} peças registradas. ${osParaMover.size > 0 ? `${osParaMover.size} OS(s) movida(s) para Em Reparo automaticamente.` : ''}`
+      );
 
-      // Fila do XML
       const remainingQueue = xmlQueue.slice(1);
       setXmlQueue(remainingQueue);
 
       if (remainingQueue.length > 0) {
-        await processarModalInteligente(remainingQueue[0], unidadeId);
+        await openPreviewModal(remainingQueue[0], unidadeId);
       } else {
         setPreviewData(null);
         setPecasExpandidas([]);
       }
 
       loadNFs();
-    } catch (error: any) {
-      setError(`Falha na importação: ${error.message}`);
+    } catch (err: any) {
+      setError(`Falha na importação: ${err.message}`);
     } finally {
-      setUploading(false);
+      setIsSaving(false);
     }
   };
 
@@ -407,85 +433,359 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setXmlQueue([]);
   };
 
-  // Funções de NF existentes mantidas (Delete, Print, Details)...
-  const handleDeleteNF = async (nf: NF) => { /* lógica mantida... */ };
-  const handleDownloadNFPDF = async (nf: NF) => { /* lógica mantida... */ };
   const handleViewNFDetails = (nfId: string) => {
     setSelectedNFId(nfId);
     setShowDetailsModal(true);
   };
 
+  const handleDownloadNFPDF = async (nf: NF) => {
+    if (!nf.chave_acesso) {
+      setError('Chave de acesso não disponível para esta NF');
+      return;
+    }
+
+    setDownloadingNFId(nf.id);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success && data.pdfUrl) {
+        window.open(data.pdfUrl, '_blank');
+      } else {
+        setError(data.error || 'Erro ao consultar DANFE');
+      }
+    } catch (err) {
+      setError('Erro ao consultar DANFE');
+    } finally {
+      setDownloadingNFId(null);
+    }
+  };
+
+  const handleDeleteNF = async (nf: NF) => {
+    if (!confirm(`Deseja excluir a NF ${nf.numero_nf}? Todas as peças vinculadas serão removidas.`)) return;
+
+    setDeletingNFId(nf.id);
+    try {
+      const { error } = await supabase.from('estoque_nfs').delete().eq('id', nf.id);
+      if (error) throw error;
+      setNfs(prev => prev.filter(n => n.id !== nf.id));
+      setSuccessMsg(`NF ${nf.numero_nf} excluída com sucesso.`);
+    } catch (err: any) {
+      setError(`Erro ao excluir NF: ${err.message}`);
+    } finally {
+      setDeletingNFId(null);
+    }
+  };
+
+  const qtdAlocadas = pecasExpandidas.filter(p => p.os_alocada_id).length;
+  const qtdOFS = pecasExpandidas.length - qtdAlocadas;
+
   return (
     <>
-      <NFDetailsModal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} nfId={selectedNFId || ''} />
+      <NFDetailsModal
+        isOpen={showDetailsModal}
+        onClose={() => setShowDetailsModal(false)}
+        nfId={selectedNFId || ''}
+      />
 
-      {/* NOVO MODAL INTELIGENTE DE ALOCAÇÃO */}
+      {/* GIA STOCK INTELLIGENT ALLOCATION MODAL */}
       {showPreviewModal && previewData && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="premium-card w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col border-[#39FF14]/30 shadow-[0_0_30px_rgba(57,255,20,0.15)]">
-            <div className="flex items-center justify-between p-6 border-b border-[#39FF14]/20 bg-gradient-to-r from-[#39FF14]/10 to-transparent">
-              <div className="flex items-center gap-3">
-                <Zap className="w-6 h-6 text-[#39FF14] animate-pulse" />
+        <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
+          <div
+            className="w-full max-w-5xl max-h-[96vh] overflow-hidden flex flex-col rounded-2xl"
+            style={{
+              background: 'linear-gradient(135deg, #0a0a0a 0%, #0d1a0d 50%, #0a0a0a 100%)',
+              border: '1px solid rgba(57,255,20,0.3)',
+              boxShadow: '0 0 60px rgba(57,255,20,0.12), 0 0 120px rgba(57,255,20,0.05), inset 0 0 40px rgba(0,0,0,0.5)',
+            }}
+          >
+            {/* Header */}
+            <div
+              className="flex items-center justify-between px-6 py-5"
+              style={{
+                background: 'linear-gradient(90deg, rgba(57,255,20,0.08) 0%, rgba(57,255,20,0.03) 60%, transparent 100%)',
+                borderBottom: '1px solid rgba(57,255,20,0.2)',
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <div
+                  className="p-2.5 rounded-xl"
+                  style={{
+                    background: 'rgba(57,255,20,0.1)',
+                    border: '1px solid rgba(57,255,20,0.3)',
+                    boxShadow: '0 0 20px rgba(57,255,20,0.2)',
+                  }}
+                >
+                  <Zap
+                    className="w-6 h-6"
+                    style={{ color: '#39FF14', filter: 'drop-shadow(0 0 8px #39FF14)' }}
+                  />
+                </div>
                 <div>
-                  <h2 className="tech-heading text-xl text-[#39FF14]">GIA STOCK - ALOCAÇÃO INTELIGENTE</h2>
-                  <p className="text-xs text-gray-400">NF {previewData.numeroNF} • {previewData.fornecedor}</p>
+                  <div className="flex items-center gap-3">
+                    <h2
+                      className="text-lg font-black tracking-[0.2em] uppercase"
+                      style={{ color: '#39FF14', textShadow: '0 0 20px rgba(57,255,20,0.5)' }}
+                    >
+                      GIA STOCK
+                    </h2>
+                    <span
+                      className="text-xs font-bold px-2 py-0.5 rounded-full tracking-widest"
+                      style={{
+                        background: 'rgba(57,255,20,0.15)',
+                        border: '1px solid rgba(57,255,20,0.4)',
+                        color: '#39FF14',
+                      }}
+                    >
+                      ALOCAÇÃO INTELIGENTE
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    NF <span className="text-white font-mono font-bold">{previewData.numeroNF}</span>
+                    {' '}•{' '}
+                    <span className="text-gray-300">{previewData.fornecedor}</span>
+                    {' '}•{' '}
+                    <span style={{ color: '#39FF14' }}>
+                      R$ {previewData.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={handleCancelImport}
+                className="p-2 rounded-lg transition-colors hover:bg-white/5"
+              >
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            {/* Stats bar */}
+            <div
+              className="flex items-center gap-6 px-6 py-3"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.3)' }}
+            >
+              <div className="flex items-center gap-2">
+                <Cpu className="w-4 h-4" style={{ color: '#39FF14' }} />
+                <span className="text-xs text-gray-400">
+                  Motor de prioridade ativo •{' '}
+                  <span style={{ color: '#39FF14' }}>{requisicoesDisponiveis.length} OS(s)</span> cruzadas
+                </span>
+              </div>
+              <div className="flex items-center gap-4 ml-auto">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: '#39FF14', boxShadow: '0 0 6px #39FF14' }} />
+                  <span className="text-xs text-gray-300">
+                    <span style={{ color: '#39FF14' }} className="font-bold">{qtdAlocadas}</span> alocadas para OS
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full bg-gray-600" />
+                  <span className="text-xs text-gray-400">
+                    <span className="text-gray-300 font-bold">{qtdOFS}</span> para OFS
+                  </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex-1 overflow-y-auto cyber-scrollbar p-6 bg-gray-900/50">
-              <div className="space-y-3">
-                {pecasExpandidas.map((peca, idx) => {
-                  // Filtra OSs que precisam especificamente deste PN
-                  const osCompativeis = requisicoesDisponiveis.filter(r => r.codigo_peca === peca.pn);
+            {/* Parts list */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-2.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(57,255,20,0.3) transparent' }}>
+              {pecasExpandidas.map((peca, idx) => {
+                const osCompativeis = requisicoesDisponiveis.filter(r => r.codigo_peca === peca.pn);
+                const isAlocada = !!peca.os_alocada_id;
+                const selectedReq = requisicoesDisponiveis.find(r => r.os_id === peca.os_alocada_id && r.codigo_peca === peca.pn);
+                const priorityTag = selectedReq ? getPriorityTag(selectedReq) : null;
 
-                  return (
-                    <div key={peca.id_temp} className={`p-4 rounded-xl border flex flex-col lg:flex-row gap-4 items-center justify-between transition-all ${peca.os_alocada_id ? 'bg-[#39FF14]/5 border-[#39FF14]/40' : 'bg-gray-800/50 border-gray-700'}`}>
-                      <div className="flex-1 min-w-0 flex items-start gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gray-800 flex items-center justify-center text-xs font-bold text-gray-400 shrink-0">
-                          {idx + 1}
-                        </div>
-                        <div>
-                          <p className="font-mono text-[#00D4FF] font-bold">{peca.pn}</p>
-                          <p className="text-gray-300 text-sm truncate">{peca.descricao}</p>
-                        </div>
+                return (
+                  <div
+                    key={peca.id_temp}
+                    className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center rounded-xl p-4 transition-all duration-300"
+                    style={{
+                      background: isAlocada
+                        ? 'linear-gradient(135deg, rgba(57,255,20,0.06) 0%, rgba(57,255,20,0.02) 100%)'
+                        : 'rgba(255,255,255,0.03)',
+                      border: isAlocada
+                        ? '1px solid rgba(57,255,20,0.35)'
+                        : '1px solid rgba(255,255,255,0.08)',
+                    }}
+                  >
+                    {/* Part info */}
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
+                        style={{
+                          background: isAlocada ? 'rgba(57,255,20,0.15)' : 'rgba(255,255,255,0.05)',
+                          border: isAlocada ? '1px solid rgba(57,255,20,0.3)' : '1px solid rgba(255,255,255,0.1)',
+                          color: isAlocada ? '#39FF14' : '#6B7280',
+                        }}
+                      >
+                        {idx + 1}
                       </div>
-
-                      <div className="w-full lg:w-1/2 flex items-center gap-2">
-                        <div className="flex-1">
-                          <select
-                            value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}`}
-                            onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
-                            className={`w-full bg-gray-900 border text-sm rounded-lg px-3 py-2 outline-none transition-all ${peca.os_alocada_id ? 'border-[#39FF14] text-[#39FF14]' : 'border-gray-600 text-gray-300 focus:border-[#00D4FF]'}`}
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="font-mono text-sm font-black tracking-wider"
+                            style={{ color: '#00D4FF' }}
                           >
-                            <option value="|">📥 Enviar para Estoque Livre (OFS)</option>
-                            {osCompativeis.map(req => {
-                              const isAtrasada = (new Date().getTime() - new Date(req.os.data_abertura).getTime()) / (1000 * 3600 * 24) > 10;
-                              return (
-                                <option key={req.id} value={`${req.os_id}|${req.id}`}>
-                                  OS {req.os.numero_os_interna} {req.os.numero_os_samsung ? `(${req.os.numero_os_samsung})` : ''} - {req.os.tipo_os} {isAtrasada ? '🚨 ATRASADA' : ''}
-                                </option>
-                              );
-                            })}
-                          </select>
+                            {peca.pn}
+                          </span>
+                          {peca.valorComImpostos > 0 && (
+                            <span className="text-xs text-gray-500 font-mono">
+                              R$ {peca.valorComImpostos.toFixed(2)}
+                            </span>
+                          )}
                         </div>
+                        <p className="text-xs text-gray-400 truncate">{peca.descricao}</p>
                       </div>
                     </div>
-                  );
-                })}
-              </div>
+
+                    {/* Allocation select */}
+                    <div className="flex items-center gap-3 lg:w-[420px] shrink-0">
+                      {priorityTag && PRIORITY_LABELS[priorityTag] && (
+                        <span
+                          className="text-xs font-bold px-2 py-1 rounded-lg whitespace-nowrap shrink-0"
+                          style={{
+                            background: PRIORITY_LABELS[priorityTag].bg,
+                            border: `1px solid ${PRIORITY_LABELS[priorityTag].border}`,
+                            color: PRIORITY_LABELS[priorityTag].color,
+                          }}
+                        >
+                          {PRIORITY_LABELS[priorityTag].label}
+                        </span>
+                      )}
+
+                      <div className="relative flex-1">
+                        <select
+                          value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}`}
+                          onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
+                          className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none transition-all"
+                          style={{
+                            background: isAlocada ? 'rgba(57,255,20,0.08)' : 'rgba(0,0,0,0.5)',
+                            border: isAlocada ? '1px solid rgba(57,255,20,0.5)' : '1px solid rgba(255,255,255,0.15)',
+                            color: isAlocada ? '#39FF14' : '#9CA3AF',
+                          }}
+                        >
+                          <option value="|" style={{ background: '#111', color: '#9CA3AF' }}>
+                            Enviar para Estoque Livre (OFS)
+                          </option>
+                          {osCompativeis.map(req => {
+                            const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
+                            const isAtrasada = daysOpen > 10;
+                            const tipoLabel = req.os.tipo_os || '';
+                            return (
+                              <option
+                                key={req.id}
+                                value={`${req.os_id}|${req.id}`}
+                                style={{ background: '#111', color: '#fff' }}
+                              >
+                                OS {req.os.numero_os_interna}
+                                {req.os.numero_os_samsung ? ` (${req.os.numero_os_samsung})` : ''}
+                                {' '}- {tipoLabel}
+                                {isAtrasada ? ' - ATRASADA' : ''}
+                                {req.os.tipo_os === 'LP' ? ' - GARANTIA' : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                        <ChevronDown
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
+                          style={{ color: isAlocada ? '#39FF14' : '#6B7280' }}
+                        />
+                      </div>
+
+                      {isAlocada ? (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                          style={{ background: 'rgba(57,255,20,0.15)', border: '1px solid rgba(57,255,20,0.4)' }}
+                        >
+                          <CheckCircle className="w-4 h-4" style={{ color: '#39FF14' }} />
+                        </div>
+                      ) : (
+                        <div
+                          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+                          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                        >
+                          <Package className="w-4 h-4 text-gray-600" />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="flex items-center justify-between p-6 border-t border-gray-700 bg-gray-900">
-              <p className="text-sm text-gray-400">
-                <span className="text-[#39FF14] font-bold">{pecasExpandidas.filter(p => p.os_alocada_id).length}</span> de <span className="font-bold">{pecasExpandidas.length}</span> peças alocadas para OS.
-              </p>
-              <div className="flex gap-3">
-                <button onClick={handleCancelImport} className="px-6 py-2.5 rounded-lg text-sm font-semibold transition-all bg-gray-800 hover:bg-gray-700 text-gray-300">
+            {/* Footer */}
+            <div
+              className="flex items-center justify-between px-6 py-4"
+              style={{
+                borderTop: '1px solid rgba(57,255,20,0.15)',
+                background: 'rgba(0,0,0,0.5)',
+              }}
+            >
+              <div className="flex items-center gap-4">
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4" style={{ color: '#39FF14' }} />
+                    <span className="text-xs text-gray-400">
+                      <span style={{ color: '#39FF14' }} className="font-black text-sm">{qtdAlocadas}</span>
+                      <span className="text-gray-500"> / </span>
+                      <span className="text-gray-300 font-bold">{pecasExpandidas.length}</span>
+                      <span className="text-gray-500"> peças alocadas inteligentemente</span>
+                    </span>
+                  </div>
+                  {qtdAlocadas > 0 && (
+                    <span className="text-xs text-gray-600 ml-6">
+                      {qtdAlocadas} OS(s) serão movidas para Em Reparo automaticamente
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleCancelImport}
+                  className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#9CA3AF',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.1)')}
+                  onMouseLeave={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.06)')}
+                >
                   Cancelar
                 </button>
-                <button onClick={handleConfirmImport} disabled={uploading} className="px-6 py-2.5 rounded-lg text-sm font-bold transition-all bg-[#39FF14] text-black hover:bg-[#39FF14]/80 disabled:opacity-50 flex items-center gap-2">
-                  {uploading ? 'Salvando e Organizando...' : 'Gerar Entrada e Etiquetas'}
+                <button
+                  onClick={handleConfirmImport}
+                  disabled={isSaving}
+                  className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-50"
+                  style={{
+                    background: isSaving ? 'rgba(57,255,20,0.4)' : '#39FF14',
+                    color: '#000',
+                    boxShadow: isSaving ? 'none' : '0 0 20px rgba(57,255,20,0.4)',
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-4 h-4" />
+                      Gerar Entrada e Etiquetas
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -493,26 +793,231 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         </div>
       )}
 
-      {/* RENDER NORMAL DA TELA (Inputs e Lista) */}
+      {/* MAIN CONTENT */}
       <div className="space-y-6">
-        <div className="bg-[#39FF14]/10 border border-[#39FF14]/30 rounded-lg p-6">
-          <h4 className="font-semibold text-[#39FF14] mb-2 flex items-center gap-2">
-            <Zap className="w-5 h-5" /> Entrada de Peças via XML
-          </h4>
-          <p className="text-sm text-gray-300 mb-4">
-            Faça upload do XML. A GIA Stock irá cruzar os dados com as OS em aberto e sugerir a alocação inteligente antes de imprimir as etiquetas.
-          </p>
-
-          <div className="flex items-center gap-4">
-            <label className="flex items-center gap-2 px-6 py-3 bg-[#39FF14] text-black font-bold rounded-lg hover:bg-[#39FF14]/80 transition cursor-pointer">
-              <Upload className="w-5 h-5" />
-              {uploading ? `Processando... (${currentFileIndex}/${totalFiles})` : 'Fazer Upload de XML'}
-              <input type="file" accept=".xml" multiple onChange={handleXMLUpload} disabled={uploading} className="hidden" />
-            </label>
+        {/* Upload Section */}
+        <div
+          className="rounded-2xl p-6"
+          style={{
+            background: 'linear-gradient(135deg, rgba(57,255,20,0.06) 0%, rgba(57,255,20,0.02) 100%)',
+            border: '1px solid rgba(57,255,20,0.25)',
+          }}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className="p-3 rounded-xl shrink-0"
+              style={{
+                background: 'rgba(57,255,20,0.1)',
+                border: '1px solid rgba(57,255,20,0.3)',
+                boxShadow: '0 0 16px rgba(57,255,20,0.15)',
+              }}
+            >
+              <Zap className="w-6 h-6 animate-pulse" style={{ color: '#39FF14' }} />
+            </div>
+            <div className="flex-1">
+              <h4
+                className="font-black text-base tracking-wide mb-1"
+                style={{ color: '#39FF14' }}
+              >
+                GIA STOCK — ENTRADA INTELIGENTE VIA XML
+              </h4>
+              <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                Faça upload do XML da NF. A GIA Stock cruza automaticamente os PNs com as OS em aberto,
+                sugere alocação por prioridade (LP &gt; Atrasada &gt; IH) e move o Kanban ao confirmar.
+              </p>
+              <div className="flex items-center gap-3 flex-wrap">
+                <label
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all cursor-pointer"
+                  style={{
+                    background: uploading || isSaving ? 'rgba(57,255,20,0.4)' : '#39FF14',
+                    color: '#000',
+                    boxShadow: uploading || isSaving ? 'none' : '0 0 16px rgba(57,255,20,0.35)',
+                    opacity: uploading || isSaving ? 0.7 : 1,
+                  }}
+                >
+                  <Upload className="w-4 h-4" />
+                  {uploading
+                    ? `Analisando XML... (${currentFileIndex}/${totalFiles})`
+                    : isSaving
+                    ? 'Processando...'
+                    : 'Upload de XML'}
+                  <input
+                    type="file"
+                    accept=".xml"
+                    multiple
+                    onChange={handleXMLUpload}
+                    disabled={uploading || isSaving}
+                    className="hidden"
+                  />
+                </label>
+                <span className="text-xs text-gray-500">Suporta múltiplos arquivos simultâneos</span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* ... Restante igual (Erros e Lista de NFs Processadas) */}
+        {/* Error / Success messages */}
+        {error && (
+          <div
+            className="flex items-start gap-3 p-4 rounded-xl"
+            style={{ background: 'rgba(255,0,100,0.08)', border: '1px solid rgba(255,0,100,0.3)' }}
+          >
+            <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: '#FF0064' }} />
+            <div>
+              <p className="text-sm font-bold" style={{ color: '#FF0064' }}>Erro na importação</p>
+              <pre className="text-xs text-red-300 mt-1 whitespace-pre-wrap font-mono">{error}</pre>
+            </div>
+            <button onClick={() => setError(null)} className="ml-auto shrink-0">
+              <X className="w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors" />
+            </button>
+          </div>
+        )}
+
+        {successMsg && (
+          <div
+            className="flex items-start gap-3 p-4 rounded-xl"
+            style={{ background: 'rgba(57,255,20,0.06)', border: '1px solid rgba(57,255,20,0.3)' }}
+          >
+            <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: '#39FF14' }} />
+            <p className="text-sm text-gray-200">{successMsg}</p>
+            <button onClick={() => setSuccessMsg(null)} className="ml-auto shrink-0">
+              <X className="w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors" />
+            </button>
+          </div>
+        )}
+
+        {/* NF List */}
+        {nfs.length > 0 && (
+          <div>
+            <h3
+              className="text-xs font-black tracking-[0.2em] uppercase mb-4"
+              style={{ color: '#00D4FF' }}
+            >
+              Notas Fiscais Recentes
+            </h3>
+            <div className="space-y-2">
+              {nfs.map(nf => (
+                <div
+                  key={nf.id}
+                  className="flex items-center gap-4 p-4 rounded-xl transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.03)',
+                    border: '1px solid rgba(255,255,255,0.08)',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.borderColor = 'rgba(0,212,255,0.25)')}
+                  onMouseLeave={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                >
+                  <div
+                    className="p-2 rounded-lg shrink-0"
+                    style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.2)' }}
+                  >
+                    <FileText className="w-5 h-5" style={{ color: '#00D4FF' }} />
+                  </div>
+
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono font-black text-sm text-white">NF {nf.numero_nf}</span>
+                      {nf.processada ? (
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{
+                            background: 'rgba(57,255,20,0.12)',
+                            border: '1px solid rgba(57,255,20,0.3)',
+                            color: '#39FF14',
+                          }}
+                        >
+                          Processada
+                        </span>
+                      ) : (
+                        <span
+                          className="text-xs font-bold px-2 py-0.5 rounded-full"
+                          style={{
+                            background: 'rgba(255,191,0,0.12)',
+                            border: '1px solid rgba(255,191,0,0.3)',
+                            color: '#FFBF00',
+                          }}
+                        >
+                          Pendente
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-3 mt-0.5">
+                      <span className="text-xs text-gray-500">{nf.fornecedor}</span>
+                      <span className="text-xs text-gray-600">•</span>
+                      <span className="text-xs text-gray-500">
+                        {new Date(nf.data_emissao).toLocaleDateString('pt-BR')}
+                      </span>
+                      {nf.qtd_pecas > 0 && (
+                        <>
+                          <span className="text-xs text-gray-600">•</span>
+                          <span className="text-xs text-gray-500">{nf.qtd_pecas} peças</span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <span className="text-sm font-bold mr-2" style={{ color: '#39FF14' }}>
+                      R$ {nf.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+
+                    <button
+                      onClick={() => handleViewNFDetails(nf.id)}
+                      title="Ver detalhes"
+                      className="p-2 rounded-lg transition-colors hover:bg-white/5"
+                    >
+                      <Eye className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
+                    </button>
+
+                    {nf.chave_acesso && (
+                      <button
+                        onClick={() => handleDownloadNFPDF(nf)}
+                        disabled={downloadingNFId === nf.id}
+                        title="Baixar DANFE"
+                        className="p-2 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-40"
+                      >
+                        {downloadingNFId === nf.id ? (
+                          <div
+                            className="w-4 h-4 border-2 border-t-transparent rounded-full animate-spin"
+                            style={{ borderColor: '#00D4FF', borderTopColor: 'transparent' }}
+                          />
+                        ) : (
+                          <Download className="w-4 h-4 text-gray-400 hover:text-white transition-colors" />
+                        )}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => handleDeleteNF(nf)}
+                      disabled={deletingNFId === nf.id}
+                      title="Excluir NF"
+                      className="p-2 rounded-lg transition-colors hover:bg-red-500/10 disabled:opacity-40"
+                    >
+                      {deletingNFId === nf.id ? (
+                        <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4 text-gray-600 hover:text-red-400 transition-colors" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {nfs.length === 0 && !uploading && !isSaving && (
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <div
+              className="p-5 rounded-2xl mb-4"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            >
+              <Package className="w-10 h-10 text-gray-700" />
+            </div>
+            <p className="text-gray-500 font-medium">Nenhuma NF importada ainda</p>
+            <p className="text-xs text-gray-600 mt-1">Faça upload de um XML para começar</p>
+          </div>
+        )}
       </div>
     </>
   );
