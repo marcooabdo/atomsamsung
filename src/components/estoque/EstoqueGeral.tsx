@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Filter, Package, Eye, History, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, X } from 'lucide-react';
+import { Search, Filter, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
@@ -11,6 +11,7 @@ import { PecaDetailsModal } from './PecaDetailsModal';
 type EstoquePeca = Database['public']['Tables']['estoque_pecas']['Row'] & {
   nf_data_emissao?: string;
   nf_delivery?: string;
+  os_numero?: string | null;
 };
 
 interface EstoqueGeralProps {
@@ -25,14 +26,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [showArquivadas, setShowArquivadas] = useState(false);
   const [selectedPeca, setSelectedPeca] = useState<EstoquePeca | null>(null);
-  const [showHistory, setShowHistory] = useState<string | null>(null);
   const [showLabelSelector, setShowLabelSelector] = useState(false);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
   const [generatedLabels, setGeneratedLabels] = useState<any[]>([]);
   const [showLocationSelector, setShowLocationSelector] = useState(false);
   const [pecaLocalizacoes, setPecaLocalizacoes] = useState<any[]>([]);
-  const [historicoData, setHistoricoData] = useState<any[]>([]);
-  const [loadingHistorico, setLoadingHistorico] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
@@ -42,12 +40,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   useEffect(() => {
     loadPecas();
   }, [statusFilter, showArquivadas, selectedUnidade]);
-
-  useEffect(() => {
-    if (showHistory) {
-      loadHistorico(showHistory);
-    }
-  }, [showHistory]);
 
   const loadPecas = async () => {
     try {
@@ -65,6 +57,10 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           estoque_etiquetas(
             id_sequencial,
             delivery
+          ),
+          os:os_id(
+            numero_os_interna,
+            numero_os_samsung
           ),
           requisicoes_pecas!peca_estoque_id(
             id,
@@ -104,7 +100,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       const enrichedPecas = (data || []).map((peca: any) => ({
         ...peca,
         nf_data_emissao: peca.estoque_nfs?.data_emissao,
-        nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery
+        nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery,
+        os_numero: peca.os?.numero_os_samsung || peca.os?.numero_os_interna || null,
       }));
 
       enrichedPecas.sort((a, b) => {
@@ -119,41 +116,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       setLoading(false);
     }
   };
-
-  const loadHistorico = async (pecaId: string) => {
-    setLoadingHistorico(true);
-    setHistoricoData([]);
-    try {
-      const { data, error } = await supabase
-        .from('estoque_historico')
-        .select(`
-          *,
-          usuario:usuarios(nome),
-          peca:estoque_pecas(
-            id,
-            pn,
-            descricao,
-            id_numerico,
-            nf:estoque_nfs(
-              numero_nf,
-              data_emissao,
-              delivery,
-              fornecedor
-            )
-          )
-        `)
-        .eq('peca_id', pecaId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setHistoricoData(data || []);
-    } catch (error) {
-      setHistoricoData([]);
-    } finally {
-      setLoadingHistorico(false);
-    }
-  };
-
 
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
@@ -216,12 +178,16 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     );
   };
 
-  const filteredPecas = pecas.filter((peca) =>
-    peca.pn.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (peca.id_numerico && peca.id_numerico.toString().includes(searchTerm)) ||
-    peca.descricao.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (peca.nf_delivery && peca.nf_delivery.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredPecas = pecas.filter((peca) => {
+    const term = searchTerm.toLowerCase();
+    return (
+      peca.pn.toLowerCase().includes(term) ||
+      (peca.id_numerico && peca.id_numerico.toString().includes(searchTerm)) ||
+      (peca.descricao && peca.descricao.toLowerCase().includes(term)) ||
+      (peca.nf_delivery && peca.nf_delivery.toLowerCase().includes(term)) ||
+      (peca.os_numero && peca.os_numero.toLowerCase().includes(term))
+    );
+  });
 
   const toggleSelectPeca = (pecaId: string) => {
     setSelectedPecas(prev => {
@@ -281,7 +247,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
           <input
             type="text"
-            placeholder="Buscar por PN, ID ou descrição..."
+            placeholder="Buscar por PN, ID, descrição ou OS..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="neon-input w-full pl-10 pr-4 py-2"
@@ -521,13 +487,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                   <Eye className="w-4 h-4" />
                   Ver Detalhes
                 </button>
-                <button
-                  onClick={() => setShowHistory(peca.id)}
-                  className="flex items-center justify-center gap-2 px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition text-sm border border-gray-700"
-                  title="Ver Histórico"
-                >
-                  <History className="w-4 h-4" />
-                </button>
               </div>
             </div>
           ))
@@ -685,153 +644,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         />
       )}
 
-      {showHistory && (
-        <div className="fixed inset-0 z-50" onClick={() => setShowHistory(null)}>
-          <div className="absolute inset-0 bg-black/40" />
-          <div
-            className="absolute right-4 top-1/2 -translate-y-1/2 w-[480px] max-h-[85vh] flex flex-col rounded-2xl shadow-2xl overflow-hidden"
-            style={{
-              background: 'var(--bg-card)',
-              border: '1px solid var(--border-accent)',
-              boxShadow: '0 20px 60px var(--shadow-primary), 0 0 24px rgba(var(--accent-rgb), 0.08)',
-              backdropFilter: 'blur(24px)',
-            }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-primary)' }}>
-              <div className="flex items-center gap-2">
-                <History className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
-                <h2 className="text-lg font-bold" style={{ color: 'var(--text-accent)' }}>Histórico da Peça</h2>
-              </div>
-              <button
-                onClick={() => setShowHistory(null)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-gray-800/50"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            </div>
-
-            {historicoData.length > 0 && historicoData[0].peca?.nf && (
-              <div className="mx-4 mt-4 p-3 rounded-lg border" style={{ background: 'rgba(var(--accent-rgb), 0.04)', borderColor: 'var(--border-primary)' }}>
-                <h3 className="text-xs font-bold text-gray-400 uppercase mb-2">Informações de Entrada</h3>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  {historicoData[0].peca.id_numerico && (
-                    <div>
-                      <span className="text-gray-500">ID:</span>
-                      <span className="text-[#39FF14] font-bold ml-1">#{historicoData[0].peca.id_numerico}</span>
-                    </div>
-                  )}
-                  <div>
-                    <span className="text-gray-500">PN:</span>
-                    <span className="text-white font-mono ml-1">{historicoData[0].peca.pn}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">NF:</span>
-                    <span className="text-white font-bold ml-1">{historicoData[0].peca.nf.numero_nf}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Fornecedor:</span>
-                    <span className="text-white ml-1">{historicoData[0].peca.nf.fornecedor}</span>
-                  </div>
-                  <div>
-                    <span className="text-gray-500">Emissao:</span>
-                    <span className="text-white ml-1">
-                      {new Date(historicoData[0].peca.nf.data_emissao).toLocaleDateString('pt-BR')}
-                    </span>
-                  </div>
-                  {historicoData[0].peca.nf.delivery && (
-                    <div>
-                      <span className="text-gray-500">Delivery:</span>
-                      <span className="font-bold ml-1" style={{ color: 'var(--text-accent)' }}>{historicoData[0].peca.nf.delivery}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            <div className="flex-1 overflow-y-auto cyber-scrollbar p-4">
-              {loadingHistorico ? (
-                <div className="text-center py-12">
-                  <div className="w-10 h-10 border-3 rounded-full animate-spin mx-auto mb-3" style={{ borderColor: 'var(--border-primary)', borderTopColor: 'var(--text-accent)' }} />
-                  <p className="text-gray-400 text-sm">Carregando histórico...</p>
-                </div>
-              ) : historicoData.length === 0 ? (
-                <div className="text-center py-12">
-                  <History className="w-10 h-10 text-gray-600 mx-auto mb-3" />
-                  <p className="text-gray-400 text-sm">Nenhum histórico encontrado</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {historicoData.map((item) => (
-                    <div key={item.id} className="p-3 rounded-lg border" style={{ background: 'rgba(var(--accent-rgb), 0.03)', borderColor: 'var(--border-primary)' }}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="px-2 py-0.5 bg-[#00D4FF]/20 text-[#00D4FF] rounded text-xs font-medium">
-                              {item.acao}
-                            </span>
-                            <span className="text-[10px] text-gray-500">
-                              {new Date(item.created_at).toLocaleString('pt-BR')}
-                            </span>
-                          </div>
-
-                          {item.status_anterior && item.status_novo && (
-                            <div className="flex items-center gap-2 text-xs mt-1.5">
-                              <span className="text-gray-400">Status:</span>
-                              {getStatusBadge(item.status_anterior)}
-                              <span className="text-gray-500">-{'>'}</span>
-                              {getStatusBadge(item.status_novo)}
-                            </div>
-                          )}
-
-                          {item.origem && (
-                            <div className="text-xs text-gray-400 mt-1.5">
-                              <strong>Origem:</strong> {item.origem}
-                            </div>
-                          )}
-
-                          {item.destino && (
-                            <div className="text-xs text-gray-400 mt-0.5">
-                              <strong>Destino:</strong> {item.destino}
-                            </div>
-                          )}
-
-                          {item.observacao && (
-                            <div
-                              className="text-xs mt-1.5 p-2 rounded border"
-                              style={{
-                                backgroundColor: item.observacao.includes('DEFEITO:') ? '#FF006410' : 'rgba(var(--accent-rgb), 0.04)',
-                                borderColor: item.observacao.includes('DEFEITO:') ? '#FF006460' : 'var(--border-primary)',
-                                color: item.observacao.includes('DEFEITO:') ? '#FF0064' : 'var(--text-secondary)'
-                              }}
-                            >
-                              {item.observacao.includes('DEFEITO:') && (
-                                <div className="font-bold mb-1 flex items-center gap-1">
-                                  <AlertCircle className="w-3 h-3" />
-                                  <span>DEFEITO DE FABRICA</span>
-                                </div>
-                              )}
-                              <div className={item.observacao.includes('DEFEITO:') ? 'font-medium' : ''}>
-                                {item.observacao}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-
-                        {item.usuario && (
-                          <div className="text-[10px] text-gray-500 ml-2 whitespace-nowrap">
-                            {item.usuario.nome}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {showEmitirNFModal && selectedPecas.size > 0 && (
         <EmitirNFModal
