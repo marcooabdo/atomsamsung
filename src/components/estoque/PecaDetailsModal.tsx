@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
 
@@ -17,6 +17,8 @@ interface Peca {
   id_numerico: number | null;
   unidade_id: string;
   os_id?: string | null;
+  data_coleta_transportadora?: string | null;
+  data_retorno_credito?: string | null;
 }
 
 interface PecaDetalhada extends Peca {
@@ -67,6 +69,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
   devolucao_pendente: { label: 'Devolução Pendente', color: '#FF0064' },
   devolvida_nova: { label: 'Devolvida Nova', color: '#39FF14' },
   devolvida_defeito: { label: 'Devolvida c/ Defeito', color: '#FF0064' },
+  devolvida_samsung: { label: 'Devolvida Samsung', color: '#60a5fa' },
   usada_upc: { label: 'Usada UPC', color: '#6B7280' },
 };
 
@@ -77,6 +80,14 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const [pecaDetalhada, setPecaDetalhada] = useState<PecaDetalhada | null>(null);
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
   const [loadingHistorico, setLoadingHistorico] = useState(true);
+
+  const [dataColeta, setDataColeta] = useState('');
+  const [dataCredito, setDataCredito] = useState('');
+  const [salvandoColeta, setSalvandoColeta] = useState(false);
+  const [salvandoCredito, setSalvandoCredito] = useState(false);
+
+  const [localColeta, setLocalColeta] = useState<string | null>(peca.data_coleta_transportadora || null);
+  const [localCredito, setLocalCredito] = useState<string | null>(peca.data_retorno_credito || null);
 
   useEffect(() => {
     loadDetalhes();
@@ -99,11 +110,79 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           .limit(30),
       ]);
 
-      if (detRes.data) setPecaDetalhada(detRes.data as unknown as PecaDetalhada);
+      if (detRes.data) {
+        const det = detRes.data as unknown as PecaDetalhada;
+        setPecaDetalhada(det);
+        setLocalColeta((det as any).data_coleta_transportadora || null);
+        setLocalCredito((det as any).data_retorno_credito || null);
+      }
       setHistorico((histRes.data || []) as unknown as HistoricoItem[]);
     } finally {
       setLoadingHistorico(false);
     }
+  };
+
+  const handleRegistrarColeta = async () => {
+    if (!dataColeta) return;
+    setSalvandoColeta(true);
+    try {
+      const isoDate = new Date(dataColeta + 'T12:00:00').toISOString();
+      await supabase
+        .from('estoque_pecas')
+        .update({ data_coleta_transportadora: isoDate })
+        .eq('id', peca.id);
+
+      await supabase.from('estoque_historico').insert({
+        peca_id: peca.id,
+        acao: 'Coleta Registrada',
+        status_anterior: 'devolvida_samsung',
+        status_novo: 'devolvida_samsung',
+        observacao: `Data de coleta pela transportadora registrada: ${new Date(isoDate).toLocaleDateString('pt-BR')}`,
+      });
+
+      setLocalColeta(isoDate);
+      setDataColeta('');
+      await loadDetalhes();
+    } catch {
+      alert('Erro ao registrar coleta');
+    } finally {
+      setSalvandoColeta(false);
+    }
+  };
+
+  const handleConfirmarCredito = async () => {
+    if (!dataCredito) return;
+    setSalvandoCredito(true);
+    try {
+      const isoDate = new Date(dataCredito + 'T12:00:00').toISOString();
+      await supabase
+        .from('estoque_pecas')
+        .update({ data_retorno_credito: isoDate })
+        .eq('id', peca.id);
+
+      await supabase.from('estoque_historico').insert({
+        peca_id: peca.id,
+        acao: 'Crédito GSPN Confirmado',
+        status_anterior: 'devolvida_samsung',
+        status_novo: 'devolvida_samsung',
+        observacao: `Crédito confirmado no GSPN em: ${new Date(isoDate).toLocaleDateString('pt-BR')}`,
+      });
+
+      setLocalCredito(isoDate);
+      setDataCredito('');
+      await loadDetalhes();
+    } catch {
+      alert('Erro ao confirmar crédito');
+    } finally {
+      setSalvandoCredito(false);
+    }
+  };
+
+  const calcularSLA = (coleta: string, credito: string) => {
+    const d1 = new Date(coleta);
+    const d2 = new Date(credito);
+    const diffMs = d2.getTime() - d1.getTime();
+    return Math.round(diffMs / (1000 * 60 * 60 * 24));
   };
 
   const handleAlterarLocalizacao = async () => {
@@ -176,6 +255,10 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const osLabel = osVinculada
     ? (osVinculada.numero_os_samsung || osVinculada.numero_os_interna)
     : null;
+
+  const isSamsungReturn = peca.status === 'devolvida_samsung';
+  const slaValido = localColeta && localCredito;
+  const slaDias = slaValido ? calcularSLA(localColeta!, localCredito!) : null;
 
   const modalContent = (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
@@ -281,6 +364,137 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
               )}
             </div>
           </div>
+
+          {/* Logistica Reversa - only for devolvida_samsung */}
+          {isSamsungReturn && (
+            <div
+              className="rounded-xl p-5"
+              style={{
+                background: 'rgba(96,165,250,0.06)',
+                border: '2px solid rgba(96,165,250,0.35)',
+              }}
+            >
+              <div className="flex items-center gap-2 mb-4">
+                <Truck className="w-4 h-4 text-blue-400" />
+                <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider">Logística Reversa</h3>
+              </div>
+
+              <div className="space-y-4">
+                {/* Coleta */}
+                <div
+                  className="p-4 rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-2 h-2 rounded-full ${localColeta ? 'bg-green-400' : 'bg-orange-400 animate-pulse'}`} />
+                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Coleta pela Transportadora</p>
+                  </div>
+
+                  {localColeta ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                      <span className="text-green-400 font-semibold text-sm">
+                        Coletada em {new Date(localColeta).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={dataColeta}
+                        onChange={(e) => setDataColeta(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm text-white bg-gray-900 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleRegistrarColeta}
+                        disabled={!dataColeta || salvandoColeta}
+                        className="px-4 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 whitespace-nowrap"
+                        style={{
+                          background: 'rgba(249,115,22,0.2)',
+                          border: '1px solid rgba(249,115,22,0.5)',
+                          color: '#fb923c',
+                        }}
+                      >
+                        {salvandoColeta ? 'Salvando...' : 'Registrar Coleta'}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Credito GSPN */}
+                <div
+                  className="p-4 rounded-lg"
+                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                >
+                  <div className="flex items-center gap-2 mb-3">
+                    <div className={`w-2 h-2 rounded-full ${localCredito ? 'bg-green-400' : localColeta ? 'bg-red-400 animate-pulse' : 'bg-gray-600'}`} />
+                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Crédito no GSPN</p>
+                  </div>
+
+                  {localCredito ? (
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
+                      <span className="text-green-400 font-semibold text-sm">
+                        Crédito confirmado em {new Date(localCredito).toLocaleDateString('pt-BR')}
+                      </span>
+                    </div>
+                  ) : localColeta ? (
+                    <div className="flex gap-2">
+                      <input
+                        type="date"
+                        value={dataCredito}
+                        onChange={(e) => setDataCredito(e.target.value)}
+                        className="flex-1 px-3 py-2 rounded-lg text-sm text-white bg-gray-900 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                      />
+                      <button
+                        onClick={handleConfirmarCredito}
+                        disabled={!dataCredito || salvandoCredito}
+                        className="px-4 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-50 whitespace-nowrap"
+                        style={{
+                          background: 'rgba(239,68,68,0.2)',
+                          border: '1px solid rgba(239,68,68,0.5)',
+                          color: '#f87171',
+                        }}
+                      >
+                        {salvandoCredito ? 'Salvando...' : 'Confirmar Crédito no GSPN'}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 italic">Aguardando coleta para liberar esta etapa</p>
+                  )}
+                </div>
+
+                {/* SLA */}
+                {slaDias !== null && (
+                  <div
+                    className="p-4 rounded-lg flex items-center gap-3"
+                    style={{
+                      background: slaDias <= 10 ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)',
+                      border: `1px solid ${slaDias <= 10 ? 'rgba(34,197,94,0.4)' : 'rgba(239,68,68,0.4)'}`,
+                    }}
+                  >
+                    {slaDias <= 10 ? (
+                      <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
+                    ) : (
+                      <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                    )}
+                    <div>
+                      <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-0.5">Auditoria SLA</p>
+                      {slaDias <= 10 ? (
+                        <p className="text-green-400 font-bold text-sm">
+                          SLA Cumprido: {slaDias} {slaDias === 1 ? 'dia' : 'dias'}
+                        </p>
+                      ) : (
+                        <p className="text-red-400 font-bold text-sm">
+                          SLA Estourado: {slaDias} dias (Meta: 10 dias)
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Localização */}
           <div>

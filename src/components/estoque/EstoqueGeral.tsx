@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Filter, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText } from 'lucide-react';
+import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
@@ -36,6 +36,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
   const [selectedPecas, setSelectedPecas] = useState<Set<string>>(new Set());
   const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
+  const [despachandoSamsung, setDespachandoSamsung] = useState(false);
 
   useEffect(() => {
     loadPecas();
@@ -72,16 +73,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           )
         `);
 
-      // Aplicar filtro de unidade
       if (canSeeAllUnits) {
-        // Master/Diretoria: filtrar SOMENTE se selectedUnidade for UUID válido
         if (selectedUnidade && selectedUnidade !== '' && selectedUnidade !== 'all') {
           query = query.eq('unidade_id', selectedUnidade);
-        } else {
-          // NÃO aplicar filtro - ver tudo
         }
       } else if (unidadeFilter) {
-        // Usuário normal: filtrar pela sua unidade
         query = query.eq('unidade_id', unidadeFilter);
       }
 
@@ -117,17 +113,55 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     }
   };
 
+  const handleDespacharSamsung = async () => {
+    if (selectedPecas.size === 0) return;
+    setDespachandoSamsung(true);
+    try {
+      const ids = Array.from(selectedPecas);
+      const now = new Date().toISOString();
+
+      await supabase
+        .from('estoque_pecas')
+        .update({
+          status: 'devolvida_samsung',
+          data_coleta_transportadora: null,
+          data_retorno_credito: null,
+          updated_at: now,
+        })
+        .in('id', ids);
+
+      const historicoEntries = ids.map((id) => ({
+        peca_id: id,
+        usuario_id: user?.id || null,
+        acao: 'Despachada para Samsung',
+        status_anterior: pecas.find(p => p.id === id)?.status || null,
+        status_novo: 'devolvida_samsung',
+        observacao: 'Peça despachada em lote para logística reversa Samsung',
+      }));
+
+      await supabase.from('estoque_historico').insert(historicoEntries);
+
+      clearSelection();
+      await loadPecas();
+    } catch (error) {
+      alert('Erro ao despachar peças para Samsung');
+    } finally {
+      setDespachandoSamsung(false);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       disponivel: { label: 'Disponível', className: 'bg-green-500/20 text-green-400 border border-green-500/30' },
       reservada: { label: 'Reservada', className: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' },
       vinculada_tecnico: { label: 'Com Técnico', className: 'bg-blue-500/20 text-blue-400 border border-blue-500/30' },
-      em_rota: { label: 'Em Rota', className: 'bg-purple-500/20 text-purple-400 border border-purple-500/30' },
+      em_rota: { label: 'Em Rota', className: 'bg-blue-500/20 text-blue-400 border border-blue-500/30' },
       em_uso: { label: 'Em Uso', className: 'bg-orange-500/20 text-orange-400 border border-orange-500/30' },
       usada: { label: 'Usada', className: 'bg-gray-500/20 text-gray-400 border border-gray-500/30' },
       devolucao_pendente: { label: 'Devolução Pendente', className: 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' },
       devolvida_nova: { label: 'Devolvida Nova', className: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' },
       devolvida_defeito: { label: 'Devolvida c/ Defeito', className: 'bg-red-500/20 text-red-400 border border-red-500/30' },
+      devolvida_samsung: { label: 'Devolvida Samsung', className: 'bg-blue-600/20 text-blue-300 border border-blue-500/30' },
       usada_upc: { label: 'Usada UPC', className: 'bg-slate-500/20 text-slate-400 border border-slate-500/30' },
       arquivada: { label: 'Arquivada', className: 'bg-gray-500/20 text-gray-500 border border-gray-500/30' }
     };
@@ -176,6 +210,44 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         {label}
       </span>
     );
+  };
+
+  const getLogisticaReversaStyle = (peca: EstoquePeca) => {
+    if (peca.status !== 'devolvida_samsung') return { cardClass: '', indicator: null };
+
+    if (!peca.data_coleta_transportadora) {
+      return {
+        cardClass: 'border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)] animate-pulse',
+        indicator: (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-500/20 border border-orange-500/40 text-orange-400 text-xs font-semibold">
+            <Truck className="w-3 h-3" />
+            Aguardando Coleta
+          </div>
+        ),
+      };
+    }
+
+    if (!peca.data_retorno_credito) {
+      return {
+        cardClass: 'border-red-500 shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse',
+        indicator: (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-red-500/20 border border-red-500/40 text-red-400 text-xs font-semibold">
+            <AlertCircle className="w-3 h-3" />
+            Aguardando Crédito GSPN
+          </div>
+        ),
+      };
+    }
+
+    return {
+      cardClass: 'border-gray-600',
+      indicator: (
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-500/40 text-green-400 text-xs font-semibold">
+          <CheckSquare className="w-3 h-3" />
+          Crédito Retornado
+        </div>
+      ),
+    };
   };
 
   const filteredPecas = pecas.filter((peca) => {
@@ -230,7 +302,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
   const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const allCurrentPageSelected = currentPagePecas.length > 0 && currentPagePecas.every(p => selectedPecas.has(p.id));
-  const someCurrentPageSelected = currentPagePecas.some(p => selectedPecas.has(p.id));
 
   if (loading) {
     return (
@@ -269,6 +340,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           <option value="devolucao_pendente">Devolução Pendente</option>
           <option value="devolvida_nova">Devolvida Nova</option>
           <option value="devolvida_defeito">Devolvida c/ Defeito</option>
+          <option value="devolvida_samsung">Devolvida Samsung</option>
           <option value="usada_upc">Usada UPC</option>
         </select>
 
@@ -283,19 +355,35 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         </label>
 
         {selectedPecas.size > 0 && (
-          <button
-            onClick={() => setShowEmitirNFModal(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
-            style={{
-              background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
-              border: '2px solid rgba(255,165,0,0.7)',
-              color: '#FFA500',
-              boxShadow: '0 0 15px rgba(255,165,0,0.2)'
-            }}
-          >
-            <FileText className="w-4 h-4" />
-            Emitir NF ({selectedPecas.size})
-          </button>
+          <>
+            <button
+              onClick={handleDespacharSamsung}
+              disabled={despachandoSamsung}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap disabled:opacity-60"
+              style={{
+                background: 'linear-gradient(135deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 100%)',
+                border: '2px solid rgba(59,130,246,0.7)',
+                color: '#60a5fa',
+                boxShadow: '0 0 15px rgba(59,130,246,0.2)'
+              }}
+            >
+              <Truck className="w-4 h-4" />
+              {despachandoSamsung ? 'Despachando...' : `Despachar para Samsung (${selectedPecas.size})`}
+            </button>
+            <button
+              onClick={() => setShowEmitirNFModal(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
+                border: '2px solid rgba(255,165,0,0.7)',
+                color: '#FFA500',
+                boxShadow: '0 0 15px rgba(255,165,0,0.2)'
+              }}
+            >
+              <FileText className="w-4 h-4" />
+              Emitir NF ({selectedPecas.size})
+            </button>
+          </>
         )}
       </div>
 
@@ -353,143 +441,152 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             <p className="text-gray-400">Nenhuma peça encontrada</p>
           </div>
         ) : (
-          filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((peca) => (
-            <div
-              key={peca.id}
-              className={`premium-card p-4 hover-lift relative transition-all ${
-                selectedPecas.has(peca.id)
-                  ? 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
-                  : ''
-              }`}
-            >
-              <button
-                onClick={() => toggleSelectPeca(peca.id)}
-                className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
+          filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((peca) => {
+            const { cardClass, indicator } = getLogisticaReversaStyle(peca);
+            return (
+              <div
+                key={peca.id}
+                className={`premium-card p-4 hover-lift relative transition-all ${
                   selectedPecas.has(peca.id)
-                    ? 'bg-[#FFA500] text-black'
-                    : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    ? 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
+                    : cardClass
                 }`}
               >
-                {selectedPecas.has(peca.id) ? (
-                  <CheckSquare className="w-5 h-5" />
-                ) : (
-                  <Square className="w-5 h-5" />
-                )}
-              </button>
-
-              <div className="flex items-start justify-between mb-3 pr-10">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="px-2.5 py-1 bg-[#39FF14]/20 text-[#39FF14] rounded font-bold text-sm">
-                      ID #{peca.id_numerico || 'N/A'}
-                    </div>
-                    <div className="font-mono text-base font-semibold text-[#00D4FF]">
-                      {peca.pn}
-                    </div>
-                  </div>
-                  <div className="space-y-1 mb-2">
-                    {peca.nf_delivery && (
-                      <div className="text-xs text-gray-400 flex items-center gap-1">
-                        <Package className="w-3 h-3 text-[#00D4FF]" />
-                        Delivery: <span className="text-[#00D4FF] font-bold">{peca.nf_delivery}</span>
-                      </div>
-                    )}
-                    {peca.nf_data_emissao && (
-                      <div className="text-xs text-gray-400 flex items-center gap-1">
-                        <Clock className="w-3 h-3" />
-                        Entrada: <span className="text-gray-300">{new Date(peca.nf_data_emissao).toLocaleDateString('pt-BR')}</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    {getStatusBadge(peca.status)}
-                    {getAgeBadge(getDaysFromEmission(peca.nf_data_emissao))}
-                    {(() => {
-                      const requisicaoAprovada = (peca as any).requisicoes_pecas?.find(
-                        (req: any) => req.status === 'atendida'
-                      );
-                      if (requisicaoAprovada) {
-                        return (
-                          <div
-                            className="px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"
-                            style={{
-                              backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
-                              color: 'var(--text-accent)',
-                              border: '1px solid rgba(var(--accent-rgb), 0.38)'
-                            }}
-                          >
-                            <Package className="w-3 h-3" />
-                            REQ #{requisicaoAprovada.id.slice(0, 8)}
-                          </div>
-                        );
-                      }
-                      return null;
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              <p className="text-sm text-gray-300 mb-3 line-clamp-2">
-                {peca.descricao}
-              </p>
-
-              {(() => {
-                const requisicaoAprovada = (peca as any).requisicoes_pecas?.find(
-                  (req: any) => req.status === 'atendida'
-                );
-                if (requisicaoAprovada) {
-                  return (
-                    <div className="mb-3 p-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30">
-                      <div className="flex items-center justify-between text-xs">
-                        <span className="text-[#00D4FF] font-semibold">Requisitado em:</span>
-                        <span className="text-gray-300">
-                          {new Date(requisicaoAprovada.created_at).toLocaleString('pt-BR')}
-                        </span>
-                      </div>
-                      {requisicaoAprovada.usuarios?.nome && (
-                        <div className="flex items-center justify-between text-xs mt-1">
-                          <span className="text-[#00D4FF] font-semibold">Por:</span>
-                          <span className="text-gray-300">{requisicaoAprovada.usuarios.nome}</span>
-                        </div>
-                      )}
-                      {requisicaoAprovada.quantidade_requisitada && (
-                        <div className="flex items-center justify-between text-xs mt-1">
-                          <span className="text-[#00D4FF] font-semibold">Quantidade:</span>
-                          <span className="text-gray-300">{requisicaoAprovada.quantidade_requisitada}</span>
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return null;
-              })()}
-
-              <div className="space-y-2 text-xs text-gray-400 mb-4">
-                {peca.localizacao && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-500">Localização:</span>
-                    <span className="font-medium text-gray-300">{peca.localizacao}</span>
-                  </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Valor:</span>
-                  <span className="font-medium text-[#39FF14]">
-                    R$ {peca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
                 <button
-                  onClick={() => setSelectedPeca(peca)}
-                  className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#00D4FF]/10 text-[#00D4FF] rounded-lg hover:bg-[#00D4FF]/20 transition text-sm border border-[#00D4FF]/30"
+                  onClick={() => toggleSelectPeca(peca.id)}
+                  className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
+                    selectedPecas.has(peca.id)
+                      ? 'bg-[#FFA500] text-black'
+                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                  }`}
                 >
-                  <Eye className="w-4 h-4" />
-                  Ver Detalhes
+                  {selectedPecas.has(peca.id) ? (
+                    <CheckSquare className="w-5 h-5" />
+                  ) : (
+                    <Square className="w-5 h-5" />
+                  )}
                 </button>
+
+                <div className="flex items-start justify-between mb-3 pr-10">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="px-2.5 py-1 bg-[#39FF14]/20 text-[#39FF14] rounded font-bold text-sm">
+                        ID #{peca.id_numerico || 'N/A'}
+                      </div>
+                      <div className="font-mono text-base font-semibold text-[#00D4FF]">
+                        {peca.pn}
+                      </div>
+                    </div>
+                    <div className="space-y-1 mb-2">
+                      {peca.nf_delivery && (
+                        <div className="text-xs text-gray-400 flex items-center gap-1">
+                          <Package className="w-3 h-3 text-[#00D4FF]" />
+                          Delivery: <span className="text-[#00D4FF] font-bold">{peca.nf_delivery}</span>
+                        </div>
+                      )}
+                      {peca.nf_data_emissao && (
+                        <div className="text-xs text-gray-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          Entrada: <span className="text-gray-300">{new Date(peca.nf_data_emissao).toLocaleDateString('pt-BR')}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {getStatusBadge(peca.status)}
+                      {getAgeBadge(getDaysFromEmission(peca.nf_data_emissao))}
+                      {(() => {
+                        const requisicaoAprovada = (peca as any).requisicoes_pecas?.find(
+                          (req: any) => req.status === 'atendida'
+                        );
+                        if (requisicaoAprovada) {
+                          return (
+                            <div
+                              className="px-2 py-1 rounded-md text-[10px] font-bold uppercase flex items-center gap-1"
+                              style={{
+                                backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
+                                color: 'var(--text-accent)',
+                                border: '1px solid rgba(var(--accent-rgb), 0.38)'
+                              }}
+                            >
+                              <Package className="w-3 h-3" />
+                              REQ #{requisicaoAprovada.id.slice(0, 8)}
+                            </div>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-sm text-gray-300 mb-3 line-clamp-2">
+                  {peca.descricao}
+                </p>
+
+                {indicator && (
+                  <div className="mb-3">
+                    {indicator}
+                  </div>
+                )}
+
+                {(() => {
+                  const requisicaoAprovada = (peca as any).requisicoes_pecas?.find(
+                    (req: any) => req.status === 'atendida'
+                  );
+                  if (requisicaoAprovada) {
+                    return (
+                      <div className="mb-3 p-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-[#00D4FF] font-semibold">Requisitado em:</span>
+                          <span className="text-gray-300">
+                            {new Date(requisicaoAprovada.created_at).toLocaleString('pt-BR')}
+                          </span>
+                        </div>
+                        {requisicaoAprovada.usuarios?.nome && (
+                          <div className="flex items-center justify-between text-xs mt-1">
+                            <span className="text-[#00D4FF] font-semibold">Por:</span>
+                            <span className="text-gray-300">{requisicaoAprovada.usuarios.nome}</span>
+                          </div>
+                        )}
+                        {requisicaoAprovada.quantidade_requisitada && (
+                          <div className="flex items-center justify-between text-xs mt-1">
+                            <span className="text-[#00D4FF] font-semibold">Quantidade:</span>
+                            <span className="text-gray-300">{requisicaoAprovada.quantidade_requisitada}</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+
+                <div className="space-y-2 text-xs text-gray-400 mb-4">
+                  {peca.localizacao && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Localização:</span>
+                      <span className="font-medium text-gray-300">{peca.localizacao}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Valor:</span>
+                    <span className="font-medium text-[#39FF14]">
+                      R$ {peca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setSelectedPeca(peca)}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#00D4FF]/10 text-[#00D4FF] rounded-lg hover:bg-[#00D4FF]/20 transition text-sm border border-[#00D4FF]/30"
+                  >
+                    <Eye className="w-4 h-4" />
+                    Ver Detalhes
+                  </button>
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -561,11 +658,13 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         <span>Valor total: <span className="text-[#39FF14] font-bold">R$ {filteredPecas.reduce((sum, p) => sum + p.valor_com_impostos, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
       </div>
 
-      {/* Modal de Detalhes */}
       {selectedPeca && (
         <PecaDetailsModal
           peca={selectedPeca}
-          onClose={() => setSelectedPeca(null)}
+          onClose={() => {
+            setSelectedPeca(null);
+            loadPecas();
+          }}
           onShowLabelSelector={() => setShowLabelSelector(true)}
           onShowLocationSelector={(localizacoes) => {
             setPecaLocalizacoes(localizacoes);
@@ -574,7 +673,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         />
       )}
 
-      {/* Label Selector for Single Piece */}
       {showLabelSelector && selectedPeca && (
         <LabelSelector
           items={[{
@@ -594,7 +692,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         />
       )}
 
-      {/* Label Preview */}
       {showLabelPreview && (
         <LabelGenerator
           labels={generatedLabels}
@@ -605,7 +702,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         />
       )}
 
-      {/* Location Selector */}
       {showLocationSelector && selectedPeca && (
         <LocationSelector
           partNumber={selectedPeca.pn}
@@ -622,10 +718,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                 })
                 .eq('id', selectedPeca.id);
 
-              // Registrar no histórico
               await supabase.from('estoque_historico').insert({
                 peca_id: selectedPeca.id,
-                usuario_id: usuario.id,
+                usuario_id: user?.id || null,
                 acao: 'Localização Atualizada',
                 origem: localizacaoAnterior,
                 destino: locationText || 'Sem localização',
@@ -635,15 +730,14 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
               setSelectedPeca({ ...selectedPeca, localizacao: locationText });
               setShowLocationSelector(false);
               await loadPecas();
-              alert('✅ Localização atualizada com sucesso!');
+              alert('Localização atualizada com sucesso!');
             } catch (error) {
-              alert('❌ Erro ao atualizar localização');
+              alert('Erro ao atualizar localização');
             }
           }}
           onClose={() => setShowLocationSelector(false)}
         />
       )}
-
 
       {showEmitirNFModal && selectedPecas.size > 0 && (
         <EmitirNFModal

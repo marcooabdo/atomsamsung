@@ -1031,6 +1031,8 @@ export type Database = {
           data_ultima_movimentacao: string
           qrcode_url: string | null
           bin_id: string | null
+          data_coleta_transportadora: string | null
+          data_retorno_credito: string | null
           created_at: string
           updated_at: string
         }
@@ -1051,6 +1053,8 @@ export type Database = {
           data_ultima_movimentacao?: string
           qrcode_url?: string | null
           bin_id?: string | null
+          data_coleta_transportadora?: string | null
+          data_retorno_credito?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -1071,6 +1075,8 @@ export type Database = {
           data_ultima_movimentacao?: string
           qrcode_url?: string | null
           bin_id?: string | null
+          data_coleta_transportadora?: string | null
+          data_retorno_credito?: string | null
           created_at?: string
           updated_at?: string
         }
