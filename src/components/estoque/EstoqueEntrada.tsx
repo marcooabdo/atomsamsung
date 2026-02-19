@@ -249,49 +249,45 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setScanningEffect(true);
     try {
       const pnsUnicos = [...new Set(nfData.produtos.map(p => p.pn))];
-
-      const [reqsResult, osPecasResult] = await Promise.all([
-        supabase
-          .from('requisicoes_pecas')
-          .select(`
-            id, os_id, codigo_peca,
-            os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
-          `)
-          .in('status', ['pendente', 'pedido_feito'])
-          .eq('unidade_id', unidadeId),
-        supabase
-          .from('os_pecas')
-          .select(`
-            id, os_id, pn,
-            os:os_id (numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome)
-          `)
-          .eq('status', 'requisitada'),
-      ]);
-
       const xmlPnsNorm = new Set(pnsUnicos.map(normalizePn));
 
-      const reqs: RequisicaoPendente[] = (reqsResult.data as unknown as RequisicaoPendente[] || [])
-        .filter(r => xmlPnsNorm.has(normalizePn(r.codigo_peca)));
+      // Step 1: fetch requisicoes_pecas without nested join to avoid RLS join failures
+      const { data: reqsRaw } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, os_id, codigo_peca, descricao, os_peca_id')
+        .in('status', ['pendente', 'pedido_feito'])
+        .not('os_id', 'is', null);
 
-      const fromOsPecas: RequisicaoPendente[] = ((osPecasResult.data as any[]) || [])
-        .filter((r: any) => r.os && xmlPnsNorm.has(normalizePn(r.pn)))
-        .map((r: any) => ({
+      const reqsFiltered = (reqsRaw || []).filter(
+        r => xmlPnsNorm.has(normalizePn(r.codigo_peca))
+      );
+
+      // Step 2: fetch all matching OS in one query
+      const osIds = [...new Set(reqsFiltered.map(r => r.os_id).filter(Boolean))];
+      const { data: osData } = osIds.length > 0
+        ? await supabase
+            .from('os')
+            .select('id, numero_os_interna, numero_os_samsung, tipo_os, data_abertura, cliente_nome')
+            .in('id', osIds)
+        : { data: [] };
+
+      const osMap = new Map((osData || []).map(o => [o.id, o]));
+
+      const reqs: RequisicaoPendente[] = reqsFiltered
+        .map(r => ({
           id: r.id,
           os_id: r.os_id,
-          codigo_peca: r.pn,
-          os: r.os,
-        }));
+          codigo_peca: r.codigo_peca,
+          descricao: r.descricao || '',
+          os_peca_id: r.os_peca_id ?? null,
+          os: osMap.get(r.os_id) ?? null,
+        }))
+        .filter(r => r.os !== null);
 
-      const existingOsIds = new Set(reqs.map(r => `${r.os_id}:${normalizePn(r.codigo_peca)}`));
-      const merged = [
-        ...reqs,
-        ...fromOsPecas.filter(r => !existingOsIds.has(`${r.os_id}:${normalizePn(r.codigo_peca)}`)),
-      ];
-
-      const sortedReqs = merged.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
-
+      const sortedReqs = reqs.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
       setRequisicoesDisponiveis(sortedReqs);
 
+      // Auto-allocate: match each product to a requisicao
       const pecasParaAlocar: PecaExpandida[] = [];
       let reqsDisponiveis = [...sortedReqs];
 
@@ -302,11 +298,13 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           );
           let alocadaOsId = '';
           let alocadaReqId = '';
+          let alocadaOsPecaId: string | null = null;
 
           if (reqMatchIndex !== -1) {
             const match = reqsDisponiveis.splice(reqMatchIndex, 1)[0];
             alocadaOsId = match.os_id;
             alocadaReqId = match.id;
+            alocadaOsPecaId = match.os_peca_id;
           }
 
           pecasParaAlocar.push({
@@ -317,6 +315,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             valorComImpostos: prod.valorComImpostos,
             os_alocada_id: alocadaOsId,
             requisicao_alocada_id: alocadaReqId,
+            os_peca_id: alocadaOsPecaId,
           });
         }
       });
@@ -333,13 +332,17 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   };
 
   const handleAlocacaoChange = (id_temp: string, valueStr: string) => {
+    // format: "os_id|req_id|os_peca_id"  (OFS = "||")
     const parts = valueStr.split('|');
     const os_id = parts[0] || '';
     const req_id = parts[1] || '';
+    const raw_os_peca_id = parts[2] || '';
+    const os_peca_id: string | null = raw_os_peca_id || null;
+
     setPecasExpandidas(prev =>
       prev.map(p =>
         p.id_temp === id_temp
-          ? { ...p, os_alocada_id: os_id, requisicao_alocada_id: req_id }
+          ? { ...p, os_alocada_id: os_id, requisicao_alocada_id: req_id, os_peca_id }
           : p
       )
     );
@@ -444,20 +447,35 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       (osData || []).forEach((o: any) => { osNumeroMap[o.id] = o.numero_os_interna; });
 
       for (const peca of pecasExpandidas) {
-        if (!peca.os_alocada_id) continue;
+        if (!peca.os_alocada_id || !peca.os_peca_id) continue;
 
+        // Fetch current values to detect change before updating
+        const { data: osPecaAtual } = await supabase
+          .from('os_pecas')
+          .select('descricao, valor_gspn')
+          .eq('id', peca.os_peca_id)
+          .maybeSingle();
+
+        const descricaoAntiga = osPecaAtual?.descricao || '';
+        const valorAntigo = osPecaAtual?.valor_gspn || 0;
+        const descricaoNova = peca.descricao;
+        const valorNovo = peca.valorComImpostos;
+        const changed = descricaoNova !== descricaoAntiga || Math.abs(valorNovo - valorAntigo) > 0.01;
+
+        // Update os_peca by exact ID — DB trigger recalculates markup automatically
         await supabase
           .from('os_pecas')
           .update({
-            descricao: peca.descricao,
-            valor_gspn: peca.valorComImpostos,
-            valor_unitario: peca.valorComImpostos,
+            descricao: descricaoNova,
+            valor_gspn: valorNovo,
+            editado_manualmente: false,
           })
-          .eq('os_id', peca.os_alocada_id)
-          .filter('pn', 'ilike', peca.pn.replace(/[-\s]/g, '%'));
+          .eq('id', peca.os_peca_id);
+
+        if (!changed) continue;
 
         const osNumero = osNumeroMap[peca.os_alocada_id] || peca.os_alocada_id;
-        const valorFormatado = peca.valorComImpostos.toLocaleString('pt-BR', {
+        const valorFormatado = valorNovo.toLocaleString('pt-BR', {
           minimumFractionDigits: 2,
           maximumFractionDigits: 2,
         });
@@ -465,12 +483,20 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         await supabase.from('gia_mural_tarefas').insert({
           gia_source: 'ESTOQUE',
           titulo: `Custo Atualizado via NF - OS ${osNumero}`,
-          descricao: `GIA Stock informa: A peca ${peca.pn} (${peca.descricao}) entrou na NF ${nfRecord.numero_nf} com o custo de R$ ${valorFormatado}. O sistema recalculou automaticamente o markup e o valor total da OS. Favor conferir se o orcamento do cliente precisa de renegociacao.`,
+          descricao: `GIA Stock informa: A peca ${peca.pn} (${descricaoNova}) entrou na NF ${nfRecord.numero_nf} com o custo de R$ ${valorFormatado}. O sistema recalculou automaticamente o markup e o valor total da OS. Favor conferir se o orcamento do cliente precisa de renegociacao.`,
           prioridade: 'alta',
           gia_responsavel: 'GIA Stock',
           status: 'pendente',
           os_id: peca.os_alocada_id,
           os_numero: osNumero,
+          metadata: {
+            pn: peca.pn,
+            descricao_antiga: descricaoAntiga,
+            descricao_nova: descricaoNova,
+            valor_antigo: valorAntigo,
+            valor_novo: valorNovo,
+            numero_nf: nfRecord.numero_nf,
+          },
         });
       }
 
@@ -736,7 +762,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
                       <div className="relative flex-1">
                         <select
-                          value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}`}
+                          value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}|${peca.os_peca_id || ''}`}
                           onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
                           className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none transition-all"
                           style={{
@@ -745,17 +771,18 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                             color: isAlocada ? '#39FF14' : '#9CA3AF',
                           }}
                         >
-                          <option value="|" style={{ background: '#111', color: '#9CA3AF' }}>
+                          <option value="||" style={{ background: '#111', color: '#9CA3AF' }}>
                             Enviar para Estoque Livre (OFS)
                           </option>
                           {osCompativeis.map(req => {
+                            if (!req.os) return null;
                             const daysOpen = (Date.now() - new Date(req.os.data_abertura).getTime()) / 86400000;
                             const isAtrasada = daysOpen > 10;
                             const tipoLabel = req.os.tipo_os || '';
                             return (
                               <option
                                 key={req.id}
-                                value={`${req.os_id}|${req.id}`}
+                                value={`${req.os_id}|${req.id}|${req.os_peca_id || ''}`}
                                 style={{ background: '#111', color: '#fff' }}
                               >
                                 OS {req.os.numero_os_interna}
