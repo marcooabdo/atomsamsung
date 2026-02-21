@@ -9,6 +9,7 @@ export interface MuralTarefa {
   gia_responsavel: string;
   concluido_por: string | null;
   concluido_at: string | null;
+  unidade_id?: string | null;
   whatsapp_phone?: string | null;
   os_id?: string | null;
   os_numero?: string | null;

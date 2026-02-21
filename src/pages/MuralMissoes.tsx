@@ -13,6 +13,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 import type { MuralTarefa } from './mural/types';
 import { GIA_AGENTS } from './mural/constants';
 import { agentMatchesTask, sortTasks } from './mural/utils';
@@ -22,6 +23,7 @@ import { AgentLoadBar } from './mural/AgentLoadBar';
 import { AgentColumn } from './mural/AgentColumn';
 
 export function MuralMissoes() {
+  const { unidadeAtual, usuario } = useAuth();
   const [tasks, setTasks] = useState<MuralTarefa[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -31,15 +33,23 @@ export function MuralMissoes() {
   const [activeAgentIdx, setActiveAgentIdx] = useState(0);
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isMaster = usuario?.perfil === 'master';
+
   const loadTasks = useCallback(async () => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('gia_mural_tarefas')
       .select('*')
       .eq('status', 'pendente')
       .order('created_at', { ascending: true });
+
+    if (!isMaster && unidadeAtual) {
+      query = query.or(`unidade_id.eq.${unidadeAtual},unidade_id.is.null`);
+    }
+
+    const { data, error } = await query;
     if (!error && data) setTasks(sortTasks(data as MuralTarefa[]));
     setLoading(false);
-  }, []);
+  }, [unidadeAtual, isMaster]);
 
   useEffect(() => {
     loadTasks();
@@ -48,7 +58,8 @@ export function MuralMissoes() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gia_mural_tarefas' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const t = payload.new as MuralTarefa;
-          if (t.status === 'pendente') {
+          const belongsToUnit = isMaster || !t.unidade_id || t.unidade_id === unidadeAtual;
+          if (t.status === 'pendente' && belongsToUnit) {
             setTasks((prev) => sortTasks([...prev, t]));
             setNewTaskFlash(true);
             if (flashTimeout.current) clearTimeout(flashTimeout.current);
