@@ -33,6 +33,7 @@ interface Unidade {
   latitude: number | null;
   longitude: number | null;
   crt: number | null;
+  limite_credito_gspn: number | null;
   created_at: string;
 }
 
@@ -170,7 +171,8 @@ export function Configuracoes() {
     estado: '',
     samsung_asccode: '',
     samsung_token: '',
-    crt: '' as unknown as number
+    crt: '' as unknown as number,
+    limite_credito_gspn: '' as unknown as number,
   });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
@@ -289,7 +291,8 @@ export function Configuracoes() {
             estado: unidade.estado || '',
             samsung_asccode: unidade.samsung_asccode || '',
             samsung_token: unidade.samsung_token || '',
-            crt: unidade.crt ?? ('' as unknown as number)
+            crt: unidade.crt ?? ('' as unknown as number),
+            limite_credito_gspn: unidade.limite_credito_gspn ?? ('' as unknown as number),
           });
           break;
         case 'usuarios':
@@ -335,7 +338,8 @@ export function Configuracoes() {
         estado: '',
         samsung_asccode: '',
         samsung_token: '',
-        crt: '' as unknown as number
+        crt: '' as unknown as number,
+        limite_credito_gspn: '' as unknown as number,
       });
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
@@ -397,7 +401,8 @@ export function Configuracoes() {
             estado: formUnidade.uf || null,
             samsung_asccode: formUnidade.samsung_asccode || null,
             samsung_token: formUnidade.samsung_token || null,
-            crt: formUnidade.crt ? Number(formUnidade.crt) : null
+            crt: formUnidade.crt ? Number(formUnidade.crt) : null,
+            limite_credito_gspn: formUnidade.limite_credito_gspn ? Number(formUnidade.limite_credito_gspn) : null,
           };
           if (editingId) {
             const { error } = await supabase.from('unidades').update(unidadeData).eq('id', editingId);
@@ -1042,6 +1047,29 @@ export function Configuracoes() {
                           className="neon-input"
                         />
                       </div>
+                    </div>
+                  </div>
+
+                  {/* GSPN Credit Limit */}
+                  <div className="rounded-xl p-4 bg-[#39FF14]/5 border border-[#39FF14]/20">
+                    <h4 className="text-xs font-bold text-[#39FF14] uppercase tracking-wider mb-3 flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-[#39FF14] shadow-[0_0_8px_rgba(57,255,20,0.8)]" />
+                      Crédito GSPN
+                    </h4>
+                    <div>
+                      <label className="block text-xs text-gray-400 uppercase mb-2">Limite de Crédito GSPN (R$)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={formUnidade.limite_credito_gspn as unknown as string}
+                        onChange={(e) => setFormUnidade({...formUnidade, limite_credito_gspn: e.target.value as unknown as number})}
+                        placeholder="Ex: 50000.00"
+                        className="neon-input"
+                      />
+                      <p className="text-xs text-gray-500 mt-1.5">
+                        Teto de crédito em peças Samsung GSPN desta unidade. Usado no Dashboard de Crédito GSPN.
+                      </p>
                     </div>
                   </div>
                 </>

@@ -7,9 +7,10 @@ import { EstoqueTransferencias } from '../components/estoque/EstoqueTransferenci
 import { EstoqueDevolucoes } from '../components/estoque/EstoqueDevolucoes';
 import { EstoqueEntrada } from '../components/estoque/EstoqueEntrada';
 import { EstoqueMapa } from '../components/estoque/EstoqueMapa';
-import { Package, ArrowRightLeft, RotateCcw, Upload, Map } from 'lucide-react';
+import { Package, ArrowRightLeft, RotateCcw, Upload, Map, Zap } from 'lucide-react';
+import { EstoqueCreditoGSPN } from '../components/estoque/EstoqueCreditoGSPN';
 
-type Tab = 'geral' | 'entrada' | 'transferencias' | 'devolucoes' | 'mapa';
+type Tab = 'geral' | 'entrada' | 'transferencias' | 'devolucoes' | 'mapa' | 'credito_gspn';
 
 export function Estoque() {
   const { user } = useAuth();
@@ -37,7 +38,8 @@ export function Estoque() {
     { id: 'entrada' as Tab, label: 'Entrada de NF', icon: Upload, color: '#39FF14', isAccent: false },
     { id: 'transferencias' as Tab, label: 'Transferências', icon: ArrowRightLeft, color: '#FFBF00', isAccent: false },
     { id: 'devolucoes' as Tab, label: 'Devoluções', icon: RotateCcw, color: '#FF0064', isAccent: false },
-    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: 'var(--text-accent)', isAccent: true }
+    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: 'var(--text-accent)', isAccent: true },
+    { id: 'credito_gspn' as Tab, label: 'Crédito GSPN', icon: Zap, color: '#39FF14', isAccent: false },
   ];
 
   return (
@@ -101,6 +103,7 @@ export function Estoque() {
           {activeTab === 'transferencias' && <EstoqueTransferencias selectedUnidade={selectedUnidade} user={user} />}
           {activeTab === 'devolucoes' && <EstoqueDevolucoes selectedUnidade={selectedUnidade} user={user} />}
           {activeTab === 'mapa' && <EstoqueMapa selectedUnidade={selectedUnidade} />}
+          {activeTab === 'credito_gspn' && <EstoqueCreditoGSPN selectedUnidade={selectedUnidade} user={user} />}
         </div>
       </div>
     </div>
