@@ -1,7 +1,7 @@
 import type { BadgeConfig, GIAAgentConfig, MuralTarefa } from './types';
 
-export function getTaskBadge(titulo = '', descricao = ''): BadgeConfig {
-  const text = `${titulo} ${descricao}`.toLowerCase();
+export function getTaskBadge(titulo = '', descricao = '', responsavel = ''): BadgeConfig {
+  const text = `${titulo} ${descricao} ${responsavel}`.toLowerCase();
   if (/aprovado|pix/.test(text))
     return { label: 'APROVADO', bg: 'rgba(52,211,153,0.15)', border: 'rgba(52,211,153,0.55)', color: '#34D399', glow: 'rgba(52,211,153,0.3)' };
   if (/orçamento|cotação|orcamento|cotacao/.test(text))
@@ -10,6 +10,8 @@ export function getTaskBadge(titulo = '', descricao = ''): BadgeConfig {
     return { label: 'GARANTIA', bg: 'rgba(168,85,247,0.15)', border: 'rgba(168,85,247,0.5)', color: '#C084FC', glow: 'rgba(168,85,247,0.25)' };
   if (/status|acompanhamento/.test(text))
     return { label: 'ACOMPANHAMENTO', bg: 'rgba(6,182,212,0.15)', border: 'rgba(6,182,212,0.5)', color: '#22D3EE', glow: 'rgba(6,182,212,0.25)' };
+  if (/devolucao|devolução|gia stock|estoque|prazo/.test(text))
+    return { label: 'ESTOQUE', bg: 'rgba(251,146,60,0.15)', border: 'rgba(251,146,60,0.45)', color: '#FB923C', glow: 'rgba(251,146,60,0.25)' };
   return { label: 'TRIAGEM', bg: 'rgba(100,116,139,0.1)', border: 'rgba(100,116,139,0.3)', color: '#64748B', glow: null };
 }
 
