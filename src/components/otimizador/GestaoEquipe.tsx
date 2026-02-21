@@ -1,7 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Users, Clock, CheckCircle, Search, Award, AlertTriangle, MapPin } from 'lucide-react';
+import { Users, Clock, CheckCircle, Search, Award, ChevronDown, ChevronUp, Edit2, Save, X } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
+
+const SAMSUNG_SKILLS = [
+  'DA - WSM / KITCHEN',
+  'DA - REF / Ar Condicionado',
+  'DTV - TV',
+  'DTV - Monitor / SoundBar',
+];
 
 interface TecnicoStats {
   id: string;
@@ -14,6 +21,7 @@ interface TecnicoStats {
   horario_almoco_inicio: string;
   ativo: boolean;
   tipo: string;
+  habilidades: string[];
   os_concluidas: number;
   os_em_andamento: number;
   os_atrasadas: number;
@@ -26,6 +34,9 @@ export default function GestaoEquipe() {
   const [tecnicos, setTecnicos] = useState<TecnicoStats[]>([]);
   const [loadingTecnicos, setLoadingTecnicos] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editHabilidades, setEditHabilidades] = useState<string[]>([]);
+  const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (selectedUnidade) loadTecnicosStats();
@@ -36,7 +47,7 @@ export default function GestaoEquipe() {
     try {
       const { data: tecnicosData } = await supabase
         .from('usuarios')
-        .select('id, nome, email, telefone, horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, horario_almoco_inicio, ativo, tipo')
+        .select('id, nome, email, telefone, horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, horario_almoco_inicio, ativo, tipo, habilidades')
         .eq('unidade_id', selectedUnidade)
         .in('tipo', ['tecnico', 'tecnico_ih'])
         .order('nome');
@@ -53,7 +64,8 @@ export default function GestaoEquipe() {
           .from('os')
           .select('id, tecnico_id, tecnico_agendado_id, coluna_kanban, created_at')
           .eq('unidade_id', selectedUnidade)
-          .or(`tecnico_id.in.(${tecIds.join(',')}),tecnico_agendado_id.in.(${tecIds.join(',')})`),
+          .or(`tecnico_id.in.(${tecIds.join(',')}),tecnico_agendado_id.in.(${tecIds.join(',')})`)
+          .limit(2000),
         supabase
           .from('agendamentos')
           .select('tecnico_id, checkin_hora, checkout_hora, status')
@@ -63,8 +75,7 @@ export default function GestaoEquipe() {
 
       const allOs = osRes.data || [];
       const allAgend = agendRes.data || [];
-      const now = new Date();
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
       const closedColumns = ['os_fechada', 'reparo_concluido'];
 
       const tecnicosComStats = tecnicosData.map(tec => {
@@ -87,6 +98,7 @@ export default function GestaoEquipe() {
 
         return {
           ...tec,
+          habilidades: tec.habilidades || [],
           os_concluidas: concluidas,
           os_em_andamento: emAndamento,
           os_atrasadas: atrasadas,
@@ -102,6 +114,39 @@ export default function GestaoEquipe() {
     }
   };
 
+  const startEdit = (tec: TecnicoStats) => {
+    setEditingId(tec.id);
+    setEditHabilidades([...tec.habilidades]);
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+    setEditHabilidades([]);
+  };
+
+  const toggleSkill = (skill: string) => {
+    setEditHabilidades(prev =>
+      prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill]
+    );
+  };
+
+  const saveHabilidades = async (tecId: string) => {
+    setSavingId(tecId);
+    try {
+      await supabase
+        .from('usuarios')
+        .update({ habilidades: editHabilidades })
+        .eq('id', tecId);
+
+      setTecnicos(prev =>
+        prev.map(t => t.id === tecId ? { ...t, habilidades: editHabilidades } : t)
+      );
+      setEditingId(null);
+    } finally {
+      setSavingId(null);
+    }
+  };
+
   const filteredTecnicos = tecnicos.filter(t =>
     t.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
     t.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -109,7 +154,6 @@ export default function GestaoEquipe() {
 
   const totalOsConcluidas = tecnicos.reduce((s, t) => s + t.os_concluidas, 0);
   const totalOsEmAndamento = tecnicos.reduce((s, t) => s + t.os_em_andamento, 0);
-  const totalAtrasadas = tecnicos.reduce((s, t) => s + t.os_atrasadas, 0);
   const mediaTaxa = tecnicos.length > 0
     ? Math.round(tecnicos.reduce((s, t) => s + t.taxa_sucesso, 0) / tecnicos.length)
     : 0;
@@ -126,7 +170,7 @@ export default function GestaoEquipe() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Gestao de Equipe</h2>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Performance e disponibilidade dos tecnicos</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Performance, disponibilidade e habilidades dos tecnicos</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -156,7 +200,7 @@ export default function GestaoEquipe() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
           <input
             type="text"
-            placeholder="Buscar técnico..."
+            placeholder="Buscar tecnico..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm focus:outline-none transition-colors"
@@ -167,7 +211,7 @@ export default function GestaoEquipe() {
         {filteredTecnicos.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-14 h-14 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Nenhum técnico encontrado</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum tecnico encontrado</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -178,7 +222,7 @@ export default function GestaoEquipe() {
                     {tec.nome.split(' ').map(n => n[0]).join('').slice(0, 2)}
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>{tec.nome}</h3>
                       <span className="px-2 py-0.5 rounded-full text-xs font-medium" style={{
                         backgroundColor: tec.ativo ? '#10B98115' : '#EF444415',
@@ -197,6 +241,17 @@ export default function GestaoEquipe() {
                     </div>
                     <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>{tec.email}</p>
                   </div>
+                  <button
+                    onClick={() => editingId === tec.id ? cancelEdit() : startEdit(tec)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors"
+                    style={{
+                      backgroundColor: editingId === tec.id ? '#EF444415' : '#3B82F615',
+                      color: editingId === tec.id ? '#EF4444' : '#3B82F6',
+                      border: `1px solid ${editingId === tec.id ? '#EF444430' : '#3B82F630'}`,
+                    }}
+                  >
+                    {editingId === tec.id ? <><X className="w-3 h-3" />Cancelar</> : <><Edit2 className="w-3 h-3" />Skills</>}
+                  </button>
                 </div>
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3 text-xs">
@@ -224,7 +279,62 @@ export default function GestaoEquipe() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {editingId === tec.id ? (
+                  <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+                    <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
+                      Linhas de Produto atendidas (Samsung)
+                    </p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {SAMSUNG_SKILLS.map(skill => {
+                        const active = editHabilidades.includes(skill);
+                        return (
+                          <button
+                            key={skill}
+                            onClick={() => toggleSkill(skill)}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
+                            style={{
+                              backgroundColor: active ? '#10B98120' : 'var(--bg-secondary)',
+                              color: active ? '#10B981' : 'var(--text-secondary)',
+                              border: `1px solid ${active ? '#10B98150' : 'var(--border-primary)'}`,
+                            }}
+                          >
+                            {skill}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => saveHabilidades(tec.id)}
+                        disabled={savingId === tec.id}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-colors"
+                        style={{ backgroundColor: '#10B981', color: '#fff' }}
+                      >
+                        <Save className="w-3 h-3" />
+                        {savingId === tec.id ? 'Salvando...' : 'Salvar Habilidades'}
+                      </button>
+                      <span className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                        {editHabilidades.length === 0 ? 'Sem restricao (atende tudo)' : `${editHabilidades.length} linha(s) selecionada(s)`}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {tec.habilidades.length === 0 ? (
+                      <span className="px-2 py-1 rounded text-xs" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-tertiary)', border: '1px solid var(--border-primary)' }}>
+                        Atende todas as linhas
+                      </span>
+                    ) : (
+                      tec.habilidades.map(h => (
+                        <span key={h} className="px-2 py-1 rounded text-xs font-medium" style={{ backgroundColor: '#10B98112', color: '#10B981', border: '1px solid #10B98130' }}>
+                          {h}
+                        </span>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
                   {[
                     { label: 'Concluidas', val: tec.os_concluidas, color: '#10B981' },
                     { label: 'Andamento', val: tec.os_em_andamento, color: '#3B82F6' },

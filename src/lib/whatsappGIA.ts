@@ -68,19 +68,25 @@ export async function enviarConfirmacaoAgendamento(
 ): Promise<{ sucesso: boolean; motivo?: string }> {
   const { os_id, cliente_nome, telefone, data_agendamento, tecnico_nome, unidade_id } = dados;
 
+  if (!telefone || telefone.replace(/\D/g, '').length < 8) {
+    await criarAlertaMural(unidade_id, os_id, cliente_nome, 'Telefone inválido ou ausente');
+    return { sucesso: false, motivo: 'Telefone inválido ou ausente' };
+  }
+
   const instancia = await buscarInstancia(unidade_id);
 
   if (!instancia) {
+    await criarAlertaMural(unidade_id, os_id, cliente_nome, 'Nenhuma instância WhatsApp conectada');
     return { sucesso: false, motivo: 'Nenhuma instância WhatsApp conectada para esta unidade' };
   }
 
   const telefoneFormatado = formatarTelefone(telefone);
 
   const mensagem =
-    `Olá *${cliente_nome}*! Aqui é a assistente virtual da Autorizada Samsung. ` +
-    `Seu atendimento com o técnico *${tecnico_nome}* foi pré-agendado para *${data_agendamento}*.\n\n` +
-    `Por favor, responda com:\n` +
-    `*[ 1 ]* - Para CONFIRMAR.\n` +
+    `Olá *${cliente_nome}*! Aqui é a assistente virtual da Autorizada Samsung.\n\n` +
+    `Sua visita In-Home com o técnico *${tecnico_nome}* foi pré-agendada para *${data_agendamento}*.\n\n` +
+    `Por favor, confirme sua presença respondendo com:\n` +
+    `*[ 1 ]* - Para CONFIRMAR a visita.\n` +
     `*[ 2 ]* - Para REMARCAR.`;
 
   const sucesso = await enviarMensagemEvolution(instancia, telefoneFormatado, mensagem);
@@ -88,11 +94,37 @@ export async function enviarConfirmacaoAgendamento(
   if (sucesso) {
     await supabase
       .from('os')
-      .update({ status_agendamento_gia: 'aguardando_confirmacao_cliente' })
+      .update({
+        status_agendamento_gia: 'aguardando_confirmacao_cliente',
+        whatsapp_sent_at: new Date().toISOString(),
+      })
       .eq('id', os_id);
+  } else {
+    await criarAlertaMural(unidade_id, os_id, cliente_nome, 'Falha ao enviar WhatsApp');
   }
 
   return { sucesso, motivo: sucesso ? undefined : 'Falha na API do WhatsApp' };
+}
+
+async function criarAlertaMural(
+  unidadeId: string,
+  osId: string,
+  clienteNome: string,
+  motivo: string
+): Promise<void> {
+  try {
+    await supabase.from('gia_mural_tarefas').insert({
+      unidade_id: unidadeId,
+      os_id: osId,
+      titulo: 'Falha no envio de WhatsApp de Agendamento',
+      descricao: `Não foi possível enviar a confirmação de agendamento para o cliente ${clienteNome || ''}. Motivo: ${motivo}. Por favor, entre em contato manualmente.`,
+      gia_source: 'CONNECT',
+      prioridade: 'alta',
+      status: 'pendente',
+    });
+  } catch {
+    // non-critical
+  }
 }
 
 export async function enviarLoteConfirmacoes(

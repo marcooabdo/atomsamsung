@@ -996,7 +996,11 @@ async function processMessage(
   }
 
   if (!fromMe && tipo === "text" && conteudo) {
-    await processRatingResponse(supabase, conversa.id, conteudo.trim(), instancia);
+    const trimmed = conteudo.trim();
+    const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
+    if (!handledByGIA) {
+      await processRatingResponse(supabase, conversa.id, trimmed, instancia);
+    }
   }
 
   console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${tipo} ===`);
@@ -1004,6 +1008,116 @@ async function processMessage(
     status: 200,
     headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
   });
+}
+
+async function processGIASchedulingResponse(
+  supabase: any,
+  phoneNumber: string,
+  messageContent: string,
+  instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string }
+): Promise<boolean> {
+  const normalized = messageContent.replace(/[\[\]]/g, "").trim();
+  if (normalized !== "1" && normalized !== "2") return false;
+
+  const phoneSuffixes = [phoneNumber, phoneNumber.replace(/^55/, "")];
+  const phoneVariants = phoneSuffixes.flatMap(p => [p, `55${p.replace(/^55/, "")}`]);
+
+  let osRecord: any = null;
+  for (const phone of phoneVariants) {
+    const { data } = await supabase
+      .from("os")
+      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, unidade_id, data_agendamento, periodo_agendamento, status_agendamento_gia")
+      .eq("status_agendamento_gia", "aguardando_confirmacao_cliente")
+      .ilike("cliente_telefone", `%${phone.slice(-9)}%`)
+      .order("whatsapp_sent_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (data) {
+      osRecord = data;
+      break;
+    }
+  }
+
+  if (!osRecord) {
+    console.log("GIA Scheduling: no OS awaiting confirmation for phone:", phoneNumber);
+    return false;
+  }
+
+  console.log("GIA Scheduling: processing reply", normalized, "for OS:", osRecord.id);
+
+  const phoneForSend = phoneNumber.startsWith("55") ? phoneNumber : `55${phoneNumber}`;
+
+  if (normalized === "1") {
+    await supabase
+      .from("os")
+      .update({
+        confirmado_com_cliente: true,
+        status_agendamento_gia: "confirmado",
+      })
+      .eq("id", osRecord.id);
+
+    const dataFormatada = osRecord.data_agendamento
+      ? new Date(osRecord.data_agendamento + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" })
+      : "a combinar";
+
+    const replyText =
+      `Perfeito, *${osRecord.cliente_nome || "Cliente"}*! ✅\n` +
+      `Sua visita In-Home foi confirmada para *${dataFormatada}*${osRecord.periodo_agendamento ? ` (${osRecord.periodo_agendamento})` : ""}.\n` +
+      `Nosso técnico entrará em contato antes de chegar. Obrigado!`;
+
+    try {
+      await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+        body: JSON.stringify({ number: phoneForSend, text: replyText }),
+      });
+    } catch (err) {
+      console.error("GIA Scheduling: failed to send confirmation reply:", err);
+    }
+
+    console.log("GIA Scheduling: OS confirmed:", osRecord.id);
+    return true;
+  }
+
+  if (normalized === "2") {
+    await supabase
+      .from("os")
+      .update({ status_agendamento_gia: "recusado_pelo_cliente" })
+      .eq("id", osRecord.id);
+
+    const osNumero = osRecord.numero_os_interna || osRecord.numero_os_samsung || osRecord.id.slice(0, 8);
+
+    await supabase.from("gia_mural_tarefas").insert({
+      unidade_id: osRecord.unidade_id,
+      os_id: osRecord.id,
+      os_numero: osNumero,
+      titulo: "Cliente pediu remarcação",
+      descricao: `O cliente ${osRecord.cliente_nome || ""} da OS ${osNumero} recusou o agendamento e pediu para remarcar. Contato: ${osRecord.cliente_telefone || ""}`,
+      gia_source: "CONNECT",
+      prioridade: "alta",
+      status: "pendente",
+    });
+
+    const replyText =
+      `Entendido, *${osRecord.cliente_nome || "Cliente"}*!\n` +
+      `Nossa equipe entrará em contato para reagendar sua visita. Pedimos desculpas pelo inconveniente.`;
+
+    try {
+      await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+        body: JSON.stringify({ number: phoneForSend, text: replyText }),
+      });
+    } catch (err) {
+      console.error("GIA Scheduling: failed to send reschedule reply:", err);
+    }
+
+    console.log("GIA Scheduling: OS reschedule requested:", osRecord.id);
+    return true;
+  }
+
+  return false;
 }
 
 async function processRatingResponse(
