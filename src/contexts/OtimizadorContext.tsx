@@ -12,7 +12,8 @@ export type OtimizadorTab =
   | 'checklists'
   | 'pecas'
   | 'analytics'
-  | 'config';
+  | 'config'
+  | 'despacho';
 
 interface Unidade {
   id: string;
