@@ -1,19 +1,17 @@
 export interface MuralTarefa {
   id: string;
   created_at: string;
-  setor: string;
+  gia_source: string | null;
   prioridade: 'alta' | 'normal';
   titulo: string;
   descricao: string;
   status: 'pendente' | 'concluido';
   gia_responsavel: string;
-  concluido_por: string | null;
   concluido_at: string | null;
   unidade_id?: string | null;
   whatsapp_phone?: string | null;
   os_id?: string | null;
   os_numero?: string | null;
-  gia_source?: string | null;
   metadata?: Record<string, unknown> | null;
 }
 

@@ -140,7 +140,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                 label: 'Setor', content: (
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
-                    <span className="text-sm font-bold text-slate-300">{task.setor || task.gia_responsavel}</span>
+                    <span className="text-sm font-bold text-slate-300">{task.gia_source || task.gia_responsavel}</span>
                   </div>
                 )
               },
