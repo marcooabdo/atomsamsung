@@ -250,13 +250,16 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     }
   };
 
-  const statusCfg = STATUS_COLORS[peca.status] || { label: peca.status, color: '#6B7280' };
+  const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito'];
+
+  const currentStatus = (pecaDetalhada as any)?.status || peca.status;
+  const statusCfg = STATUS_COLORS[currentStatus] || { label: currentStatus, color: '#6B7280' };
   const osVinculada = pecaDetalhada?.os;
   const osLabel = osVinculada
     ? (osVinculada.numero_os_samsung || osVinculada.numero_os_interna)
     : null;
 
-  const isSamsungReturn = peca.status === 'devolvida_samsung';
+  const isSamsungReturn = LOGISTICA_REVERSA_STATUSES.includes(currentStatus);
   const slaValido = localColeta && localCredito;
   const slaDias = slaValido ? calcularSLA(localColeta!, localCredito!) : null;
 

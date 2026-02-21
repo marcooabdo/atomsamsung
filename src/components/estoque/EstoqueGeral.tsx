@@ -118,17 +118,17 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     setDespachandoSamsung(true);
     try {
       const ids = Array.from(selectedPecas);
-      const now = new Date().toISOString();
 
-      await supabase
+      const { error: updateError } = await supabase
         .from('estoque_pecas')
         .update({
           status: 'devolvida_samsung',
           data_coleta_transportadora: null,
           data_retorno_credito: null,
-          updated_at: now,
         })
         .in('id', ids);
+
+      if (updateError) throw updateError;
 
       const historicoEntries = ids.map((id) => ({
         peca_id: id,
@@ -143,8 +143,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       clearSelection();
       await loadPecas();
-    } catch (error) {
-      alert('Erro ao despachar peças para Samsung');
+    } catch (error: any) {
+      alert(`Erro ao despachar peças para Samsung: ${error?.message || error}`);
     } finally {
       setDespachandoSamsung(false);
     }
@@ -213,7 +213,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   };
 
   const getLogisticaReversaStyle = (peca: EstoquePeca) => {
-    if (peca.status !== 'devolvida_samsung') return { cardClass: '', indicator: null };
+    const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito'];
+    if (!LOGISTICA_REVERSA_STATUSES.includes(peca.status)) return { cardClass: '', indicator: null };
 
     if (!peca.data_coleta_transportadora) {
       return {
