@@ -8,7 +8,7 @@ import {
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress, buildOSAddress, getGoogleMapsApiKey, haversineDistance, estimateDriveTime, getRealTravelTime } from '../../lib/googleMapsHelper';
-import { GoogleMap, useJsApiLoader, Marker, Polyline, InfoWindow, DirectionsRenderer } from '@react-google-maps/api';
+import { GoogleMap, useJsApiLoader, Marker, InfoWindow, DirectionsRenderer } from '@react-google-maps/api';
 
 interface OSItem {
   id: string;
@@ -375,7 +375,6 @@ export default function MotorOtimizacaoNew() {
     const inicioMin = timeToMinutes(horarioInicio);
     const fimMin = timeToMinutes(horarioFim);
     const almocoMin = timeToMinutes(horarioAlmoco);
-
     const resultParadas: ParadaItinerario[] = [];
     const resultNaoRoteirizadas: OSItem[] = [...osSemCoord];
     const disponivel = new Set(osComCoord.map(os => os.id));
@@ -383,6 +382,8 @@ export default function MotorOtimizacaoNew() {
     let currentPos = { ...baseCoords };
     let currentMin = inicioMin;
     let dia = 1;
+    let almocoFeitoNoDia = false;
+    let semProgresso = 0;
 
     while (disponivel.size > 0 && dia <= maxDias) {
       const restante = osComCoord.filter(os => disponivel.has(os.id));
@@ -402,8 +403,8 @@ export default function MotorOtimizacaoNew() {
       }));
 
       distances.sort((a, b) => {
-        const scoreA = (1 - a.dist / 200) * 0.5 + Math.min(a.os.dias_aberta / 30, 1) * 0.3 + (a.os.prioridade === 'urgente' ? 1 : a.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.2;
-        const scoreB = (1 - b.dist / 200) * 0.5 + Math.min(b.os.dias_aberta / 30, 1) * 0.3 + (b.os.prioridade === 'urgente' ? 1 : b.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.2;
+        const scoreA = (1 - Math.min(a.dist / 500, 1)) * 0.6 + Math.min(a.os.dias_aberta / 30, 1) * 0.3 + (a.os.prioridade === 'urgente' ? 1 : a.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
+        const scoreB = (1 - Math.min(b.dist / 500, 1)) * 0.6 + Math.min(b.os.dias_aberta / 30, 1) * 0.3 + (b.os.prioridade === 'urgente' ? 1 : b.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
         return scoreB - scoreA;
       });
 
@@ -416,8 +417,11 @@ export default function MotorOtimizacaoNew() {
 
       let arrivalMin = currentMin + travelMin;
 
-      if (currentMin < almocoMin && arrivalMin >= almocoMin) {
+      if (!almocoFeitoNoDia && currentMin < almocoMin && arrivalMin >= almocoMin) {
         arrivalMin += duracaoAlmoco;
+        almocoFeitoNoDia = true;
+      } else if (!almocoFeitoNoDia && currentMin >= almocoMin) {
+        almocoFeitoNoDia = true;
       }
 
       const departureMin = arrivalMin + tempoMedioReparo;
@@ -427,14 +431,27 @@ export default function MotorOtimizacaoNew() {
           dia++;
           currentMin = inicioMin;
           currentPos = { ...baseCoords };
+          almocoFeitoNoDia = false;
+          semProgresso++;
+          if (semProgresso > maxDias * restante.length + 10) {
+            restante.forEach(os => {
+              if (disponivel.has(os.id)) {
+                resultNaoRoteirizadas.push(os);
+                disponivel.delete(os.id);
+              }
+            });
+            break;
+          }
           continue;
         } else {
           resultNaoRoteirizadas.push(best.os);
           disponivel.delete(best.os.id);
+          semProgresso = 0;
           continue;
         }
       }
 
+      semProgresso = 0;
       resultParadas.push({
         os: best.os,
         ordem: resultParadas.length + 1,
@@ -448,11 +465,26 @@ export default function MotorOtimizacaoNew() {
       currentPos = { lat: best.os.lat, lng: best.os.lng };
       currentMin = departureMin;
       disponivel.delete(best.os.id);
+
+      if (currentMin >= fimMin && disponivel.size > 0) {
+        if (permitePernoite && dia < maxDias) {
+          dia++;
+          currentMin = inicioMin;
+          currentPos = { ...baseCoords };
+          almocoFeitoNoDia = false;
+        } else {
+          disponivel.forEach(id => {
+            const os = osComCoord.find(o => o.id === id);
+            if (os) resultNaoRoteirizadas.push(os);
+          });
+          disponivel.clear();
+        }
+      }
     }
 
     disponivel.forEach(id => {
       const os = osComCoord.find(o => o.id === id);
-      if (os) resultNaoRoteirizadas.push(os);
+      if (os && !resultNaoRoteirizadas.find(o => o.id === id)) resultNaoRoteirizadas.push(os);
     });
 
     setParadas(resultParadas);
@@ -792,15 +824,6 @@ export default function MotorOtimizacaoNew() {
     if (baseCoords) return baseCoords;
     if (paradas.length > 0) return { lat: paradas[0].os.lat, lng: paradas[0].os.lng };
     return { lat: -23.55, lng: -46.63 };
-  }, [baseCoords, paradas]);
-
-  const routePath = useMemo(() => {
-    if (!baseCoords || paradas.length === 0) return [];
-    return [
-      baseCoords,
-      ...paradas.map(p => ({ lat: p.os.lat, lng: p.os.lng })),
-      baseCoords,
-    ];
   }, [baseCoords, paradas]);
 
   const fitMapBounds = useCallback(() => {
@@ -1360,7 +1383,7 @@ export default function MotorOtimizacaoNew() {
                 />
               );
             })}
-            {directions ? (
+            {directions && (
               <DirectionsRenderer
                 directions={directions}
                 options={{
@@ -1372,17 +1395,6 @@ export default function MotorOtimizacaoNew() {
                   },
                 }}
               />
-            ) : routePath.length > 1 && (
-              <>
-                <Polyline
-                  path={routePath}
-                  options={{ strokeColor: '#1E40AF', strokeWeight: 6, strokeOpacity: 0.3, geodesic: true }}
-                />
-                <Polyline
-                  path={routePath}
-                  options={{ strokeColor: '#3B82F6', strokeWeight: 4, strokeOpacity: 1, geodesic: true }}
-                />
-              </>
             )}
             {selectedOSId && !selectedMarker && (() => {
               const os = filteredOS.find(o => o.id === selectedOSId);
