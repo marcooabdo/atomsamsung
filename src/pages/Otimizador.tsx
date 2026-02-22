@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Bot, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route } from 'lucide-react';
+import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route, Truck } from 'lucide-react';
 import { OtimizadorProvider, useOtimizador, type OtimizadorTab } from '../contexts/OtimizadorContext';
 import { UnitFilter } from '../components/UnitFilter';
 import DashboardExecutivo from '../components/otimizador/DashboardExecutivo';
@@ -11,7 +11,6 @@ import SistemaChecklists from '../components/otimizador/SistemaChecklists';
 import ControlePecas from '../components/otimizador/ControlePecas';
 import Analytics from '../components/otimizador/Analytics';
 import ConfiguracaoOtimizador from '../components/otimizador/ConfiguracaoOtimizador';
-import AprovacaoGIA from '../components/otimizador/AprovacaoGIA';
 
 const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)' },
@@ -19,7 +18,6 @@ const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }
   { id: 'mapa', label: 'Rastreamento', icon: Navigation, color: '#10B981' },
   { id: 'rotas', label: 'Rotas', icon: Route, color: '#EC4899' },
   { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00' },
-  { id: 'despacho', label: 'GIA Logistics', icon: Bot, color: '#00D4FF' },
   { id: 'equipe', label: 'Equipe', icon: Users, color: '#06B6D4' },
   { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899' },
   { id: 'pecas', label: 'Pecas', icon: Package, color: '#F97316' },
@@ -38,7 +36,6 @@ function OtimizadorContent() {
       case 'mapa': return <MapaRastreamento />;
       case 'rotas': return <GestaoRotas />;
       case 'motor': return <MotorOtimizacaoNew />;
-      case 'despacho': return <AprovacaoGIA />;
       case 'equipe': return <GestaoEquipe />;
       case 'checklists': return <SistemaChecklists />;
       case 'pecas': return <ControlePecas />;
@@ -54,8 +51,8 @@ function OtimizadorContent() {
         <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl lg:text-3xl font-bold flex items-center gap-2" style={{ color: 'var(--text-accent)' }}>
-              <Zap className="w-7 h-7 lg:w-8 lg:h-8" />
-              Centro de Comando
+              <Truck className="w-7 h-7 lg:w-8 lg:h-8" />
+              GIA Logistic
             </h1>
             <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Hub gerencial para gestao de atendimentos</p>
           </div>

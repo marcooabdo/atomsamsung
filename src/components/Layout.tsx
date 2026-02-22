@@ -27,7 +27,8 @@ import {
   ShoppingCart,
   Users,
   Radio,
-  Target
+  Target,
+  Truck
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -42,7 +43,7 @@ const allMenuItems = [
   { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', permKey: 'menu_chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
-  { id: 'otimizador', permKey: 'menu_otimizador', label: 'Centro de Comando', icon: Zap, path: '/otimizador' },
+  { id: 'otimizador', permKey: 'menu_otimizador', label: 'GIA Logistic', icon: Truck, path: '/otimizador' },
   { id: 'customer-intelligence', permKey: 'menu_ci', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
   { id: 'registro-vendas', permKey: 'menu_vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
   { id: 'skywalker', permKey: 'menu_skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },

@@ -95,15 +95,60 @@ export async function geocodificarOSLogistica(os: OSLogistica): Promise<{ lat: n
 // Fetch helpers
 // ---------------------------------------------------------------------------
 
+const COR_POR_COLUNA: Record<string, string> = {
+  rota_preta: '#111827',
+  rota_vermelha: '#EF4444',
+  rota_azul: '#3B82F6',
+  rota_verde: '#10B981',
+  rota_amarela: '#F59E0B',
+  rota_laranja: '#F97316',
+  rota_rosa: '#EC4899',
+  rota_roxo: '#8B5CF6',
+  rota_cinza: '#6B7280',
+  rota_branca: '#E5E7EB',
+};
+
 export async function buscarRotasColuna(unidadeId: string): Promise<RotaColuna[]> {
-  const { data } = await supabase
-    .from('rotas')
-    .select('id, nome, cor, coluna_kanban, cidades')
-    .eq('unidade_id', unidadeId)
-    .eq('ativa', true)
-    .not('coluna_kanban', 'is', null)
-    .order('nome');
-  return (data ?? []) as RotaColuna[];
+  const [rotasDB, osDistinct] = await Promise.all([
+    supabase
+      .from('rotas')
+      .select('id, nome, cor, coluna_kanban, cidades')
+      .eq('unidade_id', unidadeId)
+      .eq('ativa', true)
+      .not('coluna_kanban', 'is', null)
+      .order('nome'),
+    supabase
+      .from('os')
+      .select('coluna_kanban')
+      .eq('unidade_id', unidadeId)
+      .like('coluna_kanban', 'rota_%'),
+  ]);
+
+  const rotasCadastradas = (rotasDB.data ?? []) as RotaColuna[];
+  const colunasUsadas = new Set(rotasCadastradas.map(r => r.coluna_kanban));
+
+  const colunasDistintas = new Set(
+    (osDistinct.data ?? [])
+      .map(r => r.coluna_kanban as string)
+      .filter(Boolean)
+  );
+
+  const extras: RotaColuna[] = [];
+  for (const coluna of colunasDistintas) {
+    if (!colunasUsadas.has(coluna)) {
+      const sufixo = coluna.replace(/^rota_/, '');
+      const nome = 'Rota ' + sufixo.charAt(0).toUpperCase() + sufixo.slice(1);
+      extras.push({
+        id: coluna,
+        nome,
+        cor: COR_POR_COLUNA[coluna] ?? '#6B7280',
+        coluna_kanban: coluna,
+        cidades: [],
+      });
+    }
+  }
+
+  return [...rotasCadastradas, ...extras].sort((a, b) => a.nome.localeCompare(b.nome));
 }
 
 export async function buscarTecnicosLogistica(unidadeId: string): Promise<TecnicoLogistica[]> {

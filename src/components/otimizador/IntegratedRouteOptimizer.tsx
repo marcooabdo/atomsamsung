@@ -68,6 +68,11 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [minutosUsados, setMinutosUsados] = useState(0);
   const [minutosDisponiveis, setMinutosDisponiveis] = useState(0);
   const [showJaAgendadas, setShowJaAgendadas] = useState(false);
+  const [osSemLinha, setOsSemLinha] = useState<OSLogistica[]>([]);
+  const [linhasSelecionadas, setLinhasSelecionadas] = useState<Record<string, string>>({});
+  const [showLinhaModal, setShowLinhaModal] = useState(false);
+  const [listaParaFiltrarDepoisDaLinha, setListaParaFiltrarDepoisDaLinha] = useState<OSLogistica[]>([]);
+  const [linhasDisponiveis, setLinhasDisponiveis] = useState<string[]>(['Samsung', 'Apple', 'Motorola', 'Xiaomi', 'LG', 'Sony', 'Nokia', 'Outros']);
 
   useEffect(() => {
     carregarDados();
@@ -75,15 +80,22 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
 
   const carregarDados = async () => {
     setLoading(true);
-    const [rotasData, tecnicosData, unidadeData] = await Promise.all([
+    const [rotasData, tecnicosData, unidadeData, linhasData] = await Promise.all([
       buscarRotasColuna(unidadeId),
       buscarTecnicosLogistica(unidadeId),
       supabase.from('unidades').select('latitude, longitude').eq('id', unidadeId).single(),
+      supabase.from('os').select('aparelho_linha').eq('unidade_id', unidadeId).not('aparelho_linha', 'is', null),
     ]);
     setRotas(rotasData);
     setTecnicos(tecnicosData);
     if (unidadeData.data?.latitude && unidadeData.data?.longitude) {
       setBaseCoords({ lat: Number(unidadeData.data.latitude), lng: Number(unidadeData.data.longitude) });
+    }
+    if (linhasData.data) {
+      const base = ['Samsung', 'Apple', 'Motorola', 'Xiaomi', 'LG', 'Sony', 'Nokia', 'Outros'];
+      const fromDB = [...new Set((linhasData.data as { aparelho_linha: string }[]).map(r => r.aparelho_linha).filter(Boolean))];
+      const merged = [...new Set([...base, ...fromDB])].sort();
+      setLinhasDisponiveis(merged);
     }
     setLoading(false);
   };
@@ -133,9 +145,38 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       return;
     }
 
+    const semLinha = listaComCoords.filter(os => !os.aparelho_linha);
+    if (semLinha.length > 0) {
+      setOsSemLinha(semLinha);
+      setLinhasSelecionadas({});
+      setListaParaFiltrarDepoisDaLinha(listaComCoords);
+      setOsPendentes(listaComCoords);
+      setShowLinhaModal(true);
+      setBuscando(false);
+      return;
+    }
+
     aplicarFiltros(listaComCoords, tecnicoSelecionado);
     setOsPendentes(listaComCoords);
     setBuscando(false);
+    setEtapa('processar');
+  };
+
+  const confirmarLinhas = async () => {
+    const listaAtualizada = listaParaFiltrarDepoisDaLinha.map(os => {
+      const linha = linhasSelecionadas[os.id];
+      return linha ? { ...os, aparelho_linha: linha } : os;
+    });
+    for (const os of listaAtualizada) {
+      const linha = linhasSelecionadas[os.id];
+      if (linha) {
+        await supabase.from('os').update({ aparelho_linha: linha }).eq('id', os.id);
+      }
+    }
+    setShowLinhaModal(false);
+    setOsSemLinha([]);
+    aplicarFiltros(listaAtualizada, tecnicoSelecionado!);
+    setOsPendentes(listaAtualizada);
     setEtapa('processar');
   };
 
@@ -778,6 +819,77 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
                   {new Date(dataRota + 'T12:00:00').toLocaleDateString('pt-BR')}
                 </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: OSs sem linha */}
+      {showLinhaModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.7)' }}>
+          <div className="w-full max-w-lg rounded-2xl shadow-2xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <div className="px-6 py-5 border-b" style={{ borderColor: 'var(--border-primary)' }}>
+              <div className="flex items-center gap-3 mb-1">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#F59E0B15', border: '1px solid #F59E0B30' }}>
+                  <AlertCircle className="w-4 h-4" style={{ color: '#F59E0B' }} />
+                </div>
+                <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {osSemLinha.length} OS{osSemLinha.length > 1 ? 's' : ''} sem Linha preenchida
+                </h3>
+              </div>
+              <p className="text-xs ml-11" style={{ color: 'var(--text-secondary)' }}>
+                Selecione a linha de produto para cada OS antes de prosseguir com a otimizacao.
+              </p>
+            </div>
+            <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-4">
+              {osSemLinha.map(os => (
+                <div key={os.id} className="flex items-center gap-3">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                      OS {os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)}
+                    </p>
+                    <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>
+                      {os.cliente_nome ?? 'Cliente não informado'}
+                    </p>
+                  </div>
+                  <select
+                    value={linhasSelecionadas[os.id] ?? ''}
+                    onChange={e => setLinhasSelecionadas(prev => ({ ...prev, [os.id]: e.target.value }))}
+                    className="w-44 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                    style={{ backgroundColor: 'var(--bg-secondary)', border: `1px solid ${linhasSelecionadas[os.id] ? '#10B98150' : 'var(--border-primary)'}`, color: 'var(--text-primary)' }}
+                  >
+                    <option value="">Selecionar linha...</option>
+                    {linhasDisponiveis.map(l => (
+                      <option key={l} value={l}>{l}</option>
+                    ))}
+                  </select>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 border-t flex items-center justify-between gap-3" style={{ borderColor: 'var(--border-primary)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-tertiary)' }}>
+                {Object.keys(linhasSelecionadas).filter(k => linhasSelecionadas[k]).length} de {osSemLinha.length} preenchidas
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setShowLinhaModal(false);
+                    setOsSemLinha([]);
+                  }}
+                  className="px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                  style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmarLinhas}
+                  disabled={osSemLinha.some(os => !linhasSelecionadas[os.id])}
+                  className="px-5 py-2 rounded-lg text-sm font-bold transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ backgroundColor: '#10B981', color: '#fff' }}
+                >
+                  Confirmar e Otimizar
+                </button>
               </div>
             </div>
           </div>
