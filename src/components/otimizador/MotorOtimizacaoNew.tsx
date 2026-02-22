@@ -375,66 +375,117 @@ export default function MotorOtimizacaoNew() {
     const inicioMin = timeToMinutes(horarioInicio);
     const fimMin = timeToMinutes(horarioFim);
     const almocoMin = timeToMinutes(horarioAlmoco);
+
     const resultParadas: ParadaItinerario[] = [];
     const resultNaoRoteirizadas: OSItem[] = [...osSemCoord];
     const disponivel = new Set(osComCoord.map(os => os.id));
+
+    type CandidateInfo = { os: OSItem; travelMin: number; dist: number; arrivalMin: number; departureMin: number };
+
+    const computeCandidate = async (
+      os: OSItem,
+      pos: { lat: number; lng: number },
+      curMin: number,
+      almocoFeito: boolean
+    ): Promise<CandidateInfo> => {
+      const dist = haversineDistance(pos, { lat: os.lat, lng: os.lng }) * 1.3;
+      const googleTime = await getRealTravelTime(pos, { lat: os.lat, lng: os.lng });
+      const travelMin = googleTime?.duration ?? estimateDriveTime(dist, 40);
+      const realDist = googleTime?.distance ?? dist;
+
+      let arrival = curMin + travelMin;
+      if (!almocoFeito && curMin < almocoMin && arrival >= almocoMin) {
+        arrival += duracaoAlmoco;
+      }
+      const departure = arrival + tempoMedioReparo;
+      return { os, travelMin, dist: realDist, arrivalMin: arrival, departureMin: departure };
+    };
 
     let currentPos = { ...baseCoords };
     let currentMin = inicioMin;
     let dia = 1;
     let almocoFeitoNoDia = false;
-    let semProgresso = 0;
 
     while (disponivel.size > 0 && dia <= maxDias) {
       const restante = osComCoord.filter(os => disponivel.has(os.id));
       if (restante.length === 0) break;
 
-      let preferidas: OSItem[];
+      let candidatos = restante;
       if (currentMin < almocoMin) {
-        preferidas = restante.filter(os => os.periodo_preferido === 'manha' || !os.periodo_preferido);
+        const preferidas = candidatos.filter(os => os.periodo_preferido === 'manha' || !os.periodo_preferido);
+        if (preferidas.length > 0) candidatos = preferidas;
       } else {
-        preferidas = restante.filter(os => os.periodo_preferido === 'tarde' || !os.periodo_preferido);
+        const preferidas = candidatos.filter(os => os.periodo_preferido === 'tarde' || !os.periodo_preferido);
+        if (preferidas.length > 0) candidatos = preferidas;
       }
-      if (preferidas.length === 0) preferidas = restante;
 
-      const distances = preferidas.map(os => ({
-        os,
-        dist: haversineDistance(currentPos, { lat: os.lat, lng: os.lng }) * 1.3,
-      }));
-
-      distances.sort((a, b) => {
-        const scoreA = (1 - Math.min(a.dist / 500, 1)) * 0.6 + Math.min(a.os.dias_aberta / 30, 1) * 0.3 + (a.os.prioridade === 'urgente' ? 1 : a.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
-        const scoreB = (1 - Math.min(b.dist / 500, 1)) * 0.6 + Math.min(b.os.dias_aberta / 30, 1) * 0.3 + (b.os.prioridade === 'urgente' ? 1 : b.os.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
-        return scoreB - scoreA;
+      candidatos.sort((a, b) => {
+        const da = haversineDistance(currentPos, { lat: a.lat, lng: a.lng });
+        const db = haversineDistance(currentPos, { lat: b.lat, lng: b.lng });
+        const sa = (1 - Math.min(da / 500, 1)) * 0.6 + Math.min(a.dias_aberta / 30, 1) * 0.3 + (a.prioridade === 'urgente' ? 1 : a.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
+        const sb = (1 - Math.min(db / 500, 1)) * 0.6 + Math.min(b.dias_aberta / 30, 1) * 0.3 + (b.prioridade === 'urgente' ? 1 : b.prioridade === 'alta' ? 0.7 : 0.4) * 0.1;
+        return sb - sa;
       });
 
-      const best = distances[0];
-      if (!best) break;
+      let placed = false;
+      const maxCheck = Math.min(candidatos.length, 5);
 
-      const googleTime = await getRealTravelTime(currentPos, { lat: best.os.lat, lng: best.os.lng });
-      const travelMin = googleTime?.duration ?? estimateDriveTime(best.dist, 40);
-      const realDist = googleTime?.distance ?? best.dist;
+      for (let ci = 0; ci < maxCheck; ci++) {
+        const candidate = await computeCandidate(candidatos[ci], currentPos, currentMin, almocoFeitoNoDia);
 
-      let arrivalMin = currentMin + travelMin;
+        if (candidate.departureMin <= fimMin) {
+          const atualizaAlmoco = !almocoFeitoNoDia && currentMin < almocoMin && candidate.arrivalMin >= almocoMin;
+          if (atualizaAlmoco || (!almocoFeitoNoDia && currentMin >= almocoMin)) {
+            almocoFeitoNoDia = true;
+          }
 
-      if (!almocoFeitoNoDia && currentMin < almocoMin && arrivalMin >= almocoMin) {
-        arrivalMin += duracaoAlmoco;
-        almocoFeitoNoDia = true;
-      } else if (!almocoFeitoNoDia && currentMin >= almocoMin) {
-        almocoFeitoNoDia = true;
+          resultParadas.push({
+            os: candidate.os,
+            ordem: resultParadas.length + 1,
+            distancia_km: Math.round(candidate.dist * 10) / 10,
+            tempo_deslocamento_min: candidate.travelMin,
+            horario_chegada: minutesToTime(candidate.arrivalMin),
+            horario_saida: minutesToTime(candidate.departureMin),
+            dia,
+          });
+
+          currentPos = { lat: candidate.os.lat, lng: candidate.os.lng };
+          currentMin = candidate.departureMin;
+          disponivel.delete(candidate.os.id);
+          placed = true;
+
+          if (currentMin >= fimMin && disponivel.size > 0) {
+            if (permitePernoite && dia < maxDias) {
+              dia++;
+              currentMin = inicioMin;
+              currentPos = { ...baseCoords };
+              almocoFeitoNoDia = false;
+            } else {
+              disponivel.forEach(id => {
+                const os = osComCoord.find(o => o.id === id);
+                if (os) resultNaoRoteirizadas.push(os);
+              });
+              disponivel.clear();
+            }
+          }
+          break;
+        }
       }
 
-      const departureMin = arrivalMin + tempoMedioReparo;
-
-      if (departureMin > fimMin) {
+      if (!placed) {
         if (permitePernoite && dia < maxDias) {
           dia++;
           currentMin = inicioMin;
           currentPos = { ...baseCoords };
           almocoFeitoNoDia = false;
-          semProgresso++;
-          if (semProgresso > maxDias * restante.length + 10) {
-            restante.forEach(os => {
+
+          const restanteAfter = osComCoord.filter(os => disponivel.has(os.id));
+          const tooFar = await Promise.all(
+            restanteAfter.slice(0, 5).map(os => computeCandidate(os, baseCoords, inicioMin, false))
+          );
+          const anyFits = tooFar.some(c => c.departureMin <= fimMin);
+          if (!anyFits) {
+            restanteAfter.forEach(os => {
               if (disponivel.has(os.id)) {
                 resultNaoRoteirizadas.push(os);
                 disponivel.delete(os.id);
@@ -442,42 +493,13 @@ export default function MotorOtimizacaoNew() {
             });
             break;
           }
-          continue;
         } else {
-          resultNaoRoteirizadas.push(best.os);
-          disponivel.delete(best.os.id);
-          semProgresso = 0;
-          continue;
-        }
-      }
-
-      semProgresso = 0;
-      resultParadas.push({
-        os: best.os,
-        ordem: resultParadas.length + 1,
-        distancia_km: Math.round(realDist * 10) / 10,
-        tempo_deslocamento_min: travelMin,
-        horario_chegada: minutesToTime(arrivalMin),
-        horario_saida: minutesToTime(departureMin),
-        dia,
-      });
-
-      currentPos = { lat: best.os.lat, lng: best.os.lng };
-      currentMin = departureMin;
-      disponivel.delete(best.os.id);
-
-      if (currentMin >= fimMin && disponivel.size > 0) {
-        if (permitePernoite && dia < maxDias) {
-          dia++;
-          currentMin = inicioMin;
-          currentPos = { ...baseCoords };
-          almocoFeitoNoDia = false;
-        } else {
-          disponivel.forEach(id => {
-            const os = osComCoord.find(o => o.id === id);
-            if (os) resultNaoRoteirizadas.push(os);
+          const restanteAfter = osComCoord.filter(os => disponivel.has(os.id));
+          restanteAfter.forEach(os => {
+            resultNaoRoteirizadas.push(os);
+            disponivel.delete(os.id);
           });
-          disponivel.clear();
+          break;
         }
       }
     }
