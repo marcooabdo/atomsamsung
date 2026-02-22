@@ -336,6 +336,14 @@ export default function MotorOtimizacaoNew() {
     return Math.max(1, Math.ceil((fim.getTime() - inicio.getTime()) / 86400000) + 1);
   }, [dataInicio, dataFim]);
 
+  const skillMatch = useCallback((osLinha: string, habs: string[]): boolean => {
+    if (habs.length === 0) return true;
+    if (!osLinha) return true;
+    const norm = osLinha.trim().toUpperCase();
+    if (!norm) return true;
+    return habs.some(h => h === norm || h.includes(norm) || norm.includes(h));
+  }, []);
+
   const runOptimization = useCallback(async () => {
     if (!baseCoords || filteredOS.length === 0) return;
     setLoading(true);
@@ -369,10 +377,8 @@ export default function MotorOtimizacaoNew() {
       });
     }
 
-    // Skill filter: compare os.aparelho_linha with tecnico.habilidades
     const tecObj = tecnicosData.find((t: any) => t.id === selectedTecnico);
     const habilidades: string[] = (tecObj?.habilidades ?? []).map((h: string) => h.trim().toUpperCase());
-    const hasSkillFilter = habilidades.length > 0;
 
     const osComCoord: OSItem[] = [];
     const resultNaoRoteirizadas: OSItem[] = [];
@@ -382,12 +388,9 @@ export default function MotorOtimizacaoNew() {
         resultNaoRoteirizadas.push(os);
         continue;
       }
-      if (hasSkillFilter && os.aparelho_linha) {
-        const linhaNorm = os.aparelho_linha.trim().toUpperCase();
-        if (!habilidades.some(h => h === linhaNorm)) {
-          resultNaoRoteirizadas.push(os);
-          continue;
-        }
+      if (!skillMatch(os.aparelho_linha, habilidades)) {
+        resultNaoRoteirizadas.push(os);
+        continue;
       }
       osComCoord.push(os);
     }
@@ -404,9 +407,6 @@ export default function MotorOtimizacaoNew() {
     const inicioMin = timeToMinutes(horarioInicio);
     const fimMin = timeToMinutes(horarioFim);
     const almocoMin = timeToMinutes(horarioAlmoco);
-    const limiteMinDia = fimMin - inicioMin - duracaoAlmoco;
-
-    // TSP direction heuristic: are older OS farther or nearer?
     const withDist = osComCoord.map(os => ({
       os,
       dist: haversineDistance(baseCoords, { lat: os.lat, lng: os.lng }),
@@ -417,16 +417,18 @@ export default function MotorOtimizacaoNew() {
     const avgAgeNear = withDist.slice(half).reduce((s, x) => s + x.os.dias_aberta, 0) / Math.max(withDist.length - half, 1);
     const farthestFirst = avgAgeFar > avgAgeNear && osComCoord.length >= 3;
 
-    // Nearest-neighbor TSP ordering
     const ordered: OSItem[] = [];
     const remaining = [...osComCoord];
-    let tspPos = farthestFirst ? baseCoords : baseCoords;
+    let tspPos = { ...baseCoords };
 
-    if (farthestFirst) {
+    if (farthestFirst && remaining.length > 0) {
       remaining.sort((a, b) =>
         haversineDistance(baseCoords, { lat: b.lat, lng: b.lng }) -
         haversineDistance(baseCoords, { lat: a.lat, lng: a.lng })
       );
+      const farthest = remaining.shift()!;
+      ordered.push(farthest);
+      tspPos = { lat: farthest.lat, lng: farthest.lng };
     }
 
     while (remaining.length > 0) {
@@ -441,76 +443,113 @@ export default function MotorOtimizacaoNew() {
       remaining.splice(bestIdx, 1);
     }
 
-    // Stable partition: morning-preferred first, then no-pref, then afternoon-preferred
     const manha = ordered.filter(os => os.periodo_preferido === 'manha');
     const semPref = ordered.filter(os => !os.periodo_preferido);
     const tarde = ordered.filter(os => os.periodo_preferido === 'tarde');
     const osFinais = [...manha, ...semPref, ...tarde];
 
-    // Bin-packing: distribute OS into days with STRICT hourly limit
     const resultParadas: ParadaItinerario[] = [];
     let dia = 1;
-    let tempoAcumuladoDia = 0;
     let currentMin = inicioMin;
-    let almocoFeitoNoDia = false;
+    let almocoFeitoDia = false;
     let currentPos = { ...baseCoords };
 
     for (const os of osFinais) {
-      let placed = false;
-      let tryDia = dia;
-      let tryMin = currentMin;
-      let tryAcum = tempoAcumuladoDia;
-      let tryAlmoco = almocoFeitoNoDia;
-      let tryPos = currentPos;
+      const dist = haversineDistance(currentPos, { lat: os.lat, lng: os.lng }) * 1.3;
+      const googleTime = await getRealTravelTime(currentPos, { lat: os.lat, lng: os.lng });
+      let travelMin = googleTime?.duration ?? estimateDriveTime(dist, 60);
+      const realDist = googleTime?.distance ?? dist;
 
-      while (tryDia <= maxDias) {
-        const dist = haversineDistance(tryPos, { lat: os.lat, lng: os.lng }) * 1.3;
-        const googleTime = await getRealTravelTime(tryPos, { lat: os.lat, lng: os.lng });
-        const travelMin = googleTime?.duration ?? estimateDriveTime(dist, 40);
-        const realDist = googleTime?.distance ?? dist;
+      let travelRemaining = travelMin;
+      let tmpDia = dia;
+      let tmpMin = currentMin;
+      let tmpAlmoco = almocoFeitoDia;
 
-        let chegadaMin = tryMin + travelMin;
-        if (!tryAlmoco && tryMin < almocoMin && chegadaMin >= almocoMin) {
-          chegadaMin += duracaoAlmoco;
-          tryAlmoco = true;
-        } else if (!tryAlmoco && tryMin >= almocoMin) {
-          tryAlmoco = true;
+      while (travelRemaining > 0 && tmpDia <= maxDias) {
+        if (!tmpAlmoco && tmpMin < almocoMin && tmpMin + travelRemaining >= almocoMin) {
+          const driveBeforeLunch = almocoMin - tmpMin;
+          travelRemaining -= driveBeforeLunch;
+          tmpMin = almocoMin + duracaoAlmoco;
+          tmpAlmoco = true;
+          continue;
+        }
+        if (!tmpAlmoco && tmpMin >= almocoMin) {
+          tmpAlmoco = true;
         }
 
-        const saidaMin = chegadaMin + tempoMedioReparo;
-        const custoTotal = travelMin + tempoMedioReparo;
+        const tempoRestanteDia = fimMin - tmpMin;
+        if (tempoRestanteDia <= 0) {
+          if (!permitePernoite || tmpDia >= maxDias) break;
+          tmpDia++;
+          tmpMin = inicioMin;
+          tmpAlmoco = false;
+          continue;
+        }
 
-        if (saidaMin <= fimMin && tryAcum + custoTotal <= limiteMinDia) {
+        if (travelRemaining <= tempoRestanteDia) {
+          tmpMin += travelRemaining;
+          travelRemaining = 0;
+        } else {
+          travelRemaining -= tempoRestanteDia;
+          if (!permitePernoite || tmpDia >= maxDias) break;
+          tmpDia++;
+          tmpMin = inicioMin;
+          tmpAlmoco = false;
+        }
+      }
+
+      if (travelRemaining > 0) {
+        resultNaoRoteirizadas.push(os);
+        continue;
+      }
+
+      const chegadaMin = tmpMin;
+      if (!tmpAlmoco && chegadaMin >= almocoMin) {
+        tmpAlmoco = true;
+      }
+
+      const saidaMin = chegadaMin + tempoMedioReparo;
+
+      if (saidaMin > fimMin) {
+        if (permitePernoite && tmpDia < maxDias) {
+          tmpDia++;
+          const reparoInicio = inicioMin;
+          const reparoFim = reparoInicio + tempoMedioReparo;
+
           resultParadas.push({
             os,
             ordem: resultParadas.length + 1,
             distancia_km: Math.round(realDist * 10) / 10,
             tempo_deslocamento_min: travelMin,
-            horario_chegada: minutesToTime(chegadaMin),
-            horario_saida: minutesToTime(saidaMin),
-            dia: tryDia,
+            horario_chegada: minutesToTime(reparoInicio),
+            horario_saida: minutesToTime(reparoFim),
+            dia: tmpDia,
           });
 
-          dia = tryDia;
-          currentMin = saidaMin;
-          tempoAcumuladoDia = tryAcum + custoTotal;
-          almocoFeitoNoDia = tryAlmoco;
+          dia = tmpDia;
+          currentMin = reparoFim;
+          almocoFeitoDia = false;
           currentPos = { lat: os.lat, lng: os.lng };
-          placed = true;
-          break;
         } else {
-          if (tryDia >= maxDias) break;
-          tryDia++;
-          tryMin = inicioMin;
-          tryAcum = 0;
-          tryAlmoco = false;
-          tryPos = { ...baseCoords };
+          resultNaoRoteirizadas.push(os);
         }
+        continue;
       }
 
-      if (!placed) {
-        resultNaoRoteirizadas.push(os);
-      }
+      resultParadas.push({
+        os,
+        ordem: resultParadas.length + 1,
+        distancia_km: Math.round(realDist * 10) / 10,
+        tempo_deslocamento_min: travelMin,
+        horario_chegada: minutesToTime(chegadaMin),
+        horario_saida: minutesToTime(saidaMin),
+        dia: tmpDia,
+      });
+
+      dia = tmpDia;
+      currentMin = saidaMin;
+      almocoFeitoDia = tmpAlmoco;
+      currentPos = { lat: os.lat, lng: os.lng };
     }
 
     setParadas(resultParadas);
@@ -518,7 +557,7 @@ export default function MotorOtimizacaoNew() {
     generateItinerary(resultParadas);
     setStep('result');
     setLoading(false);
-  }, [baseCoords, filteredOS, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, maxDias, selectedTecnico, tecnicosData]);
+  }, [baseCoords, filteredOS, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, tempoMedioReparo, permitePernoite, maxDias, selectedTecnico, tecnicosData, skillMatch]);
 
   const generateItinerary = useCallback((paradasList: ParadaItinerario[]) => {
     if (!baseCoords) return;
@@ -529,149 +568,245 @@ export default function MotorOtimizacaoNew() {
       return;
     }
 
-    const dias: DiaItinerario[] = [];
     const dataBase = new Date(dataInicio);
     const inicioMin = timeToMinutes(horarioInicio);
     const fimMin = timeToMinutes(horarioFim);
     const almocoMin = timeToMinutes(horarioAlmoco);
     const almocoFimMin = almocoMin + duracaoAlmoco;
 
-    const diasUsados = [...new Set(paradasList.map(p => p.dia))].sort((a, b) => a - b);
-    const maxDia = diasUsados[diasUsados.length - 1];
+    const totalDias = Math.max(...paradasList.map(p => p.dia));
+    const diasMap: Record<number, { eventos: DiaItinerario['eventos']; kmDia: number; atendimentos: number }> = {};
 
-    for (let idx = 0; idx < diasUsados.length; idx++) {
-      const d = diasUsados[idx];
-      const isLastDay = d === maxDia;
-      const paradasDia = paradasList.filter(p => p.dia === d);
-      const dataAtual = addDaysToDate(dataBase, d - 1);
-      const eventos: DiaItinerario['eventos'] = [];
-
-      eventos.push({
-        tipo: 'saida_base',
-        horario_inicio: horarioInicio,
-        horario_fim: horarioInicio,
-        descricao: 'Saida da base',
-      });
-
-      let lastPos = baseCoords;
-      let kmDia = 0;
-      let almocoAdded = false;
-      let currentMin = inicioMin;
-
-      for (const parada of paradasDia) {
-        const chegadaMin = timeToMinutes(parada.horario_chegada);
-        const saidaMin = timeToMinutes(parada.horario_saida);
-        const deslocamentoInicio = currentMin;
-        const deslocamentoFim = deslocamentoInicio + parada.tempo_deslocamento_min;
-
-        if (!almocoAdded && deslocamentoInicio < almocoMin && deslocamentoFim >= almocoMin) {
-          const tempoAteAlmoco = almocoMin - deslocamentoInicio;
-          const frac = parada.tempo_deslocamento_min > 0 ? tempoAteAlmoco / parada.tempo_deslocamento_min : 0;
-
-          eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(deslocamentoInicio),
-            horario_fim: minutesToTime(almocoMin),
-            descricao: 'Em Deslocamento',
-            distancia_km: Math.round(parada.distancia_km * frac * 10) / 10,
-            duracao_min: tempoAteAlmoco,
-          });
-
-          eventos.push({
-            tipo: 'almoco',
-            horario_inicio: horarioAlmoco,
-            horario_fim: minutesToTime(almocoFimMin),
-            descricao: 'Pausa para Almoco',
-            duracao_min: duracaoAlmoco,
-          });
-          almocoAdded = true;
-
-          const tempoRestante = parada.tempo_deslocamento_min - tempoAteAlmoco;
-          if (tempoRestante > 0) {
-            eventos.push({
-              tipo: 'deslocamento',
-              horario_inicio: minutesToTime(almocoFimMin),
-              horario_fim: parada.horario_chegada,
-              descricao: 'Em Deslocamento',
-              distancia_km: Math.round(parada.distancia_km * (1 - frac) * 10) / 10,
-              duracao_min: tempoRestante,
-            });
-          }
-        } else if (!almocoAdded && chegadaMin >= almocoMin && deslocamentoInicio < almocoMin) {
-          eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(deslocamentoInicio),
-            horario_fim: minutesToTime(almocoMin),
-            descricao: 'Em Deslocamento',
-            distancia_km: parada.distancia_km,
-            duracao_min: almocoMin - deslocamentoInicio,
-          });
-          eventos.push({
-            tipo: 'almoco',
-            horario_inicio: horarioAlmoco,
-            horario_fim: minutesToTime(almocoFimMin),
-            descricao: 'Pausa para Almoco',
-            duracao_min: duracaoAlmoco,
-          });
-          almocoAdded = true;
-        } else {
-          eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(currentMin),
-            horario_fim: parada.horario_chegada,
-            descricao: 'Em Deslocamento',
-            distancia_km: parada.distancia_km,
-            duracao_min: parada.tempo_deslocamento_min,
-          });
-        }
-
-        eventos.push({
-          tipo: 'atendimento',
-          horario_inicio: parada.horario_chegada,
-          horario_fim: parada.horario_saida,
-          descricao: `OS ${parada.os.numero_os} - ${parada.os.cliente_nome}`,
-          os: parada.os,
-          parada,
-        });
-
-        kmDia += parada.distancia_km;
-        lastPos = { lat: parada.os.lat, lng: parada.os.lng };
-        currentMin = saidaMin;
-      }
-
-      if (paradasDia.length > 0) {
-        const lastParada = paradasDia[paradasDia.length - 1];
-        const retornoKm = haversineDistance(lastPos, baseCoords) * 1.3;
-        const retornoMin = estimateDriveTime(retornoKm, 40);
-
-        if (isLastDay || !permitePernoite) {
-          eventos.push({
-            tipo: 'retorno_base',
-            horario_inicio: lastParada.horario_saida,
-            horario_fim: minutesToTime(timeToMinutes(lastParada.horario_saida) + retornoMin),
-            descricao: 'Retorno a base',
-            distancia_km: Math.round(retornoKm * 10) / 10,
-            duracao_min: retornoMin,
-          });
-          kmDia += retornoKm;
-        } else {
-          eventos.push({
-            tipo: 'pernoite',
-            horario_inicio: lastParada.horario_saida,
-            horario_fim: horarioFim,
-            descricao: 'Pernoite na regiao',
-          });
-        }
-      }
-
-      dias.push({
-        dia: idx + 1,
-        data: formatDateBR(dataAtual),
-        eventos,
-        km_total: Math.round(kmDia * 10) / 10,
-        atendimentos: paradasDia.length,
-      });
+    for (let d = 1; d <= totalDias; d++) {
+      diasMap[d] = { eventos: [], kmDia: 0, atendimentos: 0 };
     }
+
+    let cursorDia = 1;
+    let cursorMin = inicioMin;
+    let cursorPos = { ...baseCoords };
+    let almocoFeitoDia: Record<number, boolean> = {};
+
+    const addAlmoco = (d: number) => {
+      if (!almocoFeitoDia[d]) {
+        diasMap[d].eventos.push({
+          tipo: 'almoco',
+          horario_inicio: horarioAlmoco,
+          horario_fim: minutesToTime(almocoFimMin),
+          descricao: 'Pausa para Almoco',
+          duracao_min: duracaoAlmoco,
+        });
+        almocoFeitoDia[d] = true;
+      }
+    };
+
+    diasMap[1].eventos.push({
+      tipo: 'saida_base',
+      horario_inicio: horarioInicio,
+      horario_fim: horarioInicio,
+      descricao: 'Saida da base',
+    });
+
+    for (const parada of paradasList) {
+      const travelTotal = parada.tempo_deslocamento_min;
+      const totalDistKm = parada.distancia_km;
+      let travelRemaining = travelTotal;
+      let driveStartMin = cursorMin;
+      let driveStartDia = cursorDia;
+      const kmPerMin = travelTotal > 0 ? totalDistKm / travelTotal : 0;
+
+      while (travelRemaining > 0) {
+        if (!diasMap[driveStartDia]) {
+          diasMap[driveStartDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+        }
+
+        if (!almocoFeitoDia[driveStartDia] && driveStartMin < almocoMin && driveStartMin + travelRemaining >= almocoMin) {
+          const driveBeforeLunch = almocoMin - driveStartMin;
+          const kmSegment = Math.round(kmPerMin * driveBeforeLunch * 10) / 10;
+          if (driveBeforeLunch > 0) {
+            diasMap[driveStartDia].eventos.push({
+              tipo: 'deslocamento',
+              horario_inicio: minutesToTime(driveStartMin),
+              horario_fim: minutesToTime(almocoMin),
+              descricao: 'Em Deslocamento',
+              distancia_km: kmSegment,
+              duracao_min: driveBeforeLunch,
+            });
+            diasMap[driveStartDia].kmDia += kmSegment;
+          }
+          travelRemaining -= driveBeforeLunch;
+          addAlmoco(driveStartDia);
+          driveStartMin = almocoFimMin;
+          continue;
+        }
+        if (!almocoFeitoDia[driveStartDia] && driveStartMin >= almocoMin) {
+          addAlmoco(driveStartDia);
+        }
+
+        const restoDia = fimMin - driveStartMin;
+        if (restoDia <= 0) {
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'pernoite',
+            horario_inicio: minutesToTime(fimMin),
+            horario_fim: horarioFim,
+            descricao: 'Pernoite - em transito',
+          });
+          driveStartDia++;
+          driveStartMin = inicioMin;
+          almocoFeitoDia[driveStartDia] = false;
+          if (!diasMap[driveStartDia]) {
+            diasMap[driveStartDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          }
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'saida_base',
+            horario_inicio: horarioInicio,
+            horario_fim: horarioInicio,
+            descricao: 'Continua deslocamento',
+          });
+          continue;
+        }
+
+        if (travelRemaining <= restoDia) {
+          const kmSegment = Math.round(kmPerMin * travelRemaining * 10) / 10;
+          const chegadaMin = driveStartMin + travelRemaining;
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(driveStartMin),
+            horario_fim: minutesToTime(chegadaMin),
+            descricao: 'Em Deslocamento',
+            distancia_km: kmSegment,
+            duracao_min: travelRemaining,
+          });
+          diasMap[driveStartDia].kmDia += kmSegment;
+          driveStartMin = chegadaMin;
+          travelRemaining = 0;
+        } else {
+          const kmSegment = Math.round(kmPerMin * restoDia * 10) / 10;
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(driveStartMin),
+            horario_fim: minutesToTime(fimMin),
+            descricao: 'Em Deslocamento',
+            distancia_km: kmSegment,
+            duracao_min: restoDia,
+          });
+          diasMap[driveStartDia].kmDia += kmSegment;
+          travelRemaining -= restoDia;
+
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'pernoite',
+            horario_inicio: minutesToTime(fimMin),
+            horario_fim: horarioFim,
+            descricao: 'Pernoite - em transito',
+          });
+          driveStartDia++;
+          driveStartMin = inicioMin;
+          almocoFeitoDia[driveStartDia] = false;
+          if (!diasMap[driveStartDia]) {
+            diasMap[driveStartDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          }
+          diasMap[driveStartDia].eventos.push({
+            tipo: 'saida_base',
+            horario_inicio: horarioInicio,
+            horario_fim: horarioInicio,
+            descricao: 'Continua deslocamento',
+          });
+        }
+      }
+
+      const atendimentoDia = parada.dia;
+      if (!diasMap[atendimentoDia]) {
+        diasMap[atendimentoDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+      }
+
+      const saidaMinFinal = timeToMinutes(parada.horario_saida);
+
+      diasMap[atendimentoDia].eventos.push({
+        tipo: 'atendimento',
+        horario_inicio: parada.horario_chegada,
+        horario_fim: parada.horario_saida,
+        descricao: `OS ${parada.os.numero_os} - ${parada.os.cliente_nome}`,
+        os: parada.os,
+        parada,
+      });
+      diasMap[atendimentoDia].atendimentos++;
+
+      cursorDia = atendimentoDia;
+      cursorMin = saidaMinFinal;
+      cursorPos = { lat: parada.os.lat, lng: parada.os.lng };
+    }
+
+    const lastParada = paradasList[paradasList.length - 1];
+    const lastDia = lastParada.dia;
+    const retornoKm = haversineDistance(cursorPos, baseCoords) * 1.3;
+    const retornoMin = estimateDriveTime(retornoKm, 60);
+    const retornoStartMin = timeToMinutes(lastParada.horario_saida);
+
+    if (!permitePernoite || retornoStartMin + retornoMin <= fimMin) {
+      diasMap[lastDia].eventos.push({
+        tipo: 'retorno_base',
+        horario_inicio: lastParada.horario_saida,
+        horario_fim: minutesToTime(Math.min(retornoStartMin + retornoMin, fimMin)),
+        descricao: 'Retorno a base',
+        distancia_km: Math.round(retornoKm * 10) / 10,
+        duracao_min: retornoMin,
+      });
+      diasMap[lastDia].kmDia += retornoKm;
+    } else {
+      let retRemaining = retornoMin;
+      let retDia = lastDia;
+      let retMin = retornoStartMin;
+      const retKmPerMin = retornoMin > 0 ? retornoKm / retornoMin : 0;
+
+      while (retRemaining > 0) {
+        const restoDia = fimMin - retMin;
+        if (restoDia <= 0) {
+          if (!diasMap[retDia]) diasMap[retDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          diasMap[retDia].eventos.push({
+            tipo: 'pernoite', horario_inicio: minutesToTime(fimMin), horario_fim: horarioFim, descricao: 'Pernoite - retornando',
+          });
+          retDia++; retMin = inicioMin;
+          if (!diasMap[retDia]) diasMap[retDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          continue;
+        }
+        if (retRemaining <= restoDia) {
+          const km = Math.round(retKmPerMin * retRemaining * 10) / 10;
+          if (!diasMap[retDia]) diasMap[retDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          diasMap[retDia].eventos.push({
+            tipo: 'retorno_base',
+            horario_inicio: minutesToTime(retMin),
+            horario_fim: minutesToTime(retMin + retRemaining),
+            descricao: 'Retorno a base',
+            distancia_km: km, duracao_min: retRemaining,
+          });
+          diasMap[retDia].kmDia += km;
+          retRemaining = 0;
+        } else {
+          const km = Math.round(retKmPerMin * restoDia * 10) / 10;
+          if (!diasMap[retDia]) diasMap[retDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+          diasMap[retDia].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(retMin), horario_fim: minutesToTime(fimMin),
+            descricao: 'Retornando a base', distancia_km: km, duracao_min: restoDia,
+          });
+          diasMap[retDia].kmDia += km;
+          retRemaining -= restoDia;
+          diasMap[retDia].eventos.push({
+            tipo: 'pernoite', horario_inicio: minutesToTime(fimMin), horario_fim: horarioFim, descricao: 'Pernoite - retornando',
+          });
+          retDia++; retMin = inicioMin;
+          if (!diasMap[retDia]) diasMap[retDia] = { eventos: [], kmDia: 0, atendimentos: 0 };
+        }
+      }
+    }
+
+    const diasKeys = Object.keys(diasMap).map(Number).sort((a, b) => a - b);
+    const dias: DiaItinerario[] = diasKeys.map((d, idx) => ({
+      dia: idx + 1,
+      data: formatDateBR(addDaysToDate(dataBase, d - 1)),
+      eventos: diasMap[d].eventos,
+      km_total: Math.round(diasMap[d].kmDia * 10) / 10,
+      atendimentos: diasMap[d].atendimentos,
+    }));
 
     setItinerario(dias);
     setExpandedDays([1]);
@@ -706,54 +841,73 @@ export default function MotorOtimizacaoNew() {
     let currentPos = { ...baseCoords };
     let currentMin = inicioMin;
     let dia = 1;
+    let almocoFeito = false;
 
-    const recalculated = newParadas.map((p, idx) => {
+    const recalculated: ParadaItinerario[] = [];
+
+    for (let idx = 0; idx < newParadas.length; idx++) {
+      const p = newParadas[idx];
       const dist = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.3;
-      const travelMin = estimateDriveTime(dist, 40);
-      let arrivalMin = currentMin + travelMin;
+      let travelMin = estimateDriveTime(dist, 60);
+      let travelRemaining = travelMin;
+      let tmpDia = dia;
+      let tmpMin = currentMin;
+      let tmpAlmoco = almocoFeito;
 
-      if (currentMin < almocoMin && arrivalMin >= almocoMin) {
-        arrivalMin += duracaoAlmoco;
+      while (travelRemaining > 0 && tmpDia <= maxDias) {
+        if (!tmpAlmoco && tmpMin < almocoMin && tmpMin + travelRemaining >= almocoMin) {
+          const driveBeforeLunch = almocoMin - tmpMin;
+          travelRemaining -= driveBeforeLunch;
+          tmpMin = almocoMin + duracaoAlmoco;
+          tmpAlmoco = true;
+          continue;
+        }
+        if (!tmpAlmoco && tmpMin >= almocoMin) tmpAlmoco = true;
+
+        const restoDia = fimMin - tmpMin;
+        if (restoDia <= 0) {
+          if (!permitePernoite || tmpDia >= maxDias) break;
+          tmpDia++; tmpMin = inicioMin; tmpAlmoco = false;
+          continue;
+        }
+        if (travelRemaining <= restoDia) {
+          tmpMin += travelRemaining;
+          travelRemaining = 0;
+        } else {
+          travelRemaining -= restoDia;
+          if (!permitePernoite || tmpDia >= maxDias) break;
+          tmpDia++; tmpMin = inicioMin; tmpAlmoco = false;
+        }
       }
 
-      const departureMin = arrivalMin + tempoMedioReparo;
+      if (travelRemaining > 0) continue;
 
-      if (departureMin > fimMin && permitePernoite && dia < maxDias) {
-        dia++;
-        currentMin = inicioMin;
-        currentPos = { ...baseCoords };
-        const newDist = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.3;
-        const newTravel = estimateDriveTime(newDist, 40);
-        arrivalMin = currentMin + newTravel;
-        const newDep = arrivalMin + tempoMedioReparo;
+      let chegadaMin = tmpMin;
+      if (!tmpAlmoco && chegadaMin >= almocoMin) tmpAlmoco = true;
+      let saidaMin = chegadaMin + tempoMedioReparo;
 
-        currentPos = { lat: p.os.lat, lng: p.os.lng };
-        currentMin = newDep;
-
-        return {
-          ...p,
-          ordem: idx + 1,
-          distancia_km: Math.round(newDist * 10) / 10,
-          tempo_deslocamento_min: newTravel,
-          horario_chegada: minutesToTime(arrivalMin),
-          horario_saida: minutesToTime(newDep),
-          dia,
-        };
+      if (saidaMin > fimMin && permitePernoite && tmpDia < maxDias) {
+        tmpDia++;
+        chegadaMin = inicioMin;
+        saidaMin = inicioMin + tempoMedioReparo;
+        tmpAlmoco = false;
       }
 
-      currentPos = { lat: p.os.lat, lng: p.os.lng };
-      currentMin = departureMin;
-
-      return {
+      recalculated.push({
         ...p,
-        ordem: idx + 1,
+        ordem: recalculated.length + 1,
         distancia_km: Math.round(dist * 10) / 10,
         tempo_deslocamento_min: travelMin,
-        horario_chegada: minutesToTime(arrivalMin),
-        horario_saida: minutesToTime(departureMin),
-        dia,
-      };
-    });
+        horario_chegada: minutesToTime(chegadaMin),
+        horario_saida: minutesToTime(saidaMin),
+        dia: tmpDia,
+      });
+
+      dia = tmpDia;
+      currentMin = saidaMin;
+      almocoFeito = tmpAlmoco;
+      currentPos = { lat: p.os.lat, lng: p.os.lng };
+    }
 
     setParadas(recalculated);
     generateItinerary(recalculated);

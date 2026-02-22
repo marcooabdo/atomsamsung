@@ -23,7 +23,7 @@ export function haversineDistance(a: LatLng, b: LatLng): number {
   return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
 }
 
-export function estimateDriveTime(distKm: number, avgSpeedKmh = 40): number {
+export function estimateDriveTime(distKm: number, avgSpeedKmh = 60): number {
   return Math.round((distKm / avgSpeedKmh) * 60);
 }
 
