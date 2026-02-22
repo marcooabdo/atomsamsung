@@ -179,19 +179,18 @@ export async function buscarOSsDaRota(unidadeId: string, colunaKanban: string): 
 }
 
 // ---------------------------------------------------------------------------
-// Skill filter
+// Skill filter — FIX: trim + toUpperCase on both sides
 // ---------------------------------------------------------------------------
 
 export function tecnicoAtendeLinha(tecnico: TecnicoLogistica, aparelhoLinha: string | null): boolean {
   if (!tecnico.habilidades || tecnico.habilidades.length === 0) return true;
   if (!aparelhoLinha) return true;
-  return tecnico.habilidades.some(
-    h => h.trim().toLowerCase() === aparelhoLinha.trim().toLowerCase()
-  );
+  const norm = aparelhoLinha.trim().toUpperCase();
+  return tecnico.habilidades.some(h => h.trim().toUpperCase() === norm);
 }
 
 // ---------------------------------------------------------------------------
-// Time filter helper
+// Time filter helper — multi-day bin-packing with strict daily limits
 // ---------------------------------------------------------------------------
 
 export interface JanelaTempoResult {
@@ -199,41 +198,74 @@ export interface JanelaTempoResult {
   sobrasHorario: OSLogistica[];
   minutosUsados: number;
   minutosDisponiveis: number;
+  diasNecessarios: number;
+}
+
+function _timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
 }
 
 /**
- * Dada lista de OSs e o técnico, retorna quais cabem no expediente do dia.
- * Tempo por OS: 60 min (reparo) + 20 min (deslocamento estimado).
+ * Distribui OSs em dias respeitando o limite diário de horas úteis (bin-packing).
+ * - Se o horário atual já passou do expediente, Dia 1 = amanhã.
+ * - Cada OS custa minutosOsPadrao + minutosDeslocamento.
+ * - Quando um dia está cheio, fecha-o e abre o próximo.
+ * - O que não couber em nenhum dia disponível vai para sobrasHorario.
  */
 export function filtrarPorJanelaTempo(
   osList: OSLogistica[],
   tecnico: TecnicoLogistica,
   minutosOsPadrao = 60,
-  minutosDeslocamento = 20
+  minutosDeslocamento = 20,
+  maxDias = 5
 ): JanelaTempoResult {
   const inicioStr = tecnico.horario_inicio_expediente ?? '08:00';
   const fimStr = tecnico.horario_fim_expediente ?? '18:00';
   const almocoDur = tecnico.duracao_almoco_minutos ?? 60;
 
-  const [iH, iM] = inicioStr.split(':').map(Number);
-  const [fH, fM] = fimStr.split(':').map(Number);
-  const minutosDisponiveis = (fH * 60 + fM) - (iH * 60 + iM) - almocoDur;
+  const inicioMin = _timeToMin(inicioStr);
+  const fimMin = _timeToMin(fimStr);
+  const limiteMinDia = fimMin - inicioMin - almocoDur;
+
+  // FIX: Day 1 start guard — if past expediente, start tomorrow
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const diaOffset = agoraMin >= fimMin ? 1 : 0;
 
   const aprovadas: OSLogistica[] = [];
   const sobrasHorario: OSLogistica[] = [];
-  let minutosUsados = 0;
+
+  let dia = 1 + diaOffset;
+  let tempoAcumuladoDia = 0;
+  let totalMinutosUsados = 0;
+
+  const custoPorOS = minutosOsPadrao + minutosDeslocamento;
 
   for (const os of osList) {
-    const custo = minutosOsPadrao + minutosDeslocamento;
-    if (minutosUsados + custo <= minutosDisponiveis) {
+    if (tempoAcumuladoDia + custoPorOS <= limiteMinDia) {
       aprovadas.push(os);
-      minutosUsados += custo;
+      tempoAcumuladoDia += custoPorOS;
+      totalMinutosUsados += custoPorOS;
     } else {
-      sobrasHorario.push(os);
+      if (dia < maxDias) {
+        dia++;
+        tempoAcumuladoDia = custoPorOS;
+        totalMinutosUsados += custoPorOS;
+        aprovadas.push(os);
+      } else {
+        sobrasHorario.push(os);
+      }
     }
   }
 
-  return { aprovadas, sobrasHorario, minutosUsados, minutosDisponiveis };
+  return {
+    aprovadas,
+    sobrasHorario,
+    minutosUsados: totalMinutosUsados,
+    minutosDisponiveis: limiteMinDia * (maxDias - diaOffset),
+    diasNecessarios: dia,
+  };
 }
 
 // ---------------------------------------------------------------------------

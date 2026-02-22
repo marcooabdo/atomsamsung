@@ -62,6 +62,7 @@ export interface OSIncluida {
   os_id: string;
   numero_os: string;
   ordem_visita: number;
+  dia: number;
   horario_chegada: string;
   horario_conclusao: string;
   distancia_anterior_km: number;
@@ -89,31 +90,244 @@ export interface OSExcluida {
   tecnicos_sugeridos?: string[];
 }
 
-async function calcularDistanciaETempo(
-  lat1: number,
-  lng1: number,
-  lat2: number,
-  lng2: number
-): Promise<{ distancia_km: number; tempo_minutos: number }> {
+// ---------------------------------------------------------------------------
+// Haversine distance (km, straight line)
+// ---------------------------------------------------------------------------
+function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lng2 - lng1) * Math.PI / 180;
   const a =
-    Math.sin(dLat/2) * Math.sin(dLat/2) +
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  const distanciaLinhaReta = R * c;
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
 
+function calcularDistanciaETempo(
+  lat1: number, lng1: number,
+  lat2: number, lng2: number
+): { distancia_km: number; tempo_minutos: number } {
+  const distanciaLinhaReta = haversine(lat1, lng1, lat2, lng2);
   const fatorCorrecaoEstradas = 1.4;
   const distancia_km = distanciaLinhaReta * fatorCorrecaoEstradas;
-
   const velocidade_media = 35;
   const tempo_minutos = Math.ceil((distancia_km / velocidade_media) * 60);
-
   return { distancia_km, tempo_minutos };
 }
 
+function timeToMin(t: string): number {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + (m || 0);
+}
+
+function minToTimeStr(min: number): string {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+}
+
+function minToISO(baseDate: Date, min: number, dayOffset: number): string {
+  const d = new Date(baseDate);
+  d.setDate(d.getDate() + dayOffset);
+  d.setHours(0, 0, 0, 0);
+  d.setMinutes(min);
+  return d.toISOString();
+}
+
+// ---------------------------------------------------------------------------
+// TSP direction heuristic: check if far OS are older (go far-first) or near
+// ---------------------------------------------------------------------------
+function resolverDirecaoTSP(
+  osList: OSParaOtimizar[],
+  base: { lat: number; lng: number }
+): 'farthest_first' | 'nearest_first' {
+  if (osList.length < 2) return 'nearest_first';
+
+  const withDist = osList.map(os => ({
+    os,
+    dist: haversine(base.lat, base.lng, os.lat, os.lng),
+    age: (Date.now() - new Date(os.created_at).getTime()) / 86400000,
+  }));
+
+  const sorted = [...withDist].sort((a, b) => b.dist - a.dist);
+  const farHalf = sorted.slice(0, Math.ceil(sorted.length / 2));
+  const nearHalf = sorted.slice(Math.ceil(sorted.length / 2));
+
+  const avgAgeFar = farHalf.reduce((s, x) => s + x.age, 0) / farHalf.length;
+  const avgAgeNear = nearHalf.reduce((s, x) => s + x.age, 0) / nearHalf.length;
+
+  return avgAgeFar > avgAgeNear ? 'farthest_first' : 'nearest_first';
+}
+
+// ---------------------------------------------------------------------------
+// Bin-packing TSP: distribui OSs em dias respeitando limite de horas
+// ---------------------------------------------------------------------------
+function binPackingTSP(
+  osOrdenadas: OSParaOtimizar[],
+  base: { lat: number; lng: number; endereco: string },
+  inicioMin: number,
+  fimMin: number,
+  almocoMin: number,
+  duracaoAlmocoMin: number,
+  maxDias: number,
+  dataBase: Date
+): { incluidas: OSIncluida[]; excluidas: OSExcluida[]; avisos: string[] } {
+  const limiteMinDia = fimMin - inicioMin - duracaoAlmocoMin;
+  const incluidas: OSIncluida[] = [];
+  const excluidas: OSExcluida[] = [];
+  const avisos: string[] = [];
+
+  let dia = 1;
+  let tempoAcumuladoDia = 0;
+  let currentMin = inicioMin;
+  let almocoFeitoDia = false;
+  let posAtual = { lat: base.lat, lng: base.lng };
+  let ordem = 1;
+
+  for (const os of osOrdenadas) {
+    let placed = false;
+
+    while (dia <= maxDias) {
+      const { distancia_km, tempo_minutos: travelMin } = calcularDistanciaETempo(
+        posAtual.lat, posAtual.lng, os.lat, os.lng
+      );
+
+      let chegadaMin = currentMin + travelMin;
+
+      if (!almocoFeitoDia && currentMin < almocoMin && chegadaMin >= almocoMin) {
+        chegadaMin += duracaoAlmocoMin;
+        almocoFeitoDia = true;
+      } else if (!almocoFeitoDia && currentMin >= almocoMin) {
+        almocoFeitoDia = true;
+      }
+
+      const saidaMin = chegadaMin + os.tempo_medio_reparo;
+      const custoTotal = travelMin + os.tempo_medio_reparo;
+
+      if (saidaMin <= fimMin && tempoAcumuladoDia + custoTotal <= limiteMinDia) {
+        incluidas.push({
+          os_id: os.id,
+          numero_os: os.numero_os,
+          ordem_visita: ordem++,
+          dia,
+          horario_chegada: minToISO(dataBase, chegadaMin, dia - 1),
+          horario_conclusao: minToISO(dataBase, saidaMin, dia - 1),
+          distancia_anterior_km: parseFloat(distancia_km.toFixed(2)),
+          tempo_deslocamento_minutos: travelMin,
+          lat: os.lat,
+          lng: os.lng,
+          endereco: os.endereco,
+          coordenadas: { lat: os.lat, lng: os.lng },
+          cliente_nome: os.cliente_nome,
+          cliente_logradouro: os.cliente_logradouro,
+          cliente_numero: os.cliente_numero,
+          cliente_bairro: os.cliente_bairro,
+          cliente_cidade: os.cliente_cidade,
+          cliente_cep: os.cliente_cep,
+          prioridade: os.prioridade,
+          tipo_atendimento: os.tipo_atendimento,
+          tipo_os: os.tipo_os,
+          linha_produto_nome: os.linha_produto_nome,
+        });
+
+        posAtual = { lat: os.lat, lng: os.lng };
+        currentMin = saidaMin;
+        tempoAcumuladoDia += custoTotal;
+        placed = true;
+        break;
+      } else {
+        if (dia >= maxDias) break;
+        dia++;
+        currentMin = inicioMin;
+        tempoAcumuladoDia = 0;
+        almocoFeitoDia = false;
+        posAtual = { lat: base.lat, lng: base.lng };
+      }
+    }
+
+    if (!placed) {
+      excluidas.push({
+        os_id: os.id,
+        numero_os: os.numero_os,
+        motivo: `Não cabe no horizonte de ${maxDias} dias úteis`,
+      });
+    }
+  }
+
+  const diasNecessarios = incluidas.length > 0 ? Math.max(...incluidas.map(o => o.dia)) : 0;
+  if (diasNecessarios > 1) {
+    avisos.push(`Esta rota requer ${diasNecessarios} dias de trabalho.`);
+  }
+
+  return { incluidas, excluidas, avisos };
+}
+
+// ---------------------------------------------------------------------------
+// Nearest-neighbor TSP ordering (respects direction heuristic)
+// ---------------------------------------------------------------------------
+function ordenarTSP(
+  osList: OSParaOtimizar[],
+  base: { lat: number; lng: number },
+  direcao: 'farthest_first' | 'nearest_first'
+): OSParaOtimizar[] {
+  if (osList.length === 0) return [];
+
+  const restantes = [...osList];
+  const ordered: OSParaOtimizar[] = [];
+
+  if (direcao === 'farthest_first') {
+    let pos = { lat: base.lat, lng: base.lng };
+
+    const allWithDist = restantes.map(os => ({
+      os,
+      dist: haversine(base.lat, base.lng, os.lat, os.lng),
+    }));
+    allWithDist.sort((a, b) => b.dist - a.dist);
+
+    const farthestFirst = allWithDist.map(d => d.os);
+    let remaining = [...farthestFirst];
+
+    while (remaining.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversine(pos.lat, pos.lng, remaining[i].lat, remaining[i].lng);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      ordered.push(remaining[bestIdx]);
+      pos = { lat: remaining[bestIdx].lat, lng: remaining[bestIdx].lng };
+      remaining.splice(bestIdx, 1);
+    }
+  } else {
+    let pos = { lat: base.lat, lng: base.lng };
+    let remaining = [...restantes];
+
+    while (remaining.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversine(pos.lat, pos.lng, remaining[i].lat, remaining[i].lng);
+        if (d < bestDist) {
+          bestDist = d;
+          bestIdx = i;
+        }
+      }
+      ordered.push(remaining[bestIdx]);
+      pos = { lat: remaining[bestIdx].lat, lng: remaining[bestIdx].lng };
+      remaining.splice(bestIdx, 1);
+    }
+  }
+
+  return ordered;
+}
+
+// ---------------------------------------------------------------------------
+// Main optimization function
+// ---------------------------------------------------------------------------
 export async function otimizarRotaInteligente(
   unidadeId: string,
   tecnicoId: string,
@@ -133,23 +347,18 @@ export async function otimizarRotaInteligente(
   const pontoBase = {
     lat: unidade.latitude,
     lng: unidade.longitude,
-    endereco: unidade.endereco || 'Unidade'
+    endereco: unidade.endereco || 'Unidade',
   };
 
   const { data: tecnico } = await supabase
     .from('usuarios')
-    .select(`
-      *,
-      tecnicos_linhas_produto(linha_produto_id)
-    `)
+    .select('*, tecnicos_linhas_produto(linha_produto_id)')
     .eq('id', tecnicoId)
     .single();
 
-  if (!tecnico) {
-    throw new Error('Técnico não encontrado');
-  }
+  if (!tecnico) throw new Error('Técnico não encontrado');
 
-  const linhasDoTecnico = tecnico.tecnicos_linhas_produto?.map((t: any) => t.linha_produto_id) || [];
+  const linhasDoTecnico = (tecnico.tecnicos_linhas_produto?.map((t: any) => t.linha_produto_id) || []) as string[];
 
   const { data: osLista } = await supabase
     .from('os')
@@ -164,6 +373,7 @@ export async function otimizarRotaInteligente(
       lat,
       lng,
       tipo_atendimento,
+      aparelho_linha,
       cliente_nome,
       cliente_logradouro,
       cliente_numero,
@@ -186,45 +396,48 @@ export async function otimizarRotaInteligente(
 
   for (const os of osLista) {
     const agendamento = os.agendamentos?.[0];
-
-    let osLat = os.lat;
-    let osLng = os.lng;
-
-    if (!osLat || !osLng) {
-      osLat = agendamento?.lat;
-      osLng = agendamento?.lng;
-    }
+    let osLat = os.lat ?? agendamento?.lat;
+    let osLng = os.lng ?? agendamento?.lng;
 
     if (!osLat || !osLng) {
       osExcluidas.push({
         os_id: os.id,
-        numero_os: os.numero_os_samsung || os.numero_os_interna,
-        motivo: 'OS sem coordenadas de localização'
+        numero_os: os.numero_os_samsung || os.numero_os_interna || '',
+        motivo: 'OS sem coordenadas de localização',
       });
       continue;
     }
 
-    if (os.linha_produto_id && !linhasDoTecnico.includes(os.linha_produto_id)) {
-      const { data: tecnicosCompativeis } = await supabase.rpc('buscar_tecnicos_compativeis', {
-        p_os_id: os.id,
-        p_unidade_id: unidadeId
-      });
+    // FIX: skill filter with trim + toUpperCase on both sides
+    if (os.linha_produto_id && linhasDoTecnico.length > 0 && !linhasDoTecnico.includes(os.linha_produto_id)) {
+      const aparelhoNorm = (os.aparelho_linha ?? '').trim().toUpperCase();
+      const habilidades: string[] = tecnico.habilidades ?? [];
+      const hasSkillByName = habilidades.some(
+        h => h.trim().toUpperCase() === aparelhoNorm
+      );
 
-      osExcluidas.push({
-        os_id: os.id,
-        numero_os: os.numero_os_samsung || os.numero_os_interna,
-        motivo: `O técnico não atende a linha de produto: ${os.linhas_produto?.nome || 'N/A'}`,
-        tecnicos_sugeridos: tecnicosCompativeis?.map((t: any) => t.tecnico_nome) || []
-      });
-      continue;
+      if (!hasSkillByName) {
+        const { data: tecnicosCompativeis } = await supabase.rpc('buscar_tecnicos_compativeis', {
+          p_os_id: os.id,
+          p_unidade_id: unidadeId,
+        });
+
+        osExcluidas.push({
+          os_id: os.id,
+          numero_os: os.numero_os_samsung || os.numero_os_interna || '',
+          motivo: `O técnico não atende a linha de produto: ${os.linhas_produto?.nome || os.aparelho_linha || 'N/A'}`,
+          tecnicos_sugeridos: tecnicosCompativeis?.map((t: any) => t.tecnico_nome) || [],
+        });
+        continue;
+      }
     }
 
     osValidas.push({
       id: os.id,
-      numero_os: os.numero_os_samsung || os.numero_os_interna,
+      numero_os: os.numero_os_samsung || os.numero_os_interna || '',
       tipo_os: os.tipo_os,
       linha_produto_id: os.linha_produto_id,
-      linha_produto_nome: os.linhas_produto?.nome || null,
+      linha_produto_nome: os.linhas_produto?.nome ?? null,
       tempo_medio_reparo: os.linhas_produto?.tempo_medio_reparo_minutos || 60,
       lat: parseFloat(osLat as any),
       lng: parseFloat(osLng as any),
@@ -238,22 +451,68 @@ export async function otimizarRotaInteligente(
       cliente_cidade: os.cliente_cidade || '',
       cliente_cep: os.cliente_cep || '',
       prioridade: 'media',
-      tipo_atendimento: os.tipo_atendimento || 'IH'
+      tipo_atendimento: os.tipo_atendimento || 'IH',
     });
   }
 
-  osValidas.sort((a, b) => {
-    if (a.tipo_os === 'LP' && b.tipo_os !== 'LP') return -1;
-    if (a.tipo_os !== 'LP' && b.tipo_os === 'LP') return 1;
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-  });
+  if (osValidas.length === 0) {
+    throw new Error('Nenhuma OS válida após filtro de habilidades');
+  }
 
-  const rotaOtimizada = await algoritmoNearestNeighbor(
+  // Work hours
+  const horarioInicio: string = tecnico.horario_inicio_expediente ?? '08:00';
+  const horarioFim: string = tecnico.horario_fim_expediente ?? '18:00';
+  const horarioAlmoco: string = tecnico.horario_almoco_inicio ?? '12:00';
+  const duracaoAlmoco: number = tecnico.duracao_almoco_minutos ?? 60;
+  const maxDias: number = tecnico.dias_permitidos_fora ?? 5;
+
+  const inicioMin = timeToMin(horarioInicio);
+  const fimMin = timeToMin(horarioFim);
+  const almocoMin = timeToMin(horarioAlmoco);
+
+  // FIX: Day 1 start date — if current time is past expediente, start tomorrow
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const dataBase = new Date(agora);
+  dataBase.setHours(0, 0, 0, 0);
+  if (agoraMin >= fimMin) {
+    dataBase.setDate(dataBase.getDate() + 1);
+  }
+
+  // TSP direction heuristic
+  const direcao = resolverDirecaoTSP(osValidas, pontoBase);
+  const osOrdenadas = ordenarTSP(osValidas, pontoBase, direcao);
+
+  if (direcao === 'farthest_first') {
+    const avisoDir = 'Estratégia: OS mais distantes são as mais antigas — técnico parte para o final da rota e volta atendendo no caminho.';
+    console.info(avisoDir);
+  }
+
+  // Bin-packing with strict day limits
+  const { incluidas, excluidas: excluidasBinPack, avisos } = binPackingTSP(
+    osOrdenadas,
     pontoBase,
-    osValidas,
-    tecnico
+    inicioMin,
+    fimMin,
+    almocoMin,
+    duracaoAlmoco,
+    maxDias,
+    dataBase
   );
 
+  const todasExcluidas = [...osExcluidas, ...excluidasBinPack];
+
+  // Retorno base
+  const ultimaOS = incluidas[incluidas.length - 1];
+  const { distancia_km: distanciaRetorno, tempo_minutos: tempoRetorno } = ultimaOS
+    ? calcularDistanciaETempo(ultimaOS.lat!, ultimaOS.lng!, pontoBase.lat, pontoBase.lng)
+    : { distancia_km: 0, tempo_minutos: 0 };
+
+  const distanciaTotal = incluidas.reduce((s, o) => s + o.distancia_anterior_km, 0) + distanciaRetorno;
+  const tempoTotal = incluidas.reduce((s, o) => s + o.tempo_deslocamento_minutos + 0, 0);
+  const diasNecessarios = incluidas.length > 0 ? Math.max(...incluidas.map(o => o.dia)) : 0;
+
+  // Save log
   const { data: otimizacaoLog, error: logError } = await supabase
     .from('otimizacao_logs')
     .insert({
@@ -261,15 +520,15 @@ export async function otimizarRotaInteligente(
       tecnico_id: tecnicoId,
       usuario_otimizador_id: usuarioOtimizadorId,
       rotas_selecionadas: rotasSelecionadas,
-      total_os_incluidas: rotaOtimizada.os_incluidas.length,
-      total_os_excluidas: osExcluidas.length,
-      distancia_total_km: rotaOtimizada.metricas.distancia_total_km,
-      tempo_total_minutos: rotaOtimizada.metricas.tempo_total_minutos,
-      quilometragem_total_km: rotaOtimizada.metricas.quilometragem_total_km,
-      horario_inicio_previsto: rotaOtimizada.metricas.horario_inicio,
-      horario_fim_previsto: rotaOtimizada.metricas.horario_fim,
-      dias_necessarios: rotaOtimizada.metricas.dias_necessarios,
-      resultado_json: { ...rotaOtimizada, os_excluidas: osExcluidas }
+      total_os_incluidas: incluidas.length,
+      total_os_excluidas: todasExcluidas.length,
+      distancia_total_km: parseFloat(distanciaTotal.toFixed(2)),
+      tempo_total_minutos: tempoTotal,
+      quilometragem_total_km: parseFloat(distanciaTotal.toFixed(2)),
+      horario_inicio_previsto: horarioInicio,
+      horario_fim_previsto: horarioFim,
+      dias_necessarios: diasNecessarios,
+      resultado_json: { os_incluidas: incluidas, os_excluidas: todasExcluidas, avisos },
     })
     .select()
     .single();
@@ -278,7 +537,7 @@ export async function otimizarRotaInteligente(
     throw new Error('Erro ao salvar log de otimização');
   }
 
-  for (const osIncluida of rotaOtimizada.os_incluidas) {
+  for (const osIncluida of incluidas) {
     await supabase.from('otimizacao_os').insert({
       otimizacao_id: otimizacaoLog.id,
       os_id: osIncluida.os_id,
@@ -287,162 +546,38 @@ export async function otimizarRotaInteligente(
       horario_chegada_previsto: osIncluida.horario_chegada,
       horario_conclusao_previsto: osIncluida.horario_conclusao,
       distancia_anterior_km: osIncluida.distancia_anterior_km,
-      tempo_deslocamento_minutos: osIncluida.tempo_deslocamento_minutos
+      tempo_deslocamento_minutos: osIncluida.tempo_deslocamento_minutos,
     });
   }
 
-  for (const osExcluida of osExcluidas) {
+  for (const osExcluida of todasExcluidas) {
     await supabase.from('otimizacao_os').insert({
       otimizacao_id: otimizacaoLog.id,
       os_id: osExcluida.os_id,
       incluida: false,
-      motivo_exclusao: osExcluida.motivo
+      motivo_exclusao: osExcluida.motivo,
     });
   }
 
-  const polyline = await gerarPolylineGoogleMaps(pontoBase, rotaOtimizada.os_incluidas);
+  const polyline = await gerarPolylineGoogleMaps(pontoBase, incluidas);
 
   return {
     otimizacao_id: otimizacaoLog.id,
-    os_incluidas: rotaOtimizada.os_incluidas,
-    os_excluidas: osExcluidas,
-    metricas: rotaOtimizada.metricas,
-    avisos: rotaOtimizada.avisos,
-    pontoBase,
-    polyline
-  };
-}
-
-async function algoritmoNearestNeighbor(
-  pontoBase: { lat: number; lng: number; endereco: string },
-  osLista: OSParaOtimizar[],
-  tecnico: any
-): Promise<Omit<ResultadoOtimizacao, 'otimizacao_id' | 'os_excluidas'>> {
-  const osIncluidas: OSIncluida[] = [];
-  const osRestantes = [...osLista];
-  const avisos: string[] = [];
-
-  const minutosDisponiveis =
-    (parseInt(tecnico.horario_fim.split(':')[0]) * 60 + parseInt(tecnico.horario_fim.split(':')[1])) -
-    (parseInt(tecnico.horario_inicio.split(':')[0]) * 60 + parseInt(tecnico.horario_inicio.split(':')[1])) -
-    (tecnico.tempo_almoco_minutos || 60);
-
-  let posicaoAtual = pontoBase;
-  let tempoAcumulado = 0;
-  let distanciaTotal = 0;
-  let ordem = 1;
-
-  const horarioInicio = new Date();
-  horarioInicio.setHours(parseInt(tecnico.horario_inicio.split(':')[0]));
-  horarioInicio.setMinutes(parseInt(tecnico.horario_inicio.split(':')[1]));
-
-  let horarioAtual = new Date(horarioInicio);
-
-  while (osRestantes.length > 0) {
-    let maisProxima: OSParaOtimizar | null = null;
-    let menorDistancia = Infinity;
-    let indiceMaisProxima = -1;
-
-    for (let i = 0; i < osRestantes.length; i++) {
-      const os = osRestantes[i];
-      const { distancia_km } = await calcularDistanciaETempo(
-        posicaoAtual.lat,
-        posicaoAtual.lng,
-        os.lat,
-        os.lng
-      );
-
-      if (distancia_km < menorDistancia) {
-        menorDistancia = distancia_km;
-        maisProxima = os;
-        indiceMaisProxima = i;
-      }
-    }
-
-    if (!maisProxima) break;
-
-    const { distancia_km, tempo_minutos } = await calcularDistanciaETempo(
-      posicaoAtual.lat,
-      posicaoAtual.lng,
-      maisProxima.lat,
-      maisProxima.lng
-    );
-
-    const tempoTotal = tempo_minutos + maisProxima.tempo_medio_reparo;
-
-    horarioAtual = new Date(horarioAtual.getTime() + tempo_minutos * 60000);
-    const horarioChegada = new Date(horarioAtual);
-    horarioAtual = new Date(horarioAtual.getTime() + maisProxima.tempo_medio_reparo * 60000);
-    const horarioConclusao = new Date(horarioAtual);
-
-    osIncluidas.push({
-      os_id: maisProxima.id,
-      numero_os: maisProxima.numero_os,
-      ordem_visita: ordem++,
-      horario_chegada: horarioChegada.toISOString(),
-      horario_conclusao: horarioConclusao.toISOString(),
-      distancia_anterior_km: distancia_km,
-      tempo_deslocamento_minutos: tempo_minutos,
-      lat: maisProxima.lat,
-      lng: maisProxima.lng,
-      endereco: maisProxima.endereco,
-      coordenadas: { lat: maisProxima.lat, lng: maisProxima.lng },
-      cliente_nome: maisProxima.cliente_nome,
-      cliente_logradouro: maisProxima.cliente_logradouro,
-      cliente_numero: maisProxima.cliente_numero,
-      cliente_bairro: maisProxima.cliente_bairro,
-      cliente_cidade: maisProxima.cliente_cidade,
-      cliente_cep: maisProxima.cliente_cep,
-      prioridade: maisProxima.prioridade,
-      tipo_atendimento: maisProxima.tipo_atendimento,
-      tipo_os: maisProxima.tipo_os,
-      linha_produto_nome: maisProxima.linha_produto_nome
-    });
-
-    tempoAcumulado += tempoTotal;
-    distanciaTotal += distancia_km;
-    posicaoAtual = { lat: maisProxima.lat, lng: maisProxima.lng, endereco: maisProxima.endereco };
-    osRestantes.splice(indiceMaisProxima, 1);
-  }
-
-  const { distancia_km: distanciaRetorno, tempo_minutos: tempoRetorno } = await calcularDistanciaETempo(
-    posicaoAtual.lat,
-    posicaoAtual.lng,
-    pontoBase.lat,
-    pontoBase.lng
-  );
-
-  distanciaTotal += distanciaRetorno;
-
-  const diasNecessarios = Math.ceil(tempoAcumulado / minutosDisponiveis);
-  const requerPernoite = diasNecessarios > 1;
-
-  if (requerPernoite) {
-    avisos.push(`⚠️ Esta rota requer ${diasNecessarios} dias de trabalho. O técnico precisará pernoitar.`);
-  }
-
-  if (diasNecessarios > 1 && diasNecessarios <= 3) {
-    avisos.push(`✓ Rota viável em ${diasNecessarios} dias com pernoite.`);
-  } else if (diasNecessarios > 3) {
-    avisos.push(`⚠️ Atenção: Rota longa de ${diasNecessarios} dias. Considere dividir em múltiplas rotas.`);
-  }
-
-  const horarioFim = new Date(horarioInicio.getTime() + tempoAcumulado * 60000);
-  const horarioRetornoBase = new Date(horarioFim.getTime() + tempoRetorno * 60000);
-
-  return {
-    os_incluidas: osIncluidas,
+    os_incluidas: incluidas,
+    os_excluidas: todasExcluidas,
     metricas: {
       distancia_total_km: parseFloat(distanciaTotal.toFixed(2)),
-      tempo_total_minutos: tempoAcumulado,
+      tempo_total_minutos: tempoTotal,
       quilometragem_total_km: parseFloat(distanciaTotal.toFixed(2)),
       dias_necessarios: diasNecessarios,
-      horario_inicio: horarioInicio.toTimeString().slice(0, 5),
-      horario_fim: horarioRetornoBase.toTimeString().slice(0, 5),
-      requer_pernoite: requerPernoite,
-      distancia_retorno_km: parseFloat(distanciaRetorno.toFixed(2))
+      horario_inicio: horarioInicio,
+      horario_fim: horarioFim,
+      requer_pernoite: diasNecessarios > 1,
+      distancia_retorno_km: parseFloat(distanciaRetorno.toFixed(2)),
     },
-    avisos
+    avisos,
+    pontoBase,
+    polyline,
   };
 }
 
@@ -453,19 +588,30 @@ export async function recalcularRotaComNovaOrdem(
 ): Promise<{ os_incluidas: OSIncluida[]; metricas: any; avisos: string[]; polyline?: string }> {
   const avisos: string[] = [];
 
-  const minutosDisponiveis =
-    (parseInt(tecnico.horario_fim.split(':')[0]) * 60 + parseInt(tecnico.horario_fim.split(':')[1])) -
-    (parseInt(tecnico.horario_inicio.split(':')[0]) * 60 + parseInt(tecnico.horario_inicio.split(':')[1])) -
-    (tecnico.tempo_almoco_minutos || 60);
+  const horarioInicio: string = tecnico.horario_inicio_expediente ?? tecnico.horario_inicio ?? '08:00';
+  const horarioFim: string = tecnico.horario_fim_expediente ?? tecnico.horario_fim ?? '18:00';
+  const horarioAlmoco: string = tecnico.horario_almoco_inicio ?? '12:00';
+  const duracaoAlmoco: number = tecnico.duracao_almoco_minutos ?? 60;
+  const maxDias: number = tecnico.dias_permitidos_fora ?? 5;
 
-  const horarioInicio = new Date();
-  horarioInicio.setHours(parseInt(tecnico.horario_inicio.split(':')[0]));
-  horarioInicio.setMinutes(parseInt(tecnico.horario_inicio.split(':')[1]));
+  const inicioMin = timeToMin(horarioInicio);
+  const fimMin = timeToMin(horarioFim);
+  const almocoMin = timeToMin(horarioAlmoco);
+  const limiteMinDia = fimMin - inicioMin - duracaoAlmoco;
 
-  let horarioAtual = new Date(horarioInicio);
-  let posicaoAtual = pontoBase;
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const dataBase = new Date(agora);
+  dataBase.setHours(0, 0, 0, 0);
+  if (agoraMin >= fimMin) dataBase.setDate(dataBase.getDate() + 1);
+
+  let dia = 1;
+  let tempoAcumuladoDia = 0;
+  let currentMin = inicioMin;
+  let almocoFeitoDia = false;
+  let posAtual = { lat: pontoBase.lat, lng: pontoBase.lng };
   let distanciaTotal = 0;
-  let tempoAcumulado = 0;
+  let tempoTotal = 0;
 
   const osRecalculadas: OSIncluida[] = [];
 
@@ -473,52 +619,92 @@ export async function recalcularRotaComNovaOrdem(
     const os = osIncluidas[i];
     const coords = os.coordenadas || { lat: os.lat!, lng: os.lng! };
 
-    const { distancia_km, tempo_minutos } = await calcularDistanciaETempo(
-      posicaoAtual.lat,
-      posicaoAtual.lng,
-      coords.lat,
-      coords.lng
+    const { distancia_km, tempo_minutos: travelMin } = calcularDistanciaETempo(
+      posAtual.lat, posAtual.lng, coords.lat, coords.lng
     );
 
-    horarioAtual = new Date(horarioAtual.getTime() + tempo_minutos * 60000);
-    const horarioChegada = new Date(horarioAtual);
-
     const tempoReparo = 60;
-    horarioAtual = new Date(horarioAtual.getTime() + tempoReparo * 60000);
-    const horarioConclusao = new Date(horarioAtual);
+    let chegadaMin = currentMin + travelMin;
+    const custoTotal = travelMin + tempoReparo;
+
+    if (!almocoFeitoDia && currentMin < almocoMin && chegadaMin >= almocoMin) {
+      chegadaMin += duracaoAlmoco;
+      almocoFeitoDia = true;
+    } else if (!almocoFeitoDia && currentMin >= almocoMin) {
+      almocoFeitoDia = true;
+    }
+
+    const saidaMin = chegadaMin + tempoReparo;
+
+    if (saidaMin > fimMin || tempoAcumuladoDia + custoTotal > limiteMinDia) {
+      if (dia < maxDias) {
+        dia++;
+        currentMin = inicioMin;
+        tempoAcumuladoDia = 0;
+        almocoFeitoDia = false;
+        posAtual = { lat: pontoBase.lat, lng: pontoBase.lng };
+
+        const { distancia_km: d2, tempo_minutos: t2 } = calcularDistanciaETempo(
+          posAtual.lat, posAtual.lng, coords.lat, coords.lng
+        );
+        let c2 = inicioMin + t2;
+        const s2 = c2 + tempoReparo;
+
+        osRecalculadas.push({
+          ...os,
+          ordem_visita: i + 1,
+          dia,
+          horario_chegada: minToISO(dataBase, c2, dia - 1),
+          horario_conclusao: minToISO(dataBase, s2, dia - 1),
+          distancia_anterior_km: parseFloat(d2.toFixed(2)),
+          tempo_deslocamento_minutos: t2,
+        });
+
+        tempoAcumuladoDia += t2 + tempoReparo;
+        distanciaTotal += d2;
+        tempoTotal += t2 + tempoReparo;
+        posAtual = { lat: coords.lat, lng: coords.lng };
+        currentMin = s2;
+        continue;
+      }
+    }
 
     osRecalculadas.push({
       ...os,
       ordem_visita: i + 1,
-      horario_chegada: horarioChegada.toISOString(),
-      horario_conclusao: horarioConclusao.toISOString(),
-      distancia_anterior_km: distancia_km,
-      tempo_deslocamento_minutos: tempo_minutos
+      dia,
+      horario_chegada: minToISO(dataBase, chegadaMin, dia - 1),
+      horario_conclusao: minToISO(dataBase, saidaMin, dia - 1),
+      distancia_anterior_km: parseFloat(distancia_km.toFixed(2)),
+      tempo_deslocamento_minutos: travelMin,
     });
 
-    tempoAcumulado += tempo_minutos + tempoReparo;
+    tempoAcumuladoDia += custoTotal;
     distanciaTotal += distancia_km;
-    posicaoAtual = { lat: coords.lat, lng: coords.lng, endereco: os.endereco || '' };
+    tempoTotal += custoTotal;
+    posAtual = { lat: coords.lat, lng: coords.lng };
+    currentMin = saidaMin;
   }
 
-  const { distancia_km: distanciaRetorno, tempo_minutos: tempoRetorno } = await calcularDistanciaETempo(
-    posicaoAtual.lat,
-    posicaoAtual.lng,
-    pontoBase.lat,
-    pontoBase.lng
+  const { distancia_km: distanciaRetorno, tempo_minutos: tempoRetorno } = calcularDistanciaETempo(
+    posAtual.lat, posAtual.lng, pontoBase.lat, pontoBase.lng
   );
-
   distanciaTotal += distanciaRetorno;
 
-  const diasNecessarios = Math.ceil(tempoAcumulado / minutosDisponiveis);
-  const requerPernoite = diasNecessarios > 1;
-
-  if (requerPernoite) {
-    avisos.push(`⚠️ Esta rota requer ${diasNecessarios} dias de trabalho. O técnico precisará pernoitar.`);
+  const diasNecessarios = osRecalculadas.length > 0 ? Math.max(...osRecalculadas.map(o => o.dia)) : 0;
+  if (diasNecessarios > 1) {
+    avisos.push(`Esta rota requer ${diasNecessarios} dias de trabalho.`);
   }
 
-  const horarioFim = new Date(horarioInicio.getTime() + tempoAcumulado * 60000);
-  const horarioRetornoBase = new Date(horarioFim.getTime() + tempoRetorno * 60000);
+  const horarioFimPrevisto = minToTimeStr(
+    (osRecalculadas[osRecalculadas.length - 1]
+      ? timeToMin(
+          new Date(osRecalculadas[osRecalculadas.length - 1].horario_conclusao)
+            .toTimeString()
+            .slice(0, 5)
+        ) + tempoRetorno
+      : timeToMin(horarioFim))
+  );
 
   const polyline = await gerarPolylineGoogleMaps(pontoBase, osRecalculadas);
 
@@ -526,16 +712,16 @@ export async function recalcularRotaComNovaOrdem(
     os_incluidas: osRecalculadas,
     metricas: {
       distancia_total_km: parseFloat(distanciaTotal.toFixed(2)),
-      tempo_total_minutos: tempoAcumulado,
+      tempo_total_minutos: tempoTotal,
       quilometragem_total_km: parseFloat(distanciaTotal.toFixed(2)),
       dias_necessarios: diasNecessarios,
-      horario_inicio: horarioInicio.toTimeString().slice(0, 5),
-      horario_fim: horarioRetornoBase.toTimeString().slice(0, 5),
-      requer_pernoite: requerPernoite,
-      distancia_retorno_km: parseFloat(distanciaRetorno.toFixed(2))
+      horario_inicio: horarioInicio,
+      horario_fim: horarioFimPrevisto,
+      requer_pernoite: diasNecessarios > 1,
+      distancia_retorno_km: parseFloat(distanciaRetorno.toFixed(2)),
     },
     avisos,
-    polyline
+    polyline,
   };
 }
 
@@ -553,23 +739,17 @@ export async function aplicarOtimizacao(otimizacaoId: string): Promise<boolean> 
     for (const osIncluida of osIncluidas) {
       await supabase
         .from('os')
-        .update({
-          ordem_rota: osIncluida.ordem_visita,
-          updated_at: new Date().toISOString()
-        })
+        .update({ ordem_rota: osIncluida.ordem_visita, updated_at: new Date().toISOString() })
         .eq('id', osIncluida.os_id);
     }
 
     await supabase
       .from('otimizacao_logs')
-      .update({
-        aplicada: true,
-        data_hora_aplicacao: new Date().toISOString()
-      })
+      .update({ aplicada: true, data_hora_aplicacao: new Date().toISOString() })
       .eq('id', otimizacaoId);
 
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 }

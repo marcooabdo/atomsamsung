@@ -43,6 +43,7 @@ export interface ResultadoOtimizacao {
     horario_fim_previsto: string;
   };
   cidadesSemRota: string[];
+  direcao_tsp?: 'farthest_first' | 'nearest_first';
 }
 
 export interface ConfigRota {
@@ -82,13 +83,88 @@ function minutesToDate(baseDate: Date, minutes: number, dayOffset: number): Date
   return d;
 }
 
-function scorePontuacao(os: OSParaRoteirizar, distKm: number, maxDist: number): number {
-  const distScore = 1 - (distKm / (maxDist || 1));
-  const idadeScore = Math.min(os.dias_aberta / 30, 1);
-  const prioridadeScore = os.prioridade === 'urgente' ? 1 : os.prioridade === 'alta' ? 0.7 : os.prioridade === 'normal' ? 0.4 : 0.2;
-  return distScore * 0.5 + idadeScore * 0.3 + prioridadeScore * 0.2;
+// ---------------------------------------------------------------------------
+// TSP direction heuristic
+// ---------------------------------------------------------------------------
+function resolverDirecaoTSP(
+  osList: OSParaRoteirizar[],
+  base: LatLng
+): 'farthest_first' | 'nearest_first' {
+  if (osList.length < 2) return 'nearest_first';
+
+  const withDist = osList.map(os => ({
+    dist: haversineDistance(base, { lat: os.lat, lng: os.lng }),
+    age: os.dias_aberta,
+  }));
+
+  withDist.sort((a, b) => b.dist - a.dist);
+  const half = Math.ceil(withDist.length / 2);
+  const farHalf = withDist.slice(0, half);
+  const nearHalf = withDist.slice(half);
+
+  const avgAgeFar = farHalf.reduce((s, x) => s + x.age, 0) / farHalf.length;
+  const avgAgeNear = nearHalf.reduce((s, x) => s + x.age, 0) / nearHalf.length;
+
+  return avgAgeFar > avgAgeNear ? 'farthest_first' : 'nearest_first';
 }
 
+// ---------------------------------------------------------------------------
+// Nearest-neighbor TSP ordering
+// ---------------------------------------------------------------------------
+function ordenarTSP(
+  osList: OSParaRoteirizar[],
+  base: LatLng,
+  direcao: 'farthest_first' | 'nearest_first'
+): OSParaRoteirizar[] {
+  if (osList.length === 0) return [];
+
+  const ordered: OSParaRoteirizar[] = [];
+
+  if (direcao === 'farthest_first') {
+    // Sort all by distance from base descending, then do nearest-neighbor from that farthest point
+    const withDist = [...osList].map(os => ({
+      os,
+      dist: haversineDistance(base, { lat: os.lat, lng: os.lng }),
+    }));
+    withDist.sort((a, b) => b.dist - a.dist);
+
+    let remaining = withDist.map(d => d.os);
+    let pos = base;
+
+    while (remaining.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversineDistance(pos, { lat: remaining[i].lat, lng: remaining[i].lng });
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      ordered.push(remaining[bestIdx]);
+      pos = { lat: remaining[bestIdx].lat, lng: remaining[bestIdx].lng };
+      remaining.splice(bestIdx, 1);
+    }
+  } else {
+    let remaining = [...osList];
+    let pos = base;
+
+    while (remaining.length > 0) {
+      let bestIdx = 0;
+      let bestDist = Infinity;
+      for (let i = 0; i < remaining.length; i++) {
+        const d = haversineDistance(pos, { lat: remaining[i].lat, lng: remaining[i].lng });
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      }
+      ordered.push(remaining[bestIdx]);
+      pos = { lat: remaining[bestIdx].lat, lng: remaining[bestIdx].lng };
+      remaining.splice(bestIdx, 1);
+    }
+  }
+
+  return ordered;
+}
+
+// ---------------------------------------------------------------------------
+// Main optimization — strict bin-packing per day
+// ---------------------------------------------------------------------------
 export function otimizarRota(
   osList: OSParaRoteirizar[],
   config: Partial<ConfigRota>,
@@ -115,118 +191,171 @@ export function otimizarRota(
     return {
       paradas: [],
       excluidas,
-      metricas: { distancia_total_km: 0, tempo_total_min: 0, dias_necessarios: 0, os_incluidas: 0, os_excluidas: excluidas.length, horario_inicio: cfg.horario_inicio, horario_fim_previsto: cfg.horario_fim },
+      metricas: {
+        distancia_total_km: 0,
+        tempo_total_min: 0,
+        dias_necessarios: 0,
+        os_incluidas: 0,
+        os_excluidas: excluidas.length,
+        horario_inicio: cfg.horario_inicio,
+        horario_fim_previsto: cfg.horario_fim,
+      },
       cidadesSemRota,
+    };
+  }
+
+  if (comCoord.length === 0) {
+    return {
+      paradas: [],
+      excluidas,
+      metricas: {
+        distancia_total_km: 0,
+        tempo_total_min: 0,
+        dias_necessarios: 0,
+        os_incluidas: 0,
+        os_excluidas: excluidas.length,
+        horario_inicio: cfg.horario_inicio,
+        horario_fim_previsto: cfg.horario_fim,
+      },
+      cidadesSemRota: [],
     };
   }
 
   const inicioMin = timeToMinutes(cfg.horario_inicio);
   const fimMin = timeToMinutes(cfg.horario_fim);
   const almocoMin = timeToMinutes(cfg.almoco_inicio);
+  const limiteMinDia = fimMin - inicioMin - cfg.duracao_almoco_min;
 
-  let currentPos: LatLng = { ...cfg.base };
-  let currentMin = inicioMin;
-  let dia = 1;
-  const disponivel = new Set(comCoord.map(os => os.id));
-  const baseDate = new Date();
+  // FIX: Day 1 start guard — if current time is already past expediente, day 1 = tomorrow
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const baseDate = new Date(agora);
   baseDate.setHours(0, 0, 0, 0);
+  if (agoraMin >= fimMin) {
+    baseDate.setDate(baseDate.getDate() + 1);
+  }
 
-  const manhaPeriodo = comCoord.filter(os => os.periodo_agendamento === 'manha').map(os => os.id);
-  const tardePeriodo = comCoord.filter(os => os.periodo_agendamento === 'tarde').map(os => os.id);
+  // TSP direction heuristic
+  const direcao = resolverDirecaoTSP(comCoord, cfg.base);
+  const osOrdenadas = ordenarTSP(comCoord, cfg.base, direcao);
 
-  while (disponivel.size > 0) {
-    if (dia > cfg.max_dias) {
-      disponivel.forEach(id => {
-        const os = comCoord.find(o => o.id === id);
-        if (os) excluidas.push({ os, motivo: `Excede ${cfg.max_dias} dias de rota` });
-      });
-      break;
-    }
+  // Respect period preferences within the TSP order
+  const manhaPeriodo = new Set(comCoord.filter(os => os.periodo_agendamento === 'manha').map(os => os.id));
+  const tardePeriodo = new Set(comCoord.filter(os => os.periodo_agendamento === 'tarde').map(os => os.id));
 
-    const restante = comCoord.filter(os => disponivel.has(os.id));
-    if (restante.length === 0) break;
+  // Re-sort TSP result to prefer morning OS first, afternoon OS later (stable partition)
+  const manha = osOrdenadas.filter(os => manhaPeriodo.has(os.id));
+  const tarde = osOrdenadas.filter(os => tardePeriodo.has(os.id));
+  const semPeriodo = osOrdenadas.filter(os => !manhaPeriodo.has(os.id) && !tardePeriodo.has(os.id));
+  const osFinais = [...manha, ...semPeriodo, ...tarde];
 
-    let preferidas: OSParaRoteirizar[];
-    if (currentMin < almocoMin) {
-      preferidas = restante.filter(os => manhaPeriodo.includes(os.id));
-      if (preferidas.length === 0) preferidas = restante.filter(os => !tardePeriodo.includes(os.id));
-      if (preferidas.length === 0) preferidas = restante;
-    } else {
-      preferidas = restante.filter(os => tardePeriodo.includes(os.id));
-      if (preferidas.length === 0) preferidas = restante.filter(os => !manhaPeriodo.includes(os.id));
-      if (preferidas.length === 0) preferidas = restante;
-    }
+  // Bin-packing: distribute OS into days with strict hourly limit
+  let dia = 1;
+  let tempoAcumuladoDia = 0;
+  let currentMin = inicioMin;
+  let almocoFeitoDia = false;
+  let posAtual: LatLng = { ...cfg.base };
 
-    const distances = preferidas.map(os => ({
-      os,
-      dist: haversineDistance(currentPos, { lat: os.lat, lng: os.lng }) * 1.35,
-    }));
+  for (const os of osFinais) {
+    let placed = false;
 
-    const maxDist = Math.max(...distances.map(d => d.dist), 1);
-    distances.sort((a, b) => scorePontuacao(b.os, b.dist, maxDist) - scorePontuacao(a.os, a.dist, maxDist));
+    let tentativaDia = dia;
+    let tentativaMin = currentMin;
+    let tentativaAcumulado = tempoAcumuladoDia;
+    let tentativaAlmoco = almocoFeitoDia;
+    let tentativaPos = posAtual;
 
-    const best = distances[0];
-    if (!best) break;
+    while (tentativaDia <= cfg.max_dias) {
+      const dist = haversineDistance(tentativaPos, { lat: os.lat, lng: os.lng }) * 1.35;
+      const travelMin = estimateDriveTime(dist, cfg.velocidade_media_kmh);
 
-    const travelMin = estimateDriveTime(best.dist, cfg.velocidade_media_kmh);
-    let arrivalMin = currentMin + travelMin;
+      let chegadaMin = tentativaMin + travelMin;
 
-    if (currentMin < almocoMin && arrivalMin >= almocoMin) {
-      arrivalMin += cfg.duracao_almoco_min;
-    }
+      if (!tentativaAlmoco && tentativaMin < almocoMin && chegadaMin >= almocoMin) {
+        chegadaMin += cfg.duracao_almoco_min;
+        tentativaAlmoco = true;
+      } else if (!tentativaAlmoco && tentativaMin >= almocoMin) {
+        tentativaAlmoco = true;
+      }
 
-    const departureMin = arrivalMin + (best.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min);
+      const atendMin = os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min;
+      const saidaMin = chegadaMin + atendMin;
+      const custoTotal = travelMin + atendMin;
 
-    if (departureMin > fimMin) {
-      if (cfg.permite_pernoite && dia < cfg.max_dias) {
-        dia++;
-        currentMin = inicioMin;
-        continue;
-      } else if (paradas.length === 0 || arrivalMin <= fimMin) {
-        // still allow if arrival is within work hours
+      // FIX: strict validation — departure MUST be within work hours AND daily budget
+      if (saidaMin <= fimMin && tentativaAcumulado + custoTotal <= limiteMinDia) {
+        paradas.push({
+          os,
+          ordem: paradas.length + 1,
+          distancia_km: Math.round(dist * 10) / 10,
+          tempo_deslocamento_min: travelMin,
+          horario_chegada: minutesToDate(baseDate, chegadaMin, tentativaDia - 1),
+          horario_saida: minutesToDate(baseDate, saidaMin, tentativaDia - 1),
+          dia: tentativaDia,
+          is_existente: !!os.agendamento_existente,
+        });
+
+        // Commit state
+        dia = tentativaDia;
+        currentMin = saidaMin;
+        tempoAcumuladoDia = tentativaAcumulado + custoTotal;
+        almocoFeitoDia = tentativaAlmoco;
+        posAtual = { lat: os.lat, lng: os.lng };
+        placed = true;
+        break;
       } else {
-        excluidas.push({ os: best.os, motivo: `Não cabe no horário (dia ${dia})` });
-        disponivel.delete(best.os.id);
-        continue;
+        // Day is full — open next day
+        if (tentativaDia >= cfg.max_dias) break;
+        tentativaDia++;
+        tentativaMin = inicioMin;
+        tentativaAcumulado = 0;
+        tentativaAlmoco = false;
+        tentativaPos = { ...cfg.base };
       }
     }
 
-    paradas.push({
-      os: best.os,
-      ordem: paradas.length + 1,
-      distancia_km: Math.round(best.dist * 10) / 10,
-      tempo_deslocamento_min: travelMin,
-      horario_chegada: minutesToDate(baseDate, arrivalMin, dia - 1),
-      horario_saida: minutesToDate(baseDate, departureMin, dia - 1),
-      dia,
-      is_existente: !!best.os.agendamento_existente,
-    });
-
-    currentPos = { lat: best.os.lat, lng: best.os.lng };
-    currentMin = departureMin;
-    disponivel.delete(best.os.id);
+    if (!placed) {
+      excluidas.push({ os, motivo: `Não cabe no horizonte de ${cfg.max_dias} dias` });
+    }
   }
 
   const distTotal = paradas.reduce((s, p) => s + p.distancia_km, 0);
   const lastParada = paradas[paradas.length - 1];
-  const retornoKm = lastParada ? haversineDistance({ lat: lastParada.os.lat, lng: lastParada.os.lng }, cfg.base) * 1.35 : 0;
+  const retornoKm = lastParada
+    ? haversineDistance({ lat: lastParada.os.lat, lng: lastParada.os.lng }, cfg.base) * 1.35
+    : 0;
+
+  const tempoTotalMin = paradas.reduce(
+    (s, p) => s + p.tempo_deslocamento_min + (p.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min),
+    0
+  ) + estimateDriveTime(retornoKm, cfg.velocidade_media_kmh);
+
+  const diasNecessarios = paradas.length > 0 ? Math.max(...paradas.map(p => p.dia)) : 0;
+
+  const horarioFimPrevisto = lastParada
+    ? `${lastParada.horario_saida.getHours().toString().padStart(2, '0')}:${lastParada.horario_saida.getMinutes().toString().padStart(2, '0')}`
+    : cfg.horario_fim;
 
   return {
     paradas,
     excluidas,
     metricas: {
       distancia_total_km: Math.round((distTotal + retornoKm) * 10) / 10,
-      tempo_total_min: paradas.reduce((s, p) => s + p.tempo_deslocamento_min + (p.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min), 0) + estimateDriveTime(retornoKm, cfg.velocidade_media_kmh),
-      dias_necessarios: paradas.length > 0 ? paradas[paradas.length - 1].dia : 0,
+      tempo_total_min: tempoTotalMin,
+      dias_necessarios: diasNecessarios,
       os_incluidas: paradas.length,
       os_excluidas: excluidas.length,
       horario_inicio: cfg.horario_inicio,
-      horario_fim_previsto: lastParada ? `${lastParada.horario_saida.getHours().toString().padStart(2, '0')}:${lastParada.horario_saida.getMinutes().toString().padStart(2, '0')}` : cfg.horario_fim,
+      horario_fim_previsto: horarioFimPrevisto,
     },
     cidadesSemRota: [],
+    direcao_tsp: direcao,
   };
 }
 
+// ---------------------------------------------------------------------------
+// Recalculate with new order — same strict bin-packing
+// ---------------------------------------------------------------------------
 export function recalcularComNovaOrdem(
   paradas: ParadaRota[],
   config: Partial<ConfigRota>
@@ -235,54 +364,75 @@ export function recalcularComNovaOrdem(
   const inicioMin = timeToMinutes(cfg.horario_inicio);
   const fimMin = timeToMinutes(cfg.horario_fim);
   const almocoMin = timeToMinutes(cfg.almoco_inicio);
-  const baseDate = new Date();
+  const limiteMinDia = fimMin - inicioMin - cfg.duracao_almoco_min;
+
+  const agora = new Date();
+  const agoraMin = agora.getHours() * 60 + agora.getMinutes();
+  const baseDate = new Date(agora);
   baseDate.setHours(0, 0, 0, 0);
+  if (agoraMin >= fimMin) baseDate.setDate(baseDate.getDate() + 1);
 
   let currentPos: LatLng = { ...cfg.base };
   let currentMin = inicioMin;
   let dia = 1;
+  let tempoAcumuladoDia = 0;
+  let almocoFeitoDia = false;
 
   return paradas.map((p, idx) => {
     const dist = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.35;
     const travelMin = estimateDriveTime(dist, cfg.velocidade_media_kmh);
-    let arrivalMin = currentMin + travelMin;
+    let chegadaMin = currentMin + travelMin;
 
-    if (currentMin < almocoMin && arrivalMin >= almocoMin) {
-      arrivalMin += cfg.duracao_almoco_min;
+    if (!almocoFeitoDia && currentMin < almocoMin && chegadaMin >= almocoMin) {
+      chegadaMin += cfg.duracao_almoco_min;
+      almocoFeitoDia = true;
+    } else if (!almocoFeitoDia && currentMin >= almocoMin) {
+      almocoFeitoDia = true;
     }
 
-    const departureMin = arrivalMin + (p.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min);
+    const atendMin = p.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min;
+    const saidaMin = chegadaMin + atendMin;
+    const custoTotal = travelMin + atendMin;
 
-    if (departureMin > fimMin && cfg.permite_pernoite) {
+    // Advance to next day if this OS doesn't fit
+    if ((saidaMin > fimMin || tempoAcumuladoDia + custoTotal > limiteMinDia) && cfg.permite_pernoite && dia < cfg.max_dias) {
       dia++;
       currentMin = inicioMin;
-      const newTravel = estimateDriveTime(dist, cfg.velocidade_media_kmh);
-      arrivalMin = currentMin + newTravel;
-      const newDep = arrivalMin + (p.os.tempo_estimado_minutos || cfg.tempo_medio_atendimento_min);
+      tempoAcumuladoDia = 0;
+      almocoFeitoDia = false;
+      currentPos = { ...cfg.base };
+
+      const dist2 = haversineDistance(currentPos, { lat: p.os.lat, lng: p.os.lng }) * 1.35;
+      const travel2 = estimateDriveTime(dist2, cfg.velocidade_media_kmh);
+      const chegada2 = currentMin + travel2;
+      const saida2 = chegada2 + atendMin;
+
       currentPos = { lat: p.os.lat, lng: p.os.lng };
-      currentMin = newDep;
+      currentMin = saida2;
+      tempoAcumuladoDia = travel2 + atendMin;
 
       return {
         ...p,
         ordem: idx + 1,
-        distancia_km: Math.round(dist * 10) / 10,
-        tempo_deslocamento_min: newTravel,
-        horario_chegada: minutesToDate(baseDate, arrivalMin, dia - 1),
-        horario_saida: minutesToDate(baseDate, newDep, dia - 1),
+        distancia_km: Math.round(dist2 * 10) / 10,
+        tempo_deslocamento_min: travel2,
+        horario_chegada: minutesToDate(baseDate, chegada2, dia - 1),
+        horario_saida: minutesToDate(baseDate, saida2, dia - 1),
         dia,
       };
     }
 
     currentPos = { lat: p.os.lat, lng: p.os.lng };
-    currentMin = departureMin;
+    currentMin = saidaMin;
+    tempoAcumuladoDia += custoTotal;
 
     return {
       ...p,
       ordem: idx + 1,
       distancia_km: Math.round(dist * 10) / 10,
       tempo_deslocamento_min: travelMin,
-      horario_chegada: minutesToDate(baseDate, arrivalMin, dia - 1),
-      horario_saida: minutesToDate(baseDate, departureMin, dia - 1),
+      horario_chegada: minutesToDate(baseDate, chegadaMin, dia - 1),
+      horario_saida: minutesToDate(baseDate, saidaMin, dia - 1),
       dia,
     };
   });
