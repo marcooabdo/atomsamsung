@@ -40,11 +40,6 @@ function isJaAgendadoNoDia(os: OSLogistica, dataRota: string, tecnicoId: string)
   return os.data_agendamento === dataRota && os.tecnico_agendado_id === tecnicoId;
 }
 
-function isPendenteRoteirizar(os: OSLogistica): boolean {
-  return !os.confirmado_com_cliente && !os.rota_id &&
-    os.status_agendamento_gia !== 'confirmado';
-}
-
 export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('configurar');
   const [rotas, setRotas] = useState<RotaColuna[]>([]);
@@ -105,18 +100,17 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
     const jaAgendadas = todasOS.filter(os =>
       isJaAgendadoNoDia(os, dataRota, tecnicoSelecionado.id)
     );
-    const pendentes = todasOS.filter(os =>
-      !isJaAgendadoNoDia(os, dataRota, tecnicoSelecionado.id) &&
-      isPendenteRoteirizar(os)
+    const paraRoteirizar = todasOS.filter(os =>
+      !isJaAgendadoNoDia(os, dataRota, tecnicoSelecionado.id)
     );
 
     setOsJaAgendadas(jaAgendadas);
 
-    // Geocode only pending OSs
+    // Geocode all pipeline OSs (except already scheduled ones for this day)
     const listaComCoords: OSLogistica[] = [];
     const semCoords: OSLogistica[] = [];
 
-    for (const os of pendentes) {
+    for (const os of paraRoteirizar) {
       if (os.lat && os.lng) {
         listaComCoords.push(os);
       } else {
@@ -594,7 +588,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                   <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
                   <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     {osPendentes.length === 0
-                      ? 'Nenhuma OS pendente nesta rota para o período selecionado'
+                      ? 'Nenhuma OS disponível no pipeline desta rota (excluindo as já agendadas no dia)'
                       : 'Nenhuma OS atende os filtros de skill e horário'}
                   </p>
                 </div>
@@ -763,7 +757,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 <span className="font-bold" style={{ color: '#3B82F6' }}>{osJaAgendadas.length}</span>
               </div>
               <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--text-tertiary)' }}>Pendentes</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>Disponíveis p/ rota</span>
                 <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>{osPendentes.length}</span>
               </div>
               <div className="flex justify-between text-xs">
