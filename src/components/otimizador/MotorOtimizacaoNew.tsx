@@ -91,6 +91,19 @@ function isColorDark(hexColor: string): boolean {
   return luminance < 0.5;
 }
 
+const COR_ROTA: Record<string, string> = {
+  rota_preta: '#374151',
+  rota_vermelha: '#EF4444',
+  rota_azul: '#3B82F6',
+  rota_verde: '#10B981',
+  rota_amarela: '#EAB308',
+  rota_laranja: '#F97316',
+  rota_rosa: '#EC4899',
+  rota_roxo: '#8B5CF6',
+  rota_cinza: '#6B7280',
+  rota_branca: '#E5E7EB',
+};
+
 function formatDuration(min: number): string {
   const h = Math.floor(min / 60);
   const m = Math.round(min % 60);
@@ -130,7 +143,7 @@ export default function MotorOtimizacaoNew() {
   const [tempoMedioReparo, setTempoMedioReparo] = useState(90);
   const [permitePernoite, setPermitePernoite] = useState(false);
 
-  const [rotas, setRotas] = useState<any[]>([]);
+  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cor: string; coluna_kanban: string; cidades: string[]; os_count: number }>>([]);
   const [selectedRotas, setSelectedRotas] = useState<string[]>([]);
   const [osList, setOsList] = useState<OSItem[]>([]);
   const [filteredOS, setFilteredOS] = useState<OSItem[]>([]);
@@ -174,8 +187,48 @@ export default function MotorOtimizacaoNew() {
   }, [osList, filterCidade, filterProduto]);
 
   const loadRotas = async () => {
-    const { data } = await supabase.from('rotas').select('*').eq('unidade_id', selectedUnidade!).eq('ativa', true).order('nome');
-    if (data) setRotas(data);
+    const [rotasDB, osDistinct] = await Promise.all([
+      supabase.from('rotas').select('id, nome, cor, coluna_kanban, cidades').eq('unidade_id', selectedUnidade!).eq('ativa', true).not('coluna_kanban', 'is', null).order('nome'),
+      supabase.from('os').select('coluna_kanban').eq('unidade_id', selectedUnidade!).like('coluna_kanban', 'rota_%'),
+    ]);
+
+    const cadastradas = (rotasDB.data ?? []) as { id: string; nome: string; cor: string; coluna_kanban: string; cidades: string[] }[];
+    const colunasUsadas = new Set(cadastradas.map(r => r.coluna_kanban));
+
+    const colunasDistintas = new Set(
+      (osDistinct.data ?? []).map(r => r.coluna_kanban as string).filter(Boolean)
+    );
+
+    const extras: typeof cadastradas = [];
+    for (const col of colunasDistintas) {
+      if (!colunasUsadas.has(col)) {
+        const sufixo = col.replace(/^rota_/, '');
+        extras.push({
+          id: col,
+          nome: 'Rota ' + sufixo.charAt(0).toUpperCase() + sufixo.slice(1),
+          cor: COR_ROTA[col] ?? '#6B7280',
+          coluna_kanban: col,
+          cidades: [],
+        });
+      }
+    }
+
+    const todasRotas = [...cadastradas, ...extras].sort((a, b) => a.nome.localeCompare(b.nome));
+
+    const colunasTodasRotas = todasRotas.map(r => r.coluna_kanban).filter(Boolean);
+    let osCountMap: Record<string, number> = {};
+    if (colunasTodasRotas.length > 0) {
+      const { data: osCount } = await supabase
+        .from('os')
+        .select('coluna_kanban')
+        .eq('unidade_id', selectedUnidade!)
+        .in('coluna_kanban', colunasTodasRotas);
+      for (const os of osCount ?? []) {
+        osCountMap[os.coluna_kanban] = (osCountMap[os.coluna_kanban] ?? 0) + 1;
+      }
+    }
+
+    setRotas(todasRotas.map(r => ({ ...r, os_count: osCountMap[r.coluna_kanban] ?? 0 })));
   };
 
   const loadBaseCoords = async () => {
@@ -202,15 +255,14 @@ export default function MotorOtimizacaoNew() {
 
     const rotaCols = selectedRotas.map(id => {
       const r = rotas.find(rt => rt.id === id);
-      return r?.coluna_kanban || null;
+      return r?.coluna_kanban || id;
     }).filter(Boolean);
 
     const { data: osData } = await supabase
       .from('os')
       .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento')
       .eq('unidade_id', selectedUnidade!)
-      .in('coluna_kanban', rotaCols as string[])
-      .eq('tipo_atendimento', 'IH');
+      .in('coluna_kanban', rotaCols as string[]);
 
     if (!osData) {
       setLoading(false);
@@ -1007,8 +1059,8 @@ export default function MotorOtimizacaoNew() {
                     >
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: rota.cor, border: isDark ? '1px solid #666' : 'none' }} />
                       <span className="truncate">{rota.nome}</span>
-                      {rota.cidades?.length > 0 && (
-                        <span className="text-[10px] opacity-70">({rota.cidades.length})</span>
+                      {rota.os_count > 0 && (
+                        <span className="text-[10px] opacity-70">({rota.os_count} OS)</span>
                       )}
                     </button>
                   );
