@@ -1,5 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Play, RefreshCw, AlertCircle, MapPin, Users, CheckCircle2, Clock, Send, Trash2, Plus, ArrowRight, ChevronDown, ChevronUp, Route } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import {
+  Play, RefreshCw, AlertCircle, MapPin, CheckCircle2,
+  Send, Trash2, Plus, Route, CalendarCheck, Info,
+} from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
   type OSLogistica,
@@ -32,6 +35,16 @@ interface SobraItem {
   motivoLabel: string;
 }
 
+function isJaAgendadoNoDia(os: OSLogistica, dataRota: string, tecnicoId: string): boolean {
+  if (!os.data_agendamento || !os.tecnico_agendado_id) return false;
+  return os.data_agendamento === dataRota && os.tecnico_agendado_id === tecnicoId;
+}
+
+function isPendenteRoteirizar(os: OSLogistica): boolean {
+  return !os.confirmado_com_cliente && !os.rota_id &&
+    os.status_agendamento_gia !== 'confirmado';
+}
+
 export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [etapa, setEtapa] = useState<Etapa>('configurar');
   const [rotas, setRotas] = useState<RotaColuna[]>([]);
@@ -40,9 +53,13 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [tecnicoSelecionado, setTecnicoSelecionado] = useState<TecnicoLogistica | null>(null);
   const [dataRota, setDataRota] = useState(() => new Date().toISOString().split('T')[0]);
   const [periodoRota, setPeriodoRota] = useState('manha');
-  const [osDaRota, setOsDaRota] = useState<OSLogistica[]>([]);
+
+  const [todasOsDaRota, setTodasOsDaRota] = useState<OSLogistica[]>([]);
+  const [osPendentes, setOsPendentes] = useState<OSLogistica[]>([]);
+  const [osJaAgendadas, setOsJaAgendadas] = useState<OSLogistica[]>([]);
   const [osAprovadas, setOsAprovadas] = useState<OSLogistica[]>([]);
   const [sobras, setSobras] = useState<SobraItem[]>([]);
+
   const [resultadoOtimizacao, setResultadoOtimizacao] = useState<ResultadoOtimizacao | null>(null);
   const [loading, setLoading] = useState(false);
   const [buscando, setBuscando] = useState(false);
@@ -55,6 +72,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [baseCoords, setBaseCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [minutosUsados, setMinutosUsados] = useState(0);
   const [minutosDisponiveis, setMinutosDisponiveis] = useState(0);
+  const [showJaAgendadas, setShowJaAgendadas] = useState(false);
 
   useEffect(() => {
     carregarDados();
@@ -81,13 +99,24 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
     setErro(null);
     setSucesso(null);
 
-    const lista = await buscarOSsDaRota(unidadeId, rotaSelecionada.coluna_kanban);
+    const todasOS = await buscarOSsDaRota(unidadeId, rotaSelecionada.coluna_kanban);
+    setTodasOsDaRota(todasOS);
 
-    // Geocode sequentially with delay
+    const jaAgendadas = todasOS.filter(os =>
+      isJaAgendadoNoDia(os, dataRota, tecnicoSelecionado.id)
+    );
+    const pendentes = todasOS.filter(os =>
+      !isJaAgendadoNoDia(os, dataRota, tecnicoSelecionado.id) &&
+      isPendenteRoteirizar(os)
+    );
+
+    setOsJaAgendadas(jaAgendadas);
+
+    // Geocode only pending OSs
     const listaComCoords: OSLogistica[] = [];
     const semCoords: OSLogistica[] = [];
 
-    for (const os of lista) {
+    for (const os of pendentes) {
       if (os.lat && os.lng) {
         listaComCoords.push(os);
       } else {
@@ -104,14 +133,14 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
     }
 
     if (semCoords.length > 0) {
-      setOsDaRota(listaComCoords);
+      setOsPendentes(listaComCoords);
       setOsSemCoords(semCoords);
       setBuscando(false);
       return;
     }
 
     aplicarFiltros(listaComCoords, tecnicoSelecionado);
-    setOsDaRota(listaComCoords);
+    setOsPendentes(listaComCoords);
     setBuscando(false);
     setEtapa('processar');
   };
@@ -122,7 +151,11 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
 
     for (const os of lista) {
       if (!tecnicoAtendeLinha(tecnico, os.aparelho_linha)) {
-        sobrasSkill.push({ os, motivo: 'skill', motivoLabel: `Linha "${os.aparelho_linha || 'N/A'}" não atendida pelo técnico` });
+        sobrasSkill.push({
+          os,
+          motivo: 'skill',
+          motivoLabel: `Linha "${os.aparelho_linha || 'N/A'}" não atendida pelo técnico`,
+        });
       } else {
         aptas.push(os);
       }
@@ -147,32 +180,32 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       await supabase.from('os').update({ lat: r.lat, lng: r.lng }).eq('id', r.osId);
     }
 
-    const listaAtualizada = osDaRota.map(os => {
+    const listaAtualizada = osPendentes.map(os => {
       const res = resultados.find(r => r.osId === os.id);
       return res ? { ...os, lat: res.lat, lng: res.lng } : os;
     });
 
     setOsSemCoords([]);
     aplicarFiltros(listaAtualizada, tecnicoSelecionado!);
-    setOsDaRota(listaAtualizada);
+    setOsPendentes(listaAtualizada);
     setEtapa('processar');
   };
 
   const moverParaSobras = (os: OSLogistica) => {
-    setOsAprovadas(prev => prev.filter(o => o.id !== os.id));
+    const novaLista = osAprovadas.filter(o => o.id !== os.id);
+    setOsAprovadas(novaLista);
     setSobras(prev => [...prev, { os, motivo: 'tempo', motivoLabel: 'Removido manualmente' }]);
     if (tecnicoSelecionado) {
-      const novaLista = osAprovadas.filter(o => o.id !== os.id);
       const { minutosUsados: mu } = filtrarPorJanelaTempo(novaLista, tecnicoSelecionado);
       setMinutosUsados(mu);
     }
   };
 
   const moverParaAprovadas = (item: SobraItem) => {
+    const novaLista = [...osAprovadas, item.os];
     setSobras(prev => prev.filter(s => s.os.id !== item.os.id));
-    setOsAprovadas(prev => [...prev, item.os]);
+    setOsAprovadas(novaLista);
     if (tecnicoSelecionado) {
-      const novaLista = [...osAprovadas, item.os];
       const { minutosUsados: mu } = filtrarPorJanelaTempo(novaLista, tecnicoSelecionado);
       setMinutosUsados(mu);
     }
@@ -254,13 +287,16 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
 
   const reiniciar = () => {
     setEtapa('configurar');
-    setOsDaRota([]);
+    setTodasOsDaRota([]);
+    setOsPendentes([]);
+    setOsJaAgendadas([]);
     setOsAprovadas([]);
     setSobras([]);
     setResultadoOtimizacao(null);
     setRotaId(null);
     setErro(null);
     setSucesso(null);
+    setShowJaAgendadas(false);
   };
 
   const horasUsadas = `${Math.floor(minutosUsados / 60)}h${String(minutosUsados % 60).padStart(2, '0')}`;
@@ -280,10 +316,14 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>GIA Logistics — Despachador</h2>
-          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Human-Led, AI-Assisted. Voce decide, a IA organiza.</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Human-Led, AI-Assisted. Você decide, a IA organiza.</p>
         </div>
         {etapa !== 'configurar' && (
-          <button onClick={reiniciar} className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors" style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}>
+          <button
+            onClick={reiniciar}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+          >
             <RefreshCw className="w-4 h-4" /> Nova Rota
           </button>
         )}
@@ -293,16 +333,20 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       <div className="flex items-center gap-2">
         {(['configurar', 'processar', 'roteirizar', 'confirmar'] as Etapa[]).map((e, i) => {
           const labels = ['Configurar', 'Filtrar OSs', 'Roteirizar', 'Confirmar'];
+          const etapaIndex = ['configurar', 'processar', 'roteirizar', 'confirmar'].indexOf(etapa);
           const atual = etapa === e;
-          const passado = ['configurar', 'processar', 'roteirizar', 'confirmar'].indexOf(etapa) > i;
+          const passado = etapaIndex > i;
           return (
             <div key={e} className="flex items-center gap-2">
               <div className="flex items-center gap-1.5">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{
-                  backgroundColor: passado ? '#10B981' : atual ? '#3B82F6' : 'var(--bg-secondary)',
-                  color: passado || atual ? '#fff' : 'var(--text-tertiary)',
-                  border: `1px solid ${passado ? '#10B981' : atual ? '#3B82F6' : 'var(--border-primary)'}`,
-                }}>
+                <div
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold"
+                  style={{
+                    backgroundColor: passado ? '#10B981' : atual ? '#3B82F6' : 'var(--bg-secondary)',
+                    color: passado || atual ? '#fff' : 'var(--text-tertiary)',
+                    border: `1px solid ${passado ? '#10B981' : atual ? '#3B82F6' : 'var(--border-primary)'}`,
+                  }}
+                >
                   {passado ? <CheckCircle2 className="w-3.5 h-3.5" /> : i + 1}
                 </div>
                 <span className="text-xs font-medium" style={{ color: atual ? 'var(--text-primary)' : 'var(--text-tertiary)' }}>{labels[i]}</span>
@@ -329,11 +373,12 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       {/* ETAPA 1: Configurar */}
       {etapa === 'configurar' && (
         <div className="rounded-xl p-6 space-y-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-          <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Selecione a Rota e o Tecnico</h3>
+          <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Selecione a Rota e o Técnico</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Rotas */}
             <div>
-              <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Rota</label>
+              <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Rota (pipeline)</label>
               <div className="space-y-2">
                 {rotas.length === 0 ? (
                   <p className="text-sm" style={{ color: 'var(--text-tertiary)' }}>Nenhuma rota cadastrada com coluna kanban</p>
@@ -351,7 +396,9 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                       <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: rota.cor ?? '#6B7280' }} />
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{rota.nome}</p>
-                        <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{rota.cidades?.slice(0, 3).join(', ')}{(rota.cidades?.length ?? 0) > 3 ? '...' : ''}</p>
+                        <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>
+                          {rota.cidades?.slice(0, 3).join(', ')}{(rota.cidades?.length ?? 0) > 3 ? '...' : ''}
+                        </p>
                       </div>
                       {rotaSelecionada?.id === rota.id && <CheckCircle2 className="w-4 h-4 flex-shrink-0" style={{ color: '#3B82F6' }} />}
                     </button>
@@ -360,16 +407,17 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
               </div>
             </div>
 
+            {/* Técnico + data */}
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Tecnico</label>
+                <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Técnico</label>
                 <select
                   value={tecnicoSelecionado?.id ?? ''}
                   onChange={e => setTecnicoSelecionado(tecnicos.find(t => t.id === e.target.value) ?? null)}
                   className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
                   style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
                 >
-                  <option value="">Selecionar tecnico...</option>
+                  <option value="">Selecionar técnico...</option>
                   {tecnicos.map(t => (
                     <option key={t.id} value={t.id}>{t.nome}</option>
                   ))}
@@ -405,14 +453,14 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Periodo</label>
+                  <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-secondary)' }}>Período</label>
                   <select
                     value={periodoRota}
                     onChange={e => setPeriodoRota(e.target.value)}
                     className="w-full px-3 py-2 rounded-lg text-sm focus:outline-none"
                     style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
                   >
-                    <option value="manha">Manha</option>
+                    <option value="manha">Manhã</option>
                     <option value="tarde">Tarde</option>
                     <option value="dia_todo">Dia todo</option>
                   </select>
@@ -425,9 +473,14 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
             onClick={buscarOSs}
             disabled={!rotaSelecionada || !tecnicoSelecionado || buscando}
             className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
-            style={{ backgroundColor: rotaSelecionada && tecnicoSelecionado ? '#3B82F6' : 'var(--bg-secondary)', color: rotaSelecionada && tecnicoSelecionado ? '#fff' : 'var(--text-tertiary)' }}
+            style={{
+              backgroundColor: rotaSelecionada && tecnicoSelecionado ? '#3B82F6' : 'var(--bg-secondary)',
+              color: rotaSelecionada && tecnicoSelecionado ? '#fff' : 'var(--text-tertiary)',
+            }}
           >
-            {buscando ? <><RefreshCw className="w-4 h-4 animate-spin" />Buscando e Geolocalizando...</> : <><Play className="w-4 h-4" />Buscar OSs da Rota</>}
+            {buscando
+              ? <><RefreshCw className="w-4 h-4 animate-spin" />Buscando e Geolocalizando...</>
+              : <><Play className="w-4 h-4" />Buscar OSs da Rota</>}
           </button>
         </div>
       )}
@@ -437,15 +490,63 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
         <GeolocalizacaoManualModal
           osSemCoords={osSemCoords}
           onSalvar={resolverGeoManual}
-          onFechar={() => { setOsSemCoords([]); setEtapa('processar'); aplicarFiltros(osDaRota, tecnicoSelecionado!); }}
+          onFechar={() => {
+            setOsSemCoords([]);
+            setEtapa('processar');
+            aplicarFiltros(osPendentes, tecnicoSelecionado!);
+          }}
         />
       )}
 
       {/* ETAPA 2+: Filtros + Sobras + Painel */}
       {(etapa === 'processar' || etapa === 'roteirizar' || etapa === 'confirmar') && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          {/* Coluna esquerda: OS Aprovadas */}
+          {/* Coluna esquerda: OS da rota + mapa */}
           <div className="lg:col-span-2 space-y-4">
+
+            {/* Já agendadas no dia — painel informativo */}
+            {osJaAgendadas.length > 0 && (
+              <div className="rounded-xl overflow-hidden" style={{ border: '1px solid #3B82F630', backgroundColor: '#3B82F608' }}>
+                <button
+                  className="w-full flex items-center justify-between px-4 py-3 text-left"
+                  onClick={() => setShowJaAgendadas(p => !p)}
+                >
+                  <div className="flex items-center gap-2">
+                    <CalendarCheck className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                    <span className="text-sm font-semibold" style={{ color: '#3B82F6' }}>
+                      {osJaAgendadas.length} OS{osJaAgendadas.length > 1 ? 's' : ''} já agendada{osJaAgendadas.length > 1 ? 's' : ''} para {tecnicoSelecionado?.nome} em {new Date(dataRota + 'T12:00:00').toLocaleDateString('pt-BR')}
+                    </span>
+                  </div>
+                  <Info className="w-4 h-4" style={{ color: '#3B82F6' }} />
+                </button>
+                {showJaAgendadas && (
+                  <div className="divide-y" style={{ borderColor: '#3B82F620' }}>
+                    {osJaAgendadas.map(os => {
+                      const numOS = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+                      return (
+                        <div key={os.id} className="flex items-center gap-3 px-4 py-3">
+                          <CalendarCheck className="w-4 h-4 flex-shrink-0" style={{ color: '#3B82F6' }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>OS {numOS}</p>
+                            <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</p>
+                            <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>
+                              {[os.cliente_logradouro, os.cliente_numero, os.cliente_bairro].filter(Boolean).join(', ')}
+                            </p>
+                          </div>
+                          <span
+                            className="flex-shrink-0 px-2 py-0.5 rounded text-xs font-medium"
+                            style={{ backgroundColor: '#3B82F615', color: '#3B82F6', border: '1px solid #3B82F630' }}
+                          >
+                            {os.status_agendamento_gia === 'confirmado' ? 'Confirmado' : 'Agendado'}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Barra de tempo */}
             <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <div className="flex items-center justify-between mb-2">
@@ -455,15 +556,24 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 </span>
               </div>
               <div className="h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--bg-secondary)' }}>
-                <div className="h-full rounded-full transition-all" style={{ width: `${pctUso}%`, backgroundColor: pctUso > 90 ? '#EF4444' : pctUso > 70 ? '#F59E0B' : '#10B981' }} />
+                <div
+                  className="h-full rounded-full transition-all"
+                  style={{
+                    width: `${pctUso}%`,
+                    backgroundColor: pctUso > 90 ? '#EF4444' : pctUso > 70 ? '#F59E0B' : '#10B981',
+                  }}
+                />
               </div>
             </div>
 
+            {/* Lista de OSs aprovadas */}
             <div className="rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <div className="flex items-center justify-between px-5 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4" style={{ color: '#10B981' }} />
-                  <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>OSs na Rota ({osAprovadas.length})</span>
+                  <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
+                    OSs na Rota ({osAprovadas.length})
+                  </span>
                 </div>
                 {etapa === 'processar' && (
                   <button
@@ -472,7 +582,9 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
                     style={{ backgroundColor: '#3B82F6', color: '#fff' }}
                   >
-                    {loading ? <><RefreshCw className="w-3 h-3 animate-spin" />Otimizando...</> : <><Route className="w-3 h-3" />Otimizar Sequencia</>}
+                    {loading
+                      ? <><RefreshCw className="w-3 h-3 animate-spin" />Otimizando...</>
+                      : <><Route className="w-3 h-3" />Otimizar Sequência</>}
                   </button>
                 )}
               </div>
@@ -480,7 +592,11 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
               {osAprovadas.length === 0 ? (
                 <div className="p-8 text-center">
                   <MapPin className="w-10 h-10 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
-                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS disponivel para esta rota/tecnico</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+                    {osPendentes.length === 0
+                      ? 'Nenhuma OS pendente nesta rota para o período selecionado'
+                      : 'Nenhuma OS atende os filtros de skill e horário'}
+                  </p>
                 </div>
               ) : (
                 <div className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
@@ -534,7 +650,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
               />
             )}
 
-            {/* Action buttons */}
+            {/* Salvar rota */}
             {etapa === 'roteirizar' && (
               <button
                 onClick={salvarRota}
@@ -542,10 +658,13 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-colors"
                 style={{ backgroundColor: '#10B981', color: '#fff' }}
               >
-                {salvando ? <><RefreshCw className="w-4 h-4 animate-spin" />Salvando...</> : <><CheckCircle2 className="w-4 h-4" />Salvar Rota e Agendar com Clientes</>}
+                {salvando
+                  ? <><RefreshCw className="w-4 h-4 animate-spin" />Salvando...</>
+                  : <><CheckCircle2 className="w-4 h-4" />Salvar Rota e Agendar com Clientes</>}
               </button>
             )}
 
+            {/* Confirmar */}
             {etapa === 'confirmar' && (
               <div className="rounded-xl p-5 space-y-4" style={{ backgroundColor: '#10B98108', border: '1px solid #10B98125' }}>
                 <div className="flex items-center gap-2">
@@ -553,7 +672,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                   <h3 className="font-semibold" style={{ color: 'var(--text-primary)' }}>Notificar Clientes via WhatsApp</h3>
                 </div>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  A rota foi salva. Ao confirmar, todos os clientes da rota receberao uma mensagem de confirmacao de agendamento pelo WhatsApp.
+                  A rota foi salva. Todos os clientes da rota receberão uma mensagem de confirmação de agendamento pelo WhatsApp.
                 </p>
                 <button
                   onClick={confirmarEAgendar}
@@ -561,21 +680,31 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                   className="flex items-center gap-2 px-6 py-2.5 rounded-lg font-semibold text-sm transition-colors"
                   style={{ backgroundColor: '#10B981', color: '#fff' }}
                 >
-                  {enviando ? <><RefreshCw className="w-4 h-4 animate-spin" />Enviando mensagens...</> : <><Send className="w-4 h-4" />Confirmar e Enviar WhatsApp em Lote</>}
+                  {enviando
+                    ? <><RefreshCw className="w-4 h-4 animate-spin" />Enviando mensagens...</>
+                    : <><Send className="w-4 h-4" />Confirmar e Enviar WhatsApp em Lote</>}
                 </button>
               </div>
             )}
           </div>
 
-          {/* Coluna direita: Sobras */}
+          {/* Coluna direita: Sobras + Resumo */}
           <div className="space-y-4">
+            {/* Sobras */}
             <div className="rounded-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-              <div className="px-5 py-3" style={{ borderBottom: '1px solid var(--border-primary)', backgroundColor: '#EF444408', borderRadius: '12px 12px 0 0' }}>
+              <div
+                className="px-5 py-3"
+                style={{
+                  borderBottom: '1px solid var(--border-primary)',
+                  backgroundColor: '#EF444408',
+                  borderRadius: '12px 12px 0 0',
+                }}
+              >
                 <div className="flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" style={{ color: '#EF4444' }} />
                   <span className="font-semibold text-sm" style={{ color: '#EF4444' }}>Sobras ({sobras.length})</span>
                 </div>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>OSs excluidas por skill ou horario</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-tertiary)' }}>OSs excluídas por skill ou horário</p>
               </div>
 
               {sobras.length === 0 ? (
@@ -606,11 +735,14 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                           </button>
                         )}
                       </div>
-                      <div className="mt-1.5 px-2 py-1 rounded text-xs" style={{
-                        backgroundColor: item.motivo === 'skill' ? '#F59E0B10' : '#EF444410',
-                        color: item.motivo === 'skill' ? '#F59E0B' : '#EF4444',
-                        border: `1px solid ${item.motivo === 'skill' ? '#F59E0B25' : '#EF444425'}`,
-                      }}>
+                      <div
+                        className="mt-1.5 px-2 py-1 rounded text-xs"
+                        style={{
+                          backgroundColor: item.motivo === 'skill' ? '#F59E0B10' : '#EF444410',
+                          color: item.motivo === 'skill' ? '#F59E0B' : '#EF4444',
+                          border: `1px solid ${item.motivo === 'skill' ? '#F59E0B25' : '#EF444425'}`,
+                        }}
+                      >
                         {item.motivoLabel}
                       </div>
                     </div>
@@ -623,8 +755,16 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
             <div className="rounded-xl p-4 space-y-2" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <p className="text-xs font-semibold" style={{ color: 'var(--text-secondary)' }}>Resumo</p>
               <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--text-tertiary)' }}>Total na fila</span>
-                <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{osDaRota.length}</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>Total no pipeline</span>
+                <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{todasOsDaRota.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: 'var(--text-tertiary)' }}>Já agendadas (dia)</span>
+                <span className="font-bold" style={{ color: '#3B82F6' }}>{osJaAgendadas.length}</span>
+              </div>
+              <div className="flex justify-between text-xs">
+                <span style={{ color: 'var(--text-tertiary)' }}>Pendentes</span>
+                <span className="font-bold" style={{ color: 'var(--text-secondary)' }}>{osPendentes.length}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span style={{ color: 'var(--text-tertiary)' }}>Na rota</span>
@@ -634,13 +774,16 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 <span style={{ color: 'var(--text-tertiary)' }}>Sobras</span>
                 <span className="font-bold" style={{ color: '#EF4444' }}>{sobras.length}</span>
               </div>
+              <div className="h-px my-1" style={{ backgroundColor: 'var(--border-primary)' }} />
               <div className="flex justify-between text-xs">
-                <span style={{ color: 'var(--text-tertiary)' }}>Tecnico</span>
+                <span style={{ color: 'var(--text-tertiary)' }}>Técnico</span>
                 <span className="font-bold truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>{tecnicoSelecionado?.nome ?? '-'}</span>
               </div>
               <div className="flex justify-between text-xs">
                 <span style={{ color: 'var(--text-tertiary)' }}>Data</span>
-                <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{dataRota}</span>
+                <span className="font-bold" style={{ color: 'var(--text-primary)' }}>
+                  {new Date(dataRota + 'T12:00:00').toLocaleDateString('pt-BR')}
+                </span>
               </div>
             </div>
           </div>
@@ -650,7 +793,12 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   );
 }
 
-function OSCard({ os, ordem, disabled, onRemover }: {
+function OSCard({
+  os,
+  ordem,
+  disabled,
+  onRemover,
+}: {
   os: OSLogistica;
   ordem: number;
   disabled: boolean;
@@ -661,14 +809,22 @@ function OSCard({ os, ordem, disabled, onRemover }: {
 
   return (
     <div className="flex items-center gap-3 px-5 py-3">
-      <div className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0" style={{ backgroundColor: '#3B82F615', color: '#3B82F6', border: '1px solid #3B82F630' }}>
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0"
+        style={{ backgroundColor: '#3B82F615', color: '#3B82F6', border: '1px solid #3B82F630' }}
+      >
         {ordem}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>OS {numOS}</span>
           {os.aparelho_linha && (
-            <span className="px-1.5 py-0.5 rounded text-xs" style={{ backgroundColor: '#F59E0B10', color: '#F59E0B', border: '1px solid #F59E0B25' }}>{os.aparelho_linha}</span>
+            <span
+              className="px-1.5 py-0.5 rounded text-xs"
+              style={{ backgroundColor: '#F59E0B10', color: '#F59E0B', border: '1px solid #F59E0B25' }}
+            >
+              {os.aparelho_linha}
+            </span>
           )}
         </div>
         <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{os.cliente_nome}</p>
