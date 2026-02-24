@@ -35,6 +35,8 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const [approvalLink, setApprovalLink] = useState<string>('');
   const [linkCopied, setLinkCopied] = useState(false);
   const [gerandoLink, setGerandoLink] = useState(false);
+  const [linkExpiresAt, setLinkExpiresAt] = useState<string | null>(null);
+  const [carregandoLink, setCarregandoLink] = useState(false);
   const [usuariosUnidade, setUsuariosUnidade] = useState<any[]>([]);
   const [vendedorResponsavel, setVendedorResponsavel] = useState<string | null>(os.vendedor_responsavel_id || null);
   const [salvandoVendedor, setSalvandoVendedor] = useState(false);
@@ -361,19 +363,54 @@ Assistencia Tecnica Samsung`;
     }
   };
 
+  const carregarLinkExistente = async () => {
+    setCarregandoLink(true);
+    try {
+      const { data } = await supabase
+        .from('orcamento_links')
+        .select('token, expires_at, status')
+        .eq('os_id', osId)
+        .eq('ativo', true)
+        .eq('status', 'pendente')
+        .order('created_at', { ascending: false })
+        .maybeSingle();
+
+      if (data?.token) {
+        if (data.expires_at && new Date(data.expires_at) < new Date()) {
+          setApprovalLink('');
+          setLinkExpiresAt(null);
+          return;
+        }
+        const baseUrl = window.location.origin;
+        setApprovalLink(`${baseUrl}/orcamento/${data.token}`);
+        setLinkExpiresAt(data.expires_at);
+      } else {
+        setApprovalLink('');
+        setLinkExpiresAt(null);
+      }
+    } catch {
+      setApprovalLink('');
+      setLinkExpiresAt(null);
+    } finally {
+      setCarregandoLink(false);
+    }
+  };
+
   const gerarLinkAprovacao = async () => {
     setGerandoLink(true);
     try {
       const { data, error } = await supabase
-        .rpc('criar_novo_link_orcamento', { p_os_id: osId });
+        .rpc('upsert_orcamento_link', { p_os_id: osId });
 
       if (error) throw error;
 
       if (data && data.length > 0) {
         const token = data[0].token;
+        const expiresAt = data[0].expires_at;
         const baseUrl = window.location.origin;
         const link = `${baseUrl}/orcamento/${token}`;
         setApprovalLink(link);
+        setLinkExpiresAt(expiresAt);
         onUpdate();
         return link;
       }
@@ -394,8 +431,8 @@ Assistencia Tecnica Samsung`;
 
   useEffect(() => {
     if (showWhatsAppModal) {
-      setApprovalLink('');
       setLinkCopied(false);
+      carregarLinkExistente();
     }
   }, [showWhatsAppModal]);
 
@@ -1368,10 +1405,10 @@ Assistencia Tecnica Samsung`;
                   )}
                 </div>
 
-                {gerandoLink ? (
+                {(gerandoLink || carregandoLink) ? (
                   <div className="flex flex-col items-center justify-center py-6">
                     <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[#00D4FF] mb-3"></div>
-                    <p className="text-xs text-gray-400">Gerando link seguro...</p>
+                    <p className="text-xs text-gray-400">{carregandoLink ? 'Verificando link existente...' : 'Gerando link seguro...'}</p>
                   </div>
                 ) : approvalLink ? (
                   <>
@@ -1382,7 +1419,12 @@ Assistencia Tecnica Samsung`;
                     <div className="mb-3 p-2 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center gap-2">
                       <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0" />
                       <p className="text-[10px] text-yellow-300">
-                        <strong>Validade:</strong> Este link expira em <strong>72 horas</strong> apos a geracao
+                        <strong>Validade:</strong> Este link expira em{' '}
+                        <strong>
+                          {linkExpiresAt
+                            ? new Date(linkExpiresAt).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+                            : '72 horas'}
+                        </strong>
                       </p>
                     </div>
 
