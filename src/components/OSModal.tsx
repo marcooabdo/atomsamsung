@@ -5423,8 +5423,8 @@ Não haverá cobrança ao cliente.`
           onClose={() => setMostrarModalConvertTipo(false)}
           onSuccess={() => {
             setMostrarModalConvertTipo(false);
-            loadOS();
             onReload?.();
+            onClose();
           }}
         />
       )}

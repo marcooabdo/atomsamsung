@@ -1179,8 +1179,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           // Buscar markup ativo
           const tipoOSAtual = currentMode === 'view' ? os?.tipo_os : tipoOS;
           const tipoOrcamentoAtual = currentMode === 'view' ? (os?.tipo_orcamento || 'normal') : (tipoOrcamento || 'normal');
+          const isSCACCAtual = tipoOrcamentoAtual === 'samsung_contigo' || tipoOrcamentoAtual === 'acessorios' || modoSCACC;
           let valorComMarkup = pedido?.valor_estimado || null;
-          if (valorComMarkup && tipoOSAtual === 'OW') {
+          if (valorComMarkup && (tipoOSAtual === 'OW' || isSCACCAtual)) {
             const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
               p_unidade_id: unidadeParaBusca,
               p_tipo_orcamento: tipoOrcamentoAtual,
@@ -1244,7 +1245,11 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const calcularMarkup = async () => {
       const valorGSPN = parseFloat(novaPecaValor);
 
-      if (!valorGSPN || valorGSPN <= 0 || (!modoSCACC && tipoOS !== 'OW') || !unidadeId) {
+      const tipoOrcamentoEfetivo = currentMode === 'view' ? (os?.tipo_orcamento || tipoOrcamento || 'normal') : (tipoOrcamento || 'normal');
+      const isSCACCEfetivo = modoSCACC || tipoOrcamentoEfetivo === 'samsung_contigo' || tipoOrcamentoEfetivo === 'acessorios';
+      const tipoOSEfetivo = currentMode === 'view' ? os?.tipo_os : tipoOS;
+
+      if (!valorGSPN || valorGSPN <= 0 || (!isSCACCEfetivo && tipoOSEfetivo !== 'OW') || !unidadeId) {
         setNovaPecaValorComMarkup(null);
         return;
       }
@@ -1252,7 +1257,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       try {
         const { data: markupData } = await supabase.rpc('get_markup_for_unidade_and_tipo', {
           p_unidade_id: unidadeId,
-          p_tipo_orcamento: tipoOrcamento || 'normal',
+          p_tipo_orcamento: tipoOrcamentoEfetivo,
           p_valor: valorGSPN
         });
 
@@ -1280,7 +1285,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     };
 
     calcularMarkup();
-  }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento, modoSCACC]);
+  }, [novaPecaValor, tipoOS, unidadeId, tipoOrcamento, modoSCACC, os, currentMode]);
 
   const loadComentarios = async () => {
     if (!currentOsId) return;
@@ -3137,7 +3142,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                               onClick={() => {
                                 setNovaPecaCodigo(peca.pn);
                                 setNovaPecaDescricao(peca.descricao);
-                                if (tipoOS === 'OW' && peca.valor_com_markup) {
+                                if ((tipoOS === 'OW' || modoSCACC) && peca.valor_com_markup) {
                                   setNovaPecaValor(peca.valor_com_markup.toFixed(2));
                                 } else if (peca.valor_corrigido) {
                                   setNovaPecaValor(peca.valor_corrigido.toFixed(2));
@@ -3154,7 +3159,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   <p className="text-xs text-gray-400 mt-0.5 truncate">{peca.descricao}</p>
                                 </div>
                                 <div className="flex-shrink-0">
-                                  {tipoOS === 'OW' && peca.valor_com_markup ? (
+                                  {(tipoOS === 'OW' || modoSCACC) && peca.valor_com_markup ? (
                                     <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
                                       backgroundColor: '#39FF1420',
                                       color: '#39FF14',
@@ -4457,7 +4462,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       )}
                       <div>
                         <label className="text-xs text-gray-500 uppercase">Tipo de Atendimento</label>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <span
                             className="px-3 py-1 rounded text-xs font-bold"
                             style={{
@@ -4478,6 +4483,30 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           >
                             {os.tipo_os}
                           </span>
+                          {(os.tipo_orcamento === 'samsung_contigo' || modoSCACC) && (
+                            <span
+                              className="px-3 py-1 rounded text-xs font-bold"
+                              style={{
+                                backgroundColor: '#FFA50030',
+                                color: '#FFA500',
+                                border: '1px solid #FFA50060'
+                              }}
+                            >
+                              Samsung Contigo
+                            </span>
+                          )}
+                          {os.tipo_orcamento === 'acessorios' && (
+                            <span
+                              className="px-3 py-1 rounded text-xs font-bold"
+                              style={{
+                                backgroundColor: '#39FF1430',
+                                color: '#39FF14',
+                                border: '1px solid #39FF1460'
+                              }}
+                            >
+                              Acessórios
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -4711,7 +4740,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 onClick={() => {
                                   setNovaPecaCodigo(sugestao.pn);
                                   setNovaPecaDescricao(sugestao.descricao);
-                                  if (os?.tipo_os === 'OW' && sugestao.valor_com_markup) {
+                                  const isSCACCView = modoSCACC || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+                                  if ((os?.tipo_os === 'OW' || isSCACCView) && sugestao.valor_com_markup) {
                                     setNovaPecaValor(sugestao.valor_com_markup.toFixed(2));
                                   } else {
                                     setNovaPecaValor((sugestao.valor_corrigido || sugestao.valor_com_impostos || 0).toFixed(2));
@@ -4726,7 +4756,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                     <p className="text-xs text-gray-400 mt-1">{sugestao.descricao}</p>
                                   </div>
                                   <div className="flex-shrink-0">
-                                    {os?.tipo_os === 'OW' && sugestao.valor_com_markup ? (
+                                    {(os?.tipo_os === 'OW' || modoSCACC || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && sugestao.valor_com_markup ? (
                                       <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
                                         backgroundColor: '#39FF1420',
                                         color: '#39FF14',
