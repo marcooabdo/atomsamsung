@@ -4790,14 +4790,21 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           Valor GSPN (R$)
                         </label>
                         <div className="flex gap-2">
-                          <input
-                            type="number"
-                            step="0.01"
-                            value={novaPecaValor}
-                            onChange={(e) => setNovaPecaValor(e.target.value)}
-                            className="neon-input flex-1"
-                            placeholder="0.00"
-                          />
+                          <div className="flex-1">
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={novaPecaValor}
+                              onChange={(e) => setNovaPecaValor(e.target.value)}
+                              className="neon-input w-full"
+                              placeholder="0.00"
+                            />
+                            {novaPecaValorComMarkup !== null && (
+                              <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
+                                c/ Markup: R$ {novaPecaValorComMarkup.toFixed(2)}
+                              </p>
+                            )}
+                          </div>
                           <button
                             onClick={() => {
                               if (!novaPecaCodigo || !novaPecaDescricao) {
@@ -4809,7 +4816,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 codigo: novaPecaCodigo,
                                 descricao: novaPecaDescricao,
                                 quantidade: novaPecaQuantidade,
-                                valor: novaPecaValor
+                                valor: novaPecaValorComMarkup !== null ? novaPecaValorComMarkup.toFixed(2) : novaPecaValor
                               });
                               setMostrarConfirmacaoRequisicaoManual(true);
                             }}
