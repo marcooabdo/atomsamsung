@@ -782,13 +782,15 @@ export function NotasFiscais() {
                     )}
 
                     {/* Mensagem de erro */}
-                    {nf.status === 'erro' && nf.erro_mensagem && (
-                      <div className="mt-3 p-3 bg-[#FF006410] border border-[#FF006460] rounded-lg">
+                    {nf.status === 'erro' && (
+                      <div className="mt-3 p-3 rounded-lg" style={{ backgroundColor: '#FF006415', border: '1px solid #FF006450' }}>
                         <div className="flex items-start gap-2">
-                          <AlertCircle className="w-4 h-4 text-[#FF0064] flex-shrink-0 mt-0.5" />
-                          <div>
-                            <p className="text-xs font-bold text-[#FF0064] mb-1">Erro na emissão:</p>
-                            <p className="text-xs text-gray-300">{nf.erro_mensagem}</p>
+                          <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#FF0064' }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold mb-1" style={{ color: '#FF0064' }}>Erro na emissao:</p>
+                            <p className="text-xs break-words" style={{ color: '#E5E7EB' }}>
+                              {nf.erro_mensagem || 'Falha ao processar a nota fiscal. Verifique os dados e tente novamente.'}
+                            </p>
                           </div>
                         </div>
                       </div>
@@ -1008,21 +1010,23 @@ export function NotasFiscais() {
               )}
 
               {/* Observações e Erro */}
-              {(notaDetalhes.observacoes || notaDetalhes.erro_mensagem) && (
+              {(notaDetalhes.observacoes || notaDetalhes.status === 'erro') && (
                 <div>
-                  <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Observações</h3>
+                  <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Observacoes</h3>
                   {notaDetalhes.observacoes && (
                     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-3">
                       <p className="text-sm text-gray-300">{notaDetalhes.observacoes}</p>
                     </div>
                   )}
-                  {notaDetalhes.erro_mensagem && (
-                    <div className="bg-[#FF006410] border border-[#FF006460] rounded-lg p-4">
+                  {notaDetalhes.status === 'erro' && (
+                    <div className="rounded-lg p-4" style={{ backgroundColor: '#FF006415', border: '1px solid #FF006450' }}>
                       <div className="flex items-start gap-2">
-                        <AlertCircle className="w-5 h-5 text-[#FF0064] flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-sm font-bold text-[#FF0064] mb-1">Mensagem de Erro:</p>
-                          <p className="text-sm text-gray-300">{notaDetalhes.erro_mensagem}</p>
+                        <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#FF0064' }} />
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold mb-1" style={{ color: '#FF0064' }}>Mensagem de Erro:</p>
+                          <p className="text-sm break-words" style={{ color: '#E5E7EB' }}>
+                            {notaDetalhes.erro_mensagem || 'Falha ao processar a nota fiscal. Verifique os dados e tente novamente.'}
+                          </p>
                         </div>
                       </div>
                     </div>
