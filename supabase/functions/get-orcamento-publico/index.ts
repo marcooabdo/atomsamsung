@@ -158,6 +158,7 @@ Deno.serve(async (req: Request) => {
       if (status === 'aprovado') {
         osUpdateData.orcamento_aprovado = true;
         osUpdateData.orcamento_aprovado_em = new Date().toISOString();
+        osUpdateData.bloqueio_movimentacao_automatica = true;
         osUpdateData.coluna_kanban = 'orcamento_aprovado';
       } else if (status === 'rejeitado') {
         osUpdateData.orcamento_aprovado = false;
@@ -169,6 +170,13 @@ Deno.serve(async (req: Request) => {
         .from('os')
         .update(osUpdateData)
         .eq('id', linkData.os_id);
+
+      if (status === 'aprovado') {
+        await supabase
+          .from('os')
+          .update({ bloqueio_movimentacao_automatica: false })
+          .eq('id', linkData.os_id);
+      }
 
       return new Response(
         JSON.stringify({ success: true, message: 'Resposta registrada com sucesso' }),
