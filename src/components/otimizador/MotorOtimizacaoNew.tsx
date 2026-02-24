@@ -42,7 +42,7 @@ interface DiaItinerario {
   dia: number;
   data: string;
   eventos: Array<{
-    tipo: 'saida_base' | 'deslocamento' | 'atendimento' | 'almoco' | 'pernoite' | 'retorno_base';
+    tipo: 'saida_base' | 'continua_deslocamento' | 'deslocamento' | 'atendimento' | 'almoco' | 'pernoite' | 'retorno_base';
     horario_inicio: string;
     horario_fim: string;
     descricao: string;
@@ -359,22 +359,67 @@ export default function MotorOtimizacaoNew() {
     const almocoMin = timeToMinutes(horarioAlmoco);
     const almocoFimMin = almocoMin + duracaoAlmoco;
 
-    const totalDias = Math.max(...paradasList.map(p => p.dia));
-    const diasMap: Record<number, { eventos: DiaItinerario['eventos']; kmDia: number; atendimentos: number }> = {};
-    for (let d = 1; d <= totalDias; d++) {
-      diasMap[d] = { eventos: [], kmDia: 0, atendimentos: 0 };
+    // Determinar quais dias têm pernoite (dias que não são o último)
+    const ultimoDiaComParada = Math.max(...paradasList.map(p => p.dia));
+
+    // Calcular retorno à base partindo do último atendimento
+    const lastParadaGlobal = paradasList[paradasList.length - 1];
+    const retornoKmTotal = haversineDistance(
+      { lat: lastParadaGlobal.os.lat, lng: lastParadaGlobal.os.lng }, baseCoords
+    ) * 1.3;
+    const retornoMinTotal = estimateDriveTime(retornoKmTotal, 60);
+
+    // Calcular quantos dias extras o retorno precisa
+    const retornoStartMin = timeToMinutes(lastParadaGlobal.horario_saida);
+    let retMinRestante = retornoMinTotal;
+    let retCurrentMin = retornoStartMin;
+    let retornoDiasExtras = 0;
+
+    // Simular o percurso de retorno dia a dia
+    while (retMinRestante > 0) {
+      const disponivel = fimMin - retCurrentMin;
+      if (disponivel <= 0) {
+        retornoDiasExtras++;
+        retCurrentMin = inicioMin;
+        continue;
+      }
+      if (retMinRestante <= disponivel) {
+        retMinRestante = 0;
+      } else {
+        retMinRestante -= disponivel;
+        retornoDiasExtras++;
+        retCurrentMin = inicioMin;
+      }
     }
 
-    for (let d = 1; d <= totalDias; d++) {
-      const paradasDia = paradasList.filter(p => p.dia === d);
-      const isLastDay = d === totalDias;
+    const totalDias = ultimoDiaComParada + retornoDiasExtras;
 
-      diasMap[d].eventos.push({
-        tipo: 'saida_base',
-        horario_inicio: horarioInicio,
-        horario_fim: horarioInicio,
-        descricao: d === 1 ? 'Saida da base' : 'Continua deslocamento',
-      });
+    const diasMap: Record<number, { eventos: DiaItinerario['eventos']; kmDia: number; atendimentos: number; isPernoite: boolean }> = {};
+    for (let d = 1; d <= totalDias; d++) {
+      diasMap[d] = { eventos: [], kmDia: 0, atendimentos: 0, isPernoite: d < totalDias };
+    }
+
+    // Preencher dias com atendimentos
+    for (let d = 1; d <= ultimoDiaComParada; d++) {
+      const paradasDia = paradasList.filter(p => p.dia === d);
+      const isPernoite = d < totalDias;
+
+      // Cabeçalho do dia: Saida da Base (dia 1) ou Continua Deslocamento (dias com pernoite anterior)
+      if (d === 1) {
+        diasMap[d].eventos.push({
+          tipo: 'saida_base',
+          horario_inicio: horarioInicio,
+          horario_fim: horarioInicio,
+          descricao: 'Saida da base',
+        });
+      } else {
+        diasMap[d].eventos.push({
+          tipo: 'continua_deslocamento',
+          horario_inicio: horarioInicio,
+          horario_fim: horarioInicio,
+          descricao: 'Continua deslocamento do hotel',
+        });
+      }
 
       let currentMin = inicioMin;
       let almocoAdded = false;
@@ -443,31 +488,136 @@ export default function MotorOtimizacaoNew() {
         currentMin = saidaMin;
       }
 
-      if (isLastDay && paradasDia.length > 0) {
-        const lastParada = paradasDia[paradasDia.length - 1];
-        const retornoKm = haversineDistance(
-          { lat: lastParada.os.lat, lng: lastParada.os.lng }, baseCoords
-        ) * 1.3;
-        const retMin = estimateDriveTime(retornoKm, 60);
-        const retStart = timeToMinutes(lastParada.horario_saida);
-        diasMap[d].eventos.push({
-          tipo: 'retorno_base',
-          horario_inicio: lastParada.horario_saida,
-          horario_fim: minutesToTime(retStart + retMin),
-          descricao: 'Retorno a base',
-          distancia_km: Math.round(retornoKm * 10) / 10,
-          duracao_min: retMin,
-        });
-        diasMap[d].kmDia += retornoKm;
-      } else if (!isLastDay) {
-        const lastParadaDia = paradasDia.length > 0 ? paradasDia[paradasDia.length - 1] : null;
+      if (isPernoite) {
+        // Após atendimentos, técnico continua se deslocando até 18h antes do pernoite
+        const tempoAtePernoite = fimMin - currentMin;
+        if (tempoAtePernoite > 0 && d === ultimoDiaComParada) {
+          // No último dia com atendimento: continua em direção à base
+          const fracKm = retornoKmTotal > 0 ? (tempoAtePernoite / retornoMinTotal) : 0;
+          diasMap[d].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(currentMin),
+            horario_fim: horarioFim,
+            descricao: 'Em Deslocamento (retorno)',
+            distancia_km: Math.round(retornoKmTotal * fracKm * 10) / 10,
+            duracao_min: tempoAtePernoite,
+          });
+          diasMap[d].kmDia += retornoKmTotal * fracKm;
+        } else if (tempoAtePernoite > 0 && paradasDia.length === 0) {
+          // Dia de trânsito puro (sem atendimento): rodando em direção ao destino
+          const diaRelativo = d - 1;
+          const fracao = totalDias > 1 ? diaRelativo / (totalDias - 1) : 0.5;
+          const kmDiaEstimado = retornoKmTotal * (tempoAtePernoite / retornoMinTotal);
+          diasMap[d].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: horarioInicio,
+            horario_fim: horarioFim,
+            descricao: 'Em Deslocamento',
+            distancia_km: Math.round(kmDiaEstimado * 10) / 10,
+            duracao_min: tempoAtePernoite,
+          });
+          diasMap[d].kmDia += kmDiaEstimado;
+          void fracao;
+        }
+
         diasMap[d].eventos.push({
           tipo: 'pernoite',
-          horario_inicio: lastParadaDia ? lastParadaDia.horario_saida : horarioFim,
+          horario_inicio: horarioFim,
           horario_fim: horarioFim,
           descricao: 'Pernoite na regiao',
         });
       }
+    }
+
+    // Gerar dias de retorno à base
+    if (retornoDiasExtras > 0 || ultimoDiaComParada === totalDias) {
+      // Calcular distribuição km/dia para o retorno
+      let retMinRestante2 = retornoMinTotal;
+      let retCurrentMin2 = retornoStartMin;
+      let kmJaPercorrido = 0;
+
+      for (let extra = 0; extra < retornoDiasExtras + 1; extra++) {
+        const diaAtual = ultimoDiaComParada + extra;
+        if (diaAtual > totalDias) break;
+
+        const isUltimoDiaRetorno = extra === retornoDiasExtras;
+        const startMin = extra === 0 ? retornoStartMin : inicioMin;
+        const disponivel = fimMin - (extra === 0 ? retornoStartMin : inicioMin);
+
+        if (extra === 0 && retornoDiasExtras === 0) {
+          // Retorno cabe no mesmo dia do último atendimento
+          diasMap[diaAtual].eventos.push({
+            tipo: 'retorno_base',
+            horario_inicio: lastParadaGlobal.horario_saida,
+            horario_fim: minutesToTime(retornoStartMin + retornoMinTotal),
+            descricao: 'Retorno a base',
+            distancia_km: Math.round(retornoKmTotal * 10) / 10,
+            duracao_min: retornoMinTotal,
+          });
+          diasMap[diaAtual].kmDia += retornoKmTotal;
+          break;
+        }
+
+        if (extra > 0) {
+          // Dia de retorno: começa com "Continua Deslocamento"
+          diasMap[diaAtual] = { eventos: [], kmDia: 0, atendimentos: 0, isPernoite: !isUltimoDiaRetorno };
+          diasMap[diaAtual].eventos.push({
+            tipo: 'continua_deslocamento',
+            horario_inicio: horarioInicio,
+            horario_fim: horarioInicio,
+            descricao: 'Continua retorno a base',
+          });
+        }
+
+        const minNesteDia = Math.min(retMinRestante2, disponivel);
+        const fracKm = retornoMinTotal > 0 ? minNesteDia / retornoMinTotal : 0;
+        const kmNesteDia = retornoKmTotal * fracKm;
+        const endMin = (extra === 0 ? retornoStartMin : inicioMin) + minNesteDia;
+
+        if (isUltimoDiaRetorno) {
+          diasMap[diaAtual].eventos.push({
+            tipo: 'retorno_base',
+            horario_inicio: minutesToTime(extra === 0 ? retornoStartMin : inicioMin),
+            horario_fim: minutesToTime(endMin),
+            descricao: 'Retorno a base',
+            distancia_km: Math.round(kmNesteDia * 10) / 10,
+            duracao_min: minNesteDia,
+          });
+        } else {
+          diasMap[diaAtual].eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(extra === 0 ? retornoStartMin : inicioMin),
+            horario_fim: horarioFim,
+            descricao: 'Em Deslocamento (retorno a base)',
+            distancia_km: Math.round(kmNesteDia * 10) / 10,
+            duracao_min: minNesteDia,
+          });
+          diasMap[diaAtual].eventos.push({
+            tipo: 'pernoite',
+            horario_inicio: horarioFim,
+            horario_fim: horarioFim,
+            descricao: 'Pernoite na regiao',
+          });
+        }
+
+        diasMap[diaAtual].kmDia += kmNesteDia;
+        kmJaPercorrido += kmNesteDia;
+        retMinRestante2 -= minNesteDia;
+        retCurrentMin2 = inicioMin;
+        void startMin;
+        void retCurrentMin2;
+      }
+    } else {
+      // Retorno cabe no último dia com atendimento (sem dias extras)
+      diasMap[ultimoDiaComParada].eventos.push({
+        tipo: 'retorno_base',
+        horario_inicio: lastParadaGlobal.horario_saida,
+        horario_fim: minutesToTime(retornoStartMin + retornoMinTotal),
+        descricao: 'Retorno a base',
+        distancia_km: Math.round(retornoKmTotal * 10) / 10,
+        duracao_min: retornoMinTotal,
+      });
+      diasMap[ultimoDiaComParada].kmDia += retornoKmTotal;
     }
 
     const diasKeys = Object.keys(diasMap).map(Number).sort((a, b) => a - b);
@@ -1609,17 +1759,19 @@ export default function MotorOtimizacaoNew() {
 
                             <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{
                               backgroundColor: evento.tipo === 'saida_base' ? '#10B98120' :
+                                evento.tipo === 'continua_deslocamento' ? '#F59E0B20' :
                                 evento.tipo === 'deslocamento' ? 'var(--bg-tertiary)' :
                                 evento.tipo === 'atendimento' ? (evento.os?.rota_cor || '#3B82F6') + '20' :
                                 evento.tipo === 'almoco' ? '#F59E0B20' :
-                                evento.tipo === 'pernoite' ? '#8B5CF620' :
+                                evento.tipo === 'pernoite' ? '#6366F120' :
                                 '#10B98120'
                             }}>
                               {evento.tipo === 'saida_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
+                              {evento.tipo === 'continua_deslocamento' && <Navigation className="w-4 h-4" style={{ color: '#F59E0B' }} />}
                               {evento.tipo === 'deslocamento' && <Navigation className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />}
                               {evento.tipo === 'atendimento' && <Wrench className="w-4 h-4" style={{ color: evento.os?.rota_cor || '#3B82F6' }} />}
                               {evento.tipo === 'almoco' && <Coffee className="w-4 h-4" style={{ color: '#F59E0B' }} />}
-                              {evento.tipo === 'pernoite' && <Moon className="w-4 h-4" style={{ color: '#8B5CF6' }} />}
+                              {evento.tipo === 'pernoite' && <Moon className="w-4 h-4" style={{ color: '#6366F1' }} />}
                               {evento.tipo === 'retorno_base' && <Home className="w-4 h-4" style={{ color: '#10B981' }} />}
                             </div>
 
@@ -1627,6 +1779,7 @@ export default function MotorOtimizacaoNew() {
                               <div className="flex items-center gap-2">
                                 <p className="text-sm font-medium" style={{ color: evento.tipo === 'atendimento' ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                                   {evento.tipo === 'saida_base' && 'Saida da Base'}
+                                  {evento.tipo === 'continua_deslocamento' && 'Continua Deslocamento'}
                                   {evento.tipo === 'deslocamento' && 'Em Deslocamento'}
                                   {evento.tipo === 'atendimento' && `OS ${evento.os?.numero_os}`}
                                   {evento.tipo === 'almoco' && 'Pausa para Almoco'}
@@ -1640,18 +1793,23 @@ export default function MotorOtimizacaoNew() {
                                 )}
                               </div>
 
-                              {evento.tipo === 'deslocamento' && (
+                              {(evento.tipo === 'deslocamento' || evento.tipo === 'continua_deslocamento') && (
                                 <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  {evento.distancia_km && (
+                                  {evento.distancia_km && evento.distancia_km > 0 && (
                                     <span className="flex items-center gap-1">
                                       <MapPin className="w-3 h-3" />
                                       {evento.distancia_km} km
                                     </span>
                                   )}
-                                  {evento.duracao_min && (
+                                  {evento.duracao_min && evento.duracao_min > 0 && (
                                     <span className="flex items-center gap-1">
                                       <Clock className="w-3 h-3" />
                                       {formatDuration(evento.duracao_min)}
+                                    </span>
+                                  )}
+                                  {evento.tipo === 'continua_deslocamento' && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded" style={{ backgroundColor: '#F59E0B20', color: '#F59E0B' }}>
+                                      saindo do hotel
                                     </span>
                                   )}
                                 </div>
