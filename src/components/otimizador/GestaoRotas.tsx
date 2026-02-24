@@ -529,10 +529,9 @@ export default function GestaoRotas() {
         </div>
 
         <div className="lg:col-span-2 space-y-2">
-          {ROTA_COLUMNS.map(rc => {
+          {ROTA_COLUMNS.filter(rc => (rotaOS[rc.kanban] || []).length > 0).map(rc => {
             const osInRoute = rotaOS[rc.kanban] || [];
             const isExpanded = expandedRoutes.has(rc.kanban);
-            const dbRota = rotasDB.find(r => r.coluna_kanban === rc.kanban);
 
             return (
               <div key={rc.kanban} className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: `1px solid ${rc.borderCor}30` }}>
@@ -547,11 +546,6 @@ export default function GestaoRotas() {
                     <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: rc.cor + '20', color: rc.cor === '#1a1a1a' ? 'var(--text-secondary)' : rc.cor }}>
                       {osInRoute.length}
                     </span>
-                    {dbRota?.cidades && dbRota.cidades.length > 0 && (
-                      <span className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-                        {dbRota.cidades.join(', ')}
-                      </span>
-                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     {osInRoute.length > 0 && (
@@ -612,14 +606,16 @@ export default function GestaoRotas() {
                   </div>
                 )}
 
-                {isExpanded && osInRoute.length === 0 && (
-                  <div className="border-t p-4 text-center" style={{ borderColor: rc.borderCor + '20' }}>
-                    <p className="text-[11px]" style={{ color: 'var(--text-tertiary)' }}>Nenhuma OS nesta rota</p>
-                  </div>
-                )}
               </div>
             );
           })}
+          {ROTA_COLUMNS.every(rc => (rotaOS[rc.kanban] || []).length === 0) && !loading && (
+            <div className="rounded-xl p-8 text-center" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+              <Navigation className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-secondary)' }} />
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS em rota</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Mova OS da coluna "Peca Disponivel" para uma rota</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
