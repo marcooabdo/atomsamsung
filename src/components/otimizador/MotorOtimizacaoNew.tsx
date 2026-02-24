@@ -359,273 +359,290 @@ export default function MotorOtimizacaoNew() {
     const almocoMin = timeToMinutes(horarioAlmoco);
     const almocoFimMin = almocoMin + duracaoAlmoco;
 
-    // Determinar quais dias têm pernoite (dias que não são o último)
+    // ---------------------------------------------------------------
+    // Helpers para inserir deslocamento com almoço embutido
+    // Dado: posição atual (curMin), destino (destMin), km total do trecho
+    // Retorna: eventos gerados + novo currentMin + almocoAdded atualizado
+    // ---------------------------------------------------------------
+    function pushDeslocamento(
+      eventos: DiaItinerario['eventos'],
+      curMin: number,
+      destMin: number,
+      travelKm: number,
+      almocoAdded: boolean,
+      kmDia: { v: number }
+    ): { newMin: number; almocoAdded: boolean } {
+      const travelMin = Math.max(0, destMin - curMin);
+      if (travelMin === 0) return { newMin: curMin, almocoAdded };
+
+      let localAlmoco = almocoAdded;
+
+      // Precisamos atravessar o horário de almoço durante este trecho?
+      if (!localAlmoco && curMin < almocoMin && destMin > almocoMin) {
+        const minAntes = almocoMin - curMin;
+        const fracAntes = travelMin > 0 ? minAntes / travelMin : 0;
+        const kmAntes = Math.round(travelKm * fracAntes * 10) / 10;
+
+        // Trecho antes do almoço
+        if (minAntes > 0) {
+          eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(curMin),
+            horario_fim: minutesToTime(almocoMin),
+            descricao: 'Em Deslocamento',
+            distancia_km: kmAntes,
+            duracao_min: minAntes,
+          });
+          kmDia.v += kmAntes;
+        }
+
+        // Almoço
+        eventos.push({
+          tipo: 'almoco',
+          horario_inicio: minutesToTime(almocoMin),
+          horario_fim: minutesToTime(almocoFimMin),
+          descricao: 'Pausa para Almoco',
+          duracao_min: duracaoAlmoco,
+        });
+        localAlmoco = true;
+
+        // Trecho após almoço até destino
+        const minDepois = destMin - almocoFimMin;
+        const kmDepois = Math.round(travelKm * (1 - fracAntes) * 10) / 10;
+        if (minDepois > 0) {
+          eventos.push({
+            tipo: 'deslocamento',
+            horario_inicio: minutesToTime(almocoFimMin),
+            horario_fim: minutesToTime(destMin),
+            descricao: 'Em Deslocamento',
+            distancia_km: kmDepois,
+            duracao_min: minDepois,
+          });
+          kmDia.v += kmDepois;
+        }
+      } else {
+        // Sem almoço no meio — mas marcar se já passamos do horário
+        if (!localAlmoco && curMin >= almocoMin) localAlmoco = true;
+        eventos.push({
+          tipo: 'deslocamento',
+          horario_inicio: minutesToTime(curMin),
+          horario_fim: minutesToTime(destMin),
+          descricao: 'Em Deslocamento',
+          distancia_km: Math.round(travelKm * 10) / 10,
+          duracao_min: travelMin,
+        });
+        kmDia.v += travelKm;
+      }
+
+      return { newMin: destMin, almocoAdded: localAlmoco };
+    }
+
+    // ---------------------------------------------------------------
+    // Fase 1: dias com atendimentos
+    // ---------------------------------------------------------------
     const ultimoDiaComParada = Math.max(...paradasList.map(p => p.dia));
 
-    // Calcular retorno à base partindo do último atendimento
+    // Calcular retorno à base total (km e minutos)
     const lastParadaGlobal = paradasList[paradasList.length - 1];
-    const retornoKmTotal = haversineDistance(
+    const retornoKmTotal = Math.round(haversineDistance(
       { lat: lastParadaGlobal.os.lat, lng: lastParadaGlobal.os.lng }, baseCoords
-    ) * 1.3;
+    ) * 1.3 * 10) / 10;
     const retornoMinTotal = estimateDriveTime(retornoKmTotal, 60);
 
-    // Calcular quantos dias extras o retorno precisa
-    const retornoStartMin = timeToMinutes(lastParadaGlobal.horario_saida);
-    let retMinRestante = retornoMinTotal;
-    let retCurrentMin = retornoStartMin;
-    let retornoDiasExtras = 0;
+    type DiaData = { eventos: DiaItinerario['eventos']; kmDia: number; atendimentos: number };
+    const diasMap: Record<number, DiaData> = {};
+    let currentMinUltimoDia = inicioMin; // rastreia onde o técnico terminou no último dia
 
-    // Simular o percurso de retorno dia a dia
-    while (retMinRestante > 0) {
-      const disponivel = fimMin - retCurrentMin;
-      if (disponivel <= 0) {
-        retornoDiasExtras++;
-        retCurrentMin = inicioMin;
-        continue;
-      }
-      if (retMinRestante <= disponivel) {
-        retMinRestante = 0;
-      } else {
-        retMinRestante -= disponivel;
-        retornoDiasExtras++;
-        retCurrentMin = inicioMin;
-      }
-    }
-
-    const totalDias = ultimoDiaComParada + retornoDiasExtras;
-
-    const diasMap: Record<number, { eventos: DiaItinerario['eventos']; kmDia: number; atendimentos: number; isPernoite: boolean }> = {};
-    for (let d = 1; d <= totalDias; d++) {
-      diasMap[d] = { eventos: [], kmDia: 0, atendimentos: 0, isPernoite: d < totalDias };
-    }
-
-    // Preencher dias com atendimentos
     for (let d = 1; d <= ultimoDiaComParada; d++) {
       const paradasDia = paradasList.filter(p => p.dia === d);
-      const isPernoite = d < totalDias;
+      const eventos: DiaItinerario['eventos'] = [];
+      const kmDia = { v: 0 };
+      let atendimentos = 0;
+      let currentMin = inicioMin;
+      let almocoAdded = false;
 
-      // Cabeçalho do dia: Saida da Base (dia 1) ou Continua Deslocamento (dias com pernoite anterior)
+      // Cabeçalho do dia
       if (d === 1) {
-        diasMap[d].eventos.push({
+        eventos.push({
           tipo: 'saida_base',
-          horario_inicio: horarioInicio,
-          horario_fim: horarioInicio,
+          horario_inicio: minutesToTime(inicioMin),
+          horario_fim: minutesToTime(inicioMin),
           descricao: 'Saida da base',
         });
       } else {
-        diasMap[d].eventos.push({
+        eventos.push({
           tipo: 'continua_deslocamento',
-          horario_inicio: horarioInicio,
-          horario_fim: horarioInicio,
+          horario_inicio: minutesToTime(inicioMin),
+          horario_fim: minutesToTime(inicioMin),
           descricao: 'Continua deslocamento do hotel',
         });
       }
 
-      let currentMin = inicioMin;
-      let almocoAdded = false;
+      // Dias de trânsito (sem atendimentos) — o técnico percorre o dia inteiro em direção ao destino
+      if (paradasDia.length === 0) {
+        const kmDiaTransito = Math.round(retornoKmTotal * ((fimMin - inicioMin) / Math.max(retornoMinTotal, 1)) * 10) / 10;
+        const r = pushDeslocamento(eventos, inicioMin, fimMin, kmDiaTransito, almocoAdded, kmDia);
+        almocoAdded = r.almocoAdded;
+        currentMin = fimMin;
+      }
 
+      // Processar cada parada do dia
       for (const parada of paradasDia) {
         const chegadaMin = timeToMinutes(parada.horario_chegada);
         const saidaMin = timeToMinutes(parada.horario_saida);
-        const travelMin = Math.max(0, chegadaMin - currentMin);
         const travelKm = parada.distancia_km;
 
-        if (!almocoAdded && currentMin < almocoMin && chegadaMin >= almocoMin) {
-          const driveBeforeLunch = almocoMin - currentMin;
-          const frac = travelMin > 0 ? driveBeforeLunch / travelMin : 0;
-          diasMap[d].eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(currentMin),
-            horario_fim: horarioAlmoco,
-            descricao: 'Em Deslocamento',
-            distancia_km: Math.round(travelKm * frac * 10) / 10,
-            duracao_min: driveBeforeLunch,
-          });
-          diasMap[d].eventos.push({
-            tipo: 'almoco',
-            horario_inicio: horarioAlmoco,
-            horario_fim: minutesToTime(almocoFimMin),
-            descricao: 'Pausa para Almoco',
-            duracao_min: duracaoAlmoco,
-          });
-          almocoAdded = true;
-          const afterLunch = chegadaMin - almocoFimMin;
-          if (afterLunch > 0) {
-            diasMap[d].eventos.push({
-              tipo: 'deslocamento',
-              horario_inicio: minutesToTime(almocoFimMin),
-              horario_fim: parada.horario_chegada,
-              descricao: 'Em Deslocamento',
-              distancia_km: Math.round(travelKm * (1 - frac) * 10) / 10,
-              duracao_min: afterLunch,
-            });
-          }
-        } else {
-          if (!almocoAdded && currentMin >= almocoMin) almocoAdded = true;
-          if (travelMin > 0) {
-            diasMap[d].eventos.push({
-              tipo: 'deslocamento',
-              horario_inicio: minutesToTime(currentMin),
-              horario_fim: parada.horario_chegada,
-              descricao: 'Em Deslocamento',
-              distancia_km: travelKm,
-              duracao_min: travelMin,
-            });
-          }
-        }
+        // Deslocamento até esta parada (com almoço embutido se necessário)
+        const r = pushDeslocamento(eventos, currentMin, chegadaMin, travelKm, almocoAdded, kmDia);
+        almocoAdded = r.almocoAdded;
+        currentMin = r.newMin;
 
-        diasMap[d].kmDia += travelKm;
-
-        diasMap[d].eventos.push({
+        // Atendimento
+        eventos.push({
           tipo: 'atendimento',
-          horario_inicio: parada.horario_chegada,
-          horario_fim: parada.horario_saida,
+          horario_inicio: minutesToTime(chegadaMin),
+          horario_fim: minutesToTime(saidaMin),
           descricao: `OS ${parada.os.numero_os} - ${parada.os.cliente_nome}`,
           os: parada.os,
           parada,
         });
-        diasMap[d].atendimentos++;
+        atendimentos++;
         currentMin = saidaMin;
+        if (!almocoAdded && currentMin >= almocoMin) almocoAdded = true;
       }
 
-      if (isPernoite) {
-        // Após atendimentos, técnico continua se deslocando até 18h antes do pernoite
-        const tempoAtePernoite = fimMin - currentMin;
-        if (tempoAtePernoite > 0 && d === ultimoDiaComParada) {
-          // No último dia com atendimento: continua em direção à base
-          const fracKm = retornoKmTotal > 0 ? (tempoAtePernoite / retornoMinTotal) : 0;
-          diasMap[d].eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(currentMin),
-            horario_fim: horarioFim,
-            descricao: 'Em Deslocamento (retorno)',
-            distancia_km: Math.round(retornoKmTotal * fracKm * 10) / 10,
-            duracao_min: tempoAtePernoite,
-          });
-          diasMap[d].kmDia += retornoKmTotal * fracKm;
-        } else if (tempoAtePernoite > 0 && paradasDia.length === 0) {
-          // Dia de trânsito puro (sem atendimento): rodando em direção ao destino
-          const diaRelativo = d - 1;
-          const fracao = totalDias > 1 ? diaRelativo / (totalDias - 1) : 0.5;
-          const kmDiaEstimado = retornoKmTotal * (tempoAtePernoite / retornoMinTotal);
-          diasMap[d].eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: horarioInicio,
-            horario_fim: horarioFim,
-            descricao: 'Em Deslocamento',
-            distancia_km: Math.round(kmDiaEstimado * 10) / 10,
-            duracao_min: tempoAtePernoite,
-          });
-          diasMap[d].kmDia += kmDiaEstimado;
-          void fracao;
-        }
+      const isUltimoDiaAtend = d === ultimoDiaComParada;
+      const tempoRestante = fimMin - currentMin;
 
-        diasMap[d].eventos.push({
+      if (isUltimoDiaAtend) {
+        // Último dia com atendimentos: adicionar retorno à base a partir de currentMin
+        const retornoEndMin = currentMin + retornoMinTotal;
+
+        if (retornoEndMin <= fimMin) {
+          // Retorno cabe inteiramente neste dia
+          const r = pushDeslocamento(eventos, currentMin, retornoEndMin, retornoKmTotal, almocoAdded, kmDia);
+          almocoAdded = r.almocoAdded;
+          // Marcar o último segmento como retorno_base
+          for (let i = eventos.length - 1; i >= 0; i--) {
+            if (eventos[i].tipo === 'deslocamento') {
+              eventos[i].tipo = 'retorno_base';
+              eventos[i].descricao = 'Retorno a base';
+              break;
+            }
+          }
+        } else if (tempoRestante > 0) {
+          // Retorno não cabe: percorre até 18h e pernoita
+          const fracRetorno = tempoRestante / Math.max(retornoMinTotal, 1);
+          const kmInicioRetorno = Math.round(retornoKmTotal * fracRetorno * 10) / 10;
+          const r = pushDeslocamento(eventos, currentMin, fimMin, kmInicioRetorno, almocoAdded, kmDia);
+          almocoAdded = r.almocoAdded;
+          eventos.push({
+            tipo: 'pernoite',
+            horario_inicio: minutesToTime(fimMin),
+            horario_fim: minutesToTime(fimMin),
+            descricao: 'Pernoite na regiao',
+          });
+        } else {
+          // Sem tempo restante: apenas pernoite
+          eventos.push({
+            tipo: 'pernoite',
+            horario_inicio: minutesToTime(fimMin),
+            horario_fim: minutesToTime(fimMin),
+            descricao: 'Pernoite na regiao',
+          });
+        }
+      } else {
+        // Dias intermediários: se há tempo restante, continua rodando em direção ao próximo destino
+        if (tempoRestante > 0) {
+          const kmEsteSegmento = Math.round(retornoKmTotal * (tempoRestante / Math.max(retornoMinTotal, 1)) * 10) / 10;
+          const r = pushDeslocamento(eventos, currentMin, fimMin, kmEsteSegmento, almocoAdded, kmDia);
+          almocoAdded = r.almocoAdded;
+        }
+        eventos.push({
           tipo: 'pernoite',
-          horario_inicio: horarioFim,
-          horario_fim: horarioFim,
+          horario_inicio: minutesToTime(fimMin),
+          horario_fim: minutesToTime(fimMin),
           descricao: 'Pernoite na regiao',
         });
       }
+      void almocoAdded;
+
+      if (isUltimoDiaAtend) currentMinUltimoDia = currentMin;
+      diasMap[d] = { eventos, kmDia: Math.round(kmDia.v * 10) / 10, atendimentos };
     }
 
-    // Gerar dias de retorno à base
-    if (retornoDiasExtras > 0 || ultimoDiaComParada === totalDias) {
-      // Calcular distribuição km/dia para o retorno
-      let retMinRestante2 = retornoMinTotal;
-      let retCurrentMin2 = retornoStartMin;
-      let kmJaPercorrido = 0;
+    // ---------------------------------------------------------------
+    // Fase 2: dias de retorno (quando retorno não coube no último dia de atendimento)
+    // ---------------------------------------------------------------
+    // currentMinUltimoDia é onde o técnico parou no último dia (após atendimentos)
+    // O retorno começa a partir daqui; se ele já foi iniciado na Fase 1, desconta
+    const minPercorridosUltimoDia = Math.max(0, fimMin - currentMinUltimoDia);
+    const retornoFitUltimoDia = (currentMinUltimoDia + retornoMinTotal) <= fimMin;
 
-      for (let extra = 0; extra < retornoDiasExtras + 1; extra++) {
-        const diaAtual = ultimoDiaComParada + extra;
-        if (diaAtual > totalDias) break;
+    if (!retornoFitUltimoDia && currentMinUltimoDia < fimMin) {
+      // Minutos de retorno já percorridos no último dia
+      const fracPercorrida = minPercorridosUltimoDia / Math.max(retornoMinTotal, 1);
+      let retMinRestante = retornoMinTotal - minPercorridosUltimoDia;
+      let retKmRestante = Math.round(retornoKmTotal * (1 - fracPercorrida) * 10) / 10;
+      let diaRetorno = ultimoDiaComParada + 1;
 
-        const isUltimoDiaRetorno = extra === retornoDiasExtras;
-        const startMin = extra === 0 ? retornoStartMin : inicioMin;
-        const disponivel = fimMin - (extra === 0 ? retornoStartMin : inicioMin);
+      while (retMinRestante > 0) {
+        const eventos: DiaItinerario['eventos'] = [];
+        const kmDia = { v: 0 };
+        let almocoAdded = false;
 
-        if (extra === 0 && retornoDiasExtras === 0) {
-          // Retorno cabe no mesmo dia do último atendimento
-          diasMap[diaAtual].eventos.push({
-            tipo: 'retorno_base',
-            horario_inicio: lastParadaGlobal.horario_saida,
-            horario_fim: minutesToTime(retornoStartMin + retornoMinTotal),
-            descricao: 'Retorno a base',
-            distancia_km: Math.round(retornoKmTotal * 10) / 10,
-            duracao_min: retornoMinTotal,
-          });
-          diasMap[diaAtual].kmDia += retornoKmTotal;
-          break;
-        }
+        eventos.push({
+          tipo: 'continua_deslocamento',
+          horario_inicio: minutesToTime(inicioMin),
+          horario_fim: minutesToTime(inicioMin),
+          descricao: 'Continua retorno a base',
+        });
 
-        if (extra > 0) {
-          // Dia de retorno: começa com "Continua Deslocamento"
-          diasMap[diaAtual] = { eventos: [], kmDia: 0, atendimentos: 0, isPernoite: !isUltimoDiaRetorno };
-          diasMap[diaAtual].eventos.push({
-            tipo: 'continua_deslocamento',
-            horario_inicio: horarioInicio,
-            horario_fim: horarioInicio,
-            descricao: 'Continua retorno a base',
-          });
-        }
-
-        const minNesteDia = Math.min(retMinRestante2, disponivel);
-        const fracKm = retornoMinTotal > 0 ? minNesteDia / retornoMinTotal : 0;
-        const kmNesteDia = retornoKmTotal * fracKm;
-        const endMin = (extra === 0 ? retornoStartMin : inicioMin) + minNesteDia;
+        const disponivelMin = fimMin - inicioMin;
+        const minNesteDia = Math.min(retMinRestante, disponivelMin);
+        const fracNesteDia = minNesteDia / Math.max(retornoMinTotal, 1);
+        const kmNesteDia = Math.round(retornoKmTotal * fracNesteDia * 10) / 10;
+        const endMinRetorno = inicioMin + minNesteDia;
+        const isUltimoDiaRetorno = retMinRestante <= disponivelMin;
 
         if (isUltimoDiaRetorno) {
-          diasMap[diaAtual].eventos.push({
-            tipo: 'retorno_base',
-            horario_inicio: minutesToTime(extra === 0 ? retornoStartMin : inicioMin),
-            horario_fim: minutesToTime(endMin),
-            descricao: 'Retorno a base',
-            distancia_km: Math.round(kmNesteDia * 10) / 10,
-            duracao_min: minNesteDia,
-          });
+          // Chega na base neste dia
+          const r = pushDeslocamento(eventos, inicioMin, endMinRetorno, kmNesteDia, almocoAdded, kmDia);
+          almocoAdded = r.almocoAdded;
+          const lastEvt = eventos[eventos.length - 1];
+          if (lastEvt.tipo === 'deslocamento') {
+            lastEvt.tipo = 'retorno_base';
+            lastEvt.descricao = 'Retorno a base';
+          }
         } else {
-          diasMap[diaAtual].eventos.push({
-            tipo: 'deslocamento',
-            horario_inicio: minutesToTime(extra === 0 ? retornoStartMin : inicioMin),
-            horario_fim: horarioFim,
-            descricao: 'Em Deslocamento (retorno a base)',
-            distancia_km: Math.round(kmNesteDia * 10) / 10,
-            duracao_min: minNesteDia,
-          });
-          diasMap[diaAtual].eventos.push({
+          // Mais um dia de trânsito
+          const r = pushDeslocamento(eventos, inicioMin, fimMin, kmNesteDia, almocoAdded, kmDia);
+          almocoAdded = r.almocoAdded;
+          eventos.push({
             tipo: 'pernoite',
-            horario_inicio: horarioFim,
-            horario_fim: horarioFim,
+            horario_inicio: minutesToTime(fimMin),
+            horario_fim: minutesToTime(fimMin),
             descricao: 'Pernoite na regiao',
           });
         }
 
-        diasMap[diaAtual].kmDia += kmNesteDia;
-        kmJaPercorrido += kmNesteDia;
-        retMinRestante2 -= minNesteDia;
-        retCurrentMin2 = inicioMin;
-        void startMin;
-        void retCurrentMin2;
+        diasMap[diaRetorno] = { eventos, kmDia: Math.round(kmDia.v * 10) / 10, atendimentos: 0 };
+        retMinRestante -= minNesteDia;
+        retKmRestante = Math.round((retKmRestante - kmNesteDia) * 10) / 10;
+        diaRetorno++;
+        void retKmRestante;
       }
-    } else {
-      // Retorno cabe no último dia com atendimento (sem dias extras)
-      diasMap[ultimoDiaComParada].eventos.push({
-        tipo: 'retorno_base',
-        horario_inicio: lastParadaGlobal.horario_saida,
-        horario_fim: minutesToTime(retornoStartMin + retornoMinTotal),
-        descricao: 'Retorno a base',
-        distancia_km: Math.round(retornoKmTotal * 10) / 10,
-        duracao_min: retornoMinTotal,
-      });
-      diasMap[ultimoDiaComParada].kmDia += retornoKmTotal;
     }
 
+    // ---------------------------------------------------------------
+    // Montar resultado final
+    // ---------------------------------------------------------------
     const diasKeys = Object.keys(diasMap).map(Number).sort((a, b) => a - b);
     const dias: DiaItinerario[] = diasKeys.map((d, idx) => ({
       dia: idx + 1,
       data: formatDateBR(addDaysToDate(dataBase, d - 1)),
       eventos: diasMap[d].eventos,
-      km_total: Math.round(diasMap[d].kmDia * 10) / 10,
+      km_total: diasMap[d].kmDia,
       atendimentos: diasMap[d].atendimentos,
     }));
 
@@ -1841,26 +1858,41 @@ export default function MotorOtimizacaoNew() {
                                 </>
                               )}
 
-                              {evento.tipo === 'almoco' && evento.duracao_min && (
+                              {evento.tipo === 'almoco' && (
+                                <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3" />
+                                    {evento.horario_inicio} ate {evento.horario_fim}
+                                  </span>
+                                  {evento.duracao_min && (
+                                    <span>{formatDuration(evento.duracao_min)}</span>
+                                  )}
+                                </div>
+                              )}
+
+                              {evento.tipo === 'pernoite' && (
                                 <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                                  Duracao: {formatDuration(evento.duracao_min)}
+                                  Para no hotel as {evento.horario_inicio} — retoma as {horarioInicio} do dia seguinte
                                 </p>
                               )}
 
                               {evento.tipo === 'retorno_base' && (
                                 <div className="flex items-center gap-3 mt-1 text-xs" style={{ color: 'var(--text-secondary)' }}>
-                                  {evento.distancia_km && (
+                                  {evento.distancia_km && evento.distancia_km > 0 && (
                                     <span className="flex items-center gap-1">
                                       <MapPin className="w-3 h-3" />
                                       {evento.distancia_km} km
                                     </span>
                                   )}
-                                  {evento.duracao_min && (
+                                  {evento.duracao_min && evento.duracao_min > 0 && (
                                     <span className="flex items-center gap-1">
                                       <Clock className="w-3 h-3" />
                                       {formatDuration(evento.duracao_min)}
                                     </span>
                                   )}
+                                  <span className="flex items-center gap-1">
+                                    Chega na base: {evento.horario_fim}
+                                  </span>
                                 </div>
                               )}
                             </div>
