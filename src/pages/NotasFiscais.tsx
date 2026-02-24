@@ -128,6 +128,7 @@ export function NotasFiscais() {
   const [retryNota, setRetryNota] = useState<NotaFiscal | null>(null);
   const [emittingId, setEmittingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
+  const [showPayload, setShowPayload] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -895,7 +896,7 @@ export function NotasFiscais() {
                 </div>
               </div>
               <button
-                onClick={() => setNotaDetalhes(null)}
+                onClick={() => { setNotaDetalhes(null); setShowPayload(false); }}
                 className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors"
               >
                 <XCircle className="w-5 h-5 text-[#00D4FF]" />
@@ -1078,6 +1079,54 @@ export function NotasFiscais() {
               {notaDetalhes.tentativas && notaDetalhes.tentativas > 0 && (
                 <div className="text-xs text-gray-500">
                   Tentativas de emissao: {notaDetalhes.tentativas}
+                </div>
+              )}
+
+              {/* Payload JSON */}
+              {notaDetalhes.payload_json && (
+                <div>
+                  <button
+                    onClick={() => setShowPayload(v => !v)}
+                    className="flex items-center gap-2 w-full text-left group"
+                  >
+                    <h3 className="text-sm font-bold text-[#00D4FF] uppercase">Payload JSON</h3>
+                    <span
+                      className="text-xs px-2 py-0.5 rounded font-mono transition-colors"
+                      style={{
+                        backgroundColor: showPayload ? '#00D4FF20' : '#ffffff10',
+                        border: '1px solid',
+                        borderColor: showPayload ? '#00D4FF60' : '#ffffff20',
+                        color: showPayload ? '#00D4FF' : '#9CA3AF'
+                      }}
+                    >
+                      {showPayload ? 'ocultar' : 'visualizar'}
+                    </span>
+                  </button>
+
+                  {showPayload && (
+                    <div className="mt-3 relative">
+                      <div
+                        className="rounded-lg p-4 overflow-auto max-h-80 text-xs font-mono leading-relaxed"
+                        style={{ backgroundColor: '#0a0a0a', border: '1px solid #ffffff15', color: '#a3e635' }}
+                      >
+                        <pre className="whitespace-pre-wrap break-words">
+                          {JSON.stringify(notaDetalhes.payload_json, null, 2)}
+                        </pre>
+                      </div>
+                      <button
+                        onClick={() => navigator.clipboard.writeText(JSON.stringify(notaDetalhes.payload_json, null, 2))}
+                        className="absolute top-2 right-2 text-xs px-2 py-1 rounded transition-colors"
+                        style={{
+                          backgroundColor: '#ffffff15',
+                          border: '1px solid #ffffff20',
+                          color: '#9CA3AF'
+                        }}
+                        title="Copiar"
+                      >
+                        Copiar
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
