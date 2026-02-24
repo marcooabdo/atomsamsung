@@ -120,6 +120,7 @@ export function Kanban() {
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | 'NA' | null>(null);
+  const [selectedOSTipoOrcamento, setSelectedOSTipoOrcamento] = useState<string | null>(null);
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [criarOSOW, setCriarOSOW] = useState(false);
   const [criarOSSCACC, setCriarOSSCACC] = useState(false);
@@ -2242,6 +2243,7 @@ export function Kanban() {
                             onClick={() => {
                               setSelectedOSId(os.id);
                               setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
+                              setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
                             }}
                             className="rounded-lg p-2 cursor-pointer group relative overflow-hidden"
                             style={{
@@ -2282,6 +2284,7 @@ export function Kanban() {
                           onClick={() => {
                             setSelectedOSId(os.id);
                             setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
+                            setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
                           }}
                           className="rounded-xl p-3 cursor-pointer group relative overflow-hidden"
                           style={{
@@ -3011,12 +3014,13 @@ export function Kanban() {
         </div>
       </div>
 
-      {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA') && (
+      {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA') && selectedOSTipoOrcamento !== 'samsung_contigo' && selectedOSTipoOrcamento !== 'acessorios' && (
         <OSModal
           osId={selectedOSId}
           onClose={() => {
             setSelectedOSId(null);
             setSelectedOSTipo(null);
+            setSelectedOSTipoOrcamento(null);
           }}
           onReload={loadKanbanData}
         />
@@ -3028,9 +3032,24 @@ export function Kanban() {
           onClose={() => {
             setSelectedOSId(null);
             setSelectedOSTipo(null);
+            setSelectedOSTipoOrcamento(null);
           }}
           onReload={loadKanbanData}
           mode="view"
+        />
+      )}
+
+      {selectedOSId && (selectedOSTipoOrcamento === 'samsung_contigo' || selectedOSTipoOrcamento === 'acessorios') && (
+        <OSLPModal
+          osId={selectedOSId}
+          onClose={() => {
+            setSelectedOSId(null);
+            setSelectedOSTipo(null);
+            setSelectedOSTipoOrcamento(null);
+          }}
+          onReload={loadKanbanData}
+          mode="view"
+          modoSCACC={true}
         />
       )}
 
