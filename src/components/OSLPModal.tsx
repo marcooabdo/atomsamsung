@@ -4462,7 +4462,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       )}
                       <div>
                         <label className="text-xs text-gray-500 uppercase">Tipo de Atendimento</label>
-                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1">
                           <span
                             className="px-3 py-1 rounded text-xs font-bold"
                             style={{
@@ -4483,32 +4483,25 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           >
                             {os.tipo_os}
                           </span>
-                          {(os.tipo_orcamento === 'samsung_contigo' || modoSCACC) && (
-                            <span
-                              className="px-3 py-1 rounded text-xs font-bold"
-                              style={{
-                                backgroundColor: '#FFA50030',
-                                color: '#FFA500',
-                                border: '1px solid #FFA50060'
-                              }}
-                            >
-                              Samsung Contigo
-                            </span>
-                          )}
-                          {os.tipo_orcamento === 'acessorios' && (
-                            <span
-                              className="px-3 py-1 rounded text-xs font-bold"
-                              style={{
-                                backgroundColor: '#39FF1430',
-                                color: '#39FF14',
-                                border: '1px solid #39FF1460'
-                              }}
-                            >
-                              Acessórios
-                            </span>
-                          )}
                         </div>
                       </div>
+                      {(os.tipo_orcamento === 'samsung_contigo' || os.tipo_orcamento === 'acessorios') && (
+                        <div>
+                          <label className="text-xs text-gray-500 uppercase">Tipo de Orçamento</label>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span
+                              className="px-3 py-1 rounded text-xs font-bold"
+                              style={{
+                                backgroundColor: os.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' : '#39FF1430',
+                                color: os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14',
+                                border: `1px solid ${os.tipo_orcamento === 'samsung_contigo' ? '#FFA50060' : '#39FF1460'}`
+                              }}
+                            >
+                              {os.tipo_orcamento === 'samsung_contigo' ? 'Samsung Contigo' : 'Acessórios'}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
 
