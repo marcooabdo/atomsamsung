@@ -261,7 +261,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       return `- ${desc} (${qtd}x)`;
     }).join('\n');
 
-    const valorTotal = os.valor_total || 0;
+    const valorTotal = calcularValorFinal();
     const nomeCliente = os.cliente_nome?.split(' ')[0] || 'Cliente';
 
     return `Prezado(a) ${nomeCliente},
@@ -1302,7 +1302,7 @@ Assistencia Tecnica Samsung`;
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-gray-400 uppercase tracking-wider">Valor Total</span>
                   <span className="text-lg font-bold text-[#39FF14]">
-                    R$ {(os.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                    R$ {calcularValorFinal().toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
