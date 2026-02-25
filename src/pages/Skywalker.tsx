@@ -116,8 +116,16 @@ function RankingTab() {
   const { usuario } = useAuth();
   const [mesInicio, setMesInicio] = useState(mesReferencia.slice(0, 7));
   const [mesFim, setMesFim] = useState(mesReferencia.slice(0, 7));
+  const [filtroUnidade, setFiltroUnidade] = useState('all');
+  const [unidades, setUnidades] = useState<{ id: string; nome: string }[]>([]);
 
   const isPeriodo = mesInicio !== mesFim;
+
+  useEffect(() => {
+    supabase.from('unidades').select('id, nome').order('nome').then(({ data }) => {
+      if (data) setUnidades(data);
+    });
+  }, []);
 
   useEffect(() => {
     const inicio = mesInicio + '-01';
@@ -126,6 +134,10 @@ function RankingTab() {
       loadRanking(inicio, fim);
     }
   }, [mesInicio, mesFim]);
+
+  const rankingFiltrado = filtroUnidade === 'all'
+    ? ranking
+    : ranking.filter(r => r.unidade_nome === unidades.find(u => u.id === filtroUnidade)?.nome);
 
   const myRank = ranking.findIndex(r => r.usuario_id === usuario?.id) + 1;
 
@@ -172,6 +184,17 @@ function RankingTab() {
               style={{ color: 'var(--text-primary)', minWidth: 120 }}
             />
           </div>
+          <select
+            value={filtroUnidade}
+            onChange={(e) => setFiltroUnidade(e.target.value)}
+            className="rounded-lg px-3 py-2 text-sm"
+            style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="all">Todas as Unidades</option>
+            {unidades.map(u => (
+              <option key={u.id} value={u.id}>{u.nome}</option>
+            ))}
+          </select>
         </div>
       </div>
 
@@ -185,7 +208,7 @@ function RankingTab() {
               <div>
                 <p className="font-bold" style={{ color: 'var(--text-primary)' }}>Sua posicao no ranking</p>
                 <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                  {ranking[myRank - 1]?.estrelas_total || 0} estrelas {isPeriodo ? 'no periodo' : 'este mes'}
+                  {rankingFiltrado[myRank - 1]?.estrelas_total || 0} estrelas {isPeriodo ? 'no periodo' : 'este mes'}
                 </p>
               </div>
             </div>
@@ -196,7 +219,7 @@ function RankingTab() {
         </div>
       )}
 
-      {ranking.length >= 3 && (
+      {rankingFiltrado.length >= 3 && (
         <div className="rounded-2xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-end justify-center gap-3">
             {[
@@ -204,7 +227,7 @@ function RankingTab() {
               { rankIdx: 0, pos: 1, color: '#FFD700', barHeight: 120, avatarSize: 'w-18 h-18', avatarText: 'text-xl', crown: '👑' },
               { rankIdx: 2, pos: 3, color: '#CD7F32', barHeight: 60, avatarSize: 'w-13 h-13', avatarText: 'text-sm', crown: '🥉' },
             ].map(({ rankIdx, pos, color, barHeight, crown }) => {
-              const r = ranking[rankIdx];
+              const r = rankingFiltrado[rankIdx];
               if (!r) return null;
               const isFirst = pos === 1;
               return (
@@ -258,7 +281,7 @@ function RankingTab() {
       )}
 
       <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-        {ranking.map((r, idx) => {
+        {rankingFiltrado.map((r, idx) => {
           const isMe = r.usuario_id === usuario?.id;
           return (
             <div
@@ -302,7 +325,7 @@ function RankingTab() {
             </div>
           );
         })}
-        {ranking.length === 0 && (
+        {rankingFiltrado.length === 0 && (
           <div className="text-center py-16">
             <Trophy className="w-12 h-12 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-secondary)' }} />
             <p style={{ color: 'var(--text-secondary)' }}>Nenhum profissional no ranking deste mês</p>
