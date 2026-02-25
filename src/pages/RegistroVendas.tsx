@@ -82,7 +82,8 @@ export function RegistroVendas() {
     busca: '',
     status: 'all',
     tipo_venda: 'all',
-    vendedor_id: 'all'
+    vendedor_id: 'all',
+    unidade_id: 'all'
   });
 
   const [formData, setFormData] = useState({
@@ -442,6 +443,7 @@ export function RegistroVendas() {
     if (filtros.status !== 'all' && v.status !== filtros.status) return false;
     if (filtros.tipo_venda !== 'all' && v.tipo_venda !== filtros.tipo_venda) return false;
     if (filtros.vendedor_id !== 'all' && v.vendedor_id !== filtros.vendedor_id) return false;
+    if (filtros.unidade_id !== 'all' && v.unidade_id !== filtros.unidade_id) return false;
     return true;
   });
 
@@ -561,7 +563,7 @@ export function RegistroVendas() {
           <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
             <input
@@ -606,6 +608,18 @@ export function RegistroVendas() {
           >
             <option value="all">Todos os Vendedores</option>
             {usuarios.map(u => (
+              <option key={u.id} value={u.id}>{u.nome}</option>
+            ))}
+          </select>
+
+          <select
+            value={filtros.unidade_id}
+            onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
+            className="rounded-lg px-3 py-2 text-sm"
+            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+          >
+            <option value="all">Todas as Unidades</option>
+            {unidades.map(u => (
               <option key={u.id} value={u.id}>{u.nome}</option>
             ))}
           </select>
