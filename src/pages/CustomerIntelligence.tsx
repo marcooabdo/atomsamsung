@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import {
   Zap, Building2, ChevronDown, Calendar, RefreshCw,
-  BarChart3, Users, TrendingUp, Package, Download, Printer
+  BarChart3, Users, TrendingUp, Package, Download, Printer, LayoutGrid
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -12,8 +12,9 @@ import CIDashboardTab from '../components/ci/CIDashboardTab';
 import CICarteiraTab from '../components/ci/CICarteiraTab';
 import CIPerformanceTab from '../components/ci/CIPerformanceTab';
 import CIProdutosTab from '../components/ci/CIProdutosTab';
+import CIVendedoresTab from '../components/ci/CIVendedoresTab';
 
-type Tab = 'dashboard' | 'carteira' | 'vendedores' | 'produtos';
+type Tab = 'dashboard' | 'carteira' | 'vendedores' | 'produtos' | 'categorias';
 
 export default function CustomerIntelligence() {
   const { usuario } = useAuth();
@@ -226,6 +227,7 @@ export default function CustomerIntelligence() {
             { id: 'dashboard' as Tab, label: 'Dashboard', icon: BarChart3 },
             { id: 'carteira' as Tab, label: carteiraLabel, icon: Users },
             { id: 'vendedores' as Tab, label: 'Performance', icon: TrendingUp },
+            { id: 'categorias' as Tab, label: 'Vendedores', icon: LayoutGrid },
             { id: 'produtos' as Tab, label: 'Produtos', icon: Package }
           ]).map(tab => (
             <button
@@ -266,6 +268,15 @@ export default function CustomerIntelligence() {
 
         {activeTab === 'vendedores' && (
           <CIPerformanceTab vendedores={filteredVendedores} />
+        )}
+
+        {activeTab === 'categorias' && (
+          <CIVendedoresTab
+            usuarioUnidadeId={usuario?.unidade_id || null}
+            isGerente={isGerente}
+            selectedUnidade={selectedUnidade}
+            periodoFiltro={periodoFiltro}
+          />
         )}
 
         {activeTab === 'produtos' && (
