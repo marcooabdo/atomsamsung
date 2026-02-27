@@ -208,68 +208,85 @@ export function EmitirNFSeModal({
 
   const buildPayload = () => {
     const now = new Date();
-    const isCpf = form.tomadorDocumento.length <= 11;
+    const tzOffset = -3 * 60;
+    const localDate = new Date(now.getTime() + (tzOffset - now.getTimezoneOffset()) * 60000);
+    const dhEmi = localDate.toISOString().replace('Z', '-03:00');
+    const dCompet = localDate.toISOString().split('T')[0];
+
+    const isCpf = form.tomadorDocumento.replace(/\D/g, '').length <= 11;
     const docKey = isCpf ? 'CPF' : 'CNPJ';
+
+    const aliquota = selectedConfig?.aliquota_iss || 0;
+    const vServ = parseFloat(form.valorServicos.toFixed(2));
+    const vTotTribMun = parseFloat((vServ * (aliquota / 100)).toFixed(2));
+    const vLiq = parseFloat((vServ + vTotTribMun).toFixed(2));
+
+    const toma: any = {
+      [docKey]: form.tomadorDocumento.replace(/\D/g, ''),
+      xNome: form.tomadorNome,
+      end: {
+        xLgr: form.tomadorLogradouro || 'NAO INFORMADO',
+        nro: form.tomadorNumero || 'S/N',
+        xBairro: form.tomadorBairro || 'NAO INFORMADO',
+        endNac: {
+          cMun: form.tomadorCidadeIbge || '0000000',
+          CEP: form.tomadorCep.replace(/\D/g, '') || '00000000'
+        }
+      }
+    };
+
+    if (form.tomadorEmail) {
+      toma.email = form.tomadorEmail;
+    }
+
+    const cServObj: any = {
+      cTribNac: form.cTribNac,
+      cTribMun: selectedConfig?.codigo_servico || '001',
+      xDescServ: form.descricaoServico || 'Prestacao de servicos',
+    };
+
+    if (form.cNBS) {
+      cServObj.cNBS = form.cNBS;
+    }
 
     const payload: any = {
       ambiente: form.ambiente === 1 ? 'producao' : 'homologacao',
       provedor: 'nacional',
       infDPS: {
         tpAmb: form.ambiente,
-        dhEmi: now.toISOString().replace('Z', '-03:00'),
-        dCompet: now.toISOString().split('T')[0],
+        dhEmi,
+        dCompet,
         prest: {
           CNPJ: (unidade?.cnpj || '').replace(/\D/g, '')
         },
-        toma: {
-          [docKey]: form.tomadorDocumento.replace(/\D/g, ''),
-          xNome: form.tomadorNome,
-          end: {
-            xLgr: form.tomadorLogradouro || 'NAO INFORMADO',
-            nro: form.tomadorNumero || 'S/N',
-            xBairro: form.tomadorBairro || 'NAO INFORMADO',
-            endNac: {
-              cMun: form.tomadorCidadeIbge || '0000000',
-              CEP: form.tomadorCep.replace(/\D/g, '') || '00000000',
-              ...(form.tomadorMunicipio ? { xMun: form.tomadorMunicipio } : {}),
-              ...(form.tomadorUF ? { UF: form.tomadorUF.toUpperCase().slice(0, 2) } : {})
-            }
-          }
-        },
+        toma,
         serv: {
           locPrest: {
             cLocPrestacao: form.cLocPrestacao
           },
-          cServ: {
-            cTribNac: form.cTribNac,
-            xDescServ: form.descricaoServico || 'Prestacao de servicos',
-            cNBS: form.cNBS
-          }
+          cServ: cServObj
         },
         valores: {
           vServPrest: {
-            vServ: form.valorServicos
+            vServ
           },
           trib: {
             tribMun: {
               tribISSQN: form.tribISSQN,
-              vLiq: form.valorServicos
+              tpRetISSQN: 1,
+              vLiq
             },
             totTrib: {
               vTotTrib: {
                 vTotTribFed: 0,
                 vTotTribEst: 0,
-                vTotTribMun: 0
+                vTotTribMun
               }
             }
           }
         }
       }
     };
-
-    if (form.tomadorEmail) {
-      payload.infDPS.toma.email = form.tomadorEmail;
-    }
 
     return payload;
   };
