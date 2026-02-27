@@ -21,6 +21,7 @@ interface NFConfig {
   codigo_servico: string | null;
   cnae: string | null;
   aliquota_iss: number;
+  iss_retido: boolean;
   observacoes_padrao: string | null;
 }
 
@@ -80,6 +81,7 @@ interface FormState {
   cNBS: string;
   cLocPrestacao: string;
   tribISSQN: number;
+  tpRetISSQN: number | null;
   observacoes: string;
 }
 
@@ -132,6 +134,7 @@ export function EmitirNFSeModal({
     cNBS: '',
     cLocPrestacao: '',
     tribISSQN: 1,
+    tpRetISSQN: null,
     observacoes: ''
   });
 
@@ -197,6 +200,7 @@ export function EmitirNFSeModal({
       cNBS: config.nfse_codigo_nbs || '',
       cLocPrestacao: config.nfse_codigo_municipio_prestacao || '',
       tribISSQN: config.nfse_trib_issqn || 1,
+      tpRetISSQN: config.iss_retido ? 1 : null,
       tomadorCidadeIbge: config.nfse_codigo_municipio_ibge || prev.tomadorCidadeIbge,
       descricaoServico: config.nfse_descricao_servico || prev.descricaoServico,
       observacoes: config.observacoes_padrao || prev.observacoes
@@ -241,9 +245,12 @@ export function EmitirNFSeModal({
 
     const cServObj: any = {
       cTribNac: form.cTribNac,
-      cTribMun: selectedConfig?.codigo_servico || '001',
       xDescServ: form.descricaoServico || 'Prestacao de servicos',
     };
+
+    if (selectedConfig?.codigo_servico) {
+      cServObj.cTribMun = selectedConfig.codigo_servico;
+    }
 
     if (form.cNBS) {
       cServObj.cNBS = form.cNBS;
@@ -273,7 +280,7 @@ export function EmitirNFSeModal({
           trib: {
             tribMun: {
               tribISSQN: form.tribISSQN,
-              tpRetISSQN: 1,
+              ...(form.tpRetISSQN !== null ? { tpRetISSQN: form.tpRetISSQN } : {}),
               vLiq
             },
             totTrib: {
@@ -663,6 +670,26 @@ export function EmitirNFSeModal({
                             <option value={3}>3 - Isencao</option>
                             <option value={4}>4 - Imunidade</option>
                           </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-[10px] text-gray-500 mb-1">tpRetISSQN</label>
+                          <select
+                            value={form.tpRetISSQN ?? ''}
+                            onChange={(e) => setForm(prev => ({ ...prev, tpRetISSQN: e.target.value === '' ? null : parseInt(e.target.value) }))}
+                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                          >
+                            <option value="">Nao enviar</option>
+                            <option value={1}>1 - Retencao pelo tomador</option>
+                            <option value={2}>2 - Retencao pelo intermediario</option>
+                            <option value={3}>3 - Retencao pelo prestador</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end pb-1">
+                          <p className="text-[10px] text-gray-500 leading-relaxed">
+                            ISS retido pelo tomador (alguns municipios exigem). Deixe em "Nao enviar" se o municipio nao reter ISS.
+                          </p>
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
