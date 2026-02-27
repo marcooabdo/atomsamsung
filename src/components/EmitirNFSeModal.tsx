@@ -82,6 +82,9 @@ interface FormState {
   cLocPrestacao: string;
   tribISSQN: number;
   tpRetISSQN: number | null;
+  modoTribMun: 'vLiq' | 'pAliq';
+  pAliq: number;
+  cLocIncid: string;
   observacoes: string;
 }
 
@@ -135,6 +138,9 @@ export function EmitirNFSeModal({
     cLocPrestacao: '',
     tribISSQN: 1,
     tpRetISSQN: null,
+    modoTribMun: 'vLiq',
+    pAliq: 0,
+    cLocIncid: '',
     observacoes: ''
   });
 
@@ -224,6 +230,7 @@ export function EmitirNFSeModal({
     const vServ = parseFloat(form.valorServicos.toFixed(2));
     const vTotTribMun = parseFloat((vServ * (aliquota / 100)).toFixed(2));
     const vLiq = parseFloat((vServ + vTotTribMun).toFixed(2));
+    const pAliqEfetiva = form.pAliq > 0 ? form.pAliq : aliquota;
 
     const toma: any = {
       [docKey]: form.tomadorDocumento.replace(/\D/g, ''),
@@ -278,18 +285,27 @@ export function EmitirNFSeModal({
             vServ
           },
           trib: {
-            tribMun: {
-              tribISSQN: form.tribISSQN,
-              ...(form.tpRetISSQN !== null ? { tpRetISSQN: form.tpRetISSQN } : {}),
-              vLiq
-            },
-            totTrib: {
-              vTotTrib: {
-                vTotTribFed: 0,
-                vTotTribEst: 0,
-                vTotTribMun
+            tribMun: form.modoTribMun === 'pAliq'
+              ? {
+                  tribISSQN: form.tribISSQN,
+                  ...(form.tpRetISSQN !== null ? { tpRetISSQN: form.tpRetISSQN } : {}),
+                  pAliq: pAliqEfetiva,
+                  ...(form.cLocIncid ? { cLocIncid: form.cLocIncid } : {})
+                }
+              : {
+                  tribISSQN: form.tribISSQN,
+                  ...(form.tpRetISSQN !== null ? { tpRetISSQN: form.tpRetISSQN } : {}),
+                  vLiq
+                },
+            ...(form.modoTribMun === 'vLiq' ? {
+              totTrib: {
+                vTotTrib: {
+                  vTotTribFed: 0,
+                  vTotTribEst: 0,
+                  vTotTribMun
+                }
               }
-            }
+            } : {})
           }
         }
       }
@@ -724,6 +740,42 @@ export function EmitirNFSeModal({
                           placeholder="3170206"
                         />
                       </div>
+                      <div>
+                        <label className="block text-[10px] text-gray-500 mb-1">Modo Tributacao Municipal</label>
+                        <select
+                          value={form.modoTribMun}
+                          onChange={(e) => setForm(prev => ({ ...prev, modoTribMun: e.target.value as 'vLiq' | 'pAliq' }))}
+                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                        >
+                          <option value="vLiq">vLiq + totTrib (ex: Uberlandia)</option>
+                          <option value="pAliq">pAliq + cLocIncid (ex: Sao Paulo)</option>
+                        </select>
+                      </div>
+                      {form.modoTribMun === 'pAliq' && (
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">pAliq (%)</label>
+                            <input
+                              type="number"
+                              step="0.01"
+                              value={form.pAliq || ''}
+                              onChange={(e) => setForm(prev => ({ ...prev, pAliq: parseFloat(e.target.value) || 0 }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                              placeholder="5"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-gray-500 mb-1">cLocIncid (Municipio Incidencia)</label>
+                            <input
+                              type="text"
+                              value={form.cLocIncid}
+                              onChange={(e) => setForm(prev => ({ ...prev, cLocIncid: e.target.value }))}
+                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                              placeholder="3548708"
+                            />
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
