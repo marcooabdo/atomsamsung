@@ -38,11 +38,11 @@ interface LayoutProps {
 const allMenuItems = [
   { id: 'gia', permKey: 'menu_gia', label: 'GIA', icon: Sparkles, path: '/gia', glow: true },
   { id: 'mural-missoes', permKey: 'menu_gia', label: 'ATOM Command Center', icon: Target, path: '/mural-missoes', glow: true },
+  { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
   { id: 'dashboard', permKey: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', permKey: 'menu_chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
-  { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
   { id: 'otimizador', permKey: 'menu_otimizador', label: 'GIA Logistic', icon: Truck, path: '/otimizador' },
   { id: 'customer-intelligence', permKey: 'menu_ci', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },
   { id: 'registro-vendas', permKey: 'menu_vendas', label: 'Registro de Vendas', icon: ShoppingCart, path: '/registro-vendas' },
