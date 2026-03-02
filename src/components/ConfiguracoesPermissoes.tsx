@@ -9,18 +9,14 @@ import {
   ChevronDown,
   ChevronRight,
   LayoutDashboard,
-  Kanban,
   Calendar,
-  Route,
   Package,
   DollarSign,
   Receipt,
-  FileText,
   Brain,
   Rocket,
   MessageCircle,
   ShoppingCart,
-  MessageSquare,
   Settings,
   Filter,
   AlertTriangle,
@@ -28,16 +24,8 @@ import {
   Target,
   Radio,
   Layers,
-  Truck,
-  ClipboardList
+  Truck
 } from 'lucide-react';
-
-interface Permission {
-  recurso: string;
-  tipo_recurso: string;
-  habilitado: boolean;
-  descricao: string;
-}
 
 interface PerfilPermissions {
   [recurso: string]: boolean;
@@ -55,53 +43,33 @@ const PERFIS = [
   { id: 'atendente', label: 'Atendente', color: '#ec4899', desc: 'Atendimento ao cliente' }
 ];
 
-const MENU_ICONS: Record<string, any> = {
-  menu_gia: Sparkles,
-  menu_mural_missoes: Target,
-  menu_atom_connect: Radio,
-  menu_dashboard: LayoutDashboard,
-  menu_kanban: Layers,
-  menu_agendamento: Calendar,
-  menu_otimizador: Truck,
-  menu_estoque: Package,
-  menu_financeiro: DollarSign,
-  menu_nf: Receipt,
-  menu_cotacoes: ClipboardList,
-  menu_ci: Brain,
-  menu_skywalker: Rocket,
-  menu_chat: MessageCircle,
-  menu_vendas: ShoppingCart,
-  menu_configuracoes: Settings
-};
+interface MenuItem {
+  id: string;
+  label: string;
+  icon: any;
+  subItems?: { id: string; label: string }[];
+}
 
-const MENU_GROUPS = [
+const MENU_ITEMS: MenuItem[] = [
+  { id: 'menu_gia', label: 'GIA', icon: Sparkles },
+  { id: 'menu_mural_missoes', label: 'ATOM Command Center', icon: Target },
   {
-    title: 'Menus Principais',
-    type: 'menu',
-    items: [
-      { id: 'menu_gia', label: 'GIA' },
-      { id: 'menu_mural_missoes', label: 'ATOM Command Center' },
-      { id: 'menu_atom_connect', label: 'ATOM Connect' },
-      { id: 'menu_dashboard', label: 'Central ATOM' },
-      { id: 'menu_kanban', label: 'Pipeline Operacional' },
-      { id: 'menu_agendamento', label: 'Agendamento' },
-      { id: 'menu_estoque', label: 'Nucleo de Pecas' },
-      { id: 'menu_chat', label: 'QG de Comunicacao' },
-      { id: 'menu_otimizador', label: 'GIA Logistic' },
-      { id: 'menu_ci', label: 'Customer Intelligence' },
-      { id: 'menu_vendas', label: 'Registro de Vendas' },
-      { id: 'menu_skywalker', label: 'Skywalker' },
-      { id: 'menu_financeiro', label: 'ATOM Finance' },
-      { id: 'menu_nf', label: 'Notas Fiscais' },
-      { id: 'menu_cotacoes', label: 'OFS Gateway' },
-      { id: 'menu_configuracoes', label: 'ATOM Core Settings' }
+    id: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio,
+    subItems: [
+      { id: 'atom_connect_dashboard', label: 'Dashboard' },
+      { id: 'atom_connect_chat', label: 'Conversas' },
+      { id: 'atom_connect_kanban', label: 'Kanban' },
+      { id: 'atom_connect_automacao', label: 'Automacao' },
+      { id: 'atom_connect_marketing', label: 'Marketing' },
+      { id: 'atom_connect_config', label: 'Configuracoes' }
     ]
   },
+  { id: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard },
+  { id: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers },
+  { id: 'menu_agendamento', label: 'Agendamento', icon: Calendar },
   {
-    title: 'Submenus Estoque',
-    type: 'submenu',
-    parent: 'menu_estoque',
-    items: [
+    id: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package,
+    subItems: [
       { id: 'estoque_dashboard', label: 'Dashboard' },
       { id: 'estoque_geral', label: 'Estoque Geral' },
       { id: 'estoque_entrada', label: 'Entrada de NF' },
@@ -110,23 +78,10 @@ const MENU_GROUPS = [
       { id: 'estoque_mapa', label: 'Mapa do Estoque' }
     ]
   },
+  { id: 'menu_chat', label: 'QG de Comunicacao', icon: MessageCircle },
   {
-    title: 'Submenus Financeiro',
-    type: 'submenu',
-    parent: 'menu_financeiro',
-    items: [
-      { id: 'financeiro_dashboard', label: 'Dashboard' },
-      { id: 'financeiro_caixa', label: 'Caixa' },
-      { id: 'financeiro_lancamentos', label: 'Lancamentos' },
-      { id: 'financeiro_consumo', label: 'Consumo de Pecas' },
-      { id: 'financeiro_pendencias', label: 'Pendencias Samsung' }
-    ]
-  },
-  {
-    title: 'Submenus Otimizador',
-    type: 'submenu',
-    parent: 'menu_otimizador',
-    items: [
+    id: 'menu_otimizador', label: 'GIA Logistic', icon: Truck,
+    subItems: [
       { id: 'otimizador_dashboard', label: 'Dashboard Executivo' },
       { id: 'otimizador_motor', label: 'Motor de Otimizacao' },
       { id: 'otimizador_rotas', label: 'Gestao de Rotas' },
@@ -139,11 +94,32 @@ const MENU_GROUPS = [
       { id: 'otimizador_config', label: 'Configuracao' }
     ]
   },
+  { id: 'menu_ci', label: 'Customer Intelligence', icon: Brain },
+  { id: 'menu_vendas', label: 'Registro de Vendas', icon: ShoppingCart },
   {
-    title: 'Submenus Configuracoes',
-    type: 'submenu',
-    parent: 'menu_configuracoes',
-    items: [
+    id: 'menu_skywalker', label: 'Skywalker', icon: Rocket,
+    subItems: [
+      { id: 'skywalker_visao_geral', label: 'Visao Geral' },
+      { id: 'skywalker_times', label: 'Times' },
+      { id: 'skywalker_regras', label: 'Regras do Jogo' },
+      { id: 'skywalker_niveis', label: 'Niveis e Bonus' }
+    ]
+  },
+  {
+    id: 'menu_financeiro', label: 'ATOM Finance', icon: DollarSign,
+    subItems: [
+      { id: 'financeiro_dashboard', label: 'Dashboard' },
+      { id: 'financeiro_caixa', label: 'Caixa' },
+      { id: 'financeiro_lancamentos', label: 'Lancamentos' },
+      { id: 'financeiro_consumo', label: 'Consumo de Pecas' },
+      { id: 'financeiro_pendencias', label: 'Pendencias Samsung' }
+    ]
+  },
+  { id: 'menu_nf', label: 'Notas Fiscais', icon: Receipt },
+  { id: 'menu_cotacoes', label: 'OFS Gateway', icon: Filter },
+  {
+    id: 'menu_configuracoes', label: 'ATOM Core Settings', icon: Settings,
+    subItems: [
       { id: 'config_unidades', label: 'Unidades' },
       { id: 'config_usuarios', label: 'Usuarios' },
       { id: 'config_servicos', label: 'Servicos' },
@@ -155,37 +131,6 @@ const MENU_GROUPS = [
       { id: 'config_nf', label: 'Nota Fiscal' },
       { id: 'config_permissoes', label: 'Permissoes' }
     ]
-  },
-  {
-    title: 'Submenus Atom Connect',
-    type: 'submenu',
-    parent: 'menu_atom_connect',
-    items: [
-      { id: 'atom_connect_dashboard', label: 'Dashboard' },
-      { id: 'atom_connect_chat', label: 'Conversas' },
-      { id: 'atom_connect_kanban', label: 'Kanban' },
-      { id: 'atom_connect_automacao', label: 'Automacao' },
-      { id: 'atom_connect_marketing', label: 'Marketing' },
-      { id: 'atom_connect_config', label: 'Configuracoes' }
-    ]
-  },
-  {
-    title: 'Submenus Skywalker',
-    type: 'submenu',
-    parent: 'menu_skywalker',
-    items: [
-      { id: 'skywalker_visao_geral', label: 'Visao Geral' },
-      { id: 'skywalker_times', label: 'Times' },
-      { id: 'skywalker_regras', label: 'Regras do Jogo' },
-      { id: 'skywalker_niveis', label: 'Niveis e Bonus' }
-    ]
-  },
-  {
-    title: 'Filtros e Acoes',
-    type: 'filtro',
-    items: [
-      { id: 'filtrar_unidades', label: 'Pode filtrar outras unidades' }
-    ]
   }
 ];
 
@@ -194,8 +139,7 @@ export function ConfiguracoesPermissoes() {
   const [permissions, setPermissions] = useState<PerfilPermissions>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set(['Menus Principais']));
-  const [hasChanges, setHasChanges] = useState(false);
+  const [expandedMenus, setExpandedMenus] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadPermissions(selectedPerfil);
@@ -246,24 +190,62 @@ export function ConfiguracoesPermissoes() {
     }
   };
 
-  const toggleGroup = (title: string) => {
-    setExpandedGroups(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(title)) {
-        newSet.delete(title);
+  const toggleExpand = (menuId: string) => {
+    setExpandedMenus(prev => {
+      const next = new Set(prev);
+      if (next.has(menuId)) {
+        next.delete(menuId);
       } else {
-        newSet.add(title);
+        next.add(menuId);
       }
-      return newSet;
+      return next;
     });
   };
 
-  const getGroupStats = (items: { id: string }[]) => {
-    const enabled = items.filter(item => permissions[item.id]).length;
-    return { enabled, total: items.length };
-  };
+  const totalEnabled = MENU_ITEMS.filter(m => permissions[m.id]).length;
+  const totalMenus = MENU_ITEMS.length;
 
   const perfilInfo = PERFIS.find(p => p.id === selectedPerfil);
+  const isMaster = selectedPerfil === 'master';
+
+  const renderToggle = (id: string) => {
+    const isEnabled = permissions[id];
+    const isSaving = saving === id;
+    const isDisabled = isMaster;
+
+    return (
+      <button
+        onClick={() => !isDisabled && togglePermission(id)}
+        disabled={isDisabled || isSaving}
+        className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all ${
+          isDisabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'
+        }`}
+        style={{
+          background: isEnabled ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
+          border: `1px solid ${isEnabled ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.5)'}`
+        }}
+      >
+        {isSaving ? (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+          </div>
+        ) : (
+          <div
+            className={`absolute top-0.5 w-5 h-5 rounded-full transition-all flex items-center justify-center ${
+              isEnabled ? 'left-6' : 'left-0.5'
+            }`}
+            style={{ background: isEnabled ? '#10b981' : '#ef4444' }}
+          >
+            {isEnabled ? (
+              <Check className="w-3 h-3 text-white" />
+            ) : (
+              <X className="w-3 h-3 text-white" />
+            )}
+          </div>
+        )}
+      </button>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -298,28 +280,22 @@ export function ConfiguracoesPermissoes() {
             <button
               key={perfil.id}
               onClick={() => setSelectedPerfil(perfil.id)}
-              className={`w-full text-left p-3 rounded-xl transition-all ${
-                selectedPerfil === perfil.id
-                  ? 'ring-2'
-                  : 'hover:bg-gray-800/50'
+              className={`w-full text-left p-3 rounded-xl transition-all border ${
+                selectedPerfil === perfil.id ? 'ring-1' : 'border-transparent hover:bg-gray-800/50'
               }`}
               style={{
                 background: selectedPerfil === perfil.id ? `${perfil.color}15` : 'rgba(0,0,0,0.2)',
-                borderColor: selectedPerfil === perfil.id ? perfil.color : 'transparent',
-                ringColor: selectedPerfil === perfil.id ? perfil.color : 'transparent'
+                borderColor: selectedPerfil === perfil.id ? `${perfil.color}60` : 'transparent'
               }}
             >
               <div className="flex items-center gap-3">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ background: perfil.color }}
-                />
-                <div className="flex-1">
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: perfil.color }} />
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-white">{perfil.label}</p>
                   <p className="text-xs text-gray-500">{perfil.desc}</p>
                 </div>
                 {perfil.id === 'master' && (
-                  <Shield className="w-4 h-4 text-red-400" />
+                  <Shield className="w-4 h-4 text-red-400 flex-shrink-0" />
                 )}
               </div>
             </button>
@@ -347,11 +323,25 @@ export function ConfiguracoesPermissoes() {
                   <p className="text-sm text-gray-400">{perfilInfo.desc}</p>
                 </div>
               </div>
-              {selectedPerfil === 'master' && (
-                <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                  <p className="text-xs text-red-400 font-medium">Acesso Total - Não Editável</p>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">{totalEnabled}/{totalMenus} menus ativos</p>
+                  <div className="w-20 h-1.5 rounded-full bg-gray-800 overflow-hidden mt-1">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{
+                        width: `${(totalEnabled / totalMenus) * 100}%`,
+                        background: totalEnabled === totalMenus ? '#10b981' : totalEnabled === 0 ? '#ef4444' : '#f59e0b'
+                      }}
+                    />
+                  </div>
                 </div>
-              )}
+                {isMaster && (
+                  <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
+                    <p className="text-xs text-red-400 font-medium">Acesso Total - Nao Editavel</p>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -360,111 +350,74 @@ export function ConfiguracoesPermissoes() {
               <Loader2 className="w-8 h-8 text-cyan-400 animate-spin" />
             </div>
           ) : (
-            <div className="space-y-3">
-              {MENU_GROUPS.map(group => {
-                const isExpanded = expandedGroups.has(group.title);
-                const stats = getGroupStats(group.items);
-                const parentEnabled = group.parent ? permissions[group.parent] : true;
+            <div className="rounded-xl border border-gray-800 overflow-hidden">
+              <div className="px-4 py-3 bg-gray-900/70 border-b border-gray-800">
+                <p className="text-xs text-gray-400 uppercase tracking-wider font-medium">Menus do Sistema</p>
+              </div>
+              <div className="divide-y divide-gray-800/50">
+                {MENU_ITEMS.map(item => {
+                  const Icon = item.icon;
+                  const isEnabled = permissions[item.id];
+                  const hasSubItems = item.subItems && item.subItems.length > 0;
+                  const isExpanded = expandedMenus.has(item.id);
+                  const activeSubCount = hasSubItems
+                    ? item.subItems!.filter(s => permissions[s.id]).length
+                    : 0;
 
-                return (
-                  <div
-                    key={group.title}
-                    className="rounded-xl border border-gray-800 overflow-hidden"
-                    style={{ opacity: !parentEnabled ? 0.5 : 1 }}
-                  >
-                    <button
-                      onClick={() => toggleGroup(group.title)}
-                      className="w-full flex items-center justify-between p-4 bg-gray-900/50 hover:bg-gray-900/70 transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        {isExpanded ? (
-                          <ChevronDown className="w-4 h-4 text-gray-500" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
-                        )}
-                        <span className="text-sm font-medium text-white">{group.title}</span>
-                        {group.type === 'filtro' && (
-                          <Filter className="w-4 h-4 text-amber-400" />
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">
-                          {stats.enabled}/{stats.total} ativos
-                        </span>
-                        <div className="w-16 h-1.5 rounded-full bg-gray-800 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${(stats.enabled / stats.total) * 100}%`,
-                              background: stats.enabled === stats.total ? '#10b981' :
-                                         stats.enabled === 0 ? '#ef4444' : '#f59e0b'
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </button>
-
-                    {isExpanded && (
-                      <div className="p-3 space-y-1 bg-gray-950/50">
-                        {group.items.map(item => {
-                          const Icon = MENU_ICONS[item.id];
-                          const isEnabled = permissions[item.id];
-                          const isSaving = saving === item.id;
-                          const isDisabled = selectedPerfil === 'master' || !parentEnabled;
-
-                          return (
-                            <div
-                              key={item.id}
-                              className={`flex items-center justify-between p-3 rounded-lg transition-all ${
-                                isDisabled ? 'opacity-50' : 'hover:bg-gray-800/50'
-                              }`}
-                            >
-                              <div className="flex items-center gap-3">
-                                {Icon && <Icon className="w-4 h-4 text-gray-500" />}
-                                <span className="text-sm text-gray-300">{item.label}</span>
-                              </div>
-                              <button
-                                onClick={() => !isDisabled && togglePermission(item.id)}
-                                disabled={isDisabled || isSaving}
-                                className={`relative w-12 h-6 rounded-full transition-all ${
-                                  isDisabled ? 'cursor-not-allowed' : 'cursor-pointer'
-                                }`}
-                                style={{
-                                  background: isEnabled ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)',
-                                  border: `1px solid ${isEnabled ? 'rgba(16,185,129,0.5)' : 'rgba(239,68,68,0.5)'}`
-                                }}
-                              >
-                                {isSaving ? (
-                                  <div className="absolute inset-0 flex items-center justify-center">
-                                    <Loader2 className="w-4 h-4 text-white animate-spin" />
-                                  </div>
-                                ) : (
-                                  <>
-                                    <div
-                                      className={`absolute top-0.5 w-5 h-5 rounded-full transition-all flex items-center justify-center ${
-                                        isEnabled ? 'left-6' : 'left-0.5'
-                                      }`}
-                                      style={{
-                                        background: isEnabled ? '#10b981' : '#ef4444'
-                                      }}
-                                    >
-                                      {isEnabled ? (
-                                        <Check className="w-3 h-3 text-white" />
-                                      ) : (
-                                        <X className="w-3 h-3 text-white" />
-                                      )}
-                                    </div>
-                                  </>
-                                )}
-                              </button>
+                  return (
+                    <div key={item.id}>
+                      <div
+                        className={`flex items-center gap-3 px-4 py-3 transition-colors ${
+                          hasSubItems ? 'hover:bg-gray-800/30' : ''
+                        }`}
+                      >
+                        {hasSubItems ? (
+                          <button
+                            onClick={() => toggleExpand(item.id)}
+                            className="flex items-center gap-3 flex-1 min-w-0 text-left"
+                          >
+                            <div className="w-4 h-4 flex-shrink-0 text-gray-500">
+                              {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </div>
-                          );
-                        })}
+                            <Icon className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                            <span className="text-sm text-gray-200 flex-1">{item.label}</span>
+                            {isEnabled && (
+                              <span className="text-xs text-gray-500 mr-2 flex-shrink-0">
+                                {activeSubCount}/{item.subItems!.length} sub-menus
+                              </span>
+                            )}
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-3 flex-1 min-w-0">
+                            <div className="w-4 h-4 flex-shrink-0" />
+                            <Icon className="w-4 h-4 flex-shrink-0 text-gray-400" />
+                            <span className="text-sm text-gray-200 flex-1">{item.label}</span>
+                          </div>
+                        )}
+                        {renderToggle(item.id)}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+
+                      {hasSubItems && isExpanded && (
+                        <div
+                          className="border-t border-gray-800/50"
+                          style={{ opacity: isEnabled ? 1 : 0.45 }}
+                        >
+                          {item.subItems!.map(sub => (
+                            <div
+                              key={sub.id}
+                              className="flex items-center gap-3 pl-12 pr-4 py-2.5 hover:bg-gray-800/20 transition-colors"
+                            >
+                              <div className="w-1 h-1 rounded-full bg-gray-600 flex-shrink-0" />
+                              <span className="text-sm text-gray-400 flex-1">{sub.label}</span>
+                              {renderToggle(sub.id)}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
