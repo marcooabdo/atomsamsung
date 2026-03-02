@@ -975,16 +975,20 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       // Calcula valores
       const valorGSPN = valorNum;
       const valorComMarkup = os?.tipo_os === 'OW' ? calcularValorComMarkup(valorGSPN) : valorGSPN;
-      const valorTotal = valorComMarkup * (peca.quantidade || 1);
+      const valorTotal = valorComMarkup * Math.max(peca.quantidade || 1, 1);
 
-      // Atualiza a peça
+      // Atualiza a peça (corrige quantidade 0 para 1 se necessário)
+      const updatePayload: Record<string, any> = {
+        valor_gspn: valorGSPN,
+        valor_unitario: valorComMarkup,
+        valor_total: valorTotal
+      };
+      if (!peca.quantidade || peca.quantidade === 0) {
+        updatePayload.quantidade = 1;
+      }
       const { error: updateError } = await supabase
         .from('os_pecas')
-        .update({
-          valor_gspn: valorGSPN,
-          valor_unitario: valorComMarkup,
-          valor_total: valorTotal
-        })
+        .update(updatePayload)
         .eq('id', pecaId);
 
       if (updateError) throw updateError;
@@ -3921,7 +3925,7 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               ) : (
                                 <>
-                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
+                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
 
                                   {/* Campo de edição do valor GSPN se não estiver definido */}
                                   {editandoValorGSPN[peca.id] !== undefined ? (
@@ -3973,31 +3977,47 @@ Não haverá cobrança ao cliente.`
                                     </div>
                                   ) : (
                                     <>
-                                      {(!peca.valor_gspn || peca.valor_gspn === 0) && peca.status !== 'manual' && (
-                                        <button
-                                          onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
-                                          className="px-2 py-1 rounded text-xs font-bold transition-all"
-                                          style={{
-                                            backgroundColor: '#9333EA20',
-                                            border: '1px solid #9333EA60',
-                                            color: '#9333EA'
-                                          }}
-                                        >
-                                          Definir Valor GSPN
-                                        </button>
-                                      )}
-
-                                      {(peca.valor_gspn && peca.valor_gspn > 0) && (
-                                        <div className="flex flex-col gap-1">
-                                          <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                            GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
-                                          </p>
-                                          {os?.tipo_os === 'OW' && (
-                                            <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
-                                              c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                            </p>
+                                      {peca.status !== 'manual' && (
+                                        <>
+                                          {(!peca.valor_gspn || peca.valor_gspn === 0) ? (
+                                            <button
+                                              onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
+                                              className="px-2 py-1 rounded text-xs font-bold transition-all"
+                                              style={{
+                                                backgroundColor: '#9333EA20',
+                                                border: '1px solid #9333EA60',
+                                                color: '#9333EA'
+                                              }}
+                                            >
+                                              Definir Valor GSPN
+                                            </button>
+                                          ) : (
+                                            <div className="flex items-center gap-2">
+                                              <div className="flex flex-col gap-1">
+                                                <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                                  GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
+                                                </p>
+                                                {os?.tipo_os === 'OW' && (
+                                                  <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
+                                                    c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                                  </p>
+                                                )}
+                                              </div>
+                                              <button
+                                                onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
+                                                className="p-1 rounded transition-all"
+                                                style={{
+                                                  backgroundColor: '#9333EA20',
+                                                  border: '1px solid #9333EA60',
+                                                  color: '#9333EA'
+                                                }}
+                                                title="Editar valor GSPN"
+                                              >
+                                                <Pencil className="w-3 h-3" />
+                                              </button>
+                                            </div>
                                           )}
-                                        </div>
+                                        </>
                                       )}
 
                                       {(() => {
@@ -4056,7 +4076,7 @@ Não haverá cobrança ao cliente.`
                                         );
                                       })()}
                                       <p className="text-xs font-bold text-[#39FF14]">
-                                        Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                        Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
                                       </p>
 
                                       {peca.status === 'manual' && (
