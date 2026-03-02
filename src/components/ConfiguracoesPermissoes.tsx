@@ -23,7 +23,13 @@ import {
   MessageSquare,
   Settings,
   Filter,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles,
+  Target,
+  Radio,
+  Layers,
+  Truck,
+  ClipboardList
 } from 'lucide-react';
 
 interface Permission {
@@ -50,20 +56,21 @@ const PERFIS = [
 ];
 
 const MENU_ICONS: Record<string, any> = {
+  menu_gia: Sparkles,
+  menu_mural_missoes: Target,
+  menu_atom_connect: Radio,
   menu_dashboard: LayoutDashboard,
-  menu_kanban: Kanban,
+  menu_kanban: Layers,
   menu_agendamento: Calendar,
-  menu_otimizador: Route,
+  menu_otimizador: Truck,
   menu_estoque: Package,
   menu_financeiro: DollarSign,
   menu_nf: Receipt,
-  menu_cotacoes: FileText,
+  menu_cotacoes: ClipboardList,
   menu_ci: Brain,
-  menu_gia: Brain,
   menu_skywalker: Rocket,
   menu_chat: MessageCircle,
   menu_vendas: ShoppingCart,
-  menu_atom_connect: MessageSquare,
   menu_configuracoes: Settings
 };
 
@@ -72,21 +79,22 @@ const MENU_GROUPS = [
     title: 'Menus Principais',
     type: 'menu',
     items: [
-      { id: 'menu_dashboard', label: 'Dashboard' },
-      { id: 'menu_kanban', label: 'Kanban' },
-      { id: 'menu_agendamento', label: 'Agendamento' },
-      { id: 'menu_otimizador', label: 'Otimizador' },
-      { id: 'menu_estoque', label: 'Estoque' },
-      { id: 'menu_financeiro', label: 'Financeiro' },
-      { id: 'menu_nf', label: 'Notas Fiscais' },
-      { id: 'menu_cotacoes', label: 'Cotacoes' },
-      { id: 'menu_ci', label: 'Customer Intelligence' },
       { id: 'menu_gia', label: 'GIA' },
-      { id: 'menu_skywalker', label: 'Skywalker' },
-      { id: 'menu_chat', label: 'Chat' },
+      { id: 'menu_mural_missoes', label: 'ATOM Command Center' },
+      { id: 'menu_atom_connect', label: 'ATOM Connect' },
+      { id: 'menu_dashboard', label: 'Central ATOM' },
+      { id: 'menu_kanban', label: 'Pipeline Operacional' },
+      { id: 'menu_agendamento', label: 'Agendamento' },
+      { id: 'menu_estoque', label: 'Nucleo de Pecas' },
+      { id: 'menu_chat', label: 'QG de Comunicacao' },
+      { id: 'menu_otimizador', label: 'GIA Logistic' },
+      { id: 'menu_ci', label: 'Customer Intelligence' },
       { id: 'menu_vendas', label: 'Registro de Vendas' },
-      { id: 'menu_atom_connect', label: 'Atom Connect' },
-      { id: 'menu_configuracoes', label: 'Configuracoes' }
+      { id: 'menu_skywalker', label: 'Skywalker' },
+      { id: 'menu_financeiro', label: 'ATOM Finance' },
+      { id: 'menu_nf', label: 'Notas Fiscais' },
+      { id: 'menu_cotacoes', label: 'OFS Gateway' },
+      { id: 'menu_configuracoes', label: 'ATOM Core Settings' }
     ]
   },
   {
