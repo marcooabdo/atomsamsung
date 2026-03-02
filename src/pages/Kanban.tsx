@@ -199,6 +199,10 @@ export function Kanban() {
   const [mandatoryRoutePickerOS, setMandatoryRoutePickerOS] = useState<OS | null>(null);
   const [pendingMandatoryMove, setPendingMandatoryMove] = useState<{ targetColumn: string; position?: number } | null>(null);
   const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
+  const [showBuscarOSModal, setShowBuscarOSModal] = useState(false);
+  const [buscarOSNumero, setBuscarOSNumero] = useState('');
+  const [buscarOSLoading, setBuscarOSLoading] = useState(false);
+  const [buscarOSResult, setBuscarOSResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -475,6 +479,55 @@ export function Kanban() {
       setShowErrorModal(true);
     } finally {
       setSyncingSamsung(false);
+    }
+  };
+
+  const buscarOSPorNumero = async () => {
+    if (!selectedUnidade || !buscarOSNumero.trim()) return;
+
+    setBuscarOSLoading(true);
+    setBuscarOSResult(null);
+
+    try {
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('nome, samsung_asccode, samsung_token')
+        .eq('id', selectedUnidade)
+        .single();
+
+      if (!unidadeData) {
+        setBuscarOSResult({ status: 'error', message: 'Unidade não encontrada.' });
+        return;
+      }
+
+      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
+        setBuscarOSResult({ status: 'error', message: 'Esta unidade não possui configuração Samsung (ASC Code ou Token não configurados).' });
+        return;
+      }
+
+      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/por-os', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ascCode: unidadeData.samsung_asccode,
+          tokenApi: unidadeData.samsung_token,
+          filial: unidadeData.nome.toLowerCase(),
+          unidade_id: selectedUnidade,
+          numero_os: buscarOSNumero.trim()
+        }),
+      });
+
+      const result = await response.json();
+
+      if (result.status === 'success') {
+        setBuscarOSResult({ status: 'success', message: result.message || 'Processamento realizado com sucesso. A OS será importada em breve.' });
+      } else {
+        setBuscarOSResult({ status: 'error', message: result.message || 'Erro desconhecido ao buscar OS.' });
+      }
+    } catch (error) {
+      setBuscarOSResult({ status: 'error', message: error instanceof Error ? error.message : 'Erro desconhecido ao buscar OS.' });
+    } finally {
+      setBuscarOSLoading(false);
     }
   };
 
@@ -2063,6 +2116,26 @@ export function Kanban() {
               <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
               {syncingSamsung ? 'SINCRONIZANDO...' : 'SYNC NOVAS OS'}
             </button>
+
+            <button
+              onClick={() => {
+                setBuscarOSNumero('');
+                setBuscarOSResult(null);
+                setShowBuscarOSModal(true);
+              }}
+              disabled={!selectedUnidade}
+              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.15) 0%, rgba(var(--accent-rgb),0.03) 100%)',
+                border: '1px solid var(--text-accent)',
+                color: 'var(--text-accent)',
+                boxShadow: '0 0 8px rgba(var(--accent-rgb),0.15)'
+              }}
+              title={!selectedUnidade ? 'Selecione uma unidade' : 'Trazer OS por número'}
+            >
+              <Search className="w-3.5 h-3.5" />
+              TRAZER OS
+            </button>
           </div>
         </div>
 
@@ -3189,6 +3262,131 @@ export function Kanban() {
         title={infoModalData.title}
         message={infoModalData.message}
       />
+
+      {showBuscarOSModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
+          <div
+            className="rounded-2xl shadow-2xl overflow-hidden w-full max-w-sm mx-4"
+            style={{
+              backgroundColor: 'var(--bg-card)',
+              border: '1px solid var(--border-accent)',
+              backdropFilter: 'blur(20px)',
+            }}
+          >
+            <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: 'var(--border-primary)', background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.08), rgba(var(--accent-rgb),0.02))' }}>
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-lg" style={{ background: 'rgba(var(--accent-rgb),0.15)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}>
+                  <Search className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Trazer OS por Número</h3>
+                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Importar OS específica da Samsung</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBuscarOSModal(false)}
+                className="p-1.5 rounded-lg transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseOver={e => (e.currentTarget.style.background = 'rgba(255,255,255,0.08)')}
+                onMouseOut={e => (e.currentTarget.style.background = 'transparent')}
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-2" style={{ color: 'var(--text-secondary)' }}>
+                  NÚMERO DA OS SAMSUNG
+                </label>
+                <input
+                  type="text"
+                  value={buscarOSNumero}
+                  onChange={e => {
+                    setBuscarOSNumero(e.target.value);
+                    setBuscarOSResult(null);
+                  }}
+                  onKeyDown={e => { if (e.key === 'Enter' && buscarOSNumero.trim() && !buscarOSLoading) buscarOSPorNumero(); }}
+                  placeholder="Ex: 4174839926"
+                  autoFocus
+                  className="w-full px-3 py-2.5 rounded-lg text-sm font-mono outline-none transition-all"
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid var(--border-primary)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={e => (e.currentTarget.style.borderColor = 'var(--text-accent)')}
+                  onBlur={e => (e.currentTarget.style.borderColor = 'var(--border-primary)')}
+                />
+              </div>
+
+              {buscarOSResult && (
+                <div
+                  className="rounded-lg p-3 flex items-start gap-2.5"
+                  style={{
+                    background: buscarOSResult.status === 'success'
+                      ? 'rgba(16,185,129,0.1)'
+                      : 'rgba(239,68,68,0.1)',
+                    border: `1px solid ${buscarOSResult.status === 'success' ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                  }}
+                >
+                  {buscarOSResult.status === 'success' ? (
+                    <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#10b981' }} />
+                  ) : (
+                    <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                  )}
+                  <div>
+                    <p className="text-xs font-semibold mb-0.5" style={{ color: buscarOSResult.status === 'success' ? '#10b981' : '#ef4444' }}>
+                      {buscarOSResult.status === 'success' ? 'Solicitação enviada' : 'Erro'}
+                    </p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{buscarOSResult.message}</p>
+                    {buscarOSResult.status === 'success' && (
+                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
+                        O processamento ocorre de forma assincrona. A OS aparecera no Kanban em breve.
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowBuscarOSModal(false)}
+                  className="flex-1 py-2.5 rounded-lg text-xs font-semibold transition-all"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+                  onMouseOver={e => (e.currentTarget.style.borderColor = 'var(--text-accent)')}
+                  onMouseOut={e => (e.currentTarget.style.borderColor = 'var(--border-primary)')}
+                >
+                  Fechar
+                </button>
+                <button
+                  onClick={buscarOSPorNumero}
+                  disabled={!buscarOSNumero.trim() || buscarOSLoading}
+                  className="flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.15) 100%)',
+                    border: '1px solid var(--text-accent)',
+                    color: 'var(--text-accent)',
+                    boxShadow: '0 0 12px rgba(var(--accent-rgb),0.2)'
+                  }}
+                >
+                  {buscarOSLoading ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Buscando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="w-3.5 h-3.5" />
+                      Trazer OS
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {routePickerOS && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center pb-8 pointer-events-none" style={{ background: 'rgba(0,0,0,0.3)' }}>
