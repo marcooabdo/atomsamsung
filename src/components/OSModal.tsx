@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -207,6 +207,10 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   // Estados para edição de valores GSPN
   const [editandoValorGSPN, setEditandoValorGSPN] = useState<Record<string, string>>({});
   const [salvandoValorGSPN, setSalvandoValorGSPN] = useState<Record<string, boolean>>({});
+
+  // Estados para edição inline de valores de peças manuais
+  const [editandoValorPeca, setEditandoValorPeca] = useState<Record<string, { unitario: string; quantidade: string }>>({});
+  const [removendoPecaId, setRemovendoPecaId] = useState<string | null>(null);
 
   // Estados temporários para modo de criação
   const [dadosTemporarios, setDadosTemporarios] = useState({
@@ -1007,6 +1011,64 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       showAlert({ message: 'Erro ao salvar valor GSPN', type: 'error' });
     } finally {
       setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: false }));
+    }
+  };
+
+  const handleRemoverPecaManual = async (peca: any) => {
+    if (!peca || peca.status !== 'manual') return;
+    setRemovendoPecaId(peca.id);
+    try {
+      const { error } = await supabase
+        .from('os_pecas')
+        .delete()
+        .eq('id', peca.id);
+      if (error) throw error;
+
+      await supabase.from('os_comentarios').insert({
+        os_id: osId,
+        usuario_id: usuario?.id,
+        comentario: `🗑️ Peça manual removida: ${peca.descricao}${peca.codigo ? ` (${peca.codigo})` : ''}`,
+        is_system: true
+      });
+
+      await loadPecas();
+      await loadComentarios();
+      await loadOSData();
+    } catch (error: any) {
+      showAlert({ message: 'Erro ao remover peça: ' + (error?.message || 'Erro desconhecido'), type: 'error' });
+    } finally {
+      setRemovendoPecaId(null);
+    }
+  };
+
+  const handleSalvarValoresPecaManual = async (pecaId: string) => {
+    const edicao = editandoValorPeca[pecaId];
+    if (!edicao) return;
+
+    const novoUnitario = parseFloat(edicao.unitario) || 0;
+    const novaQtd = parseInt(edicao.quantidade) || 1;
+
+    try {
+      const { error } = await supabase
+        .from('os_pecas')
+        .update({
+          valor_unitario: novoUnitario,
+          valor_total: novoUnitario * novaQtd,
+          quantidade: novaQtd
+        })
+        .eq('id', pecaId);
+      if (error) throw error;
+
+      setEditandoValorPeca(prev => {
+        const novo = { ...prev };
+        delete novo[pecaId];
+        return novo;
+      });
+
+      await loadPecas();
+      await loadOSData();
+    } catch (error: any) {
+      showAlert({ message: 'Erro ao salvar valores: ' + (error?.message || 'Erro desconhecido'), type: 'error' });
     }
   };
 
@@ -3808,51 +3870,54 @@ Não haverá cobrança ao cliente.`
                               )}
                             </div>
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
-                              <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
 
-                              {/* Campo de edição do valor GSPN se não estiver definido */}
-                              {editandoValorGSPN[peca.id] !== undefined ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="Valor GSPN"
-                                    value={editandoValorGSPN[peca.id]}
-                                    onChange={(e) => setEditandoValorGSPN(prev => ({
-                                      ...prev,
-                                      [peca.id]: e.target.value
-                                    }))}
-                                    className="neon-input w-32 text-xs py-1"
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    autoFocus
-                                  />
+                              {/* Modo de edição inline para peças manuais */}
+                              {peca.status === 'manual' && editandoValorPeca[peca.id] ? (
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500">Qtd:</span>
+                                    <input
+                                      type="number"
+                                      min="1"
+                                      step="1"
+                                      value={editandoValorPeca[peca.id].quantidade}
+                                      onChange={(e) => setEditandoValorPeca(prev => ({
+                                        ...prev,
+                                        [peca.id]: { ...prev[peca.id], quantidade: e.target.value }
+                                      }))}
+                                      className="w-14 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                    />
+                                  </div>
+                                  <div className="flex items-center gap-1">
+                                    <span className="text-xs text-gray-500">Unit: R$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={editandoValorPeca[peca.id].unitario}
+                                      onChange={(e) => setEditandoValorPeca(prev => ({
+                                        ...prev,
+                                        [peca.id]: { ...prev[peca.id], unitario: e.target.value }
+                                      }))}
+                                      className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                      autoFocus
+                                    />
+                                  </div>
+                                  <p className="text-xs font-bold text-[#39FF14]">
+                                    Total: R$ {(parseFloat(editandoValorPeca[peca.id].unitario || '0') * parseInt(editandoValorPeca[peca.id].quantidade || '1')).toFixed(2)}
+                                  </p>
                                   <button
-                                    onClick={() => handleSalvarValorGSPN(peca.id)}
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    className="p-1.5 rounded transition-all disabled:opacity-50"
-                                    style={{
-                                      backgroundColor: '#39FF1420',
-                                      border: '1px solid #39FF1460',
-                                      color: '#39FF14'
-                                    }}
-                                    title="Salvar valor"
+                                    onClick={() => handleSalvarValoresPecaManual(peca.id)}
+                                    className="p-1.5 rounded transition-all"
+                                    style={{ backgroundColor: '#39FF1420', border: '1px solid #39FF1460', color: '#39FF14' }}
+                                    title="Salvar"
                                   >
                                     <Save className="w-3.5 h-3.5" />
                                   </button>
                                   <button
-                                    onClick={() => setEditandoValorGSPN(prev => {
-                                      const novo = { ...prev };
-                                      delete novo[peca.id];
-                                      return novo;
-                                    })}
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    className="p-1.5 rounded transition-all disabled:opacity-50"
-                                    style={{
-                                      backgroundColor: '#FF006420',
-                                      border: '1px solid #FF006460',
-                                      color: '#FF0064'
-                                    }}
+                                    onClick={() => setEditandoValorPeca(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                    className="p-1.5 rounded transition-all"
+                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
                                     title="Cancelar"
                                   >
                                     <X className="w-3.5 h-3.5" />
@@ -3860,84 +3925,162 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               ) : (
                                 <>
-                                  {(!peca.valor_gspn || peca.valor_gspn === 0) && (
-                                    <button
-                                      onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
-                                      className="px-2 py-1 rounded text-xs font-bold transition-all"
-                                      style={{
-                                        backgroundColor: '#9333EA20',
-                                        border: '1px solid #9333EA60',
-                                        color: '#9333EA'
-                                      }}
-                                    >
-                                      Definir Valor GSPN
-                                    </button>
-                                  )}
+                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
 
-                                  {(peca.valor_gspn && peca.valor_gspn > 0) && (
-                                    <div className="flex flex-col gap-1">
-                                      <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                        GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
-                                      </p>
-                                      {os?.tipo_os === 'OW' && (
-                                        <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
-                                          c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                        </p>
-                                      )}
+                                  {/* Campo de edição do valor GSPN se não estiver definido */}
+                                  {editandoValorGSPN[peca.id] !== undefined ? (
+                                    <div className="flex items-center gap-2">
+                                      <input
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        placeholder="Valor GSPN"
+                                        value={editandoValorGSPN[peca.id]}
+                                        onChange={(e) => setEditandoValorGSPN(prev => ({
+                                          ...prev,
+                                          [peca.id]: e.target.value
+                                        }))}
+                                        className="neon-input w-32 text-xs py-1"
+                                        disabled={salvandoValorGSPN[peca.id]}
+                                        autoFocus
+                                      />
+                                      <button
+                                        onClick={() => handleSalvarValorGSPN(peca.id)}
+                                        disabled={salvandoValorGSPN[peca.id]}
+                                        className="p-1.5 rounded transition-all disabled:opacity-50"
+                                        style={{
+                                          backgroundColor: '#39FF1420',
+                                          border: '1px solid #39FF1460',
+                                          color: '#39FF14'
+                                        }}
+                                        title="Salvar valor"
+                                      >
+                                        <Save className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => setEditandoValorGSPN(prev => {
+                                          const novo = { ...prev };
+                                          delete novo[peca.id];
+                                          return novo;
+                                        })}
+                                        disabled={salvandoValorGSPN[peca.id]}
+                                        className="p-1.5 rounded transition-all disabled:opacity-50"
+                                        style={{
+                                          backgroundColor: '#FF006420',
+                                          border: '1px solid #FF006460',
+                                          color: '#FF0064'
+                                        }}
+                                        title="Cancelar"
+                                      >
+                                        <X className="w-3.5 h-3.5" />
+                                      </button>
                                     </div>
-                                  )}
-
-                                  {(() => {
-                                    const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
-                                    const valorControladoPorMarkup = !ehCotacaoPeca && peca.valor_gspn > 0;
-                                    if (valorControladoPorMarkup) {
-                                      return null;
-                                    }
-                                    return (
-                                      <div className="flex items-center gap-2">
-                                        <span className="text-xs text-gray-500">Unit: R$</span>
-                                        <input
-                                          type="number"
-                                          step="0.01"
-                                          defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
-                                          onBlur={async (e) => {
-                                            const novoValor = parseFloat(e.target.value) || 0;
-                                            if (novoValor === peca.valor_unitario) return;
-
-                                            try {
-                                              if (ehCotacaoPeca) {
-                                                const { error: updateError } = await supabase
-                                                  .from('cotacoes_pecas')
-                                                  .update({
-                                                    valor_final_unitario: novoValor,
-                                                    valor_total: novoValor * (peca.quantidade || 1)
-                                                  })
-                                                  .eq('id', peca.id);
-                                                if (updateError) throw updateError;
-                                              } else {
-                                                const { error: updateError } = await supabase
-                                                  .from('os_pecas')
-                                                  .update({
-                                                    valor_unitario: novoValor,
-                                                    valor_total: novoValor * (peca.quantidade || 1)
-                                                  })
-                                                  .eq('id', peca.id);
-                                                if (updateError) throw updateError;
-                                              }
-
-                                              await loadOSData();
-                                            } catch (error: any) {
-                                              alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
-                                            }
+                                  ) : (
+                                    <>
+                                      {(!peca.valor_gspn || peca.valor_gspn === 0) && peca.status !== 'manual' && (
+                                        <button
+                                          onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
+                                          className="px-2 py-1 rounded text-xs font-bold transition-all"
+                                          style={{
+                                            backgroundColor: '#9333EA20',
+                                            border: '1px solid #9333EA60',
+                                            color: '#9333EA'
                                           }}
-                                          className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                                        />
-                                      </div>
-                                    );
-                                  })()}
-                                  <p className="text-xs font-bold text-[#39FF14]">
-                                    Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
-                                  </p>
+                                        >
+                                          Definir Valor GSPN
+                                        </button>
+                                      )}
+
+                                      {(peca.valor_gspn && peca.valor_gspn > 0) && (
+                                        <div className="flex flex-col gap-1">
+                                          <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                            GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
+                                          </p>
+                                          {os?.tipo_os === 'OW' && (
+                                            <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
+                                              c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                            </p>
+                                          )}
+                                        </div>
+                                      )}
+
+                                      {(() => {
+                                        const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
+                                        const valorControladoPorMarkup = !ehCotacaoPeca && peca.valor_gspn > 0;
+                                        if (valorControladoPorMarkup) {
+                                          return null;
+                                        }
+                                        if (peca.status === 'manual') {
+                                          return (
+                                            <div className="flex items-center gap-2">
+                                              <p className="text-xs text-gray-400">Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}</p>
+                                            </div>
+                                          );
+                                        }
+                                        return (
+                                          <div className="flex items-center gap-2">
+                                            <span className="text-xs text-gray-500">Unit: R$</span>
+                                            <input
+                                              type="number"
+                                              step="0.01"
+                                              defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
+                                              onBlur={async (e) => {
+                                                const novoValor = parseFloat(e.target.value) || 0;
+                                                if (novoValor === peca.valor_unitario) return;
+
+                                                try {
+                                                  if (ehCotacaoPeca) {
+                                                    const { error: updateError } = await supabase
+                                                      .from('cotacoes_pecas')
+                                                      .update({
+                                                        valor_final_unitario: novoValor,
+                                                        valor_total: novoValor * (peca.quantidade || 1)
+                                                      })
+                                                      .eq('id', peca.id);
+                                                    if (updateError) throw updateError;
+                                                  } else {
+                                                    const { error: updateError } = await supabase
+                                                      .from('os_pecas')
+                                                      .update({
+                                                        valor_unitario: novoValor,
+                                                        valor_total: novoValor * (peca.quantidade || 1)
+                                                      })
+                                                      .eq('id', peca.id);
+                                                    if (updateError) throw updateError;
+                                                  }
+
+                                                  await loadOSData();
+                                                } catch (error: any) {
+                                                  alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
+                                                }
+                                              }}
+                                              className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                            />
+                                          </div>
+                                        );
+                                      })()}
+                                      <p className="text-xs font-bold text-[#39FF14]">
+                                        Total: R$ {Number(peca.valor_total || 0).toFixed(2)}
+                                      </p>
+
+                                      {peca.status === 'manual' && (
+                                        <button
+                                          onClick={() => setEditandoValorPeca(prev => ({
+                                            ...prev,
+                                            [peca.id]: {
+                                              unitario: String(Number(peca.valor_unitario || 0).toFixed(2)),
+                                              quantidade: String(peca.quantidade || 1)
+                                            }
+                                          }))}
+                                          className="p-1.5 rounded transition-all"
+                                          style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
+                                          title="Editar quantidade e valor"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                      )}
+                                    </>
+                                  )}
                                 </>
                               )}
                             </div>
@@ -4090,6 +4233,27 @@ Não haverá cobrança ao cliente.`
                               >
                                 <Send className="w-3 h-3" />
                                 REQUISITAR
+                              </button>
+                            )}
+
+                            {peca.status === 'manual' && !requisicao && !requisicaoDevolvida && (
+                              <button
+                                onClick={() => handleRemoverPecaManual(peca)}
+                                disabled={removendoPecaId === peca.id}
+                                className="neon-button flex items-center gap-2 text-xs px-3 py-2"
+                                style={{
+                                  backgroundColor: '#FF006410',
+                                  borderColor: '#FF0064',
+                                  color: '#FF0064'
+                                }}
+                                title="Remover peça manual"
+                              >
+                                {removendoPecaId === peca.id ? (
+                                  <RefreshCw className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                                REMOVER
                               </button>
                             )}
 
