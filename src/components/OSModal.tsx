@@ -1089,7 +1089,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     setAdicionandoPecaOW(true);
     try {
       const valorComMarkup = calcularValorComMarkup(valorGSPNNum);
-      const quantidade = isSCACC ? novaPecaQuantidadeOW : 1;
+      const quantidade = novaPecaQuantidadeOW;
       const valorTotal = valorComMarkup * quantidade;
 
       const { error: insertError } = await supabase
@@ -1112,7 +1112,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id,
-        comentario: `Peca adicionada${isSCACC ? ' em lote' : ' manualmente'}: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${quantidade} - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
+        comentario: `Peca adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${quantidade} - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
         is_system: true
       });
 
@@ -1124,7 +1124,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       await loadPecas();
       await loadComentarios();
-      showAlert({ message: `Peca adicionada com sucesso!${isSCACC && quantidade > 1 ? ` (${quantidade} unidades)` : ''}`, type: 'success' });
+      showAlert({ message: `Peca adicionada com sucesso!${quantidade > 1 ? ` (${quantidade} unidades)` : ''}`, type: 'success' });
     } catch (error: any) {
       showAlert({ message: `Erro ao adicionar peca: ${error.message}`, type: 'error' });
     } finally {
@@ -3713,26 +3713,24 @@ Não haverá cobrança ao cliente.`
                         </p>
                       )}
                     </div>
-                    {isSCACC && (
-                      <div>
-                        <label className="text-xs text-gray-400 uppercase block mb-2">
-                          Quantidade *
-                        </label>
-                        <input
-                          type="number"
-                          min="1"
-                          value={novaPecaQuantidadeOW}
-                          onChange={(e) => setNovaPecaQuantidadeOW(Math.max(1, parseInt(e.target.value) || 1))}
-                          className="neon-input w-full"
-                          placeholder="1"
-                        />
-                        {novaPecaQuantidadeOW > 1 && (
-                          <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
-                            Requisicao em lote ({novaPecaQuantidadeOW} un.)
-                          </p>
-                        )}
-                      </div>
-                    )}
+                    <div>
+                      <label className="text-xs text-gray-400 uppercase block mb-2">
+                        Quantidade *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={novaPecaQuantidadeOW}
+                        onChange={(e) => setNovaPecaQuantidadeOW(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="neon-input w-full"
+                        placeholder="1"
+                      />
+                      {novaPecaQuantidadeOW > 1 && (
+                        <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                          Requisicao em lote ({novaPecaQuantidadeOW} un.)
+                        </p>
+                      )}
+                    </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
                         Acoes
@@ -3747,14 +3745,12 @@ Não haverá cobrança ao cliente.`
                           color: accentColor
                         }}
                       >
-                        {adicionandoPecaOW ? 'ADICIONANDO...' : isSCACC ? `ADICIONAR (${novaPecaQuantidadeOW}x)` : 'ADICIONAR PECA'}
+                        {adicionandoPecaOW ? 'ADICIONANDO...' : novaPecaQuantidadeOW > 1 ? `ADICIONAR (${novaPecaQuantidadeOW}x)` : 'ADICIONAR PECA'}
                       </button>
                     </div>
                   </div>
                   <p className="text-[10px] text-gray-500 mt-3">
-                    {isSCACC
-                      ? '* Pecas adicionadas serao requisitadas em lote. Informe a quantidade desejada. O valor final e calculado automaticamente com markup configurado.'
-                      : '* Pecas adicionadas manualmente seguem o fluxo de requisicao padrao. Cada peca e adicionada com quantidade 1. O valor final e calculado automaticamente com markup configurado.'}
+                    * Informe a quantidade desejada. Ao requisitar, sera gerada uma requisicao com a quantidade informada. O valor final e calculado automaticamente com markup configurado.
                   </p>
                 </div>
                 );
