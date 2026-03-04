@@ -393,7 +393,7 @@ export function GIA() {
   const hasMessages = messages.length > 0 || isProcessing;
 
   return (
-    <div className="h-screen flex flex-col -m-6 overflow-hidden" style={{ background: '#060a10' }}>
+    <div className="h-screen flex flex-col -m-6 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
       <GIAHeader
         aiState={aiState}
         connection={connection}
@@ -431,10 +431,10 @@ export function GIA() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3 }}
               >
-                <h2 className="text-xl font-bold mb-1.5" style={{ color: '#e2e8f0' }}>
+                <h2 className="text-xl font-bold mb-1.5" style={{ color: 'var(--text-primary)' }}>
                   {usuario?.nome?.split(' ')[0] || 'Usuario'}
                 </h2>
-                <p className="text-sm mb-6" style={{ color: '#374151' }}>
+                <p className="text-sm mb-6" style={{ color: 'var(--text-secondary)' }}>
                   Como posso ajudar voce hoje?
                 </p>
 
@@ -450,9 +450,9 @@ export function GIA() {
                       onClick={() => sendMessage(suggestion)}
                       className="px-4 py-2.5 rounded-xl text-xs font-medium"
                       style={{
-                        background: 'rgba(255,255,255,0.03)',
-                        border: '1px solid rgba(255,255,255,0.06)',
-                        color: '#64748b',
+                        background: 'var(--bg-card)',
+                        border: '1px solid var(--border-primary)',
+                        color: 'var(--text-secondary)',
                       }}
                       whileHover={{
                         background: 'rgba(168,85,247,0.08)',
@@ -548,8 +548,8 @@ function GIAHeader({
     <header
       className="flex-shrink-0 flex items-center justify-between px-5 py-2.5 z-10"
       style={{
-        background: 'rgba(6,10,16,0.85)',
-        borderBottom: '1px solid rgba(168,85,247,0.08)',
+        background: 'var(--bg-secondary)',
+        borderBottom: '1px solid var(--border-primary)',
         backdropFilter: 'blur(20px)',
       }}
     >
@@ -574,8 +574,8 @@ function GIAHeader({
           />
         </div>
         <div>
-          <h1 className="text-sm font-bold tracking-wide" style={{ color: '#e2e8f0' }}>GIA</h1>
-          <p className="text-[8px] tracking-[0.2em] uppercase font-medium" style={{ color: '#374151' }}>
+          <h1 className="text-sm font-bold tracking-wide" style={{ color: 'var(--text-primary)' }}>GIA</h1>
+          <p className="text-[8px] tracking-[0.2em] uppercase font-medium" style={{ color: 'var(--text-secondary)' }}>
             Global Intelligence Assistant
           </p>
         </div>
@@ -600,7 +600,7 @@ function GIAHeader({
 
         <div
           className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg ml-1 cursor-pointer group relative"
-          style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}
+          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
           onClick={onCheckConnections}
           title="Verificar conexão"
         >
@@ -633,7 +633,7 @@ function GIAHeader({
           {(connection.status === 'error' || connection.status === 'partial') && connection.error && (
             <div
               className="absolute top-full right-0 mt-2 p-3 rounded-lg shadow-xl z-50 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none w-64"
-              style={{ background: '#0d1117', border: '1px solid rgba(255,255,255,0.08)' }}
+              style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}
             >
               <div className="flex items-start gap-2">
                 <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
@@ -676,12 +676,12 @@ function HistoryPanel({ conversations, conversationId, onLoad, onDelete, onClose
         transition={{ type: 'spring', stiffness: 300, damping: 30 }}
         className="w-72 h-full flex flex-col"
         style={{
-          background: 'rgba(6,10,16,0.98)',
-          borderRight: '1px solid rgba(168,85,247,0.08)',
+          background: 'var(--bg-secondary)',
+          borderRight: '1px solid var(--border-primary)',
           backdropFilter: 'blur(20px)',
         }}
       >
-        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid rgba(168,85,247,0.06)' }}>
+        <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
           <span className="text-[10px] font-semibold tracking-[0.15em] uppercase" style={{ color: '#4a5568' }}>
             Historico
           </span>

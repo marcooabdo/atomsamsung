@@ -579,6 +579,49 @@
 :root.light .to-\[\#1a1f2e\] { --tw-gradient-to: #f1f5f9 var(--tw-gradient-to-position) !important; }
 
 /* ================================================================
+   LIGHT THEME - NEON COLOR ACCESSIBILITY
+   Neon greens (#39FF14) and neon yellows (#FFBF00) are invisible/harsh
+   on light backgrounds. Replace with solid, accessible alternatives.
+   ================================================================ */
+
+/* Neon green (#39FF14) → accessible green */
+:root.light .text-\[\#39FF14\] { color: #16803c !important; }
+:root.light .bg-\[\#39FF14\] { background-color: #16803c !important; }
+:root.light .border-\[\#39FF14\] { border-color: #16803c !important; }
+:root.light .text-\[\#39FF14\]\/50 { color: rgba(22, 128, 60, 0.6) !important; }
+:root.light .text-\[\#39FF14\]\/80 { color: rgba(22, 128, 60, 0.8) !important; }
+:root.light .bg-\[\#39FF14\]\/10 { background-color: rgba(22, 128, 60, 0.08) !important; }
+:root.light .bg-\[\#39FF14\]\/20 { background-color: rgba(22, 128, 60, 0.12) !important; }
+:root.light .border-\[\#39FF14\]\/30 { border-color: rgba(22, 128, 60, 0.3) !important; }
+:root.light .hover\:bg-\[\#39FF14\]\/10:hover { background-color: rgba(22, 128, 60, 0.08) !important; }
+:root.light .accent-\[\#39FF14\] { accent-color: #16803c !important; }
+
+/* Neon yellow (#FFBF00) → accessible amber */
+:root.light .text-\[\#FFBF00\] { color: #92400e !important; }
+:root.light .bg-\[\#FFBF00\] { background-color: #d97706 !important; }
+:root.light .border-\[\#FFBF00\] { border-color: #d97706 !important; }
+:root.light .text-\[\#FFBF00\]\/50 { color: rgba(146, 64, 14, 0.6) !important; }
+:root.light .bg-\[\#FFBF00\]\/10 { background-color: rgba(217, 119, 6, 0.08) !important; }
+:root.light .bg-\[\#FFBF00\]\/20 { background-color: rgba(217, 119, 6, 0.12) !important; }
+:root.light .border-\[\#FFBF00\]\/30 { border-color: rgba(217, 119, 6, 0.3) !important; }
+
+/* Neon red (#FF0064) → accessible red */
+:root.light .text-\[\#FF0064\] { color: #be123c !important; }
+:root.light .bg-\[\#FF0064\] { background-color: #be123c !important; }
+:root.light .border-\[\#FF0064\] { border-color: #be123c !important; }
+:root.light .bg-\[\#FF0064\]\/10 { background-color: rgba(190, 18, 60, 0.08) !important; }
+:root.light .bg-\[\#FF0064\]\/20 { background-color: rgba(190, 18, 60, 0.12) !important; }
+:root.light .border-\[\#FF0064\]\/30 { border-color: rgba(190, 18, 60, 0.3) !important; }
+
+/* Inline neon box-shadows: kill neon glow on light themes */
+:root.light [style*="drop-shadow(0 0"][style*="#39FF14"],
+:root.light [style*="boxShadow"][style*="#39FF14"],
+:root.light [style*="box-shadow"][style*="#39FF14"] {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+/* ================================================================
    DARK-PINK THEME - additional overrides for dark pink variant
    Maps any leftover #ff007f references to new accent
    ================================================================ */

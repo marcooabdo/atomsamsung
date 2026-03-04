@@ -105,7 +105,7 @@ export function MuralMissoes() {
   return (
     <div
       className="flex flex-col relative overflow-hidden"
-      style={{ height: '100vh', background: 'linear-gradient(160deg, #030510 0%, #060a18 40%, #04080f 100%)', color: '#E2E8F0' }}
+      style={{ height: '100vh', background: 'var(--bg-primary)', color: 'var(--text-primary)' }}
     >
       <ScanlineOverlay />
 
@@ -118,7 +118,7 @@ export function MuralMissoes() {
 
       <div
         className="relative z-10 flex-shrink-0 px-5 py-2.5 flex items-center justify-between"
-        style={{ background: 'rgba(3,5,16,0.92)', borderBottom: '1px solid rgba(0,212,255,0.1)', backdropFilter: 'blur(24px)' }}
+        style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)', backdropFilter: 'blur(24px)' }}
       >
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3">
@@ -272,7 +272,7 @@ export function MuralMissoes() {
 
       <div
         className="relative z-10 flex-shrink-0 px-5 py-1.5 flex items-center justify-between"
-        style={{ background: 'rgba(3,5,16,0.88)', borderTop: '1px solid rgba(255,255,255,0.04)' }}
+        style={{ background: 'var(--bg-secondary)', borderTop: '1px solid var(--border-primary)' }}
       >
         <div className="flex items-center gap-1.5">
           <Bot className="w-3 h-3 text-slate-800" />

@@ -369,11 +369,11 @@ export default function AtomConnect() {
 
   return (
     <ModalProvider>
-      <div className="-m-6 h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #060610 0%, #0A0A18 50%, #080814 100%)' }}>
+      <div className="-m-6 h-screen flex flex-col overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
       <audio ref={audioRef} src="/notification.mp3" preload="auto" />
 
       {/* Top Bar */}
-      <header className="flex-shrink-0 border-b border-white/[0.06]" style={{ background: 'linear-gradient(180deg, rgba(0,212,255,0.03) 0%, transparent 100%)' }}>
+      <header className="flex-shrink-0" style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}>
         <div className="h-16 flex items-center justify-between px-5 relative">
           <div className="flex items-center gap-3">
             <div className="relative">
@@ -418,8 +418,9 @@ export default function AtomConnect() {
                         exit={{ opacity: 0, y: 8, scale: 0.96 }}
                         className="absolute left-1/2 -translate-x-1/2 top-14 w-72 max-h-80 overflow-y-auto rounded-xl border-2 border-cyan-400/40 shadow-2xl z-50"
                         style={{
-                          background: 'linear-gradient(180deg, #12122a, #0d0d1e)',
-                          boxShadow: '0 0 30px rgba(0, 212, 255, 0.3)'
+                          background: 'var(--bg-card)',
+                          border: '2px solid rgba(var(--accent-rgb), 0.3)',
+                          boxShadow: '0 0 30px rgba(var(--accent-rgb), 0.2)'
                         }}
                       >
                         <button
@@ -521,10 +522,10 @@ export default function AtomConnect() {
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, y: 8, scale: 0.96 }}
                     className="absolute right-0 top-9 w-72 max-h-80 overflow-y-auto rounded-xl border border-white/[0.08] shadow-2xl z-50"
-                    style={{ background: 'linear-gradient(180deg, #12122a, #0d0d1e)' }}
+                    style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}
                   >
-                    <div className="p-3 border-b border-white/[0.06]">
-                      <h3 className="font-semibold text-white text-xs">Notificacoes</h3>
+                    <div className="p-3" style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                      <h3 className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>Notificacoes</h3>
                     </div>
                     {notifications.length === 0 ? (
                       <div className="p-5 text-center text-white/20 text-xs">

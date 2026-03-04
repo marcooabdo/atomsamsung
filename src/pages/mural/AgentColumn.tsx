@@ -21,7 +21,7 @@ export function AgentColumn({ agent, tasks, completingId, onComplete }: AgentCol
     <div
       className="flex flex-col rounded-2xl overflow-hidden flex-shrink-0 w-[280px]"
       style={{
-        background: 'rgba(6,9,20,0.88)',
+        background: 'var(--bg-card)',
         border: `1px solid ${agent.borderColor}`,
         backdropFilter: 'blur(20px)',
         boxShadow: `0 0 40px ${agent.color}06, inset 0 1px 0 rgba(255,255,255,0.03)`,
@@ -92,7 +92,7 @@ export function AgentColumn({ agent, tasks, completingId, onComplete }: AgentCol
 
       <div
         className="px-3 py-1.5 flex-shrink-0 flex items-center justify-between"
-        style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.25)' }}
+        style={{ borderBottom: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}
       >
         <div className="flex items-center gap-1.5">
           <Database className="w-2 h-2" style={{ color: agent.color, opacity: 0.4 }} />
@@ -142,7 +142,7 @@ export function AgentColumn({ agent, tasks, completingId, onComplete }: AgentCol
 
       <div
         className="px-2.5 py-1.5 flex items-center gap-2 flex-shrink-0"
-        style={{ borderTop: `1px solid ${agent.color}10`, background: 'rgba(0,0,0,0.35)' }}
+        style={{ borderTop: `1px solid ${agent.color}10`, background: 'var(--bg-secondary)' }}
       >
         <div className="flex-1 h-0.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.05)' }}>
           {tasks.length > 0 && (
