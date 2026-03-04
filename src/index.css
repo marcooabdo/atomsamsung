@@ -488,6 +488,110 @@
 }
 
 /* ================================================================
+   LIGHT THEME - ADDITIONAL MISSING PATTERNS
+   Covers more inline style patterns specific to Chat, GIA, Mural, etc.
+   ================================================================ */
+
+/* Chat page specific dark backgrounds */
+:root.light .bg-\[\#0a1015\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0d1419\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#0d2832\] { background-color: rgba(var(--accent-rgb), 0.06) !important; }
+:root.light .bg-\[\#0d2832\]\/50 { background-color: rgba(var(--accent-rgb), 0.03) !important; }
+:root.light .bg-\[\#0d2832\]\/60 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+:root.light .border-\[\#1a3a4a\]\/50 { border-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root.light .border-\[\#1a3a4a\]\/30 { border-color: rgba(var(--accent-rgb), 0.12) !important; }
+:root.light .hover\:bg-\[\#1a3a4a\]\/30:hover { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+
+/* More dark hex backgrounds */
+:root.light .bg-\[\#0f1623\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0c1222\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#141928\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#0e1520\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#101828\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0a0e1a\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#070d18\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#050c14\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0c1520\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0b1520\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#080f18\] { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#10151e\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#12181f\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#111520\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#13191f\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#151b25\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#181e28\] { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#1c2330\] { background-color: #f1f5f9 !important; }
+:root.light .bg-\[\#202836\] { background-color: #f1f5f9 !important; }
+:root.light .bg-\[\#1e2535\] { background-color: #f1f5f9 !important; }
+
+/* Opacity variants of common dark backgrounds */
+:root.light .bg-\[\#0a1015\]\/50 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-\[\#0a1015\]\/80 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+:root.light .bg-\[\#0d1419\]\/50 { background-color: var(--bg-secondary) !important; }
+:root.light .bg-\[\#0d1419\]\/80 { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#0d1419\]\/95 { background-color: var(--bg-primary) !important; }
+:root.light .bg-\[\#1a1f2e\]\/50 { background-color: rgba(var(--accent-rgb), 0.02) !important; }
+:root.light .bg-\[\#1a1f2e\]\/80 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+
+/* Border patterns used across Chat and other pages */
+:root.light .border-\[\#0d1419\] { border-color: rgba(var(--accent-rgb), 0.15) !important; }
+:root.light .border-\[\#1a2535\] { border-color: rgba(var(--accent-rgb), 0.12) !important; }
+:root.light .border-\[\#1e2535\] { border-color: rgba(var(--accent-rgb), 0.12) !important; }
+:root.light .border-\[\#0a1015\] { border-color: rgba(var(--accent-rgb), 0.1) !important; }
+
+/* Hover patterns */
+:root.light .hover\:bg-\[\#0d2832\]:hover { background-color: rgba(var(--accent-rgb), 0.08) !important; }
+:root.light .hover\:bg-\[\#0d1419\]:hover { background-color: var(--bg-secondary) !important; }
+:root.light .hover\:bg-\[\#1a1f2e\]:hover { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+
+/* Text color patterns missing */
+:root.light .text-gray-50 { color: var(--text-primary) !important; }
+:root.light .text-white\/40 { color: var(--text-secondary) !important; }
+:root.light .text-white\/30 { color: var(--text-secondary) !important; }
+:root.light .text-white\/20 { color: var(--text-secondary) !important; }
+
+/* divide utilities */
+:root.light .divide-gray-900 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+:root.light .divide-gray-600 > :not([hidden]) ~ :not([hidden]) { border-color: #e2e8f0 !important; }
+:root.light .divide-white\/5 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.06) !important; }
+:root.light .divide-white\/10 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(0,0,0,0.08) !important; }
+
+/* Ring colors for light theme */
+:root.light .ring-gray-700 { --tw-ring-color: #e2e8f0 !important; }
+:root.light .ring-gray-800 { --tw-ring-color: #e2e8f0 !important; }
+
+/* Backdrop / overlay patterns */
+:root.light .bg-gray-950\/80 { background-color: rgba(255, 255, 255, 0.92) !important; }
+:root.light .bg-gray-950\/90 { background-color: rgba(255, 255, 255, 0.95) !important; }
+:root.light .bg-gray-950\/95 { background-color: rgba(255, 255, 255, 0.98) !important; }
+
+/* Chart / recharts text inside light */
+:root.light .recharts-text { fill: var(--text-secondary) !important; }
+:root.light .recharts-cartesian-axis-tick text { fill: var(--text-secondary) !important; }
+
+/* From/to gradient patterns not yet covered */
+:root.light .from-\[\#0a1015\] { --tw-gradient-from: var(--bg-primary) var(--tw-gradient-from-position) !important; }
+:root.light .from-\[\#0d1419\] { --tw-gradient-from: var(--bg-secondary) var(--tw-gradient-from-position) !important; }
+:root.light .from-\[\#0d2832\] { --tw-gradient-from: rgba(var(--accent-rgb), 0.06) var(--tw-gradient-from-position) !important; }
+:root.light .from-\[\#1a2535\] { --tw-gradient-from: #f1f5f9 var(--tw-gradient-from-position) !important; }
+:root.light .to-\[\#0a1015\] { --tw-gradient-to: var(--bg-primary) var(--tw-gradient-to-position) !important; }
+:root.light .to-\[\#0d1419\] { --tw-gradient-to: var(--bg-secondary) var(--tw-gradient-to-position) !important; }
+:root.light .to-\[\#1a1f2e\] { --tw-gradient-to: #f1f5f9 var(--tw-gradient-to-position) !important; }
+
+/* ================================================================
+   DARK-PINK THEME - additional overrides for dark pink variant
+   Maps any leftover #ff007f references to new accent
+   ================================================================ */
+:root.theme-dark-pink .text-\[\#ff007f\] { color: var(--text-accent) !important; }
+:root.theme-dark-pink .bg-\[\#ff007f\] { background-color: var(--text-accent) !important; }
+:root.theme-dark-pink .border-\[\#ff007f\] { border-color: var(--text-accent) !important; }
+:root.theme-dark-pink .text-\[\#ff007f\]\/50 { color: rgba(var(--accent-rgb), 0.5) !important; }
+:root.theme-dark-pink .text-\[\#ff007f\]\/60 { color: rgba(var(--accent-rgb), 0.6) !important; }
+:root.theme-dark-pink .bg-\[\#ff007f\]\/10 { background-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root.theme-dark-pink .bg-\[\#ff007f\]\/20 { background-color: rgba(var(--accent-rgb), 0.2) !important; }
+:root.theme-dark-pink .border-\[\#ff007f\]\/30 { border-color: rgba(var(--accent-rgb), 0.3) !important; }
+
+/* ================================================================
    CUSTOM BACKGROUND IMAGE SUPPORT
    Plano de fundo personalizado aplicado via ThemeContext
    ================================================================ */

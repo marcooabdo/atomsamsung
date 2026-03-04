@@ -87,25 +87,29 @@ export function Chat() {
 
   return (
     <>
-      <div className="h-screen flex flex-col bg-[#0a1015] -m-6 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-3 border-b border-[#1a3a4a]/50 bg-[#0d1419]">
+      <div className="h-screen flex flex-col -m-6 overflow-hidden" style={{ background: 'var(--bg-primary)' }}>
+        <div className="flex items-center justify-between px-6 py-3 border-b" style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}>
           <div className="flex gap-1">
             <button
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full text-gray-400 hover:text-white hover:bg-[#1a3a4a]/30 transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full transition-all"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'; (e.currentTarget as HTMLElement).style.color = 'var(--text-primary)'; }}
+              onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = 'transparent'; (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'; }}
             >
               <Building2 className="w-4 h-4" />
               <span className="font-medium text-sm">Campus</span>
             </button>
             <button
-              className="flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#0d2832] text-[#00D4FF] border border-[#00D4FF]/30 transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-full transition-all"
+              style={{ background: 'rgba(var(--accent-rgb), 0.1)', color: 'var(--text-accent)', border: '1px solid rgba(var(--accent-rgb), 0.3)' }}
             >
               <MessageCircle className="w-4 h-4" />
               <span className="font-medium text-sm">Chat</span>
             </button>
           </div>
-          <div className="flex items-center gap-2 px-4 py-2 rounded-full border border-[#00D4FF]/30 bg-[#0d2832]">
-            <div className="w-2 h-2 bg-[#00D4FF] rounded-full"></div>
-            <span className="text-sm text-[#00D4FF] font-medium">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ border: '1px solid rgba(var(--accent-rgb), 0.3)', background: 'rgba(var(--accent-rgb), 0.08)' }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: 'var(--text-accent)' }}></div>
+            <span className="text-sm font-medium" style={{ color: 'var(--text-accent)' }}>
               {onlineCount} online
             </span>
           </div>
@@ -115,7 +119,8 @@ export function Chat() {
           <div
             className={`${
               isMobile && selectedConversationId ? 'hidden' : 'flex'
-            } flex-col w-full md:w-[380px] lg:w-[420px] bg-[#0d1419] border-r border-[#1a3a4a]/50`}
+            } flex-col w-full md:w-[380px] lg:w-[420px] border-r`}
+            style={{ background: 'var(--bg-secondary)', borderColor: 'var(--border-primary)' }}
           >
             <ChatConversationList
               userId={usuario.id}
@@ -130,7 +135,8 @@ export function Chat() {
           <div
             className={`${
               isMobile && !selectedConversationId ? 'hidden' : 'flex'
-            } flex-1 bg-[#0a1015]`}
+            } flex-1`}
+            style={{ background: 'var(--bg-primary)' }}
           >
             {selectedConversationId ? (
               <ChatWindow
@@ -142,13 +148,13 @@ export function Chat() {
             ) : (
               <div className="w-full h-full flex items-center justify-center">
                 <div className="text-center">
-                  <div className="w-28 h-28 mx-auto mb-6 rounded-full bg-[#0d2832] border border-[#00D4FF]/20 flex items-center justify-center">
-                    <MessageCircle className="w-14 h-14 text-[#00D4FF]/60" strokeWidth={1.5} />
+                  <div className="w-28 h-28 mx-auto mb-6 rounded-full flex items-center justify-center" style={{ background: 'rgba(var(--accent-rgb), 0.08)', border: '1px solid rgba(var(--accent-rgb), 0.2)' }}>
+                    <MessageCircle className="w-14 h-14" strokeWidth={1.5} style={{ color: 'rgba(var(--accent-rgb), 0.6)' as any }} />
                   </div>
-                  <h3 className="text-xl font-semibold text-white mb-2">
+                  <h3 className="text-xl font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
                     Selecione uma conversa
                   </h3>
-                  <p className="text-sm text-gray-500">
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     Escolha uma conversa na lista ao lado ou inicie uma nova
                   </p>
                 </div>
