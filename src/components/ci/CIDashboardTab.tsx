@@ -83,7 +83,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className={`${GLASS} p-6 lg:col-span-2`}>
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-6" style={{ color: 'var(--text-primary)' }}>
             <BarChart3 className="w-5 h-5 text-cyan-400" />
             Top 10 Clientes por Faturamento
           </h3>
@@ -91,10 +91,10 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
             <div className="h-[350px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={chartData} layout="vertical">
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis type="number" stroke="#64748B" tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} />
-                  <YAxis type="category" dataKey="name" stroke="#64748B" width={120} tick={{ fontSize: 11 }} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: '1px solid #06B6D4', borderRadius: '12px' }} formatter={(value: number) => [formatCurrency(value), 'Faturamento']} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
+                  <XAxis type="number" stroke="currentColor" strokeOpacity={0.5} tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} tick={{ fill: 'currentColor', fillOpacity: 0.7, fontSize: 11 }} />
+                  <YAxis type="category" dataKey="name" stroke="currentColor" strokeOpacity={0.5} width={120} tick={{ fill: 'currentColor', fillOpacity: 0.7, fontSize: 11 }} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.4)', borderRadius: '12px', color: 'var(--text-primary)' }} formatter={(value: number) => [formatCurrency(value), 'Faturamento']} />
                   <Bar dataKey="valor" fill="url(#ciBarGradient)" radius={[0, 8, 8, 0]} />
                   <defs>
                     <linearGradient id="ciBarGradient" x1="0" y1="0" x2="1" y2="0">
@@ -109,7 +109,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
         </div>
 
         <div className={`${GLASS} p-6`}>
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-6" style={{ color: 'var(--text-primary)' }}>
             <LucidePie className="w-5 h-5 text-blue-400" />
             Faturamento por Vendedor
           </h3>
@@ -121,7 +121,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
                     <Pie data={pieData} cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={4} dataKey="value">
                       {pieData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
                     </Pie>
-                    <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: '1px solid #3B82F6', borderRadius: '12px' }} formatter={(value: number) => [formatCurrency(value), '']} />
+                    <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.4)', borderRadius: '12px', color: 'var(--text-primary)' }} formatter={(value: number) => [formatCurrency(value), '']} />
                   </PieChart>
                 </ResponsiveContainer>
               </div>
@@ -130,9 +130,9 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
                   <div key={i} className="flex items-center justify-between text-sm">
                     <div className="flex items-center gap-2">
                       <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
-                      <span className="text-slate-300">{item.name}</span>
+                      <span style={{ color: 'var(--text-primary)' }}>{item.name}</span>
                     </div>
-                    <span className="text-slate-400">{formatCurrency(item.value)}</span>
+                    <span style={{ color: 'var(--text-secondary)' }}>{formatCurrency(item.value)}</span>
                   </div>
                 ))}
               </div>
@@ -143,7 +143,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
         </div>
 
         <div className={`${GLASS} p-6 lg:col-span-3`}>
-          <h3 className="text-lg font-semibold text-white flex items-center gap-2 mb-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-6" style={{ color: 'var(--text-primary)' }}>
             <Activity className="w-5 h-5 text-emerald-400" />
             Evolucao do Faturamento
           </h3>
@@ -157,10 +157,10 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
                       <stop offset="95%" stopColor="#06B6D4" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                  <XAxis dataKey="name" stroke="#64748B" />
-                  <YAxis stroke="#64748B" tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} />
-                  <Tooltip contentStyle={{ backgroundColor: '#1E293B', border: '1px solid #06B6D4', borderRadius: '12px' }} formatter={(value: number, name: string) => [name === 'faturamento' ? formatCurrency(value) : value, name === 'faturamento' ? 'Faturamento' : 'Orcamentos']} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
+                  <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.5} tick={{ fill: 'currentColor', fillOpacity: 0.7 }} />
+                  <YAxis stroke="currentColor" strokeOpacity={0.5} tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} tick={{ fill: 'currentColor', fillOpacity: 0.7 }} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.4)', borderRadius: '12px', color: 'var(--text-primary)' }} formatter={(value: number, name: string) => [name === 'faturamento' ? formatCurrency(value) : value, name === 'faturamento' ? 'Faturamento' : 'Orcamentos']} />
                   <Area type="monotone" dataKey="faturamento" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#ciAreaGradient)" />
                   <Line type="monotone" dataKey="orcamentos" stroke="#F59E0B" strokeWidth={2} dot={{ fill: '#F59E0B', strokeWidth: 2 }} />
                 </AreaChart>
@@ -186,9 +186,9 @@ function KPICard({ icon: Icon, iconColor, textColor, hoverBorder, value, label, 
         </div>
         {badge}
       </div>
-      <p className={`${isName ? 'text-lg truncate' : 'text-2xl'} font-bold text-white mb-0.5`} title={value}>{value}</p>
+      <p className={`${isName ? 'text-lg truncate' : 'text-2xl'} font-bold mb-0.5`} style={{ color: 'var(--text-primary)' }} title={value}>{value}</p>
       {subValue && <p className={`text-sm ${subColor}`}>{subValue}</p>}
-      <p className="text-sm text-slate-400 mt-1">{label}</p>
+      <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>{label}</p>
     </div>
   );
 }

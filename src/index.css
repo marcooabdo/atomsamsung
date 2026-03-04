@@ -579,6 +579,42 @@
 :root.light .to-\[\#1a1f2e\] { --tw-gradient-to: #f1f5f9 var(--tw-gradient-to-position) !important; }
 
 /* ================================================================
+   CUSTOMER INTELLIGENCE - GLASS CARD THEMING
+   ================================================================ */
+
+.ci-glass-card {
+  background: linear-gradient(135deg, rgba(15, 23, 42, 0.8), rgba(30, 41, 59, 0.6), rgba(15, 23, 42, 0.8));
+}
+
+.ci-glass-inner {
+  background: linear-gradient(135deg, rgba(30, 41, 59, 0.4), rgba(15, 23, 42, 0.4));
+}
+
+:root.light .ci-glass-card {
+  background: #ffffff !important;
+  border-color: rgba(var(--accent-rgb), 0.2) !important;
+  box-shadow: 0 4px 24px rgba(var(--accent-rgb), 0.06) !important;
+  color: var(--text-primary);
+}
+
+:root.light .ci-glass-inner {
+  background: rgba(var(--accent-rgb), 0.03) !important;
+  border-color: rgba(var(--accent-rgb), 0.12) !important;
+}
+
+/* All text inside CI glass cards should use theme variables on light */
+:root.light .ci-glass-card .text-white { color: var(--text-primary) !important; }
+:root.light .ci-glass-card .text-slate-400 { color: var(--text-secondary) !important; }
+:root.light .ci-glass-card .text-slate-300 { color: var(--text-primary) !important; }
+:root.light .ci-glass-card .text-slate-500 { color: var(--text-secondary) !important; }
+:root.light .ci-glass-card .text-slate-600 { color: var(--text-secondary) !important; }
+:root.light .ci-glass-card .border-slate-700\/50 { border-color: rgba(var(--accent-rgb), 0.1) !important; }
+:root.light .ci-glass-card .bg-slate-800\/40 { background-color: rgba(var(--accent-rgb), 0.04) !important; }
+:root.light .ci-glass-card .bg-slate-800\/60 { background-color: rgba(var(--accent-rgb), 0.05) !important; }
+:root.light .ci-glass-card .bg-slate-900\/80 { background-color: rgba(var(--accent-rgb), 0.03) !important; }
+:root.light .ci-glass-card .divide-slate-700\/50 > :not([hidden]) ~ :not([hidden]) { border-color: rgba(var(--accent-rgb), 0.1) !important; }
+
+/* ================================================================
    LIGHT THEME - NEON COLOR ACCESSIBILITY
    Neon greens (#39FF14) and neon yellows (#FFBF00) are invisible/harsh
    on light backgrounds. Replace with solid, accessible alternatives.

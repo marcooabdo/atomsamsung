@@ -47,10 +47,8 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
         className="relative rounded-xl overflow-hidden cursor-pointer select-none"
         style={{
           background: isAlta
-            ? 'linear-gradient(145deg, rgba(30,8,8,0.96), rgba(12,5,20,0.98))'
-            : hovered
-              ? 'linear-gradient(145deg, rgba(14,22,48,0.97), rgba(7,11,26,0.99))'
-              : 'linear-gradient(145deg, rgba(10,15,35,0.92), rgba(5,8,20,0.96))',
+            ? 'var(--bg-card)'
+            : 'var(--bg-card)',
           border: `1px solid ${isAlta ? 'rgba(239,68,68,0.4)' : hovered ? `${accentColor}50` : `${accentColor}22`}`,
           boxShadow: hovered
             ? isAlta ? '0 4px 18px rgba(239,68,68,0.18)' : `0 4px 18px ${accentColor}14`
@@ -130,7 +128,7 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
           <p
             className="text-[12px] font-bold leading-snug"
             style={{
-              color: isAlta ? '#FCA5A5' : hovered ? '#F1F5F9' : '#CBD5E1',
+              color: isAlta ? 'var(--color-red-text, #FCA5A5)' : 'var(--text-primary)',
               transition: 'color 0.18s ease',
               overflow: 'hidden',
               display: '-webkit-box',
@@ -145,8 +143,8 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
             <p
               className="text-[10px] leading-snug mt-1 pl-2"
               style={{
-                color: '#2D3748',
-                borderLeft: `1px solid ${hovered ? `${accentColor}35` : 'rgba(255,255,255,0.05)'}`,
+                color: 'var(--text-secondary)',
+                borderLeft: `1px solid ${hovered ? `${accentColor}35` : 'var(--border-primary)'}`,
                 overflow: 'hidden',
                 display: '-webkit-box',
                 WebkitLineClamp: 1,
@@ -158,10 +156,10 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
             </p>
           )}
 
-          <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+          <div className="flex items-center justify-between mt-2 pt-1.5" style={{ borderTop: '1px solid var(--border-primary)' }}>
             <div className="flex items-center gap-1">
-              <Clock className="w-2 h-2 text-slate-700" />
-              <span className="text-[9px] font-mono text-slate-700">{formatTime(task.created_at)}</span>
+              <Clock className="w-2 h-2" style={{ color: 'var(--text-secondary)' }} />
+              <span className="text-[9px] font-mono" style={{ color: 'var(--text-secondary)' }}>{formatTime(task.created_at)}</span>
             </div>
             <button
               onClick={handleCompleteClick}

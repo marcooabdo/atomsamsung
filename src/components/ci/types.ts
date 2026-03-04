@@ -52,8 +52,8 @@ export const CI_FILTER_COLORS: Record<string, string> = {
 
 export const CHART_COLORS = ['#06B6D4', '#3B82F6', '#14B8A6', '#10B981', '#F59E0B', '#0EA5E9', '#22D3EE', '#38BDF8'];
 
-export const GLASS = 'backdrop-blur-xl bg-gradient-to-br from-slate-900/80 via-slate-800/60 to-slate-900/80 border border-cyan-500/20 rounded-2xl shadow-2xl shadow-cyan-500/5';
-export const GLASS_INNER = 'backdrop-blur-md bg-gradient-to-br from-slate-800/40 to-slate-900/40 border border-slate-700/50 rounded-xl';
+export const GLASS = 'backdrop-blur-xl border border-cyan-500/20 rounded-2xl shadow-2xl shadow-cyan-500/5 ci-glass-card';
+export const GLASS_INNER = 'backdrop-blur-md border border-slate-700/50 rounded-xl ci-glass-inner';
 
 export interface OSRecord {
   id: string;

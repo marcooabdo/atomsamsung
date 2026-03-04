@@ -12,7 +12,7 @@ export function AgentLoadBar({ agents, tasks, activeAgentIdx, onAgentClick }: Ag
   return (
     <div
       className="relative z-10 flex-shrink-0 px-4 py-0 flex items-center gap-1 overflow-x-auto"
-      style={{ background: 'rgba(3,5,16,0.8)', borderBottom: '1px solid rgba(255,255,255,0.04)' }}
+      style={{ background: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-primary)' }}
     >
       <span
         className="text-[9px] font-mono text-slate-700 uppercase tracking-widest pr-3 flex-shrink-0 py-2.5"
