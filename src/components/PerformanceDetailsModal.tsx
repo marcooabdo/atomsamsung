@@ -83,30 +83,32 @@ export function PerformanceDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.85)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <div
         className="w-full max-w-6xl max-h-[90vh] overflow-hidden rounded-xl"
         style={{
-          background: 'linear-gradient(135deg, rgba(0,0,0,0.95) 0%, rgba(10,10,10,0.98) 100%)',
-          border: '1px solid rgba(6,182,212,0.3)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5), 0 0 0 1px rgba(6,182,212,0.1)'
+          background: 'var(--bg-card)',
+          border: '1px solid var(--border-accent)',
+          boxShadow: 'var(--card-shadow)'
         }}
       >
-        <div className="p-6 border-b border-gray-800/50 flex items-center justify-between">
+        <div
+          className="p-6 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border-primary)' }}
+        >
           <div className="flex items-center gap-3">
             <div
               className="p-2 rounded-lg"
               style={{
-                background: 'linear-gradient(135deg, rgba(6,182,212,0.15) 0%, rgba(6,182,212,0.05) 100%)',
-                border: '1px solid rgba(6,182,212,0.3)',
-                boxShadow: '0 0 12px rgba(6,182,212,0.15)'
+                background: 'rgba(var(--accent-rgb),0.12)',
+                border: '1px solid rgba(var(--accent-rgb),0.3)',
               }}
             >
-              <MetricIcon className="w-5 h-5 text-[#06B6D4]" />
+              <MetricIcon className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">{title}</h2>
-              <p className="text-xs text-gray-400 mt-1">
+              <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                 {osList.length} ordem(ns) de serviço analisada(s)
               </p>
             </div>
@@ -116,17 +118,17 @@ export function PerformanceDetailsModal({
               onClick={exportToExcel}
               className="px-4 py-2 rounded-lg flex items-center gap-2 text-xs font-bold transition-all duration-300"
               style={{
-                background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)',
+                background: 'rgba(16,185,129,0.12)',
                 border: '1px solid rgba(16,185,129,0.3)',
                 color: '#10B981'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0.2) 100%)';
+                e.currentTarget.style.background = 'rgba(16,185,129,0.22)';
                 e.currentTarget.style.borderColor = 'rgba(16,185,129,0.5)';
                 e.currentTarget.style.transform = 'translateY(-1px)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.1) 100%)';
+                e.currentTarget.style.background = 'rgba(16,185,129,0.12)';
                 e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)';
                 e.currentTarget.style.transform = 'translateY(0)';
               }}
@@ -138,16 +140,16 @@ export function PerformanceDetailsModal({
               onClick={onClose}
               className="p-2 rounded-lg transition-all duration-300"
               style={{
-                background: 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0.1) 100%)',
+                background: 'rgba(239,68,68,0.12)',
                 border: '1px solid rgba(239,68,68,0.3)',
                 color: '#EF4444'
               }}
               onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.2) 100%)';
+                e.currentTarget.style.background = 'rgba(239,68,68,0.22)';
                 e.currentTarget.style.borderColor = 'rgba(239,68,68,0.5)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0.1) 100%)';
+                e.currentTarget.style.background = 'rgba(239,68,68,0.12)';
                 e.currentTarget.style.borderColor = 'rgba(239,68,68,0.3)';
               }}
             >
@@ -156,17 +158,17 @@ export function PerformanceDetailsModal({
           </div>
         </div>
 
-        <div className="p-6 border-b border-gray-800/50">
+        <div className="p-6" style={{ borderBottom: '1px solid var(--border-primary)' }}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div
               className="p-4 rounded-lg"
               style={{
-                background: 'linear-gradient(135deg, rgba(6,182,212,0.08) 0%, rgba(6,182,212,0.02) 100%)',
-                border: '1px solid rgba(6,182,212,0.2)'
+                background: 'rgba(var(--accent-rgb),0.06)',
+                border: '1px solid rgba(var(--accent-rgb),0.2)'
               }}
             >
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1">Valor Atual</p>
-              <p className="text-2xl font-bold text-[#06B6D4]">
+              <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>Valor Atual</p>
+              <p className="text-2xl font-bold" style={{ color: 'var(--text-accent)' }}>
                 {metric === 'eficiencia' ? `${currentValue.toFixed(1)} dias` : `${currentValue.toFixed(1)}%`}
               </p>
             </div>
@@ -174,11 +176,11 @@ export function PerformanceDetailsModal({
               <div
                 className="p-4 rounded-lg"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)',
+                  background: 'rgba(16,185,129,0.06)',
                   border: '1px solid rgba(16,185,129,0.2)'
                 }}
               >
-                <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1">Meta</p>
+                <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>Meta</p>
                 <p className="text-2xl font-bold text-[#10B981]">
                   {metric === 'eficiencia' ? `${targetValue.toFixed(1)} dias` : `${targetValue.toFixed(1)}%`}
                 </p>
@@ -188,14 +190,14 @@ export function PerformanceDetailsModal({
               className="p-4 rounded-lg"
               style={{
                 background: targetValue && currentValue >= targetValue
-                  ? 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)'
-                  : 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, rgba(239,68,68,0.02) 100%)',
+                  ? 'rgba(16,185,129,0.06)'
+                  : 'rgba(239,68,68,0.06)',
                 border: targetValue && currentValue >= targetValue
                   ? '1px solid rgba(16,185,129,0.2)'
                   : '1px solid rgba(239,68,68,0.2)'
               }}
             >
-              <p className="text-[10px] text-gray-500 uppercase tracking-wider font-bold mb-1">Status</p>
+              <p className="text-[10px] uppercase tracking-wider font-bold mb-1" style={{ color: 'var(--text-secondary)' }}>Status</p>
               <div className="flex items-center gap-2">
                 {targetValue && currentValue >= targetValue ? (
                   <>
@@ -215,41 +217,41 @@ export function PerformanceDetailsModal({
 
         <div className="overflow-y-auto max-h-[calc(90vh-300px)]">
           <table className="w-full">
-            <thead className="sticky top-0 z-10" style={{ background: 'rgba(0,0,0,0.95)' }}>
-              <tr className="border-b border-gray-800/50">
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">OS</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tipo</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Cliente</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Abertura</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Fechamento</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-left p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Tempo</th>
-                <th className="text-right p-4 text-[10px] font-bold text-gray-500 uppercase tracking-wider">Valor</th>
+            <thead className="sticky top-0 z-10" style={{ background: 'var(--bg-card)' }}>
+              <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>OS</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Tipo</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Cliente</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Abertura</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Fechamento</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Status</th>
+                <th className="text-left p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Tempo</th>
+                <th className="text-right p-4 text-[10px] font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Valor</th>
               </tr>
             </thead>
             <tbody>
               {osList.map((os) => (
                 <tr
                   key={os.id}
-                  className="border-b border-gray-800/30 transition-all duration-200"
-                  style={{ background: 'rgba(0,0,0,0.2)' }}
+                  className="transition-all duration-200"
+                  style={{ borderBottom: '1px solid var(--border-primary)', background: 'transparent' }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.background = 'rgba(6,182,212,0.05)';
+                    e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.04)';
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                    e.currentTarget.style.background = 'transparent';
                   }}
                 >
                   <td className="p-4">
-                    <span className="text-sm font-bold text-[#06B6D4]">{os.numero_os}</span>
+                    <span className="text-sm font-bold" style={{ color: 'var(--text-accent)' }}>{os.numero_os}</span>
                   </td>
                   <td className="p-4">
                     <span
                       className="text-[10px] font-bold px-2 py-1 rounded uppercase"
                       style={{
                         background: os.tipo_os === 'LP'
-                          ? 'linear-gradient(135deg, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.1) 100%)'
-                          : 'linear-gradient(135deg, rgba(14,165,233,0.2) 0%, rgba(14,165,233,0.1) 100%)',
+                          ? 'rgba(168,85,247,0.12)'
+                          : 'rgba(14,165,233,0.12)',
                         color: os.tipo_os === 'LP' ? '#A855F7' : '#0EA5E9',
                         border: os.tipo_os === 'LP' ? '1px solid rgba(168,85,247,0.3)' : '1px solid rgba(14,165,233,0.3)'
                       }}
@@ -258,15 +260,15 @@ export function PerformanceDetailsModal({
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className="text-sm text-gray-300">{os.cliente_nome}</span>
+                    <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{os.cliente_nome}</span>
                   </td>
                   <td className="p-4">
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                       {new Date(os.created_at).toLocaleDateString('pt-BR')}
                     </span>
                   </td>
                   <td className="p-4">
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                       {os.data_fechamento ? new Date(os.data_fechamento).toLocaleDateString('pt-BR') : '-'}
                     </span>
                   </td>
@@ -299,7 +301,7 @@ export function PerformanceDetailsModal({
                         R$ {os.valor_total.toFixed(2)}
                       </span>
                     ) : (
-                      <span className="text-xs text-gray-500">-</span>
+                      <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>-</span>
                     )}
                   </td>
                 </tr>
