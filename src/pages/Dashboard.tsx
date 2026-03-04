@@ -770,16 +770,16 @@ export function Dashboard() {
             <div
               className="cursor-pointer transition-all duration-200 p-2 rounded-lg"
               onClick={() => loadPerformanceDetails('aprovacao')}
-              style={{ background: 'rgba(0,0,0,0.2)' }}
+              style={{ background: 'var(--bg-secondary)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(16,185,129,0.05)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                e.currentTarget.style.background = 'var(--bg-secondary)';
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Taxa de Aprovacao</span>
+                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Taxa de Aprovacao</span>
                 <span className="text-xs text-[#10B981] font-bold">{stats.taxaAprovacao.toFixed(1)}%</span>
               </div>
               <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
@@ -790,23 +790,23 @@ export function Dashboard() {
                 }} />
               </div>
               {stats.metaTaxaAprovacao && (
-                <p className="text-[9px] text-gray-600 mt-1">Meta: {stats.metaTaxaAprovacao.toFixed(1)}%</p>
+                <p className="text-[9px] mt-1" style={{ color: 'var(--text-secondary)' }}>Meta: {stats.metaTaxaAprovacao.toFixed(1)}%</p>
               )}
             </div>
 
             <div
               className="cursor-pointer transition-all duration-200 p-2 rounded-lg"
               onClick={() => loadPerformanceDetails('eficiencia')}
-              style={{ background: 'rgba(0,0,0,0.2)' }}
+              style={{ background: 'var(--bg-secondary)' }}
               onMouseEnter={(e) => {
                 e.currentTarget.style.background = 'rgba(14,165,233,0.05)';
               }}
               onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
+                e.currentTarget.style.background = 'var(--bg-secondary)';
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] text-gray-500 uppercase tracking-wider font-bold">Eficiencia Operacional</span>
+                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Eficiencia Operacional</span>
                 <span className="text-xs text-[#0EA5E9] font-bold">{stats.eficienciaOperacional.toFixed(1)} dias</span>
               </div>
               <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
@@ -819,7 +819,7 @@ export function Dashboard() {
                 }} />
               </div>
               {stats.metaEficiencia && (
-                <p className="text-[9px] text-gray-600 mt-1">Meta: {stats.metaEficiencia.toFixed(1)} dias</p>
+                <p className="text-[9px] mt-1" style={{ color: 'var(--text-secondary)' }}>Meta: {stats.metaEficiencia.toFixed(1)} dias</p>
               )}
             </div>
           </div>
