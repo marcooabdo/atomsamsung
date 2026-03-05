@@ -208,11 +208,11 @@
 }
 
 :root.theme-white-pink {
-  --deep-graphite: #fff5f8;
+  --deep-graphite: #fafafa;
   --absolute-black: #ffffff;
-  --carbon-gray: #feeef5;
-  --slate-dark: #fddde9;
-  --steel-gray: #f8b4cc;
+  --carbon-gray: #f5f5f5;
+  --slate-dark: #eeeeee;
+  --steel-gray: #e0e0e0;
 
   --samsung-blue: #1428F0;
   --electric-blue: #c0254f;
@@ -227,29 +227,29 @@
   --neon-glow-lime: 0 0 8px rgba(26, 122, 50, 0.22), 0 0 18px rgba(26, 122, 50, 0.1);
   --neon-glow-accent: 0 0 6px rgba(192, 37, 79, 0.18), 0 0 14px rgba(192, 37, 79, 0.08);
 
-  --bg-primary: #fff5f8;
-  --bg-primary-rgb: 255, 245, 248;
+  --bg-primary: #f8f8f8;
+  --bg-primary-rgb: 248, 248, 248;
   --bg-secondary: #ffffff;
   --bg-card: rgba(255, 255, 255, 0.99);
-  --bg-hover: rgba(192, 37, 79, 0.05);
-  --bg-sidebar: linear-gradient(180deg, #ffffff, #feeef5);
+  --bg-hover: rgba(192, 37, 79, 0.04);
+  --bg-sidebar: linear-gradient(180deg, #ffffff, #f5f5f5);
   --text-primary: #1a0d13;
   --text-secondary: #7a4560;
   --text-accent: #c0254f;
   --text-on-accent: #ffffff;
-  --border-primary: rgba(192, 37, 79, 0.13);
-  --border-accent: rgba(192, 37, 79, 0.28);
+  --border-primary: rgba(192, 37, 79, 0.1);
+  --border-accent: rgba(192, 37, 79, 0.25);
   --shadow-primary: rgba(0, 0, 0, 0.05);
-  --grid-color: rgba(192, 37, 79, 0.025);
-  --scrollbar-track: #feeef5;
+  --grid-color: rgba(192, 37, 79, 0.015);
+  --scrollbar-track: #f0f0f0;
   --scrollbar-thumb: linear-gradient(180deg, #c0254f, #941d3e);
   --scrollbar-thumb-hover: linear-gradient(180deg, #d63b68, #c0254f);
-  --glass-bg: rgba(255, 255, 255, 0.82);
-  --glass-border: rgba(192, 37, 79, 0.12);
-  --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.07), 0 4px 18px rgba(192, 37, 79, 0.04);
+  --glass-bg: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(192, 37, 79, 0.1);
+  --card-shadow: 0 1px 4px rgba(0, 0, 0, 0.06), 0 4px 18px rgba(0, 0, 0, 0.04);
   --accent-rgb: 192, 37, 79;
-  --card-gradient-end: rgba(0,0,0,0.015);
-  --card-inset-glow: rgba(192,37,79,0.02);
+  --card-gradient-end: rgba(0,0,0,0.01);
+  --card-inset-glow: rgba(192,37,79,0.015);
   --progress-track: rgba(0,0,0,0.07);
   --subtle-border: rgba(0,0,0,0.07);
 }
