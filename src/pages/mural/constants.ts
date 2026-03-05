@@ -2,15 +2,31 @@ import type { GIAAgentConfig } from './types';
 
 export const COLUMN_CAPACITY = 100;
 
-export const GIA_AGENTS: GIAAgentConfig[] = [
+function hexToRgb(hex: string): string {
+  const clean = hex.replace('#', '');
+  const r = parseInt(clean.substring(0, 2), 16);
+  const g = parseInt(clean.substring(2, 4), 16);
+  const b = parseInt(clean.substring(4, 6), 16);
+  return `${r},${g},${b}`;
+}
+
+function neonEntry(neonGreen: string): Pick<GIAAgentConfig, 'color' | 'bgGradient' | 'borderColor' | 'headerGradient'> {
+  const rgb = hexToRgb(neonGreen);
+  return {
+    color: neonGreen,
+    bgGradient: `rgba(${rgb},0.05)`,
+    borderColor: `rgba(${rgb},0.25)`,
+    headerGradient: `linear-gradient(135deg, rgba(${rgb},0.12), rgba(${rgb},0.04))`,
+  };
+}
+
+export function getGiaAgents(neonGreen: string = '#39FF14'): GIAAgentConfig[] {
+  return [
   {
     name: 'GIA Connect',
     shortName: 'CONNECT',
-    color: '#39FF14',
+    ...neonEntry(neonGreen),
     maxLoad: 6,
-    bgGradient: 'rgba(57,255,20,0.05)',
-    borderColor: 'rgba(57,255,20,0.25)',
-    headerGradient: 'linear-gradient(135deg, rgba(57,255,20,0.12), rgba(57,255,20,0.04))',
   },
   {
     name: 'GIA Sales',
@@ -51,11 +67,8 @@ export const GIA_AGENTS: GIAAgentConfig[] = [
   {
     name: 'GIA Logistics',
     shortName: 'LOGISTICS',
-    color: '#39FF14',
+    ...neonEntry(neonGreen),
     maxLoad: 5,
-    bgGradient: 'rgba(57,255,20,0.05)',
-    borderColor: 'rgba(57,255,20,0.25)',
-    headerGradient: 'linear-gradient(135deg, rgba(57,255,20,0.12), rgba(57,255,20,0.04))',
   },
   {
     name: 'GIA Stock',
@@ -78,11 +91,8 @@ export const GIA_AGENTS: GIAAgentConfig[] = [
   {
     name: 'GIA Audit',
     shortName: 'AUDIT',
-    color: '#39FF14',
+    ...neonEntry(neonGreen),
     maxLoad: 5,
-    bgGradient: 'rgba(57,255,20,0.05)',
-    borderColor: 'rgba(57,255,20,0.25)',
-    headerGradient: 'linear-gradient(135deg, rgba(57,255,20,0.12), rgba(57,255,20,0.04))',
   },
   {
     name: 'GIA Fiscal',
@@ -111,4 +121,7 @@ export const GIA_AGENTS: GIAAgentConfig[] = [
     borderColor: 'rgba(167,139,250,0.25)',
     headerGradient: 'linear-gradient(135deg, rgba(167,139,250,0.12), rgba(167,139,250,0.04))',
   },
-];
+  ];
+}
+
+export const GIA_AGENTS = getGiaAgents();

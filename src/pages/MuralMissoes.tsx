@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useNeonGreen } from '../contexts/ThemeContext';
 import type { MuralTarefa } from './mural/types';
-import { GIA_AGENTS } from './mural/constants';
+import { getGiaAgents } from './mural/constants';
 import { agentMatchesTask, sortTasks } from './mural/utils';
 import { LiveClock } from './mural/LiveClock';
 import { ScanlineOverlay } from './mural/ScanlineOverlay';
@@ -24,6 +25,8 @@ import { AgentColumn } from './mural/AgentColumn';
 
 export function MuralMissoes() {
   const { unidadeAtual, usuario } = useAuth();
+  const neonGreen = useNeonGreen();
+  const GIA_AGENTS = getGiaAgents(neonGreen);
   const [tasks, setTasks] = useState<MuralTarefa[]>([]);
   const [loading, setLoading] = useState(true);
   const [connected, setConnected] = useState(false);
@@ -111,10 +114,10 @@ export function MuralMissoes() {
 
       <div className="absolute inset-0 pointer-events-none z-0">
         <div className="absolute top-0 left-1/4 w-96 h-96 rounded-full opacity-10" style={{ background: '#00D4FF', filter: 'blur(120px)', transform: 'translate(-50%,-50%)' }} />
-        <div className="absolute bottom-1/3 right-1/4 w-72 h-72 rounded-full opacity-10" style={{ background: '#39FF14', filter: 'blur(130px)', transform: 'translate(50%,50%)' }} />
+        <div className="absolute bottom-1/3 right-1/4 w-72 h-72 rounded-full opacity-10" style={{ background: neonGreen, filter: 'blur(130px)', transform: 'translate(50%,50%)' }} />
       </div>
 
-      <div className="absolute top-0 left-0 right-0 h-px z-10" style={{ background: 'linear-gradient(90deg, transparent, #00D4FF 30%, #39FF14 70%, transparent)' }} />
+      <div className="absolute top-0 left-0 right-0 h-px z-10" style={{ background: `linear-gradient(90deg, transparent, #00D4FF 30%, ${neonGreen} 70%, transparent)` }} />
 
       <div
         className="relative z-10 flex-shrink-0 px-5 py-2.5 flex items-center justify-between"
@@ -127,12 +130,12 @@ export function MuralMissoes() {
               style={{ background: 'linear-gradient(135deg, rgba(0,212,255,0.2), rgba(57,255,20,0.06))', border: '1px solid rgba(0,212,255,0.35)', boxShadow: '0 0 20px rgba(0,212,255,0.15)' }}
             >
               <Target style={{ width: 18, height: 18, color: '#00D4FF' }} />
-              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#39FF14] animate-pulse" style={{ boxShadow: '0 0 8px #39FF14' }} />
+              <div className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full animate-pulse" style={{ background: neonGreen, boxShadow: `0 0 8px ${neonGreen}` }} />
             </div>
             <div>
               <h1
                 className="text-base font-black tracking-[0.2em] uppercase leading-none"
-                style={{ background: 'linear-gradient(90deg, #00D4FF, #39FF14)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
+                style={{ background: `linear-gradient(90deg, #00D4FF, ${neonGreen})`, WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
               >
                 ATOM COMMAND
               </h1>
@@ -147,10 +150,10 @@ export function MuralMissoes() {
                 animate={{ opacity: 1, scale: 1, x: 0 }}
                 exit={{ opacity: 0, scale: 0.85 }}
                 className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full"
-                style={{ background: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.3)', boxShadow: '0 0 12px rgba(57,255,20,0.12)' }}
+                style={{ background: `${neonGreen}1A`, border: `1px solid ${neonGreen}4D`, boxShadow: `0 0 12px ${neonGreen}1F` }}
               >
-                <Zap className="w-2.5 h-2.5 text-[#39FF14] animate-pulse" />
-                <span className="text-[9px] font-black text-[#39FF14] tracking-wider font-mono">NOVA MISSAO</span>
+                <Zap className="w-2.5 h-2.5 animate-pulse" style={{ color: neonGreen }} />
+                <span className="text-[9px] font-black tracking-wider font-mono" style={{ color: neonGreen }}>NOVA MISSAO</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -182,11 +185,11 @@ export function MuralMissoes() {
             {connected ? (
               <>
                 <div className="relative">
-                  <div className="w-2 h-2 rounded-full bg-[#39FF14]" style={{ boxShadow: '0 0 6px #39FF14' }} />
-                  <div className="absolute inset-0 w-2 h-2 rounded-full bg-[#39FF14] animate-ping opacity-40" />
+                  <div className="w-2 h-2 rounded-full" style={{ background: neonGreen, boxShadow: `0 0 6px ${neonGreen}` }} />
+                  <div className="absolute inset-0 w-2 h-2 rounded-full animate-ping opacity-40" style={{ background: neonGreen }} />
                 </div>
-                <Wifi className="w-3 h-3 text-[#39FF14]" />
-                <span className="text-[9px] text-[#39FF14] font-black tracking-wider font-mono">ONLINE</span>
+                <Wifi className="w-3 h-3" style={{ color: neonGreen }} />
+                <span className="text-[9px] font-black tracking-wider font-mono" style={{ color: neonGreen }}>ONLINE</span>
               </>
             ) : (
               <>
@@ -240,7 +243,7 @@ export function MuralMissoes() {
           <div className="h-full flex items-center justify-center">
             <div className="flex flex-col items-center gap-4">
               <div className="relative w-14 h-14">
-                <div className="absolute inset-0 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#00D4FF', borderRightColor: '#39FF14' }} />
+                <div className="absolute inset-0 rounded-full border-2 border-transparent animate-spin" style={{ borderTopColor: '#00D4FF', borderRightColor: neonGreen }} />
                 <div className="absolute inset-2 rounded-full border border-transparent animate-spin" style={{ borderBottomColor: '#00D4FF', animationDirection: 'reverse', animationDuration: '0.6s' }} />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Radio className="w-5 h-5 text-[#00D4FF] animate-pulse" />
@@ -281,7 +284,7 @@ export function MuralMissoes() {
         <div className="flex items-center gap-3 text-[9px] font-mono text-slate-800">
           <span>GIA_MURAL_TAREFAS</span>
           <span className="text-slate-700">|</span>
-          <span className="text-[#39FF14] opacity-50">ESTADO: {connected ? 'ATIVO' : 'OFFLINE'}</span>
+          <span style={{ color: neonGreen, opacity: 0.5 }}>ESTADO: {connected ? 'ATIVO' : 'OFFLINE'}</span>
         </div>
       </div>
     </div>
