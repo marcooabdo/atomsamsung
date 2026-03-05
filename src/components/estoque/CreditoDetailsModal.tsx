@@ -72,27 +72,30 @@ export function CreditoDetailsModal({ categoria, onClose }: CreditoDetailsModalP
         style={{
           maxHeight: '90vh',
           background: 'var(--bg-card)',
-          border: '1px solid rgba(57,255,20,0.3)',
-          boxShadow: '0 0 60px rgba(57,255,20,0.08), var(--card-shadow)',
+          border: '1px solid rgba(var(--neon-green-rgb),0.28)',
+          boxShadow: '0 0 40px rgba(var(--neon-green-rgb),0.06), var(--card-shadow)',
         }}
       >
         {/* Header */}
         <div
           className="flex items-center justify-between px-6 py-4 flex-shrink-0"
-          style={{ borderBottom: '1px solid rgba(57,255,20,0.15)' }}
+          style={{ borderBottom: '1px solid rgba(var(--neon-green-rgb),0.12)' }}
         >
           <div className="flex items-center gap-3">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center"
-              style={{ background: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.3)' }}
+              style={{
+                background: 'rgba(var(--neon-green-rgb),0.1)',
+                border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+              }}
             >
-              <Package className="w-4 h-4 text-[#39FF14]" />
+              <Package className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
             </div>
             <div>
               <h2 className="text-base font-bold tracking-wider uppercase" style={{ color: 'var(--text-primary)' }}>{categoria.label}</h2>
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 {categoria.pecas.length} {categoria.pecas.length === 1 ? 'peça' : 'peças'} &nbsp;·&nbsp;
-                <span className="text-[#39FF14] font-semibold">
+                <span className="font-semibold" style={{ color: 'var(--neon-green)' }}>
                   {formatCurrency(categoria.total)}
                 </span>
               </p>
@@ -102,17 +105,18 @@ export function CreditoDetailsModal({ categoria, onClose }: CreditoDetailsModalP
           <div className="flex items-center gap-3">
             <button
               onClick={() => exportCSV(categoria)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg text-[#39FF14] text-sm font-bold uppercase tracking-wider transition-all"
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold uppercase tracking-wider transition-all"
               style={{
-                background: 'rgba(57,255,20,0.1)',
-                border: '1px solid rgba(57,255,20,0.4)',
+                background: 'rgba(var(--neon-green-rgb),0.1)',
+                border: '1px solid rgba(var(--neon-green-rgb),0.35)',
+                color: 'var(--neon-green)',
               }}
               onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(57,255,20,0.18)';
-                (e.currentTarget as HTMLElement).style.boxShadow = '0 0 15px rgba(57,255,20,0.25)';
+                (e.currentTarget as HTMLElement).style.background = 'rgba(var(--neon-green-rgb),0.18)';
+                (e.currentTarget as HTMLElement).style.boxShadow = 'var(--neon-green-glow)';
               }}
               onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.background = 'rgba(57,255,20,0.1)';
+                (e.currentTarget as HTMLElement).style.background = 'rgba(var(--neon-green-rgb),0.1)';
                 (e.currentTarget as HTMLElement).style.boxShadow = 'none';
               }}
             >
@@ -172,17 +176,17 @@ export function CreditoDetailsModal({ categoria, onClose }: CreditoDetailsModalP
                       className="transition-colors"
                       style={{
                         borderBottom: '1px solid var(--border-primary)',
-                        background: i % 2 === 0 ? 'transparent' : 'rgba(var(--accent-rgb),0.02)',
+                        background: i % 2 === 0 ? 'transparent' : 'rgba(var(--neon-green-rgb),0.02)',
                       }}
                       onMouseEnter={e => {
-                        (e.currentTarget as HTMLElement).style.background = 'rgba(57,255,20,0.04)';
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(var(--neon-green-rgb),0.04)';
                       }}
                       onMouseLeave={e => {
-                        (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? 'transparent' : 'rgba(var(--accent-rgb),0.02)';
+                        (e.currentTarget as HTMLElement).style.background = i % 2 === 0 ? 'transparent' : 'rgba(var(--neon-green-rgb),0.02)';
                       }}
                     >
                       <td className="py-3 pr-4">
-                        <div className="font-mono text-[#39FF14] text-xs font-bold">{idLabel}</div>
+                        <div className="font-mono text-xs font-bold" style={{ color: 'var(--neon-green)' }}>{idLabel}</div>
                         <div className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{item.pn}</div>
                       </td>
                       <td className="py-3 pr-4 max-w-[220px]" style={{ color: 'var(--text-primary)' }}>
@@ -229,14 +233,14 @@ export function CreditoDetailsModal({ categoria, onClose }: CreditoDetailsModalP
         <div
           className="flex items-center justify-between px-6 py-3 rounded-b-2xl flex-shrink-0"
           style={{
-            borderTop: '1px solid rgba(57,255,20,0.15)',
+            borderTop: '1px solid rgba(var(--neon-green-rgb),0.12)',
             background: 'var(--bg-card)',
           }}
         >
           <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{categoria.pecas.length} itens</span>
           <div className="flex items-center gap-2">
             <span className="text-xs uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>Total</span>
-            <span className="text-lg font-bold text-[#39FF14] drop-shadow-[0_0_8px_rgba(57,255,20,0.5)]">
+            <span className="text-lg font-bold" style={{ color: 'var(--neon-green)' }}>
               {formatCurrency(categoria.total)}
             </span>
           </div>

@@ -12,6 +12,9 @@
   --electric-blue: #00D4FF;
   --neon-cyan: #00F5FF;
   --lime-neon: #39FF14;
+  --neon-green: #39FF14;
+  --neon-green-rgb: 57, 255, 20;
+  --neon-green-glow: 0 0 12px rgba(57,255,20,0.5), 0 0 20px rgba(57,255,20,0.3);
 
   --neon-glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
   --neon-glow-cyan: 0 0 10px rgba(0, 245, 255, 0.5), 0 0 20px rgba(0, 245, 255, 0.3);
@@ -68,6 +71,9 @@
   --electric-blue: #00D4FF;
   --neon-cyan: #00F5FF;
   --lime-neon: #39FF14;
+  --neon-green: #39FF14;
+  --neon-green-rgb: 57, 255, 20;
+  --neon-green-glow: 0 0 12px rgba(57,255,20,0.5), 0 0 20px rgba(57,255,20,0.3);
 
   --neon-glow-blue: 0 0 10px rgba(0, 212, 255, 0.5), 0 0 20px rgba(0, 212, 255, 0.3), 0 0 30px rgba(0, 212, 255, 0.1);
   --neon-glow-cyan: 0 0 10px rgba(0, 245, 255, 0.5), 0 0 20px rgba(0, 245, 255, 0.3);
@@ -118,6 +124,9 @@
   --electric-blue: #f72585;
   --neon-cyan: #ff4da6;
   --lime-neon: #4CC9F0;
+  --neon-green: #39FF14;
+  --neon-green-rgb: 57, 255, 20;
+  --neon-green-glow: 0 0 12px rgba(57,255,20,0.5), 0 0 20px rgba(57,255,20,0.3);
 
   --neon-glow-blue: 0 0 10px rgba(247, 37, 133, 0.55), 0 0 22px rgba(247, 37, 133, 0.28), 0 0 36px rgba(247, 37, 133, 0.1);
   --neon-glow-cyan: 0 0 10px rgba(255, 77, 166, 0.5), 0 0 20px rgba(255, 77, 166, 0.25);
@@ -162,6 +171,9 @@
   --electric-blue: #006db3;
   --neon-cyan: #0088cc;
   --lime-neon: #1a7a32;
+  --neon-green: #15803d;
+  --neon-green-rgb: 21, 128, 61;
+  --neon-green-glow: 0 0 4px rgba(21,128,61,0.15);
 
   --neon-glow-blue: 0 0 8px rgba(0, 109, 179, 0.22), 0 0 18px rgba(0, 109, 179, 0.1);
   --neon-glow-cyan: 0 0 8px rgba(0, 136, 204, 0.22), 0 0 18px rgba(0, 136, 204, 0.1);
@@ -206,6 +218,9 @@
   --electric-blue: #c0254f;
   --neon-cyan: #d63b68;
   --lime-neon: #1a7a32;
+  --neon-green: #15803d;
+  --neon-green-rgb: 21, 128, 61;
+  --neon-green-glow: 0 0 4px rgba(21,128,61,0.15);
 
   --neon-glow-blue: 0 0 8px rgba(192, 37, 79, 0.22), 0 0 18px rgba(192, 37, 79, 0.1);
   --neon-glow-cyan: 0 0 8px rgba(214, 59, 104, 0.22), 0 0 18px rgba(214, 59, 104, 0.1);
