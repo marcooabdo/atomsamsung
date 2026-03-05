@@ -1886,9 +1886,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: usuario.ativo ? '#39FF1420' : '#FF006420',
-                                    color: usuario.ativo ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${usuario.ativo ? '#39FF14' : '#FF0064'}60`
+                                    backgroundColor: usuario.ativo ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                    color: usuario.ativo ? 'var(--neon-green)' : '#FF0064',
+                                    border: usuario.ativo ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid #FF006460'
                                   }}
                                 >
                                   {usuario.ativo ? 'Ativo' : 'Inativo'}
@@ -1955,9 +1955,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: servico.ativo ? '#39FF1420' : '#FF006420',
-                                    color: servico.ativo ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${servico.ativo ? '#39FF14' : '#FF0064'}60`
+                                    backgroundColor: servico.ativo ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                    color: servico.ativo ? 'var(--neon-green)' : '#FF0064',
+                                    border: servico.ativo ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid #FF006460'
                                   }}
                                 >
                                   {servico.ativo ? 'Ativo' : 'Inativo'}
@@ -2033,11 +2033,11 @@ export function Configuracoes() {
                                   className="px-2 py-0.5 rounded text-[10px] font-bold uppercase"
                                   style={{
                                     backgroundColor: markup.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' :
-                                                     markup.tipo_orcamento === 'acessorios' ? '#39FF1430' : 'rgba(var(--accent-rgb), 0.19)',
+                                                     markup.tipo_orcamento === 'acessorios' ? 'rgba(var(--neon-green-rgb),0.12)' : 'rgba(var(--accent-rgb), 0.19)',
                                     color: markup.tipo_orcamento === 'samsung_contigo' ? '#FFA500' :
-                                           markup.tipo_orcamento === 'acessorios' ? '#39FF14' : 'var(--text-accent)',
+                                           markup.tipo_orcamento === 'acessorios' ? 'var(--neon-green)' : 'var(--text-accent)',
                                     border: markup.tipo_orcamento === 'samsung_contigo' ? '1px solid #FFA50060' :
-                                            markup.tipo_orcamento === 'acessorios' ? '1px solid #39FF1460' : '1px solid rgba(var(--accent-rgb), 0.38)'
+                                            markup.tipo_orcamento === 'acessorios' ? '1px solid rgba(var(--neon-green-rgb),0.45)' : '1px solid rgba(var(--accent-rgb), 0.38)'
                                   }}
                                 >
                                   {markup.tipo_orcamento === 'normal' ? 'NORMAL' :
@@ -2047,9 +2047,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: markup.ativo ? '#39FF1420' : '#FF006420',
-                                    color: markup.ativo ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${markup.ativo ? '#39FF14' : '#FF0064'}60`
+                                    backgroundColor: markup.ativo ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                    color: markup.ativo ? 'var(--neon-green)' : '#FF0064',
+                                    border: markup.ativo ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid #FF006460'
                                   }}
                                 >
                                   {markup.ativo ? 'Ativo' : 'Inativo'}
@@ -2317,9 +2317,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-3 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: rota.ativa ? '#39FF1420' : '#FF006420',
-                                    color: rota.ativa ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${rota.ativa ? '#39FF14' : '#FF0064'}60`
+                                    backgroundColor: rota.ativa ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                    color: rota.ativa ? 'var(--neon-green)' : '#FF0064',
+                                    border: rota.ativa ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid #FF006460'
                                   }}
                                 >
                                   {rota.ativa ? 'Ativa' : 'Inativa'}
@@ -2444,9 +2444,9 @@ export function Configuracoes() {
                                 <span
                                   className="px-3 py-1 rounded text-xs font-bold uppercase"
                                   style={{
-                                    backgroundColor: checklist.ativo ? '#39FF1420' : '#FF006420',
-                                    color: checklist.ativo ? '#39FF14' : '#FF0064',
-                                    border: `1px solid ${checklist.ativo ? '#39FF14' : '#FF0064'}60`
+                                    backgroundColor: checklist.ativo ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                    color: checklist.ativo ? 'var(--neon-green)' : '#FF0064',
+                                    border: checklist.ativo ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid #FF006460'
                                   }}
                                 >
                                   {checklist.ativo ? 'Ativo' : 'Inativo'}
