@@ -179,7 +179,7 @@ export function OFS() {
   const hasData = rows.length > 0;
 
   return (
-    <div className="min-h-screen bg-[#0f172a] space-y-5 fade-in pb-32">
+    <div className="min-h-screen space-y-5 fade-in pb-32" style={{ background: 'var(--bg-primary)' }}>
 
       {/* BLOCO A: HEADER & IMPORTADOR */}
       <div className="space-y-4">
@@ -192,19 +192,26 @@ export function OFS() {
         <div className="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h1
-              className="text-2xl font-black tracking-[0.15em] text-[#00D4FF] uppercase"
-              style={{ textShadow: '0 0 20px rgba(0,212,255,0.5)' }}
+              className="text-2xl font-black tracking-[0.15em] uppercase"
+              style={{ color: 'var(--text-accent)' }}
             >
               OFS Gateway
             </h1>
-            <p className="text-xs text-slate-500 tracking-widest uppercase mt-0.5">
+            <p className="text-xs tracking-widest uppercase mt-0.5" style={{ color: 'var(--text-secondary)' }}>
               Dashboard de Compras Inteligente — GIA x Samsung
             </p>
           </div>
           <button
             onClick={reload}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg border border-[#00D4FF]/30 text-[#00D4FF] text-sm font-semibold hover:bg-[#00D4FF]/10 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all disabled:opacity-50"
+            style={{
+              border: '1px solid var(--border-accent)',
+              color: 'var(--text-accent)',
+              background: 'transparent',
+            }}
+            onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'}
+            onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = 'transparent'}
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Atualizar
@@ -217,42 +224,41 @@ export function OFS() {
           onDragLeave={() => setIsDragging(false)}
           onDrop={handleDrop}
           onClick={() => fileInputRef.current?.click()}
-          className={`
-            relative cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all duration-300
-            ${isDragging
-              ? 'border-[#00D4FF] bg-[#00D4FF]/10 shadow-[0_0_30px_rgba(0,212,255,0.25)]'
+          className="relative cursor-pointer rounded-xl border-2 border-dashed p-8 text-center transition-all duration-300"
+          style={
+            isDragging
+              ? { borderColor: 'var(--text-accent)', background: 'var(--bg-hover)', boxShadow: '0 0 24px rgba(var(--accent-rgb),0.2)' }
               : hasCsv
-                ? 'border-emerald-500/50 bg-emerald-500/5 hover:border-emerald-400 hover:bg-emerald-500/10'
-                : 'border-slate-600/50 bg-slate-800/30 hover:border-[#00D4FF]/50 hover:bg-[#00D4FF]/5'
-            }
-          `}
+                ? { borderColor: 'rgba(34,197,94,0.5)', background: 'rgba(34,197,94,0.05)' }
+                : { borderColor: 'var(--border-primary)', background: 'var(--bg-secondary)' }
+          }
         >
           <input ref={fileInputRef} type="file" accept=".csv" className="hidden" onChange={handleFileChange} />
           {hasCsv ? (
             <div className="flex items-center justify-center gap-3">
-              <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+              <CheckCircle2 className="w-8 h-8 text-emerald-500" />
               <div className="text-left">
-                <p className="font-bold text-emerald-300 text-sm">{csvFileName}</p>
+                <p className="font-bold text-emerald-600 text-sm">{csvFileName}</p>
                 <p className="text-xs text-emerald-500">{csvRows.length} PNs importados — clique para trocar</p>
               </div>
             </div>
           ) : (
             <div className="space-y-2">
               <DownloadCloud
-                className={`w-10 h-10 mx-auto ${isDragging ? 'text-[#00D4FF]' : 'text-slate-500'}`}
-                style={isDragging ? { filter: 'drop-shadow(0 0 8px rgba(0,212,255,0.7))' } : {}}
+                className="w-10 h-10 mx-auto"
+                style={{ color: isDragging ? 'var(--text-accent)' : 'var(--text-secondary)' }}
               />
-              <p className={`font-semibold text-sm ${isDragging ? 'text-[#00D4FF]' : 'text-slate-400'}`}>
+              <p className="font-semibold text-sm" style={{ color: isDragging ? 'var(--text-accent)' : 'var(--text-primary)' }}>
                 Arraste a planilha de sugestao diaria OFS (CSV) aqui ou clique para importar
               </p>
-              <p className="text-xs text-slate-600">Formato esperado: colunas PN e Qtd (separadas por ; , ou tab)</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Formato esperado: colunas PN e Qtd (separadas por ; , ou tab)</p>
             </div>
           )}
         </div>
       </div>
 
       {error && (
-        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-400 flex items-center gap-2">
+        <div className="rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-500 flex items-center gap-2">
           <AlertTriangle className="w-4 h-4 shrink-0" />
           {error}
         </div>
@@ -261,52 +267,84 @@ export function OFS() {
       {/* BLOCO B: SIMULADOR FINANCEIRO */}
       {selectedUnidade && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-4 space-y-1">
-            <p className="text-xs text-emerald-500 uppercase tracking-widest font-semibold">Credito Livre</p>
-            <p className="text-xl font-black text-emerald-300" style={{ textShadow: '0 0 12px rgba(52,211,153,0.4)' }}>
+
+          <div
+            className="rounded-xl p-4 space-y-1"
+            style={{
+              border: '1px solid rgba(34,197,94,0.3)',
+              background: 'rgba(34,197,94,0.05)',
+            }}
+          >
+            <p className="text-xs text-emerald-600 uppercase tracking-widest font-semibold">Credito Livre</p>
+            <p className="text-xl font-black text-emerald-600">
               {fmt(financeiro.credito_livre)}
             </p>
-            <p className="text-xs text-slate-500">Limite: {fmt(financeiro.credito_limite)}</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Limite: {fmt(financeiro.credito_limite)}</p>
           </div>
 
-          <div className="rounded-xl border border-slate-600/40 bg-slate-800/30 p-4 space-y-1">
-            <p className="text-xs text-slate-400 uppercase tracking-widest font-semibold flex items-center gap-1">
+          <div
+            className="rounded-xl p-4 space-y-1"
+            style={{
+              border: '1px solid var(--border-primary)',
+              background: 'var(--bg-card)',
+            }}
+          >
+            <p className="text-xs uppercase tracking-widest font-semibold flex items-center gap-1" style={{ color: 'var(--text-secondary)' }}>
               <Package className="w-3 h-3" /> Pedido Samsung
             </p>
-            <p className="text-xl font-black text-slate-200">
+            <p className="text-xl font-black" style={{ color: 'var(--text-primary)' }}>
               {hasCsv ? fmt(custoSamsung) : '—'}
             </p>
-            <p className="text-xs text-slate-600">100% arquivo CSV</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>100% arquivo CSV</p>
           </div>
 
-          <div className="rounded-xl border border-[#00D4FF]/30 bg-[#00D4FF]/5 p-4 space-y-1">
-            <p className="text-xs text-[#00D4FF] uppercase tracking-widest font-semibold flex items-center gap-1">
+          <div
+            className="rounded-xl p-4 space-y-1"
+            style={{
+              border: '1px solid var(--border-accent)',
+              background: 'var(--bg-hover)',
+            }}
+          >
+            <p className="text-xs uppercase tracking-widest font-semibold flex items-center gap-1" style={{ color: 'var(--text-accent)' }}>
               <TrendingUp className="w-3 h-3" /> Pedido GIA
             </p>
-            <p className="text-xl font-black text-[#00D4FF]" style={{ textShadow: '0 0 12px rgba(0,212,255,0.4)' }}>
+            <p className="text-xl font-black" style={{ color: 'var(--text-accent)' }}>
               {hasData ? fmt(custoGIA) : '—'}
             </p>
-            <p className="text-xs text-slate-600">Otimizado por IA</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Otimizado por IA</p>
           </div>
 
-          <div className={`rounded-xl border p-4 space-y-2 ${excede ? 'border-red-500/50 bg-red-500/10' : 'border-slate-600/40 bg-slate-800/30'}`}>
-            <p className={`text-xs uppercase tracking-widest font-semibold flex items-center gap-1 ${excede ? 'text-red-400' : 'text-slate-400'}`}>
+          <div
+            className="rounded-xl p-4 space-y-2"
+            style={
+              excede
+                ? { border: '1px solid rgba(239,68,68,0.5)', background: 'rgba(239,68,68,0.07)' }
+                : { border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }
+            }
+          >
+            <p
+              className="text-xs uppercase tracking-widest font-semibold flex items-center gap-1"
+              style={{ color: excede ? '#ef4444' : 'var(--text-secondary)' }}
+            >
               {excede ? <ShieldAlert className="w-3 h-3" /> : <Boxes className="w-3 h-3" />}
               Credito Restante
             </p>
-            <p className={`text-xl font-black ${excede ? 'text-red-400' : 'text-slate-200'}`}>
+            <p
+              className="text-xl font-black"
+              style={{ color: excede ? '#ef4444' : 'var(--text-primary)' }}
+            >
               {hasData ? fmt(creditoRestante) : '—'}
             </p>
             {hasData && (
               <>
-                <div className="w-full h-2 rounded-full bg-slate-700 overflow-hidden">
+                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--progress-track)' }}>
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${excede ? 'bg-red-500 animate-pulse' : usadoPct > 80 ? 'bg-amber-500' : 'bg-emerald-500'}`}
                     style={{ width: `${Math.min(100, usadoPct)}%` }}
                   />
                 </div>
                 {excede && (
-                  <p className="text-xs text-red-400 font-bold flex items-center gap-1">
+                  <p className="text-xs text-red-500 font-bold flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
                     Alerta GIA: Pedido excede limite de seguranca!
                   </p>
@@ -317,43 +355,65 @@ export function OFS() {
         </div>
       )}
 
-      {/* BLOCO C: TABELA DE DECISAO */}
+      {/* BLOCO C: ESTADOS VAZIOS */}
       {loading && (
-        <div className="flex items-center justify-center py-20 gap-3 text-[#00D4FF]">
+        <div className="flex items-center justify-center py-20 gap-3" style={{ color: 'var(--text-accent)' }}>
           <RefreshCw className="w-5 h-5 animate-spin" />
           <span className="text-sm tracking-widest uppercase">Carregando dados...</span>
         </div>
       )}
 
       {!loading && !hasData && !hasCsv && selectedUnidade && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-800/20 p-12 text-center space-y-3">
-          <Upload className="w-12 h-12 text-slate-600 mx-auto" />
-          <p className="text-slate-400 font-semibold">Importe a planilha CSV da Samsung para iniciar a analise</p>
-          <p className="text-xs text-slate-600">Os dados de estoque e giro da unidade ja estao carregados</p>
+        <div
+          className="rounded-xl p-12 text-center space-y-3"
+          style={{ border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }}
+        >
+          <Upload className="w-12 h-12 mx-auto" style={{ color: 'var(--text-secondary)' }} />
+          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Importe a planilha CSV da Samsung para iniciar a analise</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Os dados de estoque e giro da unidade ja estao carregados</p>
         </div>
       )}
 
       {!loading && !selectedUnidade && (
-        <div className="rounded-xl border border-slate-700/50 bg-slate-800/20 p-12 text-center space-y-3">
-          <Boxes className="w-12 h-12 text-slate-600 mx-auto" />
-          <p className="text-slate-400 font-semibold">Selecione uma unidade para comecar</p>
+        <div
+          className="rounded-xl p-12 text-center space-y-3"
+          style={{ border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }}
+        >
+          <Boxes className="w-12 h-12 mx-auto" style={{ color: 'var(--text-secondary)' }} />
+          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Selecione uma unidade para comecar</p>
         </div>
       )}
 
+      {/* BLOCO D: TABELA DE DECISAO */}
       {!loading && hasData && (
-        <div className="rounded-xl border border-slate-700/40 bg-slate-800/20 overflow-hidden">
-          <div className="px-4 py-3 border-b border-slate-700/40 flex items-center justify-between gap-3 flex-wrap">
+        <div
+          className="rounded-xl overflow-hidden"
+          style={{ border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }}
+        >
+          <div
+            className="px-4 py-3 flex items-center justify-between gap-3 flex-wrap"
+            style={{ borderBottom: '1px solid var(--border-primary)' }}
+          >
             <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-[#00D4FF]" />
-              <span className="text-sm font-bold text-slate-200 tracking-wide uppercase">Tabela de Decisao</span>
-              <span className="text-xs text-slate-500 bg-slate-700/50 px-2 py-0.5 rounded-full">{rows.length} PNs</span>
+              <TrendingUp className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
+              <span className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Tabela de Decisao</span>
+              <span
+                className="text-xs px-2 py-0.5 rounded-full"
+                style={{
+                  color: 'var(--text-secondary)',
+                  background: 'var(--bg-secondary)',
+                  border: '1px solid var(--border-primary)',
+                }}
+              >
+                {rows.length} PNs
+              </span>
             </div>
             {hasCsv && (
-              <div className="flex items-center gap-2 text-xs text-slate-500">
+              <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-secondary)' }}>
                 <span className="w-2 h-2 rounded-full bg-blue-500 inline-block" />
                 Samsung
                 <ArrowRight className="w-3 h-3 mx-1" />
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
                 GIA
               </div>
             )}
@@ -362,34 +422,46 @@ export function OFS() {
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-slate-700/40 bg-slate-800/40">
+                <tr style={{ borderBottom: '1px solid var(--border-primary)', background: 'var(--bg-secondary)' }}>
                   <th
-                    className="text-left px-4 py-3 text-slate-400 uppercase tracking-wider font-semibold cursor-pointer hover:text-[#00D4FF] whitespace-nowrap"
+                    className="text-left px-4 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
                     onClick={() => handleSort('pn')}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
                     PN / Descricao <SortIcon col="pn" />
                   </th>
                   <th
-                    className="text-center px-3 py-3 text-slate-400 uppercase tracking-wider font-semibold cursor-pointer hover:text-[#00D4FF] whitespace-nowrap"
+                    className="text-center px-3 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
                     onClick={() => handleSort('qtd_estoque')}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
                     Estoque + Transito <SortIcon col="qtd_estoque" />
                   </th>
                   <th
-                    className="text-center px-3 py-3 text-slate-400 uppercase tracking-wider font-semibold cursor-pointer hover:text-[#00D4FF] whitespace-nowrap"
+                    className="text-center px-3 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
                     onClick={() => handleSort('giro_60d')}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
                     Giro 60d <SortIcon col="giro_60d" />
                   </th>
-                  <th className="text-center px-3 py-3 text-slate-400 uppercase tracking-wider font-semibold whitespace-nowrap">
+                  <th className="text-center px-3 py-3 uppercase tracking-wider font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                     Recomendacao
                   </th>
-                  <th className="text-center px-3 py-3 text-slate-400 uppercase tracking-wider font-semibold whitespace-nowrap">
+                  <th className="text-center px-3 py-3 uppercase tracking-wider font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
                     Decisao Final
                   </th>
                   <th
-                    className="text-right px-4 py-3 text-slate-400 uppercase tracking-wider font-semibold cursor-pointer hover:text-[#00D4FF] whitespace-nowrap"
+                    className="text-right px-4 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
                     onClick={() => handleSort('subtotal')}
+                    onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
+                    onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
                     Subtotal <SortIcon col="subtotal" />
                   </th>
@@ -401,39 +473,45 @@ export function OFS() {
                   return (
                     <tr
                       key={row.pn}
-                      className={`border-b border-slate-700/20 transition-colors hover:bg-slate-700/20 ${idx % 2 === 0 ? 'bg-slate-800/10' : ''}`}
+                      className="transition-colors"
+                      style={{
+                        borderBottom: '1px solid var(--border-primary)',
+                        background: idx % 2 === 0 ? 'transparent' : 'var(--bg-secondary)',
+                      }}
+                      onMouseEnter={e => (e.currentTarget as HTMLElement).style.background = 'var(--bg-hover)'}
+                      onMouseLeave={e => (e.currentTarget as HTMLElement).style.background = idx % 2 === 0 ? 'transparent' : 'var(--bg-secondary)'}
                     >
                       <td className="px-4 py-3">
-                        <p className="font-mono font-bold text-[#00D4FF] text-xs tracking-wider">{row.pn}</p>
-                        <p className="text-slate-400 text-xs mt-0.5 max-w-[200px] truncate" title={row.descricao}>{row.descricao}</p>
+                        <p className="font-mono font-bold text-xs tracking-wider" style={{ color: 'var(--text-accent)' }}>{row.pn}</p>
+                        <p className="text-xs mt-0.5 max-w-[200px] truncate" style={{ color: 'var(--text-secondary)' }} title={row.descricao}>{row.descricao}</p>
                       </td>
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
-                          <span className="font-bold text-slate-200">{row.qtd_estoque}</span>
+                          <span className="font-bold" style={{ color: 'var(--text-primary)' }}>{row.qtd_estoque}</span>
                           {row.qtd_em_transito > 0 && (
-                            <span className="text-amber-400 text-xs">+{row.qtd_em_transito}</span>
+                            <span className="text-amber-500 text-xs">+{row.qtd_em_transito}</span>
                           )}
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <span className={`font-bold ${row.giro_60d > 0 ? 'text-emerald-400' : 'text-slate-600'}`}>
+                        <span className={`font-bold ${row.giro_60d > 0 ? 'text-emerald-600' : ''}`} style={row.giro_60d === 0 ? { color: 'var(--text-secondary)' } : {}}>
                           {row.giro_60d}
                         </span>
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex items-center justify-center gap-1 flex-wrap">
                           {row.qtd_samsung > 0 && (
-                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-900/60 border border-blue-500/40 text-blue-300 whitespace-nowrap">
+                            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-blue-500/10 border border-blue-500/30 text-blue-600 whitespace-nowrap">
                               SAM: {row.qtd_samsung}
                             </span>
                           )}
                           <span
                             className={`px-2 py-0.5 rounded-full text-xs font-bold whitespace-nowrap ${
                               row.qtd_gia > 0
-                                ? 'bg-emerald-900/60 border border-emerald-400/40 text-emerald-300'
-                                : 'bg-slate-700/50 border border-slate-600/40 text-slate-500'
+                                ? 'bg-emerald-500/10 border border-emerald-500/30 text-emerald-600'
+                                : 'border'
                             }`}
-                            style={row.qtd_gia > 0 ? { textShadow: '0 0 6px rgba(52,211,153,0.5)' } : {}}
+                            style={row.qtd_gia === 0 ? { borderColor: 'var(--border-primary)', color: 'var(--text-secondary)', background: 'transparent' } : {}}
                           >
                             GIA: {row.qtd_gia}
                           </span>
@@ -445,11 +523,24 @@ export function OFS() {
                           min={0}
                           value={row.qtd_final}
                           onChange={(e) => updateQtdFinal(row.pn, parseInt(e.target.value, 10) || 0)}
-                          className="w-16 text-center bg-slate-700/60 border border-slate-600/50 rounded-lg px-2 py-1.5 text-white font-bold text-sm focus:outline-none focus:border-[#00D4FF]/60 focus:bg-slate-700 transition-all"
+                          className="w-16 text-center rounded-lg px-2 py-1.5 font-bold text-sm focus:outline-none transition-all"
+                          style={{
+                            background: 'var(--bg-secondary)',
+                            border: '1px solid var(--border-primary)',
+                            color: 'var(--text-primary)',
+                          }}
+                          onFocus={e => {
+                            e.currentTarget.style.borderColor = 'var(--border-accent)';
+                            e.currentTarget.style.background = 'var(--bg-hover)';
+                          }}
+                          onBlur={e => {
+                            e.currentTarget.style.borderColor = 'var(--border-primary)';
+                            e.currentTarget.style.background = 'var(--bg-secondary)';
+                          }}
                         />
                       </td>
                       <td className="px-4 py-3 text-right">
-                        <span className={`font-bold ${subtotal > 0 ? 'text-slate-200' : 'text-slate-600'}`}>
+                        <span className={`font-bold ${subtotal > 0 ? '' : ''}`} style={{ color: subtotal > 0 ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                           {subtotal > 0 ? fmt(subtotal) : '—'}
                         </span>
                       </td>
@@ -458,14 +549,13 @@ export function OFS() {
                 })}
               </tbody>
               <tfoot>
-                <tr className="border-t-2 border-slate-600/50 bg-slate-800/50">
-                  <td colSpan={5} className="px-4 py-3 text-right text-sm font-bold text-slate-300 uppercase tracking-wider">
+                <tr style={{ borderTop: '2px solid var(--border-accent)', background: 'var(--bg-secondary)' }}>
+                  <td colSpan={5} className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
                     Total do Pedido
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
-                      className={`text-base font-black ${excede ? 'text-red-400' : 'text-emerald-400'}`}
-                      style={excede ? {} : { textShadow: '0 0 10px rgba(52,211,153,0.4)' }}
+                      className={`text-base font-black ${excede ? 'text-red-500' : 'text-emerald-600'}`}
                     >
                       {fmt(custoFinal)}
                     </span>
@@ -486,13 +576,22 @@ export function OFS() {
               flex items-center gap-3 px-6 py-4 rounded-xl font-black text-sm uppercase tracking-widest
               transition-all duration-300 shadow-2xl
               ${copied
-                ? 'bg-emerald-600 border border-emerald-400 text-white shadow-emerald-500/30'
+                ? 'bg-emerald-600 border border-emerald-400 text-white'
                 : excede
-                  ? 'bg-red-600/90 border border-red-400 text-white shadow-red-500/30 hover:bg-red-500'
-                  : 'bg-[#00D4FF] border border-[#00D4FF] text-[#0f172a] hover:shadow-[0_0_30px_rgba(0,212,255,0.5)]'
+                  ? 'bg-red-600 border border-red-400 text-white hover:bg-red-500'
+                  : ''
               }
             `}
-            style={!copied && !excede ? { boxShadow: '0 0 20px rgba(0,212,255,0.35)' } : {}}
+            style={
+              !copied && !excede
+                ? {
+                    background: 'var(--text-accent)',
+                    border: '1px solid var(--border-accent)',
+                    color: 'var(--text-on-accent)',
+                    boxShadow: '0 0 20px rgba(var(--accent-rgb),0.35)',
+                  }
+                : {}
+            }
           >
             {copied ? (
               <>
