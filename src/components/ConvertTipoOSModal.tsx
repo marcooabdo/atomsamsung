@@ -67,17 +67,17 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4">
+    <div className="fixed inset-0 flex items-center justify-center z-[100] p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <div
-        className="w-full max-w-md rounded-xl p-6 shadow-2xl relative"
-        style={{
-          backgroundColor: 'var(--card-bg)',
-          border: '1px solid var(--border)',
-        }}
+        className="w-full max-w-md rounded-xl p-6 relative"
+        style={{ background: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.3)', boxShadow: 'var(--card-shadow)' }}
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-200 transition-colors"
+          className="absolute top-4 right-4 p-1.5 rounded-lg transition-colors"
+          style={{ color: 'var(--text-secondary)' }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
         >
           <X className="w-5 h-5" />
         </button>
@@ -85,31 +85,25 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
         <div className="flex items-center gap-3 mb-6">
           <div
             className="p-3 rounded-lg"
-            style={{
-              backgroundColor: '#00D4FF15',
-              border: '1px solid #00D4FF30',
-            }}
+            style={{ background: 'rgba(var(--accent-rgb),0.12)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}
           >
-            <RefreshCw className="w-6 h-6" style={{ color: '#00D4FF' }} />
+            <RefreshCw className="w-6 h-6" style={{ color: 'var(--text-accent)' }} />
           </div>
           <div>
             <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
               Converter Tipo de OS
             </h2>
-            <p className="text-sm text-gray-400">OS #{os.numero}</p>
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>OS #{os.numero}</p>
           </div>
         </div>
 
         <div
           className="p-4 rounded-lg mb-6 flex items-start gap-3"
-          style={{
-            backgroundColor: '#FF660015',
-            border: '1px solid #FF660030',
-          }}
+          style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}
         >
-          <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-gray-300">
-            <p className="font-semibold mb-1">Atenção!</p>
+          <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
+          <div className="text-sm" style={{ color: 'var(--text-secondary)' }}>
+            <p className="font-semibold mb-1" style={{ color: '#F59E0B' }}>Atenção!</p>
             <p>
               Esta ação converterá o tipo da OS. Certifique-se de que todos os dados estão corretos antes de prosseguir.
             </p>
@@ -118,7 +112,7 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
 
         <div className="space-y-4 mb-6">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Tipo Atual
             </label>
             <div
@@ -138,11 +132,11 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
           </div>
 
           <div className="flex items-center justify-center py-2">
-            <RefreshCw className="w-5 h-5 text-gray-500" />
+            <RefreshCw className="w-5 h-5" style={{ color: 'var(--text-secondary)' }} />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="block text-sm font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>
               Converter Para
             </label>
             <div className="space-y-2">
@@ -182,11 +176,9 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
             onClick={onClose}
             disabled={convertendo}
             className="flex-1 px-4 py-3 rounded-lg font-bold transition-all"
-            style={{
-              backgroundColor: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
-              color: 'var(--text-secondary)',
-            }}
+            style={{ background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             CANCELAR
           </button>

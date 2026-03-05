@@ -48,10 +48,7 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{
-        background: 'rgba(0, 0, 0, 0.95)',
-        backdropFilter: 'blur(10px)'
-      }}
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)' }}
       onClick={onClose}
     >
       <div
@@ -61,25 +58,22 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
         <div
           className="flex items-center justify-between p-4 mb-4"
           style={{
-            background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(0,0,0,0.5) 100%)',
+            background: 'var(--bg-card)',
             border: '1px solid rgba(var(--accent-rgb),0.3)',
             borderRadius: '12px',
-            boxShadow: '0 0 30px rgba(var(--accent-rgb),0.2)'
+            boxShadow: 'var(--card-shadow)'
           }}
         >
-          <h3 className="text-lg font-bold text-white truncate max-w-[70%]">
+          <h3 className="text-lg font-bold truncate max-w-[70%]" style={{ color: 'var(--text-primary)' }}>
             {anexo.nome_arquivo}
           </h3>
           <div className="flex gap-2">
             <button
               onClick={handleDownload}
               className="p-2 rounded-lg transition-all duration-300 flex items-center gap-2"
-              style={{
-                background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.05) 100%)',
-                border: '1px solid rgba(57,255,20,0.5)',
-                color: '#39FF14',
-                boxShadow: '0 0 10px rgba(57,255,20,0.2)'
-              }}
+              style={{ background: 'rgba(16,185,129,0.12)', border: '1px solid rgba(16,185,129,0.4)', color: '#10B981' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.22)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(16,185,129,0.12)'; }}
               title="Baixar arquivo"
             >
               <Download className="w-4 h-4" />
@@ -88,12 +82,9 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
             <button
               onClick={onClose}
               className="p-2 rounded-lg transition-all duration-300"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255,0,100,0.2) 0%, rgba(255,0,100,0.05) 100%)',
-                border: '1px solid rgba(255,0,100,0.5)',
-                color: '#FF0064',
-                boxShadow: '0 0 10px rgba(255,0,100,0.2)'
-              }}
+              style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#EF4444' }}
+              onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.22)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
             >
               <X className="w-5 h-5" />
             </button>
@@ -103,10 +94,9 @@ export function AnexoPreviewModal({ anexo, onClose }: AnexoPreviewModalProps) {
         <div
           className="flex-1 overflow-auto flex items-center justify-center"
           style={{
-            background: 'linear-gradient(135deg, rgba(0,0,0,0.5) 0%, rgba(0,0,0,0.8) 100%)',
+            background: 'var(--bg-card)',
             border: '1px solid rgba(var(--accent-rgb),0.2)',
             borderRadius: '12px',
-            boxShadow: 'inset 0 0 30px rgba(var(--accent-rgb),0.1)'
           }}
         >
           {isImage(anexo.nome_arquivo) ? (

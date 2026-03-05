@@ -11,6 +11,12 @@ interface ConfirmModalProps {
   type?: 'danger' | 'warning' | 'info';
 }
 
+const TYPE_CONFIG = {
+  danger:  { rgb: '239,68,68',  color: '#EF4444' },
+  warning: { rgb: '245,158,11', color: '#F59E0B' },
+  info:    { rgb: '14,165,233', color: '#0EA5E9' },
+};
+
 export default function ConfirmModal({
   isOpen,
   onConfirm,
@@ -23,59 +29,74 @@ export default function ConfirmModal({
 }: ConfirmModalProps) {
   if (!isOpen) return null;
 
-  const handleConfirm = () => {
-    onConfirm();
-    onCancel();
-  };
+  const { rgb, color } = TYPE_CONFIG[type];
 
-  const buttonColors = {
-    danger: 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-400 hover:to-red-500',
-    warning: 'bg-gradient-to-r from-yellow-500 to-yellow-600 hover:from-yellow-400 hover:to-yellow-500',
-    info: 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400'
-  };
-
-  const borderColors = {
-    danger: 'border-red-500/30',
-    warning: 'border-yellow-500/30',
-    info: 'border-blue-500/30'
-  };
+  const handleConfirm = () => { onConfirm(); onCancel(); };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-      <div className={`bg-[#0a0a0a] rounded-xl border ${borderColors[type]} max-w-md w-full shadow-2xl`}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)' }}
+      onClick={onCancel}
+    >
+      <div
+        className="max-w-md w-full rounded-xl"
+        style={{
+          background: 'var(--bg-card)',
+          border: `1px solid rgba(${rgb},0.35)`,
+          boxShadow: 'var(--card-shadow)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 mt-1">
-              <AlertTriangle className={`w-12 h-12 ${type === 'danger' ? 'text-red-400' : type === 'warning' ? 'text-yellow-400' : 'text-blue-400'}`} />
+            <div
+              className="flex-shrink-0 p-2 rounded-lg mt-0.5"
+              style={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.3)` }}
+            >
+              <AlertTriangle className="w-6 h-6" style={{ color }} />
             </div>
             <div className="flex-1 min-w-0">
               {title && (
-                <h3 className="text-lg font-semibold text-white mb-2">
+                <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
                   {title}
                 </h3>
               )}
-              <p className="text-gray-300 whitespace-pre-wrap break-words">
+              <p className="text-sm whitespace-pre-wrap break-words" style={{ color: 'var(--text-secondary)' }}>
                 {message}
               </p>
             </div>
             <button
               onClick={onCancel}
-              className="flex-shrink-0 text-gray-400 hover:text-white transition-colors"
+              className="flex-shrink-0 p-1 rounded transition-all duration-200"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
-        <div className="px-6 pb-6 flex justify-end gap-3">
+        <div className="px-6 pb-6 flex justify-end gap-3" style={{ borderTop: '1px solid var(--border-primary)' }}>
           <button
             onClick={onCancel}
-            className="px-6 py-2 bg-white/5 text-white rounded-lg hover:bg-white/10 transition-all font-medium border border-white/10"
+            className="mt-4 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300"
+            style={{
+              background: 'transparent',
+              border: '1px solid var(--border-primary)',
+              color: 'var(--text-secondary)'
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             {cancelText}
           </button>
           <button
             onClick={handleConfirm}
-            className={`px-6 py-2 text-white rounded-lg transition-all font-medium ${buttonColors[type]}`}
+            className="mt-4 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300"
+            style={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.3)`, color }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.22)`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.12)`; e.currentTarget.style.transform = 'translateY(0)'; }}
           >
             {confirmText}
           </button>

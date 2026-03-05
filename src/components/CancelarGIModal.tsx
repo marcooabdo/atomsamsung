@@ -78,49 +78,60 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-gradient-to-br from-gray-900 to-black border border-[#FF0064]/30 rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto cyber-scrollbar shadow-2xl">
-        <div className="sticky top-0 bg-gradient-to-r from-[#FF0064] to-[#FF6B00] p-6 flex items-center justify-between z-10">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div
+        className="rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+        style={{ background: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.3)', boxShadow: 'var(--card-shadow)' }}
+      >
+        <div className="sticky top-0 p-6 flex items-center justify-between z-10" style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-3">
-            <XCircle className="w-6 h-6 text-white" />
-            <h2 className="text-2xl font-bold text-white">Cancelar GI</h2>
+            <div className="p-2 rounded-lg" style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.3)' }}>
+              <XCircle className="w-5 h-5" style={{ color: '#EF4444' }} />
+            </div>
+            <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Cancelar GI</h2>
           </div>
           <button
             onClick={handleClose}
             disabled={loading}
-            className="text-white hover:bg-white/10 p-2 rounded-lg transition disabled:opacity-50"
+            className="p-2 rounded-lg transition-colors disabled:opacity-50"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         <div className="p-6 space-y-6">
-          <div className="bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg p-4">
-            <h3 className="text-sm font-semibold text-[#FF0064] mb-3 uppercase tracking-wider">
+          <div className="rounded-lg p-4" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.25)' }}>
+            <h3 className="text-sm font-semibold mb-3 uppercase tracking-wider" style={{ color: '#EF4444' }}>
               Informações da Peça
             </h3>
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-400 uppercase">PN:</span>
-                <span className="text-sm font-mono font-bold text-white">{requisicao.codigo_peca}</span>
+                <span className="text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>PN:</span>
+                <span className="text-sm font-mono font-bold" style={{ color: 'var(--text-primary)' }}>{requisicao.codigo_peca}</span>
               </div>
               <div className="flex items-start gap-2">
-                <span className="text-xs text-gray-400 uppercase">Descrição:</span>
-                <span className="text-sm text-gray-200">{requisicao.descricao}</span>
+                <span className="text-xs uppercase" style={{ color: 'var(--text-secondary)' }}>Descrição:</span>
+                <span className="text-sm" style={{ color: 'var(--text-primary)' }}>{requisicao.descricao}</span>
               </div>
             </div>
           </div>
 
           {isLote && pecasLote && pecasLote.length > 1 && (
-            <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
+            <div className="rounded-lg p-4" style={{ background: 'rgba(var(--accent-rgb),0.06)', border: '1px solid rgba(var(--accent-rgb),0.2)' }}>
               <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-[#00D4FF] uppercase tracking-wider">
+                <h3 className="text-sm font-semibold uppercase tracking-wider" style={{ color: 'var(--text-accent)' }}>
                   Selecione as peças para cancelar GI
                 </h3>
                 <button
                   onClick={handleToggleTodas}
                   type="button"
-                  className="text-xs px-3 py-1 rounded border border-[#00D4FF]/40 text-[#00D4FF] hover:bg-[#00D4FF]/10 transition-colors"
+                  className="text-xs px-3 py-1 rounded transition-colors"
+                  style={{ border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.1)'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
                 >
                   {pecasSelecionadas.length === pecasLote.length ? 'Desmarcar Todas' : 'Selecionar Todas'}
                 </button>
@@ -129,30 +140,30 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
                 {pecasLote.map((peca) => (
                   <label
                     key={peca.id}
-                    className={`flex items-center gap-3 p-3 rounded transition-colors ${
-                      peca.gi_postada_em
-                        ? 'bg-gray-900/50 hover:bg-gray-900/70 cursor-pointer'
-                        : 'bg-gray-800/30 border border-gray-700 cursor-not-allowed opacity-60'
-                    }`}
+                    className={`flex items-center gap-3 p-3 rounded transition-colors ${peca.gi_postada_em ? 'cursor-pointer' : 'cursor-not-allowed opacity-60'}`}
+                    style={{
+                      background: peca.gi_postada_em ? 'rgba(var(--accent-rgb),0.04)' : 'rgba(var(--accent-rgb),0.02)',
+                      border: '1px solid rgba(var(--accent-rgb),0.12)'
+                    }}
                   >
                     <input
                       type="checkbox"
                       checked={pecasSelecionadas.includes(peca.id)}
                       onChange={() => handleTogglePeca(peca.id)}
                       disabled={!peca.gi_postada_em}
-                      className="w-4 h-4 rounded border-[#00D4FF]/40 text-[#00D4FF] focus:ring-[#00D4FF] focus:ring-offset-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="w-4 h-4 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                     />
                     <div className="flex-1">
                       <div className="flex items-center gap-3 flex-wrap">
-                        <span className="font-mono text-[#00D4FF] font-bold">ID #{peca.id_numerico}</span>
+                        <span className="font-mono font-bold" style={{ color: 'var(--text-accent)' }}>ID #{peca.id_numerico}</span>
                         {peca.delivery && (
-                          <span className="text-xs text-gray-400">Delivery: {peca.delivery}</span>
+                          <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Delivery: {peca.delivery}</span>
                         )}
-                        <span className="text-xs text-gray-300">
+                        <span className="text-xs" style={{ color: 'var(--text-primary)' }}>
                           R$ {Number(peca.valor_com_impostos).toFixed(2)}
                         </span>
                         {peca.gi_postada_em ? (
-                          <span className="text-[10px] px-2 py-1 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
+                          <span className="text-[10px] px-2 py-1 rounded" style={{ background: 'rgba(16,185,129,0.15)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}>
                             GI postada em {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', {
                               day: '2-digit',
                               month: '2-digit',
@@ -161,7 +172,7 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
                             })} por {peca.usuario_gi_postado?.nome || 'N/A'}
                           </span>
                         ) : (
-                          <span className="text-[10px] px-2 py-1 rounded bg-gray-700/50 text-gray-400">
+                          <span className="text-[10px] px-2 py-1 rounded" style={{ background: 'rgba(var(--accent-rgb),0.06)', color: 'var(--text-secondary)', border: '1px solid rgba(var(--accent-rgb),0.15)' }}>
                             GI não postada
                           </span>
                         )}
@@ -170,14 +181,14 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-gray-400 mt-2">
+              <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
                 {pecasSelecionadas.length} de {pecasLote.length} peça(s) selecionada(s)
               </p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-semibold text-gray-300 mb-3 uppercase tracking-wider">
+            <label className="block text-sm font-semibold mb-3 uppercase tracking-wider" style={{ color: 'var(--text-accent)' }}>
               Motivo do Cancelamento *
             </label>
             <textarea
@@ -185,44 +196,44 @@ export function CancelarGIModal({ isOpen, onClose, onConfirm, requisicao, isLote
               onChange={(e) => setMotivo(e.target.value)}
               placeholder="Descreva o motivo do cancelamento da GI (mínimo 10 caracteres)"
               rows={4}
-              className="neon-input"
+              className="w-full px-4 py-3 rounded-lg resize-none focus:outline-none transition-colors"
+              style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mt-2">
+            <p className="text-xs mt-2" style={{ color: 'var(--text-secondary)' }}>
               Caracteres: {motivo.length} / mínimo 10
             </p>
           </div>
 
-          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4 flex items-start gap-2">
-            <AlertTriangle className="w-4 h-4 text-yellow-400 flex-shrink-0 mt-0.5" />
+          <div className="rounded-lg p-4 flex items-start gap-2" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#F59E0B' }} />
             <div className="space-y-1">
-              <p className="text-xs text-yellow-300 font-semibold">Atenção:</p>
-              <p className="text-xs text-yellow-300">
+              <p className="text-xs font-semibold" style={{ color: '#F59E0B' }}>Atenção:</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                 Ao cancelar a GI, {isLote && pecasLote && pecasLote.length > 1 ? 'as peças selecionadas voltarão' : 'a peça voltará'} para o status <strong>ATENDIDA</strong> e {isLote && pecasLote && pecasLote.length > 1 ? 'poderão' : 'poderá'} ser devolvida{isLote && pecasLote && pecasLote.length > 1 ? 's' : ''} ou ter a GI postada novamente.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-gray-900/95 backdrop-blur-sm border-t border-gray-800 p-6 flex gap-4">
+        <div className="sticky bottom-0 p-6 flex gap-4" style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border-primary)' }}>
           <button
             onClick={handleClose}
             disabled={loading}
-            className="flex-1 px-6 py-3 border border-gray-700 rounded-lg font-medium hover:bg-gray-800 transition disabled:opacity-50"
+            className="flex-1 px-6 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50"
+            style={{ background: 'transparent', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--text-secondary)'; }}
           >
             Voltar
           </button>
           <button
             onClick={handleSubmit}
             disabled={loading || !motivo.trim() || motivo.trim().length < 10 || (isLote && pecasSelecionadas.length === 0)}
-            className="flex-1 px-6 py-3 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-            style={{
-              backgroundColor: loading ? 'rgba(255,0,100,0.3)' : 'rgba(255,0,100,0.2)',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              borderColor: '#FF0064',
-              color: '#FF0064'
-            }}
+            className="flex-1 px-6 py-3 rounded-lg font-medium transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+            style={{ background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.4)', color: '#EF4444' }}
+            onMouseEnter={(e) => { if (!loading) e.currentTarget.style.background = 'rgba(239,68,68,0.22)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(239,68,68,0.12)'; }}
           >
             {loading ? 'Cancelando...' : 'Confirmar Cancelamento'}
           </button>

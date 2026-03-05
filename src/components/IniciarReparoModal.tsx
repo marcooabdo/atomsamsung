@@ -165,21 +165,24 @@ export function IniciarReparoModal({
   const isAlteracao = currentTecnicoId !== null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-      <div className="bg-[#0A0F1E] rounded-xl border border-[#00D4FF]/30 shadow-2xl max-w-md w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-[#0A0F1E] border-b border-[#00D4FF]/20 p-4 flex items-center justify-between">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+      <div className="rounded-xl max-w-md w-full max-h-[90vh] overflow-y-auto" style={{ background: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.3)', boxShadow: 'var(--card-shadow)' }}>
+        <div className="sticky top-0 p-4 flex items-center justify-between z-10" style={{ background: 'var(--bg-card)', borderBottom: '1px solid var(--border-primary)' }}>
           <div>
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <User className="w-5 h-5 text-[#00D4FF]" />
+            <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+              <User className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
               {isAlteracao ? 'Alterar Técnico' : 'Iniciar Reparo'}
             </h2>
-            <p className="text-sm text-gray-400 mt-1">OS: {osNumero}</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>OS: {osNumero}</p>
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -191,22 +194,23 @@ export function IniciarReparoModal({
                 border: '1px solid rgba(var(--accent-rgb),0.3)'
               }}>
                 <div className="flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 text-[#00D4FF]" />
-                  <p className="text-sm font-medium text-white">Iniciar Reparo</p>
+                  <AlertCircle className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
+                  <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Iniciar Reparo</p>
                 </div>
-                <p className="text-sm text-gray-300">
+                <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                   Selecione o técnico que será responsável por esta ordem de serviço.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Técnico Responsável *
                 </label>
                 <select
                   value={selectedTecnicoId}
                   onChange={(e) => setSelectedTecnicoId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-[#0A0F1E] border border-[#00D4FF]/30 text-white focus:outline-none focus:border-[#00D4FF] transition-colors"
+                  className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Selecione um técnico...</option>
                   {usuarios.map((usuario) => (
@@ -238,18 +242,19 @@ export function IniciarReparoModal({
                 background: 'linear-gradient(135deg, rgba(255,191,0,0.1) 0%, rgba(255,191,0,0.03) 100%)',
                 border: '1px solid rgba(255,191,0,0.3)'
               }}>
-                <p className="text-xs text-gray-400">Técnico Atual:</p>
-                <p className="text-sm font-bold text-[#FFBF00]">{currentTecnicoNome}</p>
+                <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Técnico Atual:</p>
+                <p className="text-sm font-bold" style={{ color: '#F59E0B' }}>{currentTecnicoNome}</p>
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Novo Técnico *
                 </label>
                 <select
                   value={selectedTecnicoId}
                   onChange={(e) => setSelectedTecnicoId(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-lg bg-[#0A0F1E] border border-[#00D4FF]/30 text-white focus:outline-none focus:border-[#00D4FF] transition-colors"
+                  className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Selecione um técnico...</option>
                   {usuarios.map((usuario) => (
@@ -261,7 +266,7 @@ export function IniciarReparoModal({
               </div>
 
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-300">
+                <label className="block text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                   Motivo da Alteração *
                 </label>
                 <textarea
@@ -269,7 +274,8 @@ export function IniciarReparoModal({
                   onChange={(e) => setMotivo(e.target.value)}
                   placeholder="Explique o motivo da alteração do técnico..."
                   rows={4}
-                  className="w-full px-4 py-2.5 rounded-lg bg-[#0A0F1E] border border-[#00D4FF]/30 text-white placeholder-gray-500 focus:outline-none focus:border-[#00D4FF] transition-colors resize-none"
+                  className="w-full px-4 py-2.5 rounded-lg focus:outline-none transition-colors resize-none"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
                 />
               </div>
 

@@ -345,27 +345,33 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(8px)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
       <div className="w-full max-w-2xl max-h-[85vh] flex flex-col rounded-2xl overflow-hidden" style={{
-        background: 'linear-gradient(135deg, #0f172a 0%, #1e293b 100%)',
-        border: '1px solid rgba(37,211,102,0.3)',
-        boxShadow: '0 0 40px rgba(37,211,102,0.1)'
+        background: 'var(--bg-card)',
+        border: '1px solid rgba(var(--accent-rgb),0.3)',
+        boxShadow: 'var(--card-shadow)'
       }}>
-        <div className="flex items-center justify-between p-5 border-b border-gray-700/50">
+        <div className="flex items-center justify-between p-5" style={{ borderBottom: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-3">
             <div className="p-2.5 rounded-xl" style={{
-              background: 'linear-gradient(135deg, rgba(37,211,102,0.2), rgba(37,211,102,0.1))',
+              background: 'rgba(37,211,102,0.12)',
               border: '1px solid rgba(37,211,102,0.3)'
             }}>
-              <MessageCircle className="w-5 h-5 text-green-400" />
+              <MessageCircle className="w-5 h-5" style={{ color: '#25D366' }} />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white">WhatsApp</h2>
-              <p className="text-xs text-gray-400">Enviar mensagem ao cliente</p>
+              <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>WhatsApp</h2>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Enviar mensagem ao cliente</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-gray-700/50 transition-colors">
-            <X className="w-5 h-5 text-gray-400" />
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.06)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
+          >
+            <X className="w-5 h-5" />
           </button>
         </div>
 
@@ -400,7 +406,8 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                       type="text"
                       value={orcamentoLink}
                       readOnly
-                      className="flex-1 px-3 py-2 rounded-lg bg-gray-900/50 text-gray-300 text-xs border border-gray-700 font-mono"
+                      className="flex-1 px-3 py-2 rounded-lg text-xs font-mono"
+                      style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
                       onClick={(e) => (e.target as HTMLInputElement).select()}
                     />
                     <button
@@ -488,7 +495,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
 
           {!selectedTemplate ? (
             <div className="space-y-3">
-              <p className="text-sm text-gray-400 font-medium">Selecione um template:</p>
+              <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Selecione um template:</p>
               {Object.entries(
                 templates.reduce<Record<string, Template[]>>((acc, t) => {
                   const cat = t.categoria || 'geral';
@@ -500,7 +507,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                 <div key={cat}>
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-2 h-2 rounded-full" style={{ background: categoriaColors[cat] || '#6B7280' }} />
-                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{categoriaLabels[cat] || cat}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-secondary)' }}>{categoriaLabels[cat] || cat}</span>
                   </div>
                   <div className="space-y-2">
                     {tpls.map(t => (
@@ -508,24 +515,21 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                         key={t.id}
                         onClick={() => selectTemplate(t)}
                         className="w-full text-left p-3 rounded-xl transition-all"
-                        style={{
-                          background: 'rgba(0,0,0,0.2)',
-                          border: '1px solid rgba(255,255,255,0.05)'
-                        }}
+                        style={{ background: 'rgba(var(--accent-rgb),0.04)', border: '1px solid rgba(var(--accent-rgb),0.12)' }}
                         onMouseEnter={e => {
-                          e.currentTarget.style.background = 'rgba(37,211,102,0.05)';
-                          e.currentTarget.style.borderColor = 'rgba(37,211,102,0.2)';
+                          e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.08)';
+                          e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.25)';
                         }}
                         onMouseLeave={e => {
-                          e.currentTarget.style.background = 'rgba(0,0,0,0.2)';
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.05)';
+                          e.currentTarget.style.background = 'rgba(var(--accent-rgb),0.04)';
+                          e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.12)';
                         }}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-white font-medium">{t.nome}</span>
-                          <ChevronRight className="w-4 h-4 text-gray-500" />
+                          <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{t.nome}</span>
+                          <ChevronRight className="w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
                         </div>
-                        <p className="text-xs text-gray-500 mt-1 line-clamp-1">{t.conteudo}</p>
+                        <p className="text-xs mt-1 line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{t.conteudo}</p>
                       </button>
                     ))}
                   </div>
@@ -537,7 +541,10 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
               <div className="flex items-center justify-between">
                 <button
                   onClick={() => { setSelectedTemplate(null); setResult(null); setError(''); }}
-                  className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                  className="text-xs transition-colors"
+                  style={{ color: 'var(--text-accent)' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '0.7'; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '1'; }}
                 >
                   ← Voltar aos templates
                 </button>
@@ -552,46 +559,47 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Telefone</label>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Telefone</label>
                   <div className="flex items-center gap-2 px-3 py-2 rounded-lg" style={{
-                    background: 'rgba(0,0,0,0.3)',
-                    border: '1px solid rgba(255,255,255,0.1)'
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid rgba(var(--accent-rgb),0.25)'
                   }}>
-                    <Phone className="w-3.5 h-3.5 text-gray-500" />
+                    <Phone className="w-3.5 h-3.5" style={{ color: 'var(--text-secondary)' }} />
                     <input
                       type="text"
                       value={telefone}
                       onChange={e => setTelefone(e.target.value)}
                       placeholder="(11) 99999-9999"
-                      className="flex-1 bg-transparent text-white text-sm outline-none placeholder-gray-600"
+                      className="flex-1 bg-transparent text-sm outline-none"
+                      style={{ color: 'var(--text-primary)' }}
                     />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 mb-1">Nome</label>
+                  <label className="block text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Nome</label>
                   <input
                     type="text"
                     value={nomeDestinatario}
                     onChange={e => setNomeDestinatario(e.target.value)}
-                    className="w-full px-3 py-2 rounded-lg bg-transparent text-white text-sm outline-none placeholder-gray-600"
-                    style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)' }}
+                    className="w-full px-3 py-2 rounded-lg text-sm outline-none"
+                    style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.25)', color: 'var(--text-primary)' }}
                   />
                 </div>
               </div>
 
               {(selectedTemplate.variaveis || []).filter(v => v !== 'cliente_nome').length > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs text-gray-500 font-medium">Variaveis:</p>
+                  <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Variaveis:</p>
                   <div className="grid grid-cols-2 gap-2">
                     {(selectedTemplate.variaveis || []).filter(v => v !== 'cliente_nome').map(v => (
                       <div key={v}>
-                        <label className="block text-[10px] text-gray-600 mb-0.5">{v.replace(/_/g, ' ')}</label>
+                        <label className="block text-[10px] mb-0.5" style={{ color: 'var(--text-secondary)' }}>{v.replace(/_/g, ' ')}</label>
                         <input
                           type="text"
                           value={varValues[v] || ''}
                           onChange={e => setVarValues(prev => ({ ...prev, [v]: e.target.value }))}
-                          className="w-full px-2.5 py-1.5 rounded-lg bg-transparent text-white text-xs outline-none"
-                          style={{ background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.08)' }}
+                          className="w-full px-2.5 py-1.5 rounded-lg text-xs outline-none"
+                          style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.2)', color: 'var(--text-primary)' }}
                         />
                       </div>
                     ))}
@@ -600,14 +608,14 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
               )}
 
               <div className="rounded-xl p-4" style={{
-                background: 'rgba(37,211,102,0.05)',
-                border: '1px solid rgba(37,211,102,0.15)'
+                background: 'rgba(var(--accent-rgb),0.06)',
+                border: '1px solid rgba(var(--accent-rgb),0.2)'
               }}>
                 <div className="flex items-center gap-2 mb-2">
-                  <Eye className="w-3.5 h-3.5 text-green-400" />
-                  <span className="text-xs text-green-400 font-medium">Pré-visualização</span>
+                  <Eye className="w-3.5 h-3.5" style={{ color: 'var(--text-accent)' }} />
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-accent)' }}>Pré-visualização</span>
                 </div>
-                <p className="text-sm text-gray-300 leading-relaxed whitespace-pre-wrap">{renderPreview()}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{renderPreview()}</p>
               </div>
 
               {result && (
@@ -646,7 +654,10 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
             <div>
               <button
                 onClick={() => setShowLogs(!showLogs)}
-                className="flex items-center gap-2 text-xs text-gray-500 hover:text-gray-400 transition-colors"
+                className="flex items-center gap-2 text-xs transition-colors"
+                style={{ color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
               >
                 <Clock className="w-3.5 h-3.5" />
                 {showLogs ? 'Ocultar histórico' : `Histórico de envios (${recentLogs.length})`}
@@ -655,11 +666,11 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                 <div className="mt-2 space-y-1.5">
                   {recentLogs.map(log => (
                     <div key={log.id} className="p-2.5 rounded-lg text-xs" style={{
-                      background: 'rgba(0,0,0,0.2)',
-                      border: '1px solid rgba(255,255,255,0.05)'
+                      background: 'rgba(var(--accent-rgb),0.04)',
+                      border: '1px solid rgba(var(--accent-rgb),0.12)'
                     }}>
                       <div className="flex items-center justify-between mb-1">
-                        <span className="text-gray-300">{log.destinatario_nome || formatPhone(log.destinatario_telefone)}</span>
+                        <span style={{ color: 'var(--text-primary)' }}>{log.destinatario_nome || formatPhone(log.destinatario_telefone)}</span>
                         <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
                           log.status === 'enviado' ? 'bg-green-500/20 text-green-400' :
                           log.status === 'dry_run' ? 'bg-amber-500/20 text-amber-400' :
@@ -669,8 +680,8 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                           {log.dry_run ? 'simulado' : log.status}
                         </span>
                       </div>
-                      <p className="text-gray-500 line-clamp-1">{log.mensagem_enviada}</p>
-                      <span className="text-gray-600 text-[10px]">{new Date(log.created_at).toLocaleString('pt-BR')}</span>
+                      <p className="line-clamp-1" style={{ color: 'var(--text-secondary)' }}>{log.mensagem_enviada}</p>
+                      <span className="text-[10px]" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>{new Date(log.created_at).toLocaleString('pt-BR')}</span>
                     </div>
                   ))}
                 </div>
@@ -679,8 +690,14 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
           )}
         </div>
 
-        <div className="p-4 border-t border-gray-700/50 flex items-center justify-between">
-          <button onClick={onClose} className="px-4 py-2 text-sm text-gray-400 hover:text-white transition-colors">
+        <div className="p-4 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-primary)' }}>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm transition-colors"
+            style={{ color: 'var(--text-secondary)' }}
+            onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
+          >
             Fechar
           </button>
           {selectedTemplate && (

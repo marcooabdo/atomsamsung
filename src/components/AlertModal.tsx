@@ -9,6 +9,13 @@ interface AlertModalProps {
   confirmText?: string;
 }
 
+const TYPE_CONFIG = {
+  success: { rgb: '34,197,94',   color: '#22C55E', Icon: CheckCircle  },
+  error:   { rgb: '239,68,68',   color: '#EF4444', Icon: AlertCircle  },
+  warning: { rgb: '245,158,11',  color: '#F59E0B', Icon: AlertTriangle },
+  info:    { rgb: '14,165,233',  color: '#0EA5E9', Icon: Info         },
+};
+
 export default function AlertModal({
   isOpen,
   onClose,
@@ -19,50 +26,59 @@ export default function AlertModal({
 }: AlertModalProps) {
   if (!isOpen) return null;
 
-  const icons = {
-    success: <CheckCircle className="w-12 h-12 text-green-400" />,
-    error: <AlertCircle className="w-12 h-12 text-red-400" />,
-    warning: <AlertTriangle className="w-12 h-12 text-yellow-400" />,
-    info: <Info className="w-12 h-12 text-blue-400" />
-  };
-
-  const borderColors = {
-    success: 'border-green-500/30',
-    error: 'border-red-500/30',
-    warning: 'border-yellow-500/30',
-    info: 'border-blue-500/30'
-  };
+  const { rgb, color, Icon } = TYPE_CONFIG[type];
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[9999] p-4">
-      <div className={`bg-[#0a0a0a] rounded-xl border ${borderColors[type]} max-w-md w-full shadow-2xl`}>
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)' }}
+      onClick={onClose}
+    >
+      <div
+        className="max-w-md w-full rounded-xl"
+        style={{
+          background: 'var(--bg-card)',
+          border: `1px solid rgba(${rgb},0.35)`,
+          boxShadow: 'var(--card-shadow)'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
         <div className="p-6">
           <div className="flex items-start gap-4">
-            <div className="flex-shrink-0 mt-1">
-              {icons[type]}
+            <div
+              className="flex-shrink-0 p-2 rounded-lg mt-0.5"
+              style={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.3)` }}
+            >
+              <Icon className="w-6 h-6" style={{ color }} />
             </div>
             <div className="flex-1 min-w-0">
               {title && (
-                <h3 className="text-lg font-semibold text-white mb-2">
+                <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
                   {title}
                 </h3>
               )}
-              <p className="text-gray-300 whitespace-pre-wrap break-words">
+              <p className="text-sm whitespace-pre-wrap break-words" style={{ color: 'var(--text-secondary)' }}>
                 {message}
               </p>
             </div>
             <button
               onClick={onClose}
-              className="flex-shrink-0 text-gray-400 hover:text-white transition-colors"
+              className="flex-shrink-0 p-1 rounded transition-all duration-200"
+              style={{ color: 'var(--text-secondary)' }}
+              onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; }}
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
-        <div className="px-6 pb-6 flex justify-end">
+        <div className="px-6 pb-6 flex justify-end" style={{ borderTop: '1px solid var(--border-primary)' }}>
           <button
             onClick={onClose}
-            className="px-6 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400 transition-all font-medium"
+            className="mt-4 px-6 py-2 rounded-lg text-sm font-bold transition-all duration-300"
+            style={{ background: `rgba(${rgb},0.12)`, border: `1px solid rgba(${rgb},0.3)`, color }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.22)`; e.currentTarget.style.transform = 'translateY(-1px)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = `rgba(${rgb},0.12)`; e.currentTarget.style.transform = 'translateY(0)'; }}
           >
             {confirmText}
           </button>
