@@ -9,20 +9,22 @@ export interface ThemeInfo {
   accent: string;
   bg: string;
   isDark: boolean;
+  neonGreen: string;
 }
 
 export const THEMES: ThemeInfo[] = [
-  { id: 'original', label: 'Padrao', accent: '#00D4FF', bg: '#0A0A0D', isDark: true },
-  { id: 'dark-blue', label: 'Dark Blue', accent: '#00D4FF', bg: '#0b111a', isDark: true },
-  { id: 'dark-pink', label: 'Dark Pink', accent: '#ff007f', bg: '#1a0b16', isDark: true },
-  { id: 'white-blue', label: 'White Blue', accent: '#0077B6', bg: '#f8fafc', isDark: false },
-  { id: 'white-pink', label: 'White Pink', accent: '#d6336c', bg: '#fcf8fa', isDark: false },
+  { id: 'original', label: 'Padrao', accent: '#00D4FF', bg: '#0A0A0D', isDark: true, neonGreen: '#39FF14' },
+  { id: 'dark-blue', label: 'Dark Blue', accent: '#00D4FF', bg: '#0b111a', isDark: true, neonGreen: '#39FF14' },
+  { id: 'dark-pink', label: 'Dark Pink', accent: '#ff007f', bg: '#1a0b16', isDark: true, neonGreen: '#39FF14' },
+  { id: 'white-blue', label: 'White Blue', accent: '#0077B6', bg: '#f8fafc', isDark: false, neonGreen: '#15803d' },
+  { id: 'white-pink', label: 'White Pink', accent: '#d6336c', bg: '#fcf8fa', isDark: false, neonGreen: '#15803d' },
 ];
 
 interface ThemeContextType {
   theme: ThemeVariant;
   themeInfo: ThemeInfo;
   isDark: boolean;
+  neonGreen: string;
   customBackground: string | null;
   setTheme: (t: ThemeVariant) => void;
   toggleTheme: () => void;
@@ -53,6 +55,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     if (!themeInfo.isDark) root.classList.add('light');
     localStorage.setItem('theme-variant', theme);
     localStorage.setItem('theme', themeInfo.isDark ? 'dark' : 'light');
+    root.style.setProperty('--resolved-neon-green', themeInfo.neonGreen);
   }, [theme, themeInfo]);
 
   useEffect(() => {
@@ -101,7 +104,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ThemeContext.Provider value={{ theme, themeInfo, isDark: themeInfo.isDark, customBackground, setTheme, toggleTheme, setCustomBackground }}>
+    <ThemeContext.Provider value={{ theme, themeInfo, isDark: themeInfo.isDark, neonGreen: themeInfo.neonGreen, customBackground, setTheme, toggleTheme, setCustomBackground }}>
       {children}
     </ThemeContext.Provider>
   );
@@ -113,4 +116,9 @@ export function useTheme() {
     throw new Error('useTheme must be used within a ThemeProvider');
   }
   return context;
+}
+
+export function useNeonGreen() {
+  const { neonGreen } = useTheme();
+  return neonGreen;
 }

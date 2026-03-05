@@ -1749,7 +1749,7 @@ export function Kanban() {
                   <button
                     onClick={() => { setShowBadgeFilter(true); setShowActionMenu(false); }}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#39FF14]/10"
-                    style={{ color: '#39FF14' }}
+                    style={{ color: 'var(--neon-green)' }}
                   >
                     <Filter className="w-4 h-4" />
                     BADGES
@@ -1790,7 +1790,7 @@ export function Kanban() {
                   <button
                     onClick={() => { setCriarOSSCACC(true); setShowActionMenu(false); }}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#39FF14]/10"
-                    style={{ color: '#39FF14' }}
+                    style={{ color: 'var(--neon-green)' }}
                   >
                     <Plus className="w-4 h-4" />
                     CRIAR SC / ACC
@@ -1805,8 +1805,8 @@ export function Kanban() {
                   className="absolute top-full mt-2 right-0 z-50 min-w-[220px] rounded-lg"
                   style={{
                     background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
-                    border: '1px solid rgba(57,255,20,0.3)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(57,255,20,0.1)',
+                    border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(var(--neon-green-rgb),0.1)',
                     maxHeight: '350px'
                   }}
                 >
@@ -1834,9 +1834,9 @@ export function Kanban() {
                         className="flex items-center gap-2 cursor-pointer p-2 rounded transition-all"
                         style={{
                           background: badgeFilters[key as keyof typeof badgeFilters]
-                            ? 'linear-gradient(135deg, rgba(57,255,20,0.15) 0%, rgba(57,255,20,0.05) 100%)'
+                            ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.15) 0%, rgba(var(--neon-green-rgb),0.05) 100%)'
                             : 'transparent',
-                          border: `1px solid ${badgeFilters[key as keyof typeof badgeFilters] ? 'rgba(57,255,20,0.3)' : 'transparent'}`
+                          border: `1px solid ${badgeFilters[key as keyof typeof badgeFilters] ? 'rgba(var(--neon-green-rgb),0.3)' : 'transparent'}`
                         }}
                       >
                         <input
@@ -1871,9 +1871,9 @@ export function Kanban() {
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.05) 100%)',
-                        border: '1px solid rgba(57,255,20,0.3)',
-                        color: '#39FF14'
+                        background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.2) 0%, rgba(var(--neon-green-rgb),0.05) 100%)',
+                        border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                        color: 'var(--neon-green)'
                       }}
                     >
                       SELECIONAR TUDO
@@ -2338,7 +2338,7 @@ export function Kanban() {
                             }}
                           >
                             <div className="flex items-center gap-2">
-                              <CheckCircle className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 3px #39FF14)' }} />
+                              <CheckCircle className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
                               <div className="flex-1 min-w-0">
                                 <p className="font-bold text-[10px] text-white truncate">
                                   {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
@@ -2395,13 +2395,13 @@ export function Kanban() {
                                   <div
                                     className="p-0.5 rounded flex-shrink-0"
                                     style={{
-                                      background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.1) 100%)',
-                                      border: '1px solid rgba(57,255,20,0.4)',
-                                      boxShadow: '0 0 8px rgba(57,255,20,0.3)'
+                                      background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.2) 0%, rgba(var(--neon-green-rgb),0.1) 100%)',
+                                      border: '1px solid rgba(var(--neon-green-rgb),0.4)',
+                                      boxShadow: '0 0 8px rgba(var(--neon-green-rgb),0.3)'
                                     }}
                                     title="Correspondência encontrada em comentários, peças ou histórico"
                                   >
-                                    <Search className="w-2.5 h-2.5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 3px #39FF14)' }} />
+                                    <Search className="w-2.5 h-2.5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
                                   </div>
                                 )}
                                 <button
@@ -2616,21 +2616,21 @@ export function Kanban() {
                             {badgeFilters.agendamento && os.data_agendamento && os.tecnico_agendado_id && os.confirmado_com_cliente && (
                               <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
-                                  borderColor: 'rgba(57,255,20,0.3)',
-                                  background: 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(57,255,20,0.1)'
+                                  borderColor: 'rgba(var(--neon-green-rgb),0.3)',
+                                  background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
+                                  boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.1)'
                                 }}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <Calendar className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #39FF14)' }} />
+                                  <Calendar className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--neon-green))' }} />
                                   <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-1.5 mb-0.5">
                                       <span
                                         className="px-1.5 py-0.5 rounded text-[9px] font-bold"
                                         style={{
-                                          background: 'linear-gradient(135deg, rgba(57,255,20,0.3) 0%, rgba(57,255,20,0.15) 100%)',
-                                          color: '#39FF14',
-                                          border: '1px solid rgba(57,255,20,0.5)'
+                                          background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)',
+                                          color: 'var(--neon-green)',
+                                          border: '1px solid rgba(var(--neon-green-rgb),0.5)'
                                         }}
                                       >
                                         AGENDADO
@@ -2678,30 +2678,30 @@ export function Kanban() {
                             {badgeFilters.financeiro && mostrarInfoFinanceira && os.valor_total && os.valor_total > 0 && (
                               <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
-                                  borderColor: os.status_pagamento === 'pago' ? 'rgba(57,255,20,0.3)' :
+                                  borderColor: os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.3)' :
                                                os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.3)' : 'rgba(255,0,100,0.3)',
-                                  background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)' :
+                                  background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)' :
                                                    os.status_pagamento === 'parcial' ? 'linear-gradient(135deg, rgba(255,191,0,0.1) 0%, rgba(255,191,0,0.03) 100%)' : 'linear-gradient(135deg, rgba(255,0,100,0.1) 0%, rgba(255,0,100,0.03) 100%)',
-                                  boxShadow: `0 0 10px ${os.status_pagamento === 'pago' ? 'rgba(57,255,20,0.1)' : os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.1)' : 'rgba(255,0,100,0.1)'}`
+                                  boxShadow: `0 0 10px ${os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.1)' : os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.1)' : 'rgba(255,0,100,0.1)'}`
                                 }}
                               >
                                 <div className="flex items-center gap-1.5">
                                   <DollarSign className="w-3 h-3 flex-shrink-0"
                                     style={{
-                                      color: os.status_pagamento === 'pago' ? '#39FF14' :
+                                      color: os.status_pagamento === 'pago' ? 'var(--neon-green)' :
                                              os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064',
-                                      filter: `drop-shadow(0 0 4px ${os.status_pagamento === 'pago' ? '#39FF14' : os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064'})`
+                                      filter: `drop-shadow(0 0 4px ${os.status_pagamento === 'pago' ? 'var(--neon-green)' : os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064'})`
                                     }}
                                   />
                                   <div className="flex-1 min-w-0">
                                     <span
                                       className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-1"
                                       style={{
-                                        background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(57,255,20,0.3) 0%, rgba(57,255,20,0.15) 100%)' :
+                                        background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)' :
                                                            os.status_pagamento === 'parcial' ? 'linear-gradient(135deg, rgba(255,191,0,0.3) 0%, rgba(255,191,0,0.15) 100%)' : 'linear-gradient(135deg, rgba(255,0,100,0.3) 0%, rgba(255,0,100,0.15) 100%)',
-                                        color: os.status_pagamento === 'pago' ? '#39FF14' :
+                                        color: os.status_pagamento === 'pago' ? 'var(--neon-green)' :
                                                os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064',
-                                        border: `1px solid ${os.status_pagamento === 'pago' ? 'rgba(57,255,20,0.5)' :
+                                        border: `1px solid ${os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.5)' :
                                                               os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.5)' : 'rgba(255,0,100,0.5)'}`
                                       }}
                                     >
@@ -2777,8 +2777,8 @@ export function Kanban() {
                                   {os.tipo_os === 'OW' && lucro !== null && subtotal && subtotal > 0 && (
                                     <div className="flex items-center justify-between gap-1.5">
                                       <span className="text-[10px] font-bold" style={{
-                                        color: lucro >= 0 ? '#39FF14' : '#FF0064',
-                                        textShadow: `0 0 6px ${lucro >= 0 ? 'rgba(57,255,20,0.5)' : 'rgba(255,0,100,0.5)'}`
+                                        color: lucro >= 0 ? 'var(--neon-green)' : '#FF0064',
+                                        textShadow: `0 0 6px ${lucro >= 0 ? 'rgba(var(--neon-green-rgb),0.5)' : 'rgba(255,0,100,0.5)'}`
                                       }}>LUCRO:</span>
                                       <span className={`font-mono text-[10px] font-bold ${lucro >= 0 ? 'text-[#39FF14]' : 'text-[#FF0064]'}`}>
                                         R$ {lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -2868,20 +2868,20 @@ export function Kanban() {
                                 key={req.id}
                                 className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
                                 style={{
-                                  borderColor: 'rgba(57,255,20,0.3)',
-                                  background: 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(57,255,20,0.1)'
+                                  borderColor: 'rgba(var(--neon-green-rgb),0.3)',
+                                  background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
+                                  boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.1)'
                                 }}
                               >
                                 <div className="flex items-center gap-1.5">
-                                  <Package className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #39FF14)' }} />
+                                  <Package className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--neon-green))' }} />
                                   <div className="flex-1 min-w-0">
                                     <span
                                       className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
                                       style={{
-                                        background: 'linear-gradient(135deg, rgba(57,255,20,0.3) 0%, rgba(57,255,20,0.15) 100%)',
-                                        color: '#39FF14',
-                                        border: '1px solid rgba(57,255,20,0.5)'
+                                        background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)',
+                                        color: 'var(--neon-green)',
+                                        border: '1px solid rgba(var(--neon-green-rgb),0.5)'
                                       }}
                                     >
                                       {req.status === 'atendida' ? 'COM TÉCNICO' : req.status === 'em_uso' ? 'EM USO' : 'GI PENDENTE'}
@@ -2932,8 +2932,8 @@ export function Kanban() {
                               <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
                                 {os.tecnico_designado_id && (os as any).tecnico_designado && (
                                   <div className="rounded-lg p-2" style={{
-                                    background: 'linear-gradient(135deg, rgba(57,255,20,0.1) 0%, rgba(57,255,20,0.03) 100%)',
-                                    border: '1px solid rgba(57,255,20,0.3)'
+                                    background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
+                                    border: '1px solid rgba(var(--neon-green-rgb),0.3)'
                                   }}>
                                     <div className="flex items-center justify-between gap-2">
                                       <div className="flex items-center gap-2 min-w-0">
@@ -2981,10 +2981,10 @@ export function Kanban() {
                                     }}
                                     className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
                                     style={{
-                                      background: 'linear-gradient(135deg, rgba(57,255,20,0.2) 0%, rgba(57,255,20,0.05) 100%)',
-                                      border: '1px solid #39FF14',
-                                      color: '#39FF14',
-                                      boxShadow: '0 0 10px rgba(57,255,20,0.2)'
+                                      background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.2) 0%, rgba(var(--neon-green-rgb),0.05) 100%)',
+                                      border: '1px solid var(--neon-green)',
+                                      color: 'var(--neon-green)',
+                                      boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.2)'
                                     }}
                                   >
                                     <User className="w-3.5 h-3.5" />

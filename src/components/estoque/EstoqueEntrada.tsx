@@ -621,46 +621,46 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             className="w-full max-w-5xl max-h-[96vh] overflow-hidden flex flex-col rounded-2xl"
             style={{
               background: 'linear-gradient(135deg, #0a0a0a 0%, #0d1a0d 50%, #0a0a0a 100%)',
-              border: '1px solid rgba(57,255,20,0.3)',
-              boxShadow: '0 0 60px rgba(57,255,20,0.12), 0 0 120px rgba(57,255,20,0.05), inset 0 0 40px rgba(0,0,0,0.5)',
+              border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+              boxShadow: '0 0 60px rgba(var(--neon-green-rgb),0.12), 0 0 120px rgba(var(--neon-green-rgb),0.05), inset 0 0 40px rgba(0,0,0,0.5)',
             }}
           >
             {/* Header */}
             <div
               className="flex items-center justify-between px-6 py-5"
               style={{
-                background: 'linear-gradient(90deg, rgba(57,255,20,0.08) 0%, rgba(57,255,20,0.03) 60%, transparent 100%)',
-                borderBottom: '1px solid rgba(57,255,20,0.2)',
+                background: 'linear-gradient(90deg, rgba(var(--neon-green-rgb),0.08) 0%, rgba(var(--neon-green-rgb),0.03) 60%, transparent 100%)',
+                borderBottom: '1px solid rgba(var(--neon-green-rgb),0.2)',
               }}
             >
               <div className="flex items-center gap-4">
                 <div
                   className="p-2.5 rounded-xl"
                   style={{
-                    background: 'rgba(57,255,20,0.1)',
-                    border: '1px solid rgba(57,255,20,0.3)',
-                    boxShadow: '0 0 20px rgba(57,255,20,0.2)',
+                    background: 'rgba(var(--neon-green-rgb),0.1)',
+                    border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                    boxShadow: '0 0 20px rgba(var(--neon-green-rgb),0.2)',
                   }}
                 >
                   <Zap
                     className="w-6 h-6"
-                    style={{ color: '#39FF14', filter: 'drop-shadow(0 0 8px #39FF14)' }}
+                    style={{ color: 'var(--neon-green)', filter: 'drop-shadow(0 0 8px var(--neon-green))' }}
                   />
                 </div>
                 <div>
                   <div className="flex items-center gap-3">
                     <h2
                       className="text-lg font-black tracking-[0.2em] uppercase"
-                      style={{ color: '#39FF14', textShadow: '0 0 20px rgba(57,255,20,0.5)' }}
+                      style={{ color: 'var(--neon-green)', textShadow: '0 0 20px rgba(var(--neon-green-rgb),0.5)' }}
                     >
                       GIA STOCK
                     </h2>
                     <span
                       className="text-xs font-bold px-2 py-0.5 rounded-full tracking-widest"
                       style={{
-                        background: 'rgba(57,255,20,0.15)',
-                        border: '1px solid rgba(57,255,20,0.4)',
-                        color: '#39FF14',
+                        background: 'rgba(var(--neon-green-rgb),0.15)',
+                        border: '1px solid rgba(var(--neon-green-rgb),0.4)',
+                        color: 'var(--neon-green)',
                       }}
                     >
                       ALOCAÇÃO INTELIGENTE
@@ -671,7 +671,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                     {' '}•{' '}
                     <span className="text-gray-300">{previewData.fornecedor}</span>
                     {' '}•{' '}
-                    <span style={{ color: '#39FF14' }}>
+                    <span style={{ color: 'var(--neon-green)' }}>
                       R$ {previewData.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </p>
@@ -691,17 +691,17 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.3)' }}
             >
               <div className="flex items-center gap-2">
-                <Cpu className="w-4 h-4" style={{ color: '#39FF14' }} />
+                <Cpu className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
                 <span className="text-xs text-gray-400">
                   Motor de prioridade ativo •{' '}
-                  <span style={{ color: '#39FF14' }}>{requisicoesDisponiveis.length} OS(s)</span> cruzadas
+                  <span style={{ color: 'var(--neon-green)' }}>{requisicoesDisponiveis.length} OS(s)</span> cruzadas
                 </span>
               </div>
               <div className="flex items-center gap-4 ml-auto">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: '#39FF14', boxShadow: '0 0 6px #39FF14' }} />
+                  <div className="w-2 h-2 rounded-full" style={{ background: 'var(--neon-green)', boxShadow: '0 0 6px var(--neon-green)' }} />
                   <span className="text-xs text-gray-300">
-                    <span style={{ color: '#39FF14' }} className="font-bold">{qtdAlocadas}</span> alocadas para OS
+                    <span style={{ color: 'var(--neon-green)' }} className="font-bold">{qtdAlocadas}</span> alocadas para OS
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5">
@@ -714,7 +714,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             </div>
 
             {/* Parts list */}
-            <div className="flex-1 overflow-y-auto p-5 space-y-2.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(57,255,20,0.3) transparent' }}>
+            <div className="flex-1 overflow-y-auto p-5 space-y-2.5" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(var(--neon-green-rgb),0.3) transparent' }}>
               {pecasExpandidas.map((peca, idx) => {
                 const osCompativeis = requisicoesDisponiveis.filter(r => r.codigo_peca === peca.pn);
                 const isAlocada = !!peca.os_alocada_id;
@@ -727,10 +727,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                     className="flex flex-col lg:flex-row gap-4 items-stretch lg:items-center rounded-xl p-4 transition-all duration-300"
                     style={{
                       background: isAlocada
-                        ? 'linear-gradient(135deg, rgba(57,255,20,0.06) 0%, rgba(57,255,20,0.02) 100%)'
+                        ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.06) 0%, rgba(var(--neon-green-rgb),0.02) 100%)'
                         : 'rgba(255,255,255,0.03)',
                       border: isAlocada
-                        ? '1px solid rgba(57,255,20,0.35)'
+                        ? '1px solid rgba(var(--neon-green-rgb),0.35)'
                         : '1px solid rgba(255,255,255,0.08)',
                     }}
                   >
@@ -739,9 +739,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                       <div
                         className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-black shrink-0"
                         style={{
-                          background: isAlocada ? 'rgba(57,255,20,0.15)' : 'rgba(255,255,255,0.05)',
-                          border: isAlocada ? '1px solid rgba(57,255,20,0.3)' : '1px solid rgba(255,255,255,0.1)',
-                          color: isAlocada ? '#39FF14' : '#6B7280',
+                          background: isAlocada ? 'rgba(var(--neon-green-rgb),0.15)' : 'rgba(255,255,255,0.05)',
+                          border: isAlocada ? '1px solid rgba(var(--neon-green-rgb),0.3)' : '1px solid rgba(255,255,255,0.1)',
+                          color: isAlocada ? 'var(--neon-green)' : '#6B7280',
                         }}
                       >
                         {idx + 1}
@@ -785,9 +785,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                           onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
                           className="w-full appearance-none text-sm rounded-xl px-3 py-2.5 pr-8 outline-none transition-all"
                           style={{
-                            background: isAlocada ? 'rgba(57,255,20,0.08)' : 'rgba(0,0,0,0.5)',
-                            border: isAlocada ? '1px solid rgba(57,255,20,0.5)' : '1px solid rgba(255,255,255,0.15)',
-                            color: isAlocada ? '#39FF14' : '#9CA3AF',
+                            background: isAlocada ? 'rgba(var(--neon-green-rgb),0.08)' : 'rgba(0,0,0,0.5)',
+                            border: isAlocada ? '1px solid rgba(var(--neon-green-rgb),0.5)' : '1px solid rgba(255,255,255,0.15)',
+                            color: isAlocada ? 'var(--neon-green)' : '#9CA3AF',
                           }}
                         >
                           <option value="||" style={{ background: '#111', color: '#9CA3AF' }}>
@@ -815,16 +815,16 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                         </select>
                         <ChevronDown
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none"
-                          style={{ color: isAlocada ? '#39FF14' : '#6B7280' }}
+                          style={{ color: isAlocada ? 'var(--neon-green)' : '#6B7280' }}
                         />
                       </div>
 
                       {isAlocada ? (
                         <div
                           className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
-                          style={{ background: 'rgba(57,255,20,0.15)', border: '1px solid rgba(57,255,20,0.4)' }}
+                          style={{ background: 'rgba(var(--neon-green-rgb),0.15)', border: '1px solid rgba(var(--neon-green-rgb),0.4)' }}
                         >
-                          <CheckCircle className="w-4 h-4" style={{ color: '#39FF14' }} />
+                          <CheckCircle className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
                         </div>
                       ) : (
                         <div
@@ -844,16 +844,16 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             <div
               className="flex items-center justify-between px-6 py-4"
               style={{
-                borderTop: '1px solid rgba(57,255,20,0.15)',
+                borderTop: '1px solid rgba(var(--neon-green-rgb),0.15)',
                 background: 'rgba(0,0,0,0.5)',
               }}
             >
               <div className="flex items-center gap-4">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <Brain className="w-4 h-4" style={{ color: '#39FF14' }} />
+                    <Brain className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
                     <span className="text-xs text-gray-400">
-                      <span style={{ color: '#39FF14' }} className="font-black text-sm">{qtdAlocadas}</span>
+                      <span style={{ color: 'var(--neon-green)' }} className="font-black text-sm">{qtdAlocadas}</span>
                       <span className="text-gray-500"> / </span>
                       <span className="text-gray-300 font-bold">{pecasExpandidas.length}</span>
                       <span className="text-gray-500"> peças alocadas inteligentemente</span>
@@ -886,9 +886,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                   disabled={isSaving}
                   className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-50"
                   style={{
-                    background: isSaving ? 'rgba(57,255,20,0.4)' : '#39FF14',
+                    background: isSaving ? 'rgba(var(--neon-green-rgb),0.4)' : 'var(--neon-green)',
                     color: '#000',
-                    boxShadow: isSaving ? 'none' : '0 0 20px rgba(57,255,20,0.4)',
+                    boxShadow: isSaving ? 'none' : '0 0 20px rgba(var(--neon-green-rgb),0.4)',
                   }}
                 >
                   {isSaving ? (
@@ -915,25 +915,25 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         <div
           className="rounded-2xl p-6"
           style={{
-            background: 'linear-gradient(135deg, rgba(57,255,20,0.06) 0%, rgba(57,255,20,0.02) 100%)',
-            border: '1px solid rgba(57,255,20,0.25)',
+            background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.06) 0%, rgba(var(--neon-green-rgb),0.02) 100%)',
+            border: '1px solid rgba(var(--neon-green-rgb),0.25)',
           }}
         >
           <div className="flex items-start gap-4">
             <div
               className="p-3 rounded-xl shrink-0"
               style={{
-                background: 'rgba(57,255,20,0.1)',
-                border: '1px solid rgba(57,255,20,0.3)',
-                boxShadow: '0 0 16px rgba(57,255,20,0.15)',
+                background: 'rgba(var(--neon-green-rgb),0.1)',
+                border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                boxShadow: '0 0 16px rgba(var(--neon-green-rgb),0.15)',
               }}
             >
-              <Zap className="w-6 h-6 animate-pulse" style={{ color: '#39FF14' }} />
+              <Zap className="w-6 h-6 animate-pulse" style={{ color: 'var(--neon-green)' }} />
             </div>
             <div className="flex-1">
               <h4
                 className="font-black text-base tracking-wide mb-1"
-                style={{ color: '#39FF14' }}
+                style={{ color: 'var(--neon-green)' }}
               >
                 GIA STOCK — ENTRADA INTELIGENTE VIA XML
               </h4>
@@ -945,9 +945,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 <label
                   className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-black text-sm transition-all cursor-pointer"
                   style={{
-                    background: uploading || isSaving ? 'rgba(57,255,20,0.4)' : '#39FF14',
+                    background: uploading || isSaving ? 'rgba(var(--neon-green-rgb),0.4)' : 'var(--neon-green)',
                     color: '#000',
-                    boxShadow: uploading || isSaving ? 'none' : '0 0 16px rgba(57,255,20,0.35)',
+                    boxShadow: uploading || isSaving ? 'none' : '0 0 16px rgba(var(--neon-green-rgb),0.35)',
                     opacity: uploading || isSaving ? 0.7 : 1,
                   }}
                 >
@@ -992,9 +992,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         {successMsg && (
           <div
             className="flex items-start gap-3 p-4 rounded-xl"
-            style={{ background: 'rgba(57,255,20,0.06)', border: '1px solid rgba(57,255,20,0.3)' }}
+            style={{ background: 'rgba(var(--neon-green-rgb),0.06)', border: '1px solid rgba(var(--neon-green-rgb),0.3)' }}
           >
-            <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: '#39FF14' }} />
+            <CheckCircle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: 'var(--neon-green)' }} />
             <p className="text-sm text-gray-200">{successMsg}</p>
             <button onClick={() => setSuccessMsg(null)} className="ml-auto shrink-0">
               <X className="w-4 h-4 text-gray-500 hover:text-gray-300 transition-colors" />
@@ -1037,9 +1037,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                         <span
                           className="text-xs font-bold px-2 py-0.5 rounded-full"
                           style={{
-                            background: 'rgba(57,255,20,0.12)',
-                            border: '1px solid rgba(57,255,20,0.3)',
-                            color: '#39FF14',
+                            background: 'rgba(var(--neon-green-rgb),0.12)',
+                            border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                            color: 'var(--neon-green)',
                           }}
                         >
                           Processada
@@ -1073,7 +1073,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                   </div>
 
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-sm font-bold mr-2" style={{ color: '#39FF14' }}>
+                    <span className="text-sm font-bold mr-2" style={{ color: 'var(--neon-green)' }}>
                       R$ {nf.valor_total.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
 

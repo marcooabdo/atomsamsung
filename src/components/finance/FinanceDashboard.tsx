@@ -270,12 +270,12 @@ export default function FinanceDashboard({ unidadeId, dataInicio, dataFim }: Das
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="premium-card p-5">
           <div className="flex items-center gap-3 mb-2">
-            <div className="p-2 rounded-lg" style={{ backgroundColor: '#39FF1420' }}>
-              <DollarSign className="w-5 h-5" style={{ color: '#39FF14' }} />
+            <div className="p-2 rounded-lg" style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)' }}>
+              <DollarSign className="w-5 h-5" style={{ color: 'var(--neon-green)' }} />
             </div>
           </div>
           <p className="text-xs text-gray-400 uppercase mb-1">Dinheiro</p>
-          <p className="text-xl font-bold" style={{ color: '#39FF14' }}>
+          <p className="text-xl font-bold" style={{ color: 'var(--neon-green)' }}>
             R$ {data.totalDinheiro.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
         </div>

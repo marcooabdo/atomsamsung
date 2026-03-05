@@ -2827,8 +2827,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         onChange={(e) => setTipoOrcamento(e.target.value as 'samsung_contigo' | 'acessorios')}
                         className="neon-input w-full"
                         style={{
-                          borderColor: tipoOrcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14',
-                          boxShadow: `0 0 8px ${tipoOrcamento === 'samsung_contigo' ? 'rgba(255,165,0,0.3)' : 'rgba(57,255,20,0.3)'}`
+                          borderColor: tipoOrcamento === 'samsung_contigo' ? '#FFA500' : 'var(--neon-green)',
+                          boxShadow: `0 0 8px ${tipoOrcamento === 'samsung_contigo' ? 'rgba(255,165,0,0.3)' : 'rgba(var(--neon-green-rgb),0.3)'}`
                         }}
                       >
                         <option value="samsung_contigo">SAMSUNG CONTIGO</option>
@@ -3161,17 +3161,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 <div className="flex-shrink-0">
                                   {(tipoOS === 'OW' || modoSCACC) && peca.valor_com_markup ? (
                                     <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
-                                      backgroundColor: '#39FF1420',
-                                      color: '#39FF14',
-                                      border: '1px solid #39FF1440'
+                                      backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                      color: 'var(--neon-green)',
+                                      border: '1px solid rgba(var(--neon-green-rgb),0.25)'
                                     }}>
                                       R$ {peca.valor_com_markup.toFixed(2)}
                                     </span>
                                   ) : (
                                     <span className="text-xs px-2 py-0.5 rounded" style={{
-                                      backgroundColor: peca.count > 0 ? '#39FF1420' : '#FF006420',
-                                      color: peca.count > 0 ? '#39FF14' : '#FF0064',
-                                      border: `1px solid ${peca.count > 0 ? '#39FF14' : '#FF0064'}40`
+                                      backgroundColor: peca.count > 0 ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                      color: peca.count > 0 ? 'var(--neon-green)' : '#FF0064',
+                                      border: `1px solid ${peca.count > 0 ? 'rgba(var(--neon-green-rgb),0.25)' : '#FF006440'}`
                                     }}>
                                       {peca.count} disponível
                                     </span>
@@ -3228,7 +3228,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             placeholder="1"
                           />
                           {novaPecaQuantidade > 1 && (
-                            <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                            <p className="text-xs mt-1" style={{ color: 'var(--neon-green)' }}>
                               Requisicao em lote ({novaPecaQuantidade} un.)
                             </p>
                           )}
@@ -3261,9 +3261,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         }}
                         className="neon-button px-4 py-2 flex-1 text-xs"
                         style={{
-                          backgroundColor: modoSCACC ? '#39FF1420' : (tipoOS === 'LP' ? '#FFA50020' : 'rgba(var(--accent-rgb), 0.125)'),
-                          borderColor: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'),
-                          color: modoSCACC ? '#39FF14' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)')
+                          backgroundColor: modoSCACC ? 'rgba(var(--neon-green-rgb),0.1)' : (tipoOS === 'LP' ? '#FFA50020' : 'rgba(var(--accent-rgb), 0.125)'),
+                          borderColor: modoSCACC ? 'var(--neon-green)' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)'),
+                          color: modoSCACC ? 'var(--neon-green)' : (tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)')
                         }}
                       >
                         ADICIONAR
@@ -3293,9 +3293,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   <span
                                     className="px-2 py-0.5 rounded text-xs font-bold"
                                     style={{
-                                      backgroundColor: '#39FF1420',
-                                      color: '#39FF14',
-                                      border: '1px solid #39FF1460'
+                                      backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                      color: 'var(--neon-green)',
+                                      border: '1px solid rgba(var(--neon-green-rgb),0.35)'
                                     }}
                                   >
                                     QTD: {peca.quantidade}
@@ -3319,7 +3319,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                 {peca.valor_gspn && peca.valor_gspn !== peca.valor && (
                                   <p className="text-xs text-gray-500">GSPN: R$ {peca.valor_gspn.toFixed(2)}</p>
                                 )}
-                                <p className="text-xs" style={{ color: modoSCACC ? '#39FF14' : 'var(--text-accent)' }}>
+                                <p className="text-xs" style={{ color: modoSCACC ? 'var(--neon-green)' : 'var(--text-accent)' }}>
                                   Valor Venda: R$ {peca.valor.toFixed(2)} {peca.quantidade > 1 && `(Total: R$ ${(peca.valor * peca.quantidade).toFixed(2)})`}
                                 </p>
                               </div>
@@ -3395,9 +3395,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       }}
                       className="neon-button text-xs px-3 py-2 flex items-center gap-2"
                       style={{
-                        backgroundColor: '#39FF1420',
-                        color: '#39FF14',
-                        borderColor: '#39FF1460'
+                        backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                        color: 'var(--neon-green)',
+                        borderColor: 'rgba(var(--neon-green-rgb),0.35)'
                       }}
                     >
                       <Plus className="w-4 h-4" />
@@ -3639,7 +3639,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         </div>
                       ))}
 
-                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
                           <span className="text-2xl font-bold text-[#39FF14]">
@@ -4088,7 +4088,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         </div>
                       ))}
 
-                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
                           <span className="text-2xl font-bold text-[#39FF14]">
@@ -4492,9 +4492,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                             <span
                               className="px-3 py-1 rounded text-xs font-bold"
                               style={{
-                                backgroundColor: os.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' : '#39FF1430',
-                                color: os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14',
-                                border: `1px solid ${os.tipo_orcamento === 'samsung_contigo' ? '#FFA50060' : '#39FF1460'}`
+                                backgroundColor: os.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' : 'rgba(var(--neon-green-rgb),0.15)',
+                                color: os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : 'var(--neon-green)',
+                                border: `1px solid ${os.tipo_orcamento === 'samsung_contigo' ? '#FFA50060' : 'rgba(var(--neon-green-rgb),0.35)'}`
                               }}
                             >
                               {os.tipo_orcamento === 'samsung_contigo' ? 'Samsung Contigo' : 'Acessórios'}
@@ -4751,17 +4751,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                   <div className="flex-shrink-0">
                                     {(os?.tipo_os === 'OW' || modoSCACC || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && sugestao.valor_com_markup ? (
                                       <span className="text-xs px-2 py-0.5 rounded font-bold" style={{
-                                        backgroundColor: '#39FF1420',
-                                        color: '#39FF14',
-                                        border: '1px solid #39FF1440'
+                                        backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                        color: 'var(--neon-green)',
+                                        border: '1px solid rgba(var(--neon-green-rgb),0.25)'
                                       }}>
                                         R$ {sugestao.valor_com_markup.toFixed(2)}
                                       </span>
                                     ) : (
                                       <span className="text-xs px-2 py-0.5 rounded" style={{
-                                        backgroundColor: sugestao.count > 0 ? '#39FF1420' : '#FF006420',
-                                        color: sugestao.count > 0 ? '#39FF14' : '#FF0064',
-                                        border: `1px solid ${sugestao.count > 0 ? '#39FF14' : '#FF0064'}40`
+                                        backgroundColor: sugestao.count > 0 ? 'rgba(var(--neon-green-rgb),0.1)' : '#FF006420',
+                                        color: sugestao.count > 0 ? 'var(--neon-green)' : '#FF0064',
+                                        border: `1px solid ${sugestao.count > 0 ? 'rgba(var(--neon-green-rgb),0.25)' : '#FF006440'}`
                                       }}>
                                         {sugestao.count} disponível
                                       </span>
@@ -5111,16 +5111,16 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
                                       return reqComDevolucao && reqComDevolucao.motivo_devolucao && (
                                         <div className="mt-3 p-3 rounded-lg" style={{
-                                          backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF1410' : '#FFBF0010',
-                                          border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid #39FF1460' : '1px solid #FFBF0060'
+                                          backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? 'rgba(var(--neon-green-rgb),0.06)' : '#FFBF0010',
+                                          border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid rgba(var(--neon-green-rgb),0.35)' : '1px solid #FFBF0060'
                                         }}>
                                           <div className="flex items-start gap-2">
                                             <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
-                                              color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                              color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? 'var(--neon-green)' : '#FFBF00'
                                             }} />
                                             <div className="flex-1">
                                               <p className="text-xs font-bold mb-1" style={{
-                                                color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                                color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? 'var(--neon-green)' : '#FFBF00'
                                               }}>
                                                 {getTituloDevolucao()}
                                               </p>
@@ -5190,9 +5190,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                                 onClick={() => handlePostarGI(requisicao)}
                                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                                 style={{
-                                                  backgroundColor: '#39FF1410',
-                                                  borderColor: '#39FF14',
-                                                  color: '#39FF14'
+                                                  backgroundColor: 'rgba(var(--neon-green-rgb),0.06)',
+                                                  borderColor: 'var(--neon-green)',
+                                                  color: 'var(--neon-green)'
                                                 }}
                                               >
                                                 <Send className="w-3 h-3" />
@@ -5251,9 +5251,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                         onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                         style={{
-                                          backgroundColor: '#39FF1420',
-                                          borderColor: '#39FF14',
-                                          color: '#39FF14'
+                                          backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                          borderColor: 'var(--neon-green)',
+                                          color: 'var(--neon-green)'
                                         }}
                                       >
                                         <RefreshCw className="w-3 h-3" />
@@ -5405,7 +5405,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                         ))}
                       </div>
 
-                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                      <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
                         <div className="flex items-center justify-between">
                           <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
                           <span className="text-2xl font-bold text-[#39FF14]">
@@ -5974,8 +5974,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           }}
                           className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
                           style={{
-                            borderColor: jaAdicionado ? '#39FF1460' : 'rgba(var(--accent-rgb), 0.251)',
-                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(var(--accent-rgb),0.05)'
+                            borderColor: jaAdicionado ? 'rgba(var(--neon-green-rgb),0.35)' : 'rgba(var(--accent-rgb), 0.251)',
+                            backgroundColor: jaAdicionado ? 'rgba(var(--neon-green-rgb),0.05)' : 'rgba(var(--accent-rgb),0.05)'
                           }}
                         >
                           <div className="flex items-center justify-between gap-4">
@@ -6240,7 +6240,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           </div>
                           <div>
                             <p className="text-xs text-gray-400 uppercase mb-1">Você Recebe</p>
-                            <p className="text-[#39FF14] font-bold text-xl" style={{ textShadow: '0 0 10px rgba(57, 255, 20, 0.5)' }}>
+                            <p className="text-[#39FF14] font-bold text-xl" style={{ textShadow: '0 0 10px rgba(var(--neon-green-rgb),0.5)' }}>
                               R$ {calcularValorLiquido().toFixed(2)}
                             </p>
                           </div>
@@ -6413,9 +6413,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 }}
                 className="flex-1 neon-button flex items-center justify-center gap-2"
                 style={{
-                  backgroundColor: '#39FF1420',
-                  color: '#39FF14',
-                  border: '1px solid #39FF1460'
+                  backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                  color: 'var(--neon-green)',
+                  border: '1px solid rgba(var(--neon-green-rgb),0.35)'
                 }}
               >
                 <Save className="w-5 h-5" />
@@ -6465,9 +6465,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 }}
                 className="w-full py-3 px-6 rounded-lg font-bold transition-all duration-200 hover:scale-105"
                 style={{
-                  backgroundColor: '#39FF1420',
-                  color: '#39FF14',
-                  border: '1px solid #39FF14'
+                  backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                  color: 'var(--neon-green)',
+                  border: '1px solid var(--neon-green)'
                 }}
               >
                 FECHAR
@@ -6886,7 +6886,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   disabled={requisitando}
                   className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   style={{
-                    background: 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)',
+                    background: 'linear-gradient(135deg, var(--neon-green) 0%, #00D4FF 100%)',
                     color: '#000'
                   }}
                 >
@@ -6985,7 +6985,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   disabled={requisitandoManual}
                   className="flex-1 px-6 py-3 rounded-lg font-bold transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                   style={{
-                    background: 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)',
+                    background: 'linear-gradient(135deg, var(--neon-green) 0%, #00D4FF 100%)',
                     color: '#000'
                   }}
                 >

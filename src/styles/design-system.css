@@ -614,3 +614,38 @@ body {
 .cyber-scrollbar::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
+
+/* =====================================================
+   WHITE THEME OVERRIDES — neon green (#39FF14) tokens
+   Replace inaccessible neon on light backgrounds
+   ===================================================== */
+:root.theme-white-blue .text-\[\#39FF14\],
+:root.theme-white-pink .text-\[\#39FF14\] {
+  color: var(--neon-green) !important;
+}
+
+:root.theme-white-blue .bg-\[\#39FF14\],
+:root.theme-white-pink .bg-\[\#39FF14\] {
+  background-color: var(--neon-green) !important;
+}
+
+:root.theme-white-blue .border-\[\#39FF14\],
+:root.theme-white-pink .border-\[\#39FF14\] {
+  border-color: var(--neon-green) !important;
+}
+
+:root.theme-white-blue .hover\:bg-\[\#39FF14\]\/10:hover,
+:root.theme-white-pink .hover\:bg-\[\#39FF14\]\/10:hover {
+  background-color: rgba(var(--neon-green-rgb), 0.1) !important;
+}
+
+:root.theme-white-blue .border-\[\#39FF14\]\/30,
+:root.theme-white-pink .border-\[\#39FF14\]\/30 {
+  border-color: rgba(var(--neon-green-rgb), 0.3) !important;
+}
+
+:root.theme-white-blue .pulse-neon,
+:root.theme-white-pink .pulse-neon {
+  background-color: var(--neon-green) !important;
+  box-shadow: 0 0 6px rgba(var(--neon-green-rgb), 0.5) !important;
+}

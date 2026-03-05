@@ -3158,9 +3158,9 @@ Não haverá cobrança ao cliente.`
                         <span
                           className="px-3 py-1 rounded text-xs font-bold"
                           style={{
-                            backgroundColor: os.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' : '#39FF1430',
-                            color: os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14',
-                            border: `1px solid ${os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : '#39FF14'}60`
+                            backgroundColor: os.tipo_orcamento === 'samsung_contigo' ? '#FFA50030' : 'rgba(var(--neon-green-rgb),0.15)',
+                            color: os.tipo_orcamento === 'samsung_contigo' ? '#FFA500' : 'var(--neon-green)',
+                            border: `1px solid ${os.tipo_orcamento === 'samsung_contigo' ? '#FFA50060' : 'rgba(var(--neon-green-rgb),0.35)'}`
                           }}
                         >
                           {os.tipo_orcamento === 'normal' ? 'NORMAL' :
@@ -3176,7 +3176,7 @@ Não haverá cobrança ao cliente.`
                               onClick={() => handleToggleCortesia()}
                               className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
                               style={{
-                                backgroundColor: (os as any).is_cortesia ? '#39FF14' : '#4B5563'
+                                backgroundColor: (os as any).is_cortesia ? 'var(--neon-green)' : '#4B5563'
                               }}
                             >
                               <span
@@ -3190,10 +3190,10 @@ Não haverá cobrança ao cliente.`
                             <span
                               className="px-3 py-1 rounded text-xs font-bold animate-pulse"
                               style={{
-                                backgroundColor: '#39FF1430',
-                                color: '#39FF14',
-                                border: '1px solid #39FF1460',
-                                boxShadow: '0 0 10px rgba(57,255,20,0.3)'
+                                backgroundColor: 'rgba(var(--neon-green-rgb),0.15)',
+                                color: 'var(--neon-green)',
+                                border: '1px solid rgba(var(--neon-green-rgb),0.35)',
+                                boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.3)'
                               }}
                             >
                               CORTESIA
@@ -3616,8 +3616,8 @@ Não haverá cobrança ao cliente.`
                 const isSCACCColor = isSCACC;
                 const accentColor = isSCACC ? '#39FF14' : 'var(--text-accent)';
                 return (
-                <div className="premium-card p-4 mb-4" style={{ backgroundColor: isSCACCColor ? '#39FF1410' : 'rgba(var(--accent-rgb), 0.063)', border: isSCACCColor ? '1px solid #39FF1430' : '1px solid rgba(var(--accent-rgb), 0.19)' }}>
-                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: isSCACCColor ? '#39FF14' : 'var(--text-accent)' }}>
+                <div className="premium-card p-4 mb-4" style={{ backgroundColor: isSCACCColor ? 'rgba(var(--neon-green-rgb),0.06)' : 'rgba(var(--accent-rgb), 0.063)', border: isSCACCColor ? '1px solid rgba(var(--neon-green-rgb),0.15)' : '1px solid rgba(var(--accent-rgb), 0.19)' }}>
+                  <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{ color: isSCACCColor ? 'var(--neon-green)' : 'var(--text-accent)' }}>
                     <Package className="w-4 h-4" />
                     Adicionar Peca {isSCACC ? '(Requisicao em Lote)' : 'Manualmente'}
                   </h3>
@@ -3730,7 +3730,7 @@ Não haverá cobrança ao cliente.`
                         placeholder="1"
                       />
                       {novaPecaQuantidadeOW > 1 && (
-                        <p className="text-xs mt-1" style={{ color: '#39FF14' }}>
+                        <p className="text-xs mt-1" style={{ color: 'var(--neon-green)' }}>
                           Requisicao em lote ({novaPecaQuantidadeOW} un.)
                         </p>
                       )}
@@ -3841,7 +3841,7 @@ Não haverá cobrança ao cliente.`
                             <div className="flex items-center gap-4">
                               <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
                               {requisicao?.peca_estoque?.id_numerico && (
-                                <div className="text-xs font-bold mt-1" style={{ color: '#39FF14' }}>
+                                <div className="text-xs font-bold mt-1" style={{ color: 'var(--neon-green)' }}>
                                   {requisicao.is_lote && requisicao.pecas_lote && requisicao.pecas_lote.length > 0 ? (
                                     <div className="flex flex-wrap gap-1 items-center">
                                       <span>IDs Atendidos:</span>
@@ -3909,7 +3909,7 @@ Não haverá cobrança ao cliente.`
                                   <button
                                     onClick={() => handleSalvarValoresPecaManual(peca.id)}
                                     className="p-1.5 rounded transition-all"
-                                    style={{ backgroundColor: '#39FF1420', border: '1px solid #39FF1460', color: '#39FF14' }}
+                                    style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
                                     title="Salvar"
                                   >
                                     <Save className="w-3.5 h-3.5" />
@@ -3949,9 +3949,9 @@ Não haverá cobrança ao cliente.`
                                         disabled={salvandoValorGSPN[peca.id]}
                                         className="p-1.5 rounded transition-all disabled:opacity-50"
                                         style={{
-                                          backgroundColor: '#39FF1420',
-                                          border: '1px solid #39FF1460',
-                                          color: '#39FF14'
+                                          backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                          border: '1px solid rgba(var(--neon-green-rgb),0.35)',
+                                          color: 'var(--neon-green)'
                                         }}
                                         title="Salvar valor"
                                       >
@@ -4195,16 +4195,16 @@ Não haverá cobrança ao cliente.`
 
                               return reqComDevolucao && reqComDevolucao.motivo_devolucao && (
                                 <div className="mt-3 p-3 rounded-lg" style={{
-                                  backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF1410' : '#FFBF0010',
-                                  border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid #39FF1460' : '1px solid #FFBF0060'
+                                  backgroundColor: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF006410' : reqComDevolucao.tipo_devolucao === 'nova' ? 'rgba(var(--neon-green-rgb),0.06)' : '#FFBF0010',
+                                  border: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '1px solid #FF006460' : reqComDevolucao.tipo_devolucao === 'nova' ? '1px solid rgba(var(--neon-green-rgb),0.35)' : '1px solid #FFBF0060'
                                 }}>
                                   <div className="flex items-start gap-2">
                                     <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" style={{
-                                      color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                      color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? 'var(--neon-green)' : '#FFBF00'
                                     }} />
                                     <div className="flex-1">
                                       <p className="text-xs font-bold mb-1" style={{
-                                        color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? '#39FF14' : '#FFBF00'
+                                        color: reqComDevolucao.tipo_devolucao === 'nova_com_defeito' ? '#FF0064' : reqComDevolucao.tipo_devolucao === 'nova' ? 'var(--neon-green)' : '#FFBF00'
                                       }}>
                                         {getTituloDevolucao()}
                                       </p>
@@ -4307,9 +4307,9 @@ Não haverá cobrança ao cliente.`
                                         onClick={() => handlePostarGI(requisicao)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                         style={{
-                                          backgroundColor: '#39FF1410',
-                                          borderColor: '#39FF14',
-                                          color: '#39FF14'
+                                          backgroundColor: 'rgba(var(--neon-green-rgb),0.06)',
+                                          borderColor: 'var(--neon-green)',
+                                          color: 'var(--neon-green)'
                                         }}
                                       >
                                         <Send className="w-3 h-3" />
@@ -4383,9 +4383,9 @@ Não haverá cobrança ao cliente.`
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
                                 style={{
-                                  backgroundColor: '#39FF1420',
-                                  borderColor: '#39FF14',
-                                  color: '#39FF14'
+                                  backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
+                                  borderColor: 'var(--neon-green)',
+                                  color: 'var(--neon-green)'
                                 }}
                               >
                                 <RefreshCw className="w-3 h-3" />
@@ -4574,7 +4574,7 @@ Não haverá cobrança ao cliente.`
                     ))}
                   </div>
 
-                  <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: '#39FF14' }}>
+                  <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
                       <span className="text-2xl font-bold text-[#39FF14]">
@@ -4589,10 +4589,10 @@ Não haverá cobrança ao cliente.`
                       disabled={salvandoServicos}
                       className="neon-button px-8 py-3 text-sm flex items-center gap-2 disabled:opacity-50"
                       style={{
-                        backgroundColor: servicosSalvos ? '#39FF1440' : '#39FF1420',
-                        borderColor: '#39FF14',
-                        color: '#39FF14',
-                        boxShadow: servicosSalvos ? '0 0 30px rgba(57,255,20,0.5)' : '0 0 20px rgba(57,255,20,0.3)'
+                        backgroundColor: servicosSalvos ? 'rgba(var(--neon-green-rgb),0.25)' : 'rgba(var(--neon-green-rgb),0.1)',
+                        borderColor: 'var(--neon-green)',
+                        color: 'var(--neon-green)',
+                        boxShadow: servicosSalvos ? '0 0 30px rgba(var(--neon-green-rgb),0.5)' : '0 0 20px rgba(var(--neon-green-rgb),0.3)'
                       }}
                     >
                       {salvandoServicos ? (
@@ -5266,8 +5266,8 @@ Não haverá cobrança ao cliente.`
                           }}
                           className="premium-card p-4 cursor-pointer transition-all hover:scale-[1.01] hover:border-[#00D4FF]"
                           style={{
-                            borderColor: jaAdicionado ? '#39FF1460' : 'rgba(var(--accent-rgb), 0.25)',
-                            backgroundColor: jaAdicionado ? 'rgba(57,255,20,0.05)' : 'rgba(var(--accent-rgb),0.05)'
+                            borderColor: jaAdicionado ? 'rgba(var(--neon-green-rgb),0.35)' : 'rgba(var(--accent-rgb), 0.25)',
+                            backgroundColor: jaAdicionado ? 'rgba(var(--neon-green-rgb),0.05)' : 'rgba(var(--accent-rgb),0.05)'
                           }}
                         >
                           <div className="flex items-center justify-between gap-4">

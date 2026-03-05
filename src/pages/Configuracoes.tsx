@@ -789,7 +789,7 @@ export function Configuracoes() {
 
   const allTabs = [
     { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true },
-    { id: 'usuarios' as Tab, label: 'Usuarios', icon: Users, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
+    { id: 'usuarios' as Tab, label: 'Usuarios', icon: Users, color: 'var(--neon-green)', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
     { id: 'permissoes' as Tab, label: 'Permissoes', icon: Shield, color: '#FF6B6B', isAccent: false, onlyFor: ['master', 'diretoria'] },
     { id: 'servicos' as Tab, label: 'Servicos', icon: Wrench, color: '#FFBF00', isAccent: false },
     { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064', isAccent: false },
