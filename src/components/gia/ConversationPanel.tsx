@@ -1,5 +1,6 @@
 import { motion, AnimatePresence } from 'framer-motion';
 import { Mic, MicOff, SkipForward, RotateCcw } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface Message {
   id: string;
@@ -27,6 +28,24 @@ export function ConversationPanel({
   onReset,
   isRunning,
 }: ConversationPanelProps) {
+  const { isDark } = useTheme();
+
+  const cyanColor = isDark ? '#00d2ff' : '#0077b6';
+  const msgTextUser = isDark ? '#e2e8f0' : '#1e293b';
+  const msgTextAssist = isDark ? '#c8d6e5' : '#334155';
+  const bubbleBgUser = isDark
+    ? 'linear-gradient(135deg, rgba(0,210,255,0.15), rgba(0,150,255,0.1))'
+    : 'linear-gradient(135deg, rgba(0,119,182,0.10), rgba(0,150,255,0.06))';
+  const bubbleBorderUser = isDark ? '1px solid rgba(0,210,255,0.25)' : '1px solid rgba(0,119,182,0.25)';
+  const bubbleBgAssist = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)';
+  const bubbleBorderAssist = isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.08)';
+  const thinkingDotBg = isDark ? cyanColor : 'rgba(0,119,182,0.6)';
+  const thinkingTextColor = isDark ? '#4a5568' : '#64748b';
+  const controlBg = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.05)';
+  const controlBorder = isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.10)';
+  const borderTopColor = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+  const statusTextColor = isDark ? '#374151' : '#64748b';
+
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4" style={{ scrollbarWidth: 'thin', scrollbarColor: '#1e293b transparent' }}>
@@ -43,12 +62,8 @@ export function ConversationPanel({
               <div
                 className="max-w-[85%] rounded-2xl px-5 py-3.5"
                 style={{
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, rgba(0, 210, 255, 0.15), rgba(0, 150, 255, 0.1))'
-                    : 'rgba(255, 255, 255, 0.03)',
-                  border: msg.role === 'user'
-                    ? '1px solid rgba(0, 210, 255, 0.25)'
-                    : '1px solid rgba(255, 255, 255, 0.06)',
+                  background: msg.role === 'user' ? bubbleBgUser : bubbleBgAssist,
+                  border: msg.role === 'user' ? bubbleBorderUser : bubbleBorderAssist,
                   backdropFilter: 'blur(10px)',
                 }}
               >
@@ -61,13 +76,13 @@ export function ConversationPanel({
                       }}>
                       G
                     </div>
-                    <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+                    <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: cyanColor }}>
                       GIA
                     </span>
                   </div>
                 )}
                 <p className="text-sm leading-relaxed" style={{
-                  color: msg.role === 'user' ? '#e2e8f0' : '#c8d6e5',
+                  color: msg.role === 'user' ? msgTextUser : msgTextAssist,
                 }}>
                   {msg.text}
                 </p>
@@ -84,25 +99,22 @@ export function ConversationPanel({
             >
               <div
                 className="max-w-[85%] rounded-2xl px-5 py-3.5"
-                style={{
-                  background: 'rgba(255, 255, 255, 0.03)',
-                  border: '1px solid rgba(255, 255, 255, 0.06)',
-                }}
+                style={{ background: bubbleBgAssist, border: bubbleBorderAssist }}
               >
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold"
                     style={{ background: 'linear-gradient(135deg, #00d2ff, #00ffc8)', color: '#0a0e1a' }}>
                     G
                   </div>
-                  <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+                  <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: cyanColor }}>
                     GIA
                   </span>
                 </div>
-                <p className="text-sm leading-relaxed" style={{ color: '#c8d6e5' }}>
+                <p className="text-sm leading-relaxed" style={{ color: msgTextAssist }}>
                   {streamingText}
                   <motion.span
                     className="inline-block w-[2px] h-4 ml-0.5 align-text-bottom"
-                    style={{ background: '#00d2ff' }}
+                    style={{ background: cyanColor }}
                     animate={{ opacity: [1, 0] }}
                     transition={{ duration: 0.6, repeat: Infinity }}
                   />
@@ -120,36 +132,32 @@ export function ConversationPanel({
               className="flex justify-start"
             >
               <div className="flex items-center gap-2 px-5 py-3 rounded-2xl"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+                style={{ background: bubbleBgAssist, border: bubbleBorderAssist }}>
                 <div className="flex gap-1.5">
                   {[0, 1, 2].map((i) => (
                     <motion.div
                       key={i}
                       className="w-2 h-2 rounded-full"
-                      style={{ background: '#00d2ff' }}
+                      style={{ background: thinkingDotBg }}
                       animate={{ y: [0, -6, 0], opacity: [0.4, 1, 0.4] }}
                       transition={{ duration: 0.8, repeat: Infinity, delay: i * 0.15 }}
                     />
                   ))}
                 </div>
-                <span className="text-xs ml-1" style={{ color: '#4a5568' }}>Analisando dados...</span>
+                <span className="text-xs ml-1" style={{ color: thinkingTextColor }}>Analisando dados...</span>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
       </div>
 
-      <div className="flex-shrink-0 px-6 py-5 border-t" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="flex-shrink-0 px-6 py-5 border-t" style={{ borderColor: borderTopColor }}>
         <div className="flex items-center justify-center gap-4">
           <motion.button
             onClick={onReset}
             className="p-3 rounded-xl transition-colors"
-            style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#64748b',
-            }}
-            whileHover={{ scale: 1.05, borderColor: 'rgba(255,255,255,0.15)' }}
+            style={{ background: controlBg, border: controlBorder, color: '#64748b' }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             title="Reiniciar"
           >
@@ -162,13 +170,13 @@ export function ConversationPanel({
             style={{
               background: aiState === 'listening'
                 ? 'linear-gradient(135deg, #00d2ff, #00ffc8)'
-                : 'rgba(0, 210, 255, 0.1)',
+                : 'rgba(0,210,255,0.1)',
               border: aiState === 'listening'
                 ? 'none'
-                : '1px solid rgba(0, 210, 255, 0.3)',
+                : '1px solid rgba(0,210,255,0.3)',
               boxShadow: aiState === 'listening'
-                ? '0 0 30px rgba(0, 210, 255, 0.4), 0 0 60px rgba(0, 210, 255, 0.15)'
-                : '0 0 20px rgba(0, 210, 255, 0.1)',
+                ? '0 0 30px rgba(0,210,255,0.4), 0 0 60px rgba(0,210,255,0.15)'
+                : '0 0 20px rgba(0,210,255,0.1)',
             }}
             whileHover={{ scale: 1.08 }}
             whileTap={{ scale: 0.92 }}
@@ -176,12 +184,12 @@ export function ConversationPanel({
             {aiState === 'listening' ? (
               <MicOff className="w-6 h-6" style={{ color: '#0a0e1a' }} />
             ) : (
-              <Mic className="w-6 h-6" style={{ color: '#00d2ff' }} />
+              <Mic className="w-6 h-6" style={{ color: cyanColor }} />
             )}
             {aiState === 'listening' && (
               <motion.div
                 className="absolute inset-0 rounded-full"
-                style={{ border: '2px solid rgba(0, 210, 255, 0.5)' }}
+                style={{ border: '2px solid rgba(0,210,255,0.5)' }}
                 animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
                 transition={{ duration: 1.5, repeat: Infinity }}
               />
@@ -192,19 +200,15 @@ export function ConversationPanel({
             onClick={onSkip}
             disabled={!isRunning}
             className="p-3 rounded-xl transition-colors disabled:opacity-30"
-            style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.08)',
-              color: '#64748b',
-            }}
-            whileHover={{ scale: 1.05, borderColor: 'rgba(255,255,255,0.15)' }}
+            style={{ background: controlBg, border: controlBorder, color: '#64748b' }}
+            whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
-            title="Próximo"
+            title="Proximo"
           >
             <SkipForward className="w-4 h-4" />
           </motion.button>
         </div>
-        <p className="text-center mt-3 text-[10px] tracking-wider uppercase" style={{ color: '#374151' }}>
+        <p className="text-center mt-3 text-[10px] tracking-wider uppercase" style={{ color: statusTextColor }}>
           {aiState === 'idle' ? 'Pressione o microfone para iniciar' : 'Demonstracao em andamento'}
         </p>
       </div>

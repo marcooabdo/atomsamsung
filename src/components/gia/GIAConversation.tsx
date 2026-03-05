@@ -20,6 +20,7 @@ import {
   RadarChart,
   type ChartDataPoint,
 } from './GIACharts';
+import { useTheme } from '../../contexts/ThemeContext';
 
 export interface GIAMessage {
   id: string;
@@ -361,15 +362,36 @@ function InlineCards({ cards }: { cards: GIACardData[] }) {
   );
 }
 
-function formatText(text: string) {
+function formatText(text: string, isDark: boolean) {
+  const boldColor = isDark ? '#e2e8f0' : '#1e293b';
+  const bulletColor = isDark ? '#00d2ff' : '#0077b6';
   return text
-    .replace(/\*\*(.*?)\*\*/g, '<strong style="color:#e2e8f0">$1</strong>')
-    .replace(/^- /gm, '<span style="color:#00d2ff;margin-right:6px">&#8226;</span>')
+    .replace(/\*\*(.*?)\*\*/g, `<strong style="color:${boldColor}">$1</strong>`)
+    .replace(/^- /gm, `<span style="color:${bulletColor};margin-right:6px">&#8226;</span>`)
     .replace(/\n/g, '<br/>');
 }
 
 export function GIAConversation({ messages, streamingText, isThinking, userName }: GIAConversationProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { isDark } = useTheme();
+
+  const cyanColor = isDark ? '#00d2ff' : '#0077b6';
+  const msgTextUser = isDark ? '#d0e4f0' : '#1e293b';
+  const msgTextAssist = isDark ? '#b8c8d8' : '#334155';
+  const bubbleBgUser = isDark
+    ? 'linear-gradient(135deg, rgba(0,210,255,0.12), rgba(0,150,255,0.08))'
+    : 'linear-gradient(135deg, rgba(0,119,182,0.10), rgba(0,150,255,0.06))';
+  const bubbleBorderUser = isDark ? '1px solid rgba(0,210,255,0.2)' : '1px solid rgba(0,119,182,0.25)';
+  const bubbleBgAssist = isDark ? 'rgba(255,255,255,0.025)' : 'rgba(0,0,0,0.04)';
+  const bubbleBorderAssist = isDark ? '1px solid rgba(255,255,255,0.05)' : '1px solid rgba(0,0,0,0.08)';
+  const thinkingDotBg = isDark ? 'rgba(200,220,240,0.8)' : 'rgba(0,119,182,0.6)';
+  const thinkingTextColor = isDark ? 'rgba(255,255,255,0.3)' : '#64748b';
+  const cursorBg = cyanColor;
+  const userNameColor = isDark ? 'rgba(255,255,255,0.3)' : '#94a3b8';
+  const giaBadgeBg = isDark
+    ? 'linear-gradient(135deg, rgba(0,210,255,0.3), rgba(0,255,200,0.2))'
+    : 'linear-gradient(135deg, rgba(0,119,182,0.15), rgba(0,150,255,0.1))';
+  const giaBadgeBorder = isDark ? '1px solid rgba(0,210,255,0.3)' : '1px solid rgba(0,119,182,0.25)';
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -396,13 +418,10 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
               {msg.role === 'assistant' && (
                 <div className="flex items-center gap-2 mb-1.5">
                   <div className="w-5 h-5 rounded-full flex items-center justify-center"
-                    style={{
-                      background: 'linear-gradient(135deg, rgba(0,210,255,0.3), rgba(0,255,200,0.2))',
-                      border: '1px solid rgba(0,210,255,0.3)',
-                    }}>
-                    <Sparkles className="w-2.5 h-2.5" style={{ color: '#00d2ff' }} />
+                    style={{ background: giaBadgeBg, border: giaBadgeBorder }}>
+                    <Sparkles className="w-2.5 h-2.5" style={{ color: cyanColor }} />
                   </div>
-                  <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+                  <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: cyanColor }}>
                     GIA
                   </span>
                 </div>
@@ -410,7 +429,7 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
 
               {msg.role === 'user' && (
                 <div className="flex items-center gap-2 mb-1.5 justify-end">
-                  <span className="text-[10px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <span className="text-[10px] font-medium tracking-wide" style={{ color: userNameColor }}>
                     {userName}
                   </span>
                 </div>
@@ -419,18 +438,14 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
               <div
                 className="rounded-2xl px-4 py-3"
                 style={{
-                  background: msg.role === 'user'
-                    ? 'linear-gradient(135deg, rgba(0,210,255,0.12), rgba(0,150,255,0.08))'
-                    : 'rgba(255,255,255,0.025)',
-                  border: msg.role === 'user'
-                    ? '1px solid rgba(0,210,255,0.2)'
-                    : '1px solid rgba(255,255,255,0.05)',
+                  background: msg.role === 'user' ? bubbleBgUser : bubbleBgAssist,
+                  border: msg.role === 'user' ? bubbleBorderUser : bubbleBorderAssist,
                 }}
               >
                 <div
                   className="text-sm leading-relaxed"
-                  style={{ color: msg.role === 'user' ? '#d0e4f0' : '#b8c8d8' }}
-                  dangerouslySetInnerHTML={{ __html: formatText(msg.content) }}
+                  style={{ color: msg.role === 'user' ? msgTextUser : msgTextAssist }}
+                  dangerouslySetInnerHTML={{ __html: formatText(msg.content, isDark) }}
                 />
               </div>
 
@@ -451,31 +466,25 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
             <div className="max-w-[95%] sm:max-w-[80%]">
               <div className="flex items-center gap-2 mb-1.5">
                 <div className="w-5 h-5 rounded-full flex items-center justify-center"
-                  style={{
-                    background: 'linear-gradient(135deg, rgba(0,210,255,0.3), rgba(0,255,200,0.2))',
-                    border: '1px solid rgba(0,210,255,0.3)',
-                  }}>
-                  <Sparkles className="w-2.5 h-2.5" style={{ color: '#00d2ff' }} />
+                  style={{ background: giaBadgeBg, border: giaBadgeBorder }}>
+                  <Sparkles className="w-2.5 h-2.5" style={{ color: cyanColor }} />
                 </div>
-                <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: '#00d2ff' }}>
+                <span className="text-[10px] font-semibold tracking-widest uppercase" style={{ color: cyanColor }}>
                   GIA
                 </span>
               </div>
               <div
                 className="rounded-2xl px-4 py-3"
-                style={{
-                  background: 'rgba(255,255,255,0.025)',
-                  border: '1px solid rgba(255,255,255,0.05)',
-                }}
+                style={{ background: bubbleBgAssist, border: bubbleBorderAssist }}
               >
                 <div
                   className="text-sm leading-relaxed"
-                  style={{ color: '#b8c8d8' }}
-                  dangerouslySetInnerHTML={{ __html: formatText(streamingText) }}
+                  style={{ color: msgTextAssist }}
+                  dangerouslySetInnerHTML={{ __html: formatText(streamingText, isDark) }}
                 />
                 <motion.span
                   className="inline-block w-[2px] h-4 ml-0.5 align-text-bottom"
-                  style={{ background: '#00d2ff' }}
+                  style={{ background: cursorBg }}
                   animate={{ opacity: [1, 0] }}
                   transition={{ duration: 0.5, repeat: Infinity }}
                 />
@@ -493,19 +502,19 @@ export function GIAConversation({ messages, streamingText, isThinking, userName 
             className="flex justify-start"
           >
             <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
-              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.05)' }}>
+              style={{ background: bubbleBgAssist, border: bubbleBorderAssist }}>
               <div className="flex gap-1.5">
                 {[0, 1, 2].map((i) => (
                   <motion.div
                     key={i}
                     className="w-2 h-2 rounded-full"
-                    style={{ background: 'rgba(200,220,240,0.8)' }}
+                    style={{ background: thinkingDotBg }}
                     animate={{ y: [0, -8, 0], opacity: [0.4, 1, 0.4] }}
                     transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.15, ease: 'easeInOut' }}
                   />
                 ))}
               </div>
-              <span className="text-xs" style={{ color: 'rgba(255,255,255,0.3)' }}>Consultando dados...</span>
+              <span className="text-xs" style={{ color: thinkingTextColor }}>Consultando dados...</span>
             </div>
           </motion.div>
         )}
