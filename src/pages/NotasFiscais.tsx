@@ -98,7 +98,7 @@ export function NotasFiscais() {
   const [tipoOsFiltro, setTipoOsFiltro] = useState<'todos' | 'LP' | 'OW'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [selectedUnidade, setSelectedUnidade] = useState<string>('');
-  const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('mes');
+  const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
   // Estatísticas
