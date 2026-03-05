@@ -649,3 +649,99 @@ body {
   background-color: var(--neon-green) !important;
   box-shadow: 0 0 6px rgba(var(--neon-green-rgb), 0.5) !important;
 }
+
+/* =====================================================
+   AMBER / YELLOW CONTRAST FIXES
+   Dark themes: brighten amber/yellow for readability
+   Light themes: darken amber/yellow for readability
+   ===================================================== */
+
+/* --- Dark theme (original) --- */
+:root,
+:root.theme-original {
+  --amber-text: #fcd34d;
+  --amber-icon: #fbbf24;
+  --amber-bg: rgba(251, 191, 36, 0.12);
+  --amber-border: rgba(251, 191, 36, 0.35);
+  --yellow-text: #fde68a;
+  --yellow-icon: #fcd34d;
+  --yellow-bg: rgba(252, 211, 77, 0.12);
+  --yellow-border: rgba(252, 211, 77, 0.35);
+}
+
+:root .text-amber-400,
+:root.theme-original .text-amber-400 {
+  color: #fcd34d !important;
+}
+:root .text-amber-500,
+:root.theme-original .text-amber-500 {
+  color: #fbbf24 !important;
+}
+:root .text-yellow-400,
+:root.theme-original .text-yellow-400 {
+  color: #fde68a !important;
+}
+:root .text-yellow-500,
+:root.theme-original .text-yellow-500 {
+  color: #fcd34d !important;
+}
+:root .bg-amber-500\/10,
+:root.theme-original .bg-amber-500\/10 {
+  background-color: rgba(251, 191, 36, 0.12) !important;
+}
+:root .bg-yellow-500\/10,
+:root.theme-original .bg-yellow-500\/10 {
+  background-color: rgba(252, 211, 77, 0.12) !important;
+}
+:root .border-amber-500\/30,
+:root.theme-original .border-amber-500\/30 {
+  border-color: rgba(251, 191, 36, 0.4) !important;
+}
+:root .border-yellow-500\/30,
+:root.theme-original .border-yellow-500\/30 {
+  border-color: rgba(252, 211, 77, 0.4) !important;
+}
+
+/* --- Light themes (white-pink, white-blue) --- */
+:root.theme-white-pink .text-amber-400,
+:root.theme-white-blue .text-amber-400 {
+  color: #92400e !important;
+}
+:root.theme-white-pink .text-amber-500,
+:root.theme-white-blue .text-amber-500 {
+  color: #78350f !important;
+}
+:root.theme-white-pink .text-yellow-400,
+:root.theme-white-blue .text-yellow-400 {
+  color: #92400e !important;
+}
+:root.theme-white-pink .text-yellow-500,
+:root.theme-white-blue .text-yellow-500 {
+  color: #78350f !important;
+}
+:root.theme-white-pink .bg-amber-500\/10,
+:root.theme-white-blue .bg-amber-500\/10 {
+  background-color: rgba(180, 83, 9, 0.08) !important;
+}
+:root.theme-white-pink .bg-yellow-500\/10,
+:root.theme-white-blue .bg-yellow-500\/10 {
+  background-color: rgba(180, 83, 9, 0.08) !important;
+}
+:root.theme-white-pink .border-amber-500\/30,
+:root.theme-white-blue .border-amber-500\/30 {
+  border-color: rgba(180, 83, 9, 0.35) !important;
+}
+:root.theme-white-pink .border-yellow-500\/30,
+:root.theme-white-blue .border-yellow-500\/30 {
+  border-color: rgba(180, 83, 9, 0.35) !important;
+}
+
+/* Icon colors in banners */
+:root.theme-white-pink .lucide-alert-triangle,
+:root.theme-white-pink .lucide-alert-circle,
+:root.theme-white-pink .lucide-info,
+:root.theme-white-blue .lucide-alert-triangle,
+:root.theme-white-blue .lucide-alert-circle,
+:root.theme-white-blue .lucide-info {
+  color: inherit;
+}
