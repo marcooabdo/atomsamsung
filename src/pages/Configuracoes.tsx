@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
 import { ConfiguracoesPermissoes } from '../components/ConfiguracoesPermissoes';
