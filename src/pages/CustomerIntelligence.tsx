@@ -155,7 +155,8 @@ export default function CustomerIntelligence() {
                 <select
                   value={selectedUnidade}
                   onChange={(e) => setSelectedUnidade(e.target.value)}
-                  className="pl-9 pr-8 py-2 rounded-xl bg-slate-800/50 border border-cyan-500/30 text-white text-sm focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 appearance-none cursor-pointer min-w-[180px]"
+                  className="pl-9 pr-8 py-2 rounded-xl text-sm focus:border-cyan-400 appearance-none cursor-pointer min-w-[180px]"
+                  style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Todas Unidades</option>
                   {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
@@ -164,7 +165,7 @@ export default function CustomerIntelligence() {
               </div>
             )}
 
-            <div className="flex items-center gap-0.5 p-0.5 rounded-xl bg-slate-800/50 border border-cyan-500/30">
+            <div className="flex items-center gap-0.5 p-0.5 rounded-xl" style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}>
               {CI_FILTERS.map(tipo => (
                 <button
                   key={tipo}
@@ -172,8 +173,9 @@ export default function CustomerIntelligence() {
                   className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
                     tipoFiltro === tipo
                       ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25'
-                      : 'text-slate-400 hover:text-white hover:bg-slate-700/50'
+                      : ''
                   }`}
+                  style={tipoFiltro !== tipo ? { color: 'var(--text-secondary)' } : {}}
                 >
                   {tipo === 'geral' ? 'Geral' : tipo}
                 </button>
@@ -185,7 +187,8 @@ export default function CustomerIntelligence() {
               <select
                 value={periodoFiltro}
                 onChange={(e) => setPeriodoFiltro(e.target.value)}
-                className="pl-9 pr-8 py-2 rounded-xl bg-slate-800/50 border border-cyan-500/30 text-white text-sm focus:border-cyan-400 appearance-none cursor-pointer"
+                className="pl-9 pr-8 py-2 rounded-xl text-sm focus:border-cyan-400 appearance-none cursor-pointer"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-primary)' }}
               >
                 <option value="mes">Último Mês</option>
                 <option value="trimestre">Último Trimestre</option>
@@ -200,21 +203,28 @@ export default function CustomerIntelligence() {
               <button
                 onClick={handleReport}
                 title="Abrir relatório"
-                className="p-2 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/30 hover:bg-cyan-500/10 transition-all"
+                className="p-2 rounded-xl transition-all"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#06B6D4'; e.currentTarget.style.borderColor = 'rgba(6,182,212,0.4)'; e.currentTarget.style.background = 'rgba(6,182,212,0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
               >
                 <Printer className="w-4 h-4" />
               </button>
               <button
                 onClick={handleExportExcel}
                 title="Exportar Excel"
-                className="p-2 rounded-xl bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-emerald-400 hover:border-emerald-500/30 hover:bg-emerald-500/10 transition-all"
+                className="p-2 rounded-xl transition-all"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-secondary)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.color = '#10B981'; e.currentTarget.style.borderColor = 'rgba(16,185,129,0.4)'; e.currentTarget.style.background = 'rgba(16,185,129,0.08)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)'; e.currentTarget.style.borderColor = 'var(--border-primary)'; e.currentTarget.style.background = 'var(--bg-secondary)'; }}
               >
                 <Download className="w-4 h-4" />
               </button>
               <button
                 onClick={refresh}
                 disabled={refreshing}
-                className="p-2 rounded-xl bg-slate-800/50 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all disabled:opacity-50"
+                className="p-2 rounded-xl transition-all disabled:opacity-50"
+                style={{ background: 'var(--bg-secondary)', border: '1px solid rgba(var(--accent-rgb),0.3)', color: 'var(--text-accent)' }}
               >
                 <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               </button>
@@ -222,7 +232,7 @@ export default function CustomerIntelligence() {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-800/30 border border-slate-700/40 w-fit">
+        <div className="flex items-center gap-1.5 p-1 rounded-xl w-fit" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
           {([
             { id: 'dashboard' as Tab, label: 'Dashboard', icon: BarChart3 },
             { id: 'carteira' as Tab, label: carteiraLabel, icon: Users },
@@ -236,8 +246,9 @@ export default function CustomerIntelligence() {
               className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
                 activeTab === tab.id
                   ? 'bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-cyan-400 border border-cyan-500/30 shadow-lg shadow-cyan-500/10'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-700/30'
+                  : ''
               }`}
+              style={activeTab !== tab.id ? { color: 'var(--text-secondary)' } : {}}
             >
               <tab.icon className="w-4 h-4" />
               <span className="hidden sm:inline">{tab.label}</span>

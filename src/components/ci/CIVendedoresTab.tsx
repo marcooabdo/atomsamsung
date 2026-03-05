@@ -206,15 +206,15 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                 </div>
                 <span className="text-xs font-semibold" style={{ color: cat.color }}>{cat.label}</span>
               </div>
-              <p className="text-2xl font-black text-white">{total}</p>
-              <p className="text-xs text-slate-500 mt-0.5">{cat.source}</p>
+              <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{total}</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>{cat.source}</p>
             </div>
           );
         })}
       </div>
 
       <div className={`${GLASS} p-5`}>
-        <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2">
+        <h3 className="text-sm font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <BarChart2 className="w-4 h-4 text-cyan-400" />
           Distribuicao por Categoria (Top 10)
         </h3>
@@ -224,8 +224,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
             <XAxis dataKey="nome" tick={{ fontSize: 11, fill: '#94A3B8' }} />
             <YAxis tick={{ fontSize: 11, fill: '#94A3B8' }} />
             <Tooltip
-              contentStyle={{ backgroundColor: '#0F172A', border: '1px solid rgba(6,182,212,0.3)', borderRadius: 8, fontSize: 12 }}
-              labelStyle={{ color: '#E2E8F0' }}
+              contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(6,182,212,0.3)', borderRadius: 8, fontSize: 12, color: 'var(--text-primary)' }}
             />
             {CATEGORY_CONFIG.map(cat => (
               <Bar key={cat.key} dataKey={cat.label} fill={cat.color} radius={[3, 3, 0, 0]} maxBarSize={18} />
@@ -238,8 +237,8 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-700/50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-slate-400 w-48">
+              <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                <th className="text-left px-4 py-3 text-xs font-semibold w-48" style={{ color: 'var(--text-secondary)' }}>
                   <div className="flex items-center gap-1">
                     <Users className="w-3.5 h-3.5" />
                     Profissional
@@ -248,7 +247,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                 {CATEGORY_CONFIG.map(cat => (
                   <th
                     key={cat.key}
-                    className="text-center px-3 py-3 text-xs font-semibold cursor-pointer hover:text-white transition-colors select-none"
+                    className="text-center px-3 py-3 text-xs font-semibold cursor-pointer transition-colors select-none"
                     style={{ color: cat.color }}
                     onClick={() => handleSort(cat.key as keyof VendedorStats)}
                   >
@@ -256,11 +255,11 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                       {cat.label}
                       <SortIcon col={cat.key as keyof VendedorStats} />
                     </div>
-                    <p className="text-slate-600 font-normal normal-case mt-0.5" style={{ fontSize: 9 }}>{cat.source}</p>
+                    <p className="font-normal normal-case mt-0.5" style={{ fontSize: 9, color: 'var(--text-secondary)', opacity: 0.7 }}>{cat.source}</p>
                   </th>
                 ))}
                 <th
-                  className="text-center px-3 py-3 text-xs font-semibold text-slate-400 cursor-pointer hover:text-white transition-colors select-none"
+                  className="text-center px-3 py-3 text-xs font-semibold cursor-pointer transition-colors select-none" style={{ color: 'var(--text-secondary)' }}
                   onClick={() => handleSort('total_os')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -269,7 +268,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                   </div>
                 </th>
                 <th
-                  className="text-center px-3 py-3 text-xs font-semibold text-slate-400 cursor-pointer hover:text-white transition-colors select-none"
+                  className="text-center px-3 py-3 text-xs font-semibold cursor-pointer transition-colors select-none" style={{ color: 'var(--text-secondary)' }}
                   onClick={() => handleSort('total_vendas')}
                 >
                   <div className="flex items-center justify-center gap-1">
@@ -287,7 +286,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                   <>
                     <tr
                       key={v.id}
-                      className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors cursor-pointer"
+                      className="transition-colors cursor-pointer" style={{ borderBottom: '1px solid var(--border-primary)' }}
                       onClick={() => setExpandedId(isExpanded ? null : v.id)}
                     >
                       <td className="px-4 py-3">
@@ -299,8 +298,8 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                             {idx + 1}
                           </div>
                           <div>
-                            <p className="font-medium text-white text-sm">{v.nome}</p>
-                            <p className="text-xs text-slate-500">{totalGeral} registros</p>
+                            <p className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{v.nome}</p>
+                            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{totalGeral} registros</p>
                           </div>
                         </div>
                       </td>
@@ -316,24 +315,24 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                                 {val}
                               </span>
                             ) : (
-                              <span className="text-slate-700 text-xs">-</span>
+                              <span className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.4 }}>-</span>
                             )}
                           </td>
                         );
                       })}
                       <td className="text-center px-3 py-3">
-                        <span className="text-slate-300 font-semibold">{v.total_os}</span>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{v.total_os}</span>
                       </td>
                       <td className="text-center px-3 py-3">
-                        <span className="text-slate-300 font-semibold">{v.total_vendas}</span>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{v.total_vendas}</span>
                       </td>
                     </tr>
                     {isExpanded && (
-                      <tr key={`${v.id}-detail`} className="border-b border-slate-800/50">
-                        <td colSpan={9} className="px-4 py-4 bg-slate-900/40">
+                      <tr key={`${v.id}-detail`} style={{ borderBottom: '1px solid var(--border-primary)' }}>
+                        <td colSpan={9} className="px-4 py-4" style={{ background: 'var(--bg-card)' }}>
                           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                             <div className={`${GLASS_INNER} p-3`}>
-                              <p className="text-xs text-slate-500 mb-1">Pipeline Operacional</p>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Pipeline Operacional</p>
                               <div className="space-y-1.5">
                                 {[
                                   { label: 'OW', val: v.ow, color: '#3B82F6' },
@@ -342,17 +341,17 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                                 ].map(item => (
                                   <div key={item.label} className="flex items-center justify-between">
                                     <span className="text-xs font-medium" style={{ color: item.color }}>{item.label}</span>
-                                    <span className="text-xs font-bold text-white">{item.val}</span>
+                                    <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{item.val}</span>
                                   </div>
                                 ))}
-                                <div className="border-t border-slate-700/50 pt-1.5 flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Total OS</span>
+                                <div className="pt-1.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total OS</span>
                                   <span className="text-xs font-bold text-cyan-400">{v.total_os}</span>
                                 </div>
                               </div>
                             </div>
                             <div className={`${GLASS_INNER} p-3`}>
-                              <p className="text-xs text-slate-500 mb-1">Registro de Vendas</p>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Registro de Vendas</p>
                               <div className="space-y-1.5">
                                 {[
                                   { label: 'Store+', val: v.store_plus, color: '#10B981' },
@@ -361,33 +360,33 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                                 ].map(item => (
                                   <div key={item.label} className="flex items-center justify-between">
                                     <span className="text-xs font-medium" style={{ color: item.color }}>{item.label}</span>
-                                    <span className="text-xs font-bold text-white">{item.val}</span>
+                                    <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{item.val}</span>
                                   </div>
                                 ))}
-                                <div className="border-t border-slate-700/50 pt-1.5 flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Total Vendas</span>
+                                <div className="pt-1.5 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-primary)' }}>
+                                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total Vendas</span>
                                   <span className="text-xs font-bold text-emerald-400">{v.total_vendas}</span>
                                 </div>
                               </div>
                             </div>
                             <div className={`${GLASS_INNER} p-3`}>
-                              <p className="text-xs text-slate-500 mb-1">Consolidado</p>
+                              <p className="text-xs mb-1" style={{ color: 'var(--text-secondary)' }}>Consolidado</p>
                               <div className="space-y-1.5">
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Total Geral</span>
-                                  <span className="text-xs font-black text-white">{totalGeral}</span>
+                                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Total Geral</span>
+                                  <span className="text-xs font-black" style={{ color: 'var(--text-primary)' }}>{totalGeral}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Pipeline</span>
+                                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Pipeline</span>
                                   <span className="text-xs font-semibold text-cyan-400">{v.total_os}</span>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                  <span className="text-xs text-slate-400">Vendas</span>
+                                  <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>Vendas</span>
                                   <span className="text-xs font-semibold text-emerald-400">{v.total_vendas}</span>
                                 </div>
                                 {totalGeral > 0 && (
                                   <div className="mt-2">
-                                    <div className="h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                                    <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(var(--accent-rgb),0.12)' }}>
                                       <div
                                         className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500"
                                         style={{ width: `${(v.total_os / totalGeral) * 100}%` }}
@@ -410,7 +409,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
               })}
               {vendedores.length === 0 && (
                 <tr>
-                  <td colSpan={9} className="text-center py-16 text-slate-500">
+                  <td colSpan={9} className="text-center py-16" style={{ color: 'var(--text-secondary)' }}>
                     <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-20" />
                     <p>Nenhum dado encontrado para o periodo selecionado</p>
                   </td>
@@ -431,10 +430,10 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                     </td>
                   ))}
                   <td className="text-center px-3 py-3">
-                    <span className="text-sm font-black text-slate-200">{totalRow.total_os}</span>
+                    <span className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>{totalRow.total_os}</span>
                   </td>
                   <td className="text-center px-3 py-3">
-                    <span className="text-sm font-black text-slate-200">{totalRow.total_vendas}</span>
+                    <span className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>{totalRow.total_vendas}</span>
                   </td>
                 </tr>
               </tfoot>

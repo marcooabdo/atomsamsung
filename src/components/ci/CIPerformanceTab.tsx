@@ -12,7 +12,7 @@ export default function CIPerformanceTab({ vendedores }: Props) {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className={`${GLASS} p-6`}>
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+        <h3 className="text-lg font-semibold mb-5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <Award className="w-5 h-5 text-amber-400" />
           Ranking de Vendedores
         </h3>
@@ -21,28 +21,28 @@ export default function CIPerformanceTab({ vendedores }: Props) {
             const maxFat = vendedores[0]?.faturamento || 1;
             const pct = (vendedor.faturamento / maxFat) * 100;
             return (
-              <div key={vendedor.id} className="p-4 rounded-xl bg-slate-800/30 border border-slate-700/40 hover:border-slate-600/60 transition-all">
+              <div key={vendedor.id} className="p-4 rounded-xl transition-all" style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border-primary)' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold text-sm ${
                       idx === 0 ? 'bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-900' :
                       idx === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900' :
                       idx === 2 ? 'bg-gradient-to-br from-amber-700 to-amber-600 text-white' :
-                      'bg-slate-700 text-slate-300'
-                    }`}>
+                      ''
+                    }`} style={idx > 2 ? { background: 'rgba(var(--accent-rgb),0.15)', color: 'var(--text-accent)' } : {}}>
                       {idx + 1}
                     </div>
                     <div>
-                      <h4 className="font-medium text-white text-sm">{vendedor.nome}</h4>
-                      <p className="text-xs text-slate-500">{vendedor.totalClientes} clientes | {vendedor.totalOS} OS</p>
+                      <h4 className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>{vendedor.nome}</h4>
+                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{vendedor.totalClientes} clientes | {vendedor.totalOS} OS</p>
                     </div>
                   </div>
                   <div className="text-right">
                     <p className="text-base font-bold text-cyan-400">{formatCurrency(vendedor.faturamento)}</p>
-                    <p className="text-[10px] text-slate-500">TM: {formatCurrency(vendedor.ticketMedio)}</p>
+                    <p className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>TM: {formatCurrency(vendedor.ticketMedio)}</p>
                   </div>
                 </div>
-                <div className="h-1.5 rounded-full bg-slate-700/50 overflow-hidden">
+                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(var(--accent-rgb),0.12)' }}>
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
                     style={{ width: `${pct}%` }}
@@ -52,17 +52,17 @@ export default function CIPerformanceTab({ vendedores }: Props) {
             );
           })}
           {vendedores.length === 0 && (
-            <div className="text-center py-16 text-slate-500">
+            <div className="text-center py-16" style={{ color: 'var(--text-secondary)' }}>
               <Users className="w-12 h-12 mx-auto mb-3 opacity-40" />
               <p className="text-sm">Nenhum vendedor vinculado</p>
-              <p className="text-xs mt-1 text-slate-600">Vincule vendedores na aba Pagamentos das OS</p>
+              <p className="text-xs mt-1 opacity-60">Vincule vendedores na aba Pagamentos das OS</p>
             </div>
           )}
         </div>
       </div>
 
       <div className={`${GLASS} p-6`}>
-        <h3 className="text-lg font-semibold text-white mb-5 flex items-center gap-2">
+        <h3 className="text-lg font-semibold mb-5 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
           <TrendingUp className="w-5 h-5 text-cyan-400" />
           Comparativo de Performance
         </h3>
@@ -70,11 +70,11 @@ export default function CIPerformanceTab({ vendedores }: Props) {
           <div className="h-[450px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={vendedores.slice(0, 6)} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
-                <XAxis type="number" stroke="#64748B" tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} />
-                <YAxis type="category" dataKey="nome" stroke="#64748B" width={100} tick={{ fontSize: 12 }} />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(148,163,184,0.1)" />
+                <XAxis type="number" stroke="#94A3B8" tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} />
+                <YAxis type="category" dataKey="nome" stroke="#94A3B8" width={100} tick={{ fontSize: 12 }} />
                 <Tooltip
-                  contentStyle={{ backgroundColor: '#1E293B', border: '1px solid #06B6D4', borderRadius: '12px' }}
+                  contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid #06B6D4', borderRadius: '12px', color: 'var(--text-primary)' }}
                   formatter={(value: number, name: string) => [formatCurrency(value), name === 'faturamento' ? 'Faturamento' : 'Ticket Medio']}
                 />
                 <Legend />
@@ -84,7 +84,7 @@ export default function CIPerformanceTab({ vendedores }: Props) {
             </ResponsiveContainer>
           </div>
         ) : (
-          <div className="h-[450px] flex items-center justify-center text-slate-500">
+          <div className="h-[450px] flex items-center justify-center" style={{ color: 'var(--text-secondary)' }}>
             <div className="text-center">
               <TrendingUp className="w-12 h-12 mx-auto mb-3 opacity-30" />
               <p>Sem dados de performance</p>
