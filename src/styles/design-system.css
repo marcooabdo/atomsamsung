@@ -675,3 +675,77 @@ body {
 :root.theme-white-blue [class*="border-yellow-"] {
   border-color: rgba(194, 65, 12, 0.3) !important;
 }
+
+/* =====================================================
+   WHITE THEME — text-white / light rgba text overrides
+   Prevents invisible/near-invisible text on light bg
+   ===================================================== */
+
+/* text-white → dark slate */
+:root.theme-white-blue .text-white,
+:root.theme-white-pink .text-white {
+  color: #1e293b !important;
+}
+
+/* text-white with opacity variants (Tailwind /X) */
+:root.theme-white-blue [class*="text-white\/"],
+:root.theme-white-pink [class*="text-white\/"] {
+  color: #334155 !important;
+  opacity: 1 !important;
+}
+
+/* text-gray-100, text-gray-200 */
+:root.theme-white-blue .text-gray-100,
+:root.theme-white-pink .text-gray-100,
+:root.theme-white-blue .text-gray-200,
+:root.theme-white-pink .text-gray-200 {
+  color: #475569 !important;
+}
+
+/* text-slate-100, text-slate-200 */
+:root.theme-white-blue .text-slate-100,
+:root.theme-white-pink .text-slate-100,
+:root.theme-white-blue .text-slate-200,
+:root.theme-white-pink .text-slate-200 {
+  color: #475569 !important;
+}
+
+/* bg-white/X backgrounds that become invisible on white bg — give subtle contrast */
+:root.theme-white-blue [class*="bg-white\/"],
+:root.theme-white-pink [class*="bg-white\/"] {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+}
+
+/* border-white/X borders → subtle dark */
+:root.theme-white-blue [class*="border-white\/"],
+:root.theme-white-pink [class*="border-white\/"] {
+  border-color: rgba(0, 0, 0, 0.10) !important;
+}
+
+/* placeholder text on white/X inputs */
+:root.theme-white-blue .placeholder-gray-500::placeholder,
+:root.theme-white-pink .placeholder-gray-500::placeholder,
+:root.theme-white-blue .placeholder-white\/40::placeholder,
+:root.theme-white-pink .placeholder-white\/40::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* text-white on inputs/textareas */
+:root.theme-white-blue input.text-white,
+:root.theme-white-pink input.text-white,
+:root.theme-white-blue textarea.text-white,
+:root.theme-white-pink textarea.text-white {
+  color: #1e293b !important;
+}
+
+/* GIA Input bar icon overrides */
+:root.theme-white-blue .gia-icon-white,
+:root.theme-white-pink .gia-icon-white {
+  color: #334155 !important;
+}
+
+/* Scrollbar color in light themes */
+:root.theme-white-blue *,
+:root.theme-white-pink * {
+  scrollbar-color: rgba(0,0,0,0.15) transparent;
+}

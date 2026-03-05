@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic, MicOff, Send, Loader2, Volume2, VolumeX, Square } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 
 interface GIAInputBarProps {
   onSend: (text: string) => void;
@@ -27,6 +28,19 @@ export function GIAInputBar({
 }: GIAInputBarProps) {
   const [text, setText] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
+  const { isDark } = useTheme();
+
+  const inputTextColor = isDark ? '#e2e8f0' : '#1e293b';
+  const iconColorWhite = isDark ? '#fff' : '#334155';
+  const iconColorMuted = isDark ? 'rgba(255,255,255,0.4)' : '#94a3b8';
+  const hintTextColor = isDark ? 'rgba(255,255,255,0.15)' : '#94a3b8';
+  const formBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.04)';
+  const formBorderDefault = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.10)';
+  const formBorderActive = 'rgba(0,210,255,0.2)';
+  const btnBgOff = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+  const btnBorderOff = isDark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.10)';
+  const sendBtnBgOff = isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.06)';
+  const sendBtnBorderOff = isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.10)';
 
   useEffect(() => {
     if (!disabled && inputRef.current) {
@@ -63,8 +77,8 @@ export function GIAInputBar({
         onSubmit={handleSubmit}
         className="relative flex items-center gap-3 rounded-2xl px-4 py-3 transition-all duration-300"
         style={{
-          background: 'rgba(255,255,255,0.03)',
-          border: `1px solid ${text.length > 0 ? 'rgba(0,210,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
+          background: formBg,
+          border: `1px solid ${text.length > 0 ? formBorderActive : formBorderDefault}`,
           boxShadow: text.length > 0 ? '0 0 20px rgba(0,210,255,0.05)' : 'none',
         }}
       >
@@ -76,8 +90,8 @@ export function GIAInputBar({
           onKeyDown={handleKeyDown}
           placeholder={isListening ? 'Ouvindo...' : 'Digite sua mensagem...'}
           disabled={disabled}
-          className="flex-1 bg-transparent text-sm text-white placeholder-gray-600 outline-none disabled:opacity-40"
-          style={{ caretColor: '#00d2ff' }}
+          className="flex-1 bg-transparent text-sm placeholder-gray-500 outline-none disabled:opacity-40"
+          style={{ caretColor: '#00d2ff', color: inputTextColor }}
         />
 
         <div className="flex items-center gap-1.5">
@@ -121,19 +135,17 @@ export function GIAInputBar({
             style={{
               background: voiceEnabled
                 ? 'linear-gradient(135deg, #10b981, #059669)'
-                : 'rgba(255,255,255,0.04)',
-              border: voiceEnabled
-                ? 'none'
-                : '1px solid rgba(255,255,255,0.08)',
+                : btnBgOff,
+              border: voiceEnabled ? 'none' : btnBorderOff,
             }}
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.92 }}
             title={voiceEnabled ? 'Desativar voz da GIA (modo conversa)' : 'Ativar voz da GIA (modo conversa)'}
           >
             {voiceEnabled ? (
-              <Volume2 className="w-4 h-4" style={{ color: '#fff' }} />
+              <Volume2 className="w-4 h-4" style={{ color: iconColorWhite }} />
             ) : (
-              <VolumeX className="w-4 h-4" style={{ color: 'rgba(255,255,255,0.4)' }} />
+              <VolumeX className="w-4 h-4" style={{ color: iconColorMuted }} />
             )}
             {voiceEnabled && (
               <motion.div
@@ -172,10 +184,10 @@ export function GIAInputBar({
             style={{
               background: text.trim()
                 ? 'linear-gradient(135deg, #00d2ff, #0090ff)'
-                : 'rgba(255,255,255,0.04)',
+                : sendBtnBgOff,
               border: text.trim()
                 ? '1px solid rgba(0,210,255,0.4)'
-                : '1px solid rgba(255,255,255,0.06)',
+                : sendBtnBorderOff,
               boxShadow: text.trim() ? '0 0 15px rgba(0,210,255,0.2)' : 'none',
             }}
             whileHover={text.trim() ? { scale: 1.05 } : {}}
@@ -184,13 +196,13 @@ export function GIAInputBar({
             {disabled ? (
               <Loader2 className="w-4 h-4 animate-spin" style={{ color: '#00d2ff' }} />
             ) : (
-              <Send className="w-4 h-4" style={{ color: text.trim() ? '#fff' : 'rgba(255,255,255,0.2)' }} />
+              <Send className="w-4 h-4" style={{ color: text.trim() ? iconColorWhite : iconColorMuted }} />
             )}
           </motion.button>
         </div>
       </form>
 
-      <p className="text-center mt-2 text-[10px] tracking-wider" style={{ color: 'rgba(255,255,255,0.15)' }}>
+      <p className="text-center mt-2 text-[10px] tracking-wider" style={{ color: hintTextColor }}>
         {voiceEnabled ? 'Modo conversa ativado - Fale e a GIA responde com voz' : 'GIA tem acesso aos dados operacionais em tempo real'}
       </p>
     </div>
