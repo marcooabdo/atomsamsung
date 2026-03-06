@@ -9,6 +9,7 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface Conversa {
@@ -110,7 +111,20 @@ const DEFAULT_CHAT_WIDTH = 750;
 const CHAT_WIDTH_KEY = 'atom_connect_chat_width';
 
 export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unidadeId, fillParent }: Props) {
+  const { isDark } = useTheme();
   const { usuario, unidadeAtual } = useAuth();
+
+  const chatBg = isDark ? '#0A0A16' : 'var(--bg-secondary)';
+  const headerBg = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)';
+  const inputFooterBg = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)';
+  const borderColor = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
+  const textPrimary = isDark ? '#ffffff' : 'var(--text-primary)';
+  const textSecondary = isDark ? '#9ca3af' : 'var(--text-secondary)';
+  const inputBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
+  const dropdownBg = isDark ? '#1A1A2E' : 'var(--bg-card)';
+  const dropdownBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
+  const sectionBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const onlineDotBorder = isDark ? '#0A0A16' : 'var(--bg-secondary)';
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
@@ -1463,9 +1477,10 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       animate={fillParent ? { opacity: 1 } : { x: 0 }}
       exit={fillParent ? { opacity: 0 } : { x: '100%' }}
       transition={fillParent ? { duration: 0.15 } : { type: 'spring', damping: 25, stiffness: 200 }}
-      className={`h-full flex relative ${fillParent ? 'w-full' : 'border-l border-white/[0.06]'}`}
-      style={fillParent ? { background: '#0A0A16' } : {
-        background: '#0A0A16',
+      className={`h-full flex relative ${fillParent ? 'w-full' : ''}`}
+      style={fillParent ? { background: chatBg, borderLeft: `1px solid ${borderColor}` } : {
+        background: chatBg,
+        borderLeft: `1px solid ${borderColor}`,
         width: chatWidth,
         minWidth: MIN_CHAT_WIDTH,
         maxWidth: MAX_CHAT_WIDTH
@@ -1503,7 +1518,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
       <div className="flex-1 flex flex-col min-w-0">
         {/* Header */}
-        <div className="flex-shrink-0 p-4 border-b border-white/10 bg-black/20">
+        <div className="flex-shrink-0 p-4" style={{ borderBottom: `1px solid ${borderColor}`, background: headerBg }}>
           <div className="flex items-center justify-between">
             <div
               className={`flex items-center gap-3 ${conversa.is_group ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
@@ -1512,21 +1527,21 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               <div className="relative">
                 {renderClientPhoto('md')}
                 {!conversa.is_group && (
-                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 border-2 border-[#0A0A16] rounded-full" />
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-green-500 rounded-full" style={{ border: `2px solid ${onlineDotBorder}` }} />
                 )}
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white flex items-center gap-1.5">
+                <h3 className="text-sm font-semibold flex items-center gap-1.5" style={{ color: textPrimary }}>
                   {conversa.is_group && <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
                   {conversa.cliente_nome || conversa.cliente_telefone}
                 </h3>
                 {!conversa.is_group ? (
-                <p className="text-xs text-gray-400 flex items-center gap-1">
+                <p className="text-xs flex items-center gap-1" style={{ color: textSecondary }}>
                   <Phone className="w-3 h-3" />
                   {conversa.cliente_telefone}
                 </p>
                 ) : (
-                <p className="text-[10px] text-gray-500 mt-0.5">
+                <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>
                   {loadingMembers ? 'Carregando...' : groupMembers.length > 0 ? `${groupMembers.length} participantes - toque para ver` : 'Toque para ver participantes'}
                 </p>
                 )}
@@ -1546,7 +1561,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     {typingStatus === 'recording' ? 'Gravando audio...' : 'Digitando...'}
                   </p>
                 ) : (
-                  <p className="text-[10px] text-gray-500 mt-0.5">
+                  <p className="text-[10px] mt-0.5" style={{ color: textSecondary }}>
                     Visto: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
                   </p>
                 )}
@@ -1595,16 +1610,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
-                    className="absolute top-full left-0 mt-1 w-44 bg-[#1A1A2E] border border-white/10 rounded-lg shadow-xl z-50 overflow-hidden"
+                    className="absolute top-full left-0 mt-1 w-44 rounded-lg shadow-xl z-50 overflow-hidden" style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
                   >
                     {colunas.map(col => (
                       <button
                         key={col.id}
                         onClick={() => changeColumn(col.id)}
-                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-white/5 transition-colors"
+                        className="w-full flex items-center gap-2 px-3 py-2 text-left text-xs hover:bg-black/5 transition-colors"
+                        style={{ color: textPrimary }}
                       >
                         <span className="w-2 h-2 rounded-full" style={{ backgroundColor: col.cor }} />
-                        <span className="text-white">{col.nome}</span>
+                        {col.nome}
                       </button>
                     ))}
                   </motion.div>
@@ -1765,7 +1781,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           type="text"
                           value={editText}
                           onChange={(e) => setEditText(e.target.value)}
-                          className="w-full px-2 py-1.5 bg-black/30 border border-white/20 rounded text-sm text-white focus:outline-none"
+                          className="w-full px-2 py-1.5 rounded text-sm focus:outline-none"
+                          style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary }}
                           autoFocus
                         />
                         <div className="flex gap-2">
@@ -1978,7 +1995,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="border-t border-white/10 bg-black/40 p-3"
+              className="p-3" style={{ borderTop: `1px solid ${borderColor}`, background: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.04)' }}
             >
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
                 {attachments.map((file, index) => (
@@ -2002,7 +2019,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         </AnimatePresence>
 
         {/* Input */}
-        <div className="flex-shrink-0 p-3 border-t border-white/10 bg-black/20">
+        <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
           {isRecording ? (
             <div className="flex items-center gap-3">
               <button
@@ -2059,7 +2076,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute bottom-full left-0 mb-2 w-72 bg-[#1A1A2E] border border-white/10 rounded-xl shadow-xl p-2 z-50"
+                      className="absolute bottom-full left-0 mb-2 w-72 rounded-xl shadow-xl p-2 z-50" style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
                     >
                       <div className="grid grid-cols-8 gap-0.5 max-h-40 overflow-y-auto">
                         {EMOJI_LIST.map((emoji, i) => (
@@ -2081,7 +2098,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   onChange={(e) => setInputText(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   placeholder="Digite uma mensagem..."
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
+                  style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary }}
                 />
               </div>
               {inputText.trim() || attachments.length > 0 ? (
@@ -2118,14 +2136,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             initial={{ width: 0, opacity: 0 }}
             animate={{ width: 280, opacity: 1 }}
             exit={{ width: 0, opacity: 0 }}
-            className="border-l border-white/10 overflow-hidden flex-shrink-0"
+            className="overflow-hidden flex-shrink-0" style={{ borderLeft: `1px solid ${borderColor}` }}
           >
             <div className="w-[280px] h-full overflow-y-auto p-4 space-y-4">
               {/* Client Info */}
               <div className="flex flex-col items-center text-center">
                 {renderClientPhoto('lg')}
                 <div className="flex items-center gap-1.5 mt-3">
-                  <p className="text-sm font-medium text-white">
+                  <p className="text-sm font-medium" style={{ color: textPrimary }}>
                     {conversa.cliente_nome || 'Nome nao informado'}
                   </p>
                   <button
@@ -2139,30 +2157,30 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     <Edit2 className="w-3 h-3 text-gray-500 hover:text-white" />
                   </button>
                 </div>
-                <p className="text-xs text-gray-400">{conversa.cliente_telefone}</p>
-                <p className="text-[10px] text-gray-500 mt-1">
+                <p className="text-xs" style={{ color: textSecondary }}>{conversa.cliente_telefone}</p>
+                <p className="text-[10px] mt-1" style={{ color: textSecondary }}>
                   Ultima resposta: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
                 </p>
               </div>
 
               {/* OS Info */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Ordem de Serviço</h4>
+                <h4 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Ordem de Serviço</h4>
                 {osData ? (
-                  <div className="p-3 bg-white/5 rounded-lg space-y-2">
+                  <div className="p-3 rounded-lg space-y-2" style={{ background: sectionBg }}>
                     <div className="flex items-center justify-between">
-                      <span className="text-[10px] text-gray-400">Interna</span>
-                      <span className="text-xs font-medium text-white">#{osData.numero_os_interna}</span>
+                      <span className="text-[10px]" style={{ color: textSecondary }}>Interna</span>
+                      <span className="text-xs font-medium" style={{ color: textPrimary }}>#{osData.numero_os_interna}</span>
                     </div>
                     {osData.numero_os_samsung && (
                       <div className="flex items-center justify-between">
-                        <span className="text-[10px] text-gray-400">Samsung</span>
+                        <span className="text-[10px]" style={{ color: textSecondary }}>Samsung</span>
                         <span className="text-xs font-medium text-orange-400">{osData.numero_os_samsung}</span>
                       </div>
                     )}
                     {osData.defeito_reclamado && (
-                      <div className="pt-2 border-t border-white/10">
-                        <p className="text-[10px] text-gray-400 line-clamp-2">{osData.defeito_reclamado}</p>
+                      <div className="pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
+                        <p className="text-[10px] line-clamp-2" style={{ color: textSecondary }}>{osData.defeito_reclamado}</p>
                       </div>
                     )}
                     <div className="flex gap-2 pt-2">
@@ -2185,7 +2203,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   <div className="space-y-2">
                     <button
                       onClick={() => setShowVincularOS(true)}
-                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 transition-colors border border-dashed border-white/20"
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs hover:bg-black/5 transition-colors border border-dashed"
+                      style={{ background: sectionBg, color: textPrimary, borderColor: borderColor }}
                     >
                       <Link2 className="w-4 h-4" />
                       Vincular OS Existente
@@ -2204,12 +2223,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               {/* IH Info */}
               {conversa.tipo_atendimento === 'ih' && (
                 <div className="space-y-2">
-                  <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Visita Tecnica</h4>
-                  <div className="p-3 bg-white/5 rounded-lg space-y-2">
+                  <h4 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Visita Tecnica</h4>
+                  <div className="p-3 rounded-lg space-y-2" style={{ background: sectionBg }}>
                     {conversa.agendamento_data && (
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
-                        <span className="text-xs text-white">
+                        <Calendar className="w-4 h-4" style={{ color: textSecondary }} />
+                        <span className="text-xs" style={{ color: textPrimary }}>
                           {new Date(conversa.agendamento_data).toLocaleDateString('pt-BR')}
                           {conversa.agendamento_hora && ` as ${conversa.agendamento_hora}`}
                         </span>
@@ -2217,8 +2236,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     )}
                     {conversa.endereco_visita && (
                       <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                        <span className="text-xs text-white">{conversa.endereco_visita}</span>
+                        <MapPin className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: textSecondary }} />
+                        <span className="text-xs" style={{ color: textPrimary }}>{conversa.endereco_visita}</span>
                       </div>
                     )}
                   </div>
@@ -2227,9 +2246,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
               {/* Quick Actions */}
               <div className="space-y-2">
-                <h4 className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Acoes Rapidas</h4>
+                <h4 className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: textSecondary }}>Acoes Rapidas</h4>
                 <div className="space-y-1.5">
-                  <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs bg-white/5 text-gray-300 hover:bg-white/10 transition-colors">
+                  <button className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs hover:bg-black/5 transition-colors" style={{ background: sectionBg, color: textPrimary }}>
                     <Zap className="w-3.5 h-3.5" />
                     Disparar Fluxo
                   </button>
@@ -2254,11 +2273,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-5 w-80 max-h-[70vh] overflow-y-auto"
+              className="rounded-xl p-5 w-80 max-h-[70vh] overflow-y-auto"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-sm font-semibold text-white mb-1">Transferir Atendimento</h3>
-              <p className="text-xs text-gray-400 mb-4">Selecione um atendente da unidade</p>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Transferir Atendimento</h3>
+              <p className="text-xs mb-4" style={{ color: textSecondary }}>Selecione um atendente da unidade</p>
 
               <div className="space-y-1.5">
                 {atendentes.length === 0 ? (
@@ -2280,8 +2300,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           )}
                         </div>
                         <div className="flex-1 text-left">
-                          <p className="text-xs font-medium text-white">{atendente.nome}</p>
-                          {atendente.cargo && <p className="text-[10px] text-gray-500">{atendente.cargo}</p>}
+                          <p className="text-xs font-medium" style={{ color: textPrimary }}>{atendente.nome}</p>
+                          {atendente.cargo && <p className="text-[10px]" style={{ color: textSecondary }}>{atendente.cargo}</p>}
                         </div>
                         <ArrowRight className="w-4 h-4 text-gray-500" />
                       </button>
@@ -2313,7 +2333,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-6 w-[420px] max-h-[80vh] overflow-hidden flex flex-col"
+              className="rounded-xl p-6 w-[420px] max-h-[80vh] overflow-hidden flex flex-col"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
               onClick={(e) => e.stopPropagation()}
             >
               <div className="flex items-center gap-3 mb-4">
@@ -2321,8 +2342,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   <CheckCircle2 className="w-5 h-5" style={{ color: accentColor }} />
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-white">Finalizar Atendimento</h3>
-                  <p className="text-xs text-gray-400">Enviar pesquisa de satisfacao ao cliente</p>
+                  <h3 className="text-sm font-semibold" style={{ color: textPrimary }}>Finalizar Atendimento</h3>
+                  <p className="text-xs" style={{ color: textSecondary }}>Enviar pesquisa de satisfacao ao cliente</p>
                 </div>
               </div>
 
@@ -2333,8 +2354,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               ) : regrasFinalizacao.length === 0 ? (
                 <div className="text-center py-6">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-600" />
-                  <p className="text-sm text-gray-400 mb-2">Nenhuma regra de avaliação configurada</p>
-                  <p className="text-xs text-gray-500 mb-4">Configure regras em Configuracoes &gt; Finalizacao</p>
+                  <p className="text-sm mb-2" style={{ color: textSecondary }}>Nenhuma regra de avaliação configurada</p>
+                  <p className="text-xs mb-4" style={{ color: textSecondary }}>Configure regras em Configuracoes &gt; Finalizacao</p>
                   <button
                     onClick={finalizarDiretamente}
                     className="px-4 py-2 rounded-lg text-xs font-medium transition-colors"
@@ -2345,7 +2366,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 </div>
               ) : (
                 <>
-                  <p className="text-xs text-gray-400 mb-4">
+                  <p className="text-xs mb-4" style={{ color: textSecondary }}>
                     Selecione uma regra para enviar a mensagem de avaliacao ao cliente:
                   </p>
 
@@ -2355,13 +2376,13 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         key={regra.id}
                         onClick={() => enviarAvaliacaoParaCliente(regra)}
                         disabled={sendingAvaliacao}
-                        className="w-full text-left p-3 rounded-lg border transition-colors hover:bg-white/[0.05] disabled:opacity-50"
-                        style={{ borderColor: regra.is_default ? `${accentColor}40` : 'rgba(255,255,255,0.1)' }}
+                        className="w-full text-left p-3 rounded-lg border transition-colors hover:bg-black/5 disabled:opacity-50"
+                        style={{ borderColor: regra.is_default ? `${accentColor}40` : dropdownBorder }}
                       >
                         <div className="flex items-start justify-between">
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2">
-                              <p className="text-sm font-medium text-white">{regra.nome}</p>
+                              <p className="text-sm font-medium" style={{ color: textPrimary }}>{regra.nome}</p>
                               {regra.is_default && (
                                 <span
                                   className="text-[9px] px-1.5 py-0.5 rounded font-medium"
@@ -2384,7 +2405,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     ))}
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-white/10">
+                  <div className="mt-4 pt-3" style={{ borderTop: `1px solid ${borderColor}` }}>
                     <button
                       onClick={finalizarDiretamente}
                       className="w-full px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs text-gray-400 hover:bg-white/10 transition-colors"
@@ -2429,11 +2450,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-5 w-80"
+              className="rounded-xl p-5 w-80"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-sm font-semibold text-white mb-1">Editar Nome do Cliente</h3>
-              <p className="text-xs text-gray-400 mb-4">Altere o nome de identificacao do cliente</p>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Editar Nome do Cliente</h3>
+              <p className="text-xs mb-4" style={{ color: textSecondary }}>Altere o nome de identificacao do cliente</p>
 
               <input
                 type="text"
@@ -2441,7 +2463,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 onChange={(e) => setEditClienteNome(e.target.value)}
                 placeholder="Nome do cliente"
                 autoFocus
-                className="w-full px-3 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40 mb-4"
+                className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none mb-4"
+                style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary }}
               />
 
               <div className="flex gap-2">
@@ -2483,11 +2506,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl p-5 w-[420px] max-h-[80vh] overflow-hidden flex flex-col"
+              className="rounded-xl p-5 w-[420px] max-h-[80vh] overflow-hidden flex flex-col"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
               onClick={(e) => e.stopPropagation()}
             >
-              <h3 className="text-sm font-semibold text-white mb-1">Vincular OS Existente</h3>
-              <p className="text-xs text-gray-400 mb-4">Busque pelo numero da OS, nome ou telefone do cliente</p>
+              <h3 className="text-sm font-semibold mb-1" style={{ color: textPrimary }}>Vincular OS Existente</h3>
+              <p className="text-xs mb-4" style={{ color: textSecondary }}>Busque pelo numero da OS, nome ou telefone do cliente</p>
 
               <div className="relative mb-3">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
@@ -2497,7 +2521,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   onChange={(e) => setOsSearchTerm(e.target.value)}
                   placeholder="Digite para buscar OS..."
                   autoFocus
-                  className="w-full pl-10 pr-10 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-cyan-500/40"
+                  className="w-full pl-10 pr-10 py-2.5 rounded-lg text-sm focus:outline-none"
+                  style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary }}
                 />
                 {searchingOS && (
                   <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-cyan-400 animate-spin" />
@@ -2605,19 +2630,20 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#1A1A2E] rounded-xl w-[400px] max-h-[80vh] overflow-hidden flex flex-col border border-white/10"
+              className="rounded-xl w-[400px] max-h-[80vh] overflow-hidden flex flex-col"
+              style={{ background: dropdownBg, border: `1px solid ${dropdownBorder}` }}
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-5 border-b border-white/10 flex items-center justify-between">
+              <div className="p-5 flex items-center justify-between" style={{ borderBottom: `1px solid ${borderColor}` }}>
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${accentColor}20` }}>
                     <Users className="w-5 h-5" style={{ color: accentColor }} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-semibold text-white">
+                    <h3 className="text-sm font-semibold" style={{ color: textPrimary }}>
                       {conversa.cliente_nome || 'Grupo'}
                     </h3>
-                    <p className="text-[11px] text-gray-400">
+                    <p className="text-[11px]" style={{ color: textSecondary }}>
                       {groupMembers.length} participante{groupMembers.length !== 1 ? 's' : ''}
                     </p>
                   </div>
@@ -2658,11 +2684,11 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white truncate">
+                        <p className="text-sm truncate" style={{ color: textPrimary }}>
                           {member.name || member.phone}
                         </p>
                         {member.name && (
-                          <p className="text-[11px] text-gray-500">{member.phone}</p>
+                          <p className="text-[11px]" style={{ color: textSecondary }}>{member.phone}</p>
                         )}
                       </div>
                       {(member.role === 'admin' || member.role === 'superadmin') && (
