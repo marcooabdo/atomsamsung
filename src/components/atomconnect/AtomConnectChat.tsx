@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2 } from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -53,6 +53,10 @@ interface Mensagem {
   sender_phone?: string | null;
   created_at: string;
   edited_at?: string | null;
+  quoted_message_id?: string | null;
+  quoted_content?: string | null;
+  quoted_sender?: string | null;
+  quoted_type?: string | null;
 }
 
 interface OS {
@@ -158,6 +162,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [isRecording, setIsRecording] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [replyTo, setReplyTo] = useState<Mensagem | null>(null);
   const [showGroupMembers, setShowGroupMembers] = useState(false);
   const [groupMembers, setGroupMembers] = useState<{ phone: string; name: string | null; role: string; foto_url: string | null }[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
@@ -611,7 +616,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
-  const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string, mimeType?: string, fileName?: string): Promise<string | null> => {
+  const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string, mimeType?: string, fileName?: string, quotedMessageId?: string): Promise<string | null> => {
     if (!instancia) {
       console.error('Nenhuma instancia conectada');
       return null;
@@ -671,16 +676,20 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         const result = await response.json();
         return result.key?.id || result.messageId || null;
       } else {
+        const textPayload: Record<string, any> = {
+          number: phoneNumber,
+          text: text
+        };
+        if (quotedMessageId) {
+          textPayload.quoted = { key: { remoteJid: conversa.is_group && conversa.group_jid ? conversa.group_jid : `${phoneNumber}@s.whatsapp.net`, id: quotedMessageId } };
+        }
         const response = await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'apikey': instancia.api_key
           },
-          body: JSON.stringify({
-            number: phoneNumber,
-            text: text
-          })
+          body: JSON.stringify(textPayload)
         });
 
         if (!response.ok) {
@@ -704,7 +713,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setSending(true);
     setUploadError(null);
     const messageContent = inputText.trim();
+    const currentReplyTo = replyTo;
     setInputText('');
+    setReplyTo(null);
     if (inputRef.current) inputRef.current.style.height = 'auto';
 
     const attendantName = usuario?.nome || '';
@@ -771,20 +782,32 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       }
 
       if (messageContent) {
-        const evolutionMessageId = await sendToEvolutionAPI(messageWithName);
+        const quotedEvolutionId = currentReplyTo?.message_id || undefined;
+        const evolutionMessageId = await sendToEvolutionAPI(messageWithName, undefined, undefined, undefined, undefined, quotedEvolutionId);
+
+        const insertData: Record<string, any> = {
+          conversa_id: conversa.id,
+          message_id: evolutionMessageId,
+          from_me: true,
+          tipo: 'text',
+          conteudo: messageContent,
+          status: evolutionMessageId ? 'sent' : 'failed',
+          enviado_por: usuario?.id,
+          is_bot: false
+        };
+
+        if (currentReplyTo) {
+          insertData.quoted_message_id = currentReplyTo.message_id;
+          insertData.quoted_content = (currentReplyTo.conteudo || currentReplyTo.caption || '').substring(0, 500);
+          insertData.quoted_sender = currentReplyTo.from_me
+            ? (currentReplyTo.enviado_por && usersCache[currentReplyTo.enviado_por]) || 'Eu'
+            : conversa.cliente_nome || conversa.cliente_telefone;
+          insertData.quoted_type = currentReplyTo.tipo;
+        }
 
         const { error } = await supabase
           .from('atom_connect_mensagens')
-          .insert({
-            conversa_id: conversa.id,
-            message_id: evolutionMessageId,
-            from_me: true,
-            tipo: 'text',
-            conteudo: messageContent,
-            status: evolutionMessageId ? 'sent' : 'failed',
-            enviado_por: usuario?.id,
-            is_bot: false
-          });
+          .insert(insertData);
 
         if (error) {
           console.error('Text message insert error:', error);
@@ -1801,13 +1824,21 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   </div>
                 )}
               <motion.div
+                id={`msg-${msg.id}`}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'} group`}
+                className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'} group transition-all duration-300`}
               >
                 <div className="relative max-w-[70%]">
-                  {msg.from_me && (
-                    <div className="absolute -left-20 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {msg.from_me ? (
+                    <div className="absolute -left-24 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}
+                        className="p-1 rounded bg-white/10 hover:bg-white/20"
+                        title="Responder"
+                      >
+                        <Reply className="w-3 h-3 text-gray-400" />
+                      </button>
                       {msg.tipo === 'text' && (
                         <button
                           onClick={() => {
@@ -1826,6 +1857,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         title="Apagar"
                       >
                         <Trash2 className="w-3 h-3 text-gray-400 hover:text-red-400" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="absolute -right-8 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={() => { setReplyTo(msg); inputRef.current?.focus(); }}
+                        className="p-1 rounded bg-white/10 hover:bg-white/20"
+                        title="Responder"
+                      >
+                        <Reply className="w-3 h-3 text-gray-400" />
                       </button>
                     </div>
                   )}
@@ -1857,6 +1898,45 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     {conversa.is_group && !msg.from_me && !msg.is_bot && msg.sender_name && (
                       <div className="text-[11px] font-semibold mb-1" style={{ color: isDark ? '#34d399' : '#065f46' }}>
                         {msg.sender_name}
+                      </div>
+                    )}
+
+                    {msg.quoted_content && (
+                      <div
+                        className="rounded-lg px-2.5 py-1.5 mb-1.5 border-l-3 cursor-pointer"
+                        style={{
+                          backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                          borderLeftWidth: '3px',
+                          borderLeftColor: msg.from_me ? accentColor : (isDark ? '#34d399' : '#059669'),
+                        }}
+                        onClick={() => {
+                          if (msg.quoted_message_id) {
+                            const quotedMsg = mensagens.find(m => m.message_id === msg.quoted_message_id);
+                            if (quotedMsg) {
+                              const el = document.getElementById(`msg-${quotedMsg.id}`);
+                              if (el) {
+                                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                el.classList.add('ring-2', 'ring-white/30');
+                                setTimeout(() => el.classList.remove('ring-2', 'ring-white/30'), 1500);
+                              }
+                            }
+                          }
+                        }}
+                      >
+                        <p className="text-[10px] font-semibold mb-0.5" style={{ color: msg.from_me ? accentColor : (isDark ? '#34d399' : '#059669') }}>
+                          {msg.quoted_sender || 'Mensagem'}
+                        </p>
+                        <p className="text-[11px] line-clamp-2" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
+                          {msg.quoted_type && msg.quoted_type !== 'text' && (
+                            <span className="inline-flex items-center gap-0.5 mr-1">
+                              {msg.quoted_type === 'image' && <ImageLucide className="w-2.5 h-2.5 inline" />}
+                              {msg.quoted_type === 'audio' && <Mic className="w-2.5 h-2.5 inline" />}
+                              {msg.quoted_type === 'video' && <Video className="w-2.5 h-2.5 inline" />}
+                              {msg.quoted_type === 'document' && <FileText className="w-2.5 h-2.5 inline" />}
+                            </span>
+                          )}
+                          {msg.quoted_content}
+                        </p>
                       </div>
                     )}
 
@@ -2105,8 +2185,54 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           )}
         </AnimatePresence>
 
+        {/* Reply Preview */}
+        <AnimatePresence>
+          {replyTo && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="flex-shrink-0 px-3 py-2"
+              style={{ borderTop: `1px solid ${borderColor}`, background: isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}
+            >
+              <div className="flex items-start gap-2">
+                <div
+                  className="flex-1 rounded-lg px-3 py-2 min-w-0"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                    borderLeft: `3px solid ${accentColor}`,
+                  }}
+                >
+                  <p className="text-[11px] font-semibold mb-0.5" style={{ color: accentColor }}>
+                    {replyTo.from_me
+                      ? (replyTo.enviado_por && usersCache[replyTo.enviado_por]) || 'Eu'
+                      : replyTo.sender_name || conversa.cliente_nome || conversa.cliente_telefone}
+                  </p>
+                  <p className="text-xs truncate" style={{ color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.5)' }}>
+                    {replyTo.tipo !== 'text' && (
+                      <span className="inline-flex items-center gap-0.5 mr-1">
+                        {replyTo.tipo === 'image' && <ImageLucide className="w-3 h-3 inline" />}
+                        {replyTo.tipo === 'audio' && <Mic className="w-3 h-3 inline" />}
+                        {replyTo.tipo === 'video' && <Video className="w-3 h-3 inline" />}
+                        {replyTo.tipo === 'document' && <FileText className="w-3 h-3 inline" />}
+                      </span>
+                    )}
+                    {replyTo.conteudo || replyTo.caption || `[${replyTo.tipo}]`}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setReplyTo(null)}
+                  className="p-1 rounded hover:bg-white/10 flex-shrink-0 mt-1"
+                >
+                  <X className="w-4 h-4 text-gray-400" />
+                </button>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Input */}
-        <div className="flex-shrink-0 p-3" style={{ borderTop: `1px solid ${borderColor}`, background: inputFooterBg }}>
+        <div className="flex-shrink-0 p-3" style={{ borderTop: replyTo ? 'none' : `1px solid ${borderColor}`, background: inputFooterBg }}>
           {isRecording ? (
             <div className="flex items-center gap-3">
               <button

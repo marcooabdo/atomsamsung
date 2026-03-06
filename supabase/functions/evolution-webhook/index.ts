@@ -886,6 +886,46 @@ async function processMessage(
     msgInsertData.sender_phone = groupInfo.senderPhone;
   }
 
+  const contextInfo =
+    msg.extendedTextMessage?.contextInfo ||
+    msg.imageMessage?.contextInfo ||
+    msg.videoMessage?.contextInfo ||
+    msg.audioMessage?.contextInfo ||
+    msg.documentMessage?.contextInfo ||
+    msg.stickerMessage?.contextInfo ||
+    null;
+
+  if (contextInfo?.stanzaId) {
+    msgInsertData.quoted_message_id = contextInfo.stanzaId;
+
+    const quotedMsg = contextInfo.quotedMessage || {};
+    const quotedText =
+      quotedMsg.conversation ||
+      quotedMsg.extendedTextMessage?.text ||
+      quotedMsg.imageMessage?.caption ||
+      quotedMsg.videoMessage?.caption ||
+      (quotedMsg.audioMessage ? "[Audio]" : null) ||
+      (quotedMsg.documentMessage ? quotedMsg.documentMessage.fileName || "[Documento]" : null) ||
+      (quotedMsg.stickerMessage ? "[Sticker]" : null) ||
+      "";
+    if (quotedText) msgInsertData.quoted_content = quotedText.substring(0, 500);
+
+    const quotedParticipant = contextInfo.participant || "";
+    if (quotedParticipant) {
+      msgInsertData.quoted_sender = cleanPhoneNumber(quotedParticipant);
+    }
+
+    let quotedType = "text";
+    if (quotedMsg.imageMessage) quotedType = "image";
+    else if (quotedMsg.audioMessage) quotedType = "audio";
+    else if (quotedMsg.videoMessage) quotedType = "video";
+    else if (quotedMsg.documentMessage) quotedType = "document";
+    else if (quotedMsg.stickerMessage) quotedType = "sticker";
+    msgInsertData.quoted_type = quotedType;
+
+    console.log("Quoted message detected:", contextInfo.stanzaId, "type:", quotedType);
+  }
+
   const { error: msgError } = await supabase.from("atom_connect_mensagens").insert(msgInsertData);
 
   if (msgError) {
