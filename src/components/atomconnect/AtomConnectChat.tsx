@@ -1623,11 +1623,19 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
             <button
               onClick={() => toggleBot(!conversa.is_bot_ativo)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${
-                conversa.is_bot_ativo
-                  ? 'bg-purple-500/20 text-purple-400 hover:bg-purple-500/30 text-[10px]'
-                  : 'bg-orange-500/30 text-orange-300 hover:bg-orange-500/40 text-xs border-2 border-orange-500/50 animate-pulse shadow-lg shadow-orange-500/20'
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold transition-all ${conversa.is_bot_ativo ? 'text-[10px]' : 'text-xs border-2 animate-pulse shadow-lg'}`}
+              style={conversa.is_bot_ativo
+                ? {
+                    backgroundColor: isDark ? 'rgba(168,85,247,0.2)' : 'rgba(124,58,237,0.12)',
+                    color: isDark ? '#c084fc' : '#5b21b6'
+                  }
+                : {
+                    backgroundColor: isDark ? 'rgba(249,115,22,0.30)' : 'rgba(234,88,12,0.12)',
+                    color: isDark ? '#fed7aa' : '#9a3412',
+                    borderColor: isDark ? 'rgba(249,115,22,0.55)' : 'rgba(234,88,12,0.45)',
+                    boxShadow: '0 4px 14px rgba(249,115,22,0.15)'
+                  }
+              }
               title={conversa.is_bot_ativo ? 'Desativar GIA (modo humano)' : 'ATIVAR GIA - Clique para reativar o atendimento automático'}
             >
               <Bot className={conversa.is_bot_ativo ? 'w-3 h-3' : 'w-4 h-4'} />
@@ -1674,23 +1682,38 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mx-4 mt-3 p-3 rounded-lg bg-gradient-to-r from-orange-500/20 to-red-500/20 border-2 border-orange-500/40 shadow-lg"
+            className="mx-4 mt-3 p-3 rounded-lg border-2 shadow-lg"
+            style={{
+              background: isDark
+                ? 'linear-gradient(to right, rgba(249,115,22,0.22), rgba(239,68,68,0.22))'
+                : 'linear-gradient(to right, rgba(234,88,12,0.10), rgba(220,38,38,0.10))',
+              borderColor: isDark ? 'rgba(249,115,22,0.45)' : 'rgba(234,88,12,0.40)'
+            }}
           >
             <div className="flex items-center gap-3">
               <div className="flex-shrink-0">
-                <div className="w-10 h-10 rounded-full bg-orange-500/30 flex items-center justify-center border-2 border-orange-500/50 animate-pulse">
-                  <Bot className="w-5 h-5 text-orange-300" />
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 animate-pulse"
+                  style={{
+                    backgroundColor: isDark ? 'rgba(249,115,22,0.30)' : 'rgba(234,88,12,0.15)',
+                    borderColor: isDark ? 'rgba(249,115,22,0.55)' : 'rgba(234,88,12,0.45)'
+                  }}
+                >
+                  <Bot className="w-5 h-5" style={{ color: isDark ? '#fed7aa' : '#9a3412' }} />
                 </div>
               </div>
               <div className="flex-1">
-                <h4 className="text-sm font-bold text-orange-200 mb-0.5">GIA DESLIGADA - Atendimento Manual Ativo</h4>
-                <p className="text-xs text-orange-300/80">
+                <h4 className="text-sm font-bold mb-0.5" style={{ color: isDark ? '#fdba74' : '#7c2d12' }}>
+                  GIA DESLIGADA - Atendimento Manual Ativo
+                </h4>
+                <p className="text-xs" style={{ color: isDark ? 'rgba(251,146,60,0.90)' : '#9a3412' }}>
                   Não esqueça de reativar a GIA quando terminar o atendimento para voltar ao modo automático
                 </p>
               </div>
               <button
                 onClick={() => toggleBot(true)}
-                className="flex-shrink-0 px-4 py-2 rounded-lg bg-gradient-to-r from-purple-600 to-purple-500 text-white text-xs font-bold hover:from-purple-500 hover:to-purple-400 transition-all shadow-md hover:shadow-lg"
+                className="flex-shrink-0 px-4 py-2 rounded-lg text-white text-xs font-bold transition-all shadow-md hover:shadow-lg"
+                style={{ background: 'linear-gradient(to right, #7c3aed, #6d28d9)' }}
               >
                 Ligar GIA
               </button>
@@ -1745,8 +1768,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   <div
                     className={`rounded-2xl px-3 py-2 ${msg.from_me ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
                     style={{
-                      backgroundColor: msg.from_me ? `${accentColor}30` : 'rgba(255,255,255,0.08)',
-                      border: msg.from_me ? `1px solid ${accentColor}40` : '1px solid rgba(255,255,255,0.08)'
+                      backgroundColor: msg.from_me
+                        ? `${accentColor}30`
+                        : isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.07)',
+                      border: msg.from_me
+                        ? `1px solid ${accentColor}40`
+                        : isDark ? '1px solid rgba(255,255,255,0.09)' : '1px solid rgba(0,0,0,0.10)'
                     }}
                   >
                     {msg.is_bot && (
@@ -1757,13 +1784,13 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     )}
 
                     {msg.from_me && msg.enviado_por && usersCache[msg.enviado_por] && !msg.is_bot && (
-                      <div className="text-[11px] font-semibold mb-1" style={{ color: accentColor }}>
+                      <div className="text-[11px] font-semibold mb-1" style={{ color: isDark ? accentColor : '#0369a1' }}>
                         {usersCache[msg.enviado_por]}:
                       </div>
                     )}
 
                     {conversa.is_group && !msg.from_me && !msg.is_bot && msg.sender_name && (
-                      <div className="text-[11px] font-semibold mb-1 text-emerald-400">
+                      <div className="text-[11px] font-semibold mb-1" style={{ color: isDark ? '#34d399' : '#065f46' }}>
                         {msg.sender_name}
                       </div>
                     )}
@@ -1800,7 +1827,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     ) : (
                       <>
                         {msg.tipo === 'text' && (
-                          <p className="text-sm text-white whitespace-pre-wrap">{msg.conteudo}</p>
+                          <p className="text-sm whitespace-pre-wrap" style={{ color: isDark ? '#ffffff' : '#1a1a1a' }}>{msg.conteudo}</p>
                         )}
 
                         {msg.tipo === 'image' && (() => {
@@ -1946,8 +1973,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     )}
 
                     <div className="flex items-center justify-end gap-1.5 mt-1">
-                      {msg.edited_at && <span className="text-[9px] text-gray-500 italic">editada</span>}
-                      <span className="text-[10px] text-gray-500">{formatTime(msg.created_at)}</span>
+                      {msg.edited_at && <span className="text-[9px] italic" style={{ color: isDark ? '#6b7280' : '#6b7280' }}>editada</span>}
+                      <span className="text-[10px]" style={{ color: isDark ? '#6b7280' : '#555555' }}>{formatTime(msg.created_at)}</span>
                       {msg.from_me && (
                         <div className="flex items-center" title={getStatusText(msg.status)}>
                           {getStatusIcon(msg.status)}
