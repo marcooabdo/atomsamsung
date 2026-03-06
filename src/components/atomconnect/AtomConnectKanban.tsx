@@ -3,7 +3,7 @@ import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, Users, AlertTriangle,
   Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X,
-  Pencil, Check
+  Pencil, Check, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -73,6 +73,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   const [osMap, setOsMap] = useState<Record<string, { numero_os_interna?: string; numero_os_samsung?: string }>>({});
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnName, setEditingColumnName] = useState('');
+  const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
 
   const FIXED_COLUMNS = ['bot_triagem', 'fila_espera', 'finalizado_nps', 'monitor_atrito'];
   const isMaster = usuario?.cargo === 'master';
@@ -97,6 +98,34 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
 
     setColunas(prev => prev.map(c => c.id === colunaId ? { ...c, nome: trimmed } : c));
     setEditingColumnId(null);
+  };
+
+  const toggleColumnCollapse = (colunaId: string) => {
+    setCollapsedColumns(prev => {
+      const next = new Set(prev);
+      if (next.has(colunaId)) next.delete(colunaId);
+      else next.add(colunaId);
+      return next;
+    });
+  };
+
+  const getOldestConversaAge = (conversasList: Conversa[]) => {
+    if (conversasList.length === 0) return null;
+    let oldest = conversasList[0].created_at;
+    for (const c of conversasList) {
+      if (c.created_at < oldest) oldest = c.created_at;
+    }
+    const diffMs = Date.now() - new Date(oldest).getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+    if (diffMins < 60) return `${diffMins}min`;
+    if (diffHours < 24) return `${diffHours}h`;
+    return `${diffDays}d`;
+  };
+
+  const getUnreadCount = (conversasList: Conversa[]) => {
+    return conversasList.reduce((sum, c) => sum + (c.mensagens_nao_lidas || 0), 0);
   };
 
   const loadOsData = useCallback(async () => {
@@ -402,11 +431,94 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
             const Icon = ICON_MAP[coluna.icone] || MessageSquare;
             const columnConversas = getConversasByColuna(coluna.id);
             const isDropTarget = dragOverColumn === coluna.id;
+            const isCollapsed = collapsedColumns.has(coluna.id);
+            const oldestAge = getOldestConversaAge(columnConversas);
+            const unreadTotal = getUnreadCount(columnConversas);
+            const slaBreachedCount = columnConversas.filter(c => isSLABreached(c, coluna)).length;
+            const noAttendenteCount = columnConversas.filter(c => !c.atendente_id).length;
+
+            if (isCollapsed) {
+              return (
+                <div
+                  key={coluna.id}
+                  className={`w-[52px] min-w-[52px] flex-shrink-0 flex flex-col h-full transition-all duration-300 cursor-pointer group/col ${
+                    idx > 0 ? 'border-l border-white/[0.04]' : ''
+                  }`}
+                  style={{ background: isDropTarget ? `${coluna.cor}08` : 'transparent' }}
+                  onClick={() => toggleColumnCollapse(coluna.id)}
+                  onDragOver={(e) => handleDragOver(e, coluna.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={(e) => handleDrop(e, coluna.id)}
+                >
+                  <div className="flex flex-col items-center gap-3 py-3 border-b border-white/[0.04]">
+                    <div
+                      className="w-7 h-7 rounded-md flex items-center justify-center"
+                      style={{ backgroundColor: `${coluna.cor}15` }}
+                    >
+                      <Icon className="w-3.5 h-3.5" style={{ color: coluna.cor }} />
+                    </div>
+                    <ChevronsRight className="w-3.5 h-3.5 text-white/20 group-hover/col:text-white/50 transition-colors" />
+                  </div>
+
+                  <div className="flex-1 flex flex-col items-center py-4 gap-3">
+                    <div className="flex flex-col items-center">
+                      <span
+                        className="text-lg font-bold leading-none"
+                        style={{ color: coluna.cor }}
+                      >
+                        {columnConversas.length}
+                      </span>
+                      <span className="text-[9px] text-white/30 mt-0.5">conv.</span>
+                    </div>
+
+                    {oldestAge && (
+                      <div className="flex flex-col items-center" title="Conversa mais antiga">
+                        <Clock className="w-3 h-3 text-white/25 mb-0.5" />
+                        <span className="text-[10px] text-white/40 font-medium">{oldestAge}</span>
+                      </div>
+                    )}
+
+                    {unreadTotal > 0 && (
+                      <div
+                        className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-black bg-cyan-400"
+                        style={{ boxShadow: '0 0 8px #00D4FF40' }}
+                        title={`${unreadTotal} nao lidas`}
+                      >
+                        {unreadTotal > 99 ? '99+' : unreadTotal}
+                      </div>
+                    )}
+
+                    {slaBreachedCount > 0 && (
+                      <div className="flex flex-col items-center" title={`${slaBreachedCount} SLA excedido`}>
+                        <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
+                        <span className="text-[10px] text-red-400 font-medium">{slaBreachedCount}</span>
+                      </div>
+                    )}
+
+                    {noAttendenteCount > 0 && !slaBreachedCount && (
+                      <div className="flex flex-col items-center" title={`${noAttendenteCount} sem atendente`}>
+                        <User className="w-3 h-3 text-amber-400" />
+                        <span className="text-[10px] text-amber-400 font-medium">{noAttendenteCount}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="writing-mode-vertical flex items-center justify-center pb-4 px-1">
+                    <span
+                      className="text-[10px] font-semibold tracking-wider text-white/40 whitespace-nowrap"
+                      style={{ writingMode: 'vertical-lr', textOrientation: 'mixed' }}
+                    >
+                      {coluna.nome}
+                    </span>
+                  </div>
+                </div>
+              );
+            }
 
             return (
               <div
                 key={coluna.id}
-                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col h-full transition-all duration-200 ${
+                className={`min-w-[280px] w-[280px] flex-shrink-0 flex flex-col h-full transition-all duration-300 ${
                   idx > 0 ? 'border-l border-white/[0.04]' : ''
                 }`}
                 style={{
@@ -464,12 +576,21 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                         <p className="text-[11px] text-white/30">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
-                    {coluna.sla_minutos && (
-                      <div className="flex items-center gap-1 text-[10px] text-white/25 px-1.5 py-0.5 rounded bg-white/[0.03]">
-                        <Clock className="w-3 h-3" />
-                        {coluna.sla_minutos}min
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      {coluna.sla_minutos && (
+                        <div className="flex items-center gap-1 text-[10px] text-white/25 px-1.5 py-0.5 rounded bg-white/[0.03]">
+                          <Clock className="w-3 h-3" />
+                          {coluna.sla_minutos}min
+                        </div>
+                      )}
+                      <button
+                        onClick={() => toggleColumnCollapse(coluna.id)}
+                        className="p-1 rounded hover:bg-white/10 text-white/20 hover:text-white/50 transition-colors"
+                        title="Minimizar coluna"
+                      >
+                        <ChevronsLeft className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                   {isDropTarget && (
                     <div className="mt-2 h-0.5 rounded-full" style={{ background: `linear-gradient(90deg, ${coluna.cor}, transparent)` }} />
