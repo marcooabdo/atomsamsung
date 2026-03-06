@@ -128,6 +128,13 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
     return conversasList.reduce((sum, c) => sum + (c.mensagens_nao_lidas || 0), 0);
   };
 
+  const getInitials = (name: string | undefined) => {
+    if (!name) return '?';
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+  };
+
   const loadOsData = useCallback(async () => {
     const osIds = conversas.filter(c => c.os_id).map(c => c.os_id!);
     if (osIds.length === 0) { setOsMap({}); return; }
@@ -705,13 +712,35 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                             </div>
 
                             {atendente ? (
-                              <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center overflow-hidden border border-white/[0.08]">
-                                {atendente.foto_url ? (
-                                  <img src={atendente.foto_url} alt="" className="w-full h-full object-cover" />
-                                ) : (
-                                  <span className="text-[9px] text-white/40">{atendente.nome?.charAt(0)}</span>
-                                )}
-                              </div>
+                              atendente.id === usuario?.id ? (
+                                <div
+                                  className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center overflow-hidden border border-white/[0.08]"
+                                  title={atendente.nome || ''}
+                                >
+                                  {atendente.foto_url ? (
+                                    <img src={atendente.foto_url} alt={atendente.nome || ''} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <span className="text-[8px] font-semibold text-white/50 leading-none">{getInitials(atendente.nome)}</span>
+                                  )}
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={(e) => assignToMe(conversa, e)}
+                                  className="relative group/avatar"
+                                  title={`${atendente.nome} - Clique para assumir`}
+                                >
+                                  <div className="w-5 h-5 rounded-full bg-white/[0.06] flex items-center justify-center overflow-hidden border border-white/[0.08] group-hover/avatar:border-cyan-400/50 transition-colors">
+                                    {atendente.foto_url ? (
+                                      <img src={atendente.foto_url} alt={atendente.nome || ''} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <span className="text-[8px] font-semibold text-white/50 leading-none">{getInitials(atendente.nome)}</span>
+                                    )}
+                                  </div>
+                                  <div className="absolute inset-0 rounded-full bg-cyan-400/20 flex items-center justify-center opacity-0 group-hover/avatar:opacity-100 transition-opacity">
+                                    <UserPlus className="w-2.5 h-2.5 text-cyan-400" />
+                                  </div>
+                                </button>
+                              )
                             ) : (
                               <button
                                 onClick={(e) => assignToMe(conversa, e)}

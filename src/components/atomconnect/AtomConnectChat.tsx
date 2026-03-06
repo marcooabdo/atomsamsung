@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2 } from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -1648,6 +1648,34 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 <Link2 className="w-3 h-3" />
                 OS #{osData.numero_os_interna || osData.numero_os_samsung}
               </span>
+            )}
+
+            {conversa.atendente_id && conversa.atendente_id !== usuario?.id && (
+              <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-amber-500/15 text-amber-400">
+                <User className="w-3 h-3" />
+                {atendentes.find(a => a.id === conversa.atendente_id)?.nome || 'Outro atendente'}
+              </span>
+            )}
+
+            {conversa.atendente_id !== usuario?.id && (
+              <button
+                onClick={async () => {
+                  await supabase
+                    .from('atom_connect_conversas')
+                    .update({ atendente_id: usuario?.id })
+                    .eq('id', conversa.id);
+                  onUpdate();
+                }}
+                className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all"
+                style={{
+                  color: '#00D4FF',
+                  backgroundColor: 'rgba(0, 212, 255, 0.12)',
+                  border: '1px solid rgba(0, 212, 255, 0.25)',
+                }}
+              >
+                <UserPlus className="w-3 h-3" />
+                Assumir
+              </button>
             )}
 
             <button
