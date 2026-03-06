@@ -102,7 +102,7 @@ const ROTA_COLORS: Record<string, string> = {
 };
 
 export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
-  const { isDark } = useTheme();
+  const { isDark, themeInfo } = useTheme();
   const [osDetails, setOsDetails] = useState<OSDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [anexoPreview, setAnexoPreview] = useState<any>(null);
@@ -110,7 +110,8 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
 
-  const modalBg = isDark ? '#0f172a' : '#ffffff';
+  const themeAccent = themeInfo.accent;
+  const modalBg = isDark ? themeInfo.bg : '#ffffff';
   const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
   const textPrimary = isDark ? '#f1f5f9' : '#111827';
   const textSecondary = isDark ? '#94a3b8' : '#6b7280';

@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, DollarSign, Upload, CreditCard, Clock, Save, CheckCircle, FileText, AlertCircle, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { useTheme } from '../contexts/ThemeContext';
 import { SuccessModal } from './SuccessModal';
 
 interface AddPaymentModalProps {
@@ -14,9 +15,13 @@ type FormaPagamento = 'pix' | 'cartao_credito' | 'cartao_debito' | 'dinheiro' | 
 
 export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps) {
   const { usuario } = useAuth();
+  const { themeInfo } = useTheme();
   const [loading, setLoading] = useState(false);
   const [taxasMaquina, setTaxasMaquina] = useState<any[]>([]);
   const isSubmitting = useRef(false);
+
+  const neonGreen = themeInfo.neonGreen;
+  const themeAccent = themeInfo.accent;
 
   const [formaPagamento, setFormaPagamento] = useState<FormaPagamento>('pix');
   const [valor, setValor] = useState('');
@@ -31,11 +36,11 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const formasPagamento = [
-    { value: 'pix', label: 'PIX', icon: '💳', color: 'var(--text-accent)', isAccent: true },
-    { value: 'cartao_credito', label: 'Cartão de Crédito', icon: '💳', color: '#9D4EDD', isAccent: false },
-    { value: 'cartao_debito', label: 'Cartão de Débito', icon: '💳', color: '#3b82f6', isAccent: false },
-    { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: '#39FF14', isAccent: false },
-    { value: 'transferencia', label: 'Transferência', icon: '🏦', color: '#10b981', isAccent: false },
+    { value: 'pix', label: 'PIX', icon: '💳', color: themeAccent, isAccent: true },
+    { value: 'cartao_credito', label: 'Cartao de Credito', icon: '💳', color: '#9D4EDD', isAccent: false },
+    { value: 'cartao_debito', label: 'Cartao de Debito', icon: '💳', color: '#3b82f6', isAccent: false },
+    { value: 'dinheiro', label: 'Dinheiro', icon: '💵', color: neonGreen, isAccent: false },
+    { value: 'transferencia', label: 'Transferencia', icon: '🏦', color: '#10b981', isAccent: false },
     { value: 'boleto', label: 'Boleto', icon: '📄', color: '#FFBF00', isAccent: false },
     { value: 'outro', label: 'Outro', icon: '📋', color: '#6B7280', isAccent: false }
   ];

@@ -36,7 +36,7 @@ interface PecaDetalhe {
 
 interface TaskDetailModalProps {
   task: MuralTarefa;
-  accentColor: string;
+  themeAccent: string;
   onClose: () => void;
   onComplete: (id: string) => void;
   completing: boolean;
@@ -44,18 +44,19 @@ interface TaskDetailModalProps {
 
 export function TaskDetailModal({ task, accentColor, onClose, onComplete, completing }: TaskDetailModalProps) {
   const navigate = useNavigate();
-  const { isDark } = useTheme();
+  const { isDark, themeInfo } = useTheme();
   const isAlta = task.prioridade === 'alta';
   const badge = getTaskBadge(task.titulo, task.descricao, task.gia_responsavel);
   const isConnect = task.gia_source === 'CONNECT' || !!task.whatsapp_phone;
   const isGIAStock = (task.gia_responsavel || '').toLowerCase().includes('stock') || (task.gia_source || '').toLowerCase() === 'estoque';
-  const borderColor = isAlta ? '#EF4444' : accentColor;
+  const themeAccent = themeInfo.accent;
+  const borderColor = isAlta ? '#EF4444' : themeAccent;
 
   const [pecas, setPecas] = useState<PecaDetalhe[]>([]);
   const [loadingPecas, setLoadingPecas] = useState(false);
 
   const modalBg = isDark
-    ? 'linear-gradient(145deg, rgba(8,12,30,0.99), rgba(4,6,18,1))'
+    ? `linear-gradient(145deg, ${themeInfo.bg}f8, ${themeInfo.bg})`
     : 'linear-gradient(145deg, #ffffff, #f8fafc)';
   const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
@@ -64,7 +65,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
   const textMuted = isDark ? '#64748B' : '#94a3b8';
   const closeBtnBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)';
   const tableRowBg = isDark ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.02)';
-  const pnColor = isDark ? '#00D4FF' : '#0369a1';
+  const pnColor = themeAccent;
   const whatsappColor = isDark ? '#25D366' : '#15803d';
 
   useEffect(() => {
@@ -168,9 +169,9 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                 </div>
               )}
               {task.os_numero && (
-                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md" style={{ background: `${accentColor}12`, border: `1px solid ${accentColor}35` }}>
-                  <Hash className="w-2.5 h-2.5" style={{ color: accentColor }} />
-                  <span className="text-[9px] font-black tracking-wider font-mono" style={{ color: accentColor }}>OS {task.os_numero}</span>
+                <div className="inline-flex items-center gap-1 px-2 py-1 rounded-md" style={{ background: `${themeAccent}12`, border: `1px solid ${themeAccent}35` }}>
+                  <Hash className="w-2.5 h-2.5" style={{ color: themeAccent }} />
+                  <span className="text-[9px] font-black tracking-wider font-mono" style={{ color: themeAccent }}>OS {task.os_numero}</span>
                 </div>
               )}
               {isConnect && (
@@ -213,10 +214,10 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
               {
                 label: 'Agente', content: (
                   <div className="flex items-center gap-2">
-                    <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: `${accentColor}20` }}>
-                      <Bot className="w-3 h-3" style={{ color: accentColor }} />
+                    <div className="w-5 h-5 rounded-md flex items-center justify-center" style={{ background: `${themeAccent}20` }}>
+                      <Bot className="w-3 h-3" style={{ color: themeAccent }} />
                     </div>
-                    <span className="text-sm font-bold" style={{ color: accentColor }}>{task.gia_responsavel}</span>
+                    <span className="text-sm font-bold" style={{ color: themeAccent }}>{task.gia_responsavel}</span>
                   </div>
                 )
               },
@@ -231,7 +232,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
               {
                 label: 'Setor', content: (
                   <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
+                    <div className="w-2 h-2 rounded-full" style={{ background: themeAccent }} />
                     <span className="text-sm font-bold" style={{ color: textPrimary }}>{task.gia_source || task.gia_responsavel}</span>
                   </div>
                 )
@@ -353,17 +354,17 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
 
           {/* LINK OS */}
           {task.os_id && (
-            <div className="rounded-xl p-4 mb-3 flex items-center justify-between" style={{ background: `${accentColor}08`, border: `1px solid ${accentColor}25` }}>
+            <div className="rounded-xl p-4 mb-3 flex items-center justify-between" style={{ background: `${themeAccent}08`, border: `1px solid ${themeAccent}25` }}>
               <div className="flex items-center gap-2.5">
-                <Hash className="w-4 h-4" style={{ color: accentColor }} />
-                <span className="text-sm font-mono" style={{ color: accentColor }}>OS #{task.os_numero || task.os_id?.slice(0, 8)}</span>
+                <Hash className="w-4 h-4" style={{ color: themeAccent }} />
+                <span className="text-sm font-mono" style={{ color: themeAccent }}>OS #{task.os_numero || task.os_id?.slice(0, 8)}</span>
               </div>
               <a
                 href={`/kanban?os=${task.os_id}`}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black tracking-wider transition-all hover:scale-[1.02] active:scale-95 font-mono"
-                style={{ background: `${accentColor}18`, border: `1px solid ${accentColor}40`, color: accentColor, boxShadow: `0 0 16px ${accentColor}25` }}
+                style={{ background: `${themeAccent}18`, border: `1px solid ${themeAccent}40`, color: themeAccent, boxShadow: `0 0 16px ${themeAccent}25` }}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
                 VER OS
@@ -387,10 +388,10 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
               style={{
                 background: completing
                   ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)')
-                  : `linear-gradient(135deg, ${accentColor}28, ${accentColor}12)`,
-                border: `1px solid ${accentColor}50`,
-                color: accentColor,
-                boxShadow: completing ? 'none' : `0 0 20px ${accentColor}25`,
+                  : `linear-gradient(135deg, ${themeAccent}28, ${themeAccent}12)`,
+                border: `1px solid ${themeAccent}50`,
+                color: themeAccent,
+                boxShadow: completing ? 'none' : `0 0 20px ${themeAccent}25`,
               }}
             >
               {completing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}

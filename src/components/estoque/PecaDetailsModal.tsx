@@ -60,19 +60,19 @@ interface HistoricoItem {
   usuario: { nome: string } | null;
 }
 
-const STATUS_COLORS: Record<string, { label: string; color: string }> = {
-  disponivel: { label: 'Disponível', color: '#39FF14' },
+const getStatusColors = (neonGreen: string, themeAccent: string): Record<string, { label: string; color: string }> => ({
+  disponivel: { label: 'Disponivel', color: neonGreen },
   reservada: { label: 'Reservada', color: '#FFBF00' },
-  vinculada_tecnico: { label: 'Com Técnico', color: '#00D4FF' },
-  em_rota: { label: 'Em Rota', color: '#00D4FF' },
+  vinculada_tecnico: { label: 'Com Tecnico', color: themeAccent },
+  em_rota: { label: 'Em Rota', color: themeAccent },
   em_uso: { label: 'Em Uso', color: '#FFBF00' },
   usada: { label: 'Usada', color: '#6B7280' },
-  devolucao_pendente: { label: 'Devolução Pendente', color: '#FF0064' },
-  devolvida_nova: { label: 'Devolvida Nova', color: '#39FF14' },
+  devolucao_pendente: { label: 'Devolucao Pendente', color: '#FF0064' },
+  devolvida_nova: { label: 'Devolvida Nova', color: neonGreen },
   devolvida_defeito: { label: 'Devolvida c/ Defeito', color: '#FF0064' },
   devolvida_samsung: { label: 'Devolvida Samsung', color: '#60a5fa' },
   usada_upc: { label: 'Usada UPC', color: '#6B7280' },
-};
+});
 
 export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLocationSelector }: PecaDetailsModalProps) {
   const { isDark, themeInfo } = useTheme();
@@ -92,16 +92,17 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const [localCredito, setLocalCredito] = useState<string | null>(peca.data_retorno_credito || null);
 
   const neonGreen = themeInfo.neonGreen;
-  const modalBg = isDark ? '#0f172a' : '#ffffff';
+  const themeAccent = themeInfo.accent;
+  const modalBg = isDark ? themeInfo.bg : '#ffffff';
   const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
   const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)';
   const textPrimary = isDark ? '#ffffff' : '#0f172a';
   const textSecondary = isDark ? '#d1d5db' : '#374151';
   const textMuted = isDark ? '#6b7280' : '#9ca3af';
   const labelColor = isDark ? '#6b7280' : '#6b7280';
-  const accentCyan = isDark ? '#00D4FF' : '#0369a1';
-  const borderGreen = isDark ? 'rgba(57,255,20,0.2)' : 'rgba(21,128,61,0.25)';
-  const headerBorder = isDark ? 'rgba(57,255,20,0.15)' : 'rgba(21,128,61,0.15)';
+  const accentCyan = themeAccent;
+  const borderGreen = isDark ? `${neonGreen}33` : 'rgba(21,128,61,0.25)';
+  const headerBorder = isDark ? `${neonGreen}26` : 'rgba(21,128,61,0.15)';
 
   useEffect(() => {
     loadDetalhes();
@@ -265,6 +266,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   };
 
   const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito'];
+  const STATUS_COLORS = getStatusColors(neonGreen, themeAccent);
 
   const currentStatus = (pecaDetalhada as any)?.status || peca.status;
   const statusCfg = STATUS_COLORS[currentStatus] || { label: currentStatus, color: '#6B7280' };
