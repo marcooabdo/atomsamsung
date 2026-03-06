@@ -1403,6 +1403,25 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     return new Date(dateStr).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
+  const formatDateLabel = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const today = new Date();
+    const yesterday = new Date();
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const isSameDay = (a: Date, b: Date) =>
+      a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
+    if (isSameDay(date, today)) return 'Hoje';
+    if (isSameDay(date, yesterday)) return 'Ontem';
+    return date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
+  };
+
+  const getDateKey = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+  };
+
   const formatLastSeen = (dateStr: string | null) => {
     if (!dateStr) return 'Nunca';
     const date = new Date(dateStr);
@@ -1762,9 +1781,26 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               <p className="text-sm">Nenhuma mensagem ainda</p>
             </div>
           ) : (
-            mensagens.map((msg) => (
+            mensagens.map((msg, idx) => {
+              const prevMsg = idx > 0 ? mensagens[idx - 1] : null;
+              const showDateSeparator = !prevMsg || getDateKey(msg.created_at) !== getDateKey(prevMsg.created_at);
+
+              return (
+              <div key={msg.id}>
+                {showDateSeparator && (
+                  <div className="flex items-center justify-center my-3">
+                    <div
+                      className="px-3 py-1 rounded-full text-[11px] font-medium"
+                      style={{
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        color: isDark ? 'rgba(255,255,255,0.5)' : 'rgba(0,0,0,0.45)',
+                      }}
+                    >
+                      {formatDateLabel(msg.created_at)}
+                    </div>
+                  </div>
+                )}
               <motion.div
-                key={msg.id}
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 className={`flex ${msg.from_me ? 'justify-end' : 'justify-start'} group`}
@@ -2013,7 +2049,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   </div>
                 </div>
               </motion.div>
-            ))
+              </div>
+              );
+            })
           )}
           <div ref={messagesEndRef} />
         </div>
