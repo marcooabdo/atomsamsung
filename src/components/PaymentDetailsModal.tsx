@@ -94,9 +94,9 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
   const dateTime = formatDateTime(payment.created_at);
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-      <div className="bg-[#0F0F0F] border border-[#00D4FF]/30 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-[#0F0F0F] border-b border-[#00D4FF]/20 p-6 flex items-center justify-between z-10">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+      <div className="modal-panel w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="modal-header sticky top-0 p-6 flex items-center justify-between z-10 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div
               className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
@@ -108,8 +108,8 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
               {formaPgtoInfo.icon}
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Detalhes do Pagamento</h2>
-              <p className="text-sm text-gray-400" style={{ color: formaPgtoInfo.color }}>
+              <h2 className="text-xl font-bold">Detalhes do Pagamento</h2>
+              <p className="text-sm" style={{ color: formaPgtoInfo.color }}>
                 {formaPgtoInfo.label}
               </p>
             </div>
@@ -126,15 +126,15 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
           <div className="premium-card p-6 bg-gradient-to-r from-[#39FF14]/5 to-[#00D4FF]/5">
             <div className="grid grid-cols-2 gap-6">
               <div>
-                <p className="text-xs text-gray-400 uppercase mb-2">Valor Bruto</p>
-                <p className="text-3xl font-bold text-white">
+                <p className="text-xs modal-label uppercase mb-2">Valor Bruto</p>
+                <p className="text-3xl font-bold">
                   R$ {(payment.valor_bruto || payment.valor).toFixed(2)}
                 </p>
               </div>
 
               {payment.taxa_valor && payment.taxa_valor > 0 && (
                 <div>
-                  <p className="text-xs text-gray-400 uppercase mb-2">Valor Líquido</p>
+                  <p className="text-xs modal-label uppercase mb-2">Valor Líquido</p>
                   <p className="text-3xl font-bold text-[#39FF14]">
                     R$ {payment.valor_liquido.toFixed(2)}
                   </p>
@@ -146,13 +146,13 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
               <div className="mt-4 pt-4 border-t border-gray-700">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-gray-400 uppercase">Taxa</p>
+                    <p className="text-xs modal-label uppercase">Taxa</p>
                     <p className="text-lg font-semibold text-[#FF0064]">
                       R$ {payment.taxa_valor.toFixed(2)}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-400 uppercase">Taxa %</p>
+                    <p className="text-xs modal-label uppercase">Taxa %</p>
                     <p className="text-lg font-semibold text-gray-300">
                       {payment.taxa_percentual}%
                     </p>
@@ -166,18 +166,18 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
             <div className="premium-card p-4">
               <div className="flex items-center gap-2 mb-2">
                 <Calendar className="w-4 h-4 text-[#00D4FF]" />
-                <p className="text-xs text-gray-400 uppercase">Data e Hora</p>
+                <p className="text-xs modal-label uppercase">Data e Hora</p>
               </div>
-              <p className="text-lg font-semibold text-white">{dateTime.date}</p>
+              <p className="text-lg font-semibold">{dateTime.date}</p>
               <p className="text-sm text-gray-400">{dateTime.time}</p>
             </div>
 
             <div className="premium-card p-4">
               <div className="flex items-center gap-2 mb-2">
                 <User className="w-4 h-4 text-[#39FF14]" />
-                <p className="text-xs text-gray-400 uppercase">Lançado Por</p>
+                <p className="text-xs modal-label uppercase">Lançado Por</p>
               </div>
-              <p className="text-lg font-semibold text-white">
+              <p className="text-lg font-semibold">
                 {usuario?.nome || 'Carregando...'}
               </p>
             </div>
@@ -185,8 +185,8 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
 
           {payment.parcelamento && payment.parcelamento > 1 && (
             <div className="premium-card p-4">
-              <p className="text-xs text-gray-400 uppercase mb-2">Parcelamento</p>
-              <p className="text-lg font-semibold text-white">
+              <p className="text-xs modal-label uppercase mb-2">Parcelamento</p>
+              <p className="text-lg font-semibold">
                 {payment.parcelamento}x de R$ {((payment.valor_bruto || payment.valor) / payment.parcelamento).toFixed(2)}
               </p>
             </div>
@@ -194,15 +194,15 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
 
           {payment.nsu && (
             <div className="premium-card p-4">
-              <p className="text-xs text-gray-400 uppercase mb-2">NSU</p>
-              <p className="text-lg font-mono font-semibold text-white">{payment.nsu}</p>
+              <p className="text-xs modal-label uppercase mb-2">NSU</p>
+              <p className="text-lg font-mono font-semibold">{payment.nsu}</p>
             </div>
           )}
 
           {payment.observacoes && (
             <div className="premium-card p-4 bg-[#00D4FF]/5">
-              <p className="text-xs text-gray-400 uppercase mb-2">Observações</p>
-              <p className="text-sm text-gray-300 whitespace-pre-wrap">{payment.observacoes}</p>
+              <p className="text-xs modal-label uppercase mb-2">Observações</p>
+              <p className="text-sm whitespace-pre-wrap">{payment.observacoes}</p>
             </div>
           )}
 
@@ -214,8 +214,8 @@ export function PaymentDetailsModal({ isOpen, onClose, payment }: PaymentDetails
                     <FileText className="w-6 h-6 text-[#FFBF00]" />
                   </div>
                   <div>
-                    <p className="text-sm font-bold text-white">Comprovante Anexado</p>
-                    <p className="text-xs text-gray-400">comprovante-pagamento.pdf</p>
+                    <p className="text-sm font-bold">Comprovante Anexado</p>
+                    <p className="text-xs modal-label">comprovante-pagamento.pdf</p>
                   </div>
                 </div>
               </div>

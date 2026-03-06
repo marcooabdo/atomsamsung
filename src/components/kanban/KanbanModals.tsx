@@ -12,7 +12,7 @@ export function DiagnosticoBlockModal({ isOpen, onClose }: DiagnosticoBlockModal
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="modal-panel shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <XCircle className="w-6 h-6 text-white" />
@@ -24,7 +24,7 @@ export function DiagnosticoBlockModal({ isOpen, onClose }: DiagnosticoBlockModal
         </div>
 
         <div className="p-6">
-          <p className="text-gray-700 mb-4">
+          <p className="mb-4">
             Esta OS está em <span className="font-semibold text-red-600">DIAGNÓSTICO</span> e não pode ser movida manualmente.
           </p>
 
@@ -68,7 +68,7 @@ export function ConfirmMoveModal({ isOpen, onClose, fromColumn, toColumn, onConf
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="modal-panel shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <AlertTriangle className="w-6 h-6 text-white" />
@@ -80,18 +80,18 @@ export function ConfirmMoveModal({ isOpen, onClose, fromColumn, toColumn, onConf
         </div>
 
         <div className="p-6">
-          <p className="text-gray-700 mb-4">
+          <p className="mb-4">
             Você está movendo uma OS de <span className="font-semibold text-orange-600">"{fromColumn}"</span> para <span className="font-semibold text-blue-600">"{toColumn}"</span>.
           </p>
 
-          <p className="text-gray-600 mb-6">
+          <p className="modal-label mb-6">
             Deseja continuar com esta movimentação?
           </p>
 
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 bg-gray-100 text-gray-700 py-3 rounded-lg hover:bg-gray-200 transition-all font-medium"
+              className="flex-1 border border-[var(--border-primary)] py-3 rounded-lg hover:bg-black/5 transition-all font-medium"
             >
               Cancelar
             </button>
@@ -122,7 +122,7 @@ export function PecasAtivasBlockModal({ isOpen, onClose, pecas, statusLabels }: 
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col">
+      <div className="modal-panel shadow-2xl max-w-2xl w-full mx-4 overflow-hidden max-h-[90vh] flex flex-col">
         <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <Package className="w-6 h-6 text-white" />
@@ -220,7 +220,7 @@ export function ErrorModal({ isOpen, onClose, title, message }: ErrorModalProps)
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="modal-panel shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <XCircle className="w-6 h-6 text-white" />
@@ -232,7 +232,7 @@ export function ErrorModal({ isOpen, onClose, title, message }: ErrorModalProps)
         </div>
 
         <div className="p-6">
-          <p className="text-gray-700 mb-6 whitespace-pre-line">
+          <p className="mb-6 whitespace-pre-line">
             {message}
           </p>
 
@@ -258,7 +258,7 @@ export function SuccessModal({ isOpen, onClose, title, message }: SuccessModalPr
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="modal-panel shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-green-500 to-green-600 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <CheckCircle2 className="w-6 h-6 text-white" />
@@ -270,7 +270,7 @@ export function SuccessModal({ isOpen, onClose, title, message }: SuccessModalPr
         </div>
 
         <div className="p-6">
-          <p className="text-gray-700 mb-6 whitespace-pre-line">
+          <p className="mb-6 whitespace-pre-line">
             {message}
           </p>
 
@@ -296,7 +296,7 @@ export function InfoModal({ isOpen, onClose, title, message }: InfoModalProps) {
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999]">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full mx-4 overflow-hidden">
+      <div className="modal-panel shadow-2xl max-w-md w-full mx-4 overflow-hidden">
         <div className="bg-gradient-to-r from-blue-500 to-blue-600 px-6 py-4 flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center">
             <Info className="w-6 h-6 text-white" />
@@ -308,7 +308,7 @@ export function InfoModal({ isOpen, onClose, title, message }: InfoModalProps) {
         </div>
 
         <div className="p-6">
-          <p className="text-gray-700 mb-6 whitespace-pre-line">
+          <p className="mb-6 whitespace-pre-line">
             {message}
           </p>
 

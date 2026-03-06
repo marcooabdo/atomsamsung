@@ -222,28 +222,28 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
   const valorLiquido = calcularValorLiquido();
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-[100] p-4">
-      <div className="bg-[#0F0F0F] border border-[#00D4FF]/30 rounded-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-[#0F0F0F] border-b border-[#00D4FF]/20 p-6 z-10">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+      <div className="modal-panel w-full max-w-3xl max-h-[90vh] overflow-y-auto shadow-2xl">
+        <div className="modal-header sticky top-0 p-6 z-10 rounded-t-2xl">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 bg-[#00D4FF]/10 rounded-lg">
                 <DollarSign className="w-6 h-6 text-[#00D4FF]" />
               </div>
-              <h2 className="text-2xl font-bold text-white">Editar Pagamento</h2>
+              <h2 className="text-2xl font-bold">Editar Pagamento</h2>
             </div>
             <button
               onClick={onClose}
-              className="p-2 hover:bg-gray-800 rounded-lg transition-colors"
+              className="p-2 hover:bg-black/10 rounded-lg transition-colors"
             >
-              <X className="w-6 h-6 text-gray-400" />
+              <X className="w-6 h-6 opacity-50" />
             </button>
           </div>
         </div>
 
         <div className="p-6 space-y-6">
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-3">
+            <label className="modal-label block text-sm font-medium mb-3">
               Forma de Pagamento *
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -255,11 +255,11 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
                   className={`p-4 rounded-xl border-2 transition-all ${
                     formaPagamento === forma.value
                       ? 'border-[#00D4FF] bg-[#00D4FF]/10'
-                      : 'border-gray-700 hover:border-gray-600'
+                      : 'border-[var(--border-primary)] hover:border-[var(--border-accent)]'
                   }`}
                 >
                   <div className="text-2xl mb-2">{forma.icon}</div>
-                  <div className="text-xs text-gray-300 font-medium">{forma.label}</div>
+                  <div className="text-xs font-medium modal-label">{forma.label}</div>
                 </button>
               ))}
             </div>
@@ -267,7 +267,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
+              <label className="modal-label block text-sm font-medium mb-2">
                 Valor (R$) *
               </label>
               <input
@@ -275,20 +275,20 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
                 step="0.01"
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
-                className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                 placeholder="0.00"
               />
             </div>
 
             {isCartao && (
               <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
+                <label className="modal-label block text-sm font-medium mb-2">
                   Parcelamento
                 </label>
                 <select
                   value={parcelamento}
                   onChange={(e) => setParcelamento(e.target.value)}
-                  className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                  className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                 >
                   {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
                     <option key={n} value={n}>{n}x</option>
@@ -302,7 +302,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
             <>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="modal-label block text-sm font-medium mb-2">
                     Taxa (%)
                   </label>
                   <input
@@ -310,19 +310,19 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
                     step="0.01"
                     value={taxaPercentual}
                     onChange={(e) => setTaxaPercentual(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                    className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                     placeholder="0.00"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="modal-label block text-sm font-medium mb-2">
                     Taxa paga por
                   </label>
                   <select
                     value={taxaPagaPor}
                     onChange={(e) => setTaxaPagaPor(e.target.value as 'cliente' | 'empresa')}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                    className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                   >
                     <option value="empresa">Empresa</option>
                     <option value="cliente">Cliente</option>
@@ -345,27 +345,27 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="modal-label block text-sm font-medium mb-2">
                     NSU *
                   </label>
                   <input
                     type="text"
                     value={nsu}
                     onChange={(e) => setNsu(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                    className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                     placeholder="Número NSU"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                  <label className="modal-label block text-sm font-medium mb-2">
                     SKU Maquininha
                   </label>
                   <input
                     type="text"
                     value={skuMaquininha}
                     onChange={(e) => setSkuMaquininha(e.target.value)}
-                    className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF]"
+                    className="w-full px-4 py-3 modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF]"
                     placeholder="SKU"
                   />
                 </div>
@@ -374,7 +374,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="modal-label block text-sm font-medium mb-2">
               Comprovante
             </label>
 
@@ -385,7 +385,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
                     <Upload className="w-5 h-5 text-green-500" />
                   </div>
                   <div>
-                    <p className="text-sm text-white font-medium">Comprovante atual mantido</p>
+                    <p className="text-sm font-medium">Comprovante atual mantido</p>
                     <p className="text-xs text-gray-400">Clique para trocar o arquivo</p>
                   </div>
                 </div>
@@ -424,7 +424,7 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
                     setTrocarComprovante(false);
                     setComprovante(null);
                   }}
-                  className="w-full px-4 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition-colors"
+                  className="w-full px-4 py-2 rounded-lg transition-colors hover:bg-black/10 border border-[var(--border-primary)] modal-label"
                 >
                   Cancelar troca
                 </button>
@@ -433,14 +433,14 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">
+            <label className="modal-label block text-sm font-medium mb-2">
               Observações
             </label>
             <textarea
               value={observacoes}
               onChange={(e) => setObservacoes(e.target.value)}
               rows={3}
-              className="w-full px-4 py-3 bg-gray-800/50 border border-gray-700 rounded-lg text-white focus:outline-none focus:border-[#00D4FF] resize-none"
+              className="modal-input w-full px-4 py-3 rounded-lg focus:border-[#00D4FF] resize-none"
               placeholder="Informações adicionais sobre o pagamento..."
             />
           </div>
@@ -458,11 +458,11 @@ export function EditPaymentModal({ isOpen, payment, onClose, onSuccess }: EditPa
           </div>
         </div>
 
-        <div className="sticky bottom-0 bg-[#0F0F0F] border-t border-[#00D4FF]/20 p-6">
+        <div className="modal-header sticky bottom-0 p-6 rounded-b-2xl">
           <div className="flex gap-3">
             <button
               onClick={onClose}
-              className="flex-1 px-6 py-3 border border-gray-700 rounded-lg text-white hover:bg-gray-800 transition-colors"
+              className="flex-1 px-6 py-3 border border-[var(--border-primary)] rounded-lg hover:bg-black/10 transition-colors"
             >
               Cancelar
             </button>

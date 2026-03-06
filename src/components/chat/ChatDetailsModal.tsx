@@ -199,9 +199,9 @@ export function ChatDetailsModal({
 
   return (
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-[#0d1419] border border-[#1a3a4a] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#1a3a4a]/50 bg-gradient-to-r from-[#0d1419] to-[#0d2832]">
-          <h2 className="text-lg font-bold text-gray-200">Informações</h2>
+      <div className="modal-panel w-full max-w-2xl max-h-[90vh] overflow-hidden shadow-2xl">
+        <div className="modal-header flex items-center justify-between px-6 py-4 rounded-t-2xl">
+          <h2 className="text-lg font-bold">Informações</h2>
           <button
             onClick={onClose}
             className="p-2 hover:bg-[#1a3a4a]/50 rounded-lg transition-all"
@@ -212,7 +212,7 @@ export function ChatDetailsModal({
 
         <div className="overflow-y-auto max-h-[calc(90vh-5rem)]">
           {conversationType === 'direct' && userDetails && (
-            <div className="p-6 border-b border-[#1a3a4a]/50">
+            <div className="p-6 border-b border-[var(--border-primary)]">
               <div className="flex gap-6">
                 <div className="flex-shrink-0">
                   <ProfilePhotoUpload
@@ -226,7 +226,7 @@ export function ChatDetailsModal({
                 </div>
                 <div className="flex-1 min-w-0 space-y-4">
                   <div>
-                    <h3 className="text-2xl font-bold text-gray-200 truncate">{userDetails.nome}</h3>
+                    <h3 className="text-2xl font-bold truncate">{userDetails.nome}</h3>
                     {userDetails.tipo && (
                       <p className="text-sm text-gray-400 mt-1 uppercase">{userDetails.tipo}</p>
                     )}
@@ -291,7 +291,7 @@ export function ChatDetailsModal({
           )}
 
           {conversationType === 'group' && (
-            <div className="p-6 border-b border-[#1a3a4a]/50">
+            <div className="p-6 border-b border-[var(--border-primary)]">
               <div className="flex items-center gap-3 mb-4">
                 {groupPhotoUrl ? (
                   <img
@@ -315,7 +315,7 @@ export function ChatDetailsModal({
                 {participants.map((participant) => (
                   <div
                     key={participant.id}
-                    className="flex items-center gap-3 px-3 py-2 hover:bg-[#151f26] rounded-lg transition-all"
+                    className="flex items-center gap-3 px-3 py-2 hover:bg-black/5 rounded-lg transition-all"
                   >
                     <ProfilePhotoUpload
                       userId={participant.id}
@@ -338,7 +338,7 @@ export function ChatDetailsModal({
           )}
 
           <div className="p-6">
-            <div className="flex gap-2 mb-4 border-b border-[#1a3a4a]/50">
+            <div className="flex gap-2 mb-4 border-b border-[var(--border-primary)]">
               <button
                 onClick={() => setActiveTab('info')}
                 className={`px-4 py-2 text-sm font-medium transition-all ${
@@ -376,7 +376,7 @@ export function ChatDetailsModal({
                   sharedFiles.map((file) => (
                     <div
                       key={file.id}
-                      className="flex items-center gap-3 px-3 py-2 bg-[#151f26] rounded-lg border border-[#1a3a4a]/50 hover:border-[#00D4FF]/30 transition-all group"
+                      className="flex items-center gap-3 px-3 py-2 modal-section rounded-lg hover:border-[#00D4FF]/30 transition-all group"
                     >
                       {file.message_type === 'image' ? (
                         <div className="w-12 h-12 rounded overflow-hidden flex-shrink-0">

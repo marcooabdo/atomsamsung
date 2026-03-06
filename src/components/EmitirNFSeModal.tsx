@@ -443,9 +443,9 @@ export function EmitirNFSeModal({
   if (!isOpen) return null;
 
   return createPortal(
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
-      <div className="bg-gray-900 rounded-xl border border-gray-800 w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
-        <div className="flex items-center justify-between p-5 border-b border-gray-800">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="modal-panel w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col">
+        <div className="modal-header flex items-center justify-between p-5 rounded-t-2xl">
           <div className="flex items-center gap-3">
             <div className="p-2 rounded-lg" style={{ background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)', border: '1px solid rgba(var(--accent-rgb),0.4)' }}>
               <Receipt className="w-5 h-5 text-[#00D4FF]" />
@@ -463,7 +463,7 @@ export function EmitirNFSeModal({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
+            className="p-2 rounded-lg hover:bg-black/10 modal-label transition-colors"
           >
             <X className="w-5 h-5" />
           </button>
@@ -497,13 +497,13 @@ export function EmitirNFSeModal({
                 <label className="block text-xs font-medium text-gray-400 mb-1.5">Parametrizacao NFS-e *</label>
                 <button
                   onClick={() => setShowConfigDropdown(!showConfigDropdown)}
-                  className="w-full flex items-center justify-between px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-sm text-gray-200 hover:border-[#00D4FF]/50 transition-colors"
+                  className="modal-input w-full flex items-center justify-between px-4 py-2.5 rounded-lg text-sm hover:border-[#00D4FF]/50 transition-colors"
                 >
                   <span>{selectedConfig?.nome || 'Selecionar parametrizacao'}</span>
                   <ChevronDown className={`w-4 h-4 transition-transform ${showConfigDropdown ? 'rotate-180' : ''}`} />
                 </button>
                 {showConfigDropdown && (
-                  <div className="absolute left-0 right-0 top-full mt-1 bg-gray-800 border border-gray-700 rounded-lg shadow-xl z-10 overflow-hidden max-h-48 overflow-y-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1 modal-panel rounded-lg shadow-xl z-10 overflow-hidden max-h-48 overflow-y-auto">
                     {configs.map(c => (
                       <button
                         key={c.id}
@@ -537,7 +537,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorNome}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorNome: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         />
                       </div>
                       <div>
@@ -546,7 +546,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorDocumento}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorDocumento: e.target.value.replace(/\D/g, '') }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF] font-mono"
                           maxLength={14}
                         />
                       </div>
@@ -556,7 +556,7 @@ export function EmitirNFSeModal({
                           type="email"
                           value={form.tomadorEmail}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorEmail: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         />
                       </div>
                     </div>
@@ -567,7 +567,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorLogradouro}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorLogradouro: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         />
                       </div>
                       <div>
@@ -576,7 +576,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorNumero}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorNumero: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         />
                       </div>
                     </div>
@@ -587,7 +587,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorBairro}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorBairro: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         />
                       </div>
                       <div>
@@ -596,7 +596,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorCep}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorCep: e.target.value.replace(/\D/g, '') }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF] font-mono"
                           maxLength={8}
                         />
                       </div>
@@ -606,7 +606,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorUF}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorUF: e.target.value.toUpperCase().slice(0, 2) }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono uppercase"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF] font-mono uppercase"
                           maxLength={2}
                           placeholder="SP"
                         />
@@ -617,7 +617,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.tomadorCidadeIbge}
                           onChange={(e) => setForm(prev => ({ ...prev, tomadorCidadeIbge: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF] font-mono"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF] font-mono"
                           maxLength={7}
                         />
                       </div>
@@ -628,7 +628,7 @@ export function EmitirNFSeModal({
                         type="text"
                         value={form.tomadorMunicipio}
                         onChange={(e) => setForm(prev => ({ ...prev, tomadorMunicipio: e.target.value }))}
-                        className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                        className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#00D4FF]"
                         placeholder="Belo Horizonte"
                       />
                     </div>
@@ -667,7 +667,7 @@ export function EmitirNFSeModal({
                           <select
                             value={form.ambiente}
                             onChange={(e) => setForm(prev => ({ ...prev, ambiente: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                            className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500]"
                           >
                             <option value={2}>Homologacao</option>
                             <option value={1}>Producao</option>
@@ -678,7 +678,7 @@ export function EmitirNFSeModal({
                           <select
                             value={form.tribISSQN}
                             onChange={(e) => setForm(prev => ({ ...prev, tribISSQN: parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                            className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500]"
                           >
                             <option value={0}>0 - Reserva</option>
                             <option value={1}>1 - Exigivel</option>
@@ -694,7 +694,7 @@ export function EmitirNFSeModal({
                           <select
                             value={form.tpRetISSQN ?? ''}
                             onChange={(e) => setForm(prev => ({ ...prev, tpRetISSQN: e.target.value === '' ? null : parseInt(e.target.value) }))}
-                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                            className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500]"
                           >
                             <option value="">Nao enviar</option>
                             <option value={1}>1 - Retencao pelo tomador</option>
@@ -715,7 +715,7 @@ export function EmitirNFSeModal({
                             type="text"
                             value={form.cTribNac}
                             onChange={(e) => setForm(prev => ({ ...prev, cTribNac: e.target.value }))}
-                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                            className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500] font-mono"
                             placeholder="140101"
                           />
                         </div>
@@ -725,7 +725,7 @@ export function EmitirNFSeModal({
                             type="text"
                             value={form.cNBS}
                             onChange={(e) => setForm(prev => ({ ...prev, cNBS: e.target.value }))}
-                            className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                            className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500] font-mono"
                             placeholder="120018100"
                           />
                         </div>
@@ -736,7 +736,7 @@ export function EmitirNFSeModal({
                           type="text"
                           value={form.cLocPrestacao}
                           onChange={(e) => setForm(prev => ({ ...prev, cLocPrestacao: e.target.value }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500] font-mono"
                           placeholder="3170206"
                         />
                       </div>
@@ -745,7 +745,7 @@ export function EmitirNFSeModal({
                         <select
                           value={form.modoTribMun}
                           onChange={(e) => setForm(prev => ({ ...prev, modoTribMun: e.target.value as 'vLiq' | 'pAliq' }))}
-                          className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
+                          className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500]"
                         >
                           <option value="vLiq">vLiq + totTrib (ex: Uberlandia)</option>
                           <option value="pAliq">pAliq + cLocIncid (ex: Sao Paulo)</option>
@@ -760,7 +760,7 @@ export function EmitirNFSeModal({
                               step="0.01"
                               value={form.pAliq || ''}
                               onChange={(e) => setForm(prev => ({ ...prev, pAliq: parseFloat(e.target.value) || 0 }))}
-                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                              className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500] font-mono"
                               placeholder="5"
                             />
                           </div>
@@ -770,7 +770,7 @@ export function EmitirNFSeModal({
                               type="text"
                               value={form.cLocIncid}
                               onChange={(e) => setForm(prev => ({ ...prev, cLocIncid: e.target.value }))}
-                              className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] font-mono"
+                              className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500] font-mono"
                               placeholder="3548708"
                             />
                           </div>
@@ -781,8 +781,8 @@ export function EmitirNFSeModal({
                 </div>
               </div>
 
-              <div className="p-4 rounded-lg bg-gray-800/50 border border-gray-700">
-                <h4 className="text-xs font-bold text-white uppercase tracking-wider mb-3 flex items-center gap-2">
+              <div className="modal-section p-4 rounded-lg">
+                <h4 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-2">
                   <DollarSign className="w-3.5 h-3.5 text-[#39FF14]" />
                   Servico e Valores
                 </h4>
@@ -795,7 +795,7 @@ export function EmitirNFSeModal({
                         type="number"
                         value={form.valorServicos}
                         onChange={(e) => setForm(prev => ({ ...prev, valorServicos: parseFloat(e.target.value) || 0 }))}
-                        className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#39FF14] text-lg font-bold"
+                        className="modal-input w-full pl-10 pr-4 py-2.5 rounded-lg focus:outline-none focus:border-[#39FF14] text-lg font-bold"
                         step="0.01"
                       />
                     </div>
@@ -806,7 +806,7 @@ export function EmitirNFSeModal({
                       type="text"
                       value={form.descricaoServico}
                       onChange={(e) => setForm(prev => ({ ...prev, descricaoServico: e.target.value }))}
-                      className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                      className="modal-input w-full px-4 py-2.5 rounded-lg focus:outline-none focus:border-[#00D4FF]"
                       placeholder="Descrição do serviço prestado..."
                     />
                   </div>
@@ -817,7 +817,7 @@ export function EmitirNFSeModal({
                   <textarea
                     value={form.observacoes}
                     onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF] resize-none text-sm"
+                    className="modal-input w-full px-4 py-2.5 rounded-lg focus:outline-none focus:border-[#00D4FF] resize-none text-sm"
                     rows={2}
                   />
                 </div>
