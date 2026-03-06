@@ -165,7 +165,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const audioRefs = useRef<Record<string, HTMLAudioElement | null>>({});
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const resizeStartX = useRef(0);
@@ -705,6 +705,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setUploadError(null);
     const messageContent = inputText.trim();
     setInputText('');
+    if (inputRef.current) inputRef.current.style.height = 'auto';
 
     const attendantName = usuario?.nome || '';
     const messageWithName = attendantName ? `*${attendantName}:*\n${messageContent}` : messageContent;
@@ -2111,15 +2112,25 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               </div>
 
               <div className="flex-1 relative">
-                <input
+                <textarea
                   ref={inputRef}
-                  type="text"
                   value={inputText}
-                  onChange={(e) => setInputText(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
+                  onChange={(e) => {
+                    setInputText(e.target.value);
+                    const el = e.target;
+                    el.style.height = 'auto';
+                    el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      sendMessage();
+                    }
+                  }}
                   placeholder="Digite uma mensagem..."
-                  className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none"
-                  style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary }}
+                  rows={1}
+                  className="w-full px-4 py-2.5 rounded-xl text-sm focus:outline-none resize-none overflow-y-auto"
+                  style={{ background: inputBg, border: `1px solid ${borderColor}`, color: textPrimary, maxHeight: '120px' }}
                 />
               </div>
               {inputText.trim() || attachments.length > 0 ? (
