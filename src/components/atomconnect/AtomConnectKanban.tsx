@@ -2,7 +2,8 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, Users, AlertTriangle,
-  Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X
+  Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X,
+  Pencil, Check
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -70,6 +71,33 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   const [showFilters, setShowFilters] = useState(false);
   const [atendentes, setAtendentes] = useState<any[]>([]);
   const [osMap, setOsMap] = useState<Record<string, { numero_os_interna?: string; numero_os_samsung?: string }>>({});
+  const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
+  const [editingColumnName, setEditingColumnName] = useState('');
+
+  const FIXED_COLUMNS = ['bot_triagem', 'fila_espera', 'finalizado_nps', 'monitor_atrito'];
+  const isMaster = usuario?.cargo === 'master';
+
+  const canEditColumn = (coluna: PipelineColuna) => {
+    return isMaster && !FIXED_COLUMNS.includes(coluna.id);
+  };
+
+  const startEditingColumn = (coluna: PipelineColuna) => {
+    setEditingColumnId(coluna.id);
+    setEditingColumnName(coluna.nome);
+  };
+
+  const saveColumnName = async (colunaId: string) => {
+    const trimmed = editingColumnName.trim();
+    if (!trimmed) { setEditingColumnId(null); return; }
+
+    await supabase
+      .from('atom_connect_pipeline_colunas')
+      .update({ nome: trimmed })
+      .eq('id', colunaId);
+
+    setColunas(prev => prev.map(c => c.id === colunaId ? { ...c, nome: trimmed } : c));
+    setEditingColumnId(null);
+  };
 
   const loadOsData = useCallback(async () => {
     const osIds = conversas.filter(c => c.os_id).map(c => c.os_id!);
@@ -398,8 +426,41 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                       >
                         <Icon className="w-3 h-3" style={{ color: coluna.cor }} />
                       </div>
-                      <div>
-                        <h3 className="text-xs font-semibold text-white/80">{coluna.nome}</h3>
+                      <div className="flex-1 min-w-0">
+                        {editingColumnId === coluna.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              autoFocus
+                              value={editingColumnName}
+                              onChange={(e) => setEditingColumnName(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') saveColumnName(coluna.id);
+                                if (e.key === 'Escape') setEditingColumnId(null);
+                              }}
+                              onBlur={() => saveColumnName(coluna.id)}
+                              className="text-xs font-semibold text-white bg-white/10 border border-white/20 rounded px-1.5 py-0.5 w-full focus:outline-none focus:border-white/40"
+                            />
+                            <button
+                              onMouseDown={(e) => { e.preventDefault(); saveColumnName(coluna.id); }}
+                              className="p-0.5 rounded hover:bg-white/10 text-green-400 flex-shrink-0"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 group/title">
+                            <h3 className="text-xs font-semibold text-white/80 truncate">{coluna.nome}</h3>
+                            {canEditColumn(coluna) && (
+                              <button
+                                onClick={() => startEditingColumn(coluna)}
+                                className="p-0.5 rounded hover:bg-white/10 text-white/20 hover:text-white/60 opacity-0 group-hover/title:opacity-100 transition-opacity flex-shrink-0"
+                                title="Renomear coluna"
+                              >
+                                <Pencil className="w-2.5 h-2.5" />
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <p className="text-[11px] text-white/30">{columnConversas.length} cliente{columnConversas.length !== 1 ? 's' : ''}</p>
                       </div>
                     </div>
