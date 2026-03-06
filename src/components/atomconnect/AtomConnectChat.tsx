@@ -1,12 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  X, Send, Paperclip, Mic, Smile, Phone, Video,
-  User, Users, Link2, FileText, Play, Download, Check,
-  CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare,
-  MapPin, Calendar, AlertTriangle, ExternalLink, Edit2,
-  Trash2, Upload, File, ImageIcon as ImageLucide, GripVertical,
-  PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2
-} from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
