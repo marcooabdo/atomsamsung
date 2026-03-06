@@ -1,6 +1,7 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Clock } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle } from 'lucide-react';
+import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
 
@@ -74,6 +75,7 @@ const STATUS_COLORS: Record<string, { label: string; color: string }> = {
 };
 
 export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLocationSelector }: PecaDetailsModalProps) {
+  const { isDark, themeInfo } = useTheme();
   const [generatingLabel, setGeneratingLabel] = useState(false);
   const [showLabelGenerator, setShowLabelGenerator] = useState(false);
   const [labelData, setLabelData] = useState<LabelData[]>([]);
@@ -88,6 +90,18 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
   const [localColeta, setLocalColeta] = useState<string | null>(peca.data_coleta_transportadora || null);
   const [localCredito, setLocalCredito] = useState<string | null>(peca.data_retorno_credito || null);
+
+  const neonGreen = themeInfo.neonGreen;
+  const modalBg = isDark ? '#0f172a' : '#ffffff';
+  const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.10)';
+  const textPrimary = isDark ? '#ffffff' : '#0f172a';
+  const textSecondary = isDark ? '#d1d5db' : '#374151';
+  const textMuted = isDark ? '#6b7280' : '#9ca3af';
+  const labelColor = isDark ? '#6b7280' : '#6b7280';
+  const accentCyan = isDark ? '#00D4FF' : '#0369a1';
+  const borderGreen = isDark ? 'rgba(57,255,20,0.2)' : 'rgba(21,128,61,0.25)';
+  const headerBorder = isDark ? 'rgba(57,255,20,0.15)' : 'rgba(21,128,61,0.15)';
 
   useEffect(() => {
     loadDetalhes();
@@ -264,21 +278,21 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const slaDias = slaValido ? calcularSLA(localColeta!, localCredito!) : null;
 
   const modalContent = (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" style={{ background: isDark ? 'rgba(0,0,0,0.80)' : 'rgba(0,0,0,0.50)', backdropFilter: 'blur(8px)' }}>
       <div
         className="w-full max-w-3xl flex flex-col max-h-[90vh] overflow-hidden rounded-xl"
         style={{
-          background: '#0f172a',
-          border: '1px solid rgba(57,255,20,0.2)',
-          boxShadow: '0 0 40px rgba(57,255,20,0.1)',
+          background: modalBg,
+          border: `1px solid ${borderGreen}`,
+          boxShadow: isDark ? `0 0 40px rgba(57,255,20,0.1)` : `0 0 30px rgba(0,0,0,0.15)`,
         }}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#39FF14]/15 shrink-0">
+        <div className="flex items-center justify-between px-6 py-4 shrink-0" style={{ borderBottom: `1px solid ${headerBorder}` }}>
           <div className="flex items-center gap-3">
-            <Package className="w-5 h-5 text-[#39FF14]" />
-            <h2 className="text-lg font-bold text-[#39FF14] tracking-wide uppercase">
-              Detalhes da Peça
+            <Package className="w-5 h-5" style={{ color: neonGreen }} />
+            <h2 className="text-lg font-bold tracking-wide uppercase" style={{ color: neonGreen }}>
+              Detalhes da Peca
             </h2>
             <span
               className="px-2 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider"
@@ -293,9 +307,9 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-white/5 rounded-lg transition-colors"
+            className={`p-2 rounded-lg transition-colors ${isDark ? 'hover:bg-white/5' : 'hover:bg-black/5'}`}
           >
-            <X className="w-5 h-5 text-gray-400" />
+            <X className="w-5 h-5" style={{ color: textMuted }} />
           </button>
         </div>
 
@@ -307,14 +321,14 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             <div
               className="flex items-center gap-3 px-4 py-3 rounded-xl"
               style={{
-                background: 'rgba(57,255,20,0.07)',
-                border: '1px solid rgba(57,255,20,0.35)',
+                background: isDark ? 'rgba(57,255,20,0.07)' : 'rgba(21,128,61,0.08)',
+                border: isDark ? '1px solid rgba(57,255,20,0.35)' : '1px solid rgba(21,128,61,0.30)',
               }}
             >
-              <Link className="w-4 h-4 text-[#39FF14] shrink-0" />
+              <Link className="w-4 h-4 shrink-0" style={{ color: neonGreen }} />
               <div>
-                <p className="text-xs text-[#39FF14]/70 uppercase tracking-wider font-bold">OS Alocada</p>
-                <p className="text-[#39FF14] font-bold font-mono text-base">{osLabel}</p>
+                <p className="text-xs uppercase tracking-wider font-bold" style={{ color: isDark ? 'rgba(57,255,20,0.70)' : 'rgba(21,128,61,0.80)' }}>OS Alocada</p>
+                <p className="font-bold font-mono text-base" style={{ color: neonGreen }}>{osLabel}</p>
               </div>
             </div>
           )}
@@ -322,47 +336,47 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           {/* Main details grid */}
           <div
             className="rounded-xl p-5"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
           >
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">ID Único</p>
-                <p className="text-[#39FF14] font-bold text-2xl font-mono">#{peca.id_numerico || 'N/A'}</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>ID Unico</p>
+                <p className="font-bold text-2xl font-mono" style={{ color: neonGreen }}>#{peca.id_numerico || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Part Number</p>
-                <p className="text-white font-mono font-bold">{peca.pn}</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Part Number</p>
+                <p className="font-mono font-bold" style={{ color: textPrimary }}>{peca.pn}</p>
               </div>
               <div className="col-span-2">
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Descrição</p>
-                <p className="text-gray-300">{peca.descricao || 'N/A'}</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Descricao</p>
+                <p style={{ color: textSecondary }}>{peca.descricao || 'N/A'}</p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Valor c/ Impostos</p>
-                <p className="text-[#39FF14] font-bold">
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Valor c/ Impostos</p>
+                <p className="font-bold" style={{ color: neonGreen }}>
                   R$ {peca.valor_com_impostos.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                 </p>
               </div>
               <div>
-                <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Condição</p>
-                <p className="text-gray-300 capitalize">{peca.condicao}</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Condicao</p>
+                <p className="capitalize" style={{ color: textSecondary }}>{peca.condicao}</p>
               </div>
               {pecaDetalhada?.nf && (
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Nota Fiscal</p>
-                  <p className="text-[#00D4FF] font-mono font-bold">{pecaDetalhada.nf.numero_nf}</p>
+                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Nota Fiscal</p>
+                  <p className="font-mono font-bold" style={{ color: accentCyan }}>{pecaDetalhada.nf.numero_nf}</p>
                 </div>
               )}
               {pecaDetalhada?.nf?.fornecedor && (
                 <div>
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Fornecedor</p>
-                  <p className="text-gray-300 text-sm">{pecaDetalhada.nf.fornecedor}</p>
+                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Fornecedor</p>
+                  <p className="text-sm" style={{ color: textSecondary }}>{pecaDetalhada.nf.fornecedor}</p>
                 </div>
               )}
               {peca.nf_delivery && (
                 <div className="col-span-2">
-                  <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">Delivery</p>
-                  <p className="text-[#00D4FF] font-bold text-lg">{peca.nf_delivery}</p>
+                  <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Delivery</p>
+                  <p className="font-bold text-lg" style={{ color: accentCyan }}>{peca.nf_delivery}</p>
                 </div>
               )}
             </div>
@@ -373,30 +387,30 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             <div
               className="rounded-xl p-5"
               style={{
-                background: 'rgba(96,165,250,0.06)',
-                border: '2px solid rgba(96,165,250,0.35)',
+                background: isDark ? 'rgba(96,165,250,0.06)' : 'rgba(59,130,246,0.08)',
+                border: isDark ? '2px solid rgba(96,165,250,0.35)' : '2px solid rgba(59,130,246,0.30)',
               }}
             >
               <div className="flex items-center gap-2 mb-4">
-                <Truck className="w-4 h-4 text-blue-400" />
-                <h3 className="text-sm font-bold text-blue-400 uppercase tracking-wider">Logística Reversa</h3>
+                <Truck className="w-4 h-4" style={{ color: isDark ? '#60a5fa' : '#2563eb' }} />
+                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>Logistica Reversa</h3>
               </div>
 
               <div className="space-y-4">
                 {/* Coleta */}
                 <div
                   className="p-4 rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
                 >
                   <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-2 h-2 rounded-full ${localColeta ? 'bg-green-400' : 'bg-orange-400 animate-pulse'}`} />
-                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Coleta pela Transportadora</p>
+                    <div className={`w-2 h-2 rounded-full ${localColeta ? 'bg-green-500' : 'bg-orange-500 animate-pulse'}`} />
+                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color: textSecondary }}>Coleta pela Transportadora</p>
                   </div>
 
                   {localColeta ? (
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                      <span className="text-green-400 font-semibold text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                      <span className="text-green-600 font-semibold text-sm">
                         Coletada em {new Date(localColeta).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
@@ -406,7 +420,12 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                         type="date"
                         value={dataColeta}
                         onChange={(e) => setDataColeta(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm text-white bg-gray-900 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                        className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                        style={{
+                          background: isDark ? '#1e293b' : '#f1f5f9',
+                          border: isDark ? '1px solid #374151' : '1px solid #cbd5e1',
+                          color: textPrimary
+                        }}
                       />
                       <button
                         onClick={handleRegistrarColeta}
@@ -415,7 +434,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                         style={{
                           background: 'rgba(249,115,22,0.2)',
                           border: '1px solid rgba(249,115,22,0.5)',
-                          color: '#fb923c',
+                          color: isDark ? '#fb923c' : '#c2410c',
                         }}
                       >
                         {salvandoColeta ? 'Salvando...' : 'Registrar Coleta'}
@@ -427,18 +446,18 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                 {/* Credito GSPN */}
                 <div
                   className="p-4 rounded-lg"
-                  style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}
+                  style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
                 >
                   <div className="flex items-center gap-2 mb-3">
-                    <div className={`w-2 h-2 rounded-full ${localCredito ? 'bg-green-400' : localColeta ? 'bg-red-400 animate-pulse' : 'bg-gray-600'}`} />
-                    <p className="text-xs font-bold text-gray-300 uppercase tracking-wider">Crédito no GSPN</p>
+                    <div className={`w-2 h-2 rounded-full ${localCredito ? 'bg-green-500' : localColeta ? 'bg-red-500 animate-pulse' : 'bg-gray-400'}`} />
+                    <p className="text-xs font-bold uppercase tracking-wider" style={{ color: textSecondary }}>Credito no GSPN</p>
                   </div>
 
                   {localCredito ? (
                     <div className="flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 text-green-400 shrink-0" />
-                      <span className="text-green-400 font-semibold text-sm">
-                        Crédito confirmado em {new Date(localCredito).toLocaleDateString('pt-BR')}
+                      <CheckCircle className="w-4 h-4 text-green-500 shrink-0" />
+                      <span className="text-green-600 font-semibold text-sm">
+                        Credito confirmado em {new Date(localCredito).toLocaleDateString('pt-BR')}
                       </span>
                     </div>
                   ) : localColeta ? (
@@ -447,7 +466,12 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                         type="date"
                         value={dataCredito}
                         onChange={(e) => setDataCredito(e.target.value)}
-                        className="flex-1 px-3 py-2 rounded-lg text-sm text-white bg-gray-900 border border-gray-700 focus:border-blue-500 focus:outline-none"
+                        className="flex-1 px-3 py-2 rounded-lg text-sm focus:outline-none"
+                        style={{
+                          background: isDark ? '#1e293b' : '#f1f5f9',
+                          border: isDark ? '1px solid #374151' : '1px solid #cbd5e1',
+                          color: textPrimary
+                        }}
                       />
                       <button
                         onClick={handleConfirmarCredito}
@@ -456,14 +480,14 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                         style={{
                           background: 'rgba(239,68,68,0.2)',
                           border: '1px solid rgba(239,68,68,0.5)',
-                          color: '#f87171',
+                          color: isDark ? '#f87171' : '#dc2626',
                         }}
                       >
-                        {salvandoCredito ? 'Salvando...' : 'Confirmar Crédito no GSPN'}
+                        {salvandoCredito ? 'Salvando...' : 'Confirmar Credito no GSPN'}
                       </button>
                     </div>
                   ) : (
-                    <p className="text-xs text-gray-500 italic">Aguardando coleta para liberar esta etapa</p>
+                    <p className="text-xs italic" style={{ color: textMuted }}>Aguardando coleta para liberar esta etapa</p>
                   )}
                 </div>
 
@@ -477,18 +501,18 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                     }}
                   >
                     {slaDias <= 10 ? (
-                      <CheckCircle className="w-5 h-5 text-green-400 shrink-0" />
+                      <CheckCircle className="w-5 h-5 text-green-500 shrink-0" />
                     ) : (
-                      <AlertCircle className="w-5 h-5 text-red-400 shrink-0" />
+                      <AlertCircle className="w-5 h-5 text-red-500 shrink-0" />
                     )}
                     <div>
-                      <p className="text-xs text-gray-400 uppercase tracking-wider font-bold mb-0.5">Auditoria SLA</p>
+                      <p className="text-xs uppercase tracking-wider font-bold mb-0.5" style={{ color: textMuted }}>Auditoria SLA</p>
                       {slaDias <= 10 ? (
-                        <p className="text-green-400 font-bold text-sm">
+                        <p className="text-green-600 font-bold text-sm">
                           SLA Cumprido: {slaDias} {slaDias === 1 ? 'dia' : 'dias'}
                         </p>
                       ) : (
-                        <p className="text-red-400 font-bold text-sm">
+                        <p className="text-red-600 font-bold text-sm">
                           SLA Estourado: {slaDias} dias (Meta: 10 dias)
                         </p>
                       )}
@@ -499,21 +523,22 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             </div>
           )}
 
-          {/* Localização */}
+          {/* Localizacao */}
           <div>
-            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Localização Física</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Localizacao Fisica</p>
             {peca.localizacao ? (
               <div
                 className="p-3 rounded-lg flex items-center justify-between"
-                style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)' }}
+                style={{ background: isDark ? 'rgba(0,212,255,0.08)' : 'rgba(3,105,161,0.08)', border: isDark ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(3,105,161,0.25)' }}
               >
-                <div className="flex items-center gap-2 text-white">
-                  <MapPin className="w-4 h-4 text-[#00D4FF]" />
-                  <span className="font-mono text-sm">{peca.localizacao}</span>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-4 h-4" style={{ color: accentCyan }} />
+                  <span className="font-mono text-sm" style={{ color: textPrimary }}>{peca.localizacao}</span>
                 </div>
                 <button
                   onClick={handleAlterarLocalizacao}
-                  className="text-xs text-[#00D4FF] hover:text-[#00D4FF]/70 transition-colors"
+                  className="text-xs transition-colors"
+                  style={{ color: accentCyan }}
                 >
                   Alterar
                 </button>
@@ -521,69 +546,69 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             ) : (
               <button
                 onClick={handleAlterarLocalizacao}
-                className="w-full p-3 rounded-lg text-gray-400 text-sm transition-colors flex items-center justify-center gap-2"
-                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)' }}
+                className="w-full p-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-2"
+                style={{ background: cardBg, border: `1px solid ${cardBorder}`, color: textMuted }}
               >
                 <MapPin className="w-4 h-4" />
-                Definir localização no mapa
+                Definir localizacao no mapa
               </button>
             )}
           </div>
 
-          {/* Histórico */}
+          {/* Historico */}
           <div>
             <div className="flex items-center gap-2 mb-3">
-              <History className="w-4 h-4 text-[#00D4FF]" />
-              <p className="text-xs font-bold text-[#00D4FF] uppercase tracking-wider">Histórico de Movimentações</p>
+              <History className="w-4 h-4" style={{ color: accentCyan }} />
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: accentCyan }}>Historico de Movimentacoes</p>
             </div>
             {loadingHistorico ? (
               <div className="flex justify-center py-6">
-                <div className="w-5 h-5 border-2 border-[#39FF14] border-t-transparent rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: neonGreen, borderTopColor: 'transparent' }} />
               </div>
             ) : historico.length === 0 ? (
-              <p className="text-center text-gray-500 text-sm py-4">Nenhuma movimentação registrada</p>
+              <p className="text-center text-sm py-4" style={{ color: textMuted }}>Nenhuma movimentacao registrada</p>
             ) : (
               <div className="space-y-2 overflow-y-auto cyber-scrollbar max-h-52 pr-1">
                 {historico.map((h) => (
                   <div
                     key={h.id}
                     className="flex gap-3 p-3 rounded-lg"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                    style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
                   >
                     <div
                       className="w-2 h-2 rounded-full mt-1.5 shrink-0"
-                      style={{ background: '#39FF14', boxShadow: '0 0 6px #39FF14' }}
+                      style={{ background: neonGreen, boxShadow: isDark ? `0 0 6px ${neonGreen}` : 'none' }}
                     />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-xs font-bold text-white">{h.acao}</span>
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs font-bold" style={{ color: textPrimary }}>{h.acao}</span>
+                        <span className="text-xs" style={{ color: textMuted }}>
                           {new Date(h.created_at).toLocaleString('pt-BR')}
                         </span>
                       </div>
                       {(h.status_anterior || h.status_novo) && (
-                        <p className="text-xs text-gray-400 mt-0.5">
+                        <p className="text-xs mt-0.5" style={{ color: textMuted }}>
                           {h.status_anterior && (
-                            <span className="text-gray-500">{h.status_anterior} </span>
+                            <span style={{ color: textMuted }}>{h.status_anterior} </span>
                           )}
-                          {h.status_anterior && h.status_novo && <span className="text-gray-600">→ </span>}
+                          {h.status_anterior && h.status_novo && <span style={{ color: textMuted }}> → </span>}
                           {h.status_novo && (
-                            <span className="text-[#39FF14]">{h.status_novo}</span>
+                            <span style={{ color: neonGreen }}>{h.status_novo}</span>
                           )}
                         </p>
                       )}
                       {(h.origem || h.destino) && (
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {h.origem && <span className="text-gray-400">{h.origem}</span>}
-                          {h.origem && h.destino && <span className="text-gray-600"> → </span>}
-                          {h.destino && <span className="text-[#00D4FF]">{h.destino}</span>}
+                        <p className="text-xs mt-0.5" style={{ color: textMuted }}>
+                          {h.origem && <span style={{ color: textSecondary }}>{h.origem}</span>}
+                          {h.origem && h.destino && <span style={{ color: textMuted }}> → </span>}
+                          {h.destino && <span style={{ color: accentCyan }}>{h.destino}</span>}
                         </p>
                       )}
                       {h.observacao && (
-                        <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{h.observacao}</p>
+                        <p className="text-xs mt-0.5 line-clamp-2" style={{ color: textMuted }}>{h.observacao}</p>
                       )}
                       {h.usuario && (
-                        <p className="text-xs text-gray-600 mt-0.5">por {(h.usuario as any).nome}</p>
+                        <p className="text-xs mt-0.5" style={{ color: textMuted }}>por {(h.usuario as any).nome}</p>
                       )}
                     </div>
                   </div>
@@ -594,15 +619,15 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         </div>
 
         {/* Footer actions */}
-        <div className="shrink-0 border-t border-[#39FF14]/15 px-6 py-4 flex gap-3">
+        <div className="shrink-0 px-6 py-4 flex gap-3" style={{ borderTop: `1px solid ${headerBorder}` }}>
           <button
             onClick={handleGerarEtiqueta}
             disabled={generatingLabel}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
             style={{
-              background: 'rgba(57,255,20,0.1)',
-              border: '1px solid rgba(57,255,20,0.35)',
-              color: '#39FF14',
+              background: isDark ? 'rgba(57,255,20,0.1)' : 'rgba(21,128,61,0.1)',
+              border: isDark ? '1px solid rgba(57,255,20,0.35)' : '1px solid rgba(21,128,61,0.35)',
+              color: neonGreen,
             }}
           >
             <Printer className="w-4 h-4" />
@@ -610,8 +635,8 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           </button>
           <button
             onClick={onClose}
-            className="flex-1 px-4 py-2.5 rounded-lg text-sm font-bold text-gray-300 transition-colors"
-            style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.12)' }}
+            className={`flex-1 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+            style={{ background: cardBg, border: `1px solid ${cardBorder}`, color: textSecondary }}
           >
             Fechar
           </button>

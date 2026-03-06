@@ -4,6 +4,7 @@ import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { WhatsAppSendModal } from './WhatsAppSendModal';
 import { getStoragePublicUrl } from '../lib/storageUtils';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface OSDetailsModalProps {
   osId: string;
@@ -101,12 +102,20 @@ const ROTA_COLORS: Record<string, string> = {
 };
 
 export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
+  const { isDark } = useTheme();
   const [osDetails, setOsDetails] = useState<OSDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [anexoPreview, setAnexoPreview] = useState<any>(null);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
+
+  const modalBg = isDark ? '#0f172a' : '#ffffff';
+  const borderColor = isDark ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)';
+  const textPrimary = isDark ? '#f1f5f9' : '#111827';
+  const textSecondary = isDark ? '#94a3b8' : '#6b7280';
+  const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)';
+  const hoverBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.05)';
 
   useEffect(() => {
     loadOSDetails();
@@ -335,8 +344,8 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
   if (loading) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg p-8">
+      <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }}>
+        <div className="rounded-lg p-8" style={{ background: modalBg }}>
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
         </div>
       </div>
@@ -387,15 +396,15 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between z-10">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4 overflow-y-auto" style={{ background: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)' }}>
+      <div className="rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto" style={{ background: modalBg }}>
+        <div className="sticky top-0 p-6 flex items-center justify-between z-10" style={{ background: modalBg, borderBottom: `1px solid ${borderColor}` }}>
           <div className="flex-1">
             <div className="flex items-center gap-4">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900">OS {osDetails.numero_os_interna}</h2>
+                <h2 className="text-2xl font-bold" style={{ color: textPrimary }}>OS {osDetails.numero_os_interna}</h2>
                 {osDetails.numero_os_samsung && (
-                  <p className="text-sm text-gray-600 mt-1">Samsung: {osDetails.numero_os_samsung}</p>
+                  <p className="text-sm mt-1" style={{ color: textSecondary }}>Samsung: {osDetails.numero_os_samsung}</p>
                 )}
               </div>
               {osDetails.cliente_telefone && (
@@ -421,9 +430,12 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           </div>
           <button
             onClick={onClose}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: textSecondary }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; }}
           >
-            <X className="w-6 h-6 text-gray-600" />
+            <X className="w-6 h-6" />
           </button>
         </div>
 
@@ -449,7 +461,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-gray-900">
+                      <h3 className="text-sm font-bold" style={{ color: textPrimary }}>
                         {currentJob.is_running ? 'Sincronizando' : 'Última Sincronização'}
                       </h3>
                       {currentJob.is_running && (
@@ -461,22 +473,22 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                       )}
                     </div>
                     <div className="flex items-center gap-3 mt-1">
-                      <p className="text-xs text-gray-600">
+                      <p className="text-xs" style={{ color: textSecondary }}>
                         Status: <span className="font-medium" style={{ color: getJobStatusColor() }}>
                           {currentJob.is_running ? 'Em execução' : currentJob.status}
                         </span>
                       </p>
-                      <span className="text-xs text-gray-400">•</span>
-                      <p className="text-xs text-gray-600">
-                        Tempo: <span className="font-medium text-gray-700">{getJobTimeElapsed()}</span>
+                      <span className="text-xs" style={{ color: textSecondary }}>•</span>
+                      <p className="text-xs" style={{ color: textSecondary }}>
+                        Tempo: <span className="font-medium" style={{ color: textPrimary }}>{getJobTimeElapsed()}</span>
                       </p>
                     </div>
                   </div>
                 </div>
                 {!currentJob.is_running && (
                   <div className="text-right">
-                    <p className="text-[10px] text-gray-500">Finalizado em</p>
-                    <p className="text-xs text-gray-600 font-medium">
+                    <p className="text-[10px]" style={{ color: textSecondary }}>Finalizado em</p>
+                    <p className="text-xs font-medium" style={{ color: textPrimary }}>
                       {currentJob.finished_at ? new Date(currentJob.finished_at).toLocaleTimeString('pt-BR', {
                         hour: '2-digit',
                         minute: '2-digit'
@@ -503,19 +515,19 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           </div>
 
           {osDetails.numero_os_samsung && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-blue-600" />
-                INFORMAÇÃO DA OS
+            <div className="rounded-lg p-4 mb-6" style={{ background: isDark ? 'rgba(59,130,246,0.1)' : 'rgb(239,246,255)', border: isDark ? '1px solid rgba(59,130,246,0.3)' : '1px solid rgb(191,219,254)' }}>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                <FileText className="w-5 h-5 text-blue-500" />
+                INFORMACAO DA OS
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Status:</span>
-                  <p className="font-medium text-gray-900">{osDetails.status_samsung_desc || '—'}</p>
+                  <span style={{ color: textSecondary }}>Status:</span>
+                  <p className="font-medium" style={{ color: textPrimary }}>{osDetails.status_samsung_desc || '—'}</p>
                 </div>
                 <div>
-                  <span className="text-gray-600">Motivo:</span>
-                  <p className="font-medium text-gray-900">{osDetails.status_samsung_reason || '—'}</p>
+                  <span style={{ color: textSecondary }}>Motivo:</span>
+                  <p className="font-medium" style={{ color: textPrimary }}>{osDetails.status_samsung_reason || '—'}</p>
                 </div>
               </div>
             </div>
@@ -524,36 +536,36 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Phone className="w-5 h-5 text-gray-600" />
-                  Informações do Cliente
+                <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                  <Phone className="w-5 h-5" style={{ color: textSecondary }} />
+                  Informacoes do Cliente
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div>
-                    <span className="text-gray-600">Nome:</span>
-                    <p className="font-medium text-gray-900">{osDetails.cliente_nome}</p>
+                    <span style={{ color: textSecondary }}>Nome:</span>
+                    <p className="font-medium" style={{ color: textPrimary }}>{osDetails.cliente_nome}</p>
                   </div>
                   {osDetails.cliente_telefone && (
                     <div>
-                      <span className="text-gray-600">Telefone:</span>
-                      <p className="font-medium text-gray-900">{osDetails.cliente_telefone}</p>
+                      <span style={{ color: textSecondary }}>Telefone:</span>
+                      <p className="font-medium" style={{ color: textPrimary }}>{osDetails.cliente_telefone}</p>
                     </div>
                   )}
                   {osDetails.cliente_email && (
                     <div>
-                      <span className="text-gray-600">Email:</span>
-                      <p className="font-medium text-gray-900">{osDetails.cliente_email}</p>
+                      <span style={{ color: textSecondary }}>Email:</span>
+                      <p className="font-medium" style={{ color: textPrimary }}>{osDetails.cliente_email}</p>
                     </div>
                   )}
                 </div>
               </div>
 
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-gray-600" />
-                  Endereço
+                <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                  <MapPin className="w-5 h-5" style={{ color: textSecondary }} />
+                  Endereco
                 </h3>
-                <p className="text-sm text-gray-900 mb-3">{enderecoCompleto}</p>
+                <p className="text-sm mb-3" style={{ color: textPrimary }}>{enderecoCompleto}</p>
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleOpenMaps('google')}
@@ -575,21 +587,21 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
             <div className="space-y-4">
               <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <Package className="w-5 h-5 text-gray-600" />
+                <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                  <Package className="w-5 h-5" style={{ color: textSecondary }} />
                   Aparelho
                 </h3>
                 <div className="space-y-2 text-sm">
                   {osDetails.aparelho_modelo && (
                     <div>
-                      <span className="text-gray-600">Modelo:</span>
-                      <p className="font-medium text-gray-900">{osDetails.aparelho_modelo}</p>
+                      <span style={{ color: textSecondary }}>Modelo:</span>
+                      <p className="font-medium" style={{ color: textPrimary }}>{osDetails.aparelho_modelo}</p>
                     </div>
                   )}
                   {osDetails.aparelho_nserie && (
                     <div>
-                      <span className="text-gray-600">Número de Série:</span>
-                      <p className="font-medium text-gray-900">{osDetails.aparelho_nserie}</p>
+                      <span style={{ color: textSecondary }}>Numero de Serie:</span>
+                      <p className="font-medium" style={{ color: textPrimary }}>{osDetails.aparelho_nserie}</p>
                     </div>
                   )}
                 </div>
@@ -597,8 +609,8 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
               {osDetails.defeito_relatado && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Defeito Relatado</h3>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                  <h3 className="font-semibold mb-2" style={{ color: textPrimary }}>Defeito Relatado</h3>
+                  <p className="text-sm p-3 rounded-lg" style={{ color: textPrimary, background: cardBg }}>
                     {osDetails.defeito_relatado}
                   </p>
                 </div>
@@ -606,8 +618,8 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
               {osDetails.observacoes_internas && (
                 <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Observações Internas</h3>
-                  <p className="text-sm text-gray-700 bg-gray-50 p-3 rounded-lg">
+                  <h3 className="font-semibold mb-2" style={{ color: textPrimary }}>Observacoes Internas</h3>
+                  <p className="text-sm p-3 rounded-lg" style={{ color: textPrimary, background: cardBg }}>
                     {osDetails.observacoes_internas}
                   </p>
                 </div>
@@ -616,48 +628,48 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           </div>
 
           {osDetails.agendamento && (
-            <div className="border-t pt-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <Calendar className="w-5 h-5 text-gray-600" />
+            <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                <Calendar className="w-5 h-5" style={{ color: textSecondary }} />
                 Agendamento
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Data:</span>
-                  <p className="font-medium text-gray-900">
+                  <span style={{ color: textSecondary }}>Data:</span>
+                  <p className="font-medium" style={{ color: textPrimary }}>
                     {new Date(osDetails.agendamento.data_agendamento).toLocaleDateString('pt-BR')}
                   </p>
                 </div>
                 {osDetails.agendamento.tecnico_nome && (
                   <div>
-                    <span className="text-gray-600">Técnico:</span>
-                    <p className="font-medium text-gray-900">{osDetails.agendamento.tecnico_nome}</p>
+                    <span style={{ color: textSecondary }}>Tecnico:</span>
+                    <p className="font-medium" style={{ color: textPrimary }}>{osDetails.agendamento.tecnico_nome}</p>
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-600">Confirmação:</span>
-                  <p className="font-medium text-gray-900">
-                    {osDetails.agendamento.confirmado_com_cliente ? 'Confirmado' : 'Não confirmado'}
+                  <span style={{ color: textSecondary }}>Confirmacao:</span>
+                  <p className="font-medium" style={{ color: textPrimary }}>
+                    {osDetails.agendamento.confirmado_com_cliente ? 'Confirmado' : 'Nao confirmado'}
                   </p>
                 </div>
                 {osDetails.agendamento.horario_inicio && (
                   <div>
-                    <span className="text-gray-600">Horário:</span>
-                    <p className="font-medium text-gray-900">
+                    <span style={{ color: textSecondary }}>Horario:</span>
+                    <p className="font-medium" style={{ color: textPrimary }}>
                       {osDetails.agendamento.horario_inicio.substring(0, 5)} - {osDetails.agendamento.horario_fim?.substring(0, 5) || ''}
                     </p>
                   </div>
                 )}
                 <div>
-                  <span className="text-gray-600">Status:</span>
-                  <p className="font-medium text-gray-900 capitalize">
+                  <span style={{ color: textSecondary }}>Status:</span>
+                  <p className="font-medium capitalize" style={{ color: textPrimary }}>
                     {osDetails.agendamento.status?.replace('_', ' ') || 'Pendente'}
                   </p>
                 </div>
                 {osDetails.agendamento.checkout_pendente && (
                   <div className="md:col-span-2">
                     <span className="px-3 py-1 bg-yellow-100 text-yellow-700 border border-yellow-300 rounded-full text-sm font-medium">
-                      Aguardando movimentação após checkout
+                      Aguardando movimentacao apos checkout
                     </span>
                   </div>
                 )}
@@ -665,33 +677,33 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
             </div>
           )}
 
-          <div className="border-t pt-6">
-            <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-              <DollarSign className="w-5 h-5 text-gray-600" />
-              Informações Financeiras
+          <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
+            <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+              <DollarSign className="w-5 h-5" style={{ color: textSecondary }} />
+              Informacoes Financeiras
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
               <div>
-                <span className="text-gray-600">Status:</span>
-                <p className="font-medium text-gray-900 capitalize">
+                <span style={{ color: textSecondary }}>Status:</span>
+                <p className="font-medium capitalize" style={{ color: textPrimary }}>
                   {osDetails.status_pagamento.replace('_', ' ')}
                 </p>
               </div>
               <div>
-                <span className="text-gray-600">Valor Total:</span>
-                <p className="font-medium text-gray-900">
+                <span style={{ color: textSecondary }}>Valor Total:</span>
+                <p className="font-medium" style={{ color: textPrimary }}>
                   R$ {osDetails.valor_total.toFixed(2)}
                 </p>
               </div>
               <div>
-                <span className="text-gray-600">Valor Pago:</span>
-                <p className="font-medium text-green-600">
+                <span style={{ color: textSecondary }}>Valor Pago:</span>
+                <p className="font-medium text-green-500">
                   R$ {osDetails.valor_pago.toFixed(2)}
                 </p>
               </div>
               <div>
-                <span className="text-gray-600">Saldo Restante:</span>
-                <p className="font-medium text-orange-600">
+                <span style={{ color: textSecondary }}>Saldo Restante:</span>
+                <p className="font-medium text-orange-500">
                   R$ {osDetails.saldo_restante.toFixed(2)}
                 </p>
               </div>
@@ -699,30 +711,31 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
             {osDetails.pagamentos && osDetails.pagamentos.length > 0 && (
               <div className="mt-4">
-                <h4 className="font-medium text-gray-700 mb-2">Pagamentos Recebidos</h4>
+                <h4 className="font-medium mb-2" style={{ color: textSecondary }}>Pagamentos Recebidos</h4>
                 <div className="space-y-2">
                   {osDetails.pagamentos.map((pagamento, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      className="flex items-center justify-between p-3 rounded-lg"
+                      style={{ background: cardBg }}
                     >
                       <div>
-                        <p className="font-medium text-gray-900 capitalize">
+                        <p className="font-medium capitalize" style={{ color: textPrimary }}>
                           {pagamento.forma_pagamento.replace('_', ' ')}
                         </p>
-                        <p className="text-sm text-gray-600">
+                        <p className="text-sm" style={{ color: textSecondary }}>
                           {new Date(pagamento.data_lancamento).toLocaleDateString('pt-BR')}
                         </p>
                       </div>
                       <div className="text-right">
-                        <p className="font-medium text-green-600">
+                        <p className="font-medium text-green-500">
                           R$ {pagamento.valor.toFixed(2)}
                         </p>
                         <a
                           href={pagamento.comprovante_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-xs text-blue-600 hover:underline"
+                          className="text-xs text-blue-500 hover:underline"
                         >
                           Ver comprovante
                         </a>
@@ -735,48 +748,49 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           </div>
 
           {osDetails.pecas && osDetails.pecas.length > 0 && (
-            <div className="border-t pt-6">
-              <h3 className="font-semibold text-gray-900 mb-3">Peças Aprovadas</h3>
+            <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
+              <h3 className="font-semibold mb-3" style={{ color: textPrimary }}>Pecas Aprovadas</h3>
               <div className="space-y-2">
                 {osDetails.pecas.map((peca, index) => (
                   <div
                     key={index}
-                    className="p-3 bg-gray-50 rounded-lg space-y-2"
+                    className="p-3 rounded-lg space-y-2"
+                    style={{ background: cardBg }}
                   >
                     <div className="flex items-start justify-between">
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-900 text-lg">{peca.pn}</p>
+                          <p className="font-bold text-lg" style={{ color: textPrimary }}>{peca.pn}</p>
                           {peca.tipo_peca === 'gspn' && (
-                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs font-medium rounded border border-blue-300">
+                            <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded border border-blue-500/40">
                               GSPN
                             </span>
                           )}
                         </div>
-                        <p className="text-sm text-gray-700 mt-1">{peca.descricao}</p>
+                        <p className="text-sm mt-1" style={{ color: textSecondary }}>{peca.descricao}</p>
                         <div className="flex items-center gap-3 mt-2">
                           {peca.id_sequencial && (
                             <>
-                              <span className="text-xs text-cyan-600 font-medium">ID: {peca.id_sequencial}</span>
-                              <span className="text-gray-400">•</span>
+                              <span className="text-xs text-cyan-500 font-medium">ID: {peca.id_sequencial}</span>
+                              <span style={{ color: textSecondary }}>•</span>
                             </>
                           )}
                           {peca.delivery && (
                             <>
-                              <span className="text-xs text-orange-600 font-medium">Delivery: {peca.delivery}</span>
-                              <span className="text-gray-400">•</span>
+                              <span className="text-xs text-orange-500 font-medium">Delivery: {peca.delivery}</span>
+                              <span style={{ color: textSecondary }}>•</span>
                             </>
                           )}
-                          <span className="text-xs text-gray-600">Código: {peca.codigo_peca}</span>
-                          <span className="text-gray-400">•</span>
-                          <span className="text-xs text-gray-600">Qtd: {peca.quantidade}</span>
+                          <span className="text-xs" style={{ color: textSecondary }}>Codigo: {peca.codigo_peca}</span>
+                          <span style={{ color: textSecondary }}>•</span>
+                          <span className="text-xs" style={{ color: textSecondary }}>Qtd: {peca.quantidade}</span>
                         </div>
                         <div className="mt-2">
                           <span className={`inline-block px-2 py-1 rounded text-xs font-medium ${
-                            peca.status === 'atendida' ? 'bg-green-100 text-green-700' :
-                            peca.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                            peca.status === 'gi_postada' ? 'bg-blue-100 text-blue-700' :
-                            'bg-gray-100 text-gray-700'
+                            peca.status === 'atendida' ? 'bg-green-500/20 text-green-400' :
+                            peca.status === 'pendente' ? 'bg-yellow-500/20 text-yellow-400' :
+                            peca.status === 'gi_postada' ? 'bg-blue-500/20 text-blue-400' :
+                            'bg-gray-500/20 text-gray-400'
                           }`}>
                             {peca.status}
                           </span>
@@ -786,27 +800,27 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                         {peca.tipo_peca === 'gspn' && peca.valor_gspn && peca.valor_gspn > 0 ? (
                           <>
                             <div className="mb-1">
-                              <p className="text-xs text-gray-500">Valor GSPN:</p>
-                              <p className="text-sm text-gray-600 line-through">
+                              <p className="text-xs" style={{ color: textSecondary }}>Valor GSPN:</p>
+                              <p className="text-sm line-through" style={{ color: textSecondary }}>
                                 R$ {peca.valor_gspn.toFixed(2)}
                               </p>
                             </div>
                             <div>
-                              <p className="text-xs text-gray-500">Valor Cobrado:</p>
-                              <p className="font-medium text-green-600">
+                              <p className="text-xs" style={{ color: textSecondary }}>Valor Cobrado:</p>
+                              <p className="font-medium text-green-500">
                                 R$ {peca.valor_unitario.toFixed(2)}
                               </p>
                             </div>
-                            <p className="text-sm text-gray-600 mt-1">
+                            <p className="text-sm mt-1" style={{ color: textSecondary }}>
                               Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
                             </p>
                           </>
                         ) : (
                           <>
-                            <p className="font-medium text-gray-900">
+                            <p className="font-medium" style={{ color: textPrimary }}>
                               R$ {peca.valor_unitario.toFixed(2)}
                             </p>
-                            <p className="text-sm text-gray-600">
+                            <p className="text-sm" style={{ color: textSecondary }}>
                               Total: R$ {(peca.quantidade * peca.valor_unitario).toFixed(2)}
                             </p>
                           </>
@@ -820,9 +834,9 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           )}
 
           {osDetails.anexos && osDetails.anexos.length > 0 && (
-            <div className="border-t pt-6">
-              <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                <FileText className="w-5 h-5 text-gray-600" />
+            <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
+              <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
+                <FileText className="w-5 h-5" style={{ color: textSecondary }} />
                 Anexos
               </h3>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
@@ -833,10 +847,13 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                     <button
                       key={anexo.id}
                       onClick={() => setAnexoPreview({ ...anexo, url: publicUrl })}
-                      className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                      className="p-3 rounded-lg transition-colors"
+                      style={{ border: `1px solid ${borderColor}`, background: cardBg }}
+                      onMouseEnter={(e) => { e.currentTarget.style.background = hoverBg; }}
+                      onMouseLeave={(e) => { e.currentTarget.style.background = cardBg; }}
                     >
-                      <FileText className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-700 text-center truncate">
+                      <FileText className="w-8 h-8 mx-auto mb-2" style={{ color: textSecondary }} />
+                      <p className="text-sm text-center truncate" style={{ color: textPrimary }}>
                         {anexo.nome_arquivo}
                       </p>
                     </button>

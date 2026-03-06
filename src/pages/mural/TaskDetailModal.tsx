@@ -17,6 +17,7 @@ import {
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
+import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import type { MuralTarefa } from './types';
 import { formatFullDate, getTaskBadge } from './utils';
@@ -43,6 +44,7 @@ interface TaskDetailModalProps {
 
 export function TaskDetailModal({ task, accentColor, onClose, onComplete, completing }: TaskDetailModalProps) {
   const navigate = useNavigate();
+  const { isDark } = useTheme();
   const isAlta = task.prioridade === 'alta';
   const badge = getTaskBadge(task.titulo, task.descricao, task.gia_responsavel);
   const isConnect = task.gia_source === 'CONNECT' || !!task.whatsapp_phone;
@@ -51,6 +53,19 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
 
   const [pecas, setPecas] = useState<PecaDetalhe[]>([]);
   const [loadingPecas, setLoadingPecas] = useState(false);
+
+  const modalBg = isDark
+    ? 'linear-gradient(145deg, rgba(8,12,30,0.99), rgba(4,6,18,1))'
+    : 'linear-gradient(145deg, #ffffff, #f8fafc)';
+  const cardBg = isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.03)';
+  const cardBorder = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.08)';
+  const textPrimary = isDark ? '#F1F5F9' : '#0f172a';
+  const textSecondary = isDark ? '#94a3b8' : '#475569';
+  const textMuted = isDark ? '#64748B' : '#94a3b8';
+  const closeBtnBorder = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.12)';
+  const tableRowBg = isDark ? 'rgba(255,255,255,0.01)' : 'rgba(0,0,0,0.02)';
+  const pnColor = isDark ? '#00D4FF' : '#0369a1';
+  const whatsappColor = isDark ? '#25D366' : '#15803d';
 
   useEffect(() => {
     if (!isGIAStock || !task.unidade_id) return;
@@ -99,7 +114,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
       const clean = line.replace(/\*/g, '').trim();
       if (!clean) return null;
       return (
-        <p key={i} className="text-sm text-slate-300 leading-relaxed py-0.5">
+        <p key={i} className="text-sm leading-relaxed py-0.5" style={{ color: textSecondary }}>
           {clean}
         </p>
       );
@@ -112,7 +127,7 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 flex items-center justify-center p-6"
-      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)', zIndex: 99999 }}
+      style={{ background: isDark ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.50)', backdropFilter: 'blur(12px)', zIndex: 99999 }}
       onClick={onClose}
     >
       <motion.div
@@ -125,9 +140,11 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
           maxWidth: '760px',
           maxHeight: 'calc(100vh - 80px)',
           overflowY: 'auto',
-          background: 'linear-gradient(145deg, rgba(8,12,30,0.99), rgba(4,6,18,1))',
-          border: `1px solid ${borderColor}45`,
-          boxShadow: `0 0 80px ${borderColor}20, 0 30px 100px rgba(0,0,0,0.9)`,
+          background: modalBg,
+          border: `1px solid ${borderColor}${isDark ? '45' : '35'}`,
+          boxShadow: isDark
+            ? `0 0 80px ${borderColor}20, 0 30px 100px rgba(0,0,0,0.9)`
+            : `0 0 40px ${borderColor}15, 0 20px 60px rgba(0,0,0,0.15)`,
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -163,24 +180,28 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                 </div>
               )}
             </div>
-            <button onClick={onClose} className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors hover:bg-white/10" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-              <X className="w-3.5 h-3.5 text-slate-400" />
+            <button
+              onClick={onClose}
+              className={`flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+              style={{ border: `1px solid ${closeBtnBorder}` }}
+            >
+              <X className="w-3.5 h-3.5" style={{ color: textMuted }} />
             </button>
           </div>
 
           {/* TITULO */}
-          <h2 className="text-lg font-black leading-snug mb-5" style={{ color: isAlta ? '#FCA5A5' : '#F1F5F9' }}>
+          <h2 className="text-lg font-black leading-snug mb-5" style={{ color: isAlta ? '#DC2626' : textPrimary }}>
             {task.titulo}
           </h2>
 
           {/* DESCRICAO linha a linha */}
           {task.descricao && (
-            <div className="rounded-xl p-4 mb-5" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
+            <div className="rounded-xl p-4 mb-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
               <div className="flex items-center gap-1.5 mb-3">
-                <FileText className="w-3.5 h-3.5 text-slate-500" />
-                <span className="text-[10px] font-mono text-slate-500 uppercase tracking-widest">Descricao</span>
+                <FileText className="w-3.5 h-3.5" style={{ color: textMuted }} />
+                <span className="text-[10px] font-mono uppercase tracking-widest" style={{ color: textMuted }}>Descricao</span>
               </div>
-              <div className="space-y-0.5 divide-y divide-slate-700/30">
+              <div className="space-y-0.5" style={{ borderTop: `1px solid ${isDark ? 'rgba(148,163,184,0.15)' : 'rgba(0,0,0,0.08)'}` }}>
                 {formatDescricao(task.descricao)}
               </div>
             </div>
@@ -202,8 +223,8 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
               {
                 label: 'Criada em', content: (
                   <div className="flex items-center gap-2">
-                    <Clock className="w-3.5 h-3.5 text-slate-500" />
-                    <span className="text-xs font-mono text-slate-300">{formatFullDate(task.created_at)}</span>
+                    <Clock className="w-3.5 h-3.5" style={{ color: textMuted }} />
+                    <span className="text-xs font-mono" style={{ color: textSecondary }}>{formatFullDate(task.created_at)}</span>
                   </div>
                 )
               },
@@ -211,21 +232,21 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                 label: 'Setor', content: (
                   <div className="flex items-center gap-2">
                     <div className="w-2 h-2 rounded-full" style={{ background: accentColor }} />
-                    <span className="text-sm font-bold text-slate-300">{task.gia_source || task.gia_responsavel}</span>
+                    <span className="text-sm font-bold" style={{ color: textPrimary }}>{task.gia_source || task.gia_responsavel}</span>
                   </div>
                 )
               },
               {
                 label: 'Prioridade', content: (
                   <div className="flex items-center gap-2">
-                    {isAlta ? <Flame className="w-3.5 h-3.5 text-red-400" /> : <Info className="w-3.5 h-3.5 text-slate-500" />}
-                    <span className={`text-sm font-bold ${isAlta ? 'text-red-400' : 'text-slate-400'}`}>{isAlta ? 'ALTA' : 'NORMAL'}</span>
+                    {isAlta ? <Flame className="w-3.5 h-3.5 text-red-500" /> : <Info className="w-3.5 h-3.5" style={{ color: textMuted }} />}
+                    <span className="text-sm font-bold" style={{ color: isAlta ? '#DC2626' : textSecondary }}>{isAlta ? 'ALTA' : 'NORMAL'}</span>
                   </div>
                 )
               },
             ].map(({ label, content }) => (
-              <div key={label} className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <p className="text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-2">{label}</p>
+              <div key={label} className="rounded-xl p-4" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                <p className="text-[10px] font-mono uppercase tracking-widest mb-2" style={{ color: textMuted }}>{label}</p>
                 {content}
               </div>
             ))}
@@ -233,29 +254,29 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
 
           {/* TABELA DE PECAS — apenas GIA Stock */}
           {isGIAStock && (
-            <div className="rounded-xl overflow-hidden mb-5" style={{ border: '1px solid rgba(251,146,60,0.2)', background: 'rgba(251,146,60,0.04)' }}>
+            <div className="rounded-xl overflow-hidden mb-5" style={{ border: '1px solid rgba(251,146,60,0.25)', background: isDark ? 'rgba(251,146,60,0.04)' : 'rgba(251,146,60,0.06)' }}>
               <div className="flex items-center gap-2 px-4 py-3 border-b" style={{ borderColor: 'rgba(251,146,60,0.15)' }}>
-                <Package className="w-4 h-4 text-orange-400" />
-                <span className="text-[11px] font-mono font-black text-orange-400 uppercase tracking-widest">Pecas em Estoque</span>
+                <Package className="w-4 h-4 text-orange-500" />
+                <span className="text-[11px] font-mono font-black uppercase tracking-widest" style={{ color: isDark ? '#fb923c' : '#c2410c' }}>Pecas em Estoque</span>
                 {!loadingPecas && (
-                  <span className="ml-auto text-[10px] font-mono text-slate-500 bg-slate-700/50 px-2 py-0.5 rounded-full">{pecas.length} itens</span>
+                  <span className="ml-auto text-[10px] font-mono px-2 py-0.5 rounded-full" style={{ background: isDark ? 'rgba(100,116,139,0.3)' : 'rgba(100,116,139,0.15)', color: textSecondary }}>{pecas.length} itens</span>
                 )}
               </div>
 
               {loadingPecas ? (
-                <div className="flex items-center justify-center py-8 gap-2 text-orange-400/60">
+                <div className="flex items-center justify-center py-8 gap-2" style={{ color: isDark ? 'rgba(251,146,60,0.6)' : '#c2410c' }}>
                   <RefreshCw className="w-4 h-4 animate-spin" />
                   <span className="text-xs font-mono">Carregando...</span>
                 </div>
               ) : pecas.length === 0 ? (
-                <p className="text-center py-6 text-xs text-slate-600 font-mono">Nenhuma peca encontrada</p>
+                <p className="text-center py-6 text-xs font-mono" style={{ color: textMuted }}>Nenhuma peca encontrada</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <tr style={{ background: cardBg, borderBottom: `1px solid ${cardBorder}` }}>
                         {['ID', 'PN', 'Delivery', 'Descricao', 'NF', 'Data Emissao', 'Status'].map(h => (
-                          <th key={h} className="px-3 py-2 text-left font-mono text-[10px] text-slate-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                          <th key={h} className="px-3 py-2 text-left font-mono text-[10px] uppercase tracking-wider whitespace-nowrap" style={{ color: textMuted }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
@@ -263,34 +284,34 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
                       {pecas.map((p, idx) => (
                         <tr
                           key={p.id}
-                          className="transition-colors hover:bg-white/[0.03]"
-                          style={{ borderBottom: '1px solid rgba(255,255,255,0.03)', background: idx % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.01)' }}
+                          className={`transition-colors ${isDark ? 'hover:bg-white/[0.03]' : 'hover:bg-black/[0.03]'}`}
+                          style={{ borderBottom: `1px solid ${isDark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.05)'}`, background: idx % 2 === 0 ? 'transparent' : tableRowBg }}
                         >
                           <td className="px-3 py-2.5">
-                            <span className="font-mono text-slate-400 text-[11px]">#{p.id_numerico ?? p.id.slice(0, 6)}</span>
+                            <span className="font-mono text-[11px]" style={{ color: textMuted }}>#{p.id_numerico ?? p.id.slice(0, 6)}</span>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="font-mono font-bold text-[#00D4FF] text-[11px] tracking-wider">{p.pn}</span>
+                            <span className="font-mono font-bold text-[11px] tracking-wider" style={{ color: pnColor }}>{p.pn}</span>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="font-mono text-slate-300 text-[11px]">{p.delivery || '—'}</span>
+                            <span className="font-mono text-[11px]" style={{ color: textSecondary }}>{p.delivery || '—'}</span>
                           </td>
                           <td className="px-3 py-2.5 max-w-[160px]">
-                            <span className="text-slate-400 text-[11px] truncate block" title={p.descricao || ''}>{p.descricao || '—'}</span>
+                            <span className="text-[11px] truncate block" style={{ color: textMuted }} title={p.descricao || ''}>{p.descricao || '—'}</span>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="font-mono text-slate-300 text-[11px]">{p.numero_nf || '—'}</span>
+                            <span className="font-mono text-[11px]" style={{ color: textSecondary }}>{p.numero_nf || '—'}</span>
                           </td>
                           <td className="px-3 py-2.5">
-                            <span className="font-mono text-slate-400 text-[11px]">
+                            <span className="font-mono text-[11px]" style={{ color: textMuted }}>
                               {p.data_emissao ? new Date(p.data_emissao).toLocaleDateString('pt-BR') : '—'}
                             </span>
                           </td>
                           <td className="px-3 py-2.5">
                             <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-black font-mono ${
                               p.status === 'disponivel'
-                                ? 'bg-emerald-500/15 text-emerald-400'
-                                : 'bg-red-500/15 text-red-400'
+                                ? 'bg-emerald-500/15 text-emerald-600'
+                                : 'bg-red-500/15 text-red-600'
                             }`}>
                               {p.status === 'disponivel' ? 'NOVA' : 'DEFEITO'}
                             </span>
@@ -306,15 +327,23 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
 
           {/* WHATSAPP */}
           {task.whatsapp_phone && (
-            <div className="rounded-xl p-4 mb-3 flex items-center justify-between" style={{ background: 'rgba(37,211,102,0.06)', border: '1px solid rgba(37,211,102,0.2)' }}>
+            <div
+              className="rounded-xl p-4 mb-3 flex items-center justify-between"
+              style={{ background: isDark ? 'rgba(37,211,102,0.06)' : 'rgba(37,211,102,0.08)', border: '1px solid rgba(37,211,102,0.25)' }}
+            >
               <div className="flex items-center gap-2.5">
-                <Phone className="w-4 h-4 text-[#25D366]" />
-                <span className="text-sm font-mono text-[#25D366]">{task.whatsapp_phone}</span>
+                <Phone className="w-4 h-4" style={{ color: whatsappColor }} />
+                <span className="text-sm font-mono" style={{ color: whatsappColor }}>{task.whatsapp_phone}</span>
               </div>
               <button
                 onClick={handleOpenChat}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg text-[11px] font-black tracking-wider transition-all hover:scale-[1.02] active:scale-95 font-mono"
-                style={{ background: 'rgba(37,211,102,0.18)', border: '1px solid rgba(37,211,102,0.4)', color: '#25D366', boxShadow: '0 0 16px rgba(37,211,102,0.25)' }}
+                style={{
+                  background: isDark ? 'rgba(37,211,102,0.18)' : 'rgba(37,211,102,0.15)',
+                  border: '1px solid rgba(37,211,102,0.45)',
+                  color: whatsappColor,
+                  boxShadow: '0 0 16px rgba(37,211,102,0.20)'
+                }}
               >
                 <MessageCircle className="w-3.5 h-3.5" />
                 ABRIR CHAT
@@ -346,8 +375,8 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
           <div className="flex gap-3 mt-4">
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl text-[12px] font-black tracking-wider transition-all hover:bg-white/10 font-mono"
-              style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#64748B' }}
+              className={`flex-1 py-3 rounded-xl text-[12px] font-black tracking-wider transition-all font-mono ${isDark ? 'hover:bg-white/10' : 'hover:bg-black/5'}`}
+              style={{ border: `1px solid ${closeBtnBorder}`, color: textSecondary }}
             >
               FECHAR
             </button>
@@ -356,7 +385,9 @@ export function TaskDetailModal({ task, accentColor, onClose, onComplete, comple
               disabled={completing}
               className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[12px] font-black tracking-wider transition-all disabled:opacity-40 font-mono"
               style={{
-                background: completing ? 'rgba(255,255,255,0.04)' : `linear-gradient(135deg, ${accentColor}28, ${accentColor}12)`,
+                background: completing
+                  ? (isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.04)')
+                  : `linear-gradient(135deg, ${accentColor}28, ${accentColor}12)`,
                 border: `1px solid ${accentColor}50`,
                 color: accentColor,
                 boxShadow: completing ? 'none' : `0 0 20px ${accentColor}25`,
