@@ -111,17 +111,17 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const { isDark } = useTheme();
   const { usuario, unidadeAtual } = useAuth();
 
-  const chatBg = isDark ? '#0A0A16' : 'var(--bg-secondary)';
+  const chatBg = 'var(--bg-secondary)';
   const headerBg = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)';
   const inputFooterBg = isDark ? 'rgba(0,0,0,0.2)' : 'rgba(0,0,0,0.04)';
   const borderColor = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
-  const textPrimary = isDark ? '#ffffff' : 'var(--text-primary)';
-  const textSecondary = isDark ? '#9ca3af' : 'var(--text-secondary)';
+  const textPrimary = 'var(--text-primary)';
+  const textSecondary = 'var(--text-secondary)';
   const inputBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.06)';
-  const dropdownBg = isDark ? '#1A1A2E' : 'var(--bg-card)';
+  const dropdownBg = 'var(--bg-card)';
   const dropdownBorder = isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)';
   const sectionBg = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
-  const onlineDotBorder = isDark ? '#0A0A16' : 'var(--bg-secondary)';
+  const onlineDotBorder = 'var(--bg-secondary)';
   const [mensagens, setMensagens] = useState<Mensagem[]>([]);
   const [loading, setLoading] = useState(true);
   const [inputText, setInputText] = useState('');
