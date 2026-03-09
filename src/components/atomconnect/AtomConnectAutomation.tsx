@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  GitBranch, Plus, Play, Pause, Trash2, Edit2, MessageSquare,
-  Clock, ArrowRight, Zap, Bot, Settings, ChevronRight, X,
-  Save, Copy, AlertTriangle
-} from 'lucide-react';
+import { GitBranch, Plus, Play, Pause, Trash2, CreditCard as Edit2, MessageSquare, Clock, ArrowRight, Zap, Bot, Settings, ChevronRight, X, Save, Copy, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion, AnimatePresence } from 'framer-motion';

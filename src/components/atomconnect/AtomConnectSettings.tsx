@@ -1,11 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import {
-  Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2,
-  Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle,
-  Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone,
-  Webhook, Edit2, X, Columns, ChevronLeft, ChevronRight, Palette, GripVertical,
-  Flag
-} from 'lucide-react';
+import { Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2, Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle, Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone, Webhook, CreditCard as Edit2, X, Columns2 as Columns, ChevronLeft, ChevronRight, Palette, GripVertical, Flag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useModal } from '../../contexts/ModalContext';
