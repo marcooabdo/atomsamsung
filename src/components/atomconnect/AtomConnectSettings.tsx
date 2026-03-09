@@ -136,24 +136,32 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   };
 
   const loadPipelineColunas = async () => {
-    const { data: colunas } = await supabase
+    let query = supabase
       .from('atom_connect_pipeline_colunas')
       .select('*')
       .order('ordem');
 
+    if (effectiveUnidadeId) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${effectiveUnidadeId}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data: colunas } = await query;
+
     if (colunas) {
       const colunasWithCount = await Promise.all(
         colunas.map(async (col) => {
-          let query = supabase
+          let cQuery = supabase
             .from('atom_connect_conversas')
             .select('id', { count: 'exact', head: true })
             .eq('coluna_pipeline', col.id);
 
           if (effectiveUnidadeId) {
-            query = query.eq('unidade_id', effectiveUnidadeId);
+            cQuery = cQuery.eq('unidade_id', effectiveUnidadeId);
           }
 
-          const { count } = await query;
+          const { count } = await cQuery;
           return { ...col, conversas_count: count || 0 };
         })
       );

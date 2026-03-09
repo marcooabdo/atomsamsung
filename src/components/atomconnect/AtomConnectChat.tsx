@@ -569,10 +569,19 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   const loadColunas = async () => {
-    const { data } = await supabase
+    const targetUnidade = conversa.unidade_id || unidadeId || unidadeAtual;
+    let query = supabase
       .from('atom_connect_pipeline_colunas')
       .select('id, nome, cor, is_final')
       .order('ordem');
+
+    if (targetUnidade) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${targetUnidade}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data } = await query;
     if (data) setColunas(data);
   };
 

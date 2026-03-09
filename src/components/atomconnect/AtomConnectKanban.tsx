@@ -53,14 +53,16 @@ interface Props {
   onUpdateConversa: () => void;
   onNovaConversa: () => void;
   accentColor: string;
+  unidadeId?: string;
 }
 
 const ICON_MAP: Record<string, any> = {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star, MessageSquare
 };
 
-export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], onSelectConversa, onUpdateConversa, onNovaConversa, accentColor }: Props) {
-  const { usuario } = useAuth();
+export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], onSelectConversa, onUpdateConversa, onNovaConversa, accentColor, unidadeId }: Props) {
+  const { usuario, unidadeAtual } = useAuth();
+  const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
@@ -155,17 +157,25 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   useEffect(() => {
     loadColunas();
     loadAtendentes();
-  }, []);
+  }, [effectiveUnidadeId]);
 
   useEffect(() => {
     loadOsData();
   }, [loadOsData]);
 
   const loadColunas = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('atom_connect_pipeline_colunas')
       .select('*')
       .order('ordem');
+
+    if (effectiveUnidadeId) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${effectiveUnidadeId}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data } = await query;
     if (data) setColunas(data);
   };
 

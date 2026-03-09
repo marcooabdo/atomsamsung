@@ -73,10 +73,18 @@ export function AtomConnectAutomation({ accentColor, unidadeId }: Props) {
   };
 
   const loadColunas = async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('atom_connect_pipeline_colunas')
       .select('id, nome')
       .order('ordem');
+
+    if (effectiveUnidadeId) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${effectiveUnidadeId}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data } = await query;
     if (data) setColunas(data);
   };
 

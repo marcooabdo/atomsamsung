@@ -332,12 +332,17 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     setCreating(true);
 
     try {
-      const { data: firstColumn } = await supabase
+      let colQuery = supabase
         .from('atom_connect_pipeline_colunas')
         .select('id')
         .order('ordem', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      if (selectedUnidadeId) {
+        colQuery = colQuery.or(`unidade_id.is.null,unidade_id.eq.${selectedUnidadeId}`);
+      }
+
+      const { data: firstColumn } = await colQuery.maybeSingle();
 
       const { data: newConversa, error } = await supabase
         .from('atom_connect_conversas')

@@ -497,12 +497,17 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         return;
       }
 
-      const { data: firstColumn } = await supabase
+      let colQuery = supabase
         .from('atom_connect_pipeline_colunas')
         .select('id')
         .order('ordem', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      if (os.unidade_id) {
+        colQuery = colQuery.or(`unidade_id.is.null,unidade_id.eq.${os.unidade_id}`);
+      }
+
+      const { data: firstColumn } = await colQuery.maybeSingle();
 
       const { data: newConversa, error: createError } = await supabase
         .from('atom_connect_conversas')

@@ -171,12 +171,17 @@ export default function AtomConnect() {
         .eq('id', osId)
         .maybeSingle();
 
-      const { data: firstColumn } = await supabase
+      let colQuery = supabase
         .from('atom_connect_pipeline_colunas')
         .select('id')
         .order('ordem', { ascending: true })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
+
+      if (targetUnidade) {
+        colQuery = colQuery.or(`unidade_id.is.null,unidade_id.eq.${targetUnidade}`);
+      }
+
+      const { data: firstColumn } = await colQuery.maybeSingle();
 
       const { data: newConversa } = await supabase
         .from('atom_connect_conversas')
@@ -621,6 +626,7 @@ export default function AtomConnect() {
                   onUpdateConversa={loadConversas}
                   onNovaConversa={() => setShowNovaConversa(true)}
                   accentColor={accentColor}
+                  unidadeId={selectedUnidadeFilter || unidadeAtual || undefined}
                 />
               </motion.div>
             )}
