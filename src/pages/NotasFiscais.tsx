@@ -51,6 +51,7 @@ interface NotaFiscal {
   xml_url: string | null;
   erro_mensagem: string | null;
   observacoes: string | null;
+  observacao_final: string | null;
   tentativas: number | null;
   payload_json: any;
   created_at: string;
@@ -797,10 +798,9 @@ export function NotasFiscais() {
                       </div>
                     )}
 
-                    {/* Observações */}
-                    {nf.observacoes && (
+                    {(nf.observacao_final || nf.observacoes) && (
                       <div className="mt-3 text-xs text-gray-400">
-                        <span className="font-bold">Obs:</span> {nf.observacoes}
+                        <span className="font-bold">Obs:</span> {nf.observacao_final || nf.observacoes}
                       </div>
                     )}
                   </div>
@@ -1010,13 +1010,12 @@ export function NotasFiscais() {
                 </div>
               )}
 
-              {/* Observações e Erro */}
-              {(notaDetalhes.observacoes || notaDetalhes.status === 'erro') && (
+              {(notaDetalhes.observacao_final || notaDetalhes.observacoes || notaDetalhes.status === 'erro') && (
                 <div>
                   <h3 className="text-sm font-bold text-[#00D4FF] mb-3 uppercase">Observacoes</h3>
-                  {notaDetalhes.observacoes && (
+                  {(notaDetalhes.observacao_final || notaDetalhes.observacoes) && (
                     <div className="bg-gray-800/50 border border-gray-700 rounded-lg p-4 mb-3">
-                      <p className="text-sm text-gray-300">{notaDetalhes.observacoes}</p>
+                      <p className="text-sm text-gray-300 whitespace-pre-wrap">{notaDetalhes.observacao_final || notaDetalhes.observacoes}</p>
                     </div>
                   )}
                   {notaDetalhes.status === 'erro' && (
