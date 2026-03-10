@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   MessageSquare, Users, Clock, TrendingUp, BarChart3, Target,
   Inbox, AlertTriangle, Timer, UserCheck, Phone, Zap, ChevronDown,
-  ChevronUp
+  ChevronUp, ShoppingCart, Send, X as XIcon, Calendar, FileText,
+  DollarSign, Tag, Bell, ArrowRight, Info, PhoneOff, Undo2, Eye
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, AreaChart, Area, PieChart, Pie, Cell } from 'recharts';
 
 interface Props {
   accentColor: string;
@@ -39,6 +40,42 @@ interface ResponseMetrics {
     total_responses: number;
   }[];
 }
+
+interface FinalizadaConversa {
+  id: string;
+  cliente_nome: string | null;
+  cliente_telefone: string;
+  resultado_conversa: string | null;
+  valor_orcamento: number | null;
+  resumo_fechamento: string | null;
+  proxima_acao_data: string | null;
+  proxima_acao_descricao: string | null;
+  tags_oportunidade: string[] | null;
+  finalizado_at: string | null;
+  finalizado_por: string | null;
+  created_at: string;
+  atendente_id: string | null;
+}
+
+const RESULTADO_MAP: Record<string, { label: string; icon: any; color: string }> = {
+  venda_realizada: { label: 'Venda Realizada', icon: ShoppingCart, color: '#10b981' },
+  orcamento_enviado: { label: 'Orcamento Enviado', icon: Send, color: '#3b82f6' },
+  orcamento_recusado: { label: 'Orcamento Recusado', icon: XIcon, color: '#ef4444' },
+  agendamento_marcado: { label: 'Agendamento Marcado', icon: Calendar, color: '#8b5cf6' },
+  apenas_informacao: { label: 'Apenas Informacao', icon: Info, color: '#6b7280' },
+  sem_interesse: { label: 'Sem Interesse', icon: PhoneOff, color: '#f59e0b' },
+  retornar_depois: { label: 'Retornar Depois', icon: Clock, color: '#f97316' },
+  outro: { label: 'Outro', icon: FileText, color: '#64748b' },
+};
+
+const TAG_MAP: Record<string, { label: string; color: string }> = {
+  venda_perdida: { label: 'Venda Perdida', color: '#ef4444' },
+  orcamento_pendente: { label: 'Orc. Pendente', color: '#f59e0b' },
+  cliente_quente: { label: 'Cliente Quente', color: '#f97316' },
+  recontatar: { label: 'Recontatar', color: '#3b82f6' },
+  fidelizar: { label: 'Fidelizar', color: '#10b981' },
+  indicacao: { label: 'Indicacao', color: '#8b5cf6' },
+};
 
 const formatDuration = (seconds: number): string => {
   if (!seconds || seconds <= 0) return '--';
@@ -78,6 +115,15 @@ const formatPhone = (phone: string): string => {
   return phone;
 };
 
+const formatCurrency = (val: number): string => {
+  return val.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+};
+
+const formatDateShort = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+};
+
 export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const { unidadeAtual } = useAuth();
   const [stats, setStats] = useState({
@@ -94,6 +140,10 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes'>('hoje');
   const [showAllWaiting, setShowAllWaiting] = useState(false);
   const [expandedAttendant, setExpandedAttendant] = useState(false);
+  const [finalizadas, setFinalizadas] = useState<FinalizadaConversa[]>([]);
+  const [oportunidadesFilter, setOportunidadesFilter] = useState<string>('all');
+  const [showFollowUps, setShowFollowUps] = useState(true);
+  const [expandedConversaId, setExpandedConversaId] = useState<string | null>(null);
 
   const effectiveUnidadeId = unidadeId || unidadeAtual;
 
@@ -102,7 +152,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   }, [effectiveUnidadeId, periodo]);
 
   const loadStats = async () => {
-    const [conversasResult, colunasResult, metricsResult] = await Promise.all([
+    const [conversasResult, colunasResult, metricsResult, finalizadasResult] = await Promise.all([
       (() => {
         let query = supabase
           .from('atom_connect_conversas')
@@ -120,12 +170,24 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       })(),
       supabase.rpc('get_atom_connect_response_metrics', {
         p_unidade_id: effectiveUnidadeId || null
-      })
+      }),
+      (() => {
+        let query = supabase
+          .from('atom_connect_conversas')
+          .select('id, cliente_nome, cliente_telefone, resultado_conversa, valor_orcamento, resumo_fechamento, proxima_acao_data, proxima_acao_descricao, tags_oportunidade, finalizado_at, finalizado_por, created_at, atendente_id')
+          .not('resultado_conversa', 'is', null)
+          .order('finalizado_at', { ascending: false })
+          .limit(100);
+        if (effectiveUnidadeId) query = query.eq('unidade_id', effectiveUnidadeId);
+        return query;
+      })()
     ]);
 
     const conversas = conversasResult.data || [];
     const colunas = colunasResult.data || [];
     const metrics = metricsResult.data as ResponseMetrics | null;
+
+    setFinalizadas((finalizadasResult.data || []) as FinalizadaConversa[]);
 
     const conversasPorColuna = colunas.map(col => ({
       coluna: col.nome,
@@ -169,6 +231,11 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     if (metrics?.per_attendant) {
       metrics.per_attendant.forEach(a => allAttendantIds.add(a.atendente_id));
     }
+    const finData = finalizadasResult.data || [];
+    for (const f of finData) {
+      if (f.atendente_id) allAttendantIds.add(f.atendente_id);
+      if (f.finalizado_por) allAttendantIds.add(f.finalizado_por);
+    }
 
     if (allAttendantIds.size > 0) {
       const ids = Array.from(allAttendantIds);
@@ -206,6 +273,44 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     setLoading(false);
   };
 
+  const followUps = useMemo(() => {
+    const now = new Date();
+    return finalizadas
+      .filter(f => f.proxima_acao_data && new Date(f.proxima_acao_data) <= new Date(now.getTime() + 3 * 86400000))
+      .sort((a, b) => new Date(a.proxima_acao_data!).getTime() - new Date(b.proxima_acao_data!).getTime());
+  }, [finalizadas]);
+
+  const filteredFinalizadas = useMemo(() => {
+    if (oportunidadesFilter === 'all') return finalizadas;
+    if (oportunidadesFilter === 'follow_up') return finalizadas.filter(f => f.proxima_acao_data);
+    return finalizadas.filter(f => f.resultado_conversa === oportunidadesFilter);
+  }, [finalizadas, oportunidadesFilter]);
+
+  const opportunityStats = useMemo(() => {
+    const vendas = finalizadas.filter(f => f.resultado_conversa === 'venda_realizada');
+    const orcamentos = finalizadas.filter(f => f.resultado_conversa === 'orcamento_enviado');
+    const recusados = finalizadas.filter(f => f.resultado_conversa === 'orcamento_recusado');
+    const valorVendas = vendas.reduce((sum, v) => sum + (v.valor_orcamento || 0), 0);
+    const valorOrcamentos = orcamentos.reduce((sum, v) => sum + (v.valor_orcamento || 0), 0);
+    const totalOrcEnviados = orcamentos.length + vendas.length + recusados.length;
+    const taxaConversao = totalOrcEnviados > 0 ? (vendas.length / totalOrcEnviados) * 100 : 0;
+
+    return { vendas: vendas.length, orcamentos: orcamentos.length, recusados: recusados.length, valorVendas, valorOrcamentos, taxaConversao };
+  }, [finalizadas]);
+
+  const resultadoChartData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of finalizadas) {
+      const r = f.resultado_conversa || 'outro';
+      counts[r] = (counts[r] || 0) + 1;
+    }
+    return Object.entries(counts).map(([key, value]) => ({
+      name: RESULTADO_MAP[key]?.label || key,
+      value,
+      color: RESULTADO_MAP[key]?.color || '#64748b',
+    }));
+  }, [finalizadas]);
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -229,6 +334,9 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
 
   const slaColor = slaExpired > 0 ? '#ef4444' : '#10b981';
 
+  const isFollowUpOverdue = (dateStr: string) => new Date(dateStr) < new Date();
+  const isFollowUpToday = (dateStr: string) => new Date(dateStr).toDateString() === new Date().toDateString();
+
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -247,6 +355,61 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
           ))}
         </div>
       </div>
+
+      {/* Follow-up Alerts */}
+      {followUps.length > 0 && showFollowUps && (
+        <div className="rounded-xl border border-amber-500/30 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(249,115,22,0.08))' }}>
+          <div className="flex items-center justify-between px-5 py-3 border-b border-amber-500/20">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center">
+                <Bell className="w-4 h-4 text-amber-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-amber-300">Follow-ups Pendentes</h3>
+                <p className="text-[11px] text-amber-400/60">{followUps.length} contato{followUps.length !== 1 ? 's' : ''} para acompanhar</p>
+              </div>
+            </div>
+            <button onClick={() => setShowFollowUps(false)} className="p-1 rounded hover:bg-white/10">
+              <XIcon className="w-3.5 h-3.5 text-amber-400/50" />
+            </button>
+          </div>
+          <div className="divide-y divide-amber-500/10">
+            {followUps.slice(0, 5).map(f => {
+              const overdue = isFollowUpOverdue(f.proxima_acao_data!);
+              const today = isFollowUpToday(f.proxima_acao_data!);
+              return (
+                <div key={f.id} className="flex items-center justify-between px-5 py-3 hover:bg-white/[0.02] transition-colors">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${overdue ? 'bg-red-400 animate-pulse' : today ? 'bg-amber-400' : 'bg-blue-400'}`} />
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-white truncate">
+                        {f.cliente_nome || formatPhone(f.cliente_telefone)}
+                      </p>
+                      <p className="text-[11px] text-white/40 truncate">
+                        {f.proxima_acao_descricao || f.resumo_fechamento || 'Sem descricao'}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 flex-shrink-0 ml-3">
+                    {f.valor_orcamento && (
+                      <span className="text-xs font-medium text-emerald-400">
+                        {formatCurrency(f.valor_orcamento)}
+                      </span>
+                    )}
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                      overdue ? 'bg-red-500/20 text-red-400' :
+                      today ? 'bg-amber-500/20 text-amber-400' :
+                      'bg-blue-500/15 text-blue-400'
+                    }`}>
+                      {overdue ? 'Atrasado' : today ? 'Hoje' : formatDateShort(f.proxima_acao_data!)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Row 1: Core Stats */}
       <div className="grid grid-cols-3 gap-4">
@@ -408,7 +571,63 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       )}
 
-      {!hasData ? (
+      {/* Opportunity Conversion Stats */}
+      {finalizadas.length > 0 && (
+        <div className="grid grid-cols-4 gap-4">
+          <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl bg-emerald-500" />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-emerald-500/20">
+                <ShoppingCart className="w-5 h-5 text-emerald-400" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-emerald-400">{opportunityStats.vendas}</p>
+            <p className="text-sm text-gray-400 mt-1">Vendas Realizadas</p>
+            {opportunityStats.valorVendas > 0 && (
+              <p className="text-xs text-emerald-400/70 mt-1 font-medium">{formatCurrency(opportunityStats.valorVendas)}</p>
+            )}
+          </div>
+
+          <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl bg-blue-500" />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-blue-500/20">
+                <Send className="w-5 h-5 text-blue-400" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-blue-400">{opportunityStats.orcamentos}</p>
+            <p className="text-sm text-gray-400 mt-1">Orcamentos Pendentes</p>
+            {opportunityStats.valorOrcamentos > 0 && (
+              <p className="text-xs text-blue-400/70 mt-1 font-medium">{formatCurrency(opportunityStats.valorOrcamentos)}</p>
+            )}
+          </div>
+
+          <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl bg-red-500" />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-red-500/20">
+                <XIcon className="w-5 h-5 text-red-400" />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-red-400">{opportunityStats.recusados}</p>
+            <p className="text-sm text-gray-400 mt-1">Orcamentos Recusados</p>
+          </div>
+
+          <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl" style={{ backgroundColor: accentColor }} />
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${accentColor}20` }}>
+                <Target className="w-5 h-5" style={{ color: accentColor }} />
+              </div>
+            </div>
+            <p className="text-2xl font-bold" style={{ color: accentColor }}>{opportunityStats.taxaConversao.toFixed(0)}%</p>
+            <p className="text-sm text-gray-400 mt-1">Taxa de Conversao</p>
+            <p className="text-xs text-gray-500 mt-1">Orcamento &rarr; Venda</p>
+          </div>
+        </div>
+      )}
+
+      {!hasData && finalizadas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-500">
           <Inbox className="w-16 h-16 mb-4 opacity-30" />
           <p className="text-lg font-medium text-white/40">Nenhum dado disponivel</p>
@@ -416,6 +635,187 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       ) : (
         <>
+          {/* Opportunities List + Resultado Chart */}
+          {finalizadas.length > 0 && (
+            <div className="grid grid-cols-3 gap-6">
+              <div className="col-span-2 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex flex-col" style={{ maxHeight: 520 }}>
+                <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <FileText className="w-5 h-5" style={{ color: accentColor }} />
+                    <h3 className="text-base font-semibold text-white">Historico de Atendimentos</h3>
+                    <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{filteredFinalizadas.length}</span>
+                  </div>
+                  <select
+                    value={oportunidadesFilter}
+                    onChange={(e) => setOportunidadesFilter(e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                  >
+                    <option value="all" className="bg-[#12122a]">Todos os resultados</option>
+                    <option value="follow_up" className="bg-[#12122a]">Com follow-up</option>
+                    {Object.entries(RESULTADO_MAP).map(([key, val]) => (
+                      <option key={key} value={key} className="bg-[#12122a]">{val.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+                  {filteredFinalizadas.length === 0 ? (
+                    <div className="flex items-center justify-center py-12 text-gray-500 text-sm">
+                      Nenhum atendimento com esse filtro
+                    </div>
+                  ) : (
+                    filteredFinalizadas.map((conv, i) => {
+                      const resultado = RESULTADO_MAP[conv.resultado_conversa || ''] || RESULTADO_MAP['outro'];
+                      const Icon = resultado.icon;
+                      const isExpanded = expandedConversaId === conv.id;
+
+                      return (
+                        <div
+                          key={conv.id}
+                          className={`border-b border-white/[0.04] transition-colors ${i % 2 === 0 ? 'bg-white/[0.01]' : ''}`}
+                        >
+                          <button
+                            onClick={() => setExpandedConversaId(isExpanded ? null : conv.id)}
+                            className="w-full flex items-center gap-3 px-5 py-3 text-left hover:bg-white/[0.03] transition-colors"
+                          >
+                            <div
+                              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                              style={{ backgroundColor: `${resultado.color}15` }}
+                            >
+                              <Icon className="w-4 h-4" style={{ color: resultado.color }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-medium text-white truncate">
+                                  {conv.cliente_nome || formatPhone(conv.cliente_telefone)}
+                                </span>
+                                <span
+                                  className="text-[10px] font-medium px-1.5 py-0.5 rounded flex-shrink-0"
+                                  style={{ backgroundColor: `${resultado.color}15`, color: resultado.color }}
+                                >
+                                  {resultado.label}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-white/30 truncate mt-0.5">
+                                {conv.resumo_fechamento || 'Sem resumo'}
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-3 flex-shrink-0">
+                              {conv.valor_orcamento ? (
+                                <span className="text-xs font-semibold text-emerald-400">{formatCurrency(conv.valor_orcamento)}</span>
+                              ) : null}
+                              {conv.proxima_acao_data && (
+                                <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                              )}
+                              <span className="text-[11px] text-white/20">
+                                {conv.finalizado_at ? formatDateShort(conv.finalizado_at) : ''}
+                              </span>
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-white/20" /> : <ChevronDown className="w-3.5 h-3.5 text-white/20" />}
+                            </div>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="px-5 pb-4 pt-1 space-y-2.5">
+                              {conv.resumo_fechamento && (
+                                <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
+                                  <p className="text-xs text-white/50 mb-1 font-medium">Resumo</p>
+                                  <p className="text-xs text-white/70 leading-relaxed whitespace-pre-wrap">{conv.resumo_fechamento}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center gap-4 text-xs text-white/40">
+                                <span className="flex items-center gap-1">
+                                  <Phone className="w-3 h-3" />
+                                  {formatPhone(conv.cliente_telefone)}
+                                </span>
+                                {conv.finalizado_por && attendantNames[conv.finalizado_por] && (
+                                  <span>Finalizado por {attendantNames[conv.finalizado_por]}</span>
+                                )}
+                                {conv.proxima_acao_data && (
+                                  <span className="flex items-center gap-1 text-amber-400">
+                                    <Calendar className="w-3 h-3" />
+                                    Follow-up: {formatDateShort(conv.proxima_acao_data)}
+                                    {conv.proxima_acao_descricao && ` - ${conv.proxima_acao_descricao}`}
+                                  </span>
+                                )}
+                              </div>
+                              {conv.tags_oportunidade && conv.tags_oportunidade.length > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  {conv.tags_oportunidade.map(tag => {
+                                    const tagInfo = TAG_MAP[tag];
+                                    return tagInfo ? (
+                                      <span
+                                        key={tag}
+                                        className="text-[10px] font-medium px-2 py-0.5 rounded-full"
+                                        style={{ backgroundColor: `${tagInfo.color}15`, color: tagInfo.color }}
+                                      >
+                                        {tagInfo.label}
+                                      </span>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div className="rounded-xl bg-white/5 border border-white/10 p-5">
+                <h3 className="text-sm font-semibold text-white mb-4">Resultados por Tipo</h3>
+                {resultadoChartData.length > 0 ? (
+                  <>
+                    <div className="h-48">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie
+                            data={resultadoChartData}
+                            cx="50%"
+                            cy="50%"
+                            innerRadius={45}
+                            outerRadius={75}
+                            paddingAngle={3}
+                            dataKey="value"
+                          >
+                            {resultadoChartData.map((entry, index) => (
+                              <Cell key={index} fill={entry.color} />
+                            ))}
+                          </Pie>
+                          <Tooltip
+                            contentStyle={{
+                              backgroundColor: '#1A1A2E',
+                              border: '1px solid rgba(255,255,255,0.1)',
+                              borderRadius: '8px',
+                              fontSize: '12px',
+                            }}
+                            labelStyle={{ color: '#fff' }}
+                          />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="space-y-2 mt-3">
+                      {resultadoChartData.map(item => (
+                        <div key={item.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: item.color }} />
+                            <span className="text-xs text-white/60 truncate">{item.name}</span>
+                          </div>
+                          <span className="text-xs font-semibold text-white/80">{item.value}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex items-center justify-center h-48 text-gray-500 text-xs">
+                    Sem dados
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* Per-attendant response times */}
           {perAttendant.length > 0 && (
             <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">

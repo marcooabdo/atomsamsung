@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FinalizarConversaModal, type ClosureData } from './FinalizarConversaModal';
 
 interface Conversa {
   id: string;
@@ -152,6 +153,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [usersCache, setUsersCache] = useState<Record<string, string>>({});
   const [instancia, setInstancia] = useState<Instancia | null>(null);
   const [showFinalizarModal, setShowFinalizarModal] = useState(false);
+  const [showFinalizarConversaModal, setShowFinalizarConversaModal] = useState(false);
   const [showEditClienteModal, setShowEditClienteModal] = useState(false);
   const [editClienteNome, setEditClienteNome] = useState(conversa.cliente_nome || '');
   const [savingCliente, setSavingCliente] = useState(false);
@@ -999,18 +1001,30 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
-  const finalizarDiretamente = async () => {
-    const semNPS = !conversa.nps_score;
+  const finalizarDiretamente = () => {
+    setShowFinalizarConversaModal(true);
+  };
 
+  const handleFinalizarComDados = async (data: ClosureData) => {
     await supabase
       .from('atom_connect_conversas')
       .update({
         coluna_pipeline: 'finalizado_nps',
-        is_bot_ativo: semNPS,
-        aguardando_avaliacao: false
+        is_bot_ativo: false,
+        aguardando_avaliacao: false,
+        resultado_conversa: data.resultado_conversa,
+        valor_orcamento: data.valor_orcamento,
+        resumo_fechamento: data.resumo_fechamento,
+        proxima_acao_data: data.proxima_acao_data ? new Date(data.proxima_acao_data + 'T12:00:00').toISOString() : null,
+        proxima_acao_descricao: data.proxima_acao_descricao || null,
+        tags_oportunidade: data.tags_oportunidade,
+        finalizado_at: new Date().toISOString(),
+        finalizado_por: usuario?.id || null,
       })
       .eq('id', conversa.id);
 
+    setShowFinalizarConversaModal(false);
+    setShowFinalizarModal(false);
     onUpdate();
   };
 
@@ -2665,6 +2679,19 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
               )}
             </motion.div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showFinalizarConversaModal && (
+          <FinalizarConversaModal
+            accentColor={accentColor}
+            isDark={isDark}
+            clienteNome={conversa.cliente_nome}
+            clienteTelefone={conversa.cliente_telefone}
+            onConfirm={handleFinalizarComDados}
+            onCancel={() => setShowFinalizarConversaModal(false)}
+          />
         )}
       </AnimatePresence>
 

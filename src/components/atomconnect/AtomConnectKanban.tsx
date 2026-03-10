@@ -7,7 +7,9 @@ import {
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useTheme } from '../../contexts/ThemeContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { FinalizarConversaModal, type ClosureData } from './FinalizarConversaModal';
 
 interface Conversa {
   id: string;
@@ -62,10 +64,12 @@ const ICON_MAP: Record<string, any> = {
 
 export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], onSelectConversa, onUpdateConversa, onNovaConversa, accentColor, unidadeId }: Props) {
   const { usuario, unidadeAtual } = useAuth();
+  const { isDark } = useTheme();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
   const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [pendingFinalizeConversa, setPendingFinalizeConversa] = useState<Conversa | null>(null);
   const [filterAtendente, setFilterAtendente] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [filterVendedor, setFilterVendedor] = useState<string>('all');
   const [filterDiasSemRetorno, setFilterDiasSemRetorno] = useState<number | null>(null);
@@ -271,12 +275,43 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
       return;
     }
 
+    const targetColuna = colunas.find(c => c.id === colunaId);
+    if (targetColuna?.is_final) {
+      setPendingFinalizeConversa(draggedConversa);
+      setDraggedConversa(null);
+      return;
+    }
+
     await supabase
       .from('atom_connect_conversas')
       .update({ coluna_pipeline: colunaId })
       .eq('id', draggedConversa.id);
 
     setDraggedConversa(null);
+    onUpdateConversa();
+  };
+
+  const handleKanbanFinalize = async (data: ClosureData) => {
+    if (!pendingFinalizeConversa) return;
+
+    await supabase
+      .from('atom_connect_conversas')
+      .update({
+        coluna_pipeline: 'finalizado_nps',
+        is_bot_ativo: false,
+        aguardando_avaliacao: false,
+        resultado_conversa: data.resultado_conversa,
+        valor_orcamento: data.valor_orcamento,
+        resumo_fechamento: data.resumo_fechamento,
+        proxima_acao_data: data.proxima_acao_data ? new Date(data.proxima_acao_data + 'T12:00:00').toISOString() : null,
+        proxima_acao_descricao: data.proxima_acao_descricao || null,
+        tags_oportunidade: data.tags_oportunidade,
+        finalizado_at: new Date().toISOString(),
+        finalizado_por: usuario?.id || null,
+      })
+      .eq('id', pendingFinalizeConversa.id);
+
+    setPendingFinalizeConversa(null);
     onUpdateConversa();
   };
 
@@ -787,6 +822,19 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
           })}
         </div>
       </div>
+
+      <AnimatePresence>
+        {pendingFinalizeConversa && (
+          <FinalizarConversaModal
+            accentColor={accentColor}
+            isDark={isDark}
+            clienteNome={pendingFinalizeConversa.cliente_nome}
+            clienteTelefone={pendingFinalizeConversa.cliente_telefone}
+            onConfirm={handleKanbanFinalize}
+            onCancel={() => setPendingFinalizeConversa(null)}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
