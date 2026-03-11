@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { DollarSign, Download, Eye, CreditCard, User, Calendar, Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock, Search, RefreshCw } from 'lucide-react';
+import { DollarSign, Download, Eye, CreditCard, User, Calendar, CreditCard as Edit, Send, ThumbsUp, ThumbsDown, Copy, Check, X, AlertTriangle, MessageSquare, Percent, Tag, UserCheck, ChevronDown, Crown, Lock, Search, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AddPaymentModal } from './AddPaymentModal';
