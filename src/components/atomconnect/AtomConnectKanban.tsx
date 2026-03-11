@@ -23,6 +23,7 @@ interface Conversa {
   ultima_mensagem: string | null;
   ultima_mensagem_at: string;
   ultima_resposta_cliente_at: string | null;
+  ultima_resposta_operador_at: string | null;
   mensagens_nao_lidas: number;
   is_bot_ativo: boolean;
   tipo_atendimento: string;
@@ -317,9 +318,13 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
 
   const isSLABreached = (conversa: Conversa, coluna: PipelineColuna): boolean => {
     if (!coluna.sla_minutos || !conversa.ultima_resposta_cliente_at) return false;
-    const lastResponse = new Date(conversa.ultima_resposta_cliente_at);
+    const lastClientMsg = new Date(conversa.ultima_resposta_cliente_at);
+    if (conversa.ultima_resposta_operador_at) {
+      const lastOperatorMsg = new Date(conversa.ultima_resposta_operador_at);
+      if (lastOperatorMsg >= lastClientMsg) return false;
+    }
     const now = new Date();
-    const diffMinutes = (now.getTime() - lastResponse.getTime()) / (1000 * 60);
+    const diffMinutes = (now.getTime() - lastClientMsg.getTime()) / (1000 * 60);
     return diffMinutes > coluna.sla_minutos;
   };
 
