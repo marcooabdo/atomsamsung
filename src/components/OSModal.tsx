@@ -207,6 +207,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   // Estados para edição de valores GSPN
   const [editandoValorGSPN, setEditandoValorGSPN] = useState<Record<string, string>>({});
   const [salvandoValorGSPN, setSalvandoValorGSPN] = useState<Record<string, boolean>>({});
+  const [editandoValorFinal, setEditandoValorFinal] = useState<Record<string, string>>({});
 
   // Estados para edição inline de valores de peças manuais
   const [editandoValorPeca, setEditandoValorPeca] = useState<Record<string, { unitario: string; quantidade: string }>>({});
@@ -1020,6 +1021,44 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       showAlert({ message: 'Erro ao salvar valor GSPN', type: 'error' });
     } finally {
       setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: false }));
+    }
+  };
+
+  const handleSalvarValorFinal = async (pecaId: string) => {
+    const valorEditado = editandoValorFinal[pecaId];
+    if (!valorEditado && valorEditado !== '0') return;
+
+    const valorNum = parseFloat(valorEditado);
+    if (isNaN(valorNum) || valorNum < 0) {
+      showAlert({ message: 'Valor invalido', type: 'warning' });
+      return;
+    }
+
+    try {
+      const peca = pecas.find(p => p.id === pecaId);
+      if (!peca) throw new Error('Peca nao encontrada');
+
+      const valorTotal = valorNum * Math.max(peca.quantidade || 1, 1);
+
+      const { error } = await supabase
+        .from('os_pecas')
+        .update({
+          valor_unitario: valorNum,
+          valor_total: valorTotal
+        })
+        .eq('id', pecaId);
+
+      if (error) throw error;
+
+      setEditandoValorFinal(prev => {
+        const novo = { ...prev };
+        delete novo[pecaId];
+        return novo;
+      });
+
+      await loadPecas();
+    } catch (error: any) {
+      showAlert({ message: 'Erro ao salvar valor: ' + (error?.message || ''), type: 'error' });
     }
   };
 
@@ -3997,29 +4036,68 @@ Não haverá cobrança ao cliente.`
                                               Definir Valor GSPN
                                             </button>
                                           ) : (
-                                            <div className="flex items-center gap-2">
-                                              <div className="flex flex-col gap-1">
+                                            <div className="flex flex-col gap-1">
+                                              <div className="flex items-center gap-2">
                                                 <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
                                                   GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
                                                 </p>
-                                                {os?.tipo_os === 'OW' && (
-                                                  <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
-                                                    c/ Markup: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                                  </p>
-                                                )}
+                                                <button
+                                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
+                                                  className="p-1 rounded transition-all"
+                                                  style={{
+                                                    backgroundColor: '#9333EA20',
+                                                    border: '1px solid #9333EA60',
+                                                    color: '#9333EA'
+                                                  }}
+                                                  title="Editar valor GSPN"
+                                                >
+                                                  <Pencil className="w-3 h-3" />
+                                                </button>
                                               </div>
-                                              <button
-                                                onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
-                                                className="p-1 rounded transition-all"
-                                                style={{
-                                                  backgroundColor: '#9333EA20',
-                                                  border: '1px solid #9333EA60',
-                                                  color: '#9333EA'
-                                                }}
-                                                title="Editar valor GSPN"
-                                              >
-                                                <Pencil className="w-3 h-3" />
-                                              </button>
+                                              {editandoValorFinal[peca.id] !== undefined ? (
+                                                <div className="flex items-center gap-1.5">
+                                                  <span className="text-xs text-gray-500">Final: R$</span>
+                                                  <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0"
+                                                    value={editandoValorFinal[peca.id]}
+                                                    onChange={(e) => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                                    className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                                    autoFocus
+                                                  />
+                                                  <button
+                                                    onClick={() => handleSalvarValorFinal(peca.id)}
+                                                    className="p-1 rounded transition-all"
+                                                    style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
+                                                    title="Salvar"
+                                                  >
+                                                    <Save className="w-3 h-3" />
+                                                  </button>
+                                                  <button
+                                                    onClick={() => setEditandoValorFinal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                                    className="p-1 rounded transition-all"
+                                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                                    title="Cancelar"
+                                                  >
+                                                    <X className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-center gap-2">
+                                                  <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
+                                                    Final: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                                  </p>
+                                                  <button
+                                                    onClick={() => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: String(Number(peca.valor_unitario || 0).toFixed(2)) }))}
+                                                    className="p-1 rounded transition-all"
+                                                    style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
+                                                    title="Editar valor final"
+                                                  >
+                                                    <Pencil className="w-3 h-3" />
+                                                  </button>
+                                                </div>
+                                              )}
                                             </div>
                                           )}
                                         </>
