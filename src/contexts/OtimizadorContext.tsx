@@ -106,11 +106,24 @@ export function OtimizadorProvider({ children }: { children: ReactNode }) {
         query = query.eq('unidade_id', selectedUnidade);
       }
 
-      const { data, error } = await query;
+      const allData: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (!error && data) {
-        setOsData(data);
+      while (hasMore) {
+        const { data: page, error: pageError } = await query.range(from, from + pageSize - 1);
+        if (pageError) break;
+        if (page && page.length > 0) {
+          allData.push(...page);
+          from += pageSize;
+          hasMore = page.length === pageSize;
+        } else {
+          hasMore = false;
+        }
       }
+
+      setOsData(allData);
     } catch (error) {
     } finally {
       setLoading(false);

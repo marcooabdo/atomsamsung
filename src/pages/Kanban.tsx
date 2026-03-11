@@ -656,9 +656,28 @@ export function Kanban() {
       } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
       }
-      const { data, error } = await query.order('sequencia_coluna', { ascending: true });
+      const allData: any[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
 
-      if (error) throw error;
+      while (hasMore) {
+        const { data: page, error: pageError } = await query
+          .order('sequencia_coluna', { ascending: true })
+          .range(from, from + pageSize - 1);
+
+        if (pageError) throw pageError;
+
+        if (page && page.length > 0) {
+          allData.push(...page);
+          from += pageSize;
+          hasMore = page.length === pageSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      const data = allData;
 
       // Buscar peças do lote para requisições que têm lote
       const allRequisicoes = (data || []).flatMap(os => (os as any).requisicoes || []);
