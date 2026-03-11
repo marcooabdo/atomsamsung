@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   CheckCircle2, DollarSign, FileText, Calendar, Tag,
   X, Loader2, ShoppingCart, Send, Clock, Info,
   PhoneOff, Undo2, AlertCircle
 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { supabase } from '../../lib/supabase';
 
 interface Props {
   accentColor: string;
@@ -35,19 +36,22 @@ const RESULTADOS = [
   { value: 'outro', label: 'Outro', icon: FileText, color: '#64748b' },
 ];
 
-const TAGS_OPTIONS = [
-  { value: 'venda_perdida', label: 'Venda Perdida', color: '#ef4444' },
-  { value: 'orcamento_pendente', label: 'Orcamento Pendente', color: '#f59e0b' },
-  { value: 'cliente_quente', label: 'Cliente Quente', color: '#f97316' },
-  { value: 'recontatar', label: 'Recontatar', color: '#3b82f6' },
-  { value: 'fidelizar', label: 'Fidelizar', color: '#10b981' },
-  { value: 'indicacao', label: 'Indicacao', color: '#8b5cf6' },
-];
-
 const showValorFor = ['venda_realizada', 'orcamento_enviado', 'orcamento_recusado'];
 const showFollowUpFor = ['orcamento_enviado', 'retornar_depois', 'agendamento_marcado'];
 
 export function FinalizarConversaModal({ accentColor, isDark, clienteNome, clienteTelefone, onConfirm, onCancel }: Props) {
+  const [tagsOptions, setTagsOptions] = useState<{ value: string; label: string; color: string }[]>([]);
+
+  useEffect(() => {
+    const loadTags = async () => {
+      const { data } = await supabase
+        .from('atom_connect_tags_oportunidade')
+        .select('value, label, color')
+        .order('created_at');
+      if (data) setTagsOptions(data);
+    };
+    loadTags();
+  }, []);
   const [resultado, setResultado] = useState('');
   const [valor, setValor] = useState('');
   const [resumo, setResumo] = useState('');
@@ -261,7 +265,7 @@ export function FinalizarConversaModal({ accentColor, isDark, clienteNome, clien
               Tags de Oportunidade
             </label>
             <div className="flex flex-wrap gap-1.5">
-              {TAGS_OPTIONS.map(tag => {
+              {tagsOptions.map(tag => {
                 const selected = selectedTags.includes(tag.value);
                 return (
                   <button

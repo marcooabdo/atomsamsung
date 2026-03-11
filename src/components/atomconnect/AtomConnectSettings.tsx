@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2, Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle, Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone, Webhook, CreditCard as Edit2, X, Columns2 as Columns, ChevronLeft, ChevronRight, Palette, GripVertical, Flag } from 'lucide-react';
+import { Settings, Smartphone, QrCode, Wifi, WifiOff, RefreshCw, Trash2, Plus, Copy, Check, Eye, EyeOff, ExternalLink, AlertTriangle, Save, MessageSquare, Zap, Loader2, CheckCircle2, XCircle, Phone, Webhook, CreditCard as Edit2, X, Columns2 as Columns, ChevronLeft, ChevronRight, Palette, GripVertical, Flag, Tag } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useModal } from '../../contexts/ModalContext';
@@ -50,7 +50,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
   const { showAlert, showConfirm } = useModal();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
-  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization'>('instances');
+  const [activeTab, setActiveTab] = useState<'instances' | 'quick_replies' | 'pipeline' | 'finalization' | 'tags'>('instances');
   const [instancias, setInstancias] = useState<Instancia[]>([]);
   const [respostasRapidas, setRespostasRapidas] = useState<RespostaRapida[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,6 +86,22 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const [editColunaForm, setEditColunaForm] = useState({ nome: '', cor: '' });
   const [savingColuna, setSavingColuna] = useState(false);
 
+  interface TagOportunidade {
+    id: string;
+    value: string;
+    label: string;
+    color: string;
+    unidade_id: string | null;
+    in_use?: boolean;
+  }
+
+  const [tags, setTags] = useState<TagOportunidade[]>([]);
+  const [showNewTag, setShowNewTag] = useState(false);
+  const [newTag, setNewTag] = useState({ label: '', color: '#3b82f6' });
+  const [editingTag, setEditingTag] = useState<TagOportunidade | null>(null);
+  const [editTagForm, setEditTagForm] = useState({ label: '', color: '' });
+  const [savingTag, setSavingTag] = useState(false);
+
   const PRESET_COLORS = [
     '#00D4FF', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6',
     '#ec4899', '#6366f1', '#14b8a6', '#f97316', '#06b6d4'
@@ -96,7 +112,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   }, [effectiveUnidadeId]);
 
   const loadData = async () => {
-    await Promise.all([loadInstancias(), loadRespostasRapidas(), loadPipelineColunas()]);
+    await Promise.all([loadInstancias(), loadRespostasRapidas(), loadPipelineColunas(), loadTags()]);
     setLoading(false);
   };
 
@@ -306,6 +322,129 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
     ]);
 
     loadPipelineColunas();
+  };
+
+  const loadTags = async () => {
+    let query = supabase
+      .from('atom_connect_tags_oportunidade')
+      .select('*')
+      .order('created_at');
+
+    if (effectiveUnidadeId) {
+      query = query.or(`unidade_id.is.null,unidade_id.eq.${effectiveUnidadeId}`);
+    } else {
+      query = query.is('unidade_id', null);
+    }
+
+    const { data: tagsData } = await query;
+    if (!tagsData) return;
+
+    const { data: conversas } = await supabase
+      .from('atom_connect_conversas')
+      .select('tags_oportunidade')
+      .not('tags_oportunidade', 'is', null);
+
+    const usedValues = new Set<string>();
+    if (conversas) {
+      for (const c of conversas) {
+        if (c.tags_oportunidade) {
+          for (const t of c.tags_oportunidade) {
+            usedValues.add(t);
+          }
+        }
+      }
+    }
+
+    setTags(tagsData.map(t => ({ ...t, in_use: usedValues.has(t.value) })));
+  };
+
+  const createTag = async () => {
+    if (!newTag.label.trim()) {
+      showAlert({ type: 'warning', title: 'Campo Obrigatorio', message: 'Digite um nome para a tag' });
+      return;
+    }
+
+    setSavingTag(true);
+    const value = newTag.label.trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_|_$/g, '');
+
+    const { error } = await supabase
+      .from('atom_connect_tags_oportunidade')
+      .insert({
+        value,
+        label: newTag.label.trim(),
+        color: newTag.color,
+        unidade_id: effectiveUnidadeId || null
+      });
+
+    if (error) {
+      showAlert({ type: 'error', title: 'Erro ao Criar Tag', message: error.message });
+    } else {
+      setShowNewTag(false);
+      setNewTag({ label: '', color: '#3b82f6' });
+      loadTags();
+    }
+    setSavingTag(false);
+  };
+
+  const openEditTag = (tag: TagOportunidade) => {
+    setEditTagForm({ label: tag.label, color: tag.color });
+    setEditingTag(tag);
+  };
+
+  const saveTag = async () => {
+    if (!editingTag) return;
+    if (!editTagForm.label.trim()) {
+      showAlert({ type: 'warning', title: 'Campo Obrigatorio', message: 'O nome da tag e obrigatorio' });
+      return;
+    }
+
+    setSavingTag(true);
+    const { error } = await supabase
+      .from('atom_connect_tags_oportunidade')
+      .update({ label: editTagForm.label.trim(), color: editTagForm.color })
+      .eq('id', editingTag.id);
+
+    if (error) {
+      showAlert({ type: 'error', title: 'Erro ao Salvar', message: error.message });
+    } else {
+      setEditingTag(null);
+      loadTags();
+    }
+    setSavingTag(false);
+  };
+
+  const deleteTag = async (tag: TagOportunidade) => {
+    if (tag.in_use) {
+      showAlert({
+        type: 'warning',
+        title: 'Tag em Uso',
+        message: 'Esta tag esta sendo usada em conversas e nao pode ser excluida.'
+      });
+      return;
+    }
+
+    const confirmed = await showConfirm({
+      title: 'Confirmar Exclusao',
+      message: `Tem certeza que deseja excluir a tag "${tag.label}"?`,
+      confirmText: 'Excluir',
+      cancelText: 'Cancelar'
+    });
+
+    if (!confirmed) return;
+
+    const { error } = await supabase
+      .from('atom_connect_tags_oportunidade')
+      .delete()
+      .eq('id', tag.id);
+
+    if (error) {
+      showAlert({ type: 'error', title: 'Erro ao Excluir', message: error.message });
+    } else {
+      loadTags();
+    }
   };
 
   const openEditModal = (instancia: Instancia) => {
@@ -834,6 +973,20 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
             </div>
           </button>
           <button
+            onClick={() => setActiveTab('tags')}
+            className={`py-3 border-b-2 text-sm font-medium transition-colors ${
+              activeTab === 'tags'
+                ? 'border-current text-white'
+                : 'border-transparent text-gray-400 hover:text-white'
+            }`}
+            style={{ borderColor: activeTab === 'tags' ? accentColor : undefined }}
+          >
+            <div className="flex items-center gap-2">
+              <Tag className="w-4 h-4" />
+              Tags
+            </div>
+          </button>
+          <button
             onClick={() => setActiveTab('finalization')}
             className={`py-3 border-b-2 text-sm font-medium transition-colors ${
               activeTab === 'finalization'
@@ -1198,6 +1351,82 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'tags' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-semibold text-white">Tags de Oportunidade</h3>
+                <p className="text-sm text-gray-400">Gerencie as tags usadas ao finalizar conversas</p>
+              </div>
+              <button
+                onClick={() => setShowNewTag(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                style={{
+                  backgroundColor: `${accentColor}20`,
+                  color: accentColor,
+                  border: `1px solid ${accentColor}40`
+                }}
+              >
+                <Plus className="w-4 h-4" />
+                Nova Tag
+              </button>
+            </div>
+
+            {tags.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+                <Tag className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-lg">Nenhuma tag configurada</p>
+                <p className="text-sm mt-2">Crie tags para classificar oportunidades</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {tags.map(tag => (
+                  <div
+                    key={tag.id}
+                    className="flex items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/[0.07] transition-colors"
+                  >
+                    <div
+                      className="w-4 h-4 rounded-full flex-shrink-0"
+                      style={{ backgroundColor: tag.color }}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium text-white">{tag.label}</h4>
+                        <code className="text-[10px] text-gray-500 bg-white/5 px-1.5 py-0.5 rounded">{tag.value}</code>
+                      </div>
+                      {tag.in_use && (
+                        <p className="text-xs text-amber-400/70 mt-0.5">Em uso - nao pode ser excluida</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {!tag.in_use ? (
+                        <>
+                          <button
+                            onClick={() => openEditTag(tag)}
+                            className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white transition-colors"
+                            title="Editar tag"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => deleteTag(tag)}
+                            className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-400 transition-colors"
+                            title="Excluir tag"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-[10px] text-gray-500 bg-white/5 px-2 py-1 rounded">Bloqueada</span>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -1747,6 +1976,205 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                   style={{ backgroundColor: accentColor, color: '#000' }}
                 >
                   {savingEdit ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Salvando...
+                    </>
+                  ) : (
+                    <>
+                      <Save className="w-4 h-4" />
+                      Salvar
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* New Tag Modal */}
+      <AnimatePresence>
+        {showNewTag && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={() => setShowNewTag(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                    <Tag className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Nova Tag</h3>
+                </div>
+                <button
+                  onClick={() => setShowNewTag(false)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Nome da Tag *
+                  </label>
+                  <input
+                    type="text"
+                    value={newTag.label}
+                    onChange={(e) => setNewTag(prev => ({ ...prev, label: e.target.value }))}
+                    placeholder="Ex: Cliente VIP"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Cor
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setNewTag(prev => ({ ...prev, color }))}
+                        className={`w-8 h-8 rounded-full transition-all ${
+                          newTag.color === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1A2E]' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-lg bg-white/5">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: newTag.color }} />
+                  <span
+                    className="text-xs font-medium px-2.5 py-1 rounded-full"
+                    style={{ backgroundColor: `${newTag.color}20`, color: newTag.color }}
+                  >
+                    {newTag.label || 'Preview'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowNewTag(false)}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={createTag}
+                  disabled={savingTag}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingTag ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Criando...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-4 h-4" />
+                      Criar Tag
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Edit Tag Modal */}
+      <AnimatePresence>
+        {editingTag && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-6"
+            onClick={() => setEditingTag(null)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-[#1A1A2E] rounded-xl w-full max-w-md p-6"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center bg-white/10">
+                    <Edit2 className="w-5 h-5 text-white" />
+                  </div>
+                  <h3 className="text-lg font-semibold text-white">Editar Tag</h3>
+                </div>
+                <button
+                  onClick={() => setEditingTag(null)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-gray-400" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Nome da Tag *
+                  </label>
+                  <input
+                    type="text"
+                    value={editTagForm.label}
+                    onChange={(e) => setEditTagForm(prev => ({ ...prev, label: e.target.value }))}
+                    placeholder="Ex: Cliente VIP"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Cor
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {PRESET_COLORS.map(color => (
+                      <button
+                        key={color}
+                        onClick={() => setEditTagForm(prev => ({ ...prev, color }))}
+                        className={`w-8 h-8 rounded-full transition-all ${
+                          editTagForm.color === color ? 'ring-2 ring-white ring-offset-2 ring-offset-[#1A1A2E]' : ''
+                        }`}
+                        style={{ backgroundColor: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setEditingTag(null)}
+                  className="flex-1 px-4 py-3 bg-white/10 rounded-lg text-sm text-gray-400 hover:bg-white/20 transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={saveTag}
+                  disabled={savingTag}
+                  className="flex-1 px-4 py-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                  style={{ backgroundColor: accentColor, color: '#000' }}
+                >
+                  {savingTag ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
                       Salvando...

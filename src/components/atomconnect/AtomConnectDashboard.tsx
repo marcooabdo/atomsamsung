@@ -68,7 +68,7 @@ const RESULTADO_MAP: Record<string, { label: string; icon: any; color: string }>
   outro: { label: 'Outro', icon: FileText, color: '#64748b' },
 };
 
-const TAG_MAP: Record<string, { label: string; color: string }> = {
+const FALLBACK_TAG_MAP: Record<string, { label: string; color: string }> = {
   venda_perdida: { label: 'Venda Perdida', color: '#ef4444' },
   orcamento_pendente: { label: 'Orc. Pendente', color: '#f59e0b' },
   cliente_quente: { label: 'Cliente Quente', color: '#f97316' },
@@ -144,6 +144,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const [oportunidadesFilter, setOportunidadesFilter] = useState<string>('all');
   const [showFollowUps, setShowFollowUps] = useState(true);
   const [expandedConversaId, setExpandedConversaId] = useState<string | null>(null);
+  const [tagMap, setTagMap] = useState<Record<string, { label: string; color: string }>>(FALLBACK_TAG_MAP);
 
   const effectiveUnidadeId = unidadeId || unidadeAtual;
 
@@ -152,6 +153,18 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   }, [effectiveUnidadeId, periodo]);
 
   const loadStats = async () => {
+    const { data: tagsData } = await supabase
+      .from('atom_connect_tags_oportunidade')
+      .select('value, label, color')
+      .order('created_at');
+    if (tagsData && tagsData.length > 0) {
+      const map: Record<string, { label: string; color: string }> = {};
+      for (const t of tagsData) {
+        map[t.value] = { label: t.label, color: t.color };
+      }
+      setTagMap(map);
+    }
+
     const [conversasResult, colunasResult, metricsResult, finalizadasResult] = await Promise.all([
       (() => {
         let query = supabase
@@ -741,7 +754,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
                               {conv.tags_oportunidade && conv.tags_oportunidade.length > 0 && (
                                 <div className="flex items-center gap-1.5">
                                   {conv.tags_oportunidade.map(tag => {
-                                    const tagInfo = TAG_MAP[tag];
+                                    const tagInfo = tagMap[tag];
                                     return tagInfo ? (
                                       <span
                                         key={tag}
