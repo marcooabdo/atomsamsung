@@ -682,7 +682,7 @@ async function processMessage(
 
   let { data: conversa } = await supabase
     .from("atom_connect_conversas")
-    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group")
+    .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno")
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
@@ -1035,7 +1035,7 @@ async function processMessage(
       .eq("id", conversa.id);
   }
 
-  if (!fromMe && tipo === "text" && conteudo) {
+  if (!fromMe && tipo === "text" && conteudo && !conversa.is_interno) {
     const trimmed = conteudo.trim();
     const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
     if (!handledByGIA) {

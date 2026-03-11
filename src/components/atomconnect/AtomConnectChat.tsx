@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight } from 'lucide-react';
+import { X, Send, Paperclip, Mic, Smile, Phone, Video, User, Users, UserPlus, Link2, FileText, Play, Download, Check, CheckCheck, Clock, Bot, ArrowRight, ChevronDown, Zap, MessageSquare, MapPin, Calendar, AlertTriangle, ExternalLink, CreditCard as Edit2, Trash2, Upload, File, Image as ImageLucide, GripVertical, PanelRightClose, PanelRight, Search, Loader2, Star, CheckCircle2, Reply, CornerDownRight, ShieldAlert } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { useTheme } from '../../contexts/ThemeContext';
@@ -32,6 +32,7 @@ interface Conversa {
   cliente_digitando_at?: string | null;
   is_group?: boolean;
   group_jid?: string | null;
+  is_interno?: boolean;
   nps_score?: number | null;
   nps_comentario?: string | null;
   created_at: string;
@@ -919,6 +920,22 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
   };
 
+  const toggleInterno = async (status: boolean) => {
+    try {
+      const updateData: Record<string, any> = { is_interno: status };
+      if (status) {
+        updateData.is_bot_ativo = false;
+      }
+      await supabase
+        .from('atom_connect_conversas')
+        .update(updateData)
+        .eq('id', conversa.id);
+      onUpdate();
+    } catch (error: any) {
+      console.error('Erro ao marcar como interno:', error);
+    }
+  };
+
   const transferConversa = async (toUserId: string) => {
     await supabase
       .from('atom_connect_transferencias')
@@ -1706,6 +1723,27 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             >
               <Bot className={conversa.is_bot_ativo ? 'w-3 h-3' : 'w-4 h-4'} />
               {conversa.is_bot_ativo ? 'GIA Ativa' : 'LIGAR GIA'}
+            </button>
+
+            <button
+              onClick={() => toggleInterno(!conversa.is_interno)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-semibold transition-all"
+              style={conversa.is_interno
+                ? {
+                    backgroundColor: isDark ? 'rgba(245,158,11,0.25)' : 'rgba(217,119,6,0.12)',
+                    color: isDark ? '#fbbf24' : '#92400e',
+                    border: `1px solid ${isDark ? 'rgba(245,158,11,0.4)' : 'rgba(217,119,6,0.3)'}`
+                  }
+                : {
+                    backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)',
+                    color: isDark ? 'rgba(255,255,255,0.4)' : 'rgba(0,0,0,0.35)',
+                    border: `1px solid ${isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}`
+                  }
+              }
+              title={conversa.is_interno ? 'Remover marcacao de interno (voltara a contar nas metricas)' : 'Marcar como interno (funcionarios) - nao conta nas metricas e GIA nao responde'}
+            >
+              <ShieldAlert className="w-3 h-3" />
+              {conversa.is_interno ? 'Interno' : 'Marcar Interno'}
             </button>
 
             {osData && (

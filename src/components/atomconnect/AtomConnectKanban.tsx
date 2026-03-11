@@ -31,6 +31,7 @@ interface Conversa {
   tags: string[];
   is_group?: boolean;
   group_jid?: string | null;
+  is_interno?: boolean;
   cliente_digitando?: string | null;
   cliente_digitando_at?: string | null;
   created_at: string;
@@ -317,6 +318,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   };
 
   const isSLABreached = (conversa: Conversa, coluna: PipelineColuna): boolean => {
+    if (conversa.is_interno) return false;
     if (!coluna.sla_minutos || !conversa.ultima_resposta_cliente_at) return false;
     const lastClientMsg = new Date(conversa.ultima_resposta_cliente_at);
     if (conversa.ultima_resposta_operador_at) {
@@ -712,7 +714,8 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center justify-between">
                                 <h4 className="text-xs font-medium text-white/85 truncate flex items-center gap-1">
-                                  {conversa.is_group && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
+                                  {conversa.is_interno && <span className="text-[9px] px-1 py-0.5 rounded bg-amber-500/20 text-amber-400 flex-shrink-0 font-semibold">Interno</span>}
+                                  {conversa.is_group && !conversa.is_interno && <span className="text-[9px] px-1 py-0.5 rounded bg-emerald-500/15 text-emerald-400 flex-shrink-0">Grupo</span>}
                                   {conversa.cliente_nome || conversa.cliente_telefone}
                                 </h4>
                                 <span className="text-[10px] text-white/20 ml-1 flex-shrink-0">

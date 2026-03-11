@@ -196,7 +196,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       })()
     ]);
 
-    const conversas = conversasResult.data || [];
+    const conversas = (conversasResult.data || []).filter((c: any) => !c.is_interno);
     const colunas = colunasResult.data || [];
     const metrics = metricsResult.data as ResponseMetrics | null;
 
