@@ -171,13 +171,6 @@ Deno.serve(async (req: Request) => {
         .update(osUpdateData)
         .eq('id', linkData.os_id);
 
-      if (status === 'aprovado') {
-        await supabase
-          .from('os')
-          .update({ bloqueio_movimentacao_automatica: false })
-          .eq('id', linkData.os_id);
-      }
-
       return new Response(
         JSON.stringify({ success: true, message: 'Resposta registrada com sucesso' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -466,6 +466,7 @@ Assistencia Tecnica Samsung`;
           orcamento_aprovado_por: usuario?.id,
           valor_quando_aprovado: valorAtual,
           versao_quando_aprovado: versaoAtual,
+          bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);

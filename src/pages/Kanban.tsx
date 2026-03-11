@@ -1126,6 +1126,7 @@ export function Kanban() {
         .update({
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
+          bloqueio_movimentacao_automatica: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', draggedCard.id)
@@ -1306,7 +1307,7 @@ export function Kanban() {
     try {
       const { error } = await supabase
         .from('os')
-        .update({ coluna_kanban: targetColumn, updated_at: new Date().toISOString() })
+        .update({ coluna_kanban: targetColumn, bloqueio_movimentacao_automatica: false, updated_at: new Date().toISOString() })
         .eq('id', osId);
       if (error) throw error;
 
@@ -1438,6 +1439,7 @@ export function Kanban() {
           sequencia_coluna: novaSequencia,
           rota_id: rotaIdReal,
           cliente_cidade: cidadeCorrigida,
+          bloqueio_movimentacao_automatica: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
