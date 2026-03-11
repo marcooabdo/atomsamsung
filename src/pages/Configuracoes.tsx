@@ -759,12 +759,13 @@ export function Configuracoes() {
   };
 
   const saveTaxaFromInputs = (taxaId: string) => {
-    const inputCredito = document.getElementById(`taxa-${taxaId}`) as HTMLInputElement;
-    const inputDebito = document.getElementById(`debito-${taxaId}`) as HTMLInputElement;
+    const inputCredito = document.getElementById(`taxa-${taxaId}`) as HTMLInputElement | null;
+    const inputDebito = document.getElementById(`debito-${taxaId}`) as HTMLInputElement | null;
+    if (!inputCredito) return;
     handleSaveTaxa(
       taxaId,
       parseFloat(inputCredito.value) || 0,
-      parseFloat(inputDebito?.value || '0') || 0
+      inputDebito ? parseFloat(inputDebito.value) || 0 : 0
     );
   };
 
