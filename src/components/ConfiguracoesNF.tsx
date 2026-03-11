@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle, Calculator, Globe, Landmark, Filter, Code, Info } from 'lucide-react';
+import { Plus, CreditCard as Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle, Calculator, Globe, Landmark, Filter, Code, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
