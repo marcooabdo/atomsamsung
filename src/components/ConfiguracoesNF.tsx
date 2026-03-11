@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { Plus, Edit, Trash2, Save, X, Receipt, FileText, Building2, Percent, AlertCircle, CheckCircle, Calculator, Globe, Landmark, Filter, Code, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface NFConfig {
   id: string;
@@ -187,11 +188,15 @@ const FORM_INICIAL = {
 const ESTADOS_BRASIL = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
 export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
+  const { usuario } = useAuth();
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const filteredUnidades = canSeeAllUnits ? unidades : unidades.filter(u => u.id === usuario?.unidade_id);
+
   const [configs, setConfigs] = useState<NFConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [selectedUnidade, setSelectedUnidade] = useState<string>('');
+  const [selectedUnidade, setSelectedUnidade] = useState<string>(canSeeAllUnits ? '' : (usuario?.unidade_id || ''));
   const [form, setForm] = useState(FORM_INICIAL);
   const [saving, setSaving] = useState(false);
   const [mensagem, setMensagem] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
@@ -341,7 +346,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       });
     } else {
       setEditingId(null);
-      setForm({ ...FORM_INICIAL, unidade_id: selectedUnidade || unidades[0]?.id || '' });
+      setForm({ ...FORM_INICIAL, unidade_id: canSeeAllUnits ? (selectedUnidade || unidades[0]?.id || '') : (usuario?.unidade_id || '') });
     }
     setShowModal(true);
   };
@@ -587,16 +592,22 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-4">
           <label className="text-sm text-gray-400">Filtrar por Unidade:</label>
-          <select
-            value={selectedUnidade}
-            onChange={(e) => setSelectedUnidade(e.target.value)}
-            className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-          >
-            <option value="">Todas as unidades</option>
-            {unidades.map(u => (
-              <option key={u.id} value={u.id}>{u.nome}</option>
-            ))}
-          </select>
+          {canSeeAllUnits ? (
+            <select
+              value={selectedUnidade}
+              onChange={(e) => setSelectedUnidade(e.target.value)}
+              className="px-4 py-2 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+            >
+              <option value="">Todas as unidades</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] text-sm font-medium">
+              {filteredUnidades[0]?.nome || 'Sem unidade'}
+            </span>
+          )}
         </div>
 
         <button
@@ -812,16 +823,22 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   <label className="block text-xs font-medium text-gray-400 mb-1.5">
                     Unidade *
                   </label>
-                  <select
-                    value={form.unidade_id}
-                    onChange={(e) => setForm(prev => ({ ...prev, unidade_id: e.target.value }))}
-                    className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                  >
-                    <option value="">Selecione...</option>
-                    {unidades.map(u => (
-                      <option key={u.id} value={u.id}>{u.nome}</option>
-                    ))}
-                  </select>
+                  {canSeeAllUnits ? (
+                    <select
+                      value={form.unidade_id}
+                      onChange={(e) => setForm(prev => ({ ...prev, unidade_id: e.target.value }))}
+                      className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                    >
+                      <option value="">Selecione...</option>
+                      {unidades.map(u => (
+                        <option key={u.id} value={u.id}>{u.nome}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <div className="w-full px-4 py-2.5 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/20 text-[#00D4FF] text-sm font-medium">
+                      {filteredUnidades[0]?.nome || 'Sem unidade'}
+                    </div>
+                  )}
                 </div>
               </div>
 

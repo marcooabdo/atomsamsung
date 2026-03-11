@@ -130,10 +130,13 @@ export function Configuracoes() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTaxa, setEditingTaxa] = useState<string | null>(null);
-  const [selectedUnidadeMarkup, setSelectedUnidadeMarkup] = useState<string>('');
-  const [selectedUnidadeTaxa, setSelectedUnidadeTaxa] = useState<string>('');
-  const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>('');
-  const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>('');
+  const canSeeAllUnits = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') && !usuarioLogado?.unidade_id;
+  const userUnitId = usuarioLogado?.unidade_id || '';
+
+  const [selectedUnidadeMarkup, setSelectedUnidadeMarkup] = useState<string>(canSeeAllUnits ? '' : userUnitId);
+  const [selectedUnidadeTaxa, setSelectedUnidadeTaxa] = useState<string>(canSeeAllUnits ? '' : userUnitId);
+  const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>(canSeeAllUnits ? '' : userUnitId);
+  const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>(canSeeAllUnits ? '' : userUnitId);
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
@@ -344,10 +347,11 @@ export function Configuracoes() {
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
-      setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
-      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal', ativo: true });
-      setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota, ativa: true });
-      setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist, itens: [], ativo: true });
+      const defaultUnitForForm = canSeeAllUnits ? '' : userUnitId;
+      setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: defaultUnitForForm, ativo: true });
+      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: defaultUnitForForm, tipo_orcamento: 'normal', ativo: true });
+      setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota || defaultUnitForForm, ativa: true });
+      setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist || defaultUnitForForm, itens: [], ativo: true });
     }
     setShowModal(true);
   };
@@ -1192,13 +1196,17 @@ export function Configuracoes() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Unidade</label>
-                    <select value={formServico.unidade_id} onChange={(e) => setFormServico({...formServico, unidade_id: e.target.value})} className="neon-input">
-                      <option value="">Global (Todas as unidades)</option>
-                      {unidades.map(u => (
-                        <option key={u.id} value={u.id}>{u.nome}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Deixe "Global" para disponibilizar em todas as unidades</p>
+                    {canSeeAllUnits ? (
+                      <select value={formServico.unidade_id} onChange={(e) => setFormServico({...formServico, unidade_id: e.target.value})} className="neon-input">
+                        <option value="">Global (Todas as unidades)</option>
+                        {unidades.map(u => (
+                          <option key={u.id} value={u.id}>{u.nome}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="neon-input opacity-70">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">{canSeeAllUnits ? 'Deixe "Global" para disponibilizar em todas as unidades' : 'Servico sera vinculado a sua unidade'}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id="ativo-servico" checked={formServico.ativo} onChange={(e) => setFormServico({...formServico, ativo: e.target.checked})} className="w-4 h-4" />
@@ -1284,18 +1292,22 @@ export function Configuracoes() {
                   </div>
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Unidade</label>
-                    <select
-                      value={formMarkup.unidade_id || ''}
-                      onChange={(e) => setFormMarkup({...formMarkup, unidade_id: e.target.value || ''})}
-                      className="neon-input"
-                    >
-                      <option value="">Global (Todas as unidades)</option>
-                      {unidades.map(u => (
-                        <option key={u.id} value={u.id}>{u.nome}</option>
-                      ))}
-                    </select>
+                    {canSeeAllUnits ? (
+                      <select
+                        value={formMarkup.unidade_id || ''}
+                        onChange={(e) => setFormMarkup({...formMarkup, unidade_id: e.target.value || ''})}
+                        className="neon-input"
+                      >
+                        <option value="">Global (Todas as unidades)</option>
+                        {unidades.map(u => (
+                          <option key={u.id} value={u.id}>{u.nome}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="neon-input opacity-70">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                    )}
                     <p className="text-xs text-gray-500 mt-1">
-                      {formMarkup.unidade_id ? 'Markup será aplicado apenas para esta unidade' : 'Markup global será aplicado para todas as unidades'}
+                      {canSeeAllUnits ? (formMarkup.unidade_id ? 'Markup sera aplicado apenas para esta unidade' : 'Markup global sera aplicado para todas as unidades') : 'Markup sera vinculado a sua unidade'}
                     </p>
                   </div>
                   <div>
@@ -1556,17 +1568,21 @@ export function Configuracoes() {
 
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Unidade</label>
-                    <select
-                      value={formChecklist.unidade_id}
-                      onChange={(e) => setFormChecklist({...formChecklist, unidade_id: e.target.value})}
-                      className="neon-input"
-                    >
-                      <option value="">Global (Todas as unidades)</option>
-                      {unidades.map(u => (
-                        <option key={u.id} value={u.id}>{u.nome}</option>
-                      ))}
-                    </select>
-                    <p className="text-xs text-gray-500 mt-1">Templates globais são compartilhados entre todas as unidades</p>
+                    {canSeeAllUnits ? (
+                      <select
+                        value={formChecklist.unidade_id}
+                        onChange={(e) => setFormChecklist({...formChecklist, unidade_id: e.target.value})}
+                        className="neon-input"
+                      >
+                        <option value="">Global (Todas as unidades)</option>
+                        {unidades.map(u => (
+                          <option key={u.id} value={u.id}>{u.nome}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="neon-input opacity-70">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                    )}
+                    <p className="text-xs text-gray-500 mt-1">{canSeeAllUnits ? 'Templates globais sao compartilhados entre todas as unidades' : 'Template sera vinculado a sua unidade'}</p>
                   </div>
 
                   <div className="premium-card p-4 bg-[#3b82f6]/5 border border-[#3b82f6]/20">
@@ -1820,7 +1836,7 @@ export function Configuracoes() {
                         <p className="text-gray-500 text-sm">Nenhuma unidade cadastrada</p>
                       </div>
                     ) : (
-                      unidades.map((unidade) => (
+                      (canSeeAllUnits ? unidades : unidades.filter(u => u.id === userUnitId)).map((unidade) => (
                         <div key={unidade.id} className="premium-card p-4 hover-lift">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -1992,18 +2008,25 @@ export function Configuracoes() {
                   <div className="space-y-4">
                     <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
                       <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Selecione a Unidade</label>
-                      <select
-                        value={selectedUnidadeMarkup}
-                        onChange={(e) => setSelectedUnidadeMarkup(e.target.value)}
-                        className="neon-input"
-                      >
-                        <option value="">Global (Todas as unidades)</option>
-                        {unidades.map(u => (
-                          <option key={u.id} value={u.id}>{u.nome}</option>
-                        ))}
-                      </select>
+                      {canSeeAllUnits ? (
+                        <select
+                          value={selectedUnidadeMarkup}
+                          onChange={(e) => setSelectedUnidadeMarkup(e.target.value)}
+                          className="neon-input"
+                        >
+                          <option value="">Global (Todas as unidades)</option>
+                          {unidades.map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="neon-input text-[#00D4FF] font-medium">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                      )}
                       <p className="text-xs text-gray-500 mt-2">
-                        {selectedUnidadeMarkup ? `Visualizando markups de ${unidades.find(u => u.id === selectedUnidadeMarkup)?.nome}` : 'Visualizando todos os markups (globais e de todas as unidades)'}
+                        {canSeeAllUnits
+                          ? (selectedUnidadeMarkup ? `Visualizando markups de ${unidades.find(u => u.id === selectedUnidadeMarkup)?.nome}` : 'Visualizando todos os markups (globais e de todas as unidades)')
+                          : `Visualizando markups da sua unidade`
+                        }
                       </p>
                     </div>
 
@@ -2117,16 +2140,20 @@ export function Configuracoes() {
                   <div className="space-y-4">
                     <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
                       <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Selecione a Unidade</label>
-                      <select
-                        value={selectedUnidadeTaxa}
-                        onChange={(e) => setSelectedUnidadeTaxa(e.target.value)}
-                        className="neon-input"
-                      >
-                        <option value="" disabled>Selecione uma unidade...</option>
-                        {unidades.map(u => (
-                          <option key={u.id} value={u.id}>{u.nome}</option>
-                        ))}
-                      </select>
+                      {canSeeAllUnits ? (
+                        <select
+                          value={selectedUnidadeTaxa}
+                          onChange={(e) => setSelectedUnidadeTaxa(e.target.value)}
+                          className="neon-input"
+                        >
+                          <option value="" disabled>Selecione uma unidade...</option>
+                          {unidades.map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="neon-input text-[#00D4FF] font-medium">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                      )}
                       <p className="text-xs text-gray-500 mt-2">
                         {selectedUnidadeTaxa ? `Configurando taxas para ${unidades.find(u => u.id === selectedUnidadeTaxa)?.nome}` : 'Selecione uma unidade para configurar suas taxas'}
                       </p>
@@ -2266,16 +2293,20 @@ export function Configuracoes() {
                   <div className="space-y-4">
                     <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
                       <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Selecione a Unidade *</label>
-                      <select
-                        value={selectedUnidadeRota}
-                        onChange={(e) => setSelectedUnidadeRota(e.target.value)}
-                        className="neon-input"
-                      >
-                        <option value="">Selecione uma unidade</option>
-                        {unidades.map(u => (
-                          <option key={u.id} value={u.id}>{u.nome}</option>
-                        ))}
-                      </select>
+                      {canSeeAllUnits ? (
+                        <select
+                          value={selectedUnidadeRota}
+                          onChange={(e) => setSelectedUnidadeRota(e.target.value)}
+                          className="neon-input"
+                        >
+                          <option value="">Selecione uma unidade</option>
+                          {unidades.map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="neon-input text-[#00D4FF] font-medium">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                      )}
                       <p className="text-xs text-gray-500 mt-2">
                         {selectedUnidadeRota
                           ? `Visualizando as 7 rotas de ${unidades.find(u => u.id === selectedUnidadeRota)?.nome}. Cada unidade tem suas próprias rotas com cidades específicas.`
@@ -2376,18 +2407,22 @@ export function Configuracoes() {
                   <div className="space-y-4">
                     <div className="premium-card p-4 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
                       <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2">Filtrar por Unidade</label>
-                      <select
-                        value={selectedUnidadeChecklist}
-                        onChange={(e) => setSelectedUnidadeChecklist(e.target.value)}
-                        className="neon-input"
-                      >
-                        <option value="">Todas (Globais e Específicas)</option>
-                        {unidades.map(u => (
-                          <option key={u.id} value={u.id}>{u.nome}</option>
-                        ))}
-                      </select>
+                      {canSeeAllUnits ? (
+                        <select
+                          value={selectedUnidadeChecklist}
+                          onChange={(e) => setSelectedUnidadeChecklist(e.target.value)}
+                          className="neon-input"
+                        >
+                          <option value="">Todas (Globais e Especificas)</option>
+                          {unidades.map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="neon-input text-[#00D4FF] font-medium">{unidades.find(u => u.id === userUnitId)?.nome || 'Sua unidade'}</div>
+                      )}
                       <p className="text-xs text-gray-500 mt-2">
-                        Templates globais (sem unidade) são compartilhados entre todas as unidades.
+                        {canSeeAllUnits ? 'Templates globais (sem unidade) sao compartilhados entre todas as unidades.' : 'Visualizando checklists da sua unidade e globais.'}
                       </p>
                     </div>
 
