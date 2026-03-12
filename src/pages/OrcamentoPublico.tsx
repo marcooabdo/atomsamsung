@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import {
-  CheckCircle, XCircle, Loader2, Phone, MapPin, Package, Wrench,
+  CheckCircle, XCircle, MessageCircle, Loader2, Phone, MapPin, Package, Wrench,
   AlertCircle, Camera, FileText, User, Cpu, Calendar, Image, ShieldCheck,
   Clock, ChevronRight, Star
 } from 'lucide-react';
@@ -31,7 +31,7 @@ interface OrcamentoData {
   link: {
     id: string;
     os_id: string;
-    status: 'pendente' | 'aprovado' | 'rejeitado';
+    status: 'pendente' | 'aprovado' | 'rejeitado' | 'negociando';
     data_resposta: string | null;
     expires_at: string | null;
   };
@@ -100,7 +100,7 @@ export function OrcamentoPublico() {
   const [data, setData] = useState<OrcamentoData | null>(null);
   const [error, setError] = useState('');
   const [responding, setResponding] = useState(false);
-  const [selectedAction, setSelectedAction] = useState<'aprovado' | 'rejeitado' | null>(null);
+  const [selectedAction, setSelectedAction] = useState<'aprovado' | 'rejeitado' | 'negociando' | null>(null);
   const [mensagem, setMensagem] = useState('');
   const [showSuccess, setShowSuccess] = useState(false);
   const [showCamera, setShowCamera] = useState(false);
@@ -198,7 +198,7 @@ export function OrcamentoPublico() {
   const iniciarCapturaLocalizacaoESelfie = async () => {
     if (!selectedAction) return;
 
-    if (selectedAction === 'rejeitado' && !mensagem.trim()) {
+    if ((selectedAction === 'rejeitado' || selectedAction === 'negociando') && !mensagem.trim()) {
       alert('Por favor, escreva uma mensagem explicando o motivo.');
       return;
     }
@@ -293,8 +293,8 @@ export function OrcamentoPublico() {
       if (yPos + height > pageHeight - 20) { doc.addPage(); yPos = 20; }
     };
 
-    const acaoTitulo = selectedAction === 'aprovado' ? 'APROVAÇÃO' : 'REJEIÇÃO';
-    const corHeader = selectedAction === 'aprovado' ? [34, 197, 94] : [239, 68, 68];
+    const acaoTitulo = selectedAction === 'aprovado' ? 'APROVAÇÃO' : selectedAction === 'rejeitado' ? 'REJEIÇÃO' : 'NEGOCIAÇÃO';
+    const corHeader = selectedAction === 'aprovado' ? [34, 197, 94] : selectedAction === 'rejeitado' ? [239, 68, 68] : [245, 158, 11];
 
     doc.setFillColor(30, 64, 175);
     doc.rect(0, 0, pageWidth, 35, 'F');
@@ -319,31 +319,16 @@ export function OrcamentoPublico() {
     doc.setDrawColor(200, 200, 200);
     doc.line(margin, yPos, pageWidth - margin, yPos);
     yPos += 10;
-    doc.setTextColor(0, 0, 0);
 
     addText('DADOS DO CLIENTE', 11, 'bold');
     addText(`Nome: ${data?.os.cliente_nome || ''}`);
     if (data?.os.cliente_cpf_cnpj) addText(`CPF/CNPJ: ${data.os.cliente_cpf_cnpj}`);
     addText(`Telefone: ${data?.os.cliente_telefone || ''}`);
-    const pdfClienteEndereco = data?.os.cliente_logradouro
-      ? `${data.os.cliente_logradouro}${data.os.cliente_numero ? `, ${data.os.cliente_numero}` : ''}${data.os.cliente_bairro ? ` - ${data.os.cliente_bairro}` : ''}${data.os.cliente_cidade ? `, ${data.os.cliente_cidade}` : ''}${data.os.cliente_estado ? `/${data.os.cliente_estado}` : ''}${data.os.cliente_cep ? ` - ${data.os.cliente_cep}` : ''}`
-      : data?.os.cliente_endereco || '';
-    if (pdfClienteEndereco) addText(`Endereco: ${pdfClienteEndereco}`);
     yPos += 5;
 
     addText('EQUIPAMENTO', 11, 'bold');
     addText(`Marca/Modelo: ${data?.os.aparelho_marca || ''} ${data?.os.aparelho_modelo || ''}`);
-    if (data?.os.aparelho_numero_serie) addText(`Numero de Serie: ${data.os.aparelho_numero_serie}`);
     if (data?.os.aparelho_imei) addText(`IMEI: ${data.os.aparelho_imei}`);
-    addText(`Data de Abertura: ${new Date(data?.os.data_abertura || '').toLocaleDateString('pt-BR')}`);
-    yPos += 5;
-
-    checkPageBreak(40);
-    addText('DEFEITO E DIAGNOSTICO', 11, 'bold');
-    addText(`Defeito Relatado: ${data?.os.defeito_relatado || 'Nao informado'}`);
-    if (data?.os.diagnostico_tecnico) {
-      addText(`Diagnostico Tecnico: ${data.os.diagnostico_tecnico}`);
-    }
     yPos += 5;
 
     if (data?.os.cotacao) {
@@ -376,38 +361,6 @@ export function OrcamentoPublico() {
       addText(`TOTAL: R$ ${data.os.cotacao.valor_liquido.toFixed(2)}`, 12, 'bold');
     }
 
-    if (data?.os.termos) {
-      const { termo_orcamento, termo_garantia, observacoes_gerais, canais_atendimento } = data.os.termos;
-      if (termo_orcamento || termo_garantia || observacoes_gerais || canais_atendimento) {
-        checkPageBreak(40);
-        yPos += 5;
-        addText('TERMOS E CONDICOES', 11, 'bold');
-        if (termo_orcamento) {
-          addText('Termos do Orcamento:', 10, 'bold');
-          addText(termo_orcamento, 9);
-          yPos += 3;
-        }
-        if (termo_garantia) {
-          checkPageBreak(20);
-          addText('Termos de Garantia:', 10, 'bold');
-          addText(termo_garantia, 9);
-          yPos += 3;
-        }
-        if (observacoes_gerais) {
-          checkPageBreak(20);
-          addText('Observacoes:', 10, 'bold');
-          addText(observacoes_gerais, 9);
-          yPos += 3;
-        }
-        if (canais_atendimento) {
-          checkPageBreak(20);
-          addText('Canais de Atendimento:', 10, 'bold');
-          addText(canais_atendimento, 9);
-          yPos += 3;
-        }
-      }
-    }
-
     checkPageBreak(50);
     yPos += 10;
     doc.setFillColor(corHeader[0], corHeader[1], corHeader[2]);
@@ -415,7 +368,7 @@ export function OrcamentoPublico() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    const statusTexto = selectedAction === 'aprovado' ? 'ORCAMENTO APROVADO PELO CLIENTE' : 'ORCAMENTO REJEITADO PELO CLIENTE';
+    const statusTexto = selectedAction === 'aprovado' ? 'ORCAMENTO APROVADO PELO CLIENTE' : selectedAction === 'rejeitado' ? 'ORCAMENTO REJEITADO PELO CLIENTE' : 'CLIENTE SOLICITOU NEGOCIACAO';
     doc.text(statusTexto, pageWidth / 2, yPos + 5, { align: 'center' });
     doc.setFontSize(10);
     doc.text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos + 15, { align: 'center' });
@@ -424,7 +377,7 @@ export function OrcamentoPublico() {
 
     if (mensagem.trim()) {
       checkPageBreak(40);
-      const labelMensagem = selectedAction === 'aprovado' ? 'OBSERVACOES DO CLIENTE:' : 'MOTIVO DA REJEICAO:';
+      const labelMensagem = selectedAction === 'aprovado' ? 'OBSERVACOES DO CLIENTE:' : selectedAction === 'rejeitado' ? 'MOTIVO DA REJEICAO:' : 'PROPOSTA/SOLICITACAO DO CLIENTE:';
       addText(labelMensagem, 11, 'bold');
       doc.setFillColor(245, 245, 245);
       const mensagemLines = doc.splitTextToSize(mensagem.trim(), pageWidth - margin * 2 - 10);
@@ -515,13 +468,13 @@ export function OrcamentoPublico() {
       const latitude = localizacaoCapturada?.latitude || null;
       const longitude = localizacaoCapturada?.longitude || null;
       const enderecoCompleto = localizacaoCapturada?.endereco || null;
-      const acaoLog = selectedAction === 'aprovado' ? 'aprovado' : 'reprovado';
+      const acaoLog = selectedAction === 'aprovado' ? 'aprovado' : selectedAction === 'rejeitado' ? 'reprovado' : 'negociacao';
       await logAcao(acaoLog, data.link.id, data.link.os_id, mensagem.trim() || null, latitude, longitude, enderecoCompleto);
 
       let pdfUrl: string | null = null;
       try {
         const pdfBlob = await gerarPDFCompleto();
-        const acaoNome = selectedAction === 'aprovado' ? 'aprovacao' : 'rejeicao';
+        const acaoNome = selectedAction === 'aprovado' ? 'aprovacao' : selectedAction === 'rejeitado' ? 'rejeicao' : 'negociacao';
         const pdfFileName = `${data.os.numero_os_interna}/comprovante-${acaoNome}-${Date.now()}.pdf`;
         const { error: uploadError } = await supabase.storage.from('os-anexos').upload(pdfFileName, pdfBlob, { upsert: true, contentType: 'application/pdf' });
         if (!uploadError) {
@@ -529,7 +482,7 @@ export function OrcamentoPublico() {
           pdfUrl = publicUrl;
           const { data: linkData } = await supabase.from('orcamento_links').select('os_id').eq('token', token).maybeSingle();
           if (linkData?.os_id) {
-            const descricaoAnexo = selectedAction === 'aprovado' ? 'Comprovante de APROVACAO do orcamento pelo cliente' : 'Comprovante de REJEICAO do orcamento pelo cliente';
+            const descricaoAnexo = selectedAction === 'aprovado' ? 'Comprovante de APROVACAO do orcamento pelo cliente' : selectedAction === 'rejeitado' ? 'Comprovante de REJEICAO do orcamento pelo cliente' : 'Comprovante de NEGOCIACAO do orcamento pelo cliente';
             await supabase.from('os_anexos').insert({ os_id: linkData.os_id, url: pdfUrl, tipo: 'pdf', nome_arquivo: `comprovante-${acaoNome}-${data.os.numero_os_interna}.pdf`, descricao: descricaoAnexo });
           }
         }
@@ -601,6 +554,7 @@ export function OrcamentoPublico() {
           <p className="text-slate-500 mb-6">
             {selectedAction === 'aprovado' && 'Obrigado por aprovar o orçamento! Em breve entraremos em contato para agendar o reparo.'}
             {selectedAction === 'rejeitado' && 'Recebemos sua rejeição. Entraremos em contato para entender melhor sua situação.'}
+            {selectedAction === 'negociando' && 'Recebemos sua mensagem. Vamos analisar e retornar em breve com uma proposta.'}
           </p>
           <p className="text-sm text-slate-400">Você pode fechar esta página com segurança.</p>
         </div>
@@ -711,10 +665,12 @@ export function OrcamentoPublico() {
           {/* Status bar */}
           {jaRespondido && (
             <div className={`px-5 sm:px-6 py-3 flex items-center gap-2 ${
-              link.status === 'aprovado' ? 'bg-green-600' : 'bg-red-600'
+              link.status === 'aprovado' ? 'bg-green-600' :
+              link.status === 'rejeitado' ? 'bg-red-600' : 'bg-amber-500'
             }`}>
               {link.status === 'aprovado' && <><CheckCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Aprovado</span></>}
               {link.status === 'rejeitado' && <><XCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Orçamento Rejeitado</span></>}
+              {link.status === 'negociando' && <><MessageCircle className="w-4 h-4 text-white" /><span className="text-white text-sm font-semibold">Em Negociação</span></>}
               {link.data_resposta && (
                 <span className="text-white/80 text-xs ml-auto">
                   {new Date(link.data_resposta).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -1071,20 +1027,26 @@ export function OrcamentoPublico() {
         {/* Ação */}
         {jaRespondido ? (
           <div className={`rounded-2xl p-6 border-2 flex items-start gap-4 ${
-            link.status === 'aprovado' ? 'bg-green-50 border-green-300' : 'bg-red-50 border-red-300'
+            link.status === 'aprovado' ? 'bg-green-50 border-green-300' :
+            link.status === 'rejeitado' ? 'bg-red-50 border-red-300' :
+            'bg-amber-50 border-amber-300'
           }`}>
             <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-              link.status === 'aprovado' ? 'bg-green-100' : 'bg-red-100'
+              link.status === 'aprovado' ? 'bg-green-100' :
+              link.status === 'rejeitado' ? 'bg-red-100' : 'bg-amber-100'
             }`}>
               {link.status === 'aprovado' && <CheckCircle className="w-6 h-6 text-green-600" />}
               {link.status === 'rejeitado' && <XCircle className="w-6 h-6 text-red-600" />}
+              {link.status === 'negociando' && <MessageCircle className="w-6 h-6 text-amber-600" />}
             </div>
             <div>
               <p className={`font-bold text-base ${
-                link.status === 'aprovado' ? 'text-green-800' : 'text-red-800'
+                link.status === 'aprovado' ? 'text-green-800' :
+                link.status === 'rejeitado' ? 'text-red-800' : 'text-amber-800'
               }`}>
                 {link.status === 'aprovado' && 'Orçamento Aprovado'}
                 {link.status === 'rejeitado' && 'Orçamento Rejeitado'}
+                {link.status === 'negociando' && 'Em Negociação'}
               </p>
               <p className="text-sm text-slate-500 mt-0.5">
                 Respondido em {new Date(link.data_resposta!).toLocaleString('pt-BR')}
@@ -1096,7 +1058,7 @@ export function OrcamentoPublico() {
             <h3 className="text-lg font-bold text-slate-800 mb-1 text-center">O que você decide?</h3>
             <p className="text-sm text-slate-400 text-center mb-6">Selecione uma opção abaixo para enviar sua resposta</p>
 
-            <div className="grid grid-cols-2 gap-3 mb-6">
+            <div className="grid grid-cols-3 gap-3 mb-6">
               <button
                 onClick={() => { setSelectedAction('aprovado'); setMensagem(''); }}
                 className={`p-4 rounded-2xl border-2 transition-all text-center ${
@@ -1111,6 +1073,22 @@ export function OrcamentoPublico() {
                   <CheckCircle className={`w-5 h-5 ${selectedAction === 'aprovado' ? 'text-green-600' : 'text-slate-400'}`} />
                 </div>
                 <p className={`font-bold text-xs sm:text-sm ${selectedAction === 'aprovado' ? 'text-green-700' : 'text-slate-600'}`}>Aprovar</p>
+              </button>
+
+              <button
+                onClick={() => setSelectedAction('negociando')}
+                className={`p-4 rounded-2xl border-2 transition-all text-center ${
+                  selectedAction === 'negociando'
+                    ? 'border-amber-500 bg-amber-50 shadow-md shadow-amber-100'
+                    : 'border-slate-200 hover:border-amber-300 bg-white hover:bg-amber-50/50'
+                }`}
+              >
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-2 transition-colors ${
+                  selectedAction === 'negociando' ? 'bg-amber-100' : 'bg-slate-100'
+                }`}>
+                  <MessageCircle className={`w-5 h-5 ${selectedAction === 'negociando' ? 'text-amber-600' : 'text-slate-400'}`} />
+                </div>
+                <p className={`font-bold text-xs sm:text-sm ${selectedAction === 'negociando' ? 'text-amber-700' : 'text-slate-600'}`}>Negociar</p>
               </button>
 
               <button
@@ -1133,7 +1111,7 @@ export function OrcamentoPublico() {
             {selectedAction && selectedAction !== 'aprovado' && (
               <div className="mb-5">
                 <label className="block text-sm font-semibold text-slate-700 mb-2">
-                  Motivo da rejeição:
+                  {selectedAction === 'negociando' ? 'Sua proposta ou dúvida:' : 'Motivo da rejeição:'}
                   <span className="text-red-500 ml-1">*</span>
                 </label>
                 <textarea
@@ -1141,7 +1119,7 @@ export function OrcamentoPublico() {
                   onChange={(e) => setMensagem(e.target.value)}
                   className="w-full px-4 py-3 border border-slate-200 rounded-xl text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none bg-slate-50 placeholder-slate-400"
                   rows={4}
-                  placeholder="Por favor, explique o motivo..."
+                  placeholder={selectedAction === 'negociando' ? 'Ex: Gostaria de negociar o valor das peças...' : 'Por favor, explique o motivo...'}
                 />
               </div>
             )}
@@ -1152,6 +1130,7 @@ export function OrcamentoPublico() {
                 disabled={responding || capturandoLocalizacao}
                 className={`w-full py-4 rounded-xl font-bold text-white transition-all disabled:opacity-50 flex items-center justify-center gap-2.5 shadow-lg ${
                   selectedAction === 'aprovado' ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 shadow-green-200' :
+                  selectedAction === 'negociando' ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 shadow-amber-200' :
                   'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 shadow-red-200'
                 }`}
               >
@@ -1162,8 +1141,9 @@ export function OrcamentoPublico() {
                 ) : (
                   <>
                     {selectedAction === 'aprovado' && <CheckCircle className="w-5 h-5" />}
+                    {selectedAction === 'negociando' && <MessageCircle className="w-5 h-5" />}
                     {selectedAction === 'rejeitado' && <XCircle className="w-5 h-5" />}
-                    {selectedAction === 'aprovado' ? 'Confirmar Aprovação' : 'Confirmar Rejeição'}
+                    {selectedAction === 'aprovado' ? 'Confirmar Aprovação' : selectedAction === 'negociando' ? 'Enviar Proposta' : 'Confirmar Rejeição'}
                   </>
                 )}
               </button>

@@ -2,7 +2,6 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { getStoragePublicUrl } from '../lib/storageUtils';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -297,8 +296,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     }
   }, [osId, mode]);
 
+  // Carrega markups quando a OS for carregada (para OW)
   useEffect(() => {
-    if (os?.tipo_os === 'OW' && os?.unidade_id) {
+    if (os?.tipo_os === 'OW' && os?.unidade_id && os?.tipo_orcamento) {
       loadMarkups();
     }
   }, [os?.tipo_os, os?.unidade_id, os?.tipo_orcamento]);
@@ -803,23 +803,33 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const loadMarkups = async () => {
-    if (!os?.unidade_id) {
+    if (!os?.unidade_id || !os?.tipo_orcamento) {
+      console.log('⚠️ Markups não carregados - faltam dados:', {
+        unidade_id: os?.unidade_id,
+        tipo_orcamento: os?.tipo_orcamento,
+        os_completa: os
+      });
       setMarkups([]);
       return;
     }
 
-    const tipoOrc = os.tipo_orcamento || 'normal';
+    console.log('🔍 Carregando markups para:', {
+      unidade_id: os.unidade_id,
+      tipo_orcamento: os.tipo_orcamento,
+      tipo_os: os.tipo_os
+    });
 
     const { data, error } = await supabase
       .rpc('get_markup_for_unidade_and_tipo', {
         p_unidade_id: os.unidade_id,
-        p_tipo_orcamento: tipoOrc
+        p_tipo_orcamento: os.tipo_orcamento
       });
 
     if (error) {
-      console.error('Erro ao carregar markups:', error);
+      console.error('❌ Erro ao carregar markups:', error);
       setMarkups([]);
     } else {
+      console.log('✅ Markups carregados para tipo_orcamento "' + os.tipo_orcamento + '":', data);
       setMarkups(data || []);
     }
   };
@@ -4817,16 +4827,15 @@ Não haverá cobrança ao cliente.`
                     const isGSPN = anexo.origem === 'gspn_sync' || !!anexo.gspn_fileobjkey;
                     const isImage = anexo.tipo === 'foto' || /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i.test(anexo.nome_arquivo || '');
                     const isPDF = /\.pdf$/i.test(anexo.nome_arquivo || '');
-                    const resolvedUrl = anexo.url?.includes('://') ? anexo.url : getStoragePublicUrl(anexo.url || '');
 
                     return (
                       <div key={anexo.id} className="premium-card p-3 flex items-center gap-3">
                         <div
                           className="flex-shrink-0 w-14 h-14 rounded-lg overflow-hidden border border-white/10 bg-[#0A0F1E] flex items-center justify-center cursor-pointer hover:border-[#00D4FF]/50 transition-colors"
-                          onClick={() => setAnexoPreview({ ...anexo, url: resolvedUrl })}
+                          onClick={() => setAnexoPreview(anexo)}
                         >
-                          {isImage && resolvedUrl ? (
-                            <img src={resolvedUrl} alt={anexo.nome_arquivo} className="w-full h-full object-cover" />
+                          {isImage && anexo.url ? (
+                            <img src={anexo.url} alt={anexo.nome_arquivo} className="w-full h-full object-cover" />
                           ) : isPDF ? (
                             <FileDown className="w-6 h-6 text-red-400" />
                           ) : (
@@ -4872,7 +4881,7 @@ Não haverá cobrança ao cliente.`
                             </span>
                           </label>
                           <button
-                            onClick={() => setAnexoPreview({ ...anexo, url: resolvedUrl })}
+                            onClick={() => setAnexoPreview(anexo)}
                             className="neon-button text-xs px-3 py-1.5"
                           >
                             Abrir
