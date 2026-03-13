@@ -555,7 +555,7 @@ export default function MapaInteligente() {
                   {os.data_agendamento && (
                     <div className="flex items-center gap-1 text-xs text-gray-400 mt-1">
                       <Calendar className="w-3 h-3" />
-                      <span>{new Date(os.data_agendamento).toLocaleDateString('pt-BR')}</span>
+                      <span>{new Date(os.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
                       {os.periodo_agendamento && <span>({os.periodo_agendamento})</span>}
                     </div>
                   )}

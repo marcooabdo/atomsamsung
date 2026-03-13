@@ -266,7 +266,7 @@ export function AgendamentoLista({
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
                     <div className="flex items-center gap-2 text-gray-400">
                       <Calendar className="w-3 h-3 text-[#00D4FF]" />
-                      <span>{new Date(agendamento.data_agendamento).toLocaleDateString('pt-BR')}</span>
+                      <span>{new Date(agendamento.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}</span>
                     </div>
                     <div className="flex items-center gap-2 text-gray-400">
                       <Clock className="w-3 h-3 text-[#00D4FF]" />

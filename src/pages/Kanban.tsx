@@ -2659,7 +2659,7 @@ export function Kanban() {
                                       <CheckCircle className="w-2.5 h-2.5 text-[#39FF14]" />
                                     </div>
                                     <p className="text-[10px] text-gray-300 font-medium">
-                                      {new Date(os.data_agendamento).toLocaleDateString('pt-BR')}
+                                      {new Date(os.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                                     </p>
                                     {(os as any).tecnico_agendado?.nome && (
                                       <p className="text-[9px] text-gray-500 truncate">{(os as any).tecnico_agendado.nome}</p>
@@ -3980,7 +3980,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
 
           return {
             'Número OS': numeroOS,
-            'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento).toLocaleDateString('pt-BR') : '',
+            'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR') : '',
             'Período': a.periodo_agendamento || '',
             'Técnico Designado': nomeTecnico,
             'Cidade': os?.cliente_cidade || '',

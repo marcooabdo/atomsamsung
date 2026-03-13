@@ -267,7 +267,7 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
                     </div>
 
                     <p className="text-gray-300 text-xs">
-                      {new Date(visita.data_agendamento).toLocaleDateString('pt-BR')}
+                      {new Date(visita.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                     </p>
 
                     {os.tipo_atendimento !== 'IH' && (

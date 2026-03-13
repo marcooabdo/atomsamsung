@@ -216,7 +216,7 @@ export function CheckinModal({ agendamento, onClose, onSuccess }: CheckinModalPr
               <div>
                 <span className="text-gray-400">Data:</span>
                 <p className="text-white font-semibold">
-                  {new Date(agendamento.data_agendamento).toLocaleDateString('pt-BR')}
+                  {new Date(agendamento.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                 </p>
               </div>
               <div className="col-span-2">

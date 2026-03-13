@@ -60,7 +60,7 @@ export const AgendamentoPDF = forwardRef<HTMLDivElement, AgendamentoPDFProps>(
               <p className="text-sm text-gray-600">Data Agendada</p>
               <p className="font-semibold">
                 {agendamento.data_agendamento
-                  ? new Date(agendamento.data_agendamento).toLocaleDateString('pt-BR')
+                  ? new Date(agendamento.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')
                   : '-'}
               </p>
             </div>

@@ -638,7 +638,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 <div>
                   <span style={{ color: textSecondary }}>Data:</span>
                   <p className="font-medium" style={{ color: textPrimary }}>
-                    {new Date(osDetails.agendamento.data_agendamento).toLocaleDateString('pt-BR')}
+                    {new Date(osDetails.agendamento.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                   </p>
                 </div>
                 {osDetails.agendamento.tecnico_nome && (

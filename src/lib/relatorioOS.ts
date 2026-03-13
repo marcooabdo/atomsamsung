@@ -166,7 +166,7 @@ function gerarPDF(data: RelatorioOSData) {
 
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
-    doc.text(`Data Agendada: ${new Date(data.agendamento.data_agendamento).toLocaleDateString('pt-BR')}`, 14, yPos);
+    doc.text(`Data Agendada: ${new Date(data.agendamento.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}`, 14, yPos);
     yPos += 6;
     doc.text(`Período: ${formatPeriodo(data.agendamento.periodo)}`, 14, yPos);
     yPos += 6;

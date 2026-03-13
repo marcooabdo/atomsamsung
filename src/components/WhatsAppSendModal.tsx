@@ -252,7 +252,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
       else if (v === 'numero_os') vars[v] = osData?.numero_os || '';
       else if (v === 'equipamento') vars[v] = osData?.aparelho_modelo || '';
       else if (v === 'valor_total') vars[v] = osData?.valor_total?.toFixed(2) || '0.00';
-      else if (v === 'data_agendamento') vars[v] = osData?.data_agendamento ? new Date(osData.data_agendamento).toLocaleDateString('pt-BR') : '';
+      else if (v === 'data_agendamento') vars[v] = osData?.data_agendamento ? new Date(osData.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR') : '';
       else if (v === 'periodo') vars[v] = osData?.periodo_agendamento || 'manha';
       else vars[v] = '';
     }
