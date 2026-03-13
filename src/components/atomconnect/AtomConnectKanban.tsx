@@ -731,7 +731,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                               {conversa.os_id && osMap[conversa.os_id] && (
                               <p className="text-[10px] text-blue-400/70 flex items-center gap-0.5 mt-0.5 truncate">
                                 <FileText className="w-3 h-3 flex-shrink-0" />
-                                OS #{osMap[conversa.os_id].numero_os_interna || osMap[conversa.os_id].numero_os_samsung}
+                                OS #{osMap[conversa.os_id].numero_os_samsung || osMap[conversa.os_id].numero_os_interna}
                               </p>
                               )}
                             </div>

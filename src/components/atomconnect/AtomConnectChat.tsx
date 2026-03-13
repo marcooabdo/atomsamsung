@@ -1624,7 +1624,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 {osData && (
                 <p className="text-[10px] text-blue-400/80 flex items-center gap-1 mt-0.5">
                   <FileText className="w-3 h-3" />
-                  OS #{osData.numero_os_interna || osData.numero_os_samsung}
+                  OS #{osData.numero_os_samsung || osData.numero_os_interna}
                 </p>
                 )}
                 {typingStatus ? (
@@ -1749,7 +1749,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             {osData && (
               <span className="flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] bg-blue-500/20 text-blue-400">
                 <Link2 className="w-3 h-3" />
-                OS #{osData.numero_os_interna || osData.numero_os_samsung}
+                OS #{osData.numero_os_samsung || osData.numero_os_interna}
               </span>
             )}
 
@@ -2860,7 +2860,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                           <FileText className="w-4 h-4 text-gray-600 group-hover:text-cyan-400 flex-shrink-0 transition-colors" />
                           <div className="flex items-center gap-2 flex-1 min-w-0">
                             <span className="text-[11px] font-semibold text-cyan-400 flex-shrink-0">
-                              #{os.numero_os_interna || os.numero_os_samsung || '---'}
+                              #{os.numero_os_samsung || os.numero_os_interna || '---'}
                             </span>
                             <span className="text-[11px] text-white/70 truncate">
                               {os.cliente_nome || 'Sem nome'}

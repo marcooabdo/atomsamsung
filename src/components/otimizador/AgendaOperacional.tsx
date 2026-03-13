@@ -281,8 +281,8 @@ export default function AgendaOperacional() {
                         onClick={e => { e.stopPropagation(); setSelectedOSId(ag.id); }}
                         className="px-1 py-0.5 rounded text-[10px] cursor-pointer hover:opacity-80"
                         style={{ backgroundColor: `${ag.rota?.cor || '#3B82F6'}30`, borderLeft: `2px solid ${ag.rota?.cor || '#3B82F6'}` }}
-                        title={`${ag.numero_os_interna} - ${ag.tecnico?.nome || ''}`}>
-                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_interna}</span>
+                        title={`${ag.numero_os_samsung || ag.numero_os_interna} - ${ag.tecnico?.nome || ''}`}>
+                        <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.numero_os_interna}</span>
                       </div>
                     ))}
                     {dayAg.length > 3 && <div className="text-[10px] text-center" style={{ color: 'var(--text-tertiary)' }}>+{dayAg.length - 3}</div>}
@@ -328,7 +328,7 @@ export default function AgendaOperacional() {
                           <div className="flex items-center justify-between mb-1.5">
                             <div className="flex items-center gap-2">
                               <FileText className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
-                              <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_interna}</span>
+                              <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.numero_os_interna}</span>
                               {ag.rota && (
                                 <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: `${ag.rota.cor}20`, color: ag.rota.cor, border: `1px solid ${ag.rota.cor}40` }}>
                                   {ag.rota.nome}
@@ -342,7 +342,7 @@ export default function AgendaOperacional() {
                             </div>
                           </div>
                           <div className="space-y-1 text-xs">
-                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.cliente_nome}</p>
+                            <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{ag.cliente_nome}</p>
                             <div className="flex items-center gap-1.5" style={{ color: '#06B6D4' }}>
                               <Clock className="w-3 h-3" />
                               <span>{ag.periodo_agendamento === 'manha' ? 'Manha' : ag.periodo_agendamento === 'tarde' ? 'Tarde' : 'Nao definido'}</span>
