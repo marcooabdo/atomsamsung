@@ -69,13 +69,14 @@ export default function RouteViabilityAnalysis({ osFinanceiros, kmTotal, diasPer
       } else {
         const kmValor = os.km_ida_volta * valorKmLP;
         receitaLP += kmValor;
+        const kmSo = (os.km_ida_volta / 2).toFixed(1);
         if (os.is_cortesia) {
           qtdCortesia++;
           detalhes.push({
             numero_os: os.numero_os,
             tipo: 'Cortesia',
             receita: kmValor,
-            descricao: `${os.km_ida_volta.toFixed(1)} km x ${formatCurrency(valorKmLP)}`,
+            descricao: `Base-Cliente ${kmSo}km x2 = ${os.km_ida_volta.toFixed(1)}km x ${formatCurrency(valorKmLP)}`,
             cliente_nome: os.cliente_nome,
             cliente_cidade: os.cliente_cidade,
           });
@@ -85,7 +86,7 @@ export default function RouteViabilityAnalysis({ osFinanceiros, kmTotal, diasPer
             numero_os: os.numero_os,
             tipo: 'LP',
             receita: kmValor,
-            descricao: `${os.km_ida_volta.toFixed(1)} km x ${formatCurrency(valorKmLP)}`,
+            descricao: `Base-Cliente ${kmSo}km x2 = ${os.km_ida_volta.toFixed(1)}km x ${formatCurrency(valorKmLP)}`,
             cliente_nome: os.cliente_nome,
             cliente_cidade: os.cliente_cidade,
           });
