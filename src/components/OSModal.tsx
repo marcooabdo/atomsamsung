@@ -3663,7 +3663,7 @@ Não haverá cobrança ao cliente.`
                 </div>
               )}
 
-              {os?.tipo_os === 'OW' && (os?.coluna_kanban === 'diagnostico' || os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios') && (() => {
+              {os?.tipo_os === 'OW' && (() => {
                 const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
                 const isSCACCColor = isSCACC;
                 const accentColor = isSCACC ? '#39FF14' : 'var(--text-accent)';
@@ -4317,7 +4317,7 @@ Não haverá cobrança ao cliente.`
 
                           {/* Botões conforme status */}
                           <div className="flex gap-2">
-                            {pecaRequisitandoId === (peca.cotacao_peca_id || peca.id) && !requisicao && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
+                            {pecaRequisitandoId === (peca.cotacao_peca_id || peca.id) && !requisicao && (
                               <button
                                 disabled
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2 opacity-60 cursor-not-allowed"
@@ -4332,7 +4332,7 @@ Não haverá cobrança ao cliente.`
                               </button>
                             )}
 
-                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && !requisicaoDevolvida && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
+                            {pecaRequisitandoId !== (peca.cotacao_peca_id || peca.id) && !requisicao && !requisicaoDevolvida && (
                               <button
                                 onClick={() => handleRequisitarPeca(peca)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -4454,7 +4454,7 @@ Não haverá cobrança ao cliente.`
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicaoDevolvida?.status === 'reprovada' && !requisicao && !temNovaRequisicaoPendente && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'reprovada' && !requisicao && !temNovaRequisicaoPendente && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -4469,7 +4469,7 @@ Não haverá cobrança ao cliente.`
                               </button>
                             )}
 
-                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && (peca.status === 'manual' || os?.coluna_kanban !== 'diagnostico') && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
+                            {!criandoRequisicao && requisicaoDevolvida?.status === 'devolvida' && !requisicao && !temNovaRequisicaoPendente && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                               <button
                                 onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                 className="neon-button flex items-center gap-2 text-xs px-4 py-2"
