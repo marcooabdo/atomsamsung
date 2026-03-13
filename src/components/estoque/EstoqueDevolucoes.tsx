@@ -54,7 +54,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           os:os_id(numero_os_samsung, numero_os_interna, tipo_os, coluna_kanban, cotacao_id),
           cotacao:cotacao_id(numero_cotacao, cliente_nome),
           requisitado_usuario:requisitado_por(nome),
-          peca_estoque:peca_estoque_id(id_numerico, pn, descricao, status)
+          peca_estoque:peca_estoque_id(id_numerico, pn, descricao, status, delivery)
         `)
         .in('status', ['gi_postada', 'devolucao_pendente'])
         .eq('tipo_devolucao', tipoMap[activeSubTab])
@@ -77,20 +77,36 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
           if (req.is_lote && req.pecas_estoque_ids && req.pecas_estoque_ids.length > 0) {
             const { data: pecasData } = await supabase
               .from('estoque_pecas')
-              .select('id, id_numerico, gi_postada_em')
+              .select('id, id_numerico, gi_postada_em, delivery')
               .in('id', req.pecas_estoque_ids)
               .order('id_numerico');
 
-            // Para devolução de peça usada, filtrar apenas peças com GI postada
             if (activeSubTab === 'usada' && pecasData) {
               pecasLote = pecasData.filter(p => p.gi_postada_em !== null);
             } else {
               pecasLote = pecasData;
             }
           }
+
+          let pecaEstoqueResolvida = req.peca_estoque;
+          if (!req.peca_estoque && !req.is_lote && req.os_id && req.codigo_peca) {
+            const { data: pecaPorOS } = await supabase
+              .from('estoque_pecas')
+              .select('id, id_numerico, pn, descricao, status, delivery')
+              .eq('os_id', req.os_id)
+              .eq('pn', req.codigo_peca)
+              .not('status', 'in', '(devolvida_nova,devolvida_defeito,arquivada)')
+              .limit(1);
+
+            if (pecaPorOS && pecaPorOS.length > 0) {
+              pecaEstoqueResolvida = pecaPorOS[0];
+            }
+          }
+
           return {
             ...req,
-            pecas_lote: pecasLote
+            pecas_lote: pecasLote,
+            peca_estoque: pecaEstoqueResolvida
           };
         })
       );
@@ -136,7 +152,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
         .from('estoque_devolucoes')
         .select(`
           *,
-          peca_id(id, id_numerico, pn, descricao, status, os_id, unidade_id),
+          peca_id(id, id_numerico, pn, descricao, status, os_id, unidade_id, delivery),
           solicitada_usuario:solicitada_por(nome),
           aprovada_usuario:aprovada_por(nome)
         `)
@@ -621,6 +637,17 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                                     </>
                                   )}
                                   <span>PN: <span className="font-mono font-bold">{req.codigo_peca}</span></span>
+                                  {(() => {
+                                    const delivery = req.is_lote && req.pecas_lote && req.pecas_lote.length > 0
+                                      ? req.pecas_lote[0]?.delivery
+                                      : req.peca_estoque?.delivery;
+                                    return delivery ? (
+                                      <>
+                                        <span>•</span>
+                                        <span>Delivery: <span className="font-mono font-bold text-[#FFBF00]">{delivery}</span></span>
+                                      </>
+                                    ) : null;
+                                  })()}
                                 </div>
                                 {req.valor_peca && (
                                   <p className="text-xs text-gray-400 mb-2 flex items-center gap-1">
@@ -715,6 +742,9 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
 
                       <p className="text-sm text-gray-400 mb-1">
                         PN: <span className="font-mono">{dev.peca_id?.pn || 'N/A'}</span>
+                        {dev.peca_id?.delivery && (
+                          <span className="ml-3">Delivery: <span className="font-mono font-bold text-[#FFBF00]">{dev.peca_id.delivery}</span></span>
+                        )}
                       </p>
                       <p className="text-sm text-gray-400 mb-2">
                         {dev.peca_id?.descricao || 'N/A'}
