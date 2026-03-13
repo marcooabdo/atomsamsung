@@ -1,9 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  FileText, Building2, User, DollarSign, Receipt, Send,
-  AlertCircle, CheckCircle, Clock, X, ChevronDown, RefreshCw,
-  Download, Package, Wrench, Edit3, Save, RotateCcw, Truck, Box, Ban, Trash2
-} from 'lucide-react';
+import { FileText, Building2, User, DollarSign, Receipt, Send, AlertCircle, CheckCircle, Clock, X, ChevronDown, RefreshCw, Download, Package, Wrench, CreditCard as Edit3, Save, RotateCcw, Truck, Box, Ban, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { EmitirNFSeModal } from './EmitirNFSeModal';
 
