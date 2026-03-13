@@ -11,7 +11,7 @@ function formatCurrency(v: number) {
 }
 
 function isPedido(item: PecaCredito | PedidoCredito): item is PedidoCredito {
-  return 'valor_estimado' in item;
+  return 'valor_peca' in item && !('valor_com_impostos' in item);
 }
 
 function exportCSV(categoria: CategoriaCredito) {
@@ -23,7 +23,7 @@ function exportCSV(categoria: CategoriaCredito) {
           item.id.slice(0, 8),
           item.pn,
           item.descricao || '',
-          String(Number(item.valor_estimado).toFixed(2)),
+          String(Number(item.valor_peca).toFixed(2)),
           item.os_numero || '',
           item.status,
         ];
@@ -164,7 +164,7 @@ export function CreditoDetailsModal({ categoria, onClose }: CreditoDetailsModalP
               <tbody>
                 {categoria.pecas.map((item, i) => {
                   const isPed = isPedido(item);
-                  const valor = isPed ? Number(item.valor_estimado) : Number((item as PecaCredito).valor_com_impostos);
+                  const valor = isPed ? Number(item.valor_peca) : Number((item as PecaCredito).valor_com_impostos);
                   const idLabel = isPed
                     ? item.id.slice(0, 8) + '…'
                     : `#${(item as PecaCredito).id_numerico}`;

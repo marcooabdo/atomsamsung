@@ -21,7 +21,7 @@ export interface PedidoCredito {
   id: string;
   pn: string;
   descricao: string | null;
-  valor_estimado: number;
+  valor_peca: number;
   status: string;
   unidade_id: string | null;
   os_id: string | null;
@@ -57,7 +57,7 @@ const sumValor = (items: PecaCredito[]) =>
   items.reduce((acc, p) => acc + (Number(p.valor_com_impostos) || 0), 0);
 
 const sumPedidos = (items: PedidoCredito[]) =>
-  items.reduce((acc, p) => acc + (Number(p.valor_estimado) || 0), 0);
+  items.reduce((acc, p) => acc + (Number(p.valor_peca) || 0), 0);
 
 export function useCreditoGSPN(selectedUnidade: string): CreditoGSPNData {
   const [data, setData] = useState<CreditoGSPNData>({
@@ -148,17 +148,24 @@ export function useCreditoGSPN(selectedUnidade: string): CreditoGSPNData {
             os_coluna: p.os?.coluna_kanban || null,
           }));
 
-        // Pedidos ativos (pedido_feito, em_transito, pendente)
-        const ACTIVE_PEDIDO_STATUSES = ['pedido_feito', 'em_transito', 'pendente', 'aprovado'];
+        // Pedidos ativos = requisicoes_pecas com status pendente ou pedido_feito
+        const ACTIVE_PEDIDO_STATUSES = ['pedido_feito', 'pendente'];
         let pedidosQ = supabase
-          .from('estoque_pedidos')
-          .select(`id, pn, descricao, valor_estimado, status, unidade_id, os_id, numero_pedido_samsung,
+          .from('requisicoes_pecas')
+          .select(`id, codigo_peca, descricao, valor_peca, status, unidade_id, os_id, numero_pedido_samsung,
             os:os_id (numero_os_interna, numero_os_samsung)`)
           .in('status', ACTIVE_PEDIDO_STATUSES);
         if (selectedUnidade) pedidosQ = pedidosQ.eq('unidade_id', selectedUnidade);
         const { data: pedidosRaw } = await pedidosQ;
         const pedidosAtivos: PedidoCredito[] = (pedidosRaw || []).map((p: any) => ({
-          ...p,
+          id: p.id,
+          pn: p.codigo_peca,
+          descricao: p.descricao,
+          valor_peca: Number(p.valor_peca) || 0,
+          status: p.status,
+          unidade_id: p.unidade_id,
+          os_id: p.os_id,
+          numero_pedido_samsung: p.numero_pedido_samsung,
           os_numero: p.os?.numero_os_samsung || p.os?.numero_os_interna || null,
         }));
 
