@@ -1814,37 +1814,22 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mx-4 mt-3 p-3 rounded-lg border-2 shadow-lg"
+            className="mx-3 mt-2 px-3 py-1.5 rounded-md border shadow"
             style={{
               background: isDark
-                ? 'linear-gradient(to right, rgba(249,115,22,0.22), rgba(239,68,68,0.22))'
-                : 'linear-gradient(to right, rgba(234,88,12,0.10), rgba(220,38,38,0.10))',
-              borderColor: isDark ? 'rgba(249,115,22,0.45)' : 'rgba(234,88,12,0.40)'
+                ? 'linear-gradient(to right, rgba(249,115,22,0.18), rgba(239,68,68,0.18))'
+                : 'linear-gradient(to right, rgba(234,88,12,0.08), rgba(220,38,38,0.08))',
+              borderColor: isDark ? 'rgba(249,115,22,0.35)' : 'rgba(234,88,12,0.30)'
             }}
           >
-            <div className="flex items-center gap-3">
-              <div className="flex-shrink-0">
-                <div
-                  className="w-10 h-10 rounded-full flex items-center justify-center border-2 animate-pulse"
-                  style={{
-                    backgroundColor: isDark ? 'rgba(249,115,22,0.30)' : 'rgba(234,88,12,0.15)',
-                    borderColor: isDark ? 'rgba(249,115,22,0.55)' : 'rgba(234,88,12,0.45)'
-                  }}
-                >
-                  <Bot className="w-5 h-5" style={{ color: isDark ? '#fed7aa' : '#9a3412' }} />
-                </div>
-              </div>
-              <div className="flex-1">
-                <h4 className="text-sm font-bold mb-0.5" style={{ color: isDark ? '#fdba74' : '#7c2d12' }}>
-                  GIA DESLIGADA - Atendimento Manual Ativo
-                </h4>
-                <p className="text-xs" style={{ color: isDark ? 'rgba(251,146,60,0.90)' : '#9a3412' }}>
-                  Não esqueça de reativar a GIA quando terminar o atendimento para voltar ao modo automático
-                </p>
-              </div>
+            <div className="flex items-center gap-2">
+              <Bot className="w-3.5 h-3.5 flex-shrink-0 animate-pulse" style={{ color: isDark ? '#fdba74' : '#9a3412' }} />
+              <span className="text-xs font-semibold flex-1" style={{ color: isDark ? '#fdba74' : '#7c2d12' }}>
+                GIA desligada - Manual ativo
+              </span>
               <button
                 onClick={() => toggleBot(true)}
-                className="flex-shrink-0 px-4 py-2 rounded-lg text-white text-xs font-bold transition-all shadow-md hover:shadow-lg"
+                className="flex-shrink-0 px-2.5 py-1 rounded text-white text-[10px] font-bold transition-all hover:opacity-90"
                 style={{ background: 'linear-gradient(to right, #7c3aed, #6d28d9)' }}
               >
                 Ligar GIA
