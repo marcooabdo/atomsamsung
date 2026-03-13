@@ -155,12 +155,12 @@ export function AprovarDevolucaoModal({ isOpen, onClose, onConfirm, requisicao }
             </p>
           </div>
 
-          {/* Foto (Opcional) */}
+          {/* Foto (Obrigatória) */}
           <div>
             <label className="block text-sm font-semibold text-gray-300 mb-3 flex items-center gap-2">
               <Camera className="w-4 h-4 text-[#39FF14]" />
               Foto da Peça
-              <span className="text-xs text-gray-500 font-normal">(opcional)</span>
+              <span className="text-xs text-red-400 font-bold">(obrigatório)</span>
             </label>
 
             {previewFoto ? (
@@ -186,14 +186,14 @@ export function AprovarDevolucaoModal({ isOpen, onClose, onConfirm, requisicao }
             ) : (
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-gray-700 hover:border-[#39FF14]/50 rounded-lg p-8 flex flex-col items-center justify-center gap-3 transition-colors group"
+                className="w-full border-2 border-dashed border-red-500/60 hover:border-[#39FF14]/50 rounded-lg p-8 flex flex-col items-center justify-center gap-3 transition-colors group bg-red-500/5"
                 disabled={loading}
               >
-                <Upload className="w-8 h-8 text-gray-600 group-hover:text-[#39FF14] transition-colors" />
-                <p className="text-sm text-gray-400 group-hover:text-gray-300 transition-colors">
+                <Upload className="w-8 h-8 text-red-400 group-hover:text-[#39FF14] transition-colors" />
+                <p className="text-sm text-red-300 group-hover:text-gray-300 transition-colors">
                   Clique para adicionar foto da peça
                 </p>
-                <p className="text-xs text-gray-600">JPG, PNG ou JPEG (máx. 5MB)</p>
+                <p className="text-xs text-gray-600">JPG, PNG ou JPEG (max. 5MB)</p>
               </button>
             )}
 
@@ -226,31 +226,38 @@ export function AprovarDevolucaoModal({ isOpen, onClose, onConfirm, requisicao }
           >
             Cancelar
           </button>
-          <button
-            onClick={handleSubmit}
-            disabled={loading}
-            className="flex-1 px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            style={{
-              backgroundColor: '#39FF1420',
-              borderWidth: '1px',
-              borderStyle: 'solid',
-              borderColor: '#39FF14',
-              color: '#39FF14',
-              boxShadow: '0 0 20px rgba(57, 255, 20, 0.3)'
-            }}
-          >
-            {loading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-[#39FF14] border-t-transparent rounded-full animate-spin" />
-                Aprovando...
-              </>
-            ) : (
-              <>
-                <CheckCircle className="w-4 h-4" />
-                Aprovar Devolução
-              </>
+          <div className="flex-1 flex flex-col gap-2">
+            {!foto && (
+              <p className="text-xs text-red-400 text-center">
+                Anexe uma foto da peça para aprovar a devolução
+              </p>
             )}
-          </button>
+            <button
+              onClick={handleSubmit}
+              disabled={loading || !foto}
+              className="w-full px-6 py-3 rounded-lg font-bold uppercase tracking-wider transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: foto ? '#39FF1420' : 'rgba(255,255,255,0.05)',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: foto ? '#39FF14' : '#555',
+                color: foto ? '#39FF14' : '#666',
+                boxShadow: foto ? '0 0 20px rgba(57, 255, 20, 0.3)' : 'none'
+              }}
+            >
+              {loading ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-[#39FF14] border-t-transparent rounded-full animate-spin" />
+                  Aprovando...
+                </>
+              ) : (
+                <>
+                  <CheckCircle className="w-4 h-4" />
+                  Aprovar Devolução
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
