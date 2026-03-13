@@ -546,8 +546,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const loadPecas = async () => {
-    // Busca peças tanto de os_pecas quanto de cotacoes_pecas
-    const [osPecasResult, cotacaoPecasResult] = await Promise.all([
+    const [osPecasResult, cotacaoPecasResult, reqReprovadasResult] = await Promise.all([
       supabase
         .from('os_pecas')
         .select('*')
@@ -557,29 +556,38 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .from('cotacoes_pecas')
         .select('*')
         .eq('os_id', osId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('requisicoes_pecas')
+        .select('codigo_peca')
+        .eq('os_id', osId)
+        .eq('status', 'reprovada')
     ]);
 
-    // Converte cotacoes_pecas para o formato de os_pecas
-    const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
-      id: p.id,
-      os_id: p.os_id,
-      cotacao_peca_id: p.id,
-      codigo: p.pn,
-      pn: p.pn,
-      descricao: p.descricao,
-      quantidade: p.quantidade,
-      valor_unitario: p.valor_final_unitario,
-      valor_total: p.valor_total,
-      created_at: p.created_at,
-      updated_at: p.updated_at
-    }));
+    const pnsReprovados = new Set((reqReprovadasResult.data || []).map((r: any) => r.codigo_peca));
 
-    // Para os_pecas, garante que cotacao_peca_id está preenchido (usa seu próprio ID se não tiver)
-    const osPecasFormatted = (osPecasResult.data || []).map(p => ({
-      ...p,
-      cotacao_peca_id: p.cotacao_peca_id || p.id
-    }));
+    const cotacaoPecas = (cotacaoPecasResult.data || [])
+      .filter(p => !pnsReprovados.has(p.pn))
+      .map(p => ({
+        id: p.id,
+        os_id: p.os_id,
+        cotacao_peca_id: p.id,
+        codigo: p.pn,
+        pn: p.pn,
+        descricao: p.descricao,
+        quantidade: p.quantidade,
+        valor_unitario: p.valor_final_unitario,
+        valor_total: p.valor_total,
+        created_at: p.created_at,
+        updated_at: p.updated_at
+      }));
+
+    const osPecasFormatted = (osPecasResult.data || [])
+      .filter((p: any) => !pnsReprovados.has(p.pn))
+      .map(p => ({
+        ...p,
+        cotacao_peca_id: p.cotacao_peca_id || p.id
+      }));
 
     const todasPecas = [...osPecasFormatted, ...cotacaoPecas];
     setPecas(todasPecas);

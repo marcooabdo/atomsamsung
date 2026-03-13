@@ -217,13 +217,19 @@ Deno.serve(async (req: Request) => {
       .eq('unidade_id', osData.unidade_id)
       .maybeSingle();
 
-    // Busca pecas de cotacoes_pecas (sem filtro de exibir_no_pdf para mostrar tudo)
+    const { data: reqReprovadasData } = await supabase
+      .from('requisicoes_pecas')
+      .select('codigo_peca')
+      .eq('os_id', linkData.os_id)
+      .eq('status', 'reprovada');
+
+    const pnsReprovados = new Set((reqReprovadasData || []).map((r: any) => r.codigo_peca));
+
     const { data: cotacoesPecasData } = await supabase
       .from('cotacoes_pecas')
       .select('id, pn, descricao, quantidade, valor_final_unitario, valor_total')
       .eq('os_id', linkData.os_id);
 
-    // Busca pecas de os_pecas (pecas GSPN / Samsung)
     const { data: osPecasData } = await supabase
       .from('os_pecas')
       .select('id, pn, descricao, quantidade, valor_unitario, valor_total')
@@ -253,29 +259,30 @@ Deno.serve(async (req: Request) => {
       .eq('os_id', linkData.os_id)
       .eq('exibir_no_pdf', true);
 
-    // Mapear pecas de cotacoes_pecas
-    const pecasCotacoes = (cotacoesPecasData || []).map(p => ({
-      id: p.id,
-      codigo: p.pn || '',
-      descricao: p.descricao || '',
-      quantidade: p.quantidade || 1,
-      valor_unitario: Number(p.valor_final_unitario || 0),
-      valor_total: Number(p.valor_total || 0),
-      fonte: 'cotacao'
-    }));
+    const pecasCotacoes = (cotacoesPecasData || [])
+      .filter(p => !pnsReprovados.has(p.pn))
+      .map(p => ({
+        id: p.id,
+        codigo: p.pn || '',
+        descricao: p.descricao || '',
+        quantidade: p.quantidade || 1,
+        valor_unitario: Number(p.valor_final_unitario || 0),
+        valor_total: Number(p.valor_total || 0),
+        fonte: 'cotacao'
+      }));
 
-    // Mapear pecas de os_pecas (GSPN)
-    const pecasOs = (osPecasData || []).map(p => ({
-      id: p.id,
-      codigo: p.pn || '',
-      descricao: p.descricao || '',
-      quantidade: p.quantidade || 1,
-      valor_unitario: Number(p.valor_unitario || 0),
-      valor_total: Number(p.valor_total || 0),
-      fonte: 'os_pecas'
-    }));
+    const pecasOs = (osPecasData || [])
+      .filter(p => !pnsReprovados.has(p.pn))
+      .map(p => ({
+        id: p.id,
+        codigo: p.pn || '',
+        descricao: p.descricao || '',
+        quantidade: p.quantidade || 1,
+        valor_unitario: Number(p.valor_unitario || 0),
+        valor_total: Number(p.valor_total || 0),
+        fonte: 'os_pecas'
+      }));
 
-    // Combinar todas as pecas
     const todasPecas = [...pecasCotacoes, ...pecasOs];
 
     const servicosMapped = (servicosData || []).map(s => ({
@@ -287,18 +294,26 @@ Deno.serve(async (req: Request) => {
       valor_total: Number(s.valor_total || 0)
     }));
 
-    // Usar valores já calculados e salvos na OS (garantem consistência)
-    const valorPecasReal = Number(osData.valor_pecas || 0);
-    const valorServicosReal = Number(osData.valor_servicos || 0);
-    const valorDescontoReal = Number(osData.valor_desconto_calculado || 0);
-    const valorTotalReal = Number(osData.valor_total || 0);
+    const valorPecasReal = todasPecas.reduce((s, p) => s + (p.valor_total || 0), 0);
+    const valorServicosReal = servicosMapped.reduce((s, sv) => s + (sv.valor_total || 0), 0);
+    const subtotalReal = valorPecasReal + valorServicosReal;
+    const descontoValorNum = Number(osData.desconto_valor || 0);
+    let valorDescontoReal = 0;
+    if (descontoValorNum > 0) {
+      if (osData.desconto_tipo === 'percentual') {
+        valorDescontoReal = subtotalReal * (descontoValorNum / 100);
+      } else {
+        valorDescontoReal = descontoValorNum;
+      }
+    }
+    const valorTotalReal = Math.max(subtotalReal - valorDescontoReal, 0);
 
     const cotacao = {
       id: osData.id,
       valor_pecas: valorPecasReal,
       valor_servicos: valorServicosReal,
       desconto_tipo: osData.desconto_tipo,
-      desconto_valor: Number(osData.desconto_valor || 0),
+      desconto_valor: descontoValorNum,
       valor_desconto_calculado: valorDescontoReal,
       valor_liquido: valorTotalReal,
       created_at: osData.created_at,

@@ -932,7 +932,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }
     console.log('🔄 loadPecas: Carregando peças para OS:', currentOsId);
 
-    const [osPecasResult, cotacaoPecasResult] = await Promise.all([
+    const [osPecasResult, cotacaoPecasResult, reqReprovadasResult] = await Promise.all([
       supabase
         .from('os_pecas')
         .select('*')
@@ -942,13 +942,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .from('cotacoes_pecas')
         .select('*')
         .eq('os_id', currentOsId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: true }),
+      supabase
+        .from('requisicoes_pecas')
+        .select('codigo_peca')
+        .eq('os_id', currentOsId)
+        .eq('status', 'reprovada')
     ]);
+
+    const pnsReprovados = new Set((reqReprovadasResult.data || []).map((r: any) => r.codigo_peca));
 
     console.log('📦 os_pecas result:', osPecasResult.data?.length || 0, 'peças');
     console.log('📦 cotacoes_pecas result:', cotacaoPecasResult.data?.length || 0, 'peças');
 
-    const osPecasFormatadas = (osPecasResult.data || []).map(p => ({
+    const osPecasFormatadas = (osPecasResult.data || []).filter((p: any) => !pnsReprovados.has(p.pn)).map(p => ({
       id: p.id,
       os_id: p.os_id,
       os_peca_id: p.id,
@@ -967,7 +974,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       exibir_no_pdf: p.exibir_no_pdf
     }));
 
-    const cotacaoPecas = (cotacaoPecasResult.data || []).map(p => ({
+    const cotacaoPecas = (cotacaoPecasResult.data || []).filter(p => !pnsReprovados.has(p.pn)).map(p => ({
       id: p.id,
       os_id: p.os_id,
       os_peca_id: null,

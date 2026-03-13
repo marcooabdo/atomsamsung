@@ -190,27 +190,31 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const loadPecasServicos = async () => {
     const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
 
-    // Carregar peças de ambas as tabelas
-    const [pecasCotacaoRes, pecasOSRes] = await Promise.all([
+    const [pecasCotacaoRes, pecasOSRes, reqReprovadasRes] = await Promise.all([
       supabase.from('cotacoes_pecas').select('pn, descricao, quantidade, valor_final_unitario, valor_total').eq('os_id', osId),
-      supabase.from('os_pecas').select('pn, descricao, quantidade, valor_unitario, valor_total').eq('os_id', osId)
+      supabase.from('os_pecas').select('pn, descricao, quantidade, valor_unitario, valor_total, status').eq('os_id', osId),
+      supabase.from('requisicoes_pecas').select('codigo_peca').eq('os_id', osId).eq('status', 'reprovada'),
     ]);
 
-    // Combinar peças normalizando os campos
-    const pecasCotacao = (pecasCotacaoRes.data || []).map(p => ({
-      ...p,
-      valor_unitario: p.valor_final_unitario,
-      valor_total: p.valor_total
-    }));
+    const pnsReprovados = new Set((reqReprovadasRes.data || []).map((r: any) => r.codigo_peca));
 
-    const pecasOS = (pecasOSRes.data || []).map(p => ({
-      ...p,
-      valor_total: p.valor_total
-    }));
+    const pecasCotacao = (pecasCotacaoRes.data || [])
+      .filter(p => !pnsReprovados.has(p.pn))
+      .map(p => ({
+        ...p,
+        valor_unitario: p.valor_final_unitario,
+        valor_total: p.valor_total
+      }));
+
+    const pecasOS = (pecasOSRes.data || [])
+      .filter((p: any) => p.status !== 'devolvida' && !pnsReprovados.has(p.pn))
+      .map(p => ({
+        ...p,
+        valor_total: p.valor_total
+      }));
 
     const todasPecas = [...pecasCotacao, ...pecasOS];
 
-    // Carregar serviços da tabela correta baseado no tipo de OS
     let servicosData: any[] = [];
     if (isSCACC) {
       const { data } = await supabase

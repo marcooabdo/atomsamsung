@@ -208,7 +208,7 @@ export function OSNotaFiscalTab({
           .from('requisicoes_pecas')
           .select('id, pn:codigo_peca, descricao, quantidade:quantidade_requisitada, valor_peca, status')
           .eq('os_id', osId)
-          .not('status', 'eq', 'cancelada')
+          .not('status', 'in', '("cancelada","reprovada")')
           .order('created_at', { ascending: true }),
         supabase
           .from('os_servicos')
@@ -282,7 +282,8 @@ export function OSNotaFiscalTab({
       const allPecas = [...osPecasMapped, ...cotPecasMapped, ...reqPecasMapped].filter(p =>
         !p.devolvida_em &&
         p.status !== 'devolvida' &&
-        p.status !== 'cancelada'
+        p.status !== 'cancelada' &&
+        p.status !== 'reprovada'
       );
       setPecas(allPecas);
 
