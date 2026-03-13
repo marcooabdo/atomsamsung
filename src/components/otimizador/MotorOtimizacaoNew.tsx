@@ -9,6 +9,7 @@ import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
 import { geocodeAddress, buildOSAddress, getGoogleMapsApiKey, haversineDistance, estimateDriveTime, getRealTravelTime } from '../../lib/googleMapsHelper';
 import { GoogleMap, useJsApiLoader, Marker, InfoWindow, DirectionsRenderer } from '@react-google-maps/api';
+import RouteViabilityAnalysis from './RouteViabilityAnalysis';
 
 interface OSItem {
   id: string;
@@ -26,6 +27,9 @@ interface OSItem {
   prioridade?: string;
   rota_nome?: string;
   rota_cor?: string;
+  tipo_os?: string;
+  is_cortesia?: boolean;
+  valor_total?: number;
 }
 
 interface ParadaItinerario {
@@ -163,6 +167,70 @@ export default function MotorOtimizacaoNew() {
 
   const [baseCoords, setBaseCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [directions, setDirections] = useState<google.maps.DirectionsResult | null>(null);
+  const [owLucroMap, setOwLucroMap] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    if (paradas.length === 0 || !baseCoords) {
+      setOwLucroMap({});
+      return;
+    }
+    const owIds = paradas
+      .filter(p => p.os.tipo_os === 'OW' && !p.os.is_cortesia)
+      .map(p => p.os.id);
+    if (owIds.length === 0) { setOwLucroMap({}); return; }
+
+    (async () => {
+      const { data: pecasData } = await supabase
+        .from('os_pecas')
+        .select('os_id, valor_gspn, quantidade')
+        .in('os_id', owIds);
+
+      const { data: pagData } = await supabase
+        .from('pagamentos')
+        .select('os_id, taxa_valor')
+        .in('os_id', owIds);
+
+      const map: Record<string, number> = {};
+      for (const id of owIds) {
+        const os = paradas.find(p => p.os.id === id)?.os;
+        if (!os) continue;
+        const receitaLiquida = os.valor_total || 0;
+        const custoPecas = (pecasData ?? [])
+          .filter(p => p.os_id === id)
+          .reduce((s, p) => s + ((Number(p.valor_gspn) || 0) * (Number(p.quantidade) || 1)), 0);
+        const taxasCartao = (pagData ?? [])
+          .filter(p => p.os_id === id)
+          .reduce((s, p) => s + (Number(p.taxa_valor) || 0), 0);
+        map[id] = receitaLiquida - custoPecas - taxasCartao;
+      }
+      setOwLucroMap(map);
+    })();
+  }, [paradas, baseCoords]);
+
+  const osFinanceiros = useMemo(() => {
+    if (!baseCoords || paradas.length === 0) return [];
+    return paradas.map(p => {
+      const kmIdaVolta = haversineDistance(baseCoords, { lat: p.os.lat, lng: p.os.lng }) * 1.3 * 2;
+      return {
+        id: p.os.id,
+        numero_os: p.os.numero_os,
+        tipo_os: p.os.tipo_os || '',
+        is_cortesia: p.os.is_cortesia || false,
+        valor_total: p.os.valor_total || 0,
+        lucro_ow: owLucroMap[p.os.id] ?? 0,
+        km_ida_volta: kmIdaVolta,
+        cliente_nome: p.os.cliente_nome,
+        cliente_cidade: p.os.cliente_cidade,
+      };
+    });
+  }, [paradas, baseCoords, owLucroMap]);
+
+  const diasPernoite = useMemo(() => {
+    return itinerario.reduce((count, dia) => {
+      const temPernoite = dia.eventos.some(e => e.tipo === 'pernoite');
+      return count + (temPernoite ? 1 : 0);
+    }, 0);
+  }, [itinerario]);
 
   useEffect(() => {
     if (selectedUnidade) {
@@ -260,7 +328,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, lat, lng, coluna_kanban, created_at, periodo_agendamento')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, tipo_os, is_cortesia, valor_total, lat, lng, coluna_kanban, created_at, periodo_agendamento')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[]);
 
@@ -289,6 +357,9 @@ export default function MotorOtimizacaoNew() {
         prioridade: 'normal',
         rota_nome: rotaMatch?.nome,
         rota_cor: rotaMatch?.cor || '#3B82F6',
+        tipo_os: (os as any).tipo_os || '',
+        is_cortesia: (os as any).is_cortesia === true,
+        valor_total: Number((os as any).valor_total) || 0,
       };
     });
 
@@ -1539,6 +1610,14 @@ export default function MotorOtimizacaoNew() {
           </div>
         ))}
       </div>
+
+      {osFinanceiros.length > 0 && (
+        <RouteViabilityAnalysis
+          osFinanceiros={osFinanceiros}
+          kmTotal={metricas.km_total}
+          diasPernoite={diasPernoite}
+        />
+      )}
 
       {isLoaded && (
         <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border-primary)' }}>
