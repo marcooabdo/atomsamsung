@@ -1,5 +1,5 @@
 import { forwardRef } from 'react';
-import { CheckCircle, XCircle, MapPin, Clock, User, FileText, Image as ImageIcon, Edit3 } from 'lucide-react';
+import { CheckCircle, XCircle, MapPin, Clock, User, FileText, Image as ImageIcon, CreditCard as Edit3 } from 'lucide-react';
 
 interface AgendamentoPDFProps {
   agendamento: any;
