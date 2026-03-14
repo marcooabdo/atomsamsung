@@ -89,7 +89,8 @@ const getStorageUrl = (path: string | null): string | null => {
 };
 
 export function NotasFiscais() {
-  const { user } = useAuth();
+  const { user, usuario } = useAuth();
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const [loading, setLoading] = useState(true);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscal[]>([]);
   const [filteredNotas, setFilteredNotas] = useState<NotaFiscal[]>([]);
@@ -98,7 +99,9 @@ export function NotasFiscais() {
   const [tipoFiltro, setTipoFiltro] = useState<'todos' | 'nfse' | 'nfe'>('todos');
   const [tipoOsFiltro, setTipoOsFiltro] = useState<'todos' | 'LP' | 'OW'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
-  const [selectedUnidade, setSelectedUnidade] = useState<string>('');
+  const [selectedUnidade, setSelectedUnidade] = useState<string>(
+    !canSeeAllUnits && user?.unidade_id ? user.unidade_id : ''
+  );
   const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -136,12 +139,6 @@ export function NotasFiscais() {
   }, [user]);
 
   useEffect(() => {
-    if (user?.unidade_id) {
-      setSelectedUnidade(user.unidade_id);
-    }
-  }, [user]);
-
-  useEffect(() => {
     aplicarFiltros();
   }, [notasFiscais, tipoFiltro, tipoOsFiltro, statusFiltro, selectedUnidade, periodoFiltro, searchTerm]);
 
@@ -160,7 +157,7 @@ export function NotasFiscais() {
       setUnidades(unidadesData || []);
 
       // Carregar notas fiscais
-      const { data: nfsData, error } = await supabase
+      let nfsQuery = supabase
         .from('nf_emitidas')
         .select(`
           *,
@@ -169,6 +166,12 @@ export function NotasFiscais() {
           emitido_por_usuario:usuarios!nf_emitidas_emitido_por_fkey(nome)
         `)
         .order('created_at', { ascending: false });
+
+      if (!canSeeAllUnits && user?.unidade_id) {
+        nfsQuery = nfsQuery.eq('unidade_id', user.unidade_id);
+      }
+
+      const { data: nfsData, error } = await nfsQuery;
 
       if (error) throw error;
 

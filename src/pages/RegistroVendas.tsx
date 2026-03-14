@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -65,6 +65,7 @@ interface Unidade {
 export function RegistroVendas() {
   const { usuario } = useAuth();
   const { showAlert, showConfirm } = useModal();
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const [vendas, setVendas] = useState<Venda[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -83,7 +84,7 @@ export function RegistroVendas() {
     status: 'all',
     tipo_venda: 'all',
     vendedor_id: 'all',
-    unidade_id: 'all'
+    unidade_id: canSeeAllUnits ? 'all' : (usuario?.unidade_id || 'all')
   });
 
   const [formData, setFormData] = useState({
@@ -123,7 +124,7 @@ export function RegistroVendas() {
 
   const loadVendas = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    let query = supabase
       .from('vendas')
       .select(`
         *,
@@ -132,6 +133,12 @@ export function RegistroVendas() {
         validador:usuarios!avaliacao_validada_por(nome)
       `)
       .order('created_at', { ascending: false });
+
+    if (!canSeeAllUnits && usuario?.unidade_id) {
+      query = query.eq('unidade_id', usuario.unidade_id);
+    }
+
+    const { data, error } = await query;
 
     if (!error && data) {
       setVendas(data);
@@ -612,17 +619,23 @@ export function RegistroVendas() {
             ))}
           </select>
 
-          <select
-            value={filtros.unidade_id}
-            onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
-            className="rounded-lg px-3 py-2 text-sm"
-            style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-          >
-            <option value="all">Todas as Unidades</option>
-            {unidades.map(u => (
-              <option key={u.id} value={u.id}>{u.nome}</option>
-            ))}
-          </select>
+          {canSeeAllUnits ? (
+            <select
+              value={filtros.unidade_id}
+              onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
+              className="rounded-lg px-3 py-2 text-sm"
+              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
+            >
+              <option value="all">Todas as Unidades</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))}
+            </select>
+          ) : (
+            <span className="rounded-lg px-3 py-2 text-sm font-medium" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-accent)' }}>
+              {unidades.find(u => u.id === usuario?.unidade_id)?.nome || 'Sua Unidade'}
+            </span>
+          )}
         </div>
       </div>
 

@@ -199,9 +199,10 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
   );
 
   const isAdmin = usuario?.tipo === 'master' || usuario?.tipo === 'diretor' || usuario?.tipo === 'gerente' || usuario?.tipo === 'administrador';
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
 
   const loadProfissionais = useCallback(async () => {
-    const { data } = await supabase
+    let query = supabase
       .from('skywalker_profissionais')
       .select(`
         *,
@@ -212,6 +213,12 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
       `)
       .eq('ativo', true);
 
+    if (!canSeeAllUnits && usuario?.unidade_id) {
+      query = query.eq('unidade_id', usuario.unidade_id);
+    }
+
+    const { data } = await query;
+
     if (data) {
       setProfissionais(data as any);
       if (usuario) {
@@ -219,7 +226,7 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
         setMyProfissional(mine as any || null);
       }
     }
-  }, [usuario]);
+  }, [usuario, canSeeAllUnits]);
 
   const loadNiveis = useCallback(async () => {
     const { data } = await supabase
@@ -276,7 +283,7 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
   const loadRanking = useCallback(async (mesInicio: string, mesFim?: string) => {
     const mesFimEfetivo = mesFim || mesInicio;
 
-    const { data: profs } = await supabase
+    let profsQuery = supabase
       .from('skywalker_profissionais')
       .select(`
         id, usuario_id, time, time_id, meses_consecutivos_validos,
@@ -286,6 +293,12 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
         skywalker_time:skywalker_times(nome, cor)
       `)
       .eq('ativo', true);
+
+    if (!canSeeAllUnits && usuario?.unidade_id) {
+      profsQuery = profsQuery.eq('unidade_id', usuario.unidade_id);
+    }
+
+    const { data: profs } = await profsQuery;
 
     if (!profs) return;
 
@@ -335,7 +348,7 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
 
     entries.sort((a, b) => b.estrelas_total - a.estrelas_total || b.nivel_ordem - a.nivel_ordem);
     setRanking(entries);
-  }, []);
+  }, [canSeeAllUnits, usuario?.unidade_id]);
 
   const loadEstrelasDoMes = useCallback(async (profissionalId: string, mes: string) => {
     const { data } = await supabase
