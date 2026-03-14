@@ -531,6 +531,9 @@ export function Configuracoes() {
           break;
         case 'markup':
           if (!formMarkup.nome.trim()) return alert('Nome é obrigatório');
+          const markupUnidadeId = canSeeAllUnits
+            ? (formMarkup.unidade_id || null)
+            : (formMarkup.unidade_id || userUnitId || null);
           const markupData = {
             nome: formMarkup.nome,
             valor_minimo: formMarkup.valor_minimo ? parseFloat(formMarkup.valor_minimo) : null,
@@ -538,7 +541,7 @@ export function Configuracoes() {
             tipo: formMarkup.tipo,
             valor: parseFloat(formMarkup.valor) || 0,
             descricao: formMarkup.descricao || null,
-            unidade_id: formMarkup.unidade_id || null,
+            unidade_id: markupUnidadeId,
             tipo_orcamento: formMarkup.tipo_orcamento || 'normal',
             ativo: formMarkup.ativo
           };
