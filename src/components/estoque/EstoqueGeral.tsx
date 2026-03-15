@@ -262,7 +262,16 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     );
   });
 
+  const isElegibleForNF = (peca: EstoquePeca) => {
+    const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'];
+    if (DEVOLVIDA_STATUSES.includes(peca.status)) return false;
+    if (!(peca as any).gi_postada_em) return false;
+    return true;
+  };
+
   const toggleSelectPeca = (pecaId: string) => {
+    const peca = pecas.find(p => p.id === pecaId);
+    if (peca && !isElegibleForNF(peca)) return;
     setSelectedPecas(prev => {
       const newSet = new Set(prev);
       if (newSet.has(pecaId)) {
@@ -276,18 +285,19 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
   const toggleSelectAll = () => {
     const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const allSelected = currentPagePecas.every(p => selectedPecas.has(p.id));
+    const elegiblePecas = currentPagePecas.filter(p => isElegibleForNF(p));
+    const allSelected = elegiblePecas.length > 0 && elegiblePecas.every(p => selectedPecas.has(p.id));
 
     if (allSelected) {
       setSelectedPecas(prev => {
         const newSet = new Set(prev);
-        currentPagePecas.forEach(p => newSet.delete(p.id));
+        elegiblePecas.forEach(p => newSet.delete(p.id));
         return newSet;
       });
     } else {
       setSelectedPecas(prev => {
         const newSet = new Set(prev);
-        currentPagePecas.forEach(p => newSet.add(p.id));
+        elegiblePecas.forEach(p => newSet.add(p.id));
         return newSet;
       });
     }
@@ -453,20 +463,33 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                     : cardClass
                 }`}
               >
-                <button
-                  onClick={() => toggleSelectPeca(peca.id)}
-                  className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
-                    selectedPecas.has(peca.id)
-                      ? 'bg-[#FFA500] text-black'
-                      : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-                  }`}
-                >
-                  {selectedPecas.has(peca.id) ? (
-                    <CheckSquare className="w-5 h-5" />
-                  ) : (
+                {isElegibleForNF(peca) ? (
+                  <button
+                    onClick={() => toggleSelectPeca(peca.id)}
+                    className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
+                      selectedPecas.has(peca.id)
+                        ? 'bg-[#FFA500] text-black'
+                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                    }`}
+                  >
+                    {selectedPecas.has(peca.id) ? (
+                      <CheckSquare className="w-5 h-5" />
+                    ) : (
+                      <Square className="w-5 h-5" />
+                    )}
+                  </button>
+                ) : (
+                  <div
+                    className="absolute top-3 right-3 p-1.5 rounded-lg z-10 bg-gray-800/50 text-gray-600 cursor-not-allowed"
+                    title={
+                      ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'].includes(peca.status)
+                        ? 'Peça devolvida não pode ser selecionada para NF'
+                        : 'GI não postado — peça não elegível para emissão de NF'
+                    }
+                  >
                     <Square className="w-5 h-5" />
-                  )}
-                </button>
+                  </div>
+                )}
 
                 <div className="flex items-start justify-between mb-3 pr-10">
                   <div className="flex-1">
