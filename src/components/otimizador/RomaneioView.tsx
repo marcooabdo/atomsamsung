@@ -84,6 +84,13 @@ export default function RomaneioView() {
         osQuery = osQuery.eq('unidade_id', selectedUnidade);
       }
 
+      if (dataInicio) {
+        osQuery = osQuery.gte('data_agendamento', dataInicio);
+      }
+      if (dataFim) {
+        osQuery = osQuery.lte('data_agendamento', dataFim);
+      }
+
       const { data: osAgendadas, error: osError } = await osQuery;
 
       if (osError) throw osError;
@@ -100,7 +107,7 @@ export default function RomaneioView() {
         return;
       }
 
-      let reqQuery = supabase
+      const { data: requisicoes, error: reqError } = await supabase
         .from('requisicoes_pecas')
         .select(`
           *,
@@ -111,15 +118,6 @@ export default function RomaneioView() {
         `)
         .in('os_id', osIds)
         .in('status', ['pendente', 'atendida', 'em_uso', 'devolucao_pendente', 'gi_postada']);
-
-      if (dataInicio) {
-        reqQuery = reqQuery.gte('created_at', dataInicio + 'T00:00:00');
-      }
-      if (dataFim) {
-        reqQuery = reqQuery.lte('created_at', dataFim + 'T23:59:59');
-      }
-
-      const { data: requisicoes, error: reqError } = await reqQuery;
 
       if (reqError) throw reqError;
 
