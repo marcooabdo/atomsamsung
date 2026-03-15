@@ -1,6 +1,45 @@
-import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route, Truck } from 'lucide-react';
+import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Component, ReactNode } from 'react';
 import { OtimizadorProvider, useOtimizador, type OtimizadorTab } from '../contexts/OtimizadorContext';
 import { UnitFilter } from '../components/UnitFilter';
+
+class OtimizadorErrorBoundary extends Component<
+  { children: ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 rounded-xl p-8"
+          style={{ backgroundColor: '#EF444410', border: '1px solid #EF444430' }}>
+          <AlertTriangle className="w-10 h-10" style={{ color: '#EF4444' }} />
+          <div className="text-center">
+            <p className="font-semibold text-base mb-1" style={{ color: '#EF4444' }}>Erro ao carregar esta aba</p>
+            <p className="text-sm" style={{ color: '#9CA3AF' }}>{this.state.error?.message || 'Erro desconhecido'}</p>
+          </div>
+          <button
+            onClick={() => this.setState({ hasError: false, error: null })}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium"
+            style={{ backgroundColor: '#EF444420', color: '#EF4444', border: '1px solid #EF444440' }}
+          >
+            <RefreshCw className="w-4 h-4" />
+            Tentar novamente
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 import DashboardExecutivo from '../components/otimizador/DashboardExecutivo';
 import AgendaOperacional from '../components/otimizador/AgendaOperacional';
 import MapaRastreamento from '../components/otimizador/MapaRastreamento';
@@ -88,7 +127,9 @@ function OtimizadorContent() {
                 );
               })}
             </div>
-            <div>{renderTabContent()}</div>
+            <OtimizadorErrorBoundary key={activeTab}>
+              <div>{renderTabContent()}</div>
+            </OtimizadorErrorBoundary>
           </>
         )}
       </div>

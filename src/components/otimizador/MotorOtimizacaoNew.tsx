@@ -124,7 +124,7 @@ function getRouteTextColor(routeColor: string, isSelected: boolean): string {
 
 export default function MotorOtimizacaoNew() {
   const { selectedUnidade, tecnicosData, unidades } = useOtimizador();
-  const { isLoaded } = useJsApiLoader({ id: 'google-map-motor', googleMapsApiKey: getGoogleMapsApiKey() });
+  const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: getGoogleMapsApiKey() });
 
   const [step, setStep] = useState<'config' | 'result'>('config');
   const [loading, setLoading] = useState(false);

@@ -60,7 +60,7 @@ function getTodayLocal(): string {
 
 export default function MapaRastreamento() {
   const { selectedUnidade } = useOtimizador();
-  const { isLoaded } = useJsApiLoader({ id: 'google-map', googleMapsApiKey: getGoogleMapsApiKey() });
+  const { isLoaded } = useJsApiLoader({ id: 'google-map-script', googleMapsApiKey: getGoogleMapsApiKey() });
 
   const [tecnicos, setTecnicos] = useState<TecnicoPos[]>([]);
   const [tecnicosAgenda, setTecnicosAgenda] = useState<TecnicoAgenda[]>([]);
