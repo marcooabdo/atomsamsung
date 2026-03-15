@@ -694,6 +694,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       .select(`
         *,
         reprovado_por_usuario:usuarios!requisicoes_pecas_reprovado_por_fkey(nome),
+        requisitado_por_usuario:usuarios!requisicoes_pecas_requisitado_por_fkey(nome),
         peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(
           id_numerico,
           estoque_etiquetas(delivery)
@@ -3974,6 +3975,7 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               )}
                             </div>
+                            {/* ── LINHA DE VALORES: Qtd | GSPN | Unit | Total ── */}
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
 
                               {/* Quantidade */}
@@ -3981,7 +3983,6 @@ Não haverá cobrança ao cliente.`
 
                               {/* ── VALOR GSPN (base) ── */}
                               {editandoValorGSPN[peca.id] !== undefined ? (
-                                /* Modo edição GSPN */
                                 <div className="flex items-center gap-2">
                                   <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
                                   <input
@@ -4014,17 +4015,16 @@ Não haverá cobrança ao cliente.`
                                     <X className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                              ) : (!peca.valor_gspn || peca.valor_gspn === 0) ? (
-                                /* Botão Definir Valor GSPN quando não definido */
+                              ) : (!peca.valor_gspn || Number(peca.valor_gspn) === 0) ? (
                                 <button
                                   onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
                                   className="px-2 py-1 rounded text-xs font-bold transition-all hover:opacity-80"
                                   style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
                                 >
-                                  Definir Valor GSPN
+                                  GSPN: R$ 0.00
+                                  <Pencil className="w-3 h-3 inline ml-1.5" />
                                 </button>
                               ) : (
-                                /* GSPN definido: mostra valor + lápis editar */
                                 <div className="flex items-center gap-1.5">
                                   <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
                                     GSPN: R$ {Number(peca.valor_gspn).toFixed(2)}
@@ -4040,7 +4040,7 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               )}
 
-                              {/* ── VALOR UNITÁRIO COM MARKUP ── (sempre visível em OS OW) */}
+                              {/* ── VALOR UNITÁRIO COM MARKUP ── */}
                               {(peca.status === 'gspn' || peca.status === 'manual' || peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5">
@@ -4080,7 +4080,7 @@ Não haverá cobrança ao cliente.`
                                       onClick={() => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: String(Number(peca.valor_unitario || 0).toFixed(2)) }))}
                                       className="p-1 rounded transition-all hover:opacity-80"
                                       style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
-                                      title="Editar valor unitário com markup"
+                                      title="Editar valor unitário"
                                     >
                                       <Pencil className="w-3 h-3" />
                                     </button>
@@ -4088,7 +4088,7 @@ Não haverá cobrança ao cliente.`
                                 )
                               )}
 
-                              {/* ── VALOR TOTAL ── (calculado automaticamente) */}
+                              {/* ── VALOR TOTAL ── */}
                               <p className="text-xs font-bold text-[#39FF14]">
                                 Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
                               </p>
@@ -4138,9 +4138,14 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               )}
                             </div>
+
+                            {/* ── HORÁRIO E USUÁRIO DE REQUISIÇÃO ── */}
                             {(requisicao || requisicaoDevolvida) && (
                               <p className="text-xs text-gray-500 mt-2">
                                 Requisitado em: {new Date((requisicao || requisicaoDevolvida)!.created_at).toLocaleString('pt-BR')}
+                                {(requisicao || requisicaoDevolvida)!.requisitado_por_usuario?.nome && (
+                                  <span className="ml-1">por <span className="text-gray-400 font-medium">{(requisicao || requisicaoDevolvida)!.requisitado_por_usuario.nome}</span></span>
+                                )}
                               </p>
                             )}
                             {requisicao?.status === 'pedido_feito' && (
