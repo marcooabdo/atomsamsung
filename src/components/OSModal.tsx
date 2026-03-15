@@ -208,6 +208,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [editandoValorGSPN, setEditandoValorGSPN] = useState<Record<string, string>>({});
   const [salvandoValorGSPN, setSalvandoValorGSPN] = useState<Record<string, boolean>>({});
   const [editandoValorFinal, setEditandoValorFinal] = useState<Record<string, string>>({});
+  const [editandoValorTotal, setEditandoValorTotal] = useState<Record<string, string>>({});
 
   // Estados para edição inline de valores de peças manuais
   const [editandoValorPeca, setEditandoValorPeca] = useState<Record<string, { unitario: string; quantidade: string }>>({});
@@ -1075,8 +1076,49 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       });
 
       await loadPecas();
+      await loadOS();
     } catch (error: any) {
       showAlert({ message: 'Erro ao salvar valor: ' + (error?.message || ''), type: 'error' });
+    }
+  };
+
+  const handleSalvarValorTotal = async (pecaId: string) => {
+    const valorEditado = editandoValorTotal[pecaId];
+    if (!valorEditado && valorEditado !== '0') return;
+
+    const valorNum = parseFloat(valorEditado);
+    if (isNaN(valorNum) || valorNum < 0) {
+      showAlert({ message: 'Valor total invalido', type: 'warning' });
+      return;
+    }
+
+    try {
+      const peca = pecas.find(p => p.id === pecaId);
+      if (!peca) throw new Error('Peca nao encontrada');
+
+      const qtd = Math.max(peca.quantidade || 1, 1);
+      const novoUnitario = valorNum / qtd;
+
+      const { error } = await supabase
+        .from('os_pecas')
+        .update({
+          valor_unitario: novoUnitario,
+          valor_total: valorNum
+        })
+        .eq('id', pecaId);
+
+      if (error) throw error;
+
+      setEditandoValorTotal(prev => {
+        const novo = { ...prev };
+        delete novo[pecaId];
+        return novo;
+      });
+
+      await loadPecas();
+      await loadOS();
+    } catch (error: any) {
+      showAlert({ message: 'Erro ao salvar valor total: ' + (error?.message || ''), type: 'error' });
     }
   };
 
@@ -1099,7 +1141,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       await loadPecas();
       await loadComentarios();
-      await loadOSData();
+      await loadOS();
     } catch (error: any) {
       showAlert({ message: 'Erro ao remover peça: ' + (error?.message || 'Erro desconhecido'), type: 'error' });
     } finally {
@@ -1132,7 +1174,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       });
 
       await loadPecas();
-      await loadOSData();
+      await loadOS();
     } catch (error: any) {
       showAlert({ message: 'Erro ao salvar valores: ' + (error?.message || 'Erro desconhecido'), type: 'error' });
     }
@@ -4166,7 +4208,8 @@ Não haverá cobrança ao cliente.`
                                                     if (updateError) throw updateError;
                                                   }
 
-                                                  await loadOSData();
+                                                  await loadPecas();
+                                                  await loadOS();
                                                 } catch (error: any) {
                                                   alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
                                                 }
@@ -4176,9 +4219,53 @@ Não haverá cobrança ao cliente.`
                                           </div>
                                         );
                                       })()}
-                                      <p className="text-xs font-bold text-[#39FF14]">
-                                        Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
-                                      </p>
+                                      {editandoValorTotal[peca.id] !== undefined ? (
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-xs text-gray-500">Total: R$</span>
+                                          <input
+                                            type="number"
+                                            step="0.01"
+                                            min="0"
+                                            value={editandoValorTotal[peca.id]}
+                                            onChange={(e) => setEditandoValorTotal(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                            className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#39FF14]"
+                                            autoFocus
+                                          />
+                                          <button
+                                            onClick={() => handleSalvarValorTotal(peca.id)}
+                                            className="p-1 rounded transition-all"
+                                            style={{ backgroundColor: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.35)', color: '#39FF14' }}
+                                            title="Salvar"
+                                          >
+                                            <Save className="w-3 h-3" />
+                                          </button>
+                                          <button
+                                            onClick={() => setEditandoValorTotal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                            className="p-1 rounded transition-all"
+                                            style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                            title="Cancelar"
+                                          >
+                                            <X className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-center gap-2">
+                                          <p className="text-xs font-bold text-[#39FF14]">
+                                            Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
+                                          </p>
+                                          <button
+                                            onClick={() => setEditandoValorTotal(prev => ({
+                                              ...prev,
+                                              [peca.id]: String(Number(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2))
+                                            }))}
+                                            className="p-1 rounded transition-all"
+                                            style={{ backgroundColor: 'rgba(57,255,20,0.08)', border: '1px solid rgba(57,255,20,0.3)', color: '#39FF14' }}
+                                            title="Editar valor total"
+                                          >
+                                            <Pencil className="w-3 h-3" />
+                                          </button>
+                                        </div>
+                                      )}
 
                                       {peca.status === 'manual' && (
                                         <button
