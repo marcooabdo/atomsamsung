@@ -4041,7 +4041,7 @@ Não haverá cobrança ao cliente.`
                               )}
 
                               {/* ── VALOR UNITÁRIO COM MARKUP ── (sempre visível em OS OW) */}
-                              {(peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
