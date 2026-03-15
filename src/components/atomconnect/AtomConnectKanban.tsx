@@ -3,7 +3,7 @@ import {
   Bot, Clock, DollarSign, Package, Wrench, CheckCircle, MapPin, Star,
   Phone, MessageSquare, User, Users, AlertTriangle,
   Plus, UserPlus, Link2, Filter, FileText, CalendarClock, X,
-  Pencil, Check, ChevronsLeft, ChevronsRight
+  Pencil, Check, ChevronsLeft, ChevronsRight, ArrowUp, ArrowDown
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -82,6 +82,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   const [editingColumnId, setEditingColumnId] = useState<string | null>(null);
   const [editingColumnName, setEditingColumnName] = useState('');
   const [collapsedColumns, setCollapsedColumns] = useState<Set<string>>(new Set());
+  const [columnSortOrder, setColumnSortOrder] = useState<Record<string, 'asc' | 'desc'>>({});
 
   const FIXED_COLUMNS = ['bot_triagem', 'fila_espera', 'finalizado_nps', 'monitor_atrito'];
   const isMaster = usuario?.cargo === 'master';
@@ -249,9 +250,20 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   }, [conversas, searchTerm, filterAtendente, filterVendedor, filterDiasSemRetorno, filterVinculadoOS, usuario, osMap, deepSearchIds]);
 
   const getConversasByColuna = (colunaId: string) => {
+    const order = columnSortOrder[colunaId] ?? 'desc';
     return filteredConversas
       .filter(c => c.coluna_pipeline === colunaId)
-      .sort((a, b) => new Date(b.ultima_mensagem_at).getTime() - new Date(a.ultima_mensagem_at).getTime());
+      .sort((a, b) => {
+        const diff = new Date(a.ultima_mensagem_at).getTime() - new Date(b.ultima_mensagem_at).getTime();
+        return order === 'asc' ? diff : -diff;
+      });
+  };
+
+  const toggleColumnSort = (colunaId: string) => {
+    setColumnSortOrder(prev => ({
+      ...prev,
+      [colunaId]: (prev[colunaId] ?? 'desc') === 'desc' ? 'asc' : 'desc'
+    }));
   };
 
   const handleDragStart = (e: React.DragEvent, conversa: Conversa) => {
@@ -642,6 +654,17 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                           {coluna.sla_minutos}min
                         </div>
                       )}
+                      <button
+                        onClick={() => toggleColumnSort(coluna.id)}
+                        className="p-1 rounded hover:bg-white/10 transition-colors"
+                        style={{ color: (columnSortOrder[coluna.id] ?? 'desc') === 'asc' ? accentColor : 'rgba(255,255,255,0.2)' }}
+                        title={(columnSortOrder[coluna.id] ?? 'desc') === 'desc' ? 'Mais recentes primeiro — clique para inverter' : 'Mais antigos primeiro — clique para inverter'}
+                      >
+                        {(columnSortOrder[coluna.id] ?? 'desc') === 'desc'
+                          ? <ArrowDown className="w-3.5 h-3.5" />
+                          : <ArrowUp className="w-3.5 h-3.5" />
+                        }
+                      </button>
                       <button
                         onClick={() => toggleColumnCollapse(coluna.id)}
                         className="p-1 rounded hover:bg-white/10 text-white/20 hover:text-white/50 transition-colors"
