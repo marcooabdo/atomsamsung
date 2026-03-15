@@ -30,6 +30,9 @@ interface OSItem {
   tipo_os?: string;
   is_cortesia?: boolean;
   valor_total?: number;
+  confirmado_com_cliente?: boolean;
+  data_agendamento_confirmada?: string | null;
+  periodo_agendamento_confirmado?: string | null;
 }
 
 interface ParadaItinerario {
@@ -262,10 +265,8 @@ export default function MotorOtimizacaoNew() {
     if (filterProduto) {
       filtered = filtered.filter(os => os.aparelho_linha?.toLowerCase().includes(filterProduto.toLowerCase()));
     }
-    const jaAgendadasIds = new Set(osJaAgendadas.map(o => o.id));
-    filtered = filtered.filter(os => !jaAgendadasIds.has(os.id));
     setFilteredOS(filtered);
-  }, [osList, filterCidade, filterProduto, osJaAgendadas]);
+  }, [osList, filterCidade, filterProduto]);
 
   useEffect(() => {
     if (!selectedTecnico || !selectedUnidade || !dataInicio || !dataFim) {
@@ -275,16 +276,77 @@ export default function MotorOtimizacaoNew() {
     (async () => {
       const { data } = await supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_os, is_cortesia, valor_total, lat, lng, coluna_kanban, created_at, data_agendamento, periodo_agendamento, confirmado_com_cliente')
         .eq('unidade_id', selectedUnidade)
         .eq('tecnico_agendado_id', selectedTecnico)
         .eq('confirmado_com_cliente', true)
         .gte('data_agendamento', dataInicio)
         .lte('data_agendamento', dataFim)
         .not('data_agendamento', 'is', null);
-      setOsJaAgendadas(data ?? []);
+
+      const confirmadas = data ?? [];
+      setOsJaAgendadas(confirmadas.map(o => ({
+        id: o.id,
+        numero_os_interna: o.numero_os_interna,
+        numero_os_samsung: o.numero_os_samsung,
+        cliente_nome: o.cliente_nome,
+        cliente_cidade: o.cliente_cidade,
+        data_agendamento: o.data_agendamento,
+        periodo_agendamento: o.periodo_agendamento,
+        confirmado_com_cliente: o.confirmado_com_cliente,
+      })));
+
+      if (confirmadas.length > 0) {
+        setOsList(prev => {
+          const existingIds = new Set(prev.map(o => o.id));
+          const novas: OSItem[] = confirmadas
+            .filter(os => !existingIds.has(os.id))
+            .map(os => {
+              const diasAberta = Math.floor((Date.now() - new Date(os.created_at).getTime()) / 86400000);
+              const rotaMatch = rotas.find(r => r.coluna_kanban === os.coluna_kanban);
+              return {
+                id: os.id,
+                numero_os: os.numero_os_samsung || os.numero_os_interna || '',
+                lat: Number(os.lat) || 0,
+                lng: Number(os.lng) || 0,
+                cliente_nome: os.cliente_nome || '',
+                cliente_cidade: os.cliente_cidade || '',
+                cliente_bairro: os.cliente_bairro || '',
+                cliente_endereco: buildOSAddress(os),
+                aparelho_linha: os.aparelho_linha || '',
+                dias_aberta: diasAberta,
+                tempo_estimado_min: tempoMedioReparo,
+                periodo_preferido: os.periodo_agendamento as any,
+                prioridade: 'normal',
+                rota_nome: rotaMatch?.nome,
+                rota_cor: rotaMatch?.cor || '#F59E0B',
+                tipo_os: os.tipo_os || '',
+                is_cortesia: os.is_cortesia === true,
+                valor_total: Number(os.valor_total) || 0,
+                confirmado_com_cliente: true,
+                data_agendamento_confirmada: os.data_agendamento,
+                periodo_agendamento_confirmado: os.periodo_agendamento,
+              };
+            });
+
+          const atualizadas = prev.map(o => {
+            const confirmada = confirmadas.find(c => c.id === o.id);
+            if (confirmada) {
+              return {
+                ...o,
+                confirmado_com_cliente: true,
+                data_agendamento_confirmada: confirmada.data_agendamento,
+                periodo_agendamento_confirmado: confirmada.periodo_agendamento,
+              };
+            }
+            return o;
+          });
+
+          return [...atualizadas, ...novas];
+        });
+      }
     })();
-  }, [selectedTecnico, selectedUnidade, dataInicio, dataFim]);
+  }, [selectedTecnico, selectedUnidade, dataInicio, dataFim, rotas, tempoMedioReparo]);
 
   const loadRotas = async () => {
     const [rotasDB, osDistinct] = await Promise.all([
@@ -763,7 +825,7 @@ export default function MotorOtimizacaoNew() {
   }, [baseCoords, dataInicio, horarioInicio, horarioFim, horarioAlmoco, duracaoAlmoco, permitePernoite, tempoMedioReparo]);
 
   const runOptimization = useCallback(async () => {
-    if (!baseCoords || filteredOS.length === 0) return;
+    if (!baseCoords || (filteredOS.length === 0 && osJaAgendadas.length === 0)) return;
     setLoading(true);
 
     let osParaOtimizar = [...filteredOS];
@@ -1447,7 +1509,7 @@ export default function MotorOtimizacaoNew() {
                   OS ja Agendadas e Confirmadas com o Cliente ({osJaAgendadas.length})
                 </h3>
                 <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
-                  Estas OS ja possuem agendamento confirmado com o cliente para este tecnico no periodo selecionado. Elas nao entram na roteirizacao automatica.
+                  Estas OS ja possuem agendamento confirmado com o cliente. Elas serao incluidas na roteirizacao e aparecero marcadas com alerta. A sequencia otimizada pode sugerir uma ordem diferente da confirmada.
                 </p>
                 <div className="space-y-2">
                   {osJaAgendadas.map((os) => {
@@ -1563,11 +1625,17 @@ export default function MotorOtimizacaoNew() {
                         >
                           <div className="w-2 h-8 rounded-full" style={{ backgroundColor: os.rota_cor || '#3B82F6' }} />
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2 flex-wrap">
                               <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>OS {os.numero_os}</span>
                               <span className="text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: os.rota_cor + '20', color: os.rota_cor }}>
                                 {os.rota_nome}
                               </span>
+                              {os.confirmado_com_cliente && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1" style={{ backgroundColor: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40' }}>
+                                  <AlertTriangle className="w-2.5 h-2.5" />
+                                  Ja confirmado
+                                </span>
+                              )}
                               {!os.lat && !os.lng && (
                                 <span className="text-[10px] px-1 py-0.5 rounded bg-red-500/20 text-red-400">Sem coord.</span>
                               )}
@@ -1634,7 +1702,7 @@ export default function MotorOtimizacaoNew() {
 
               <button
                 onClick={runOptimization}
-                disabled={selectedRotas.length === 0 || !selectedTecnico || filteredOS.length === 0 || loading}
+                disabled={selectedRotas.length === 0 || !selectedTecnico || (filteredOS.length === 0 && osJaAgendadas.length === 0) || loading}
                 className="w-full mt-6 py-3.5 rounded-xl font-bold text-base flex items-center justify-center gap-2 disabled:opacity-40 transition-all"
                 style={{ backgroundColor: '#FFBF00', color: '#000' }}
               >
@@ -1973,6 +2041,22 @@ export default function MotorOtimizacaoNew() {
                                     #{evento.parada.ordem}
                                   </span>
                                 )}
+                              {evento.tipo === 'atendimento' && evento.os?.confirmado_com_cliente && (() => {
+                                const dataConf = evento.os.data_agendamento_confirmada
+                                  ? new Date(evento.os.data_agendamento_confirmada + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                                  : null;
+                                const periodoConf = evento.os.periodo_agendamento_confirmado === 'manha' ? 'Manha' : evento.os.periodo_agendamento_confirmado === 'tarde' ? 'Tarde' : null;
+                                return (
+                                  <span
+                                    className="text-[10px] px-1.5 py-0.5 rounded font-medium flex items-center gap-1"
+                                    style={{ backgroundColor: '#F59E0B20', color: '#F59E0B', border: '1px solid #F59E0B40' }}
+                                    title={`Ja confirmado com o cliente: ${dataConf || ''}${periodoConf ? ' - ' + periodoConf : ''}`}
+                                  >
+                                    <AlertTriangle className="w-2.5 h-2.5" />
+                                    Confirmado {dataConf}{periodoConf ? ` ${periodoConf}` : ''}
+                                  </span>
+                                );
+                              })()}
                               </div>
 
                               {(evento.tipo === 'deslocamento' || evento.tipo === 'continua_deslocamento') && (
