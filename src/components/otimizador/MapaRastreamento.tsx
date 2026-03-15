@@ -39,6 +39,24 @@ interface TecnicoAgenda {
   total: number;
 }
 
+const COR_ROTA: Record<string, string> = {
+  rota_preta: '#374151',
+  rota_vermelha: '#EF4444',
+  rota_azul: '#3B82F6',
+  rota_verde: '#10B981',
+  rota_amarela: '#EAB308',
+  rota_laranja: '#F97316',
+  rota_rosa: '#EC4899',
+  rota_roxo: '#8B5CF6',
+  rota_cinza: '#6B7280',
+  rota_branca: '#E5E7EB',
+};
+
+function getCorByColuna(coluna: string | null | undefined): string {
+  if (!coluna) return '#3B82F6';
+  return COR_ROTA[coluna] || '#3B82F6';
+}
+
 const MAP_STYLES = [
   { elementType: 'geometry', stylers: [{ color: '#1d2c4d' }] },
   { elementType: 'labels.text.fill', stylers: [{ color: '#8ec3b9' }] },
@@ -85,7 +103,7 @@ export default function MapaRastreamento() {
         .from('agendamentos')
         .select(`
           id, os_id, tecnico_id, status, periodo, data_agendamento,
-          os:os!agendamentos_os_id_fkey(numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, lat, lng, rota_cor, coluna_kanban),
+          os:os!agendamentos_os_id_fkey(numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, lat, lng, coluna_kanban),
           tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)
         `)
         .eq('unidade_id', selectedUnidade)
@@ -114,7 +132,7 @@ export default function MapaRastreamento() {
         tecnico_id: a.tecnico_id || '',
         status: a.status,
         periodo: a.periodo || '',
-        rota_cor: a.os?.rota_cor || '#3B82F6',
+        rota_cor: getCorByColuna(a.os?.coluna_kanban),
         sem_coordenadas: !a.os?.lat || !a.os?.lng,
       }));
 

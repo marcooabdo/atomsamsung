@@ -25,7 +25,7 @@ export default function DashboardExecutivo() {
     const [osHoje, agendHoje, giRes] = await Promise.all([
       supabase.from('os').select('id, coluna_kanban, data_agendamento').eq('unidade_id', selectedUnidade).or(`data_agendamento.eq.${hoje},coluna_kanban.in.(em_atendimento,em_rota_ih)`),
       supabase.from('agendamentos').select('id, status, checkout_realizado, data_agendamento').eq('unidade_id', selectedUnidade).eq('data_agendamento', hoje),
-      supabase.from('requisicoes_pecas').select('id, status').eq('status', 'aprovada').limit(500),
+      supabase.from('requisicoes_pecas').select('id, status').in('status', ['pendente', 'atendida']).limit(500),
     ]);
 
     const osToday = osHoje.data || [];
