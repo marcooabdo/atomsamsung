@@ -1063,7 +1063,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .from('os_pecas')
         .update({
           valor_unitario: valorNum,
-          valor_total: valorTotal
+          valor_total: valorTotal,
+          editado_manualmente: true
         })
         .eq('id', pecaId);
 
@@ -4087,54 +4088,10 @@ Não haverá cobrança ao cliente.`
                                 )
                               )}
 
-                              {/* ── VALOR TOTAL ── (sempre visível) */}
-                              {editandoValorTotal[peca.id] !== undefined ? (
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-xs font-bold text-[#39FF14]">Total R$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    value={editandoValorTotal[peca.id]}
-                                    onChange={(e) => setEditandoValorTotal(prev => ({ ...prev, [peca.id]: e.target.value }))}
-                                    className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#39FF14]"
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => handleSalvarValorTotal(peca.id)}
-                                    className="p-1 rounded transition-all"
-                                    style={{ backgroundColor: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.35)', color: '#39FF14' }}
-                                    title="Salvar total"
-                                  >
-                                    <Save className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditandoValorTotal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                    className="p-1 rounded transition-all"
-                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                    title="Cancelar"
-                                  >
-                                    <X className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <p className="text-xs font-bold text-[#39FF14]">
-                                    Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
-                                  </p>
-                                  <button
-                                    onClick={() => setEditandoValorTotal(prev => ({
-                                      ...prev,
-                                      [peca.id]: String(Number(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2))
-                                    }))}
-                                    className="p-1 rounded transition-all hover:opacity-80"
-                                    style={{ backgroundColor: 'rgba(57,255,20,0.08)', border: '1px solid rgba(57,255,20,0.3)', color: '#39FF14' }}
-                                    title="Editar valor total"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                </div>
-                              )}
+                              {/* ── VALOR TOTAL ── (calculado automaticamente) */}
+                              <p className="text-xs font-bold text-[#39FF14]">
+                                Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
+                              </p>
 
                               {/* Edição de qtd+unitário para peças manuais */}
                               {peca.status === 'manual' && editandoValorPeca[peca.id] && (
