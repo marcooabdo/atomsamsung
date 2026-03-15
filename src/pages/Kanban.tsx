@@ -115,6 +115,7 @@ export function Kanban() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [dragOverPosition, setDragOverPosition] = useState<number | null>(null);
   const [columnSortOrder, setColumnSortOrder] = useState<Record<string, 'tat' | 'numero' | 'tempo_etapa' | 'sequencia'>>({});
+  const [columnSortDir, setColumnSortDir] = useState<Record<string, 'asc' | 'desc'>>({});
   const [openSortDropdown, setOpenSortDropdown] = useState<string | null>(null);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
@@ -1620,17 +1621,19 @@ export function Kanban() {
       });
 
       const sortOrder = columnSortOrder[coluna] || 'sequencia';
+      const sortDir = columnSortDir[coluna] || 'asc';
+      const dir = sortDir === 'asc' ? 1 : -1;
 
       if (sortOrder === 'tat') {
-        filtered = filtered.sort((a, b) => calcularTAT(a.created_at) - calcularTAT(b.created_at));
+        filtered = filtered.sort((a, b) => dir * (calcularTAT(a.created_at) - calcularTAT(b.created_at)));
       } else if (sortOrder === 'numero') {
         filtered = filtered.sort((a, b) => {
           const numA = a.numero_os_interna || a.numero_os_samsung || '';
           const numB = b.numero_os_interna || b.numero_os_samsung || '';
-          return numA.localeCompare(numB);
+          return dir * numA.localeCompare(numB);
         });
       } else if (sortOrder === 'tempo_etapa') {
-        filtered = filtered.sort((a, b) => new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime());
+        filtered = filtered.sort((a, b) => dir * (new Date(a.updated_at).getTime() - new Date(b.updated_at).getTime()));
       } else {
         filtered = filtered.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
       }
@@ -1640,7 +1643,7 @@ export function Kanban() {
     }, {} as Record<string, OS[]>);
 
     return { filteredData: result, computedMatchSource: newMatchSource };
-  }, [osData, searchTerm, tipoOSFilters, tipoAtendimentoFilters, tecnicoFilters, minDiasAbertos, columnSortOrder]);
+  }, [osData, searchTerm, tipoOSFilters, tipoAtendimentoFilters, tecnicoFilters, minDiasAbertos, columnSortOrder, columnSortDir]);
 
   useEffect(() => {
     if (searchTerm && Object.keys(computedMatchSource).length > 0) {
@@ -2297,17 +2300,29 @@ export function Kanban() {
                         </div>
                       </div>
                       {columnSortOrder[coluna.id] && columnSortOrder[coluna.id] !== 'sequencia' && (
-                        <div className="text-[9px] px-2 py-0.5 rounded mb-1" style={{
-                          background: `${coluna.color}10`,
-                          color: getTextColor(coluna.id, coluna.color),
-                          border: `1px solid ${getTextColor(coluna.id, coluna.color)}30`
-                        }}>
-                          Ordenado por: {
-                            columnSortOrder[coluna.id] === 'tat' ? 'TAT ↑' :
-                            columnSortOrder[coluna.id] === 'numero' ? 'Número ↑' :
-                            'Tempo na Etapa ↑'
+                        <button
+                          onClick={() => setColumnSortDir(prev => ({
+                            ...prev,
+                            [coluna.id]: (prev[coluna.id] || 'asc') === 'asc' ? 'desc' : 'asc'
+                          }))}
+                          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded mb-1 transition-all hover:opacity-80 active:scale-95"
+                          style={{
+                            background: `${coluna.color}15`,
+                            color: getTextColor(coluna.id, coluna.color),
+                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`
+                          }}
+                          title="Clique para inverter direção"
+                        >
+                          <span>
+                            {columnSortOrder[coluna.id] === 'tat' ? 'TAT TEMPO' :
+                             columnSortOrder[coluna.id] === 'numero' ? 'NÚMERO OS' :
+                             'TEMPO ETAPA'}
+                          </span>
+                          {(columnSortDir[coluna.id] || 'asc') === 'asc'
+                            ? <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                            : <svg xmlns="http://www.w3.org/2000/svg" className="w-2.5 h-2.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
                           }
-                        </div>
+                        </button>
                       )}
                     </div>
 
