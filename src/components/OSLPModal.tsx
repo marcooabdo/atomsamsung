@@ -1380,13 +1380,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     try {
       setLoading(true);
 
-      // Debug: Verificar o que está sendo criado
-      console.log('🔍 DIAGNÓSTICO - Criando OS com:');
-      console.log('  📦 Peças adicionadas:', pecasAdicionadas.length, pecasAdicionadas);
-      console.log('  ⚙️ Serviços adicionados:', servicosAdicionados.length, servicosAdicionados);
-      console.log('  💰 Pagamentos temporários:', pagamentosTemporarios.length);
-      console.log('  📎 Anexos temporários:', anexosTemporarios.length);
-      console.log('  📋 Requisições temporárias:', requisicoesTemporarias.length);
+      let pecasFinais = [...pecasAdicionadas];
+      if (novaPecaCodigo && novaPecaDescricao) {
+        const valorPeca = parseFloat(novaPecaValor) || 0;
+        const valorComMarkup = novaPecaValorComMarkup || valorPeca;
+        const quantidade = modoSCACC ? novaPecaQuantidade : 1;
+        pecasFinais = [...pecasFinais, {
+          codigo: novaPecaCodigo,
+          descricao: novaPecaDescricao,
+          valor: modoSCACC ? valorComMarkup : valorPeca,
+          valor_gspn: valorPeca,
+          quantidade: quantidade,
+          requisitada: false
+        }];
+      }
 
       await salvarOuAtualizarCliente();
 
@@ -1441,9 +1448,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       console.log('✅ OS criada com sucesso:', novaOS.id);
 
       // Salvar peças adicionadas diretamente na OS
-      if (pecasAdicionadas.length > 0) {
-        console.log(`Salvando ${pecasAdicionadas.length} peca(s) na os_pecas...`);
-        const pecasInsert = pecasAdicionadas.map(peca => ({
+      if (pecasFinais.length > 0) {
+        const pecasInsert = pecasFinais.map(peca => ({
           os_id: novaOS.id,
           pn: peca.codigo,
           descricao: peca.descricao,

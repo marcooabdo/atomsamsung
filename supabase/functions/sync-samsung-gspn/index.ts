@@ -478,7 +478,7 @@ Deno.serve(async (req: Request) => {
                                  os.SvcTypeDesc === 'Carry In' ? 'CI' : 'IH';
 
           const warrantyType = (os.WarrantyType || 'O').toUpperCase();
-          const tipoOS = 'OW';
+          const tipoOS = warrantyType === 'I' ? 'LP' : 'OW';
           const tipoOrcamento = warrantyType === 'I' ? 'samsung_contigo' : 'normal';
 
           const details = detailsMap.get(os.SvcOrderNo);
