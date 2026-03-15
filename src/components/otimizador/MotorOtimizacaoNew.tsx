@@ -33,6 +33,9 @@ interface OSItem {
   confirmado_com_cliente?: boolean;
   data_agendamento_confirmada?: string | null;
   periodo_agendamento_confirmado?: string | null;
+  data_agendamento_atual?: string | null;
+  periodo_agendamento_atual?: string | null;
+  tecnico_agendado_id_atual?: string | null;
 }
 
 interface ParadaItinerario {
@@ -422,7 +425,7 @@ export default function MotorOtimizacaoNew() {
 
     const { data: osData } = await supabase
       .from('os')
-      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, tipo_os, is_cortesia, valor_total, lat, lng, coluna_kanban, created_at, periodo_agendamento')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, cliente_bairro, cliente_logradouro, cliente_numero, cliente_estado, cliente_cep, cliente_endereco, aparelho_linha, tipo_atendimento, tipo_os, is_cortesia, valor_total, lat, lng, coluna_kanban, created_at, periodo_agendamento, data_agendamento, confirmado_com_cliente, tecnico_agendado_id')
       .eq('unidade_id', selectedUnidade!)
       .in('coluna_kanban', rotaCols as string[]);
 
@@ -454,6 +457,12 @@ export default function MotorOtimizacaoNew() {
         tipo_os: (os as any).tipo_os || '',
         is_cortesia: (os as any).is_cortesia === true,
         valor_total: Number((os as any).valor_total) || 0,
+        confirmado_com_cliente: (os as any).confirmado_com_cliente === true,
+        data_agendamento_atual: (os as any).data_agendamento || null,
+        periodo_agendamento_atual: (os as any).periodo_agendamento || null,
+        tecnico_agendado_id_atual: (os as any).tecnico_agendado_id || null,
+        data_agendamento_confirmada: (os as any).confirmado_com_cliente ? (os as any).data_agendamento || null : null,
+        periodo_agendamento_confirmado: (os as any).confirmado_com_cliente ? (os as any).periodo_agendamento || null : null,
       };
     });
 
@@ -1214,6 +1223,19 @@ export default function MotorOtimizacaoNew() {
       data_agendamento: dataStr,
       periodo_agendamento: periodo,
     }).eq('id', parada.os.id);
+
+    setParadas(prev => prev.map(p => {
+      if (p.os.id !== parada.os.id) return p;
+      return {
+        ...p,
+        os: {
+          ...p.os,
+          data_agendamento_atual: dataStr,
+          periodo_agendamento_atual: periodo,
+          tecnico_agendado_id_atual: selectedTecnico,
+        },
+      };
+    }));
 
     setSavingOS(null);
   }, [selectedTecnico, selectedUnidade, dataInicio]);
@@ -2146,21 +2168,108 @@ export default function MotorOtimizacaoNew() {
                               )}
                             </div>
 
-                            {evento.tipo === 'atendimento' && evento.parada && (
-                              <button
-                                onClick={() => handleSaveAgendamento(evento.parada!)}
-                                disabled={savingOS === evento.os?.id}
-                                className="flex-shrink-0 px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all"
-                                style={{ backgroundColor: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}
-                              >
-                                {savingOS === evento.os?.id ? (
-                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                ) : (
-                                  <Calendar className="w-3.5 h-3.5" />
-                                )}
-                                Agendar
-                              </button>
-                            )}
+                            {evento.tipo === 'atendimento' && evento.parada && (() => {
+                              const os = evento.os!;
+                              const parada = evento.parada!;
+                              const dataBase2 = new Date(dataInicio);
+                              const dataAgendOtim = addDaysToDate(dataBase2, parada.dia - 1).toISOString().split('T')[0];
+                              const periodoOtim = timeToMinutes(parada.horario_chegada) < timeToMinutes('12:00') ? 'manha' : 'tarde';
+
+                              const temAgendamento = !!(os.data_agendamento_atual || os.confirmado_com_cliente);
+                              const confirmadoCliente = os.confirmado_com_cliente === true;
+                              const dataMudou = os.data_agendamento_atual && os.data_agendamento_atual !== dataAgendOtim;
+                              const periodoMudou = os.periodo_agendamento_atual && os.periodo_agendamento_atual !== periodoOtim;
+                              const tecnicoMudou = os.tecnico_agendado_id_atual && selectedTecnico && os.tecnico_agendado_id_atual !== selectedTecnico;
+                              const precisaReagendar = confirmadoCliente && (dataMudou || periodoMudou);
+                              const precisaReprogramar = !confirmadoCliente && temAgendamento && (dataMudou || periodoMudou || tecnicoMudou);
+
+                              let label = 'Programar';
+                              let bgColor = '#3B82F620';
+                              let textColor = '#3B82F6';
+                              let borderColor = '#3B82F640';
+                              let InfoBlock: JSX.Element | null = null;
+
+                              if (precisaReagendar) {
+                                label = 'Re-agendar';
+                                bgColor = '#F59E0B20';
+                                textColor = '#F59E0B';
+                                borderColor = '#F59E0B40';
+                                const dataOrigFormatada = os.data_agendamento_atual
+                                  ? new Date(os.data_agendamento_atual + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                                  : null;
+                                const periodoOrigLabel = os.periodo_agendamento_atual === 'manha' ? 'Manha' : os.periodo_agendamento_atual === 'tarde' ? 'Tarde' : null;
+                                InfoBlock = (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: '#F59E0B15', color: '#F59E0B', border: '1px solid #F59E0B30' }}>
+                                    <CalendarDays className="w-2.5 h-2.5" />
+                                    Agendado: {dataOrigFormatada}{periodoOrigLabel ? ` ${periodoOrigLabel}` : ''}
+                                  </span>
+                                );
+                              } else if (confirmadoCliente && !precisaReagendar) {
+                                label = 'Agendado';
+                                bgColor = '#10B98120';
+                                textColor = '#10B981';
+                                borderColor = '#10B98140';
+                                const dataOrigFormatada = os.data_agendamento_confirmada
+                                  ? new Date(os.data_agendamento_confirmada + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                                  : null;
+                                const periodoOrigLabel = os.periodo_agendamento_confirmado === 'manha' ? 'Manha' : os.periodo_agendamento_confirmado === 'tarde' ? 'Tarde' : null;
+                                InfoBlock = (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: '#10B98115', color: '#10B981', border: '1px solid #10B98130' }}>
+                                    <CalendarDays className="w-2.5 h-2.5" />
+                                    {dataOrigFormatada}{periodoOrigLabel ? ` ${periodoOrigLabel}` : ''}
+                                  </span>
+                                );
+                              } else if (precisaReprogramar) {
+                                label = 'Re-programar';
+                                bgColor = '#F9731620';
+                                textColor = '#F97316';
+                                borderColor = '#F9731640';
+                                const dataOrigFormatada = os.data_agendamento_atual
+                                  ? new Date(os.data_agendamento_atual + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                                  : null;
+                                const periodoOrigLabel = os.periodo_agendamento_atual === 'manha' ? 'Manha' : os.periodo_agendamento_atual === 'tarde' ? 'Tarde' : null;
+                                InfoBlock = (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: '#F9731615', color: '#F97316', border: '1px solid #F9731630' }}>
+                                    <CalendarDays className="w-2.5 h-2.5" />
+                                    Prog.: {dataOrigFormatada}{periodoOrigLabel ? ` ${periodoOrigLabel}` : ''}
+                                  </span>
+                                );
+                              } else if (!confirmadoCliente && temAgendamento) {
+                                label = 'Programado';
+                                bgColor = '#6B728020';
+                                textColor = '#9CA3AF';
+                                borderColor = '#6B728040';
+                                const dataOrigFormatada = os.data_agendamento_atual
+                                  ? new Date(os.data_agendamento_atual + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                                  : null;
+                                const periodoOrigLabel = os.periodo_agendamento_atual === 'manha' ? 'Manha' : os.periodo_agendamento_atual === 'tarde' ? 'Tarde' : null;
+                                InfoBlock = (
+                                  <span className="text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1" style={{ backgroundColor: '#6B728015', color: '#9CA3AF', border: '1px solid #6B728030' }}>
+                                    <CalendarDays className="w-2.5 h-2.5" />
+                                    {dataOrigFormatada}{periodoOrigLabel ? ` ${periodoOrigLabel}` : ''}
+                                  </span>
+                                );
+                              }
+
+                              return (
+                                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                                  {InfoBlock && <div>{InfoBlock}</div>}
+                                  <button
+                                    onClick={() => handleSaveAgendamento(parada)}
+                                    disabled={savingOS === os.id || label === 'Agendado' || label === 'Programado'}
+                                    className="px-3 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all disabled:opacity-60"
+                                    style={{ backgroundColor: bgColor, color: textColor, border: `1px solid ${borderColor}` }}
+                                  >
+                                    {savingOS === os.id ? (
+                                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                    ) : (
+                                      <Calendar className="w-3.5 h-3.5" />
+                                    )}
+                                    {label}
+                                  </button>
+                                </div>
+                              );
+                            })()}
                           </div>
                         </div>
                       ))}
