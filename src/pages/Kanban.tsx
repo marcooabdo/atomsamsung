@@ -3123,7 +3123,7 @@ export function Kanban() {
         </div>
       </div>
 
-      {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA') && selectedOSTipoOrcamento !== 'samsung_contigo' && selectedOSTipoOrcamento !== 'acessorios' && (
+      {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA' || selectedOSTipoOrcamento === 'samsung_contigo' || selectedOSTipoOrcamento === 'acessorios') && selectedOSTipo !== 'LP' && (
         <OSModal
           osId={selectedOSId}
           onClose={() => {
@@ -3135,7 +3135,7 @@ export function Kanban() {
         />
       )}
 
-      {selectedOSId && selectedOSTipo === 'LP' && (
+      {selectedOSId && selectedOSTipo === 'LP' && selectedOSTipoOrcamento !== 'samsung_contigo' && selectedOSTipoOrcamento !== 'acessorios' && (
         <OSLPModal
           osId={selectedOSId}
           onClose={() => {
@@ -3145,20 +3145,6 @@ export function Kanban() {
           }}
           onReload={loadKanbanData}
           mode="view"
-        />
-      )}
-
-      {selectedOSId && (selectedOSTipoOrcamento === 'samsung_contigo' || selectedOSTipoOrcamento === 'acessorios') && (
-        <OSLPModal
-          osId={selectedOSId}
-          onClose={() => {
-            setSelectedOSId(null);
-            setSelectedOSTipo(null);
-            setSelectedOSTipoOrcamento(null);
-          }}
-          onReload={loadKanbanData}
-          mode="view"
-          modoSCACC={true}
         />
       )}
 
