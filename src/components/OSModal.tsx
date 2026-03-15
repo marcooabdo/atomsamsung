@@ -3981,63 +3981,56 @@ Não haverá cobrança ao cliente.`
                               {/* Quantidade */}
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
 
-                              {/* ── VALOR GSPN (base) ── */}
-                              {editandoValorGSPN[peca.id] !== undefined ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
-                                  <input
-                                    type="number"
-                                    step="0.01"
-                                    min="0"
-                                    placeholder="0.00"
-                                    value={editandoValorGSPN[peca.id]}
-                                    onChange={(e) => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: e.target.value }))}
-                                    className="neon-input w-28 text-xs py-1"
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    autoFocus
-                                  />
-                                  <button
-                                    onClick={() => handleSalvarValorGSPN(peca.id)}
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    className="p-1.5 rounded transition-all disabled:opacity-50"
-                                    style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
-                                    title="Salvar valor GSPN"
-                                  >
-                                    <Save className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    onClick={() => setEditandoValorGSPN(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                    disabled={salvandoValorGSPN[peca.id]}
-                                    className="p-1.5 rounded transition-all disabled:opacity-50"
-                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                    title="Cancelar"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </div>
-                              ) : (!peca.valor_gspn || Number(peca.valor_gspn) === 0) ? (
-                                <button
-                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
-                                  className="px-2 py-1 rounded text-xs font-bold transition-all hover:opacity-80"
-                                  style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
-                                >
-                                  GSPN: R$ 0.00
-                                  <Pencil className="w-3 h-3 inline ml-1.5" />
-                                </button>
-                              ) : (
-                                <div className="flex items-center gap-1.5">
-                                  <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                    GSPN: R$ {Number(peca.valor_gspn).toFixed(2)}
-                                  </p>
-                                  <button
-                                    onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
-                                    className="p-1 rounded transition-all hover:opacity-80"
-                                    style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
-                                    title="Editar valor GSPN"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                </div>
+                              {/* ── VALOR GSPN (base) — só para peças gspn/manual ── */}
+                              {(peca.status === 'gspn' || peca.status === 'manual') && (
+                                editandoValorGSPN[peca.id] !== undefined ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      placeholder="0.00"
+                                      value={editandoValorGSPN[peca.id]}
+                                      onChange={(e) => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                      className="neon-input w-28 text-xs py-1"
+                                      disabled={salvandoValorGSPN[peca.id]}
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleSalvarValorGSPN(peca.id)}
+                                      disabled={salvandoValorGSPN[peca.id]}
+                                      className="p-1.5 rounded transition-all disabled:opacity-50"
+                                      style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
+                                      title="Salvar valor GSPN"
+                                    >
+                                      <Save className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditandoValorGSPN(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                      disabled={salvandoValorGSPN[peca.id]}
+                                      className="p-1.5 rounded transition-all disabled:opacity-50"
+                                      style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                      GSPN: R$ {Number(peca.valor_gspn || 0).toFixed(2)}
+                                    </p>
+                                    <button
+                                      onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(Number(peca.valor_gspn || 0).toFixed(2)) }))}
+                                      className="p-1 rounded transition-all hover:opacity-80"
+                                      style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
+                                      title="Editar valor GSPN"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )
                               )}
 
                               {/* ── VALOR UNITÁRIO COM MARKUP ── */}
