@@ -1,4 +1,4 @@
-import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route, Truck, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, Navigation, Route, Truck, AlertTriangle, RefreshCw, FolderOpen } from 'lucide-react';
 import { Component, ReactNode } from 'react';
 import { OtimizadorProvider, useOtimizador, type OtimizadorTab } from '../contexts/OtimizadorContext';
 import { UnitFilter } from '../components/UnitFilter';
@@ -50,6 +50,7 @@ import SistemaChecklists from '../components/otimizador/SistemaChecklists';
 import ControlePecas from '../components/otimizador/ControlePecas';
 import Analytics from '../components/otimizador/Analytics';
 import ConfiguracaoOtimizador from '../components/otimizador/ConfiguracaoOtimizador';
+import RotasRealizadas from '../components/otimizador/RotasRealizadas';
 
 const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }> = [
   { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)' },
@@ -61,6 +62,7 @@ const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }
   { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899' },
   { id: 'pecas', label: 'Pecas', icon: Package, color: '#F97316' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, color: '#10B981' },
+  { id: 'historico', label: 'Rotas Realizadas', icon: FolderOpen, color: '#3B82F6' },
   { id: 'config', label: 'Config', icon: Cog, color: '#6B7280' },
 ];
 
@@ -79,6 +81,7 @@ function OtimizadorContent() {
       case 'checklists': return <SistemaChecklists />;
       case 'pecas': return <ControlePecas />;
       case 'analytics': return <Analytics />;
+      case 'historico': return <RotasRealizadas />;
       case 'config': return <ConfiguracaoOtimizador />;
       default: return <DashboardExecutivo />;
     }

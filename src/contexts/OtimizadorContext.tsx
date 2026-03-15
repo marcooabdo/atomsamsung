@@ -13,7 +13,8 @@ export type OtimizadorTab =
   | 'pecas'
   | 'analytics'
   | 'config'
-  | 'despacho';
+  | 'despacho'
+  | 'historico';
 
 interface Unidade {
   id: string;
