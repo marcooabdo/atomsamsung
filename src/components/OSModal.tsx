@@ -256,6 +256,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [pendingUploadNome, setPendingUploadNome] = useState('');
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
 
+  const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
     if (!currentJob) return;
@@ -1125,7 +1127,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   };
 
   const handleRemoverPecaManual = async (peca: any) => {
-    if (!peca || peca.status !== 'manual') return;
+    if (!peca || (peca.status !== 'manual' && !isSCACC)) return;
     setRemovendoPecaId(peca.id);
     try {
       const { error } = await supabase
@@ -3866,22 +3868,51 @@ Não haverá cobrança ao cliente.`
                 );
               })()}
 
-              {pecas.length === 0 ? (
-                <p className="text-center text-gray-500 py-8">Nenhuma peça cadastrada na cotação</p>
+              {(() => {
+                const pecaIdsVinculados = new Set<string>();
+                pecas.forEach(peca => {
+                  pecaIdsVinculados.add(peca.id);
+                  if (peca.cotacao_peca_id) pecaIdsVinculados.add(peca.cotacao_peca_id);
+                });
+                const orphanReqs = requisicoes.filter(r =>
+                  !r.os_peca_id && !r.cotacao_peca_id &&
+                  !pecas.some(p => (p.codigo || p.pn) === r.codigo_peca)
+                );
+                const orphanPecas = orphanReqs.reduce((acc: any[], r) => {
+                  if (!acc.find(a => a.codigo_peca === r.codigo_peca)) {
+                    acc.push({
+                      id: r.id,
+                      os_id: r.os_id,
+                      codigo: r.codigo_peca,
+                      pn: r.codigo_peca,
+                      descricao: r.descricao,
+                      quantidade: r.quantidade_requisitada,
+                      valor_unitario: 0,
+                      valor_gspn: 0,
+                      valor_total: 0,
+                      status: 'requisitada',
+                      exibir_no_pdf: true,
+                      _isOrphanReq: true
+                    });
+                  }
+                  return acc;
+                }, []);
+                const todasPecas = [...pecas, ...orphanPecas];
+                return todasPecas.length === 0 ? (
+                <p className="text-center text-gray-500 py-8">Nenhuma peça cadastrada</p>
               ) : (
                 <div className="space-y-3">
-                  {pecas.map((peca) => {
-                    // Buscar requisição desta peça (prioriza ativas, senão pega a mais recente)
+                  {todasPecas.map((peca) => {
                     const pecaId = peca.cotacao_peca_id || peca.id;
-                    const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual';
+                    const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual' || isSCACC || (peca as any)._isOrphanReq;
 
-                    // Para GSPN/manual, busca por os_peca_id; para outras, por cotacao_peca_id
                     const requisicoesDestaPeca = requisicoes.filter(r => {
+                      if ((peca as any)._isOrphanReq) {
+                        return r.codigo_peca === peca.codigo && !r.os_peca_id && !r.cotacao_peca_id;
+                      }
                       if (usaOsPecaId) {
-                        // Para GSPN e manual, busca pelo os_peca_id (ID único da peça)
                         return r.os_peca_id === peca.id;
                       } else {
-                        // Para peças normais, busca pelo cotacao_peca_id
                         return r.cotacao_peca_id === pecaId;
                       }
                     }).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
@@ -3981,8 +4012,8 @@ Não haverá cobrança ao cliente.`
                               {/* Quantidade */}
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
 
-                              {/* ── VALOR GSPN (base) — só para peças gspn/manual ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual') && (
+                              {/* ── VALOR GSPN (base) — para peças gspn/manual ou todas em SC/ACC ── */}
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC) && (
                                 editandoValorGSPN[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
@@ -4034,7 +4065,7 @@ Não haverá cobrança ao cliente.`
                               )}
 
                               {/* ── VALOR UNITÁRIO COM MARKUP ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual' || peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
@@ -4082,12 +4113,24 @@ Não haverá cobrança ao cliente.`
                               )}
 
                               {/* ── VALOR TOTAL ── */}
-                              <p className="text-xs font-bold text-[#39FF14]">
-                                Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
-                              </p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-[#39FF14]">
+                                  Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
+                                </p>
+                                {(peca.status === 'manual' || isSCACC) && !editandoValorPeca[peca.id] && (
+                                  <button
+                                    onClick={() => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { unitario: String(Number(peca.valor_unitario || 0).toFixed(2)), quantidade: String(peca.quantidade || 1) } }))}
+                                    className="p-1 rounded transition-all hover:opacity-80"
+                                    style={{ backgroundColor: '#39FF1420', border: '1px solid #39FF1460', color: '#39FF14' }}
+                                    title="Editar quantidade e valor unitário"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
 
-                              {/* Edição de qtd+unitário para peças manuais */}
-                              {peca.status === 'manual' && editandoValorPeca[peca.id] && (
+                              {/* Edição de qtd+unitário para peças manuais / SC/ACC */}
+                              {(peca.status === 'manual' || isSCACC) && editandoValorPeca[peca.id] && (
                                 <div className="flex items-center gap-2 flex-wrap w-full mt-1">
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-gray-500">Qtd:</span>
@@ -4288,7 +4331,7 @@ Não haverá cobrança ao cliente.`
                               </button>
                             )}
 
-                            {peca.status === 'manual' && !requisicao && !requisicaoDevolvida && (
+                            {(peca.status === 'manual' || (isSCACC && !peca.cotacao_peca_id)) && !requisicao && !requisicaoDevolvida && (
                               <button
                                 onClick={() => handleRemoverPecaManual(peca)}
                                 disabled={removendoPecaId === peca.id}
@@ -4298,7 +4341,7 @@ Não haverá cobrança ao cliente.`
                                   borderColor: '#FF0064',
                                   color: '#FF0064'
                                 }}
-                                title="Remover peça manual"
+                                title="Remover peça"
                               >
                                 {removendoPecaId === peca.id ? (
                                   <RefreshCw className="w-3 h-3 animate-spin" />
@@ -4449,8 +4492,9 @@ Não haverá cobrança ao cliente.`
                           <label className="flex items-center gap-2 cursor-pointer select-none group">
                             <div
                               onClick={async () => {
+                                if ((peca as any)._isOrphanReq) return;
                                 const novoValor = !peca.exibir_no_pdf;
-                                const tabela = peca.status === 'gspn' || peca.status === 'manual' ? 'os_pecas' : (peca.cotacao_peca_id ? 'cotacoes_pecas' : 'os_pecas');
+                                const tabela = peca.status === 'gspn' || peca.status === 'manual' || isSCACC ? 'os_pecas' : (peca.cotacao_peca_id ? 'cotacoes_pecas' : 'os_pecas');
                                 await supabase.from(tabela).update({ exibir_no_pdf: novoValor }).eq('id', peca.id);
                                 setPecas(prev => prev.map(p => p.id === peca.id ? { ...p, exibir_no_pdf: novoValor } : p));
                               }}
@@ -4467,7 +4511,8 @@ Não haverá cobrança ao cliente.`
                     );
                   })}
                 </div>
-              )}
+              );
+              })()}
             </div>
           )}
 
