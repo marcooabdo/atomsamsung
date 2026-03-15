@@ -1159,6 +1159,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .select('pn, descricao, valor_com_impostos')
         .eq('unidade_id', unidadeParaBusca)
         .ilike('pn', `%${codigo}%`)
+        .order('data_entrada', { ascending: false })
         .limit(10);
 
       // Agrupar e contar peças iguais

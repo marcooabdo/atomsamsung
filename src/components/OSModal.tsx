@@ -937,6 +937,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .select('pn, descricao, valor_com_impostos')
         .eq('unidade_id', os?.unidade_id || usuario?.unidade_id)
         .ilike('pn', `%${codigo}%`)
+        .order('data_entrada', { ascending: false })
         .limit(10);
 
       const pecasAgrupadas = (pecasEstoque || []).reduce((acc, peca) => {
