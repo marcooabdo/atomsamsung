@@ -4673,6 +4673,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                   </div>
 
+                  {os.tipo_os === 'LP' && os.tipo_orcamento !== 'samsung_contigo' && os.tipo_orcamento !== 'acessorios' && (
                   <div className="premium-card p-6 border-l-4 border-[#00D4FF]">
                     <div className="flex items-center justify-between">
                       <div className="flex-1">
@@ -4697,6 +4698,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       </button>
                     </div>
                   </div>
+                  )}
                 </div>
               )}
 
