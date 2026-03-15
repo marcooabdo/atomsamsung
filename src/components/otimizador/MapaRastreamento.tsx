@@ -102,8 +102,8 @@ export default function MapaRastreamento() {
       supabase
         .from('agendamentos')
         .select(`
-          id, os_id, tecnico_id, status, periodo, data_agendamento,
-          os:os!agendamentos_os_id_fkey(numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, lat, lng, coluna_kanban),
+          id, os_id, tecnico_id, status, data_agendamento,
+          os:os!agendamentos_os_id_fkey(numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, lat, lng, coluna_kanban, periodo_agendamento),
           tecnico:usuarios!agendamentos_tecnico_id_fkey(nome)
         `)
         .eq('unidade_id', selectedUnidade)
@@ -131,7 +131,7 @@ export default function MapaRastreamento() {
         tecnico_nome: a.tecnico?.nome || 'Sem técnico',
         tecnico_id: a.tecnico_id || '',
         status: a.status,
-        periodo: a.periodo || '',
+        periodo: a.os?.periodo_agendamento || '',
         rota_cor: getCorByColuna(a.os?.coluna_kanban),
         sem_coordenadas: !a.os?.lat || !a.os?.lng,
       }));
