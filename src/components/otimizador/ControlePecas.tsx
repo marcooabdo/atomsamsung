@@ -72,7 +72,7 @@ const STATUS_CONFIG: Record<string, { bg: string; border: string; text: string; 
 };
 
 export default function ControlePecas() {
-  const { selectedUnidade, loading } = useOtimizador();
+  const { selectedUnidade, loading, isMaster } = useOtimizador();
   const [activeTab, setActiveTab] = useState<'requisicoes' | 'romaneio'>('requisicoes');
   const [requisicoes, setRequisicoes] = useState<Requisicao[]>([]);
   const [pecasMaisRequisitadas, setPecasMaisRequisitadas] = useState<PecaMaisRequisitada[]>([]);
@@ -84,20 +84,21 @@ export default function ControlePecas() {
   const [expandedReq, setExpandedReq] = useState<string | null>(null);
 
   useEffect(() => {
-    if (selectedUnidade) {
+    if (selectedUnidade || isMaster) {
       loadRequisicoes();
       loadPecasMaisRequisitadas();
       loadTecnicos();
     }
-  }, [selectedUnidade, filtroStatus, filtroTecnico]);
+  }, [selectedUnidade, filtroStatus, filtroTecnico, isMaster]);
 
   const loadTecnicos = async () => {
-    const { data } = await supabase
+    let q = supabase
       .from('os')
       .select('tecnico_agendado_id, usuarios!os_tecnico_agendado_id_fkey(id, nome)')
-      .eq('unidade_id', selectedUnidade)
       .eq('tipo_atendimento', 'IH')
       .not('tecnico_agendado_id', 'is', null);
+    if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+    const { data } = await q;
 
     const tecMap = new Map<string, string>();
     data?.forEach((row: any) => {
@@ -130,9 +131,12 @@ export default function ControlePecas() {
             estoque_etiquetas(delivery)
           )
         `)
-        .eq('unidade_id', selectedUnidade)
         .order('created_at', { ascending: false })
         .limit(200);
+
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      }
 
       if (filtroStatus !== 'todos') {
         query = query.eq('status', filtroStatus);
@@ -144,7 +148,6 @@ export default function ControlePecas() {
       let filtered = (data || []).filter((r: any) => {
         if (!r.os) return false;
         if (r.os.tipo_orcamento === 'samsung_contigo' || r.os.tipo_orcamento === 'acessorios') return false;
-        if (r.os.tipo_atendimento !== 'IH') return false;
         return true;
       });
 
@@ -174,17 +177,18 @@ export default function ControlePecas() {
 
   const loadPecasMaisRequisitadas = async () => {
     try {
-      const { data, error } = await supabase
+      let q = supabase
         .from('requisicoes_pecas')
-        .select('codigo_peca, descricao, quantidade_requisitada, os:os!requisicoes_pecas_os_id_fkey(tipo_orcamento, tipo_atendimento)')
-        .eq('unidade_id', selectedUnidade);
+        .select('codigo_peca, descricao, quantidade_requisitada, os:os!requisicoes_pecas_os_id_fkey(tipo_orcamento, tipo_atendimento)');
+      if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+
+      const { data, error } = await q;
 
       if (error) throw error;
 
       const pecasMap = new Map<string, { descricao: string; total: number }>();
       data?.forEach((req: any) => {
         if (req.os?.tipo_orcamento === 'samsung_contigo' || req.os?.tipo_orcamento === 'acessorios') return;
-        if (req.os?.tipo_atendimento !== 'IH') return;
         const key = req.codigo_peca;
         const existing = pecasMap.get(key);
         if (existing) {

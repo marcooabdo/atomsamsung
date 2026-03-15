@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle, ClipboardList, Calendar } from 'lucide-react';
+import { X, MapPin, Phone, Package, FileText, PlayCircle, Navigation, CheckCircle, ClipboardList, Calendar, Wrench } from 'lucide-react';
 import { supabase, formatTipoAtendimento } from '../../lib/supabase';
 import { CheckinModal } from '../agendamento/CheckinModal';
 import { CheckoutModal } from '../agendamento/CheckoutModal';
@@ -31,9 +31,35 @@ interface OSDetailsModalProps {
   onStart: () => void;
 }
 
+interface PecaOS {
+  id: string;
+  id_numerico: number;
+  codigo_peca: string;
+  descricao: string;
+  status: string;
+  req_status: string;
+  quantidade_requisitada: number;
+}
+
+const PECA_STATUS_LABELS: Record<string, { label: string; color: string }> = {
+  disponivel: { label: 'Disponivel', color: 'text-gray-400' },
+  reservada: { label: 'Reservada', color: 'text-yellow-400' },
+  vinculada_tecnico: { label: 'Com Tecnico', color: 'text-cyan-400' },
+  em_rota: { label: 'Em Rota', color: 'text-blue-400' },
+  em_uso: { label: 'Em Uso', color: 'text-orange-400' },
+  usada: { label: 'Usada', color: 'text-green-400' },
+  devolucao_pendente: { label: 'Dev. Pendente', color: 'text-amber-400' },
+  devolvida_nova: { label: 'Dev. Nova', color: 'text-teal-400' },
+  devolvida_defeito: { label: 'Dev. Defeito', color: 'text-red-400' },
+  usada_upc: { label: 'Usada UPC', color: 'text-green-300' },
+  devolvida_samsung: { label: 'Dev. Samsung', color: 'text-teal-300' },
+  arquivada: { label: 'Arquivada', color: 'text-gray-500' },
+};
+
 export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
   const [visitas, setVisitas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [pecas, setPecas] = useState<PecaOS[]>([]);
   const [checkinModalOpen, setCheckinModalOpen] = useState(false);
   const [checkoutModalOpen, setCheckoutModalOpen] = useState(false);
   const [selectedAgendamento, setSelectedAgendamento] = useState<any>(null);
@@ -48,6 +74,7 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
 
   useEffect(() => {
     loadVisitas();
+    loadPecas();
   }, [os.id]);
 
   const loadVisitas = async () => {
@@ -95,6 +122,43 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
       console.error('Erro ao carregar visitas:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPecas = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('requisicoes_pecas')
+        .select(`
+          id,
+          codigo_peca,
+          descricao,
+          quantidade_requisitada,
+          status,
+          peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(
+            id_numerico,
+            status
+          )
+        `)
+        .eq('os_id', os.id)
+        .not('status', 'in', '("cancelada","reprovada")')
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      const pecasFormatadas: PecaOS[] = (data || []).map((req: any) => ({
+        id: req.id,
+        id_numerico: req.peca_estoque?.id_numerico || 0,
+        codigo_peca: req.codigo_peca,
+        descricao: req.descricao || '',
+        status: req.peca_estoque?.status || 'sem_peca',
+        req_status: req.status,
+        quantidade_requisitada: req.quantidade_requisitada,
+      }));
+
+      setPecas(pecasFormatadas);
+    } catch (error) {
+      console.error('Erro ao carregar pecas:', error);
     }
   };
 
@@ -227,6 +291,46 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
                   <Phone className="w-4 h-4" />
                   WhatsApp
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Pecas da OS */}
+          {pecas.length > 0 && (
+            <div className="bg-gray-800 rounded-xl p-4 space-y-3">
+              <h3 className="text-white font-bold flex items-center gap-2">
+                <Wrench className="w-5 h-5 text-cyan-400" />
+                Pecas da OS ({pecas.length})
+              </h3>
+              <div className="space-y-2">
+                {pecas.map((peca) => {
+                  const statusInfo = PECA_STATUS_LABELS[peca.status] || { label: peca.status.replace(/_/g, ' '), color: 'text-gray-400' };
+                  return (
+                    <div key={peca.id} className="bg-gray-700/50 rounded-lg p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-white font-mono text-sm font-bold">{peca.codigo_peca}</p>
+                          {peca.descricao && (
+                            <p className="text-gray-400 text-xs mt-0.5 line-clamp-1">{peca.descricao}</p>
+                          )}
+                          <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                            {peca.id_numerico > 0 && (
+                              <span className="text-xs text-cyan-400 font-mono bg-cyan-500/10 border border-cyan-500/20 px-1.5 py-0.5 rounded">
+                                #{peca.id_numerico}
+                              </span>
+                            )}
+                            <span className={`text-xs font-medium ${statusInfo.color}`}>
+                              {statusInfo.label}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <span className="text-gray-400 text-xs">Qtd: {peca.quantidade_requisitada}</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

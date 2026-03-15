@@ -41,7 +41,7 @@ interface RomaneioPorTecnico {
 }
 
 export default function RomaneioView() {
-  const { selectedUnidade, loading } = useOtimizador();
+  const { selectedUnidade, loading, isMaster } = useOtimizador();
   const [dataInicio, setDataInicio] = useState(new Date().toISOString().split('T')[0]);
   const [dataFim, setDataFim] = useState(new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]);
   const [romaneios, setRomaneios] = useState<RomaneioPorTecnico[]>([]);
@@ -50,15 +50,15 @@ export default function RomaneioView() {
   const [expandedCidade, setExpandedCidade] = useState<{ [key: string]: boolean }>({});
 
   useEffect(() => {
-    if (selectedUnidade) {
+    if (selectedUnidade || isMaster) {
       loadRomaneioData();
     }
-  }, [selectedUnidade, dataInicio, dataFim]);
+  }, [selectedUnidade, dataInicio, dataFim, isMaster]);
 
   const loadRomaneioData = async () => {
     setLoadingData(true);
     try {
-      const { data: osAgendadas, error: osError } = await supabase
+      let osQuery = supabase
         .from('os')
         .select(`
           id,
@@ -77,13 +77,14 @@ export default function RomaneioView() {
           tipo_orcamento,
           usuarios!os_tecnico_agendado_id_fkey(nome)
         `)
-        .eq('unidade_id', selectedUnidade)
         .eq('tipo_atendimento', 'IH')
-        .gte('data_agendamento', dataInicio)
-        .lte('data_agendamento', dataFim)
-        .not('data_agendamento', 'is', null)
-        .not('tecnico_agendado_id', 'is', null)
         .order('data_agendamento');
+
+      if (selectedUnidade) {
+        osQuery = osQuery.eq('unidade_id', selectedUnidade);
+      }
+
+      const { data: osAgendadas, error: osError } = await osQuery;
 
       if (osError) throw osError;
 
@@ -99,7 +100,7 @@ export default function RomaneioView() {
         return;
       }
 
-      const { data: requisicoes, error: reqError } = await supabase
+      let reqQuery = supabase
         .from('requisicoes_pecas')
         .select(`
           *,
@@ -109,7 +110,16 @@ export default function RomaneioView() {
           )
         `)
         .in('os_id', osIds)
-        .in('status', ['pendente', 'atendida', 'em_uso']);
+        .in('status', ['pendente', 'atendida', 'em_uso', 'devolucao_pendente', 'gi_postada']);
+
+      if (dataInicio) {
+        reqQuery = reqQuery.gte('created_at', dataInicio + 'T00:00:00');
+      }
+      if (dataFim) {
+        reqQuery = reqQuery.lte('created_at', dataFim + 'T23:59:59');
+      }
+
+      const { data: requisicoes, error: reqError } = await reqQuery;
 
       if (reqError) throw reqError;
 
@@ -180,10 +190,10 @@ export default function RomaneioView() {
             aparelho_modelo: os.aparelho_modelo || '',
             endereco_completo: [os.endereco_logradouro, os.endereco_numero, os.endereco_bairro].filter(Boolean).join(', '),
             periodo_agendamento: os.periodo_agendamento,
-            data_agendamento: os.data_agendamento,
+            data_agendamento: os.data_agendamento || '',
             cidade: os.endereco_cidade || 'Nao informado',
-            tecnico_agendado_id: os.tecnico_agendado_id!,
-            tecnico_nome: (os as any).usuarios?.nome || 'Nao atribuido',
+            tecnico_agendado_id: os.tecnico_agendado_id || 'sem_tecnico',
+            tecnico_nome: (os as any).usuarios?.nome || 'Sem Tecnico Atribuido',
             pecas
           };
         })
