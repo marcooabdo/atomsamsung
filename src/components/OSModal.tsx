@@ -3726,8 +3726,8 @@ Não haverá cobrança ao cliente.`
                     <Package className="w-4 h-4" />
                     Adicionar Peca {isSCACC ? '(Requisicao em Lote)' : 'Manualmente'}
                   </h3>
-                  <div className={`grid gap-3 ${isSCACC ? 'grid-cols-5' : 'grid-cols-4'}`}>
-                    <div className="relative">
+                  <div className={`grid gap-3 ${isSCACC ? 'grid-cols-5' : 'grid-cols-4'}`} style={{ overflow: 'visible' }}>
+                    <div className="relative" style={{ zIndex: mostrarSugestoesOW ? 100 : 'auto' }}>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
                         Codigo/PN *
                       </label>
@@ -3743,7 +3743,7 @@ Não haverá cobrança ao cliente.`
                         placeholder="Ex: GH82-12345A"
                       />
                       {mostrarSugestoesOW && sugestoesPecasOW.length > 0 && (
-                        <div className="absolute z-50 mt-1 w-full max-w-md bg-[#0A0F1E] rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{ border: `1px solid ${accentColor}30` }}>
+                        <div className="absolute mt-1 w-full max-w-md bg-[#0A0F1E] rounded-lg shadow-xl max-h-64 overflow-y-auto" style={{ border: `1px solid ${accentColor}30`, zIndex: 9999 }}>
                           {sugestoesPecasOW.map((sugestao, idx) => (
                             <div
                               key={idx}
@@ -4040,8 +4040,8 @@ Não haverá cobrança ao cliente.`
                                 </div>
                               )}
 
-                              {/* ── VALOR UNITÁRIO COM MARKUP ── (sempre visível se GSPN > 0) */}
-                              {peca.valor_gspn > 0 && (
+                              {/* ── VALOR UNITÁRIO COM MARKUP ── (sempre visível em OS OW) */}
+                              {(peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
