@@ -21,7 +21,6 @@ interface Requisicao {
   is_lote: boolean;
   pecas_estoque_ids: string[];
   os: {
-    numero_os: string;
     numero_os_interna: string;
     numero_os_samsung: string | null;
     tipo_os: string;
@@ -32,7 +31,7 @@ interface Requisicao {
     data_agendamento: string | null;
     periodo_agendamento: string | null;
     tecnico_agendado_id: string | null;
-  };
+  } | null;
   requisitado_por_usuario: { nome: string } | null;
   atendido_por_usuario: { nome: string } | null;
   tecnico_usuario: { nome: string } | null;
@@ -118,7 +117,7 @@ export default function ControlePecas() {
         .select(`
           *,
           os:os!requisicoes_pecas_os_id_fkey(
-            numero_os, numero_os_interna, numero_os_samsung,
+            numero_os_interna, numero_os_samsung,
             tipo_os, tipo_orcamento, tipo_atendimento,
             cliente_nome, aparelho_modelo,
             data_agendamento, periodo_agendamento, tecnico_agendado_id
@@ -403,7 +402,7 @@ export default function ControlePecas() {
                     const delivery = getDeliveryDisplay(req);
                     const estoqueStatus = getEstoqueStatus(req);
                     const isExpanded = expandedReq === req.id;
-                    const osNum = req.os?.numero_os_samsung || req.os?.numero_os_interna || req.os?.numero_os;
+                    const osNum = req.os?.numero_os_samsung || req.os?.numero_os_interna;
 
                     return (
                       <div
