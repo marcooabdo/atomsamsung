@@ -1779,7 +1779,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         status: 'pendente',
         requisitado_por: usuario?.id,
         numero_os_samsung: os?.numero_os_samsung,
-        unidade_id: os?.unidade_id
+        unidade_id: os?.unidade_id,
+        tecnico_id: os?.tecnico_agendado_id || null
       }).select();
 
       if (insertError) throw insertError;

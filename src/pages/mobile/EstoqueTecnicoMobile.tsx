@@ -67,7 +67,14 @@ export function EstoqueTecnicoMobile() {
     if (!usuario) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase
+      const { data: osDoTecnico } = await supabase
+        .from('os')
+        .select('id')
+        .eq('tecnico_agendado_id', usuario.id);
+
+      const osIds = (osDoTecnico || []).map((o: any) => o.id);
+
+      let reqQuery = supabase
         .from('requisicoes_pecas')
         .select(`
           id,
@@ -77,6 +84,7 @@ export function EstoqueTecnicoMobile() {
           status,
           created_at,
           os_id,
+          tecnico_id,
           peca_estoque:estoque_pecas!requisicoes_pecas_peca_estoque_id_fkey(
             id,
             id_numerico,
@@ -89,9 +97,16 @@ export function EstoqueTecnicoMobile() {
             aparelho_modelo
           )
         `)
-        .eq('tecnico_id', usuario.id)
         .not('status', 'in', '("cancelada","reprovada")')
         .order('created_at', { ascending: false });
+
+      if (osIds.length > 0) {
+        reqQuery = reqQuery.or(`tecnico_id.eq.${usuario.id},os_id.in.(${osIds.join(',')})`);
+      } else {
+        reqQuery = reqQuery.eq('tecnico_id', usuario.id);
+      }
+
+      const { data, error } = await reqQuery;
 
       if (error) throw error;
 
