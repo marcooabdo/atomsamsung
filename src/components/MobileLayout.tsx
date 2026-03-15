@@ -1,6 +1,6 @@
 import { ReactNode, useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Calendar, Award, LogOut, MapPin } from 'lucide-react';
+import { Calendar, Award, LogOut, MapPin, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { startTracking, stopTracking, isLocationSupported, requestLocationPermission, isTracking } from '../lib/geoTracker';
 import { startAutoSync, stopAutoSync, getPendingCount, flushQueue, isOnline } from '../lib/offlineQueue';
@@ -20,6 +20,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
 
   const tabs = [
     { path: '/mobile/agenda', icon: Calendar, label: 'Agenda' },
+    { path: '/mobile/estoque', icon: Package, label: 'Estoque' },
     { path: '/mobile/desempenho', icon: Award, label: 'Desempenho' },
   ];
 

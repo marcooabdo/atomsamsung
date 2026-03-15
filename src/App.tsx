@@ -22,6 +22,7 @@ import EtiquetaEditor from './pages/EtiquetaEditor';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
 import { DesempenhoMobile } from './pages/mobile/DesempenhoMobile';
+import { EstoqueTecnicoMobile } from './pages/mobile/EstoqueTecnicoMobile';
 import { RegistroVendas } from './pages/RegistroVendas';
 import { OrcamentoPublico } from './pages/OrcamentoPublico';
 import CustomerIntelligence from './pages/CustomerIntelligence';
@@ -116,6 +117,17 @@ function AppContent() {
           element={
             <MobileProtectedRoute>
               <ExecucaoOS />
+            </MobileProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/mobile/estoque"
+          element={
+            <MobileProtectedRoute>
+              <MobileLayout>
+                <EstoqueTecnicoMobile />
+              </MobileLayout>
             </MobileProtectedRoute>
           }
         />
