@@ -559,15 +559,20 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .order('created_at', { ascending: true }),
       supabase
         .from('requisicoes_pecas')
-        .select('codigo_peca')
+        .select('codigo_peca, os_peca_id, cotacao_peca_id')
         .eq('os_id', osId)
         .eq('status', 'reprovada')
     ]);
 
-    const pnsReprovados = new Set((reqReprovadasResult.data || []).map((r: any) => r.codigo_peca));
+    const reqReprovadas = reqReprovadasResult.data || [];
+    const osPecaIdsReprovados = new Set(reqReprovadas.map((r: any) => r.os_peca_id).filter(Boolean));
+    const cotacaoPecaIdsReprovados = new Set(reqReprovadas.map((r: any) => r.cotacao_peca_id).filter(Boolean));
+    const pnsReprovadosSemVinculo = new Set(
+      reqReprovadas.filter((r: any) => !r.os_peca_id && !r.cotacao_peca_id).map((r: any) => r.codigo_peca)
+    );
 
     const cotacaoPecas = (cotacaoPecasResult.data || [])
-      .filter(p => !pnsReprovados.has(p.pn))
+      .filter(p => !cotacaoPecaIdsReprovados.has(p.id) && !pnsReprovadosSemVinculo.has(p.pn))
       .map(p => ({
         id: p.id,
         os_id: p.os_id,
@@ -583,7 +588,12 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       }));
 
     const osPecasFormatted = (osPecasResult.data || [])
-      .filter((p: any) => !pnsReprovados.has(p.pn))
+      .filter((p: any) => {
+        if (p.status === 'manual' || p.status === 'gspn') {
+          return !osPecaIdsReprovados.has(p.id);
+        }
+        return !pnsReprovadosSemVinculo.has(p.pn);
+      })
       .map(p => ({
         ...p,
         cotacao_peca_id: p.cotacao_peca_id || p.id

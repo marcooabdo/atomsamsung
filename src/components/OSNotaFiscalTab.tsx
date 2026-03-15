@@ -192,7 +192,7 @@ export function OSNotaFiscalTab({
           .order('created_at', { ascending: false }),
         supabase
           .from('os_pecas')
-          .select('id, pn, descricao, quantidade, valor_unitario, valor_total, status, gi_postado_em, devolvida_em, usada_em, exibir_no_pdf')
+          .select('id, pn, descricao, quantidade, valor_unitario, valor_total, status, gi_postado_em, devolvida_em, usada_em, exibir_no_pdf, requisicoes:requisicoes_pecas(status)')
           .eq('os_id', osId)
           .order('created_at', { ascending: true }),
         supabase
@@ -232,8 +232,14 @@ export function OSNotaFiscalTab({
         setValorDesconto(osRes.data.valor_desconto_calculado || 0);
       }
 
-      const osPecasIds = new Set((osPecasRes.data || []).map((p: any) => p.pn));
-      const osPecasMapped: PecaItem[] = (osPecasRes.data || []).map((p: any) => ({
+      const osPecasValidas = (osPecasRes.data || []).filter((p: any) => {
+        const reqs: any[] = p.requisicoes || [];
+        if (reqs.length === 0) return false;
+        const temReqAtiva = reqs.some((r: any) => r.status !== 'cancelada' && r.status !== 'reprovada');
+        return temReqAtiva;
+      });
+      const osPecasIds = new Set(osPecasValidas.map((p: any) => p.pn));
+      const osPecasMapped: PecaItem[] = osPecasValidas.map((p: any) => ({
         ...p,
         valor_unitario: p.valor_unitario || 0,
         valor_total: p.valor_total || 0,
