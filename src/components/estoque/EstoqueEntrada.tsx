@@ -40,6 +40,19 @@ interface RequisicaoPendente {
   } | null;
 }
 
+interface TaxDetail {
+  valor: number;
+  aliquota: number;
+}
+
+interface ProdutoTaxes {
+  icms: TaxDetail | null;
+  icms_st: TaxDetail | null;
+  ipi: TaxDetail | null;
+  pis: TaxDetail | null;
+  cofins: TaxDetail | null;
+}
+
 interface PecaExpandida {
   id_temp: string;
   pn: string;
@@ -48,6 +61,7 @@ interface PecaExpandida {
   valorComImpostos: number;
   os_alocada_id: string;
   requisicao_alocada_id: string;
+  taxes: ProdutoTaxes;
 }
 
 interface NFParsed {
@@ -64,6 +78,7 @@ interface NFParsed {
     quantidade: number;
     valorUnitario: number;
     valorComImpostos: number;
+    taxes: ProdutoTaxes;
   }[];
 }
 
@@ -154,14 +169,40 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const pn = getTextContent('cProd', det);
       const descricao = getTextContent('xProd', det);
       const quantidade = parseFloat(getTextContent('qCom', det)) || 1;
-      const valorUnitario = parseFloat(getTextContent('vUnCom', det)) || 0;
+      const vUnCom = parseFloat(getTextContent('vUnCom', det)) || 0;
 
-      const vProd = parseFloat(getTextContent('vProd', det)) || 0;
+      const vItemStr = getTextContent('vItem', det);
+      const vItemVal = vItemStr ? parseFloat(vItemStr) : 0;
+
       const vIPI = parseFloat(getTextContent('vIPI', det)) || 0;
+      const pIPI = parseFloat(getTextContent('pIPI', det)) || 0;
       const vICMS = parseFloat(getTextContent('vICMS', det)) || 0;
-      const valorComImpostos = (vProd + vIPI + vICMS) / quantidade;
+      const pICMS = parseFloat(getTextContent('pICMS', det)) || 0;
+      const vICMSST = parseFloat(getTextContent('vICMSST', det)) || 0;
+      const pICMSST = parseFloat(getTextContent('pICMSST', det)) || 0;
+      const vPIS = parseFloat(getTextContent('vPIS', det)) || 0;
+      const pPIS = parseFloat(getTextContent('pPIS', det)) || 0;
+      const vCOFINS = parseFloat(getTextContent('vCOFINS', det)) || 0;
+      const pCOFINS = parseFloat(getTextContent('pCOFINS', det)) || 0;
 
-      produtos.push({ pn, descricao, quantidade, valorUnitario, valorComImpostos });
+      let valorComImpostos: number;
+      if (vItemVal > 0) {
+        valorComImpostos = vItemVal / quantidade;
+      } else {
+        const ipiPorUnidade = pIPI > 0 ? vUnCom * (pIPI / 100) : 0;
+        const icmsStPorUnidade = vICMSST > 0 ? vICMSST / quantidade : 0;
+        valorComImpostos = vUnCom + ipiPorUnidade + icmsStPorUnidade;
+      }
+
+      const taxes: ProdutoTaxes = {
+        icms: vICMS > 0 || pICMS > 0 ? { valor: vICMS / quantidade, aliquota: pICMS } : null,
+        icms_st: vICMSST > 0 || pICMSST > 0 ? { valor: vICMSST / quantidade, aliquota: pICMSST } : null,
+        ipi: vIPI > 0 || pIPI > 0 ? { valor: vIPI / quantidade, aliquota: pIPI } : null,
+        pis: vPIS > 0 || pPIS > 0 ? { valor: vPIS / quantidade, aliquota: pPIS } : null,
+        cofins: vCOFINS > 0 || pCOFINS > 0 ? { valor: vCOFINS / quantidade, aliquota: pCOFINS } : null,
+      };
+
+      produtos.push({ pn, descricao, quantidade, valorUnitario: vUnCom, valorComImpostos, taxes });
     }
 
     return { numeroNF, chaveAcesso, fornecedor, dataEmissao, valorTotal, delivery, xmlContent: xmlText, produtos };
@@ -320,6 +361,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             os_alocada_id: alocadaOsId,
             requisicao_alocada_id: alocadaReqId,
             os_peca_id: alocadaOsPecaId,
+            taxes: prod.taxes,
           });
         }
       });
@@ -394,6 +436,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           if (peca.requisicao_alocada_id) reqsParaAtualizar.add(peca.requisicao_alocada_id);
         }
 
+        const t = peca.taxes;
         return {
           id_unico: idUnico,
           pn: peca.pn,
@@ -401,6 +444,17 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           nf_id: nfRecord.id,
           unidade_id: unidadeId,
           valor_com_impostos: peca.valorComImpostos,
+          valor_unitario_sem_imposto: peca.valorUnitario,
+          icms_valor: t.icms?.valor ?? null,
+          icms_aliquota: t.icms?.aliquota ?? null,
+          icms_st_valor: t.icms_st?.valor ?? null,
+          icms_st_aliquota: t.icms_st?.aliquota ?? null,
+          ipi_valor: t.ipi?.valor ?? null,
+          ipi_aliquota: t.ipi?.aliquota ?? null,
+          pis_valor: t.pis?.valor ?? null,
+          pis_aliquota: t.pis?.aliquota ?? null,
+          cofins_valor: t.cofins?.valor ?? null,
+          cofins_aliquota: t.cofins?.aliquota ?? null,
           status: peca.os_alocada_id ? 'reservada' : 'disponivel',
           os_id: peca.os_alocada_id || null,
           data_entrada: new Date().toISOString(),

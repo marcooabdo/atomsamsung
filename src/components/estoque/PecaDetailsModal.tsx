@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
@@ -383,6 +383,52 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
               )}
             </div>
           </div>
+
+          {/* Impostos da NF */}
+          {pecaDetalhada && (() => {
+            const d = pecaDetalhada as any;
+            const hasTax = d.valor_unitario_sem_imposto || d.icms_valor || d.ipi_valor || d.icms_st_valor || d.pis_valor || d.cofins_valor;
+            if (!hasTax) return null;
+            const fmt = (v: number | null) => v != null ? `R$ ${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : '-';
+            const pct = (v: number | null) => v != null ? `${Number(v).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}%` : '-';
+            const rows: { label: string; valor: number | null; aliquota: number | null }[] = [];
+            if (d.icms_valor || d.icms_aliquota) rows.push({ label: 'ICMS', valor: d.icms_valor, aliquota: d.icms_aliquota });
+            if (d.icms_st_valor || d.icms_st_aliquota) rows.push({ label: 'ICMS ST', valor: d.icms_st_valor, aliquota: d.icms_st_aliquota });
+            if (d.ipi_valor || d.ipi_aliquota) rows.push({ label: 'IPI', valor: d.ipi_valor, aliquota: d.ipi_aliquota });
+            if (d.pis_valor || d.pis_aliquota) rows.push({ label: 'PIS', valor: d.pis_valor, aliquota: d.pis_aliquota });
+            if (d.cofins_valor || d.cofins_aliquota) rows.push({ label: 'COFINS', valor: d.cofins_valor, aliquota: d.cofins_aliquota });
+            return (
+              <div className="rounded-xl p-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+                <div className="flex items-center gap-2 mb-4">
+                  <Receipt className="w-4 h-4" style={{ color: '#FFBF00' }} />
+                  <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: '#FFBF00' }}>Impostos da NF (por unidade)</h3>
+                </div>
+                {d.valor_unitario_sem_imposto != null && (
+                  <div className="flex items-center justify-between mb-3 pb-3" style={{ borderBottom: `1px solid ${cardBorder}` }}>
+                    <span className="text-xs uppercase tracking-wider" style={{ color: labelColor }}>Valor s/ Impostos (vUnCom)</span>
+                    <span className="font-mono font-bold text-sm" style={{ color: textPrimary }}>{fmt(d.valor_unitario_sem_imposto)}</span>
+                  </div>
+                )}
+                <div className="space-y-2">
+                  {rows.map(r => (
+                    <div key={r.label} className="flex items-center justify-between py-1.5 px-3 rounded-lg" style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)' }}>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: textSecondary }}>{r.label}</span>
+                      <div className="flex items-center gap-4">
+                        <span className="text-xs" style={{ color: textMuted }}>Aliq: {pct(r.aliquota)}</span>
+                        <span className="font-mono text-sm font-bold" style={{ color: textPrimary }}>{fmt(r.valor)}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-center justify-between mt-3 pt-3" style={{ borderTop: `1px solid ${cardBorder}` }}>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: neonGreen }}>Valor c/ Impostos</span>
+                  <span className="font-mono font-bold text-base" style={{ color: neonGreen }}>
+                    R$ {Number(peca.valor_com_impostos).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Logistica Reversa - only for devolvida_samsung */}
           {isSamsungReturn && (
