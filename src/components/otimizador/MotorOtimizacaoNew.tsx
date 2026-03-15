@@ -159,6 +159,17 @@ export default function MotorOtimizacaoNew() {
   const [itinerario, setItinerario] = useState<DiaItinerario[]>([]);
   const [metricas, setMetricas] = useState({ km_total: 0, tempo_total: 0, dias: 0, atendimentos: 0 });
 
+  const [osJaAgendadas, setOsJaAgendadas] = useState<Array<{
+    id: string;
+    numero_os_interna: string;
+    numero_os_samsung: string | null;
+    cliente_nome: string;
+    cliente_cidade: string;
+    data_agendamento: string;
+    periodo_agendamento: string | null;
+    confirmado_com_cliente: boolean;
+  }>>([]);
+
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [selectedMarker, setSelectedMarker] = useState<ParadaItinerario | null>(null);
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
@@ -251,8 +262,29 @@ export default function MotorOtimizacaoNew() {
     if (filterProduto) {
       filtered = filtered.filter(os => os.aparelho_linha?.toLowerCase().includes(filterProduto.toLowerCase()));
     }
+    const jaAgendadasIds = new Set(osJaAgendadas.map(o => o.id));
+    filtered = filtered.filter(os => !jaAgendadasIds.has(os.id));
     setFilteredOS(filtered);
-  }, [osList, filterCidade, filterProduto]);
+  }, [osList, filterCidade, filterProduto, osJaAgendadas]);
+
+  useEffect(() => {
+    if (!selectedTecnico || !selectedUnidade || !dataInicio || !dataFim) {
+      setOsJaAgendadas([]);
+      return;
+    }
+    (async () => {
+      const { data } = await supabase
+        .from('os')
+        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, data_agendamento, periodo_agendamento, confirmado_com_cliente')
+        .eq('unidade_id', selectedUnidade)
+        .eq('tecnico_agendado_id', selectedTecnico)
+        .eq('confirmado_com_cliente', true)
+        .gte('data_agendamento', dataInicio)
+        .lte('data_agendamento', dataFim)
+        .not('data_agendamento', 'is', null);
+      setOsJaAgendadas(data ?? []);
+    })();
+  }, [selectedTecnico, selectedUnidade, dataInicio, dataFim]);
 
   const loadRotas = async () => {
     const [rotasDB, osDistinct] = await Promise.all([
@@ -1408,6 +1440,54 @@ export default function MotorOtimizacaoNew() {
               </div>
             </div>
 
+            {selectedTecnico && osJaAgendadas.length > 0 && (
+              <div className="rounded-2xl p-5" style={{ backgroundColor: '#F59E0B08', border: '2px solid #F59E0B40' }}>
+                <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: '#F59E0B' }}>
+                  <AlertTriangle className="w-4 h-4" />
+                  OS ja Agendadas e Confirmadas com o Cliente ({osJaAgendadas.length})
+                </h3>
+                <p className="text-xs mb-3" style={{ color: 'var(--text-secondary)' }}>
+                  Estas OS ja possuem agendamento confirmado com o cliente para este tecnico no periodo selecionado. Elas nao entram na roteirizacao automatica.
+                </p>
+                <div className="space-y-2">
+                  {osJaAgendadas.map((os) => {
+                    const dataFormatada = os.data_agendamento
+                      ? new Date(os.data_agendamento + 'T12:00:00').toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: '2-digit' })
+                      : '-';
+                    const periodoLabel = os.periodo_agendamento === 'manha' ? 'Manha' : os.periodo_agendamento === 'tarde' ? 'Tarde' : '';
+                    return (
+                      <div
+                        key={os.id}
+                        className="flex items-center gap-3 p-3 rounded-xl"
+                        style={{ backgroundColor: '#F59E0B12', border: '1px solid #F59E0B30' }}
+                      >
+                        <div className="w-2 h-8 rounded-full flex-shrink-0" style={{ backgroundColor: '#F59E0B' }} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                              OS {os.numero_os_samsung || os.numero_os_interna}
+                            </span>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ backgroundColor: '#10B98120', color: '#10B981' }}>
+                              Confirmado
+                            </span>
+                          </div>
+                          <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-secondary)' }}>
+                            {os.cliente_nome} &mdash; {os.cliente_cidade}
+                          </div>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <div className="text-xs font-medium" style={{ color: '#F59E0B' }}>{dataFormatada}</div>
+                          {periodoLabel && (
+                            <div className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>{periodoLabel}</div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {selectedRotas.length > 0 && (
               <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
                 <div className="flex items-center justify-between mb-4">
@@ -1538,6 +1618,12 @@ export default function MotorOtimizacaoNew() {
                   <span style={{ color: 'var(--text-secondary)' }}>OS disponiveis</span>
                   <span style={{ color: 'var(--text-primary)' }}>{filteredOS.length}</span>
                 </div>
+                {osJaAgendadas.length > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span style={{ color: '#F59E0B' }}>Ja confirmadas</span>
+                    <span className="font-semibold" style={{ color: '#F59E0B' }}>{osJaAgendadas.length}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm">
                   <span style={{ color: 'var(--text-secondary)' }}>Pernoite</span>
                   <span style={{ color: permitePernoite ? '#10B981' : 'var(--text-secondary)' }}>
