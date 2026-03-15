@@ -3975,9 +3975,170 @@ Não haverá cobrança ao cliente.`
                             </div>
                             <div className="flex items-center gap-4 mt-2 flex-wrap">
 
-                              {/* Modo de edição inline para peças manuais */}
-                              {peca.status === 'manual' && editandoValorPeca[peca.id] ? (
-                                <div className="flex items-center gap-2 flex-wrap">
+                              {/* Quantidade */}
+                              <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
+
+                              {/* ── VALOR GSPN (base) ── */}
+                              {editandoValorGSPN[peca.id] !== undefined ? (
+                                /* Modo edição GSPN */
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    placeholder="0.00"
+                                    value={editandoValorGSPN[peca.id]}
+                                    onChange={(e) => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                    className="neon-input w-28 text-xs py-1"
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleSalvarValorGSPN(peca.id)}
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                    className="p-1.5 rounded transition-all disabled:opacity-50"
+                                    style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
+                                    title="Salvar valor GSPN"
+                                  >
+                                    <Save className="w-3.5 h-3.5" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditandoValorGSPN(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                    disabled={salvandoValorGSPN[peca.id]}
+                                    className="p-1.5 rounded transition-all disabled:opacity-50"
+                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                    title="Cancelar"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (!peca.valor_gspn || peca.valor_gspn === 0) ? (
+                                /* Botão Definir Valor GSPN quando não definido */
+                                <button
+                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
+                                  className="px-2 py-1 rounded text-xs font-bold transition-all hover:opacity-80"
+                                  style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
+                                >
+                                  Definir Valor GSPN
+                                </button>
+                              ) : (
+                                /* GSPN definido: mostra valor + lápis editar */
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
+                                    GSPN: R$ {Number(peca.valor_gspn).toFixed(2)}
+                                  </p>
+                                  <button
+                                    onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
+                                    className="p-1 rounded transition-all hover:opacity-80"
+                                    style={{ backgroundColor: '#9333EA20', border: '1px solid #9333EA60', color: '#9333EA' }}
+                                    title="Editar valor GSPN"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* ── VALOR UNITÁRIO COM MARKUP ── (sempre visível se GSPN > 0) */}
+                              {peca.valor_gspn > 0 && (
+                                editandoValorFinal[peca.id] !== undefined ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
+                                    <input
+                                      type="number"
+                                      step="0.01"
+                                      min="0"
+                                      value={editandoValorFinal[peca.id]}
+                                      onChange={(e) => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                      className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
+                                      autoFocus
+                                    />
+                                    <button
+                                      onClick={() => handleSalvarValorFinal(peca.id)}
+                                      className="p-1 rounded transition-all"
+                                      style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
+                                      title="Salvar"
+                                    >
+                                      <Save className="w-3 h-3" />
+                                    </button>
+                                    <button
+                                      onClick={() => setEditandoValorFinal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                      className="p-1 rounded transition-all"
+                                      style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                      title="Cancelar"
+                                    >
+                                      <X className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1.5">
+                                    <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
+                                      Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
+                                    </p>
+                                    <button
+                                      onClick={() => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: String(Number(peca.valor_unitario || 0).toFixed(2)) }))}
+                                      className="p-1 rounded transition-all hover:opacity-80"
+                                      style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
+                                      title="Editar valor unitário com markup"
+                                    >
+                                      <Pencil className="w-3 h-3" />
+                                    </button>
+                                  </div>
+                                )
+                              )}
+
+                              {/* ── VALOR TOTAL ── (sempre visível) */}
+                              {editandoValorTotal[peca.id] !== undefined ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-xs font-bold text-[#39FF14]">Total R$</span>
+                                  <input
+                                    type="number"
+                                    step="0.01"
+                                    min="0"
+                                    value={editandoValorTotal[peca.id]}
+                                    onChange={(e) => setEditandoValorTotal(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                    className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#39FF14]"
+                                    autoFocus
+                                  />
+                                  <button
+                                    onClick={() => handleSalvarValorTotal(peca.id)}
+                                    className="p-1 rounded transition-all"
+                                    style={{ backgroundColor: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.35)', color: '#39FF14' }}
+                                    title="Salvar total"
+                                  >
+                                    <Save className="w-3 h-3" />
+                                  </button>
+                                  <button
+                                    onClick={() => setEditandoValorTotal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
+                                    className="p-1 rounded transition-all"
+                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
+                                    title="Cancelar"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-xs font-bold text-[#39FF14]">
+                                    Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
+                                  </p>
+                                  <button
+                                    onClick={() => setEditandoValorTotal(prev => ({
+                                      ...prev,
+                                      [peca.id]: String(Number(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2))
+                                    }))}
+                                    className="p-1 rounded transition-all hover:opacity-80"
+                                    style={{ backgroundColor: 'rgba(57,255,20,0.08)', border: '1px solid rgba(57,255,20,0.3)', color: '#39FF14' }}
+                                    title="Editar valor total"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              )}
+
+                              {/* Edição de qtd+unitário para peças manuais */}
+                              {peca.status === 'manual' && editandoValorPeca[peca.id] && (
+                                <div className="flex items-center gap-2 flex-wrap w-full mt-1">
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-gray-500">Qtd:</span>
                                     <input
@@ -3985,31 +4146,22 @@ Não haverá cobrança ao cliente.`
                                       min="1"
                                       step="1"
                                       value={editandoValorPeca[peca.id].quantidade}
-                                      onChange={(e) => setEditandoValorPeca(prev => ({
-                                        ...prev,
-                                        [peca.id]: { ...prev[peca.id], quantidade: e.target.value }
-                                      }))}
+                                      onChange={(e) => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], quantidade: e.target.value } }))}
                                       className="w-14 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                                     />
                                   </div>
                                   <div className="flex items-center gap-1">
-                                    <span className="text-xs text-gray-500">Unit: R$</span>
+                                    <span className="text-xs text-gray-500">Unit R$</span>
                                     <input
                                       type="number"
                                       step="0.01"
                                       min="0"
                                       value={editandoValorPeca[peca.id].unitario}
-                                      onChange={(e) => setEditandoValorPeca(prev => ({
-                                        ...prev,
-                                        [peca.id]: { ...prev[peca.id], unitario: e.target.value }
-                                      }))}
+                                      onChange={(e) => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], unitario: e.target.value } }))}
                                       className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                                       autoFocus
                                     />
                                   </div>
-                                  <p className="text-xs font-bold text-[#39FF14]">
-                                    Total: R$ {(parseFloat(editandoValorPeca[peca.id].unitario || '0') * parseInt(editandoValorPeca[peca.id].quantidade || '1')).toFixed(2)}
-                                  </p>
                                   <button
                                     onClick={() => handleSalvarValoresPecaManual(peca.id)}
                                     className="p-1.5 rounded transition-all"
@@ -4027,265 +4179,6 @@ Não haverá cobrança ao cliente.`
                                     <X className="w-3.5 h-3.5" />
                                   </button>
                                 </div>
-                              ) : (
-                                <>
-                                  <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
-
-                                  {/* Campo de edição do valor GSPN se não estiver definido */}
-                                  {editandoValorGSPN[peca.id] !== undefined ? (
-                                    <div className="flex items-center gap-2">
-                                      <input
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        placeholder="Valor GSPN"
-                                        value={editandoValorGSPN[peca.id]}
-                                        onChange={(e) => setEditandoValorGSPN(prev => ({
-                                          ...prev,
-                                          [peca.id]: e.target.value
-                                        }))}
-                                        className="neon-input w-32 text-xs py-1"
-                                        disabled={salvandoValorGSPN[peca.id]}
-                                        autoFocus
-                                      />
-                                      <button
-                                        onClick={() => handleSalvarValorGSPN(peca.id)}
-                                        disabled={salvandoValorGSPN[peca.id]}
-                                        className="p-1.5 rounded transition-all disabled:opacity-50"
-                                        style={{
-                                          backgroundColor: 'rgba(var(--neon-green-rgb),0.1)',
-                                          border: '1px solid rgba(var(--neon-green-rgb),0.35)',
-                                          color: 'var(--neon-green)'
-                                        }}
-                                        title="Salvar valor"
-                                      >
-                                        <Save className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={() => setEditandoValorGSPN(prev => {
-                                          const novo = { ...prev };
-                                          delete novo[peca.id];
-                                          return novo;
-                                        })}
-                                        disabled={salvandoValorGSPN[peca.id]}
-                                        className="p-1.5 rounded transition-all disabled:opacity-50"
-                                        style={{
-                                          backgroundColor: '#FF006420',
-                                          border: '1px solid #FF006460',
-                                          color: '#FF0064'
-                                        }}
-                                        title="Cancelar"
-                                      >
-                                        <X className="w-3.5 h-3.5" />
-                                      </button>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      {peca.status !== 'manual' && (
-                                        <>
-                                          {(!peca.valor_gspn || peca.valor_gspn === 0) ? (
-                                            <button
-                                              onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: '' }))}
-                                              className="px-2 py-1 rounded text-xs font-bold transition-all"
-                                              style={{
-                                                backgroundColor: '#9333EA20',
-                                                border: '1px solid #9333EA60',
-                                                color: '#9333EA'
-                                              }}
-                                            >
-                                              Definir Valor GSPN
-                                            </button>
-                                          ) : (
-                                            <div className="flex flex-col gap-1">
-                                              <div className="flex items-center gap-2">
-                                                <p className="text-xs font-bold" style={{ color: '#9333EA' }}>
-                                                  GSPN: R$ {Number(peca.valor_gspn || peca.valor_base_gspn || 0).toFixed(2)}
-                                                </p>
-                                                <button
-                                                  onClick={() => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: String(peca.valor_gspn || '') }))}
-                                                  className="p-1 rounded transition-all"
-                                                  style={{
-                                                    backgroundColor: '#9333EA20',
-                                                    border: '1px solid #9333EA60',
-                                                    color: '#9333EA'
-                                                  }}
-                                                  title="Editar valor GSPN"
-                                                >
-                                                  <Pencil className="w-3 h-3" />
-                                                </button>
-                                              </div>
-                                              {editandoValorFinal[peca.id] !== undefined ? (
-                                                <div className="flex items-center gap-1.5">
-                                                  <span className="text-xs text-gray-500">Final: R$</span>
-                                                  <input
-                                                    type="number"
-                                                    step="0.01"
-                                                    min="0"
-                                                    value={editandoValorFinal[peca.id]}
-                                                    onChange={(e) => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: e.target.value }))}
-                                                    className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                                                    autoFocus
-                                                  />
-                                                  <button
-                                                    onClick={() => handleSalvarValorFinal(peca.id)}
-                                                    className="p-1 rounded transition-all"
-                                                    style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
-                                                    title="Salvar"
-                                                  >
-                                                    <Save className="w-3 h-3" />
-                                                  </button>
-                                                  <button
-                                                    onClick={() => setEditandoValorFinal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                                    className="p-1 rounded transition-all"
-                                                    style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                                    title="Cancelar"
-                                                  >
-                                                    <X className="w-3 h-3" />
-                                                  </button>
-                                                </div>
-                                              ) : (
-                                                <div className="flex items-center gap-2">
-                                                  <p className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>
-                                                    Final: R$ {Number(peca.valor_unitario || 0).toFixed(2)}
-                                                  </p>
-                                                  <button
-                                                    onClick={() => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: String(Number(peca.valor_unitario || 0).toFixed(2)) }))}
-                                                    className="p-1 rounded transition-all"
-                                                    style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
-                                                    title="Editar valor final"
-                                                  >
-                                                    <Pencil className="w-3 h-3" />
-                                                  </button>
-                                                </div>
-                                              )}
-                                            </div>
-                                          )}
-                                        </>
-                                      )}
-
-                                      {(() => {
-                                        const ehCotacaoPeca = peca.cotacao_peca_id === peca.id && !peca.status;
-                                        const valorControladoPorMarkup = !ehCotacaoPeca && peca.valor_gspn > 0;
-                                        if (valorControladoPorMarkup) {
-                                          return null;
-                                        }
-                                        if (peca.status === 'manual') {
-                                          return (
-                                            <div className="flex items-center gap-2">
-                                              <p className="text-xs text-gray-400">Unit: R$ {Number(peca.valor_unitario || 0).toFixed(2)}</p>
-                                            </div>
-                                          );
-                                        }
-                                        return (
-                                          <div className="flex items-center gap-2">
-                                            <span className="text-xs text-gray-500">Unit: R$</span>
-                                            <input
-                                              type="number"
-                                              step="0.01"
-                                              defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
-                                              onBlur={async (e) => {
-                                                const novoValor = parseFloat(e.target.value) || 0;
-                                                if (novoValor === peca.valor_unitario) return;
-
-                                                try {
-                                                  if (ehCotacaoPeca) {
-                                                    const { error: updateError } = await supabase
-                                                      .from('cotacoes_pecas')
-                                                      .update({
-                                                        valor_final_unitario: novoValor,
-                                                        valor_total: novoValor * (peca.quantidade || 1)
-                                                      })
-                                                      .eq('id', peca.id);
-                                                    if (updateError) throw updateError;
-                                                  } else {
-                                                    const { error: updateError } = await supabase
-                                                      .from('os_pecas')
-                                                      .update({
-                                                        valor_unitario: novoValor,
-                                                        valor_total: novoValor * (peca.quantidade || 1)
-                                                      })
-                                                      .eq('id', peca.id);
-                                                    if (updateError) throw updateError;
-                                                  }
-
-                                                  await loadPecas();
-                                                  await loadOS();
-                                                } catch (error: any) {
-                                                  alert('Erro ao atualizar valor da peça: ' + (error?.message || 'Erro desconhecido'));
-                                                }
-                                              }}
-                                              className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                                            />
-                                          </div>
-                                        );
-                                      })()}
-                                      {editandoValorTotal[peca.id] !== undefined ? (
-                                        <div className="flex items-center gap-1.5">
-                                          <span className="text-xs text-gray-500">Total: R$</span>
-                                          <input
-                                            type="number"
-                                            step="0.01"
-                                            min="0"
-                                            value={editandoValorTotal[peca.id]}
-                                            onChange={(e) => setEditandoValorTotal(prev => ({ ...prev, [peca.id]: e.target.value }))}
-                                            className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#39FF14]"
-                                            autoFocus
-                                          />
-                                          <button
-                                            onClick={() => handleSalvarValorTotal(peca.id)}
-                                            className="p-1 rounded transition-all"
-                                            style={{ backgroundColor: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.35)', color: '#39FF14' }}
-                                            title="Salvar"
-                                          >
-                                            <Save className="w-3 h-3" />
-                                          </button>
-                                          <button
-                                            onClick={() => setEditandoValorTotal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                            className="p-1 rounded transition-all"
-                                            style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                            title="Cancelar"
-                                          >
-                                            <X className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      ) : (
-                                        <div className="flex items-center gap-2">
-                                          <p className="text-xs font-bold text-[#39FF14]">
-                                            Total: R$ {(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
-                                          </p>
-                                          <button
-                                            onClick={() => setEditandoValorTotal(prev => ({
-                                              ...prev,
-                                              [peca.id]: String(Number(peca.valor_total && peca.valor_total > 0 ? peca.valor_total : Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2))
-                                            }))}
-                                            className="p-1 rounded transition-all"
-                                            style={{ backgroundColor: 'rgba(57,255,20,0.08)', border: '1px solid rgba(57,255,20,0.3)', color: '#39FF14' }}
-                                            title="Editar valor total"
-                                          >
-                                            <Pencil className="w-3 h-3" />
-                                          </button>
-                                        </div>
-                                      )}
-
-                                      {peca.status === 'manual' && (
-                                        <button
-                                          onClick={() => setEditandoValorPeca(prev => ({
-                                            ...prev,
-                                            [peca.id]: {
-                                              unitario: String(Number(peca.valor_unitario || 0).toFixed(2)),
-                                              quantidade: String(peca.quantidade || 1)
-                                            }
-                                          }))}
-                                          className="p-1.5 rounded transition-all"
-                                          style={{ backgroundColor: 'rgba(var(--accent-rgb),0.1)', border: '1px solid rgba(var(--accent-rgb),0.4)', color: 'var(--text-accent)' }}
-                                          title="Editar quantidade e valor"
-                                        >
-                                          <Pencil className="w-3.5 h-3.5" />
-                                        </button>
-                                      )}
-                                    </>
-                                  )}
-                                </>
                               )}
                             </div>
                             {(requisicao || requisicaoDevolvida) && (
