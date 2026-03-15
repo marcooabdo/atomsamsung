@@ -48,9 +48,10 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
 
     setConvertendo(true);
     try {
+      const novoTipoOS = (novoTipo === 'samsung_contigo' || novoTipo === 'acessorios') ? 'OW' : os.tipo_os;
       const { error } = await supabase
         .from('os')
-        .update({ tipo_orcamento: novoTipo })
+        .update({ tipo_orcamento: novoTipo, tipo_os: novoTipoOS })
         .eq('id', os.id);
 
       if (error) throw error;
