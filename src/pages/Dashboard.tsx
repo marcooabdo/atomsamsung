@@ -108,9 +108,10 @@ export function Dashboard() {
 
       let osQuery = supabase
         .from('os')
-        .select('*')
+        .select('id, coluna_kanban, tipo_os, valor_total, data_fechamento, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em')
         .gte('created_at', `${dataInicio}T00:00:00`)
-        .lte('created_at', `${dataFim}T23:59:59`);
+        .lte('created_at', `${dataFim}T23:59:59`)
+        .limit(10000);
 
       if (!canSeeAllUnits && unidadeFilter) {
         osQuery = osQuery.eq('unidade_id', unidadeFilter);
@@ -141,10 +142,11 @@ export function Dashboard() {
 
       let cotacoesQuery = supabase
         .from('cotacoes')
-        .select('*')
+        .select('id, status')
         .gte('created_at', `${dataInicio}T00:00:00`)
         .lte('created_at', `${dataFim}T23:59:59`)
-        .eq('tipo_os', 'OW');
+        .eq('tipo_os', 'OW')
+        .limit(10000);
 
       if (!canSeeAllUnits && unidadeFilter) {
         cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
