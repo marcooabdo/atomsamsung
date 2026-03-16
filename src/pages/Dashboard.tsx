@@ -108,10 +108,9 @@ export function Dashboard() {
 
       let osQuery = supabase
         .from('os')
-        .select('id, coluna_kanban, tipo_os, valor_total, data_fechamento, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em')
+        .select('*')
         .gte('created_at', `${dataInicio}T00:00:00`)
-        .lte('created_at', `${dataFim}T23:59:59`)
-        .limit(10000);
+        .lte('created_at', `${dataFim}T23:59:59`);
 
       if (!canSeeAllUnits && unidadeFilter) {
         osQuery = osQuery.eq('unidade_id', unidadeFilter);
@@ -119,7 +118,10 @@ export function Dashboard() {
         osQuery = osQuery.eq('unidade_id', selectedUnidade);
       }
 
-      const { data: osData } = await osQuery;
+      osQuery = osQuery.limit(10000);
+
+      const { data: osData, error: osError } = await osQuery;
+      if (osError) console.error('OS query error:', osError);
       const osList = osData || [];
 
       const osAbertas = osList.filter(os => os.coluna_kanban !== 'os_fechada').length;
@@ -142,17 +144,18 @@ export function Dashboard() {
 
       let cotacoesQuery = supabase
         .from('cotacoes')
-        .select('id, status')
+        .select('*')
         .gte('created_at', `${dataInicio}T00:00:00`)
         .lte('created_at', `${dataFim}T23:59:59`)
-        .eq('tipo_os', 'OW')
-        .limit(10000);
+        .eq('tipo_os', 'OW');
 
       if (!canSeeAllUnits && unidadeFilter) {
         cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
       } else if (selectedUnidade) {
         cotacoesQuery = cotacoesQuery.eq('unidade_id', selectedUnidade);
       }
+
+      cotacoesQuery = cotacoesQuery.limit(10000);
 
       const { data: cotacoesData } = await cotacoesQuery;
       const cotacoes = cotacoesData || [];
@@ -265,6 +268,7 @@ export function Dashboard() {
         metaTaxaAprovacao: metas ? Number(metas.meta_taxa_aprovacao) : undefined,
       });
     } catch (error) {
+      console.error('Dashboard loadDashboardData error:', error);
     } finally {
       setLoading(false);
     }
