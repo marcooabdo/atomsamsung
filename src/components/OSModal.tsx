@@ -4014,7 +4014,7 @@ Não haverá cobrança ao cliente.`
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
 
                               {/* ── VALOR GSPN (base) — para peças gspn/manual ou todas em SC/ACC ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC) && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && (
                                 editandoValorGSPN[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
@@ -4066,7 +4066,7 @@ Não haverá cobrança ao cliente.`
                               )}
 
                               {/* ── VALOR UNITÁRIO COM MARKUP ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || peca.valor_gspn > 0 || peca.valor_unitario > 0) && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || peca.valor_gspn > 0 || peca.valor_unitario > 0) && !(peca as any)._isOrphanReq && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
@@ -4118,7 +4118,7 @@ Não haverá cobrança ao cliente.`
                                 <p className="text-xs font-bold text-[#39FF14]">
                                   Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
                                 </p>
-                                {(peca.status === 'manual' || isSCACC) && !editandoValorPeca[peca.id] && (
+                                {(peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && !editandoValorPeca[peca.id] && (
                                   <button
                                     onClick={() => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { unitario: String(Number(peca.valor_unitario || 0).toFixed(2)), quantidade: String(peca.quantidade || 1) } }))}
                                     className="p-1 rounded transition-all hover:opacity-80"
@@ -4131,7 +4131,7 @@ Não haverá cobrança ao cliente.`
                               </div>
 
                               {/* Edição de qtd+unitário para peças manuais / SC/ACC */}
-                              {(peca.status === 'manual' || isSCACC) && editandoValorPeca[peca.id] && (
+                              {(peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && editandoValorPeca[peca.id] && (
                                 <div className="flex items-center gap-2 flex-wrap w-full mt-1">
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-gray-500">Qtd:</span>
