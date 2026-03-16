@@ -53,6 +53,23 @@ interface PerformanceOS {
   status_final: 'aprovado' | 'reprovado' | 'aberto';
 }
 
+async function fetchAllPages<T>(
+  buildQuery: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<T[]> {
+  const PAGE_SIZE = 1000;
+  const results: T[] = [];
+  let from = 0;
+  while (true) {
+    const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
+    if (error) { console.error('fetchAllPages error:', error); break; }
+    const rows = data || [];
+    results.push(...rows);
+    if (rows.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
+  }
+  return results;
+}
+
 export function Dashboard() {
   const { usuario } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -106,23 +123,17 @@ export function Dashboard() {
       const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
       const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : usuario?.unidade_id);
 
-      let osQuery = supabase
-        .from('os')
-        .select('*')
-        .gte('created_at', `${dataInicio}T00:00:00`)
-        .lte('created_at', `${dataFim}T23:59:59`);
-
-      if (!canSeeAllUnits && unidadeFilter) {
-        osQuery = osQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        osQuery = osQuery.eq('unidade_id', selectedUnidade);
-      }
-
-      osQuery = osQuery.limit(10000);
-
-      const { data: osData, error: osError } = await osQuery;
-      if (osError) console.error('OS query error:', osError);
-      const osList = osData || [];
+      const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
+        let q = supabase
+          .from('os')
+          .select('id, coluna_kanban, tipo_os, valor_total, data_fechamento, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`)
+          .range(from, to);
+        if (!canSeeAllUnits && unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
+        else if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+        return q;
+      }) as any[];
 
       const osAbertas = osList.filter(os => os.coluna_kanban !== 'os_fechada').length;
       const receitaLP = osList.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
@@ -142,23 +153,18 @@ export function Dashboard() {
 
       const eficienciaOperacional = countResolucao > 0 ? totalDiasResolucao / countResolucao : 0;
 
-      let cotacoesQuery = supabase
-        .from('cotacoes')
-        .select('*')
-        .gte('created_at', `${dataInicio}T00:00:00`)
-        .lte('created_at', `${dataFim}T23:59:59`)
-        .eq('tipo_os', 'OW');
-
-      if (!canSeeAllUnits && unidadeFilter) {
-        cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        cotacoesQuery = cotacoesQuery.eq('unidade_id', selectedUnidade);
-      }
-
-      cotacoesQuery = cotacoesQuery.limit(10000);
-
-      const { data: cotacoesData } = await cotacoesQuery;
-      const cotacoes = cotacoesData || [];
+      const cotacoes = await fetchAllPages<Record<string, unknown>>((from, to) => {
+        let q = supabase
+          .from('cotacoes')
+          .select('id, status, unidade_id')
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`)
+          .eq('tipo_os', 'OW')
+          .range(from, to);
+        if (!canSeeAllUnits && unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
+        else if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+        return q;
+      }) as any[];
 
       const cotacoesAprovadas = cotacoes.filter(c => c.status === 'aprovada');
       const cotacoesReprovadas = cotacoes.filter(c => c.status === 'reprovada' || c.status === 'reprovada_refeita');
