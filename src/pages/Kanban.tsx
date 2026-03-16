@@ -37,6 +37,10 @@ const COLUNAS_KANBAN = [
   { id: 'rota_laranja', label: 'Rota Laranja', color: '#F97316', icon: MapPin },
   { id: 'em_rota_ih', label: 'Em Rota IH', color: '#10B981', icon: Activity },
   { id: 'saw', label: 'SAW', color: '#14B8A6', icon: Activity },
+  { id: 'instalacao_inicial', label: 'Instalação Inicial', color: '#7C3AED', icon: Activity },
+  { id: 'service_handling', label: 'Service Handling', color: '#DB2777', icon: Activity },
+  { id: 'return_handling', label: 'Return Handling', color: '#D97706', icon: Activity },
+  { id: 'trade_up', label: 'Trade Up', color: '#0891B2', icon: Activity },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
@@ -74,6 +78,10 @@ const COLUNAS_CI = [
   'diagnostico',
   'em_reparo_ci',
   'saw',
+  'instalacao_inicial',
+  'service_handling',
+  'return_handling',
+  'trade_up',
   'controle_qualidade',
   'reparo_concluido'
 ];
@@ -101,6 +109,10 @@ const COLUNAS_IH = [
   'rota_laranja',
   'em_rota_ih',
   'saw',
+  'instalacao_inicial',
+  'service_handling',
+  'return_handling',
+  'trade_up',
   'controle_qualidade',
   'reparo_concluido'
 ];

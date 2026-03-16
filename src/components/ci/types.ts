@@ -1,6 +1,7 @@
 export const APPROVED_STAGES = [
   'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel',
-  'em_reparo_ci', 'disponivel_ih', 'em_rota_ih', 'saw', 'controle_qualidade',
+  'em_reparo_ci', 'disponivel_ih', 'em_rota_ih', 'saw', 'instalacao_inicial',
+  'service_handling', 'return_handling', 'trade_up', 'controle_qualidade',
   'reparo_concluido', 'aguardando_fechamento', 'fechar_os', 'os_fechada'
 ];
 
@@ -13,6 +14,10 @@ export const KANBAN_LABELS: Record<string, string> = {
   'disponivel_ih': 'Disponivel IH',
   'em_rota_ih': 'Em Rota IH',
   'saw': 'SAW',
+  'instalacao_inicial': 'Instalacao Inicial',
+  'service_handling': 'Service Handling',
+  'return_handling': 'Return Handling',
+  'trade_up': 'Trade Up',
   'controle_qualidade': 'Controle Qualidade',
   'reparo_concluido': 'Reparo Concluido',
   'aguardando_fechamento': 'Aguard. Fechamento',
@@ -29,6 +34,10 @@ export const KANBAN_COLORS: Record<string, string> = {
   'disponivel_ih': 'text-teal-400 bg-teal-500/20 border-teal-500/30',
   'em_rota_ih': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
   'saw': 'text-green-400 bg-green-500/20 border-green-500/30',
+  'instalacao_inicial': 'text-violet-400 bg-violet-500/20 border-violet-500/30',
+  'service_handling': 'text-pink-400 bg-pink-500/20 border-pink-500/30',
+  'return_handling': 'text-amber-400 bg-amber-500/20 border-amber-500/30',
+  'trade_up': 'text-cyan-400 bg-cyan-500/20 border-cyan-500/30',
   'controle_qualidade': 'text-lime-400 bg-lime-500/20 border-lime-500/30',
   'reparo_concluido': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
   'aguardando_fechamento': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
