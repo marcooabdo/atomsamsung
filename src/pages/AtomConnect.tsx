@@ -105,6 +105,8 @@ export default function AtomConnect() {
 
   useEffect(() => {
     loadConversas();
+    const interval = setInterval(loadConversas, 30000);
+    return () => clearInterval(interval);
   }, [loadConversas]);
 
   useEffect(() => {
@@ -213,7 +215,7 @@ export default function AtomConnect() {
   }, [selectedConversa]);
 
   useEffect(() => {
-    const filterUnidadeId = unidadeAtual || (usuario?.nivel !== 'master' ? usuario?.unidade_id : null);
+    const filterUnidadeId = selectedUnidadeFilter || unidadeAtual || (usuario?.nivel !== 'master' ? usuario?.unidade_id : null);
 
     const channelConfig: any = {
       event: '*',
@@ -226,7 +228,7 @@ export default function AtomConnect() {
     }
 
     const channel = supabase
-      .channel('atom-connect-realtime')
+      .channel(`atom-connect-rt-${filterUnidadeId || 'all'}`)
       .on('postgres_changes', channelConfig, (payload) => {
         if (payload.eventType === 'INSERT') {
           const newConversa = payload.new as Conversa;
@@ -289,7 +291,7 @@ export default function AtomConnect() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [unidadeAtual, usuario]);
+  }, [selectedUnidadeFilter, unidadeAtual, usuario]);
 
   const showNewMessageNotification = (conversa: Conversa) => {
     const notification: Notification = {

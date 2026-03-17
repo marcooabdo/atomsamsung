@@ -22,6 +22,13 @@ import {
   Brain
 } from 'lucide-react';
 
+interface KanbanColumnCount {
+  coluna: string;
+  label: string;
+  count: number;
+  color: string;
+}
+
 interface DashboardStats {
   totalOS: number;
   osAbertas: number;
@@ -34,6 +41,7 @@ interface DashboardStats {
   osAtrasadas: number;
   eficienciaOperacional: number;
   taxaAprovacao: number;
+  kanbanColumns: KanbanColumnCount[];
   metaReceitaLP?: number;
   metaReceitaOW?: number;
   metaEficiencia?: number;
@@ -70,6 +78,23 @@ async function fetchAllPages<T>(
   return results;
 }
 
+const KANBAN_LABELS: Record<string, { label: string; color: string }> = {
+  os_nova: { label: 'OS Nova', color: '#0EA5E9' },
+  diagnostico: { label: 'Diagnostico', color: '#8B5CF6' },
+  negociacao_em_andamento: { label: 'Negociacao', color: '#F59E0B' },
+  orcamento_aprovado: { label: 'Orc. Aprovado', color: '#10B981' },
+  orcamentos_rejeitados: { label: 'Orc. Rejeitado', color: '#EF4444' },
+  aguardando_peca: { label: 'Aguardando Peca', color: '#F97316' },
+  peca_em_transito: { label: 'Peca em Transito', color: '#06B6D4' },
+  peca_disponivel: { label: 'Peca Disponivel', color: '#14B8A6' },
+  em_reparo: { label: 'Em Reparo', color: '#10B981' },
+  em_reparo_ci: { label: 'Reparo CI', color: '#22C55E' },
+  rota_azul: { label: 'Rota Azul', color: '#3B82F6' },
+  rota_vermelha: { label: 'Rota Vermelha', color: '#EF4444' },
+  pronto_retirada: { label: 'Pronto Retirada', color: '#059669' },
+  os_fechada: { label: 'OS Fechada', color: '#6B7280' },
+};
+
 export function Dashboard() {
   const { usuario } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -84,6 +109,7 @@ export function Dashboard() {
     osAtrasadas: 0,
     eficienciaOperacional: 0,
     taxaAprovacao: 0,
+    kanbanColumns: [],
   });
   const [loading, setLoading] = useState(true);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
@@ -138,6 +164,23 @@ export function Dashboard() {
       const osAbertas = osList.filter(os => os.coluna_kanban !== 'os_fechada').length;
       const receitaLP = osList.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
       const receitaOW = osList.filter(os => os.tipo_os === 'OW').reduce((sum, os) => sum + (os.valor_total || 0), 0);
+
+      const kanbanCountMap: Record<string, number> = {};
+      osList.forEach(os => {
+        const col = os.coluna_kanban as string;
+        if (col && col !== 'os_fechada') {
+          kanbanCountMap[col] = (kanbanCountMap[col] || 0) + 1;
+        }
+      });
+      const kanbanColumns: KanbanColumnCount[] = Object.entries(kanbanCountMap)
+        .map(([coluna, count]) => ({
+          coluna,
+          label: KANBAN_LABELS[coluna]?.label || coluna.replace(/_/g, ' '),
+          count,
+          color: KANBAN_LABELS[coluna]?.color || '#6B7280',
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 8);
 
       const osFechadas = osList.filter(os => os.coluna_kanban === 'os_fechada');
       let totalDiasResolucao = 0;
@@ -268,6 +311,7 @@ export function Dashboard() {
         osAtrasadas: 0,
         eficienciaOperacional,
         taxaAprovacao,
+        kanbanColumns,
         metaReceitaLP: metas ? Number(metas.meta_receita_lp) : undefined,
         metaReceitaOW: metas ? Number(metas.meta_receita_ow) : undefined,
         metaEficiencia: metas ? Number(metas.meta_eficiencia_operacional) : undefined,
@@ -442,12 +486,13 @@ export function Dashboard() {
   };
 
   const statCards = [
-    { title: 'OS Abertas', value: stats.osAbertas, icon: FileText, color: '#0EA5E9', hasGoal: false },
+    { title: 'Total de OS', value: stats.totalOS, icon: FileText, color: '#0EA5E9', hasGoal: false },
+    { title: 'OS Abertas', value: stats.osAbertas, icon: Activity, color: '#3B82F6', hasGoal: false },
     { title: 'Cotacoes Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
     { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
     { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
     { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
-    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#A855F7', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
+    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -518,7 +563,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {statCards.map((stat, index) => {
           const Icon = stat.icon;
 
@@ -673,53 +718,25 @@ export function Dashboard() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between p-2.5 rounded-lg"
-              style={{
-                background: 'linear-gradient(135deg, rgba(14,165,233,0.08) 0%, rgba(14,165,233,0.02) 100%)',
-                border: '1px solid rgba(14,165,233,0.2)',
-                boxShadow: '0 0 6px rgba(14,165,233,0.08)'
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#0EA5E9]" style={{ boxShadow: '0 0 4px rgba(14,165,233,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">OS em Análise</span>
+            {stats.kanbanColumns.length > 0 ? stats.kanbanColumns.map((col) => (
+              <div key={col.coluna} className="flex items-center justify-between p-2.5 rounded-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${col.color}14 0%, ${col.color}04 100%)`,
+                  border: `1px solid ${col.color}33`,
+                  boxShadow: `0 0 6px ${col.color}14`
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color, boxShadow: `0 0 4px ${col.color}66` }} />
+                  <span className="text-xs font-medium text-gray-300">{col.label}</span>
+                </div>
+                <span className="text-sm font-bold" style={{ color: col.color }}>
+                  {col.count}
+                </span>
               </div>
-              <span className="text-sm font-bold text-[#0EA5E9]">
-                {Math.floor(stats.osAbertas * 0.3)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-lg"
-              style={{
-                background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)',
-                border: '1px solid rgba(245,158,11,0.2)',
-                boxShadow: '0 0 6px rgba(245,158,11,0.08)'
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#F59E0B]" style={{ boxShadow: '0 0 4px rgba(245,158,11,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">Aguardando Pecas</span>
-              </div>
-              <span className="text-sm font-bold text-[#F59E0B]">
-                {Math.floor(stats.osAbertas * 0.4)}
-              </span>
-            </div>
-
-            <div className="flex items-center justify-between p-2.5 rounded-lg"
-              style={{
-                background: 'linear-gradient(135deg, rgba(16,185,129,0.08) 0%, rgba(16,185,129,0.02) 100%)',
-                border: '1px solid rgba(16,185,129,0.2)',
-                boxShadow: '0 0 6px rgba(16,185,129,0.08)'
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-[#10B981]" style={{ boxShadow: '0 0 4px rgba(16,185,129,0.4)' }} />
-                <span className="text-xs font-medium text-gray-300">Em Reparo</span>
-              </div>
-              <span className="text-sm font-bold text-[#10B981]">
-                {Math.floor(stats.osAbertas * 0.3)}
-              </span>
-            </div>
+            )) : (
+              <p className="text-xs text-gray-500 text-center py-4">Nenhuma OS aberta no periodo</p>
+            )}
           </div>
         </div>
 

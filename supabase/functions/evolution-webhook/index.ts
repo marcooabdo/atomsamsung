@@ -15,6 +15,19 @@ function normalizeEvent(rawEvent: string): string {
     .trim();
 }
 
+function normalizeBrazilianPhone(phone: string): string {
+  if (!phone.startsWith("55")) return phone;
+  const rest = phone.substring(2);
+  if (rest.length === 10) {
+    const ddd = rest.substring(0, 2);
+    const num = rest.substring(2);
+    if (num[0] === "6" || num[0] === "7" || num[0] === "8" || num[0] === "9") {
+      return "55" + ddd + "9" + num;
+    }
+  }
+  return phone;
+}
+
 function cleanPhoneNumber(remoteJid: string): string {
   let cleaned = remoteJid.replace("@s.whatsapp.net", "").replace("@g.us", "");
   const colonIndex = cleaned.indexOf(":");
@@ -22,7 +35,7 @@ function cleanPhoneNumber(remoteJid: string): string {
     cleaned = cleaned.substring(0, colonIndex);
   }
   cleaned = cleaned.replace(/[^0-9]/g, "");
-  return cleaned;
+  return normalizeBrazilianPhone(cleaned);
 }
 
 function isProtocolMessage(msg: any): boolean {
@@ -686,6 +699,23 @@ async function processMessage(
     .eq("cliente_telefone", phoneNumber)
     .eq("unidade_id", instancia.unidade_id)
     .maybeSingle();
+
+  if (!conversa && phoneNumber.startsWith("55") && phoneNumber.length === 13) {
+    const without9 = "55" + phoneNumber.substring(2, 4) + phoneNumber.substring(5);
+    const { data: altConversa } = await supabase
+      .from("atom_connect_conversas")
+      .select("id, coluna_pipeline, mensagens_nao_lidas, cliente_nome, is_group, is_interno")
+      .eq("cliente_telefone", without9)
+      .eq("unidade_id", instancia.unidade_id)
+      .maybeSingle();
+    if (altConversa) {
+      await supabase
+        .from("atom_connect_conversas")
+        .update({ cliente_telefone: phoneNumber })
+        .eq("id", altConversa.id);
+      conversa = altConversa;
+    }
+  }
 
   let isNewConversa = false;
 
