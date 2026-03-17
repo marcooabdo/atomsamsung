@@ -593,15 +593,11 @@ export function OSNotaFiscalTab({
 
       if (inserted?.id) {
         try {
-          const nfeResponse = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ nfe_id: inserted.id })
+          const { data: nfeData, error: nfeError } = await supabase.functions.invoke('emit-nfe', {
+            body: { nfe_id: inserted.id }
           });
-          if (!nfeResponse.ok) {
-            const errData = await nfeResponse.json().catch(() => ({}));
-            throw new Error(errData?.message || errData?.error || `Erro HTTP ${nfeResponse.status}`);
-          }
+          if (nfeError) throw new Error(nfeError.message || 'Erro ao acionar servidor de emissao');
+          if (nfeData && !nfeData.success) throw new Error(nfeData?.data?.message || nfeData?.data?.error || `Erro HTTP ${nfeData.status}`);
           setMensagem({ tipo: 'success', texto: 'Emissao iniciada' });
         } catch (fetchErr: any) {
           setMensagem({ tipo: 'error', texto: fetchErr.message || 'Erro ao acionar servidor de emissao' });
@@ -1485,15 +1481,11 @@ export function OSNotaFiscalTab({
                                 .update({ status: 'pendente', erro_mensagem: null })
                                 .eq('id', nf.id);
 
-                              const nfeResponse = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ nfe_id: nf.id })
+                              const { data: nfeRetryData, error: nfeRetryError } = await supabase.functions.invoke('emit-nfe', {
+                                body: { nfe_id: nf.id }
                               });
-                              if (!nfeResponse.ok) {
-                                const errData = await nfeResponse.json().catch(() => ({}));
-                                throw new Error(errData?.message || errData?.error || `Erro HTTP ${nfeResponse.status}`);
-                              }
+                              if (nfeRetryError) throw new Error(nfeRetryError.message || 'Erro ao acionar servidor de emissao');
+                              if (nfeRetryData && !nfeRetryData.success) throw new Error(nfeRetryData?.data?.message || nfeRetryData?.data?.error || `Erro HTTP ${nfeRetryData.status}`);
                               setMensagem({ tipo: 'success', texto: 'Emissao iniciada' });
                               loadData();
                             } catch (err: any) {

@@ -238,16 +238,12 @@ export function NotasFiscais() {
   };
 
   const dispatchNFe = async (nfId: string) => {
-    const response = await fetch('https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nfe_id: nfId })
+    const { data, error } = await supabase.functions.invoke('emit-nfe', {
+      body: { nfe_id: nfId }
     });
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err?.message || err?.error || `Erro HTTP ${response.status}`);
-    }
-    return response.json();
+    if (error) throw new Error(error.message || 'Erro ao acionar servidor de emissao');
+    if (data && !data.success) throw new Error(data?.data?.message || data?.data?.error || `Erro HTTP ${data.status}`);
+    return data;
   };
 
   const dispatchNFSe = async (nfId: string) => {
