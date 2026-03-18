@@ -249,19 +249,9 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
     setShowAttachMenu(false);
 
     try {
-      console.log('📤 Iniciando upload de arquivo:', {
-        nome: file.name,
-        tamanho: file.size,
-        tipo: file.type,
-        messageType,
-        conversationId
-      });
-
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
       const filePath = `${conversationId}/${fileName}`;
-
-      console.log('📂 Path do arquivo:', filePath);
 
       const { data: uploadData, error: uploadError } = await supabase.storage
         .from('chat-files')
@@ -271,17 +261,12 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         });
 
       if (uploadError) {
-        console.error('❌ Erro no upload:', uploadError);
         throw new Error(`Erro no upload: ${uploadError.message}`);
       }
-
-      console.log('✅ Upload concluído:', uploadData);
 
       const { data: { publicUrl } } = supabase.storage
         .from('chat-files')
         .getPublicUrl(filePath);
-
-      console.log('🔗 URL pública:', publicUrl);
 
       const { data: messageData, error: messageError } = await supabase
         .from('chat_messages')
@@ -298,11 +283,8 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
         .single();
 
       if (messageError) {
-        console.error('❌ Erro ao criar mensagem:', messageError);
         throw new Error(`Erro ao criar mensagem: ${messageError.message}`);
       }
-
-      console.log('✅ Mensagem criada:', messageData);
 
       if (messageData && onMessageAdded) {
         const { data: userData } = await supabase
@@ -318,9 +300,7 @@ export const ChatInput = forwardRef<ChatInputRef, ChatInputProps>(
       }
 
       onMessageSent?.();
-      console.log('✅ Arquivo enviado com sucesso!');
     } catch (err: any) {
-      console.error('❌ Erro completo:', err);
       alert(`Erro ao enviar arquivo: ${err.message || 'Erro desconhecido'}`);
     } finally {
       setUploading(false);

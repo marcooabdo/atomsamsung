@@ -418,8 +418,6 @@ export function SkywalkerProvider({ children }: { children: ReactNode }) {
           filter: `profissional_id=eq.${myProfissional.id}`,
         },
         (payload) => {
-          console.log('Skywalker estrelas changed:', payload);
-          // Recarregar estrelas do mês
           loadEstrelasDoMes(myProfissional.id, mesReferencia);
           // Recarregar ranking também
           loadRanking(mesReferencia);

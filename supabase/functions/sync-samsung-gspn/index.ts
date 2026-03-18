@@ -216,7 +216,6 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (syncLog.error || !syncLog.data) {
-      console.error('Error creating sync log:', syncLog.error);
       throw new Error(`Failed to create sync log: ${syncLog.error?.message || 'Unknown error'}`);
     }
 
@@ -421,7 +420,7 @@ Deno.serve(async (req: Request) => {
             cliente_cep: detailData.Return.EsBpInfo?.CustZipcode || null
           };
         } catch (error) {
-          console.error(`Error fetching details for ${os.SvcOrderNo}:`, error);
+          // ignored
           return null;
         }
       });
@@ -524,13 +523,11 @@ Deno.serve(async (req: Request) => {
             .insert(osData);
 
           if (insertError) {
-            console.error(`Erro ao criar OS ${os.SvcOrderNo}:`, insertError);
             errors.push(`OS ${os.SvcOrderNo}: ${insertError.message}`);
           } else {
             criadas++;
           }
         } catch (error: any) {
-          console.error(`Error processing OS ${os.SvcOrderNo}:`, error);
           errors.push(`OS ${os.SvcOrderNo}: ${error.message}`);
         }
       }
@@ -582,7 +579,6 @@ Deno.serve(async (req: Request) => {
     }
 
   } catch (error: any) {
-    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

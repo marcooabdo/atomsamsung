@@ -51,7 +51,7 @@ export function AprovarDevolucaoModal({ isOpen, onClose, onConfirm, requisicao }
       setPreviewFoto('');
       onClose();
     } catch (error) {
-      console.error('Erro ao aprovar:', error);
+      // ignored
     } finally {
       setLoading(false);
     }

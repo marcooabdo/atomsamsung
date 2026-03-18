@@ -430,7 +430,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       const data = await response.json();
       return data?.[0]?.exists === true;
     } catch (error) {
-      console.error('Erro ao verificar WhatsApp:', error);
+      // ignored
       return false;
     }
   };
@@ -532,7 +532,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         .single();
 
       if (createError) {
-        console.error('Erro ao criar conversa:', createError);
         setWhatsAppError('Erro ao criar conversa');
         setLoadingWhatsApp(false);
         return;
@@ -541,7 +540,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       setWhatsAppConversa(newConversa as WhatsAppConversa);
       setShowWhatsAppChat(true);
     } catch (error) {
-      console.error('Erro ao abrir WhatsApp:', error);
       setWhatsAppError('Erro ao processar solicitacao');
     } finally {
       setLoadingWhatsApp(false);
@@ -826,20 +824,9 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
   const loadMarkups = async () => {
     if (!os?.unidade_id || !os?.tipo_orcamento) {
-      console.log('⚠️ Markups não carregados - faltam dados:', {
-        unidade_id: os?.unidade_id,
-        tipo_orcamento: os?.tipo_orcamento,
-        os_completa: os
-      });
       setMarkups([]);
       return;
     }
-
-    console.log('🔍 Carregando markups para:', {
-      unidade_id: os.unidade_id,
-      tipo_orcamento: os.tipo_orcamento,
-      tipo_os: os.tipo_os
-    });
 
     const { data, error } = await supabase
       .rpc('get_markup_for_unidade_and_tipo', {
@@ -848,10 +835,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       });
 
     if (error) {
-      console.error('❌ Erro ao carregar markups:', error);
       setMarkups([]);
     } else {
-      console.log('✅ Markups carregados para tipo_orcamento "' + os.tipo_orcamento + '":', data);
       setMarkups(data || []);
     }
   };
@@ -859,26 +844,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const calcularValorComMarkup = (valorGSPN: number): number => {
     // Validação de entrada
     if (isNaN(valorGSPN) || !isFinite(valorGSPN) || valorGSPN <= 0) {
-      console.warn('⚠️ Valor GSPN inválido:', valorGSPN);
       return 0;
     }
 
-    console.log('🔍 Calculando markup:', {
-      valorGSPN,
-      tipo_orcamento: os?.tipo_orcamento,
-      markupsDisponiveis: markups.length,
-      markups: markups.map(m => ({
-        nome: m.nome,
-        tipo_orcamento: m.tipo_orcamento,
-        tipo: m.tipo,
-        valor: m.valor,
-        faixa: `${m.valor_minimo || 0} - ${m.valor_maximo || '∞'}`
-      }))
-    });
-
     // Se não há markups, retorna o valor original
     if (markups.length === 0) {
-      console.log('ℹ️ Nenhum markup disponível, retornando valor original:', valorGSPN);
       return valorGSPN;
     }
 
@@ -891,7 +861,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
     });
 
     if (!markupAplicavel) {
-      console.log('ℹ️ Nenhum markup aplicável para valor:', valorGSPN);
       return valorGSPN;
     }
 
@@ -909,17 +878,8 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
         valorFinal = valorGSPN + markupAplicavel.valor;
         break;
       default:
-        console.warn('⚠️ Tipo de markup desconhecido:', markupAplicavel.tipo);
         valorFinal = valorGSPN;
     }
-
-    console.log('✅ Markup aplicado:', {
-      valorGSPN,
-      tipo: markupAplicavel.tipo,
-      valorMarkup: markupAplicavel.valor,
-      valorFinal,
-      markup: markupAplicavel
-    });
 
     return valorFinal;
   };
@@ -975,7 +935,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       setSugestoesPecasOW(sugestoesComValor);
       setMostrarSugestoesOW(true);
     } catch (error) {
-      console.error('Erro ao buscar sugestões:', error);
       setSugestoesPecasOW([]);
     }
   };
@@ -1040,7 +999,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       await loadPecas();
       await loadComentarios();
     } catch (error) {
-      console.error('Erro ao salvar valor GSPN:', error);
       showAlert({ message: 'Erro ao salvar valor GSPN', type: 'error' });
     } finally {
       setSalvandoValorGSPN(prev => ({ ...prev, [pecaId]: false }));
@@ -1504,7 +1462,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
       await loadOS();
       if (onReload) onReload();
     } catch (error) {
-      console.error('Erro ao salvar número Samsung:', error);
       showAlert({ message: 'Erro ao salvar número da OS Samsung', type: 'error' });
     } finally {
       setSalvandoNumeroSamsung(false);
@@ -1551,8 +1508,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
           }
         });
 
-      if (logError) console.error('Erro ao salvar log:', logError);
-
       // Criar comentário automático do sistema
       const dataHora = new Date().toLocaleString('pt-BR', {
         day: '2-digit',
@@ -1589,8 +1544,6 @@ Não haverá cobrança ao cliente.`
           comentario: comentarioTexto,
           is_system: true
         });
-
-      if (comentarioError) console.error('Erro ao criar comentário:', comentarioError);
 
       alert(novoStatus ? 'Cortesia aplicada com sucesso!' : 'Cortesia removida com sucesso!');
       await loadOS();
@@ -1972,7 +1925,6 @@ Não haverá cobrança ao cliente.`
         });
 
       if (insertError) {
-        console.error('❌ Erro ao criar requisição OW:', insertError);
         throw insertError;
       }
 
@@ -2019,7 +1971,6 @@ Não haverá cobrança ao cliente.`
 
       setMostrarSucessoRequisicao(true);
     } catch (error: any) {
-      console.error('Erro ao criar requisição:', error);
       const errorMsg = error?.message || 'Erro desconhecido';
       setErroRequisicaoMsg(errorMsg);
       setMostrarErroRequisicao(true);
@@ -5309,7 +5260,6 @@ Não haverá cobrança ao cliente.`
                                   .eq('id', servicoExistente.id);
 
                                 if (error) {
-                                  console.error('Erro ao atualizar servico:', error);
                                   alert('Erro ao atualizar servico');
                                   return;
                                 }
@@ -5333,7 +5283,6 @@ Não haverá cobrança ao cliente.`
                                   .insert(dataToInsert);
 
                                 if (error) {
-                                  console.error('Erro ao adicionar servico:', error);
                                   alert('Erro ao adicionar servico: ' + error.message);
                                   return;
                                 }
@@ -5342,7 +5291,6 @@ Não haverá cobrança ao cliente.`
                               setBuscaServico('');
                               setMostrarModalServico(false);
                             } catch (err) {
-                              console.error('Erro ao processar servico:', err);
                               alert('Erro ao processar servico');
                             }
                           }}

@@ -78,17 +78,10 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
       setUsuariosUnidade(filtrados);
     } catch (error) {
-      console.error('Erro ao carregar usuarios:', error);
     }
   };
 
   const handleSalvarVendedorResponsavel = async (novoVendedorId: string | null) => {
-    console.log('=== SALVANDO VENDEDOR ===');
-    console.log('osId:', osId);
-    console.log('novoVendedorId:', novoVendedorId);
-    console.log('os.vendedor_responsavel_id atual:', os.vendedor_responsavel_id);
-    console.log('podeEditarVendedor():', podeEditarVendedor());
-
     if (!podeEditarVendedor() && os.vendedor_responsavel_id) {
       alert('Somente gerentes, diretoria ou master podem alterar o vendedor responsavel.');
       return;
@@ -103,7 +96,6 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       const vendedorAnterior = usuariosUnidade.find(u => u.id === vendedorAnteriorId);
       const vendedorNovo = usuariosUnidade.find(u => u.id === novoVendedorId);
 
-      console.log('Executando update...');
       const { data, error: updateError } = await supabase
         .from('os')
         .update({
@@ -114,8 +106,6 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
         })
         .eq('id', osId)
         .select();
-
-      console.log('Resultado update:', { data, error: updateError });
 
       if (updateError) {
         setVendedorResponsavel(vendedorAnteriorId || null);
@@ -133,7 +123,6 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
         comentario = `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Desconhecido'}`;
       }
 
-      console.log('Inserindo comentario:', comentario);
       const { error: commentError } = await supabase.from('os_comentarios').insert({
         os_id: osId,
         usuario_id: usuario?.id || null,
@@ -142,13 +131,10 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       });
 
       if (commentError) {
-        console.error('Erro ao inserir comentario:', commentError);
       }
 
-      console.log('Sucesso! Chamando onUpdate...');
       onUpdate();
     } catch (error: any) {
-      console.error('Erro ao salvar vendedor:', error);
       alert(`Erro ao salvar vendedor: ${error.message}`);
     } finally {
       setSalvandoVendedor(false);
@@ -349,12 +335,9 @@ Assistencia Tecnica Samsung`;
         });
 
         if (response.ok) {
-          console.log('GIA acionada! O cliente receberá o link no WhatsApp.');
         } else {
-          console.error('Erro GIA:', await response.text());
         }
       } catch (webhookError) {
-        console.error('Erro ao acionar GIA:', webhookError);
       }
 
       setShowWhatsAppModal(false);

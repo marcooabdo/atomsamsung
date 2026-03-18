@@ -98,7 +98,7 @@ export function ChatDetailsModal({
           .eq('conversation_id', conversationId);
 
         if (participantsError) {
-          console.error('Erro ao buscar participantes:', participantsError);
+          // ignored
         }
 
         if (participantsData) {
@@ -165,7 +165,7 @@ export function ChatDetailsModal({
         );
       }
     } catch (error) {
-      console.error('Erro ao carregar detalhes:', error);
+      // ignored
     } finally {
       setLoading(false);
     }

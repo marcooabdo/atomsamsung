@@ -113,8 +113,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`📋 Total de OS Samsung nesta unidade: ${osExistentes.length}`);
-
     const hoje = new Date();
     const dataInicio = new Date(hoje);
     dataInicio.setDate(hoje.getDate() - 90);
@@ -155,8 +153,6 @@ Deno.serve(async (req: Request) => {
 
     const apiUrl = 'https://latam.ipaas.samsung.com/latam/gcic/GetSOList/1.0/ImportSet';
 
-    console.log('🔍 Consultando API Samsung para atualização de status...');
-
     const samsungResponse = await fetch(apiUrl, {
       method: 'POST',
       headers: {
@@ -169,7 +165,6 @@ Deno.serve(async (req: Request) => {
 
     if (!samsungResponse.ok) {
       const errorText = await samsungResponse.text();
-      console.error('❌ Erro na API Samsung:', errorText);
 
       return new Response(
         JSON.stringify({
@@ -185,7 +180,6 @@ Deno.serve(async (req: Request) => {
 
     if (responseData.Return.EvRetCode !== "0") {
       const errorMsg = `API Samsung retornou erro: ${responseData.Return.EvRetMsg || 'Erro desconhecido'}`;
-      console.error('❌', errorMsg);
 
       return new Response(
         JSON.stringify({ error: errorMsg }),
@@ -194,7 +188,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const osList = responseData.EtSvcInfo?.results || [];
-    console.log(`📦 Total de OS retornadas pela API: ${osList.length}`);
 
     const osMap = new Map(osExistentes.map(os => [os.numero_os_samsung, os.id]));
 
@@ -220,22 +213,11 @@ Deno.serve(async (req: Request) => {
         .eq('id', osId);
 
       if (updateError) {
-        console.error(`❌ Erro ao atualizar OS ${os.SvcOrderNo}:`, updateError);
         erros.push(`OS ${os.SvcOrderNo}: ${updateError.message}`);
       } else {
         atualizadas++;
-        console.log(`✅ OS ${os.SvcOrderNo} atualizada - Status: ${os.StatusDesc || '—'}, Motivo: ${os.StReasonDesc || '—'}`);
       }
     }
-
-    console.log(`
-    ✅ Atualização concluída:
-    - OS na API: ${osList.length}
-    - OS no sistema: ${osExistentes.length}
-    - Atualizadas: ${atualizadas}
-    - Não encontradas na API: ${naoEncontradas}
-    - Erros: ${erros.length}
-    `);
 
     return new Response(
       JSON.stringify({
@@ -254,8 +236,6 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('❌ Erro geral:', error);
-    console.error('Stack trace:', error.stack);
     return new Response(
       JSON.stringify({
         error: 'Erro interno do servidor',

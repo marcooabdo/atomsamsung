@@ -601,7 +601,6 @@ export function Kanban() {
 
   const loadKanbanData = async () => {
     try {
-      console.log('Kanban v2.0.2 - Loading data...');
       let query = supabase
         .from('os')
         .select(`
@@ -750,7 +749,7 @@ export function Kanban() {
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar dados do Kanban:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -4017,7 +4016,6 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
 
       onClose();
     } catch (error) {
-      console.error('Erro ao exportar:', error);
       setErrorModalData({
         title: 'Erro na Exportação',
         message: 'Não foi possível exportar os dados. Por favor, tente novamente.'

@@ -58,7 +58,7 @@ export function Chat() {
         .eq('status', 'online');
       setOnlineCount(count || 0);
     } catch (err) {
-      console.error('Erro ao carregar usuários online:', err);
+      // ignored
     }
   };
 

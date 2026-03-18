@@ -50,7 +50,6 @@ Deno.serve(async (req: Request) => {
     const { data: { user: requestingUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
     if (authError || !requestingUser) {
-      console.error('Erro de autenticacao:', authError?.message || 'User not found');
       return new Response(
         JSON.stringify({
           success: false,
@@ -68,7 +67,6 @@ Deno.serve(async (req: Request) => {
       .single();
 
     if (usuarioError || !requestingUsuario) {
-      console.error('Erro ao buscar usuario:', usuarioError);
       return new Response(
         JSON.stringify({ success: false, error: 'Usuario nao encontrado no sistema' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -226,7 +224,6 @@ Deno.serve(async (req: Request) => {
 
       const { error: deleteAuthError } = await supabaseAdmin.auth.admin.deleteUser(user_id);
       if (deleteAuthError) {
-        console.error('Erro ao deletar do auth:', deleteAuthError);
         throw deleteAuthError;
       }
 
@@ -236,7 +233,6 @@ Deno.serve(async (req: Request) => {
         .eq('id', user_id);
 
       if (deleteProfileError) {
-        console.error('Erro ao deletar do usuarios:', deleteProfileError);
         throw deleteProfileError;
       }
 
@@ -256,7 +252,6 @@ Deno.serve(async (req: Request) => {
       throw new Error('Acao invalida');
     }
   } catch (error) {
-    console.error('Erro ao gerenciar usuario:', error);
     return new Response(
       JSON.stringify({
         success: false,

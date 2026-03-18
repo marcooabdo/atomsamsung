@@ -40,7 +40,6 @@ export function usePermissions() {
         (usuario.tipo === 'diretoria' && !usuario.unidade_id);
       setCanFilterUnits(canFilter);
     } catch (err) {
-      console.error('Erro ao carregar permissoes:', err);
       setPermissions({});
     } finally {
       setLoading(false);

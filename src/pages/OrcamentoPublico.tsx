@@ -132,7 +132,7 @@ export function OrcamentoPublico() {
       videoRef.current.onloadedmetadata = () => {
         videoRef.current?.play().then(() => {
           setCameraReady(true);
-        }).catch(console.error);
+        }).catch(() => { /* ignored */ });
       };
     }
     return () => {
@@ -191,7 +191,7 @@ export function OrcamentoPublico() {
         }
       });
     } catch (err) {
-      console.error('Erro ao logar acao:', err);
+      // ignored
     }
   };
 
@@ -251,7 +251,6 @@ export function OrcamentoPublico() {
       setStream(mediaStream);
       setShowCamera(true);
     } catch (err) {
-      console.error('Erro ao acessar camera:', err);
       alert('Nao foi possivel acessar a camera. Por favor, permita o acesso a camera nas configuracoes do seu navegador.');
     }
   };
@@ -433,7 +432,6 @@ export function OrcamentoPublico() {
         doc.addImage(selfieCapturada, 'JPEG', margin + 5, yPos + 5, pageWidth - margin * 2 - 10, 90);
         yPos += 110;
       } catch (err) {
-        console.error('Erro ao adicionar selfie ao PDF:', err);
         yPos += 10;
         addText('(Erro ao carregar imagem)', 10);
       }
@@ -486,7 +484,7 @@ export function OrcamentoPublico() {
             await supabase.from('os_anexos').insert({ os_id: linkData.os_id, url: pdfUrl, tipo: 'pdf', nome_arquivo: `comprovante-${acaoNome}-${data.os.numero_os_interna}.pdf`, descricao: descricaoAnexo });
           }
         }
-      } catch (err) { console.error('Erro ao gerar PDF:', err); }
+      } catch (err) { /* ignored */ }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-orcamento-publico?token=${token}&action=respond`;
       const response = await fetch(apiUrl, {

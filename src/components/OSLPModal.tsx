@@ -337,30 +337,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   useEffect(() => {
     const loadTaxasMaquina = async () => {
       if (!unidadeId) {
-        console.warn('⚠️ Sem unidade_id para carregar taxas');
         return;
       }
 
-      console.log('🔍 Carregando taxas para unidade:', unidadeId);
 
-      const { data: taxasUnidade, error: errorUnidade } = await supabase
+      const { data: taxasUnidade } = await supabase
         .from('taxas_maquina')
         .select('*')
         .eq('unidade_id', unidadeId)
         .eq('ativo', true)
         .order('parcelamento');
 
-      if (errorUnidade) {
-        console.error('❌ Erro ao carregar taxas da unidade:', errorUnidade);
-      }
 
       if (taxasUnidade && taxasUnidade.length > 0) {
-        console.log('✅ Taxas da unidade carregadas:', taxasUnidade);
         setTaxasMaquina(taxasUnidade);
         return;
       }
 
-      console.log('⚠️ Nenhuma taxa específica da unidade, buscando taxas globais');
 
       const { data: taxasGlobais, error: errorGlobais } = await supabase
         .from('taxas_maquina')
@@ -370,12 +363,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .order('parcelamento');
 
       if (errorGlobais) {
-        console.error('❌ Erro ao carregar taxas globais:', errorGlobais);
         return;
       }
 
       if (taxasGlobais) {
-        console.log('✅ Taxas globais carregadas:', taxasGlobais);
         setTaxasMaquina(taxasGlobais);
       }
     };
@@ -389,39 +380,30 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   useEffect(() => {
     const isCartao = novoPagamentoForma === 'cartao_credito' || novoPagamentoForma === 'cartao_debito';
 
-    console.log('🔄 Atualizando taxa - isCartao:', isCartao, 'parcelamento:', novoPagamentoParcelamento, 'forma:', novoPagamentoForma);
 
     if (!isCartao) {
-      console.log('ℹ️ Não é cartão, zerando taxa');
       setNovoPagamentoTaxa('0');
       return;
     }
 
     if (taxasMaquina.length === 0) {
-      console.log('⚠️ Nenhuma taxa carregada ainda');
       return;
     }
 
     const parcelaNum = parseInt(novoPagamentoParcelamento);
-    console.log('🔍 Buscando taxa para', parcelaNum, 'parcelas');
-    console.log('📋 Taxas disponíveis:', taxasMaquina.map(t => ({ parc: t.parcelamento, credito: t.taxa, debito: t.debito })));
 
     const taxa = taxasMaquina.find(t => t.parcelamento === parcelaNum);
-    console.log('📌 Taxa encontrada:', taxa);
 
     if (!taxa) {
-      console.log('❌ Taxa não encontrada para', parcelaNum, 'parcelas');
       setNovoPagamentoTaxa('0');
       return;
     }
 
     if (novoPagamentoForma === 'cartao_credito') {
       const taxaValor = Number(taxa.taxa || 0);
-      console.log('💳 Aplicando taxa CRÉDITO:', taxaValor, '%');
       setNovoPagamentoTaxa(taxaValor.toString());
     } else if (novoPagamentoForma === 'cartao_debito') {
       const taxaValor = Number(taxa.debito || 0);
-      console.log('💳 Aplicando taxa DÉBITO:', taxaValor, '%');
       setNovoPagamentoTaxa(taxaValor.toString());
     }
   }, [taxasMaquina, novoPagamentoParcelamento, novoPagamentoForma]);
@@ -807,7 +789,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       const data = await response.json();
       return data?.[0]?.exists === true;
     } catch (error) {
-      console.error('Erro ao verificar WhatsApp:', error);
       return false;
     }
   };
@@ -909,7 +890,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .single();
 
       if (createError) {
-        console.error('Erro ao criar conversa:', createError);
         setWhatsAppError('Erro ao criar conversa');
         setLoadingWhatsApp(false);
         return;
@@ -918,7 +898,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setWhatsAppConversa(newConversa as WhatsAppConversa);
       setShowWhatsAppChat(true);
     } catch (error) {
-      console.error('Erro ao abrir WhatsApp:', error);
       setWhatsAppError('Erro ao processar solicitacao');
     } finally {
       setLoadingWhatsApp(false);
@@ -927,10 +906,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
   const loadPecas = async () => {
     if (!currentOsId) {
-      console.log('loadPecas: currentOsId nao definido');
       return;
     }
-    console.log('🔄 loadPecas: Carregando peças para OS:', currentOsId);
 
     const [osPecasResult, cotacaoPecasResult, reqReprovadasResult] = await Promise.all([
       supabase
@@ -952,8 +929,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
     const pnsReprovados = new Set((reqReprovadasResult.data || []).map((r: any) => r.codigo_peca));
 
-    console.log('📦 os_pecas result:', osPecasResult.data?.length || 0, 'peças');
-    console.log('📦 cotacoes_pecas result:', cotacaoPecasResult.data?.length || 0, 'peças');
 
     const osPecasFormatadas = (osPecasResult.data || []).filter((p: any) => !pnsReprovados.has(p.pn)).map(p => ({
       id: p.id,
@@ -994,13 +969,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     }));
 
     const todasPecas = [...osPecasFormatadas, ...cotacaoPecas];
-    console.log('🔍 Todas peças LP:', todasPecas.map(p => ({
-      desc: p.descricao?.substring(0, 30),
-      os_peca_id: p.os_peca_id,
-      cotacao_peca_id: p.cotacao_peca_id,
-      tipo: p.tipo,
-      exibir_no_pdf: p.exibir_no_pdf
-    })));
     setPecas(todasPecas);
   };
 
@@ -1013,14 +981,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       .neq('status', 'cancelada')
       .order('created_at', { ascending: false });
 
-    console.log('🔍 Requisições carregadas LP (TOTAL:', data?.length, '):', data?.map(r => ({
-      id: r.id,
-      os_peca_id: r.os_peca_id,
-      cotacao_peca_id: r.cotacao_peca_id,
-      status: r.status,
-      descricao: r.descricao?.substring(0, 30),
-      codigo: r.codigo_peca
-    })));
 
     // Para cada requisição, buscar detalhes de todas as peças do lote
     const requisicoesComLote = await Promise.all(
@@ -1348,7 +1308,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       .eq('os_id', currentOsId)
       .order('created_at', { ascending: false });
 
-    console.log('📎 Anexos carregados:', data);
     setAnexos(data || []);
   };
 
@@ -1446,7 +1405,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (osError) throw osError;
 
-      console.log('✅ OS criada com sucesso:', novaOS.id);
 
       // Salvar peças adicionadas diretamente na OS
       if (pecasFinais.length > 0) {
@@ -1462,20 +1420,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           requisitada_por: usuario?.id
         }));
 
-        const { error: pecasError } = await supabase
+        await supabase
           .from('os_pecas')
           .insert(pecasInsert);
-
-        if (pecasError) {
-          console.error('Erro ao salvar pecas:', pecasError);
-        } else {
-          console.log('Pecas salvas com sucesso na os_pecas');
-        }
       }
 
       // Salvar serviços adicionados diretamente na OS (independente de cotação)
       if (servicosAdicionados.length > 0) {
-        console.log(`⚙️ Salvando ${servicosAdicionados.length} serviço(s)...`);
         const servicosInsert = servicosAdicionados.map(servico => ({
           os_id: novaOS.id,
           servico_id: servico.id || null,
@@ -1486,20 +1437,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           valor_total: servico.valor_unitario * servico.quantidade
         }));
 
-        const { error: servicosError } = await supabase
+        await supabase
           .from('os_servicos')
           .insert(servicosInsert);
-
-        if (servicosError) {
-          console.error('❌ Erro ao salvar serviços:', servicosError);
-        } else {
-          console.log('✅ Serviços salvos com sucesso');
-        }
       }
 
       // Salvar checklists selecionados
       if (checklistsSelecionados.length > 0) {
-        console.log(`📋 Vinculando ${checklistsSelecionados.length} checklist(s)...`);
         const checklistsInsert = checklistsSelecionados.map(checklistId => ({
           os_id: novaOS.id,
           checklist_template_id: checklistId,
@@ -1508,20 +1452,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           respostas: []
         }));
 
-        const { error: checklistsError } = await supabase
+        await supabase
           .from('os_checklist_vinculados')
           .insert(checklistsInsert);
-
-        if (checklistsError) {
-          console.error('❌ Erro ao vincular checklists:', checklistsError);
-        } else {
-          console.log('✅ Checklists vinculados');
-        }
       }
 
       // Salvar requisições (apenas das peças que foram marcadas para requisitar)
       if (requisicoesTemporarias.length > 0) {
-        console.log(`📦 Criando ${requisicoesTemporarias.length} requisição(ões)...`);
         const requisicoesInsert = requisicoesTemporarias.map(req => ({
           os_id: novaOS.id,
           cotacao_id: null,
@@ -1533,20 +1470,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           unidade_id: unidadeId
         }));
 
-        const { error: requisicoesError } = await supabase
+        await supabase
           .from('requisicoes_pecas')
           .insert(requisicoesInsert);
-
-        if (requisicoesError) {
-          console.error('❌ Erro ao criar requisições:', requisicoesError);
-        } else {
-          console.log('✅ Requisições criadas');
-        }
       }
 
       // Salvar pagamentos temporários
       if (pagamentosTemporarios.length > 0 && tipoOS === 'OW') {
-        console.log(`💰 Registrando ${pagamentosTemporarios.length} pagamento(s)...`);
         for (const pag of pagamentosTemporarios) {
           let comprovanteUrl = null;
 
@@ -1571,7 +1501,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           const taxaValor = pag.taxa_percentual ? (valorBruto * pag.taxa_percentual) / 100 : 0;
           const valorLiquido = pag.taxa_paga_por === 'empresa' ? valorBruto - taxaValor : valorBruto;
 
-          const { error: pagamentoError } = await supabase
+          await supabase
             .from('pagamentos')
             .insert({
               os_id: novaOS.id,
@@ -1593,15 +1523,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
               data_lancamento: new Date().toISOString()
             });
 
-          if (pagamentoError) {
-            console.error('❌ Erro ao salvar pagamento:', pagamentoError);
-          }
         }
-        console.log('✅ Pagamentos registrados');
       }
 
       if (anexosTemporarios.length > 0) {
-        console.log(`📎 Enviando ${anexosTemporarios.length} anexo(s)...`);
         for (const anexo of anexosTemporarios) {
           const fileExt = anexo.file.name.split('.').pop();
           const fileName = `${Math.random()}.${fileExt}`;
@@ -1612,7 +1537,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             .upload(filePath, anexo.file);
 
           if (uploadError) {
-            console.error('Erro ao fazer upload do anexo:', uploadError);
             continue;
           }
 
@@ -1623,7 +1547,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           const tipoArquivo = anexo.file.type.startsWith('image/') ? 'foto' :
                               anexo.file.type.startsWith('video/') ? 'video' : 'documento';
 
-          const { error: insertError } = await supabase.from('os_anexos').insert({
+          await supabase.from('os_anexos').insert({
             os_id: novaOS.id,
             nome_arquivo: anexo.nome,
             url: publicUrl,
@@ -1631,15 +1555,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
             usuario_id: usuario?.id,
             tipo: tipoArquivo
           });
-
-          if (insertError) {
-            console.error('❌ Erro ao salvar anexo no banco:', insertError);
-          }
         }
-        console.log('✅ Anexos enviados');
       }
 
-      console.log('💬 Criando comentários...');
       const comentariosInsert = [
         {
           os_id: novaOS.id,
@@ -1717,15 +1635,9 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         });
       }
 
-      const { error: comentariosError } = await supabase
+      await supabase
         .from('os_comentarios')
         .insert(comentariosInsert);
-
-      if (comentariosError) {
-        console.error('❌ Erro ao criar comentários:', comentariosError);
-      } else {
-        console.log('✅ Comentários criados');
-      }
 
       // Mostrar modal de sucesso
       setDadosOSCriada({
@@ -1741,7 +1653,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       onReload?.();
     } catch (error: any) {
-      console.error('Erro ao criar OS:', error);
       const errorMessage = error?.message || error?.error_description || error?.hint || 'Erro desconhecido';
       showAlert({ message: `Erro ao criar OS ${tipoOS}:\n\n${errorMessage}`, type: 'error' });
     } finally {
@@ -1760,13 +1671,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     setRequisitando(true);
     try {
       const peca = pecaParaRequisitar;
-      console.log('🚀 Requisitando peça LP:', {
-        peca_id: peca.id,
-        os_peca_id: peca.os_peca_id,
-        cotacao_peca_id: peca.cotacao_peca_id,
-        tipo: peca.tipo,
-        descricao: peca.descricao?.substring(0, 30)
-      });
 
       const { data: novaRequisicao, error: insertError } = await supabase.from('requisicoes_pecas').insert({
         os_id: osId,
@@ -1785,7 +1689,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
       if (insertError) throw insertError;
 
-      console.log('✅ Requisição criada:', novaRequisicao);
 
       // Mover OS para "Aguardando Peça" se não estiver lá ainda
       const colunasQueNaoPrecisamMover = ['aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
@@ -1828,7 +1731,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       setPecaParaRequisitar(null);
       setMostrarSucessoRequisicao(true);
     } catch (error) {
-      console.error('Erro ao requisitar peça:', error);
       showAlert({ message: 'Erro ao requisitar peça', type: 'error' });
     } finally {
       setRequisitando(false);
@@ -2252,24 +2154,20 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     const filePath = `${currentOsId}/${fileName}`;
 
     try {
-      console.log('📤 Fazendo upload do anexo:', { fileName, osId: currentOsId });
 
       const { error: uploadError } = await supabase.storage
         .from('os-anexos')
         .upload(filePath, file);
 
       if (uploadError) {
-        console.error('❌ Erro no upload:', uploadError);
         throw uploadError;
       }
 
-      console.log('✅ Arquivo enviado, obtendo URL pública...');
 
       const { data: { publicUrl } } = supabase.storage
         .from('os-anexos')
         .getPublicUrl(filePath);
 
-      console.log('✅ URL pública obtida, salvando no banco...');
 
       const tipoArquivo = file.type.startsWith('image/') ? 'foto' :
                           file.type.startsWith('video/') ? 'video' : 'documento';
@@ -2284,16 +2182,13 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       });
 
       if (insertError) {
-        console.error('❌ Erro ao salvar no banco:', insertError);
         throw insertError;
       }
 
-      console.log('✅ Anexo salvo com sucesso!');
       alert('Anexo enviado com sucesso!');
       loadAnexos();
       e.target.value = '';
     } catch (error) {
-      console.error('❌ Erro geral:', error);
       alert('Erro ao fazer upload do anexo');
     }
   };
@@ -2301,14 +2196,12 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const handleAbrirAnexo = async (anexo: OSAnexo) => {
     try {
       if (!anexo || !anexo.url) {
-        console.error('❌ Anexo inválido ou sem URL:', anexo);
         alert('Erro: Anexo não possui URL válida');
         return;
       }
 
       window.open(anexo.url, '_blank');
     } catch (error) {
-      console.error('❌ Erro ao abrir anexo:', error);
       alert('Erro ao abrir anexo');
     }
   };
@@ -2323,13 +2216,10 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         const urlParts = anexo.url.split('/os-anexos/');
         if (urlParts.length > 1) {
           const filePath = urlParts[1];
-          const { error: storageError } = await supabase.storage
+          await supabase.storage
             .from('os-anexos')
             .remove([filePath]);
 
-          if (storageError) {
-            console.error('❌ Erro ao remover arquivo do storage:', storageError);
-          }
         }
       }
 
@@ -2343,7 +2233,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       alert('Anexo excluído com sucesso!');
       loadAnexos();
     } catch (error) {
-      console.error('❌ Erro ao excluir anexo:', error);
       alert('Erro ao excluir anexo');
     }
   };
@@ -4886,13 +4775,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                               r.status === 'devolvida' || r.status === 'reprovada'
                             );
 
-                            console.log(`🔍 LP Peça ${peca.descricao?.substring(0, 20)}:`, {
-                              peca_os_peca_id: peca.os_peca_id,
-                              peca_cotacao_id: peca.cotacao_peca_id,
-                              tipo: peca.tipo,
-                              num_requisicoes: requisicoesDestaPeca.length,
-                              requisicao_ativa: requisicaoAtiva?.status
-                            });
 
                             todasPecasParaExibir.push({
                               peca,
@@ -5011,39 +4893,27 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                         onClick={async () => {
                                           const currentValue = peca.exibir_no_pdf !== false;
                                           const newValue = !currentValue;
-                                          console.log('🔘 Toggle clicked:', {
-                                            peca_id: peca.id,
-                                            tipo,
-                                            currentValue,
-                                            newValue,
-                                            requisicao_id: requisicao?.id
-                                          });
 
                                           try {
-                                            let result;
                                             if (requisicao) {
-                                              console.log('📝 Atualizando requisicoes_pecas:', requisicao.id);
-                                              result = await supabase
+                                              await supabase
                                                 .from('requisicoes_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', requisicao.id);
                                             } else if (tipo === 'os_peca') {
-                                              console.log('📝 Atualizando os_pecas:', peca.id);
-                                              result = await supabase
+                                              await supabase
                                                 .from('os_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', peca.id);
                                             } else if (tipo === 'cotacao') {
-                                              console.log('📝 Atualizando cotacoes_pecas:', peca.id);
-                                              result = await supabase
+                                              await supabase
                                                 .from('cotacoes_pecas')
                                                 .update({ exibir_no_pdf: newValue })
                                                 .eq('id', peca.id);
                                             }
-                                            console.log('✅ Update result:', result);
                                             await loadPecas();
                                           } catch (error) {
-                                            console.error('❌ Erro ao atualizar exibir_no_pdf:', error);
+                                            // ignored
                                           }
                                         }}
                                       >
@@ -5161,14 +5031,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                     {!requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
                                         onClick={() => {
-                                          console.log('🎯 CLIQUE NO BOTÃO - Objeto peca:', {
-                                            id: peca.id,
-                                            cotacao_peca_id: peca.cotacao_peca_id,
-                                            codigo: peca.codigo,
-                                            pn: peca.pn,
-                                            descricao: peca.descricao?.substring(0, 30),
-                                            todas_props: Object.keys(peca)
-                                          });
                                           handleRequisitarPeca(peca);
                                         }}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -5554,7 +5416,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                                         .eq('id', anexo.id);
                                       await loadAnexos();
                                     } catch (error) {
-                                      console.error('Erro ao atualizar exibir_no_pdf:', error);
+                                      // ignored
                                     }
                                   }}
                                 >

@@ -178,7 +178,7 @@ export function NotasFiscais() {
       setNotasFiscais(nfsData || []);
       calcularEstatisticas(nfsData || []);
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -273,7 +273,7 @@ export function NotasFiscais() {
         setShowRetryModal(true);
         setNotaDetalhes(null);
       } catch (error) {
-        console.error('Erro ao preparar reenvio:', error);
+        // ignored
       }
       return;
     }
@@ -294,7 +294,6 @@ export function NotasFiscais() {
       showToast('success', 'Emissao iniciada');
       loadData();
     } catch (err: any) {
-      console.error('Erro ao reenviar NF-e:', err);
       showToast('error', err.message || 'Erro ao reenviar NF-e');
     } finally {
       setEmittingId(null);

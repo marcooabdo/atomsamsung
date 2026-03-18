@@ -318,7 +318,7 @@ export function OSNotaFiscalTab({
         applyNFeConfig(nfeConfigs[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      // ignored
     } finally {
       setLoading(false);
     }

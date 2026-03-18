@@ -80,7 +80,7 @@ export function OSAgendamentoTab({
       if (error) throw error;
       setTipoOS(data?.tipo_os || '');
     } catch (error) {
-      console.error('Erro ao carregar tipo da OS:', error);
+      // ignored
     }
   };
 
@@ -165,7 +165,6 @@ export function OSAgendamentoTab({
       if (allError) throw allError;
       setTodosAgendamentos(allAgendamentos || []);
     } catch (error) {
-      console.error('Erro ao carregar agendamentos:', error);
       setAgendamentoId(null);
       setTodosAgendamentos([]);
     }

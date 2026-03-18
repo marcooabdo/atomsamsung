@@ -1315,7 +1315,6 @@ export default function MotorOtimizacaoNew() {
         if (status === google.maps.DirectionsStatus.OK && result) {
           setDirections(result);
         } else {
-          console.warn('Directions request failed:', status);
           setDirections(null);
         }
       }

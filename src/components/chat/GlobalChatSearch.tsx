@@ -100,7 +100,7 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
       if (error) throw error;
       setResults(data);
     } catch (err) {
-      console.error('Erro na busca:', err);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -110,7 +110,6 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        console.error('Usuário não autenticado');
         return;
       }
 
@@ -158,7 +157,7 @@ export function GlobalChatSearch({ userId, onSelectContact, onSelectMessage, onC
       onSelectContact(newConv.id);
       onClose();
     } catch (err) {
-      console.error('Erro ao criar conversa:', err);
+      // ignored
     }
   };
 

@@ -160,7 +160,7 @@ export function EditGroupModal({ isOpen, onClose, conversationId, onUpdate }: Ed
       await supabase.storage.from('chat').remove([oldPath]);
       setGroupPhotoUrl(null);
     } catch (err) {
-      console.error('Erro ao remover foto:', err);
+      // ignored
     }
   };
 

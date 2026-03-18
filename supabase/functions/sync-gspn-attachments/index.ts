@@ -235,8 +235,6 @@ Deno.serve(async (req: Request) => {
 
     const existingKeys = new Set((existingAnexos || []).map(a => a.gspn_fileobjkey));
 
-    console.log(`[SYNC] Iniciando sync de anexos para OS Samsung ${os.numero_os_samsung}`);
-
     const listPayload = {
       IvSvcOrderNo: os.numero_os_samsung,
       IsCommonHeader: {
@@ -262,7 +260,6 @@ Deno.serve(async (req: Request) => {
 
     if (!listResponse.ok) {
       const errText = await listResponse.text();
-      console.error('[SYNC] Erro na requisicao:', errText);
       return new Response(
         JSON.stringify({
           error: 'Erro ao buscar anexos do GSPN',
@@ -278,7 +275,6 @@ Deno.serve(async (req: Request) => {
     try {
       listData = JSON.parse(responseText);
     } catch (parseError) {
-      console.error('[SYNC] Erro ao fazer parse da resposta:', parseError);
       return new Response(
         JSON.stringify({
           error: 'Resposta invalida do GSPN',
@@ -308,7 +304,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const newAttachments = attachments.filter(a => !existingKeys.has(a.Fileobjkey));
-    console.log(`[SYNC] Novos anexos a sincronizar: ${newAttachments.length}`);
 
     if (newAttachments.length === 0) {
       return new Response(
@@ -332,8 +327,6 @@ Deno.serve(async (req: Request) => {
 
     for (const attachment of toProcess) {
       try {
-        console.log(`[SYNC] Baixando anexo: ${attachment.Filename}`);
-
         const filePayload = {
           IvSvcOrderNo: os.numero_os_samsung,
           IvDocKey: attachment.Fileobjkey,
@@ -360,7 +353,6 @@ Deno.serve(async (req: Request) => {
 
         if (!fileResponse.ok) {
           const errText = await fileResponse.text();
-          console.error(`[SYNC] Erro ao baixar ${attachment.Filename}:`, errText);
           erros.push(`Erro ao baixar ${attachment.Filename}: HTTP ${fileResponse.status}`);
           continue;
         }
@@ -368,7 +360,6 @@ Deno.serve(async (req: Request) => {
         const fileData: AttachmentFileResponse = await fileResponse.json();
 
         if (!fileData.Return?.EvFileStream) {
-          console.error(`[SYNC] Arquivo vazio: ${attachment.Filename}`);
           erros.push(`Arquivo vazio: ${attachment.Filename}`);
           continue;
         }
@@ -385,7 +376,6 @@ Deno.serve(async (req: Request) => {
           });
 
         if (uploadError) {
-          console.error(`[SYNC] Erro ao fazer upload de ${attachment.Filename}:`, uploadError);
           erros.push(`Erro ao salvar ${attachment.Filename}: ${uploadError.message}`);
           continue;
         }
@@ -413,16 +403,13 @@ Deno.serve(async (req: Request) => {
           });
 
         if (insertError) {
-          console.error(`[SYNC] Erro ao registrar anexo ${attachment.Filename}:`, insertError);
           erros.push(`Erro ao registrar ${attachment.Filename}: ${insertError.message}`);
           continue;
         }
 
         sincronizados++;
-        console.log(`[SYNC] Anexo sincronizado: ${attachment.Filename}`);
 
       } catch (error) {
-        console.error(`[SYNC] Erro ao processar anexo ${attachment.Filename}:`, error);
         erros.push(`Erro ao processar ${attachment.Filename}: ${error.message}`);
       }
     }
@@ -450,7 +437,6 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('[SYNC] Erro geral:', error);
     return new Response(
       JSON.stringify({
         error: 'Erro interno do servidor',

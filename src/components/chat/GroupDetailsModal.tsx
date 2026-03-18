@@ -95,7 +95,7 @@ export function GroupDetailsModal({
 
       setParticipants(formattedData);
     } catch (err) {
-      console.error('Erro ao buscar participantes:', err);
+      // ignored
     } finally {
       setLoading(false);
     }

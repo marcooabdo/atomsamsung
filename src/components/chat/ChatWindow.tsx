@@ -118,7 +118,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
         p_user_id: userId
       });
     } catch (err) {
-      console.error('Erro ao marcar mensagens como lidas:', err);
+      // ignored
     }
   };
 

@@ -69,7 +69,7 @@ async function fetchAllPages<T>(
   let from = 0;
   while (true) {
     const { data, error } = await buildQuery(from, from + PAGE_SIZE - 1);
-    if (error) { console.error('fetchAllPages error:', error); break; }
+    if (error) { break; }
     const rows = data || [];
     results.push(...rows);
     if (rows.length < PAGE_SIZE) break;
@@ -318,7 +318,7 @@ export function Dashboard() {
         metaTaxaAprovacao: metas ? Number(metas.meta_taxa_aprovacao) : undefined,
       });
     } catch (error) {
-      console.error('Dashboard loadDashboardData error:', error);
+      // ignored
     } finally {
       setLoading(false);
     }

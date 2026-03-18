@@ -27,8 +27,6 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    console.log(`Sending NFe emission request for ID: ${nfe_id}`);
-
     const response = await fetch(
       "https://bot-post-products.groupglobal.com.br/api/nuvemFiscal/nfe",
       {
@@ -41,8 +39,6 @@ Deno.serve(async (req: Request) => {
     );
 
     const responseText = await response.text();
-    console.log(`External API response status: ${response.status}`);
-    console.log(`External API response: ${responseText}`);
 
     let responseData;
     try {
@@ -63,7 +59,6 @@ Deno.serve(async (req: Request) => {
       }
     );
   } catch (error: any) {
-    console.error("Error in emit-nfe function:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Unknown error" }),
       {

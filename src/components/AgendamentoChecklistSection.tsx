@@ -30,16 +30,6 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
 
     setLoading(true);
     try {
-      console.log('========================================');
-      console.log('🔍 DIAGNÓSTICO: Carregando checklists técnicos');
-      console.log('========================================');
-      console.log('📋 Parâmetros recebidos:');
-      console.log('  - agendamentoId:', agendamentoId);
-      console.log('  - unidadeId:', unidadeId);
-      console.log('  - tipoOS:', tipoOS);
-      console.log('  - tipoAtendimento:', tipoAtendimento);
-      console.log('  - osId:', osId);
-
       // Carregar checklists vinculados do agendamento (técnico)
       const { data: vinculados, error: errorVinculados } = await supabase
         .from('agendamento_checklist_vinculados')
@@ -50,17 +40,12 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .eq('agendamento_id', agendamentoId);
 
       if (errorVinculados) {
-        console.error('❌ Erro ao carregar vinculados:', errorVinculados);
       }
 
-      console.log('✅ Checklists técnicos já vinculados:', vinculados?.length || 0);
       setChecklistsVinculados(vinculados || []);
 
 
       // Carregar templates TÉCNICO disponíveis
-      console.log('🔎 Buscando templates TÉCNICO do banco...');
-      console.log('Query: tipo_checklist=TÉCNICO, ativo=true, unidade=' + unidadeId + ' OU null');
-
       const { data: templates, error: errorTemplates } = await supabase
         .from('checklist_templates')
         .select('*')
@@ -69,27 +54,10 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
 
       if (errorTemplates) {
-        console.error('❌ Erro ao carregar templates:', errorTemplates);
-      }
-
-      console.log('📦 Total de templates TÉCNICO encontrados no BD:', templates?.length || 0);
-      if (templates && templates.length > 0) {
-        templates.forEach((t, index) => {
-          console.log(`  ${index + 1}. ${t.nome}`, {
-            tipo_os: t.tipo_os || 'TODOS',
-            tipos_atendimento: t.tipos_atendimento || 'TODOS',
-            unidade_id: t.unidade_id || 'TODAS'
-          });
-        });
-      } else {
-        console.warn('⚠️ NENHUM template técnico encontrado no banco!');
-        console.warn('   Verifique se existem templates com tipo_checklist=TÉCNICO e ativo=true');
       }
 
       setChecklistTemplates(templates || []);
-      console.log('========================================');
     } catch (error) {
-      console.error('❌ Erro ao carregar checklists:', error);
     } finally {
       setLoading(false);
     }
@@ -99,8 +67,6 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
     if (!agendamentoId) return;
 
     try {
-      console.log('Vinculando checklist técnico:', templateId, 'para agendamento:', agendamentoId);
-
       const template = checklistTemplates.find(t => t.id === templateId);
       const nomeChecklist = template?.nome || 'Checklist';
 
@@ -115,12 +81,9 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         .select();
 
       if (error) {
-        console.error('Erro ao inserir vínculo:', error);
         alert(`Erro ao vincular checklist: ${error.message}`);
         return;
       }
-
-      console.log('Checklist vinculado com sucesso:', data);
 
       setShowAddModal(false);
       await loadChecklists();
@@ -134,7 +97,6 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
         });
       }
     } catch (error) {
-      console.error('Erro ao vincular checklist:', error);
       alert('Erro ao vincular checklist');
     }
   };
@@ -176,16 +138,8 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
 
 
   const templatesDisponiveis = checklistTemplates.filter(t => {
-    console.log('Avaliando template técnico:', t.nome, {
-      tipo_os: t.tipo_os,
-      tipos_atendimento: t.tipos_atendimento,
-      osAtual: tipoOS,
-      atendimentoAtual: tipoAtendimento
-    });
-
     // Não mostrar se já está vinculado
     if (checklistsVinculados.some(v => v.checklist_template_id === t.id)) {
-      console.log('Template já vinculado:', t.nome);
       return false;
     }
 
@@ -193,7 +147,6 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
     // Filtrar por tipo de OS apenas se houver filtros E houver tipo de OS na OS
     if (t.tipo_os && Array.isArray(t.tipo_os) && t.tipo_os.length > 0) {
       if (tipoOS && !t.tipo_os.includes(tipoOS)) {
-        console.log('Template filtrado por tipo_os:', t.nome, 'esperava um de:', t.tipo_os, 'mas OS é:', tipoOS);
         return false;
       }
     }
@@ -201,18 +154,12 @@ export function AgendamentoChecklistSection({ agendamentoId, unidadeId, tipoOS, 
     // Filtrar por tipo de atendimento apenas se houver filtros E houver tipo de atendimento na OS
     if (t.tipos_atendimento && Array.isArray(t.tipos_atendimento) && t.tipos_atendimento.length > 0) {
       if (tipoAtendimento && !t.tipos_atendimento.includes(tipoAtendimento)) {
-        console.log('Template filtrado por tipos_atendimento:', t.nome, 'esperava um de:', t.tipos_atendimento, 'mas OS é:', tipoAtendimento);
         return false;
       }
     }
 
-    console.log('✅ Template técnico DISPONÍVEL:', t.nome);
     return true;
   });
-
-  console.log('🔍 Total de templates carregados do BD:', checklistTemplates.length);
-  console.log('✅ Total templates técnicos DISPONÍVEIS após filtros:', templatesDisponiveis.length);
-  console.log('📋 Templates disponíveis:', templatesDisponiveis.map(t => t.nome));
 
   if (!agendamentoId) {
     return (

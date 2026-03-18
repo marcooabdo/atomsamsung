@@ -483,11 +483,6 @@ export async function otimizarRotaInteligente(
   const direcao = resolverDirecaoTSP(osValidas, pontoBase);
   const osOrdenadas = ordenarTSP(osValidas, pontoBase, direcao);
 
-  if (direcao === 'farthest_first') {
-    const avisoDir = 'Estratégia: OS mais distantes são as mais antigas — técnico parte para o final da rota e volta atendendo no caminho.';
-    console.info(avisoDir);
-  }
-
   // Bin-packing with strict day limits
   const { incluidas, excluidas: excluidasBinPack, avisos } = binPackingTSP(
     osOrdenadas,

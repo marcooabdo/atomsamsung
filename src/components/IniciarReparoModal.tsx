@@ -110,7 +110,6 @@ export function IniciarReparoModal({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Erro ao iniciar reparo:', error);
       showAlert({ message: 'Erro ao iniciar reparo. Tente novamente.', type: 'error' });
     } finally {
       setLoading(false);
@@ -155,7 +154,6 @@ export function IniciarReparoModal({
       onSuccess();
       onClose();
     } catch (error) {
-      console.error('Erro ao alterar técnico:', error);
       showAlert({ message: 'Erro ao alterar técnico. Tente novamente.', type: 'error' });
     } finally {
       setLoading(false);

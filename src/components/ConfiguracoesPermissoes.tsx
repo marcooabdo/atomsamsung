@@ -161,7 +161,7 @@ export function ConfiguracoesPermissoes() {
       });
       setPermissions(perms);
     } catch (err) {
-      console.error('Erro ao carregar permissoes:', err);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -184,7 +184,7 @@ export function ConfiguracoesPermissoes() {
 
       setPermissions(prev => ({ ...prev, [recurso]: newValue }));
     } catch (err) {
-      console.error('Erro ao atualizar permissao:', err);
+      // ignored
     } finally {
       setSaving(null);
     }

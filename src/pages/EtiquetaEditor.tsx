@@ -110,7 +110,7 @@ export default function EtiquetaEditor() {
           const dados = JSON.parse(decodeURIComponent(dadosParam));
           setDadosEtiqueta(Array.isArray(dados) ? dados : [dados]);
         } catch {
-          console.error('Erro ao parsear dados');
+          // erro silencioso
         }
       }
 
@@ -234,9 +234,7 @@ export default function EtiquetaEditor() {
   };
 
   const salvarTemplate = async (comoNovo = false) => {
-    console.log('salvarTemplate chamado', { comoNovo, unidadeId, nomeTemplate });
     if (!unidadeId) {
-      console.log('Sem unidadeId, abortando');
       alert('Selecione uma unidade primeiro');
       return;
     }
@@ -269,8 +267,8 @@ export default function EtiquetaEditor() {
       }
       await loadTemplates();
       setShowSaveModal(false);
-    } catch (error) {
-      console.error('Erro ao salvar:', error);
+    } catch {
+      // erro silencioso
     } finally {
       setSaving(false);
     }
@@ -303,7 +301,6 @@ export default function EtiquetaEditor() {
 
   const adicionarElemento = (tipo: ElementoEtiqueta['tipo']) => {
     if (tipo === 'imagem') {
-      console.log('Clicando no input de imagem...', fileInputRef.current);
       fileInputRef.current?.click();
       return;
     }
@@ -328,12 +325,9 @@ export default function EtiquetaEditor() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('handleImageUpload chamado');
     const file = e.target.files?.[0];
-    console.log('Arquivo selecionado:', file?.name, 'Unidade:', unidadeId);
 
     if (!file || !unidadeId) {
-      console.log('Saindo: file ou unidadeId vazio');
       return;
     }
 
@@ -342,7 +336,6 @@ export default function EtiquetaEditor() {
       return;
     }
 
-    console.log('Iniciando upload...');
     setUploadingImage(true);
     try {
       const fileExt = file.name.split('.').pop();
@@ -381,13 +374,10 @@ export default function EtiquetaEditor() {
         .from('etiquetas-imagens')
         .getPublicUrl(data.path);
 
-      console.log('URL da imagem gerada:', publicUrl);
-
       const img = new Image();
       img.crossOrigin = 'anonymous';
 
       img.onload = () => {
-        console.log('Imagem carregada com sucesso:', img.width, 'x', img.height);
         const aspectRatio = img.width / img.height;
         let largura = 30;
         let altura = 30;
@@ -417,8 +407,7 @@ export default function EtiquetaEditor() {
         setElementoSelecionado(novoId);
       };
 
-      img.onerror = (e) => {
-        console.error('Erro ao carregar dimensões da imagem:', e);
+      img.onerror = () => {
         const novoId = `el-${Date.now()}`;
         const novo: ElementoEtiqueta = {
           id: novoId,
@@ -439,8 +428,7 @@ export default function EtiquetaEditor() {
       };
 
       img.src = publicUrl + '?t=' + Date.now();
-    } catch (error) {
-      console.error('Erro ao fazer upload:', error);
+    } catch {
       alert('Erro ao fazer upload da imagem. Tente novamente.');
     } finally {
       setUploadingImage(false);
@@ -772,9 +760,7 @@ export default function EtiquetaEditor() {
             style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }}
             alt="Imagem da etiqueta"
             crossOrigin="anonymous"
-            onLoad={() => console.log('Imagem renderizada no canvas')}
             onError={(e) => {
-              console.error('Erro ao renderizar imagem no canvas:', el.imagem_url);
               const target = e.currentTarget as HTMLImageElement;
               target.style.border = '2px solid red';
               target.alt = 'Erro ao carregar';
@@ -984,11 +970,7 @@ export default function EtiquetaEditor() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              onChange={(e) => {
-                console.log('Input onChange disparado', e.target.files);
-                handleImageUpload(e);
-              }}
-              onClick={() => console.log('Input onClick')}
+              onChange={handleImageUpload}
               className="hidden"
             />
           </div>
@@ -1055,9 +1037,7 @@ export default function EtiquetaEditor() {
                         alt="Preview"
                         className="w-full h-full object-contain"
                         crossOrigin="anonymous"
-                        onLoad={() => console.log('Preview carregado:', elementoAtual.imagem_url)}
                         onError={(e) => {
-                          console.error('Erro ao carregar preview da imagem:', elementoAtual.imagem_url);
                           const target = e.currentTarget as HTMLImageElement;
                           target.style.opacity = '0.3';
                           target.alt = 'Erro ao carregar';
@@ -1090,8 +1070,7 @@ export default function EtiquetaEditor() {
                             .getPublicUrl(data.path);
 
                           atualizarElemento(elementoAtual.id, { imagem_url: publicUrl });
-                        } catch (error) {
-                          console.error('Erro ao fazer upload:', error);
+                        } catch {
                           alert('Erro ao fazer upload da imagem.');
                         } finally {
                           setUploadingImage(false);

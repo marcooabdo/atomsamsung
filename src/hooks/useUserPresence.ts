@@ -26,7 +26,7 @@ export function useUserPresence(userId: string | undefined) {
           p_device_type: deviceType
         });
       } catch (error) {
-        console.error('Erro ao atualizar presença:', error);
+        // ignored
       }
     };
 
@@ -36,7 +36,7 @@ export function useUserPresence(userId: string | undefined) {
           p_user_id: userId
         });
       } catch (error) {
-        console.error('Erro ao definir offline:', error);
+        // ignored
       }
     };
 

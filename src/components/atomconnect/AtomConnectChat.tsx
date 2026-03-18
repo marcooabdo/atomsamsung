@@ -297,7 +297,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         }
       }
     } catch (error) {
-      console.error('Erro ao buscar foto do perfil:', error);
+      // ignored
     }
   }, [conversa.id, conversa.cliente_telefone, conversa.cliente_foto_url, conversa.is_group, conversa.group_jid, instancia]);
 
@@ -314,7 +314,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       setShowEditClienteModal(false);
       onUpdate();
     } catch (error) {
-      console.error('Erro ao salvar nome:', error);
+      // ignored
     } finally {
       setSavingCliente(false);
     }
@@ -384,7 +384,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           onUpdate();
         }
       } catch (e) {
-        console.error("Failed to resolve group name:", e);
+        // ignored
       }
     })();
   }, [conversa.id, conversa.is_group, instancia]);
@@ -471,7 +471,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         setShowGroupMembers(true);
       }
     } catch (e) {
-      console.error("Failed to fetch group members:", e);
       setShowGroupMembers(true);
     } finally {
       setLoadingMembers(false);
@@ -630,7 +629,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   const sendToEvolutionAPI = async (text: string, mediaUrl?: string, mediaType?: string, mimeType?: string, fileName?: string, quotedMessageId?: string): Promise<string | null> => {
     if (!instancia) {
-      console.error('Nenhuma instancia conectada');
       return null;
     }
 
@@ -654,8 +652,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           });
 
           if (!response.ok) {
-            const errorText = await response.text();
-            console.error('Erro Evolution API (audio):', errorText);
             return null;
           }
 
@@ -680,8 +676,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Erro Evolution API (media):', errorText);
           return null;
         }
 
@@ -705,8 +699,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         });
 
         if (!response.ok) {
-          const errorText = await response.text();
-          console.error('Erro Evolution API (text):', errorText);
           return null;
         }
 
@@ -714,7 +706,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         return result.key?.id || result.messageId || null;
       }
     } catch (error) {
-      console.error('Erro ao enviar via Evolution API:', error);
       return null;
     }
   };
@@ -740,8 +731,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           const timestamp = Date.now();
           const fileName = `${conversa.id}/${timestamp}_${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`;
 
-          console.log('Uploading file:', fileName, 'Type:', file.type, 'Size:', file.size);
-
           const { error: storageError, data: uploadData } = await supabase.storage
             .from('atom-connect-media')
             .upload(fileName, file, {
@@ -750,7 +739,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             });
 
           if (storageError) {
-            console.error('Storage upload error:', storageError);
             setUploadError(`Erro ao enviar ${file.name}: ${storageError.message}`);
             continue;
           }
@@ -758,8 +746,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           const { data: { publicUrl } } = supabase.storage
             .from('atom-connect-media')
             .getPublicUrl(fileName);
-
-          console.log('File uploaded, public URL:', publicUrl);
 
           let tipo = 'document';
           if (file.type.startsWith('image/')) tipo = 'image';
@@ -786,7 +772,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
             });
 
           if (insertError) {
-            console.error('Message insert error:', insertError);
+            // ignored
           }
         }
         setAttachments([]);
@@ -822,7 +808,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           .insert(insertData);
 
         if (error) {
-          console.error('Text message insert error:', error);
+          // ignored
         }
       }
 
@@ -848,7 +834,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         onUpdate();
       }
     } catch (error) {
-      console.error('Erro ao enviar mensagem:', error);
       setUploadError('Erro ao enviar mensagem. Tente novamente.');
     } finally {
       setSending(false);
@@ -915,7 +900,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
       onUpdate();
     } catch (error: any) {
-      console.error('Erro ao alternar bot:', error);
       alert(`Erro ao alternar bot: ${error.message}`);
     }
   };
@@ -932,7 +916,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         .eq('id', conversa.id);
       onUpdate();
     } catch (error: any) {
-      console.error('Erro ao marcar como interno:', error);
+      // ignored
     }
   };
 
@@ -1011,7 +995,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       onUpdate();
       loadMensagens();
     } catch (error) {
-      console.error('Erro ao enviar avaliacao:', error);
       alert('Erro ao enviar mensagem de avaliacao');
     } finally {
       setSendingAvaliacao(false);
@@ -1105,7 +1088,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      console.error('Erro ao iniciar gravacao:', error);
       alert('Nao foi possivel acessar o microfone. Verifique as permissoes do navegador.');
     }
   };
@@ -1145,7 +1127,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         .upload(fileName, audioBlob, { contentType: 'audio/webm' });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
         setUploadError('Erro ao fazer upload do audio');
         setSending(false);
         return;
@@ -1173,7 +1154,6 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           is_bot: false
         });
     } catch (error) {
-      console.error('Erro ao enviar audio:', error);
       setUploadError('Erro ao enviar audio');
     } finally {
       setSending(false);

@@ -2,26 +2,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
-import {
-  Plus,
-  Search,
-  Edit,
-  Send,
-  CheckCircle,
-  XCircle,
-  RefreshCw,
-  FileText,
-  Clock,
-  Activity,
-  MessageSquare,
-  MoreVertical,
-  ThumbsUp,
-  ThumbsDown,
-  AlertTriangle,
-  Microscope,
-  Copy,
-  Check
-} from 'lucide-react';
+import { Plus, Search, CreditCard as Edit, Send, CheckCircle, XCircle, RefreshCw, FileText, Clock, Activity, MessageSquare, MoreVertical, ThumbsUp, ThumbsDown, AlertTriangle, Microscope, Copy, Check } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { CotacaoModal } from '../components/CotacaoModal';
 
@@ -925,13 +906,11 @@ export function Cotacoes() {
             body: JSON.stringify({ os_id: whatsAppCotacao.os_id }),
           });
 
-          if (response.ok) {
-            console.log('GIA acionada! O cliente receberá o link no WhatsApp.');
-          } else {
-            console.error('Erro GIA:', await response.text());
+          if (!response.ok) {
+            // GIA webhook returned an error
           }
         } catch (webhookError) {
-          console.error('Erro ao acionar GIA:', webhookError);
+          // ignored
         }
       }
 

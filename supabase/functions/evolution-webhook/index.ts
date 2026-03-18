@@ -85,23 +85,6 @@ function findBase64InPayload(obj: any, maxDepth = 3, currentPath = ""): { path: 
   return null;
 }
 
-function safeLogPayload(body: any): string {
-  try {
-    const sanitized = JSON.parse(JSON.stringify(body, (key, value) => {
-      if ((key === "base64" || key === "mediaBase64" || key === "media") && typeof value === "string" && value.length > 200) {
-        return `[BASE64_DATA length=${value.length}]`;
-      }
-      if (key === "jpegThumbnail" && typeof value === "string" && value.length > 100) {
-        return `[THUMBNAIL length=${value.length}]`;
-      }
-      return value;
-    }));
-    return JSON.stringify(sanitized).substring(0, 3000);
-  } catch {
-    return "[ERROR serializing payload]";
-  }
-}
-
 function getExtensionFromMimetype(mimetype: string): string {
   const mimeMap: Record<string, string> = {
     "image/jpeg": "jpg",
@@ -131,20 +114,16 @@ async function uploadBase64ToStorage(
   try {
     const cleanBase64 = base64Data.replace(/^data:[^;]+;base64,/, "");
     if (!cleanBase64 || cleanBase64.length < 100) {
-      console.error("Base64 data too short or empty, length:", cleanBase64?.length);
       return null;
     }
 
     const binaryData = Uint8Array.from(atob(cleanBase64), (c) => c.charCodeAt(0));
     if (binaryData.length === 0) {
-      console.error("Decoded binary data is empty");
       return null;
     }
 
     const extension = getExtensionFromMimetype(mimetype);
     const fileName = `${conversaId}/${messageId}.${extension}`;
-
-    console.log("Uploading to storage:", fileName, "| size:", binaryData.length, "bytes");
 
     const { error: uploadError } = await supabase.storage
       .from("atom-connect-media")
@@ -154,7 +133,6 @@ async function uploadBase64ToStorage(
       });
 
     if (uploadError) {
-      console.error("Upload error:", uploadError);
       return null;
     }
 
@@ -162,10 +140,9 @@ async function uploadBase64ToStorage(
       .from("atom-connect-media")
       .getPublicUrl(fileName);
 
-    console.log("Media uploaded successfully:", publicUrl);
     return publicUrl;
   } catch (error) {
-    console.error("Error uploading base64 to storage:", error);
+    // ignored
     return null;
   }
 }
@@ -194,7 +171,6 @@ async function fetchAndUploadMedia(
     );
 
     if (!response.ok) {
-      console.error("Failed to fetch media from Evolution API:", response.status);
       return null;
     }
 
@@ -202,13 +178,12 @@ async function fetchAndUploadMedia(
     const base64Data = result.base64 || result.data;
 
     if (!base64Data) {
-      console.error("No base64 data in API response");
       return null;
     }
 
     return await uploadBase64ToStorage(supabase, base64Data, mimetype, conversaId, messageId);
   } catch (error) {
-    console.error("Error fetching/uploading media:", error);
+    // ignored
     return null;
   }
 }
@@ -235,20 +210,13 @@ Deno.serve(async (req: Request) => {
     );
 
     const body = await req.json();
-    console.log("=== WEBHOOK RECEIVED ===");
-    console.log("Payload:", safeLogPayload(body));
 
     const rawEvent = body.event || body.type || body.action || "";
     const event = normalizeEvent(rawEvent);
     const data = body.data || body;
     const instance = body.instance || body.instanceName || data?.instance || body.sender?.instance;
 
-    console.log("Event:", event, "| Raw:", rawEvent);
-
     if (event.includes("messages.update") || event === "message.update" || event.includes("message.ack")) {
-      console.log("Processing message STATUS UPDATE");
-      console.log("Full update payload:", JSON.stringify(data, null, 2));
-
       const rawUpdates = body.data ?? body;
       const updates = Array.isArray(rawUpdates) ? rawUpdates : [rawUpdates];
 
@@ -267,15 +235,11 @@ Deno.serve(async (req: Request) => {
           update.ack ??
           update.message?.status;
 
-        console.log(`Message ID: ${messageId}, Raw Status: ${rawStatus}, Type: ${typeof rawStatus}`);
-
         if (!messageId) {
-          console.warn(`No messageId found. Keys: ${Object.keys(update).join(", ")}`);
           continue;
         }
 
         if (rawStatus === undefined || rawStatus === null) {
-          console.warn(`No status found for message ${messageId}`);
           continue;
         }
 
@@ -294,8 +258,6 @@ Deno.serve(async (req: Request) => {
           else if (upper === "READ" || upper === "PLAYED" || upper === "VIEWED" || upper === "4" || upper === "5") newStatus = "read";
         }
 
-        console.log(`Updating message ${messageId} to status: ${newStatus}`);
-
         const { data: result, error } = await supabase
           .from("atom_connect_mensagens")
           .update({ status: newStatus })
@@ -303,12 +265,7 @@ Deno.serve(async (req: Request) => {
           .select("id");
 
         if (error) {
-          console.error(`Error updating message ${messageId}:`, error);
-        } else {
-          console.log(`Updated ${result?.length || 0} rows for message ${messageId}`);
-          if (result?.length === 0) {
-            console.warn(`No message found with message_id: ${messageId}`);
-          }
+          // ignored
         }
       }
 
@@ -321,15 +278,12 @@ Deno.serve(async (req: Request) => {
     const isMessageUpsert = event.includes("messages.upsert");
 
     if (isMessageUpsert) {
-      console.log("Processing as NEW MESSAGE event (messages.upsert)");
-
       const message = body.message || data.message || data;
       const key = body.key || message?.key || data?.key || {};
       const rawRemoteJid = key.remoteJid || body.remoteJid || data?.remoteJid || "";
       const messageId = key.id || body.messageId || "";
 
       if (!messageId) {
-        console.log("No message ID, skipping");
         return new Response(JSON.stringify({ skip: "no_message_id" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -337,7 +291,6 @@ Deno.serve(async (req: Request) => {
       }
 
       if (rawRemoteJid.endsWith("@lid") || rawRemoteJid.includes("@broadcast")) {
-        console.log("Skipping lid/broadcast message");
         return new Response(JSON.stringify({ skip: "not_personal" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -352,8 +305,6 @@ Deno.serve(async (req: Request) => {
       const senderPhone = participant ? cleanPhoneNumber(participant) : "";
       const senderName = message?.pushName || data?.pushName || body?.pushName || "";
       const groupSubject = data?.groupName || data?.subject || body?.groupName || "";
-
-      console.log("Phone:", phoneNumber, "| FromMe:", fromMe, "| MsgId:", messageId, "| IsGroup:", isGroup, senderPhone ? `| Sender: ${senderName} (${senderPhone})` : "");
 
       if (!phoneNumber || phoneNumber.length < 8) {
         return new Response(JSON.stringify({ skip: "invalid_phone" }), {
@@ -374,7 +325,6 @@ Deno.serve(async (req: Request) => {
       // Skip incoming messages without pushName — these are duplicate "delivered" events from Evolution API
       // that carry no sender info. The real event with pushName arrives milliseconds earlier.
       if (!fromMe && !isGroup && !senderName) {
-        console.log("Skipping incoming message without pushName (duplicate delivered event):", messageId);
         return new Response(JSON.stringify({ skip: "no_push_name" }), {
           status: 200,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -452,7 +402,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (event.includes("groups") && (event.includes("upsert") || event.includes("update"))) {
-      console.log("Processing GROUPS event:", event);
       const groupData = Array.isArray(data) ? data : [data];
       const instanceName = typeof instance === "string"
         ? instance
@@ -477,8 +426,6 @@ Deno.serve(async (req: Request) => {
             .eq("cliente_telefone", phone)
             .eq("unidade_id", inst.unidade_id)
             .eq("is_group", true);
-
-          console.log("Updated group name:", phone, "->", subject);
         }
       }
 
@@ -503,7 +450,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (event.includes("presence") || event.includes("composing") || event.includes("recording") || event.includes("paused")) {
-      console.log("Processing presence event:", event);
       const remoteJid = data.remoteJid || data.id || body.remoteJid || body.participant || "";
       const presenceState = data.presence || data.state || body.presence || event.split(".").pop() || "";
 
@@ -531,8 +477,6 @@ Deno.serve(async (req: Request) => {
               cliente_digitando_at: typingStatus ? new Date().toISOString() : null
             })
             .eq("id", conversa.id);
-
-          console.log("Updated typing status:", conversa.id, typingStatus);
         }
       }
     }
@@ -542,7 +486,6 @@ Deno.serve(async (req: Request) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    console.error("Webhook error:", error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -561,8 +504,6 @@ async function processMessage(
   instancia: { id: string; unidade_id: string; api_url: string; api_key: string; instance_name: string },
   groupInfo: { isGroup: boolean; groupJid: string | null; senderPhone: string; senderName: string; groupSubject: string } = { isGroup: false, groupJid: null, senderPhone: "", senderName: "", groupSubject: "" }
 ) {
-  console.log("=== PROCESSING MESSAGE ===");
-
   // 1. Deduplication by message_id (primary check)
   if (messageId) {
     const { data: existingMsg } = await supabase
@@ -577,9 +518,6 @@ async function processMessage(
           .from("atom_connect_mensagens")
           .update({ status: "sent" })
           .eq("id", existingMsg.id);
-        console.log("DUPLICATE fromMe - updated pending->sent:", messageId);
-      } else {
-        console.log("DUPLICATE blocked - message already in DB:", messageId);
       }
       return new Response(JSON.stringify({ success: true, duplicate: true }), {
         status: 200,
@@ -609,7 +547,6 @@ async function processMessage(
         .from("atom_connect_mensagens")
         .update({ message_id: messageId, status: "sent" })
         .eq("id", echoMsg.id);
-      console.log("Echo fromMe - linked real message_id to existing row:", messageId, "->", echoMsg.id);
       return new Response(JSON.stringify({ success: true, linked: true }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -678,19 +615,6 @@ async function processMessage(
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
     });
-  }
-
-  console.log("Content type:", tipo, "| Content:", conteudo.substring(0, 100), "| HasMedia:", hasMedia);
-
-  if (hasMedia) {
-    const b64Keys = [];
-    if (data?.base64) b64Keys.push("data.base64");
-    if (message?.base64) b64Keys.push("message.base64");
-    if (body?.data?.base64) b64Keys.push("body.data.base64");
-    if (body?.base64) b64Keys.push("body.base64");
-    console.log("Base64 found in:", b64Keys.length > 0 ? b64Keys.join(", ") : "NONE - will use API fallback");
-    const topKeys = Object.keys(data || {}).filter(k => k !== "message").join(", ");
-    console.log("Data top-level keys (excl message):", topKeys);
   }
 
   let { data: conversa } = await supabase
@@ -790,9 +714,6 @@ async function processMessage(
           }
         } catch {}
       }
-
-      if (groupName) console.log("Resolved group name:", groupName);
-      if (groupPhotoUrl) console.log("Resolved group photo:", groupPhotoUrl);
     }
 
     const pushName = groupInfo.isGroup
@@ -827,7 +748,6 @@ async function processMessage(
       .single();
 
     if (insertError) {
-      console.error("Error creating conversation:", insertError);
       return new Response(JSON.stringify({ error: "create_conversation_failed" }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -844,22 +764,17 @@ async function processMessage(
     if (!inlineBase64) {
       const found = findBase64InPayload(body);
       if (found) {
-        console.log("Base64 found via recursive search at:", found.path, "length:", found.value.length);
         inlineBase64 = found.value;
       }
     }
 
     if (inlineBase64) {
-      console.log("Using inline base64, length:", String(inlineBase64).length);
       mediaUrl = await uploadBase64ToStorage(supabase, inlineBase64, mediaMimetype, conversa.id, messageId);
     }
 
     if (!mediaUrl && !fromMe) {
-      console.log("Falling back to API fetch for media:", messageId);
       mediaUrl = await fetchAndUploadMedia(supabase, instancia, messageId, mediaMimetype, conversa.id);
     }
-
-    console.log("Media result:", mediaUrl ? "SUCCESS" : "FAILED");
   }
 
   // Deduplication by content: if a recent message with same conversa_id, from_me, conteudo exists
@@ -889,7 +804,6 @@ async function processMessage(
         .update(updateFields)
         .eq("id", recentDupe.id);
     }
-    console.log("Content-dedup: duplicate message blocked:", messageId, "-> existing:", recentDupe.id);
     return new Response(JSON.stringify({ success: true, linked: true }), {
       status: 200,
       headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -952,21 +866,17 @@ async function processMessage(
     else if (quotedMsg.documentMessage) quotedType = "document";
     else if (quotedMsg.stickerMessage) quotedType = "sticker";
     msgInsertData.quoted_type = quotedType;
-
-    console.log("Quoted message detected:", contextInfo.stanzaId, "type:", quotedType);
   }
 
   const { error: msgError } = await supabase.from("atom_connect_mensagens").insert(msgInsertData);
 
   if (msgError) {
     if (msgError.code === "23505" || msgError.message?.includes("unique") || msgError.message?.includes("duplicate")) {
-      console.log("DUPLICATE blocked by DB constraint:", messageId);
       return new Response(JSON.stringify({ success: true, duplicate: true }), {
         status: 200,
         headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
       });
     }
-    console.error("Error inserting message:", msgError);
   }
 
   if (!isNewConversa) {
@@ -1022,7 +932,6 @@ async function processMessage(
 
         if (resolved) {
           updateData.cliente_nome = resolved;
-          console.log("Resolved group name on update:", resolved);
         }
       }
     }
@@ -1039,7 +948,6 @@ async function processMessage(
           .maybeSingle();
 
         if (currentColumn?.is_final) {
-          console.log("Conversation in final column, moving back to first column");
           const { data: firstColumn } = await supabase
             .from("atom_connect_pipeline_colunas")
             .select("id")
@@ -1053,7 +961,6 @@ async function processMessage(
             updateData.atendente_id = null;
             updateData.aguardando_avaliacao = false;
             updateData.regra_finalizacao_id = null;
-            console.log("Moved to column:", firstColumn.id);
           }
         }
       }
@@ -1073,7 +980,6 @@ async function processMessage(
     }
   }
 
-  console.log(`=== MESSAGE PROCESSED: ${phoneNumber} -> ${tipo} ===`);
   return new Response(JSON.stringify({ success: true, conversa_id: conversa.id }), {
     status: 200,
     headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
@@ -1110,11 +1016,8 @@ async function processGIASchedulingResponse(
   }
 
   if (!osRecord) {
-    console.log("GIA Scheduling: no OS awaiting confirmation for phone:", phoneNumber);
     return false;
   }
-
-  console.log("GIA Scheduling: processing reply", normalized, "for OS:", osRecord.id);
 
   const phoneForSend = phoneNumber.startsWith("55") ? phoneNumber : `55${phoneNumber}`;
 
@@ -1143,10 +1046,9 @@ async function processGIASchedulingResponse(
         body: JSON.stringify({ number: phoneForSend, text: replyText }),
       });
     } catch (err) {
-      console.error("GIA Scheduling: failed to send confirmation reply:", err);
+      // ignored
     }
 
-    console.log("GIA Scheduling: OS confirmed:", osRecord.id);
     return true;
   }
 
@@ -1180,10 +1082,9 @@ async function processGIASchedulingResponse(
         body: JSON.stringify({ number: phoneForSend, text: replyText }),
       });
     } catch (err) {
-      console.error("GIA Scheduling: failed to send reschedule reply:", err);
+      // ignored
     }
 
-    console.log("GIA Scheduling: OS reschedule requested:", osRecord.id);
     return true;
   }
 
@@ -1256,7 +1157,7 @@ async function processRatingResponse(
         is_bot: true,
       });
     } catch (error) {
-      console.error("Error sending rating response:", error);
+      // ignored
     }
   }
 

@@ -211,7 +211,7 @@ export default function RomaneioView() {
 
       setRomaneios(Object.values(agrupadoPorTecnico));
     } catch (error) {
-      console.error('Erro ao carregar romaneio:', error);
+      // ignored
     } finally {
       setLoadingData(false);
     }

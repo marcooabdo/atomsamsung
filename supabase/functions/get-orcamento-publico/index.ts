@@ -93,7 +93,6 @@ Deno.serve(async (req: Request) => {
         .eq('id', linkData.id);
 
       if (updateError) {
-        console.error('Error updating link:', updateError);
         return new Response(
           JSON.stringify({ error: 'Erro ao salvar resposta' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -190,7 +189,6 @@ Deno.serve(async (req: Request) => {
       .maybeSingle();
 
     if (osError) {
-      console.error('Error fetching OS:', osError);
       return new Response(
         JSON.stringify({ error: 'Erro ao buscar OS', details: osError.message }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -198,7 +196,6 @@ Deno.serve(async (req: Request) => {
     }
 
     if (!osData) {
-      console.error('OS not found:', linkData.os_id);
       return new Response(
         JSON.stringify({ error: 'OS nao encontrada' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -364,7 +361,6 @@ Deno.serve(async (req: Request) => {
     );
 
   } catch (error) {
-    console.error('Error:', error);
     return new Response(
       JSON.stringify({ error: 'Erro interno do servidor' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

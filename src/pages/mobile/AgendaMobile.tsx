@@ -79,9 +79,7 @@ export function AgendaMobile() {
       .in('status', ['confirmado', 'em_andamento', 'pendente_confirmacao'])
       .order('horario_inicio', { ascending: true });
 
-    if (error) {
-      console.error('Erro ao carregar agendamentos:', error);
-    } else if (data) {
+    if (!error && data) {
       const mappedData = data.map(item => ({
         id: item.os_id,
         agendamento_id: item.id,

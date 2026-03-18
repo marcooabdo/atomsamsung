@@ -119,7 +119,7 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
 
       setVisitas(visitasComCheckin);
     } catch (error) {
-      console.error('Erro ao carregar visitas:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -158,7 +158,7 @@ export function OSDetailsModal({ os, onClose, onStart }: OSDetailsModalProps) {
 
       setPecas(pecasFormatadas);
     } catch (error) {
-      console.error('Erro ao carregar pecas:', error);
+      // ignored
     }
   };
 

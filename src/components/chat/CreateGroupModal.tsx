@@ -67,13 +67,6 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
     try {
       const memberIds = Array.from(selectedUsers);
 
-      console.log('[CreateGroupModal] Criando grupo via RPC:', {
-        p_nome: groupName.trim(),
-        p_descricao: groupDescription.trim() || null,
-        p_created_by: userId,
-        p_member_ids: memberIds
-      });
-
       const { data: conversationId, error } = await supabase.rpc('create_group_conversation', {
         p_nome: groupName.trim(),
         p_descricao: groupDescription.trim() || null,
@@ -81,18 +74,13 @@ export function CreateGroupModal({ isOpen, onClose, userId, onGroupCreated }: Cr
         p_member_ids: memberIds
       });
 
-      console.log('[CreateGroupModal] Resultado da RPC:', { conversationId, error });
-
       if (error) {
-        console.error('[CreateGroupModal] Erro ao criar grupo:', error);
         throw error;
       }
 
-      console.log('[CreateGroupModal] Grupo criado com sucesso! ID:', conversationId);
       onGroupCreated(conversationId);
       handleClose();
     } catch (err) {
-      console.error('[CreateGroupModal] Erro completo:', err);
       alert(`Erro ao criar grupo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
       setCreating(false);

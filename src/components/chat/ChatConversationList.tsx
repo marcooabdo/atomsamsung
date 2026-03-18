@@ -154,7 +154,7 @@ export function ChatConversationList({
               .single();
 
             if (error) {
-              console.error('Erro ao buscar participante:', error);
+              // ignored
             }
 
             if (participants && participants.usuarios) {
@@ -241,7 +241,7 @@ export function ChatConversationList({
 
       setUsers(processedUsers);
     } catch (err) {
-      console.error('Erro ao carregar usuarios:', err);
+      // ignored
     } finally {
       setLoadingUsers(false);
     }

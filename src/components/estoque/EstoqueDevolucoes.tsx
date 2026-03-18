@@ -350,7 +350,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
             .eq('id', pecaId);
 
           if (updateError) {
-            console.error('Erro ao atualizar estoque_pecas:', updateError);
+            // ignored
           }
 
           const { error: insertDevError } = await supabase
@@ -365,7 +365,7 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
             });
 
           if (insertDevError) {
-            console.error('Erro ao inserir estoque_devolucoes:', insertDevError);
+            // ignored
           }
 
           await supabase.from('estoque_historico').insert({

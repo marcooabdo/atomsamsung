@@ -31,7 +31,7 @@ function extractDeliveryFromXML(xmlContent: string): string | null {
 
     return null;
   } catch (e) {
-    console.error('Erro ao extrair delivery:', e);
+    // ignored
     return null;
   }
 }
@@ -76,7 +76,7 @@ Deno.serve(async (req: Request) => {
         try {
           apiData = await response.json();
         } catch (e) {
-          console.log('Resposta não é JSON');
+          // ignored
         }
       }
 
@@ -89,7 +89,7 @@ Deno.serve(async (req: Request) => {
           delivery = extractDeliveryFromXML(xmlContent);
         }
       } catch (e) {
-        console.error('Erro ao buscar XML:', e);
+        // ignored
       }
 
       const pdfUrl = `https://consultadanfe.com/danfe/pdf/${chaveAcesso}`;
@@ -115,8 +115,6 @@ Deno.serve(async (req: Request) => {
         }
       );
     } catch (apiError) {
-      console.error('Erro na API, retornando URLs diretas:', apiError);
-
       const pdfUrl = `https://consultadanfe.com/danfe/pdf/${chaveAcesso}`;
       const xmlUrl = `https://consultadanfe.com/danfe/xml/${chaveAcesso}`;
       const visualizarUrl = `https://consultadanfe.com/consulta/${chaveAcesso}`;
@@ -140,7 +138,6 @@ Deno.serve(async (req: Request) => {
       );
     }
   } catch (error) {
-    console.error("Erro ao consultar DANFE:", error);
     return new Response(
       JSON.stringify({
         error: "Erro ao processar solicitação",

@@ -127,7 +127,6 @@ Deno.serve(async (req: Request) => {
     const { data: stats, error: statsError } = await supabase.rpc("get_gia_stats");
 
     if (statsError) {
-      console.error("[GIA] Stats RPC error:", statsError.message);
       return new Response(
         JSON.stringify({ error: "Failed to fetch system stats", details: statsError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }

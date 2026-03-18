@@ -468,13 +468,11 @@ export function Configuracoes() {
 
             if (!response.ok) {
               const errorData = await response.json();
-              console.error('Erro da API:', errorData);
               throw new Error(errorData.error || errorData.details || 'Erro ao atualizar usuário');
             }
 
             const result = await response.json();
             if (!result.success) {
-              console.error('Erro no resultado:', result);
               throw new Error(result.error || result.details || 'Erro ao atualizar usuário');
             }
           } else {
@@ -499,13 +497,11 @@ export function Configuracoes() {
 
             if (!response.ok) {
               const errorData = await response.json();
-              console.error('Erro da API:', errorData);
               throw new Error(errorData.error || errorData.details || 'Erro ao criar usuário');
             }
 
             const result = await response.json();
             if (!result.success) {
-              console.error('Erro no resultado:', result);
               throw new Error(result.error || result.details || 'Erro ao criar usuário');
             }
           }

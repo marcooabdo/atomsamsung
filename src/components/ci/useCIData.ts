@@ -308,7 +308,7 @@ export function useCIData(
         totalClientes: clientesArray.length
       });
     } catch (error) {
-      console.error('Erro ao carregar dados CI:', error);
+      // ignored
     } finally {
       setLoading(false);
       setRefreshing(false);

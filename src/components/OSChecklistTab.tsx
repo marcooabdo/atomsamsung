@@ -28,8 +28,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   const loadChecklists = async () => {
     setLoading(true);
     try {
-      console.log('Carregando checklists para OS:', osId, 'tipo:', tipoOS, 'atendimento:', tipoAtendimento);
-
       // Carregar checklists vinculados
       const { data: vinculados, error: errorVinculados } = await supabase
         .from('os_checklist_vinculados')
@@ -39,19 +37,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         `)
         .eq('os_id', osId);
 
-      if (errorVinculados) {
-        console.error('Erro ao carregar vinculados:', errorVinculados);
-      }
-
-      console.log('📋 Checklists ADM VINCULADOS:', vinculados?.length || 0);
-      if (vinculados && vinculados.length > 0) {
-        console.log('🔗 Detalhes dos vinculados:', vinculados.map(v => ({
-          id: v.id,
-          template: v.checklist_template?.nome,
-          automatico: v.vinculado_automaticamente,
-          por: v.vinculado_por
-        })));
-      }
       setChecklistsVinculados(vinculados || []);
 
       // Carregar templates ADM disponíveis
@@ -62,17 +47,9 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         .eq('ativo', true)
         .or(`unidade_id.eq.${unidadeId},unidade_id.is.null`);
 
-      if (errorTemplates) {
-        console.error('Erro ao carregar templates:', errorTemplates);
-      }
-
-      console.log('📑 Templates ADM carregados do BD:', templates?.length || 0);
-      if (templates && templates.length > 0) {
-        console.log('📄 Nomes dos templates:', templates.map(t => t.nome));
-      }
       setChecklistTemplates(templates || []);
     } catch (error) {
-      console.error('Erro ao carregar checklists:', error);
+      // error loading checklists
     } finally {
       setLoading(false);
     }
@@ -80,8 +57,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
 
   const handleVincularChecklist = async (templateId: string) => {
     try {
-      console.log('Vinculando checklist:', templateId, 'para OS:', osId);
-
       const template = checklistTemplates.find(t => t.id === templateId);
       const nomeChecklist = template?.nome || 'Checklist';
 
@@ -97,12 +72,9 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         .select();
 
       if (error) {
-        console.error('Erro ao inserir vínculo:', error);
         alert(`Erro ao vincular checklist: ${error.message}`);
         return;
       }
-
-      console.log('Checklist vinculado com sucesso:', data);
 
       setShowAddModal(false);
       await loadChecklists();
@@ -114,7 +86,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
         is_system: true
       });
     } catch (error) {
-      console.error('Erro ao vincular checklist:', error);
       alert('Erro ao vincular checklist');
     }
   };
@@ -258,16 +229,8 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
   };
 
   const templatesDisponiveis = checklistTemplates.filter(t => {
-    console.log('Avaliando template ADM:', t.nome, {
-      tipo_os: t.tipo_os,
-      tipos_atendimento: t.tipos_atendimento,
-      osAtual: tipoOS,
-      atendimentoAtual: tipoAtendimento
-    });
-
     // Não mostrar se já está vinculado
     if (checklistsVinculados.some(v => v.checklist_template_id === t.id)) {
-      console.log('❌ Template já vinculado:', t.nome);
       return false;
     }
 
@@ -275,7 +238,6 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
     // Filtrar por tipo de OS apenas se houver filtros E houver tipo de OS na OS
     if (t.tipo_os && Array.isArray(t.tipo_os) && t.tipo_os.length > 0) {
       if (tipoOS && !t.tipo_os.includes(tipoOS)) {
-        console.log('❌ Template filtrado por tipo_os:', t.nome, 'esperava um de:', t.tipo_os, 'mas OS é:', tipoOS);
         return false;
       }
     }
@@ -283,18 +245,12 @@ export function OSChecklistTab({ osId, tipoOS, tipoAtendimento, unidadeId }: OSC
     // Filtrar por tipo de atendimento apenas se houver filtros E houver tipo de atendimento na OS
     if (t.tipos_atendimento && Array.isArray(t.tipos_atendimento) && t.tipos_atendimento.length > 0) {
       if (tipoAtendimento && !t.tipos_atendimento.includes(tipoAtendimento)) {
-        console.log('❌ Template filtrado por tipos_atendimento:', t.nome, 'esperava um de:', t.tipos_atendimento, 'mas OS é:', tipoAtendimento);
         return false;
       }
     }
 
-    console.log('✅ Template ADM DISPONÍVEL:', t.nome);
     return true;
   });
-
-  console.log('🔍 Total de templates ADM carregados do BD:', checklistTemplates.length);
-  console.log('✅ Total templates ADM DISPONÍVEIS após filtros:', templatesDisponiveis.length);
-  console.log('📋 Templates ADM disponíveis:', templatesDisponiveis.map(t => t.nome));
 
   if (loading) {
     return (

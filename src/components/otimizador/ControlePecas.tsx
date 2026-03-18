@@ -168,7 +168,7 @@ export default function ControlePecas() {
 
       setRequisicoes(enriched);
     } catch (error) {
-      console.error('Erro ao carregar requisicoes:', error);
+      // ignored
     } finally {
       setLoadingRequisicoes(false);
     }
@@ -204,7 +204,7 @@ export default function ControlePecas() {
 
       setPecasMaisRequisitadas(topPecas);
     } catch (error) {
-      console.error('Erro ao carregar pecas mais requisitadas:', error);
+      // ignored
     }
   };
 

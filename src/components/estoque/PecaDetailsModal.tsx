@@ -258,7 +258,6 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
       setLabelData([label]);
       setShowLabelGenerator(true);
     } catch (error: any) {
-      console.error('Erro ao preparar etiqueta:', error);
       alert(`Erro ao preparar etiqueta: ${error.message}`);
     } finally {
       setGeneratingLabel(false);

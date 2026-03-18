@@ -128,7 +128,7 @@ export function EstoqueTecnicoMobile() {
 
       setPecas(formatadas);
     } catch (err) {
-      console.error('Erro ao carregar estoque:', err);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -154,7 +154,7 @@ export function EstoqueTecnicoMobile() {
 
       await loadEstoque();
     } catch (err) {
-      console.error('Erro ao aceitar peca:', err);
+      // ignored
     } finally {
       setAceitandoId(null);
     }

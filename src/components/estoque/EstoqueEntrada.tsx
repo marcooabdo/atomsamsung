@@ -370,7 +370,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       setPreviewData(nfData);
       setShowPreviewModal(true);
     } catch (err) {
-      console.error(err);
+      // ignored
     } finally {
       setUploading(false);
       setScanningEffect(false);

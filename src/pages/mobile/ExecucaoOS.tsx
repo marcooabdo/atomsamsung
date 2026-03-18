@@ -1,9 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import {
-  ArrowLeft, MapPin, CheckCircle, Clock, Package, Camera, FileText,
-  AlertCircle, Send, ChevronDown, ChevronUp, Edit3, Navigation
-} from 'lucide-react';
+import { ArrowLeft, MapPin, CheckCircle, Clock, Package, Camera, FileText, AlertCircle, Send, ChevronDown, ChevronUp, CreditCard as Edit3, Navigation } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { AssinaturaCanvas } from '../../components/mobile/AssinaturaCanvas';
@@ -276,8 +273,6 @@ export function ExecucaoOS() {
     if (!usuario) return;
 
     try {
-      console.log('🔍 Mobile: Carregando checklists técnicos vinculados para agendamento:', agendamentoId);
-
       const { data: vinculados, error } = await supabase
         .from('agendamento_checklist_vinculados')
         .select(`
@@ -294,14 +289,11 @@ export function ExecucaoOS() {
         .eq('agendamento_id', agendamentoId);
 
       if (error) {
-        console.error('❌ Erro ao carregar checklists vinculados:', error);
         return;
       }
 
-      console.log('✅ Checklists técnicos vinculados encontrados:', vinculados?.length || 0);
       setChecklistsVinculados((vinculados as any) || []);
     } catch (error) {
-      console.error('❌ Erro ao carregar checklists:', error);
       setChecklistsVinculados([]);
     }
   };
@@ -520,7 +512,6 @@ export function ExecucaoOS() {
           .upload(filePath, file);
 
         if (uploadError) {
-          console.error('Erro no upload:', uploadError);
           continue;
         }
 
@@ -543,7 +534,6 @@ export function ExecucaoOS() {
           });
 
         if (insertError) {
-          console.error('Erro ao salvar anexo:', insertError);
           continue;
         }
 
@@ -636,7 +626,6 @@ export function ExecucaoOS() {
       });
 
     if (insertError) {
-      console.error('Erro ao salvar evidencia:', insertError);
       alert(`Erro ao salvar evidencia: ${insertError.message}`);
       return;
     }
@@ -741,7 +730,7 @@ export function ExecucaoOS() {
         ]);
 
         if (anexosError) {
-          console.error('Erro ao salvar assinaturas:', anexosError);
+          // ignored
         }
 
         await supabase
@@ -781,7 +770,6 @@ export function ExecucaoOS() {
         updateTrackingState(false, null);
         navigate('/mobile/agenda');
       } catch (error) {
-        console.error('Erro no checkout:', error);
         alert('Erro ao realizar check-out. Tente novamente.');
         setIsCheckingOut(false);
       }

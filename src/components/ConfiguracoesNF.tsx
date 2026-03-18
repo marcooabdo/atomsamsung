@@ -229,7 +229,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       if (error) throw error;
       setConfigs(data || []);
     } catch (error) {
-      console.error('Erro ao carregar configuracoes:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -246,7 +246,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       if (error) throw error;
       setExcecoes(data || []);
     } catch (error) {
-      console.error('Erro ao carregar exceções:', error);
+      // ignored
     }
   };
 
@@ -261,7 +261,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       if (error) throw error;
       setVariaveis(data || []);
     } catch (error) {
-      console.error('Erro ao carregar variáveis:', error);
+      // ignored
     }
   };
 
@@ -470,7 +470,6 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       await loadConfigs();
       setTimeout(() => handleCloseModal(), 1500);
     } catch (error: any) {
-      console.error('Erro ao salvar:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar configuracao' });
     } finally {
       setSaving(false);
@@ -490,7 +489,6 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       setMensagem({ tipo: 'success', texto: 'Parametrizacao excluida com sucesso!' });
       await loadConfigs();
     } catch (error: any) {
-      console.error('Erro ao excluir:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao excluir' });
     }
   };
@@ -510,7 +508,6 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
       }
       setMensagem({ tipo: 'success', texto: 'Exceção excluída com sucesso!' });
     } catch (error: any) {
-      console.error('Erro ao excluir exceção:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao excluir exceção' });
     }
   };

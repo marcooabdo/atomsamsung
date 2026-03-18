@@ -108,7 +108,6 @@ export function ProfilePhotoUpload({
       setSelectedFile(null);
       setPreviewUrl(null);
     } catch (error) {
-      console.error('Erro ao fazer upload:', error);
       alert('Erro ao fazer upload da foto');
     } finally {
       setUploading(false);
@@ -141,7 +140,6 @@ export function ProfilePhotoUpload({
 
       onPhotoUpdated('');
     } catch (error) {
-      console.error('Erro ao remover foto:', error);
       alert('Erro ao remover foto');
     } finally {
       setUploading(false);

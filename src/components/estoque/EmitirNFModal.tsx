@@ -124,7 +124,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
         applyConfig(firstConfig);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -208,7 +208,6 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
       setMensagem({ tipo: 'success', texto: 'Destinatario salvo com sucesso!' });
       loadData();
     } catch (error: any) {
-      console.error('Erro ao salvar destinatario:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar' });
     }
   };
@@ -287,7 +286,6 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
         onClose();
       }, 2000);
     } catch (error: any) {
-      console.error('Erro ao emitir NF-e:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao emitir NF-e' });
     } finally {
       setEmitindo(false);

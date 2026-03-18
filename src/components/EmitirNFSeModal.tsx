@@ -191,7 +191,7 @@ export function EmitirNFSeModal({
         applyConfig(cfgs[0]);
       }
     } catch (error) {
-      console.error('Erro ao carregar dados:', error);
+      // ignored
     } finally {
       setLoading(false);
     }
@@ -430,7 +430,6 @@ export function EmitirNFSeModal({
         setMensagem(null);
       }, 2000);
     } catch (error: any) {
-      console.error('Erro ao emitir NFS-e:', error);
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao emitir NFS-e' });
     } finally {
       setEmitindo(false);

@@ -149,7 +149,6 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       }
 
       const result = await response.json();
-      console.log('WhatsApp check result:', result);
 
       if (result && Array.isArray(result) && result.length > 0) {
         const numberResult = result[0];
@@ -167,7 +166,6 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         setWhatsappError('Numero nao encontrado no WhatsApp');
       }
     } catch (error) {
-      console.error('Erro ao verificar WhatsApp:', error);
       setWhatsappStatus('error');
       setWhatsappError('Nao foi possivel verificar o numero');
     }
@@ -362,7 +360,6 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         .single();
 
       if (error) {
-        console.error('Erro ao criar conversa:', error);
         alert('Erro ao criar conversa: ' + error.message);
         setCreating(false);
         return;
@@ -372,7 +369,6 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
         onConversaCriada(newConversa.id);
       }
     } catch (err) {
-      console.error('Erro inesperado ao criar conversa:', err);
       alert('Erro inesperado ao criar conversa');
       setCreating(false);
     }

@@ -52,11 +52,8 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   useEffect(() => {
     const loadTaxasMaquina = async () => {
       if (!os.unidade_id) {
-        console.warn('⚠️ OS sem unidade_id');
         return;
       }
-
-      console.log('🔍 Carregando taxas para unidade:', os.unidade_id);
 
       const { data: taxasUnidade, error: errorUnidade } = await supabase
         .from('taxas_maquina')
@@ -65,17 +62,10 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
         .eq('ativo', true)
         .order('parcelamento');
 
-      if (errorUnidade) {
-        console.error('❌ Erro ao carregar taxas da unidade:', errorUnidade);
-      }
-
       if (taxasUnidade && taxasUnidade.length > 0) {
-        console.log('✅ Taxas da unidade carregadas:', taxasUnidade);
         setTaxasMaquina(taxasUnidade);
         return;
       }
-
-      console.log('⚠️ Nenhuma taxa específica da unidade, buscando taxas globais');
 
       const { data: taxasGlobais, error: errorGlobais } = await supabase
         .from('taxas_maquina')
@@ -85,12 +75,10 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
         .order('parcelamento');
 
       if (errorGlobais) {
-        console.error('❌ Erro ao carregar taxas globais:', errorGlobais);
         return;
       }
 
       if (taxasGlobais) {
-        console.log('✅ Taxas globais carregadas:', taxasGlobais);
         setTaxasMaquina(taxasGlobais);
       }
     };
@@ -99,39 +87,29 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
   }, [os.unidade_id]);
 
   useEffect(() => {
-    console.log('🔄 Atualizando taxa - isCartao:', isCartao, 'parcelamento:', parcelamento, 'formaPagamento:', formaPagamento);
-
     if (!isCartao) {
-      console.log('ℹ️ Não é cartão, zerando taxa');
       setTaxaPercentual('0');
       return;
     }
 
     if (taxasMaquina.length === 0) {
-      console.log('⚠️ Nenhuma taxa carregada ainda');
       return;
     }
 
     const parcelaNum = parseInt(parcelamento);
-    console.log('🔍 Buscando taxa para', parcelaNum, 'parcelas');
-    console.log('📋 Taxas disponíveis:', taxasMaquina.map(t => ({ parc: t.parcelamento, credito: t.taxa, debito: t.debito })));
 
     const taxa = taxasMaquina.find(t => t.parcelamento === parcelaNum);
-    console.log('📌 Taxa encontrada:', taxa);
 
     if (!taxa) {
-      console.log('❌ Taxa não encontrada para', parcelaNum, 'parcelas');
       setTaxaPercentual('0');
       return;
     }
 
     if (formaPagamento === 'cartao_credito') {
       const taxaValor = Number(taxa.taxa || 0);
-      console.log('💳 Aplicando taxa CRÉDITO:', taxaValor, '%');
       setTaxaPercentual(taxaValor.toString());
     } else if (formaPagamento === 'cartao_debito') {
       const taxaValor = Number(taxa.debito || 0);
-      console.log('💳 Aplicando taxa DÉBITO:', taxaValor, '%');
       setTaxaPercentual(taxaValor.toString());
     }
   }, [isCartao, taxasMaquina, parcelamento, formaPagamento]);

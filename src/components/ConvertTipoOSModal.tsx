@@ -60,7 +60,6 @@ export function ConvertTipoOSModal({ os, onClose, onSuccess }: ConvertTipoOSModa
       onSuccess();
       onClose();
     } catch (error: any) {
-      console.error('Erro ao converter OS:', error);
       alert(`Erro ao converter OS: ${error.message}`);
     } finally {
       setConvertendo(false);

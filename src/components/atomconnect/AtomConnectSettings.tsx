@@ -536,7 +536,6 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         setTimeout(() => getQRCode(instanciaData), 500);
       }
     } catch (error: any) {
-      console.error('Erro ao criar instancia:', error);
       if (error.message?.includes('already')) {
         const { data: instanciaData } = await supabase
           .from('atom_connect_instancias')
@@ -607,7 +606,6 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       });
 
       const data = await response.json();
-      console.log('Check connection response:', data);
 
       const state = data?.state || data?.instance?.state;
       const isConnected = state === 'open' || state === 'connected';
@@ -663,7 +661,6 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         startQRPolling(instancia);
       }
     } catch (error) {
-      console.error('Erro ao obter QR Code:', error);
       showAlert({
         type: 'error',
         title: 'Erro ao Gerar QR Code',
@@ -686,7 +683,6 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         });
 
         const data = await response.json();
-        console.log('Connection state:', data);
 
         const state = data?.state || data?.instance?.state;
         const isConnected = state === 'open' || state === 'connected';
@@ -724,7 +720,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
           }
         }
       } catch (error) {
-        console.error('Erro ao verificar conexao:', error);
+        // ignored
       }
     }, 3000);
   };
@@ -800,12 +796,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
           })
         });
       } catch (e) {
-        console.log('Webhook set fallback failed, may already be configured:', e);
+        // ignored
       }
 
       return data;
     } catch (error) {
-      console.error('Erro ao criar instancia:', error);
       throw error;
     }
   };
@@ -846,7 +841,6 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         message: 'Webhook configurado com sucesso!'
       });
     } catch (error) {
-      console.error('Erro ao configurar webhook:', error);
       showAlert({
         type: 'error',
         title: 'Erro ao Configurar',
