@@ -471,9 +471,11 @@ export function Configuracoes() {
               body: JSON.stringify(requestBody)
             });
 
-            const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
+            const responseText = await response.text();
+            let result: any;
+            try { result = JSON.parse(responseText); } catch { result = { error: responseText || `Erro HTTP ${response.status}` }; }
             if (!response.ok || !result.success) {
-              throw new Error(result.error || result.details || 'Erro ao atualizar usuario');
+              throw new Error(result.error || result.msg || result.details || result.message || `Erro ${response.status}: ${responseText.slice(0, 200)}`);
             }
           } else {
             if (!formUsuario.senha) return alert('Senha e obrigatoria para novo usuario');
@@ -495,9 +497,11 @@ export function Configuracoes() {
               body: JSON.stringify(requestBody)
             });
 
-            const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
-            if (!response.ok || !result.success) {
-              throw new Error(result.error || result.details || 'Erro ao criar usuario');
+            const createText = await response.text();
+            let createResult: any;
+            try { createResult = JSON.parse(createText); } catch { createResult = { error: createText || `Erro HTTP ${response.status}` }; }
+            if (!response.ok || !createResult.success) {
+              throw new Error(createResult.error || createResult.msg || createResult.details || createResult.message || `Erro ${response.status}: ${createText.slice(0, 200)}`);
             }
           }
           break;
