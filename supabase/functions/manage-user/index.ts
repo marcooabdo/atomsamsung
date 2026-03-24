@@ -251,11 +251,11 @@ Deno.serve(async (req: Request) => {
     } else {
       throw new Error('Acao invalida');
     }
-  } catch (error) {
+  } catch (error: any) {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message || 'Erro ao gerenciar usuario'
+        error: error?.message || String(error) || 'Erro ao gerenciar usuario'
       }),
       {
         status: 400,

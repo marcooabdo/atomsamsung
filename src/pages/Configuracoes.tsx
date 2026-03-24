@@ -429,22 +429,27 @@ export function Configuracoes() {
             }
           }
 
-          let session = (await supabase.auth.getSession()).data.session;
+          const { data: { session } } = await supabase.auth.getSession();
 
-          if (!session || !session.access_token) {
-            const refreshResult = await supabase.auth.refreshSession();
-            session = refreshResult.data.session;
+          if (!session?.access_token) {
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            if (!refreshData.session?.access_token) {
+              alert('Sessao expirada. Faca login novamente.');
+              return;
+            }
           }
 
-          if (!session || !session.access_token) {
-            alert('Sessão expirada. Faça login novamente.');
+          const activeSession = session || (await supabase.auth.getSession()).data.session;
+          if (!activeSession?.access_token) {
+            alert('Sessao expirada. Faca login novamente.');
             return;
           }
 
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
-          const headers = {
-            'Authorization': `Bearer ${session.access_token}`,
+          const fetchHeaders = {
+            'Authorization': `Bearer ${activeSession.access_token}`,
             'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
           };
 
           if (editingId) {
@@ -462,21 +467,16 @@ export function Configuracoes() {
 
             const response = await fetch(apiUrl, {
               method: 'POST',
-              headers,
+              headers: fetchHeaders,
               body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || errorData.details || 'Erro ao atualizar usuário');
-            }
-
-            const result = await response.json();
-            if (!result.success) {
-              throw new Error(result.error || result.details || 'Erro ao atualizar usuário');
+            const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
+            if (!response.ok || !result.success) {
+              throw new Error(result.error || result.details || 'Erro ao atualizar usuario');
             }
           } else {
-            if (!formUsuario.senha) return alert('Senha é obrigatória para novo usuário');
+            if (!formUsuario.senha) return alert('Senha e obrigatoria para novo usuario');
 
             const requestBody = {
               action: 'create',
@@ -491,18 +491,13 @@ export function Configuracoes() {
 
             const response = await fetch(apiUrl, {
               method: 'POST',
-              headers,
+              headers: fetchHeaders,
               body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) {
-              const errorData = await response.json();
-              throw new Error(errorData.error || errorData.details || 'Erro ao criar usuário');
-            }
-
-            const result = await response.json();
-            if (!result.success) {
-              throw new Error(result.error || result.details || 'Erro ao criar usuário');
+            const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
+            if (!response.ok || !result.success) {
+              throw new Error(result.error || result.details || 'Erro ao criar usuario');
             }
           }
           break;
@@ -697,15 +692,20 @@ export function Configuracoes() {
     setShowDeleteConfirmModal(false);
 
     try {
-      let session = (await supabase.auth.getSession()).data.session;
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!session || !session.access_token) {
-        const refreshResult = await supabase.auth.refreshSession();
-        session = refreshResult.data.session;
+      if (!session?.access_token) {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        if (!refreshData.session?.access_token) {
+          setDeleteMessage('Sessao expirada. Faca login novamente.');
+          setShowDeleteSuccessModal(true);
+          return;
+        }
       }
 
-      if (!session || !session.access_token) {
-        setDeleteMessage('Sessão expirada. Faça login novamente.');
+      const activeSession = session || (await supabase.auth.getSession()).data.session;
+      if (!activeSession?.access_token) {
+        setDeleteMessage('Sessao expirada. Faca login novamente.');
         setShowDeleteSuccessModal(true);
         return;
       }
@@ -715,8 +715,9 @@ export function Configuracoes() {
       const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${activeSession.access_token}`,
           'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
         },
         body: JSON.stringify({
           action: 'delete',
@@ -724,15 +725,9 @@ export function Configuracoes() {
         })
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao excluir usuário');
-      }
-
-      const result = await response.json();
-
-      if (!result.success) {
-        throw new Error(result.error || 'Erro ao excluir usuário');
+      const result = await response.json().catch(() => ({ success: false, error: `Erro HTTP ${response.status}` }));
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao excluir usuario');
       }
 
       setDeleteMessage('Usuário excluído com sucesso!');
