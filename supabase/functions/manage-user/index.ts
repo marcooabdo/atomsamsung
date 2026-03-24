@@ -73,7 +73,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    if (!['master', 'gerente', 'diretoria'].includes(requestingUsuario.tipo)) {
+    if (!['master', 'gerente', 'diretoria', 'administrador'].includes(requestingUsuario.tipo)) {
       return new Response(
         JSON.stringify({ success: false, error: 'Sem permissao para gerenciar usuarios' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
