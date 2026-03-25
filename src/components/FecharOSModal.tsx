@@ -90,22 +90,51 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
       if (forceClose && resultado) {
         const allAlertas = [...resultado.bloqueios, ...resultado.alertas];
         if (allAlertas.length > 0) {
-          const linhas = ['[FECHAMENTO FORCADO] OS fechada com os seguintes desvios pendentes:'];
           const bloqs = allAlertas.filter(a => a.severidade === 'bloqueante');
           const avs = allAlertas.filter(a => a.severidade === 'alerta');
+
+          const descLinhas: string[] = [];
           if (bloqs.length > 0) {
-            linhas.push('', `BLOQUEIOS IGNORADOS (${bloqs.length}):`);
-            bloqs.forEach(b => linhas.push(`  - ${b.regra_titulo}: ${b.mensagem}`));
+            descLinhas.push(`BLOQUEIOS IGNORADOS (${bloqs.length}):`);
+            bloqs.forEach(b => descLinhas.push(`- ${b.regra_titulo}: ${b.mensagem}`));
           }
           if (avs.length > 0) {
-            linhas.push('', `ALERTAS IGNORADOS (${avs.length}):`);
-            avs.forEach(a => linhas.push(`  - ${a.regra_titulo}: ${a.mensagem}`));
+            descLinhas.push(`ALERTAS IGNORADOS (${avs.length}):`);
+            avs.forEach(a => descLinhas.push(`- ${a.regra_titulo}: ${a.mensagem}`));
           }
-          linhas.push('', `Fechamento forcado por: ${usuario.nome || usuario.id}`);
+          descLinhas.push('', `Forcado por: ${usuario.nome || usuario.id}`);
+
+          await supabase.from('gia_mural_tarefas')
+            .update({ status: 'concluido', concluido_at: new Date().toISOString() })
+            .eq('os_id', osId)
+            .eq('gia_source', 'GIA Warranty')
+            .eq('status', 'pendente')
+            .neq('metadata->>tipo', 'fechamento_forcado');
+
+          await supabase.from('gia_mural_tarefas').insert({
+            gia_source: 'GIA Warranty',
+            gia_responsavel: 'GIA Warranty',
+            prioridade: bloqs.length > 0 ? 'alta' : 'normal',
+            titulo: `[FORCADO] OS ${osNumero} - ${allAlertas.length} desvio(s) ignorado(s)`,
+            descricao: descLinhas.join('\n'),
+            status: 'pendente',
+            unidade_id: unidadeId,
+            os_id: osId,
+            os_numero: osNumero,
+            metadata: {
+              tipo: 'fechamento_forcado',
+              forcado_por: usuario.id,
+              forcado_por_nome: usuario.nome,
+              total_bloqueios: bloqs.length,
+              total_alertas: avs.length,
+              regras: allAlertas.map(a => a.regra_codigo),
+            },
+          });
+
           await supabase.from('os_comentarios').insert({
             os_id: osId,
             usuario_id: usuario.id,
-            comentario: linhas.join('\n'),
+            comentario: ['[FECHAMENTO FORCADO] OS fechada com os seguintes desvios pendentes:', '', ...descLinhas].join('\n'),
             is_system: true,
           });
         }
