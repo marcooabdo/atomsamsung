@@ -117,7 +117,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     if (selectedPecas.size === 0) return;
     setDespachandoSamsung(true);
     try {
-      const ids = Array.from(selectedPecas);
+      const ids = Array.from(selectedPecas).filter(id => {
+        const p = pecas.find(x => x.id === id);
+        return p && !DEVOLVIDA_STATUSES.includes(p.status);
+      });
+      if (ids.length === 0) return;
 
       const { error: updateError } = await supabase
         .from('estoque_pecas')
@@ -262,16 +266,16 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     );
   });
 
-  const isElegibleForNF = (peca: EstoquePeca) => {
-    const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'];
-    if (DEVOLVIDA_STATUSES.includes(peca.status)) return false;
-    if (!(peca as any).gi_postada_em) return false;
-    return true;
+  const ARCHIVED_STATUSES = ['arquivada'];
+  const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'];
+
+  const isSelectable = (peca: EstoquePeca) => {
+    return !ARCHIVED_STATUSES.includes(peca.status);
   };
 
   const toggleSelectPeca = (pecaId: string) => {
     const peca = pecas.find(p => p.id === pecaId);
-    if (peca && !isElegibleForNF(peca)) return;
+    if (peca && !isSelectable(peca)) return;
     setSelectedPecas(prev => {
       const newSet = new Set(prev);
       if (newSet.has(pecaId)) {
@@ -285,19 +289,19 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
   const toggleSelectAll = () => {
     const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-    const elegiblePecas = currentPagePecas.filter(p => isElegibleForNF(p));
-    const allSelected = elegiblePecas.length > 0 && elegiblePecas.every(p => selectedPecas.has(p.id));
+    const selectablePecas = currentPagePecas.filter(p => isSelectable(p));
+    const allSelected = selectablePecas.length > 0 && selectablePecas.every(p => selectedPecas.has(p.id));
 
     if (allSelected) {
       setSelectedPecas(prev => {
         const newSet = new Set(prev);
-        elegiblePecas.forEach(p => newSet.delete(p.id));
+        selectablePecas.forEach(p => newSet.delete(p.id));
         return newSet;
       });
     } else {
       setSelectedPecas(prev => {
         const newSet = new Set(prev);
-        elegiblePecas.forEach(p => newSet.add(p.id));
+        selectablePecas.forEach(p => newSet.add(p.id));
         return newSet;
       });
     }
@@ -346,7 +350,12 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   });
 
   const currentPagePecas = sortedPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
-  const allCurrentPageSelected = currentPagePecas.length > 0 && currentPagePecas.every(p => selectedPecas.has(p.id));
+  const selectableOnPage = currentPagePecas.filter(p => isSelectable(p));
+  const allCurrentPageSelected = selectableOnPage.length > 0 && selectableOnPage.every(p => selectedPecas.has(p.id));
+
+  const selectedPecasData = getSelectedPecasData();
+  const selectedDevolvidasCount = selectedPecasData.filter(p => DEVOLVIDA_STATUSES.includes(p.status)).length;
+  const selectedNonDevolvidasCount = selectedPecasData.filter(p => !DEVOLVIDA_STATUSES.includes(p.status)).length;
 
   if (loading) {
     return (
@@ -401,33 +410,52 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
         {selectedPecas.size > 0 && (
           <>
-            <button
-              onClick={handleDespacharSamsung}
-              disabled={despachandoSamsung}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap disabled:opacity-60"
-              style={{
-                background: 'linear-gradient(135deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 100%)',
-                border: '2px solid rgba(59,130,246,0.7)',
-                color: '#60a5fa',
-                boxShadow: '0 0 15px rgba(59,130,246,0.2)'
-              }}
-            >
-              <Truck className="w-4 h-4" />
-              {despachandoSamsung ? 'Despachando...' : `Despachar para Samsung (${selectedPecas.size})`}
-            </button>
-            <button
-              onClick={() => setShowEmitirNFModal(true)}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
-              style={{
-                background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
-                border: '2px solid rgba(255,165,0,0.7)',
-                color: '#FFA500',
-                boxShadow: '0 0 15px rgba(255,165,0,0.2)'
-              }}
-            >
-              <FileText className="w-4 h-4" />
-              Emitir NF ({selectedPecas.size})
-            </button>
+            {selectedNonDevolvidasCount > 0 && (
+              <>
+                <button
+                  onClick={handleDespacharSamsung}
+                  disabled={despachandoSamsung}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap disabled:opacity-60"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.1) 100%)',
+                    border: '2px solid rgba(59,130,246,0.7)',
+                    color: '#60a5fa',
+                    boxShadow: '0 0 15px rgba(59,130,246,0.2)'
+                  }}
+                >
+                  <Truck className="w-4 h-4" />
+                  {despachandoSamsung ? 'Despachando...' : `Despachar Samsung (${selectedNonDevolvidasCount})`}
+                </button>
+                <button
+                  onClick={() => setShowEmitirNFModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(255,165,0,0.3) 0%, rgba(255,165,0,0.1) 100%)',
+                    border: '2px solid rgba(255,165,0,0.7)',
+                    color: '#FFA500',
+                    boxShadow: '0 0 15px rgba(255,165,0,0.2)'
+                  }}
+                >
+                  <FileText className="w-4 h-4" />
+                  Emitir NF ({selectedNonDevolvidasCount})
+                </button>
+              </>
+            )}
+            {selectedDevolvidasCount > 0 && (
+              <button
+                onClick={() => setShowEmitirNFModal(true)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0,212,255,0.3) 0%, rgba(0,212,255,0.1) 100%)',
+                  border: '2px solid rgba(0,212,255,0.7)',
+                  color: '#00D4FF',
+                  boxShadow: '0 0 15px rgba(0,212,255,0.2)'
+                }}
+              >
+                <FileText className="w-4 h-4" />
+                Emitir NF Devolucao ({selectedDevolvidasCount})
+              </button>
+            )}
           </>
         )}
       </div>
@@ -516,16 +544,20 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                 onClick={() => setSelectedPeca(peca)}
                 className={`premium-card p-4 hover-lift relative transition-all cursor-pointer ${
                   selectedPecas.has(peca.id)
-                    ? 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
+                    ? DEVOLVIDA_STATUSES.includes(peca.status)
+                      ? 'ring-2 ring-[#00D4FF] bg-[#00D4FF]/5'
+                      : 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
                     : cardClass
                 }`}
               >
-                {isElegibleForNF(peca) ? (
+                {isSelectable(peca) ? (
                   <button
                     onClick={(e) => { e.stopPropagation(); toggleSelectPeca(peca.id); }}
                     className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
                       selectedPecas.has(peca.id)
-                        ? 'bg-[#FFA500] text-black'
+                        ? DEVOLVIDA_STATUSES.includes(peca.status)
+                          ? 'bg-[#00D4FF] text-black'
+                          : 'bg-[#FFA500] text-black'
                         : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
                     }`}
                   >
@@ -538,11 +570,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                 ) : (
                   <div
                     className="absolute top-3 right-3 p-1.5 rounded-lg z-10 bg-gray-800/50 text-gray-600 cursor-not-allowed"
-                    title={
-                      ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'].includes(peca.status)
-                        ? 'Peça devolvida não pode ser selecionada para NF'
-                        : 'GI não postado — peça não elegível para emissão de NF'
-                    }
+                    title="Peca arquivada"
                   >
                     <Square className="w-5 h-5" />
                   </div>
