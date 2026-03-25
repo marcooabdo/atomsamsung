@@ -205,7 +205,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
 
     const fornecedor = getTextContent('xNome');
-    const dataEmissao = getTextContent('dhEmi').split('T')[0];
+    const dataEmissao = (getTextContent('dhEmi') || getTextContent('dEmi')).split('T')[0];
     const valorTotal = parseFloat(getTextContent('vNF')) || 0;
 
     let delivery: string | null = null;
@@ -716,7 +716,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           });
         }
 
-        const labels = await generateLabelsForPecas(pecasToInsert, nfRecord, nfData);
+        const labels = await generateLabelsForPecas(pecasInseridas || pecasToInsert, nfRecord, nfData);
         allLabels.push(...labels);
       }
 
