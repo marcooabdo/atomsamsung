@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { X, Save, Building, User, Wrench, DollarSign, Paperclip, MessageSquare, Plus, Trash2, Upload, Send, Lock, AlertTriangle, Edit, Microscope, Copy, Check } from 'lucide-react';
+import { X, Save, Building, User, Wrench, DollarSign, Paperclip, MessageSquare, Plus, Trash2, Upload, Send, Lock, AlertTriangle, CreditCard as Edit, Microscope, Copy, Check } from 'lucide-react';
 import { OSPagamentoTab } from './OSPagamentoTab';
 import { AddPaymentModal } from './AddPaymentModal';
 import { PaymentDetailsModal } from './PaymentDetailsModal';
@@ -902,7 +902,9 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                      status === 'devolucao_pendente' ? 'Devolução Pendente' :
                      status === 'devolvida_nova' ? 'Devolvida Nova' :
                      status === 'devolvida_defeito' ? 'Devolvida com Defeito' :
-                     status === 'usada_upc' ? 'Usada UPC' :
+                     status === 'usada_upc' || status === 'devolvida_upc' ? 'Devolvida UPC' :
+                     status === 'devolvida_samsung' ? 'Devolvida Samsung' :
+                     status === 'devolucao_completa' ? 'Devolução Completa' :
                      status === 'arquivada' ? 'Arquivada' : 'Bloqueada';
             }
           };
@@ -963,7 +965,9 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                      status === 'devolucao_pendente' ? 'Devolução Pendente' :
                      status === 'devolvida_nova' ? 'Devolvida Nova' :
                      status === 'devolvida_defeito' ? 'Devolvida com Defeito' :
-                     status === 'usada_upc' ? 'Usada UPC' :
+                     status === 'usada_upc' || status === 'devolvida_upc' ? 'Devolvida UPC' :
+                     status === 'devolvida_samsung' ? 'Devolvida Samsung' :
+                     status === 'devolucao_completa' ? 'Devolução Completa' :
                      status === 'arquivada' ? 'Arquivada' : 'Bloqueada';
             }
           };
@@ -2115,7 +2119,10 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                             devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FFA500', icon: '⏳' },
                             devolvida_nova: { label: 'DEVOLVIDA NOVA', color: '#00CED1', icon: '🆕' },
                             devolvida_defeito: { label: 'DEVOLVIDA DEFEITO', color: '#DC143C', icon: '⚠️' },
-                            usada_upc: { label: 'USADA UPC', color: '#696969', icon: '📋' },
+                            usada_upc: { label: 'DEVOLVIDA UPC', color: '#696969', icon: '📋' },
+                            devolvida_upc: { label: 'DEVOLVIDA UPC', color: '#696969', icon: '📋' },
+                            devolvida_samsung: { label: 'DEVOLVIDA SAMSUNG', color: '#60a5fa', icon: '🔄' },
+                            devolucao_completa: { label: 'DEVOLUÇÃO COMPLETA', color: '#34d399', icon: '✅' },
                             arquivada: { label: 'ARQUIVADA', color: '#2F4F4F', icon: '📁' }
                           };
                           const config = statusConfig[info.status] || { label: 'BLOQUEADA', color: '#FF6B00', icon: '🔒' };
@@ -2249,7 +2256,10 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
                       devolucao_pendente: { label: 'DEVOLUÇÃO PENDENTE', color: '#FFA500', icon: '⏳', bg: '#FFA50005' },
                       devolvida_nova: { label: 'DEVOLVIDA NOVA', color: '#00CED1', icon: '🆕', bg: '#00CED105' },
                       devolvida_defeito: { label: 'DEVOLVIDA DEFEITO', color: '#DC143C', icon: '⚠️', bg: '#DC143C05' },
-                      usada_upc: { label: 'USADA UPC', color: '#696969', icon: '📋', bg: '#69696905' },
+                      usada_upc: { label: 'DEVOLVIDA UPC', color: '#696969', icon: '📋', bg: '#69696905' },
+                      devolvida_upc: { label: 'DEVOLVIDA UPC', color: '#696969', icon: '📋', bg: '#69696905' },
+                      devolvida_samsung: { label: 'DEVOLVIDA SAMSUNG', color: '#60a5fa', icon: '🔄', bg: '#60a5fa05' },
+                      devolucao_completa: { label: 'DEVOLUÇÃO COMPLETA', color: '#34d399', icon: '✅', bg: '#34d39905' },
                       arquivada: { label: 'ARQUIVADA', color: '#2F4F4F', icon: '📁', bg: '#2F4F4F05' }
                     };
                     const config = pecaInfo ? statusConfig[pecaInfo.status] : null;

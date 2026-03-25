@@ -66,6 +66,8 @@ const STATUS_CONFIG: Record<string, { bg: string; border: string; text: string; 
   gi_postada: { bg: 'bg-green-500/20', border: 'border-green-500/30', text: 'text-green-400', label: 'GI Postada' },
   devolvida: { bg: 'bg-gray-500/20', border: 'border-gray-500/30', text: 'text-gray-400', label: 'Devolvida' },
   devolvida_samsung: { bg: 'bg-teal-500/20', border: 'border-teal-500/30', text: 'text-teal-400', label: 'Devolvida Samsung' },
+  devolvida_upc: { bg: 'bg-slate-500/20', border: 'border-slate-500/30', text: 'text-slate-400', label: 'Devolvida UPC' },
+  devolucao_completa: { bg: 'bg-emerald-500/20', border: 'border-emerald-500/30', text: 'text-emerald-400', label: 'Devolução Completa' },
   reprovada: { bg: 'bg-red-500/20', border: 'border-red-500/30', text: 'text-red-400', label: 'Reprovada' },
   cancelada: { bg: 'bg-red-500/20', border: 'border-red-500/30', text: 'text-red-400', label: 'Cancelada' },
 };
@@ -370,6 +372,8 @@ export default function ControlePecas() {
                     <option value="gi_postada">GI Postada</option>
                     <option value="devolvida">Devolvida</option>
                     <option value="devolvida_samsung">Dev. Samsung</option>
+                    <option value="devolvida_upc">Dev. UPC</option>
+                    <option value="devolucao_completa">Dev. Completa</option>
                     <option value="reprovada">Reprovada</option>
                     <option value="cancelada">Cancelada</option>
                   </select>

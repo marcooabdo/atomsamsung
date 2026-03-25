@@ -126,7 +126,10 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
       devolucao_pendente: { label: 'Devolução Pendente', color: '#FF0064' },
       devolvida_nova: { label: 'Devolvida Nova', color: '#39FF14' },
       devolvida_defeito: { label: 'Devolvida c/ Defeito', color: '#FF0064' },
-      usada_upc: { label: 'Usada UPC', color: '#6B7280' },
+      usada_upc: { label: 'Devolvida UPC', color: '#6B7280' },
+      devolvida_upc: { label: 'Devolvida UPC', color: '#6B7280' },
+      devolvida_samsung: { label: 'Devolvida Samsung', color: '#60a5fa' },
+      devolucao_completa: { label: 'Devolução Completa', color: '#34d399' },
     };
 
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.disponivel;

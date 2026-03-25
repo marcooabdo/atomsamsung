@@ -38,8 +38,10 @@ const PECA_STATUS_INFO: Record<string, { label: string; icon: typeof Package; co
   devolucao_pendente: { label: 'Aguardando devolucao', icon: RotateCcw, color: 'text-amber-400' },
   devolvida_nova: { label: 'Devolvida (nova)', icon: RotateCcw, color: 'text-teal-400' },
   devolvida_defeito: { label: 'Devolvida com defeito', icon: AlertTriangle, color: 'text-red-400' },
-  usada_upc: { label: 'Usada (UPC)', icon: CheckCircle, color: 'text-green-300' },
+  usada_upc: { label: 'Devolvida UPC', icon: CheckCircle, color: 'text-green-300' },
+  devolvida_upc: { label: 'Devolvida UPC', icon: CheckCircle, color: 'text-green-300' },
   devolvida_samsung: { label: 'Devolvida Samsung', icon: RotateCcw, color: 'text-teal-300' },
+  devolucao_completa: { label: 'Devolução Completa', icon: CheckCircle, color: 'text-emerald-400' },
 };
 
 type FiltroTab = 'aguardando' | 'com_tecnico' | 'em_uso' | 'devolvidas' | 'todas';
@@ -165,7 +167,7 @@ export function EstoqueTecnicoMobile() {
     if (filtroTab === 'aguardando') return p.req_status === 'pendente' || p.req_status === 'atendida';
     if (filtroTab === 'com_tecnico') return p.peca_status === 'vinculada_tecnico' || p.peca_status === 'em_rota';
     if (filtroTab === 'em_uso') return p.req_status === 'em_uso' || p.peca_status === 'em_uso';
-    if (filtroTab === 'devolvidas') return ['devolucao_pendente', 'gi_postada', 'devolvida_samsung'].includes(p.req_status) || ['devolucao_pendente', 'devolvida_nova', 'devolvida_defeito', 'usada', 'usada_upc', 'devolvida_samsung'].includes(p.peca_status || '');
+    if (filtroTab === 'devolvidas') return ['devolucao_pendente', 'gi_postada', 'devolvida_samsung'].includes(p.req_status) || ['devolucao_pendente', 'devolvida_nova', 'devolvida_defeito', 'usada', 'usada_upc', 'devolvida_upc', 'devolvida_samsung', 'devolucao_completa'].includes(p.peca_status || '');
     return true;
   });
 
@@ -175,7 +177,7 @@ export function EstoqueTecnicoMobile() {
       if (tab === 'aguardando') return p.req_status === 'pendente' || p.req_status === 'atendida';
       if (tab === 'com_tecnico') return p.peca_status === 'vinculada_tecnico' || p.peca_status === 'em_rota';
       if (tab === 'em_uso') return p.req_status === 'em_uso' || p.peca_status === 'em_uso';
-      if (tab === 'devolvidas') return ['devolucao_pendente', 'gi_postada', 'devolvida_samsung'].includes(p.req_status) || ['devolucao_pendente', 'devolvida_nova', 'devolvida_defeito', 'usada', 'usada_upc', 'devolvida_samsung'].includes(p.peca_status || '');
+      if (tab === 'devolvidas') return ['devolucao_pendente', 'gi_postada', 'devolvida_samsung'].includes(p.req_status) || ['devolucao_pendente', 'devolvida_nova', 'devolvida_defeito', 'usada', 'usada_upc', 'devolvida_upc', 'devolvida_samsung', 'devolucao_completa'].includes(p.peca_status || '');
       return true;
     }).length;
   };

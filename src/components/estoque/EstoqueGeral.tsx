@@ -236,7 +236,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         devolvida_nova: 'Devolvida Nova',
         devolvida_defeito: 'Devolvida c/ Defeito',
         devolvida_samsung: 'Devolvida Samsung',
-        usada_upc: 'Usada UPC',
+        usada_upc: 'Devolvida UPC',
+        devolvida_upc: 'Devolvida UPC',
+        devolucao_completa: 'Devolucao Completa',
         arquivada: 'Arquivada',
       };
 
@@ -370,7 +372,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       devolvida_nova: { label: 'Devolvida Nova', className: 'bg-cyan-500/20 text-cyan-400 border border-cyan-500/30' },
       devolvida_defeito: { label: 'Devolvida c/ Defeito', className: 'bg-red-500/20 text-red-400 border border-red-500/30' },
       devolvida_samsung: { label: 'Devolvida Samsung', className: 'bg-blue-600/20 text-blue-300 border border-blue-500/30' },
-      usada_upc: { label: 'Usada UPC', className: 'bg-slate-500/20 text-slate-400 border border-slate-500/30' },
+      usada_upc: { label: 'Devolvida UPC', className: 'bg-slate-500/20 text-slate-400 border border-slate-500/30' },
+      devolvida_upc: { label: 'Devolvida UPC', className: 'bg-slate-500/20 text-slate-400 border border-slate-500/30' },
+      devolucao_completa: { label: 'Devolução Completa', className: 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' },
       arquivada: { label: 'Arquivada', className: 'bg-gray-500/20 text-gray-500 border border-gray-500/30' }
     };
 
@@ -421,8 +425,33 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   };
 
   const getLogisticaReversaStyle = (peca: EstoquePeca) => {
-    const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito'];
+    const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito', 'devolvida_upc', 'usada_upc'];
     if (!LOGISTICA_REVERSA_STATUSES.includes(peca.status)) return { cardClass: '', indicator: null };
+
+    const isUPC = peca.status === 'devolvida_upc' || peca.status === 'usada_upc';
+
+    if (isUPC) {
+      if (!peca.data_coleta_transportadora) {
+        return {
+          cardClass: 'border-orange-500 shadow-[0_0_15px_rgba(249,115,22,0.4)] animate-pulse',
+          indicator: (
+            <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-500/20 border border-orange-500/40 text-orange-400 text-xs font-semibold">
+              <Truck className="w-3 h-3" />
+              Aguardando Coleta
+            </div>
+          ),
+        };
+      }
+      return {
+        cardClass: 'border-gray-600',
+        indicator: (
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-green-500/20 border border-green-500/40 text-green-400 text-xs font-semibold">
+            <CheckSquare className="w-3 h-3" />
+            Coleta Realizada
+          </div>
+        ),
+      };
+    }
 
     if (!peca.data_coleta_transportadora) {
       return {
@@ -471,7 +500,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   });
 
   const ARCHIVED_STATUSES = ['arquivada'];
-  const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'];
+  const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung', 'devolvida_upc', 'usada_upc', 'devolucao_completa'];
 
   const getSelectionCategory = (): 'devolvida' | 'normal' | null => {
     if (selectedPecas.size === 0) return null;
@@ -619,13 +648,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           <option value="reservada">Reservada</option>
           <option value="vinculada_tecnico">Com Técnico</option>
           <option value="em_rota">Em Rota</option>
-          <option value="em_uso">Em Uso</option>
           <option value="usada">Usada</option>
-          <option value="devolucao_pendente">Devolução Pendente</option>
           <option value="devolvida_nova">Devolvida Nova</option>
           <option value="devolvida_defeito">Devolvida c/ Defeito</option>
-          <option value="devolvida_samsung">Devolvida Samsung</option>
-          <option value="usada_upc">Usada UPC</option>
+          <option value="devolvida_upc">Devolvida UPC</option>
+          <option value="devolucao_completa">Devolução Completa</option>
         </select>
 
         <label className="flex items-center gap-2 px-4 py-2 border border-gray-700 rounded-lg cursor-pointer hover:border-[#00D4FF]/50 transition whitespace-nowrap">

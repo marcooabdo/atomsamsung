@@ -73,7 +73,9 @@ const getStatusColors = (neonGreen: string, themeAccent: string): Record<string,
   devolvida_nova: { label: 'Devolvida Nova', color: neonGreen },
   devolvida_defeito: { label: 'Devolvida c/ Defeito', color: '#FF0064' },
   devolvida_samsung: { label: 'Devolvida Samsung', color: '#60a5fa' },
-  usada_upc: { label: 'Usada UPC', color: '#6B7280' },
+  usada_upc: { label: 'Devolvida UPC', color: '#6B7280' },
+  devolvida_upc: { label: 'Devolvida UPC', color: '#6B7280' },
+  devolucao_completa: { label: 'Devolução Completa', color: '#34d399' },
 });
 
 export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLocationSelector }: PecaDetailsModalProps) {
@@ -280,7 +282,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
     }
   };
 
-  const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito'];
+  const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito', 'devolvida_upc', 'usada_upc'];
   const STATUS_COLORS = getStatusColors(neonGreen, themeAccent);
 
   const currentStatus = (pecaDetalhada as any)?.status || peca.status;
@@ -519,7 +521,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                   )}
                 </div>
 
-                {/* Credito GSPN */}
+                {!['devolvida_upc', 'usada_upc'].includes(currentStatus) && (
                 <div
                   className="p-4 rounded-lg"
                   style={{ background: cardBg, border: `1px solid ${cardBorder}` }}
@@ -566,6 +568,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                     <p className="text-xs italic" style={{ color: textMuted }}>Aguardando coleta para liberar esta etapa</p>
                   )}
                 </div>
+                )}
 
                 {/* SLA */}
                 {slaDias !== null && (
@@ -771,7 +774,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
         {/* Footer actions */}
         <div className="shrink-0 px-6 py-4 flex gap-3 flex-wrap" style={{ borderTop: `1px solid ${headerBorder}` }}>
-          {['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'].includes(currentStatus) && (
+          {['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung', 'devolvida_upc', 'usada_upc'].includes(currentStatus) && (
             <button
               onClick={() => setShowEmitirNFModal(true)}
               className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors"

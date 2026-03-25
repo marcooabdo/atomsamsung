@@ -51,8 +51,10 @@ const PECA_STATUS_LABELS: Record<string, { label: string; color: string }> = {
   devolucao_pendente: { label: 'Dev. Pendente', color: 'text-amber-400' },
   devolvida_nova: { label: 'Dev. Nova', color: 'text-teal-400' },
   devolvida_defeito: { label: 'Dev. Defeito', color: 'text-red-400' },
-  usada_upc: { label: 'Usada UPC', color: 'text-green-300' },
+  usada_upc: { label: 'Dev. UPC', color: 'text-green-300' },
+  devolvida_upc: { label: 'Dev. UPC', color: 'text-green-300' },
   devolvida_samsung: { label: 'Dev. Samsung', color: 'text-teal-300' },
+  devolucao_completa: { label: 'Dev. Completa', color: 'text-emerald-400' },
   arquivada: { label: 'Arquivada', color: 'text-gray-500' },
 };
 
