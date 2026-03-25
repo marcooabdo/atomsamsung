@@ -754,6 +754,48 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
   };
 
+  const parseXMLMeta = (xml: string | null) => {
+    if (!xml) return { destinatario: '', natOp: '', xPed: '', cfopSet: '', ncmSet: '' };
+    try {
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const tag = (name: string, parent: Document | Element = doc) => parent.getElementsByTagName(name)[0]?.textContent || '';
+
+      const dest = doc.getElementsByTagName('dest')[0];
+      const destinatario = dest ? (tag('xNome', dest) || tag('CNPJ', dest) || tag('CPF', dest)) : '';
+      const natOp = tag('natOp');
+      const xPed = tag('xPed');
+
+      const dets = doc.getElementsByTagName('det');
+      const cfops = new Set<string>();
+      const ncms = new Set<string>();
+      for (let i = 0; i < dets.length; i++) {
+        const cfop = tag('CFOP', dets[i]);
+        const ncm = tag('NCM', dets[i]);
+        if (cfop) cfops.add(cfop);
+        if (ncm) ncms.add(ncm);
+      }
+      return { destinatario, natOp, xPed, cfopSet: [...cfops].join(', '), ncmSet: [...ncms].join(', ') };
+    } catch { return { destinatario: '', natOp: '', xPed: '', cfopSet: '', ncmSet: '' }; }
+  };
+
+  const parseXMLDetMeta = (xml: string | null, pn: string) => {
+    if (!xml) return { cfop: '', ncm: '', xPed: '' };
+    try {
+      const doc = new DOMParser().parseFromString(xml, 'text/xml');
+      const tag = (name: string, parent: Document | Element = doc) => parent.getElementsByTagName(name)[0]?.textContent || '';
+      const xPed = tag('xPed');
+      const dets = doc.getElementsByTagName('det');
+      for (let i = 0; i < dets.length; i++) {
+        const cProd = tag('cProd', dets[i]);
+        if (cProd === pn) {
+          return { cfop: tag('CFOP', dets[i]), ncm: tag('NCM', dets[i]), xPed };
+        }
+      }
+      const firstDet = dets[0];
+      return { cfop: firstDet ? tag('CFOP', firstDet) : '', ncm: firstDet ? tag('NCM', firstDet) : '', xPed };
+    } catch { return { cfop: '', ncm: '', xPed: '' }; }
+  };
+
   const handleExportReport = async () => {
     setExportingReport(true);
     try {
@@ -762,7 +804,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       let query = supabase
         .from('estoque_nfs')
-        .select('id, numero_nf, chave_acesso, fornecedor, data_emissao, valor_total, delivery, processada, created_at')
+        .select('id, numero_nf, chave_acesso, fornecedor, data_emissao, valor_total, delivery, processada, created_at, xml_conteudo')
         .eq('unidade_id', unidadeFilter)
         .order('created_at', { ascending: false });
 
@@ -779,6 +821,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         return;
       }
 
+      const nfXmlMap: Record<string, string | null> = {};
+      nfsData.forEach(n => { nfXmlMap[n.id] = n.xml_conteudo; });
+
       const nfIds = nfsData.map(n => n.id);
       const { data: pecasData } = await supabase
         .from('estoque_pecas')
@@ -786,30 +831,40 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         .in('nf_id', nfIds)
         .order('pn');
 
-      const rows = (pecasData || []).map((p: any) => ({
-        'NF': p.nf?.numero_nf || '',
-        'Fornecedor': p.nf?.fornecedor || '',
-        'Delivery': p.nf?.delivery || '',
-        'Part Number': p.pn,
-        'Descrição': p.descricao,
-        'ID Único': p.id_unico || '',
-        'Qtd': 1,
-        'Valor Unitário': p.valor_unitario_sem_imposto || 0,
-        'Valor c/ Impostos': p.valor_com_impostos || 0,
-        'ICMS Valor': p.icms_valor || 0,
-        'ICMS %': p.icms_aliquota || 0,
-        'ICMS-ST Valor': p.icms_st_valor || 0,
-        'ICMS-ST %': p.icms_st_aliquota || 0,
-        'IPI Valor': p.ipi_valor || 0,
-        'IPI %': p.ipi_aliquota || 0,
-        'PIS Valor': p.pis_valor || 0,
-        'PIS %': p.pis_aliquota || 0,
-        'COFINS Valor': p.cofins_valor || 0,
-        'COFINS %': p.cofins_aliquota || 0,
-        'Status': p.status,
-        'OS': p.os?.numero_os_samsung || p.os?.numero_os_interna || '',
-        'Data Entrada': p.data_entrada ? new Date(p.data_entrada).toLocaleDateString('pt-BR') : '',
-      }));
+      const rows = (pecasData || []).map((p: any) => {
+        const detMeta = parseXMLDetMeta(nfXmlMap[p.nf_id], p.pn);
+        const nfMeta = parseXMLMeta(nfXmlMap[p.nf_id]);
+        return {
+          'NF': p.nf?.numero_nf || '',
+          'Data Emissão': p.data_entrada ? new Date(p.data_entrada).toLocaleDateString('pt-BR') : '',
+          'Fornecedor': p.nf?.fornecedor || '',
+          'Destinatário': nfMeta.destinatario,
+          'Nat. Operação': nfMeta.natOp,
+          'Delivery': p.nf?.delivery || '',
+          'Ped. Cliente': detMeta.xPed,
+          'Part Number': p.pn,
+          'Descrição': p.descricao,
+          'NCM': detMeta.ncm,
+          'CFOP': detMeta.cfop,
+          'ID Único': p.id_unico || '',
+          'Qtd': 1,
+          'Valor Unitário': p.valor_unitario_sem_imposto || 0,
+          'Valor c/ Impostos': p.valor_com_impostos || 0,
+          'ICMS Valor': p.icms_valor || 0,
+          'ICMS %': p.icms_aliquota || 0,
+          'ICMS-ST Valor': p.icms_st_valor || 0,
+          'ICMS-ST %': p.icms_st_aliquota || 0,
+          'IPI Valor': p.ipi_valor || 0,
+          'IPI %': p.ipi_aliquota || 0,
+          'PIS Valor': p.pis_valor || 0,
+          'PIS %': p.pis_aliquota || 0,
+          'COFINS Valor': p.cofins_valor || 0,
+          'COFINS %': p.cofins_aliquota || 0,
+          'Status': p.status,
+          'OS': p.os?.numero_os_samsung || p.os?.numero_os_interna || '',
+          'Data Entrada': p.data_entrada ? new Date(p.data_entrada).toLocaleDateString('pt-BR') : '',
+        };
+      });
 
       const ws = XLSX.utils.json_to_sheet(rows);
       const colWidths = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
@@ -821,16 +876,24 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         if (p.nf_id) acc[p.nf_id] = (acc[p.nf_id] || 0) + 1;
         return acc;
       }, {});
-      const nfSummary = nfsData.map(n => ({
-        'NF': n.numero_nf,
-        'Fornecedor': n.fornecedor,
-        'Delivery': n.delivery || '',
-        'Data Emissão': n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '',
-        'Valor Total': n.valor_total,
-        'Qtd Peças': pecasByNf[n.id] || 0,
-        'Status': n.processada ? 'Processada' : 'Pendente',
-        'Chave Acesso': n.chave_acesso || '',
-      }));
+      const nfSummary = nfsData.map(n => {
+        const meta = parseXMLMeta(n.xml_conteudo);
+        return {
+          'NF': n.numero_nf,
+          'Data Emissão': n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '',
+          'Fornecedor': n.fornecedor,
+          'Destinatário': meta.destinatario,
+          'Nat. Operação': meta.natOp,
+          'Delivery': n.delivery || '',
+          'Ped. Cliente': meta.xPed,
+          'CFOP': meta.cfopSet,
+          'NCM': meta.ncmSet,
+          'Valor Total': n.valor_total,
+          'Qtd Peças': pecasByNf[n.id] || 0,
+          'Status': n.processada ? 'Processada' : 'Pendente',
+          'Chave Acesso': n.chave_acesso || '',
+        };
+      });
       const ws2 = XLSX.utils.json_to_sheet(nfSummary);
       ws2['!cols'] = Object.keys(nfSummary[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
       XLSX.utils.book_append_sheet(wb, ws2, 'Resumo NFs');
@@ -1401,7 +1464,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 mt-0.5">
+                    <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                       <span className="text-xs text-gray-500">{nf.fornecedor}</span>
                       <span className="text-xs text-gray-600">-</span>
                       <span className="text-xs text-gray-500">{new Date(nf.data_emissao).toLocaleDateString('pt-BR')}</span>
@@ -1411,6 +1474,15 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                           <span className="text-xs text-gray-500">{nf.delivery}</span>
                         </>
                       )}
+                      {(() => {
+                        const meta = parseXMLMeta(nf.xml_conteudo);
+                        return meta.xPed ? (
+                          <>
+                            <span className="text-xs text-gray-600">-</span>
+                            <span className="text-xs font-semibold" style={{ color: '#FFBF00' }}>PED.CLIENTE: {meta.xPed}</span>
+                          </>
+                        ) : null;
+                      })()}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
