@@ -227,8 +227,8 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
                   )}
                 </div>
 
-                {nf?.chave_acesso && (
-                  <div className="mt-4 pt-4 border-t border-[#00D4FF]/20">
+                <div className="mt-4 pt-4 border-t border-[#00D4FF]/20 flex items-center gap-3 flex-wrap">
+                  {nf?.chave_acesso && (
                     <button
                       onClick={handleDownloadPDF}
                       disabled={downloadingPDF}
@@ -246,16 +246,15 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
                         </>
                       )}
                     </button>
-
-                    <button
-                      onClick={() => setShowLabelSelector(true)}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors text-xs font-medium border border-[#39FF14]/30"
-                    >
-                      <Printer className="w-4 h-4" />
-                      GERAR ETIQUETAS
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => setShowLabelSelector(true)}
+                    className="flex items-center gap-2 px-4 py-2 bg-[#39FF14]/10 hover:bg-[#39FF14]/20 text-[#39FF14] rounded-lg transition-colors text-xs font-medium border border-[#39FF14]/30"
+                  >
+                    <Printer className="w-4 h-4" />
+                    GERAR ETIQUETAS
+                  </button>
+                </div>
               </div>
 
               <div className="premium-card p-6">
@@ -354,11 +353,11 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
       {showLabelSelector && nf && (
         <LabelSelector
           items={Object.values(pecasPorPN).map(grupo => ({
-            id: grupo[0].id,
-            part_number: grupo[0].pn,
-            descricao: grupo[0].descricao,
-            quantidade: grupo.length,
-            delivery: nf.fornecedor
+            id: grupo.pecas[0].id,
+            part_number: grupo.pn,
+            descricao: grupo.descricao,
+            quantidade: grupo.quantidade,
+            delivery: nf.delivery || nf.fornecedor
           }))}
           nfId={nf.id}
           nfNumero={nf.numero_nf}

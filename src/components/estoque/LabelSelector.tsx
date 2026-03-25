@@ -57,10 +57,19 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
         } catch (err) {
         }
 
+        const { data: pecaIds } = await supabase
+          .from('estoque_pecas')
+          .select('id_unico')
+          .eq('nf_id', nfId || '')
+          .eq('pn', item.part_number)
+          .order('created_at');
+
         for (let i = 0; i < item.quantidade; i++) {
-          const idSequencial = nfNumero
-            ? `NF${nfNumero.padStart(6, '0')}-${globalSeq.toString().padStart(3, '0')}`
-            : `P-${item.part_number.substring(0, 6).toUpperCase()}-${globalSeq.toString().padStart(3, '0')}`;
+          const idFromDb = pecaIds?.[i]?.id_unico;
+          const idSequencial = idFromDb
+            || (nfNumero
+              ? `NF${nfNumero.padStart(6, '0')}-${globalSeq.toString().padStart(3, '0')}`
+              : `P-${item.part_number.substring(0, 6).toUpperCase()}-${globalSeq.toString().padStart(3, '0')}`);
 
           // Gerar código de barras único
           let codigoBarras = '';

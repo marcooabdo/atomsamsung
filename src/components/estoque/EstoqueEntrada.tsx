@@ -1,11 +1,12 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
+import * as XLSX from 'xlsx';
 import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
-  Download, Eye, Trash2, Zap, X, Brain,
-  ChevronDown, Cpu, GripHorizontal, Minus, Maximize2,
-  Tag, ChevronRight, Code, ChevronLeft, ChevronsLeft, ChevronsRight
+  Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
+  ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
+  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 
@@ -104,7 +105,12 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [deletingNFId, setDeletingNFId] = useState<string | null>(null);
   const [nfPage, setNfPage] = useState(0);
   const [nfTotal, setNfTotal] = useState(0);
-  const NF_PER_PAGE = 15;
+  const NF_PER_PAGE = 100;
+  const [nfSearch, setNfSearch] = useState('');
+  const [nfDateFrom, setNfDateFrom] = useState('');
+  const [nfDateTo, setNfDateTo] = useState('');
+  const [exportingReport, setExportingReport] = useState(false);
+  const [exportingXmls, setExportingXmls] = useState(false);
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
@@ -114,78 +120,59 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [totalFiles, setTotalFiles] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [collapsedNFs, setCollapsedNFs] = useState<Record<number, boolean>>({});
-  const [isMinimized, setIsMinimized] = useState(false);
 
-  const [panelPos, setPanelPos] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const dragRef = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const panelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (showPreviewPanel && panelRef.current) {
-      const rect = panelRef.current.getBoundingClientRect();
-      setPanelPos({
-        x: window.innerWidth - rect.width - 24,
-        y: 24,
-      });
-    }
-  }, [showPreviewPanel]);
-
-  const handleMouseDown = useCallback((e: React.MouseEvent) => {
-    setIsDragging(true);
-    dragRef.current = {
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: panelPos.x,
-      origY: panelPos.y,
-    };
-  }, [panelPos]);
-
-  useEffect(() => {
-    if (!isDragging) return;
-    const handleMove = (e: MouseEvent) => {
-      if (!dragRef.current) return;
-      const dx = e.clientX - dragRef.current.startX;
-      const dy = e.clientY - dragRef.current.startY;
-      setPanelPos({
-        x: Math.max(0, Math.min(window.innerWidth - 400, dragRef.current.origX + dx)),
-        y: Math.max(0, Math.min(window.innerHeight - 100, dragRef.current.origY + dy)),
-      });
-    };
-    const handleUp = () => setIsDragging(false);
-    window.addEventListener('mousemove', handleMove);
-    window.addEventListener('mouseup', handleUp);
-    return () => {
-      window.removeEventListener('mousemove', handleMove);
-      window.removeEventListener('mouseup', handleUp);
-    };
-  }, [isDragging]);
+  const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setNfPage(0);
-    loadNFs(0);
+    loadNFs(0, '', '', '');
   }, [selectedUnidade]);
 
-  const loadNFs = async (page = nfPage) => {
+  const triggerSearch = (search: string, dateFrom: string, dateTo: string) => {
+    if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+    searchTimeoutRef.current = setTimeout(() => {
+      setNfPage(0);
+      loadNFs(0, search, dateFrom, dateTo);
+    }, 400);
+  };
+
+  const loadNFs = async (page = nfPage, search = nfSearch, dateFrom = nfDateFrom, dateTo = nfDateTo) => {
     try {
       const unidadeFilter = selectedUnidade || usuario?.unidade_id;
       if (!unidadeFilter) return;
       const from = page * NF_PER_PAGE;
       const to = from + NF_PER_PAGE - 1;
 
-      const { count } = await supabase
+      let countQuery = supabase
         .from('estoque_nfs')
         .select('id', { count: 'exact', head: true })
         .eq('unidade_id', unidadeFilter);
 
-      setNfTotal(count || 0);
-
-      const { data, error } = await supabase
+      let dataQuery = supabase
         .from('estoque_nfs')
         .select('*')
         .eq('unidade_id', unidadeFilter)
-        .order('created_at', { ascending: false })
-        .range(from, to);
+        .order('created_at', { ascending: false });
+
+      if (dateFrom) {
+        countQuery = countQuery.gte('data_emissao', dateFrom);
+        dataQuery = dataQuery.gte('data_emissao', dateFrom);
+      }
+      if (dateTo) {
+        countQuery = countQuery.lte('data_emissao', dateTo);
+        dataQuery = dataQuery.lte('data_emissao', dateTo);
+      }
+      if (search.trim()) {
+        const s = `%${search.trim()}%`;
+        const orFilter = `numero_nf.ilike.${s},fornecedor.ilike.${s},chave_acesso.ilike.${s},delivery.ilike.${s},xml_conteudo.ilike.${s}`;
+        countQuery = countQuery.or(orFilter);
+        dataQuery = dataQuery.or(orFilter);
+      }
+
+      const { count } = await countQuery;
+      setNfTotal(count || 0);
+
+      const { data, error } = await dataQuery.range(from, to);
       if (error) throw error;
       setNfs(data || []);
     } catch (err) {}
@@ -448,7 +435,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     let seq = 1;
 
     for (const peca of pecasInseridas) {
-      const idSequencial = `NF${nfRecord.numero_nf.padStart(6, '0')}-${seq.toString().padStart(3, '0')}`;
+      const idSequencial = peca.id_unico || `NF${nfRecord.numero_nf.padStart(6, '0')}-${seq.toString().padStart(3, '0')}`;
       let codigoBarras = '';
       try {
         const { data } = await supabase.rpc('gerar_codigo_barras');
@@ -741,7 +728,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `NF_${nf.numero_nf}.xml`;
+      a.download = nf.chave_acesso ? `${nf.chave_acesso}.xml` : `NF_${nf.numero_nf}.xml`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -766,6 +753,139 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
   };
 
+  const handleExportReport = async () => {
+    setExportingReport(true);
+    try {
+      const unidadeFilter = selectedUnidade || usuario?.unidade_id;
+      if (!unidadeFilter) return;
+
+      let query = supabase
+        .from('estoque_nfs')
+        .select('id, numero_nf, chave_acesso, fornecedor, data_emissao, valor_total, delivery, qtd_pecas, processada, created_at')
+        .eq('unidade_id', unidadeFilter)
+        .order('created_at', { ascending: false });
+
+      if (nfDateFrom) query = query.gte('data_emissao', nfDateFrom);
+      if (nfDateTo) query = query.lte('data_emissao', nfDateTo);
+      if (nfSearch.trim()) {
+        const s = `%${nfSearch.trim()}%`;
+        query = query.or(`numero_nf.ilike.${s},fornecedor.ilike.${s},chave_acesso.ilike.${s},delivery.ilike.${s},xml_conteudo.ilike.${s}`);
+      }
+
+      const { data: nfsData } = await query;
+      if (!nfsData || nfsData.length === 0) {
+        setError('Nenhuma NF encontrada para exportar');
+        return;
+      }
+
+      const nfIds = nfsData.map(n => n.id);
+      const { data: pecasData } = await supabase
+        .from('estoque_pecas')
+        .select('*, os:os_id(numero_os_interna, numero_os_samsung), nf:nf_id(numero_nf, delivery, fornecedor)')
+        .in('nf_id', nfIds)
+        .order('pn');
+
+      const rows = (pecasData || []).map((p: any) => ({
+        'NF': p.nf?.numero_nf || '',
+        'Fornecedor': p.nf?.fornecedor || '',
+        'Delivery': p.nf?.delivery || '',
+        'Part Number': p.pn,
+        'Descricao': p.descricao,
+        'ID Unico': p.id_unico || '',
+        'Qtd': 1,
+        'Valor Unitario': p.valor_unitario_sem_imposto || 0,
+        'Valor c/ Impostos': p.valor_com_impostos || 0,
+        'ICMS Valor': p.icms_valor || 0,
+        'ICMS %': p.icms_aliquota || 0,
+        'ICMS-ST Valor': p.icms_st_valor || 0,
+        'ICMS-ST %': p.icms_st_aliquota || 0,
+        'IPI Valor': p.ipi_valor || 0,
+        'IPI %': p.ipi_aliquota || 0,
+        'PIS Valor': p.pis_valor || 0,
+        'PIS %': p.pis_aliquota || 0,
+        'COFINS Valor': p.cofins_valor || 0,
+        'COFINS %': p.cofins_aliquota || 0,
+        'Status': p.status,
+        'OS': p.os?.numero_os_samsung || p.os?.numero_os_interna || '',
+        'Data Entrada': p.data_entrada ? new Date(p.data_entrada).toLocaleDateString('pt-BR') : '',
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const colWidths = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      ws['!cols'] = colWidths;
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Relatorio NFs');
+
+      const nfSummary = nfsData.map(n => ({
+        'NF': n.numero_nf,
+        'Fornecedor': n.fornecedor,
+        'Delivery': n.delivery || '',
+        'Data Emissao': n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '',
+        'Valor Total': n.valor_total,
+        'Qtd Pecas': n.qtd_pecas,
+        'Status': n.processada ? 'Processada' : 'Pendente',
+        'Chave Acesso': n.chave_acesso || '',
+      }));
+      const ws2 = XLSX.utils.json_to_sheet(nfSummary);
+      ws2['!cols'] = Object.keys(nfSummary[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
+      XLSX.utils.book_append_sheet(wb, ws2, 'Resumo NFs');
+
+      XLSX.writeFile(wb, `Relatorio_NFs_${new Date().toISOString().split('T')[0]}.xlsx`);
+      setSuccessMsg(`Relatorio exportado com ${rows.length} pecas de ${nfsData.length} NFs`);
+    } catch (err: any) {
+      setError(`Erro ao exportar: ${err.message}`);
+    } finally {
+      setExportingReport(false);
+    }
+  };
+
+  const handleExportAllXmls = async () => {
+    setExportingXmls(true);
+    try {
+      const unidadeFilter = selectedUnidade || usuario?.unidade_id;
+      if (!unidadeFilter) return;
+
+      let query = supabase
+        .from('estoque_nfs')
+        .select('numero_nf, chave_acesso, xml_conteudo')
+        .eq('unidade_id', unidadeFilter)
+        .not('xml_conteudo', 'is', null);
+
+      if (nfDateFrom) query = query.gte('data_emissao', nfDateFrom);
+      if (nfDateTo) query = query.lte('data_emissao', nfDateTo);
+      if (nfSearch.trim()) {
+        const s = `%${nfSearch.trim()}%`;
+        query = query.or(`numero_nf.ilike.${s},fornecedor.ilike.${s},chave_acesso.ilike.${s},delivery.ilike.${s},xml_conteudo.ilike.${s}`);
+      }
+
+      const { data: xmlsData } = await query;
+      if (!xmlsData || xmlsData.length === 0) {
+        setError('Nenhum XML disponivel para download');
+        return;
+      }
+
+      for (const nfXml of xmlsData) {
+        if (!nfXml.xml_conteudo) continue;
+        const blob = new Blob([nfXml.xml_conteudo], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = nfXml.chave_acesso ? `${nfXml.chave_acesso}.xml` : `NF_${nfXml.numero_nf}.xml`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        await new Promise(r => setTimeout(r, 100));
+      }
+
+      setSuccessMsg(`${xmlsData.length} XMLs baixados com sucesso`);
+    } catch (err: any) {
+      setError(`Erro ao exportar XMLs: ${err.message}`);
+    } finally {
+      setExportingXmls(false);
+    }
+  };
+
   const toggleNFCollapse = (nfIdx: number) => {
     setCollapsedNFs(prev => ({ ...prev, [nfIdx]: !prev[nfIdx] }));
   };
@@ -782,302 +902,276 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       />
 
       {showPreviewPanel && (
-        <div
-          ref={panelRef}
-          className="fixed z-50 flex flex-col"
-          style={{
-            left: panelPos.x,
-            top: panelPos.y,
-            width: isMinimized ? 420 : 680,
-            maxHeight: isMinimized ? 'auto' : 'calc(100vh - 48px)',
-            background: 'linear-gradient(135deg, #0a0a0a 0%, #0d1a0d 50%, #0a0a0a 100%)',
-            border: '1px solid rgba(var(--neon-green-rgb),0.3)',
-            borderRadius: 16,
-            boxShadow: '0 8px 60px rgba(0,0,0,0.6), 0 0 60px rgba(var(--neon-green-rgb),0.1)',
-            transition: isDragging ? 'none' : 'width 0.3s ease',
-          }}
-        >
-          {/* Draggable Header */}
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div
-            className="flex items-center justify-between px-4 py-3 cursor-move select-none"
-            onMouseDown={handleMouseDown}
+            className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
             style={{
-              background: 'linear-gradient(90deg, rgba(var(--neon-green-rgb),0.08) 0%, rgba(var(--neon-green-rgb),0.03) 60%, transparent 100%)',
-              borderBottom: isMinimized ? 'none' : '1px solid rgba(var(--neon-green-rgb),0.2)',
-              borderRadius: isMinimized ? 16 : '16px 16px 0 0',
+              background: 'linear-gradient(135deg, #0a0a0a 0%, #0d1a0d 50%, #0a0a0a 100%)',
+              border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+              borderRadius: 16,
+              boxShadow: '0 8px 60px rgba(0,0,0,0.6), 0 0 60px rgba(var(--neon-green-rgb),0.1)',
             }}
           >
-            <div className="flex items-center gap-3">
-              <GripHorizontal className="w-4 h-4 text-gray-600" />
-              <div
-                className="p-1.5 rounded-lg"
-                style={{
-                  background: 'rgba(var(--neon-green-rgb),0.1)',
-                  border: '1px solid rgba(var(--neon-green-rgb),0.3)',
-                }}
-              >
-                <Zap className="w-4 h-4" style={{ color: 'var(--neon-green)', filter: 'drop-shadow(0 0 6px var(--neon-green))' }} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-black tracking-[0.15em] uppercase" style={{ color: 'var(--neon-green)' }}>
-                    GIA STOCK
-                  </span>
-                  <span
-                    className="text-[10px] font-bold px-1.5 py-0.5 rounded-full tracking-wider"
-                    style={{
-                      background: 'rgba(var(--neon-green-rgb),0.15)',
-                      border: '1px solid rgba(var(--neon-green-rgb),0.4)',
-                      color: 'var(--neon-green)',
-                    }}
-                  >
-                    {allNFs.length} NF{allNFs.length > 1 ? 's' : ''}
-                  </span>
+            <div
+              className="flex items-center justify-between px-5 py-4 shrink-0"
+              style={{
+                background: 'linear-gradient(90deg, rgba(var(--neon-green-rgb),0.08) 0%, rgba(var(--neon-green-rgb),0.03) 60%, transparent 100%)',
+                borderBottom: '1px solid rgba(var(--neon-green-rgb),0.2)',
+                borderRadius: '16px 16px 0 0',
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="p-2 rounded-lg"
+                  style={{
+                    background: 'rgba(var(--neon-green-rgb),0.1)',
+                    border: '1px solid rgba(var(--neon-green-rgb),0.3)',
+                  }}
+                >
+                  <Zap className="w-5 h-5" style={{ color: 'var(--neon-green)', filter: 'drop-shadow(0 0 6px var(--neon-green))' }} />
                 </div>
-                {!isMinimized && (
-                  <p className="text-[10px] text-gray-500 mt-0.5">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-black tracking-[0.15em] uppercase" style={{ color: 'var(--neon-green)' }}>
+                      GIA STOCK
+                    </span>
+                    <span
+                      className="text-[10px] font-bold px-1.5 py-0.5 rounded-full tracking-wider"
+                      style={{
+                        background: 'rgba(var(--neon-green-rgb),0.15)',
+                        border: '1px solid rgba(var(--neon-green-rgb),0.4)',
+                        color: 'var(--neon-green)',
+                      }}
+                    >
+                      {allNFs.length} NF{allNFs.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-gray-500 mt-0.5">
                     {allPecas.length} pecas | {totalQtdAlocadas} alocadas | {totalQtdOFS} OFS
                   </p>
-                )}
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <button
-                onClick={() => setIsMinimized(!isMinimized)}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
-              >
-                {isMinimized ? <Maximize2 className="w-3.5 h-3.5 text-gray-500" /> : <Minus className="w-3.5 h-3.5 text-gray-500" />}
-              </button>
               <button
                 onClick={handleCancelImport}
-                className="p-1.5 rounded-lg transition-colors hover:bg-white/5"
+                className="p-2 rounded-lg transition-colors hover:bg-white/10"
               >
-                <X className="w-3.5 h-3.5 text-gray-500" />
+                <X className="w-5 h-5 text-gray-400" />
               </button>
             </div>
-          </div>
 
-          {!isMinimized && (
-            <>
-              {/* Stats bar */}
-              <div
-                className="flex items-center gap-4 px-4 py-2"
-                style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.3)' }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Cpu className="w-3.5 h-3.5" style={{ color: 'var(--neon-green)' }} />
-                  <span className="text-[10px] text-gray-400">
-                    <span style={{ color: 'var(--neon-green)' }}>{requisicoesDisponiveis.length} OS(s)</span> cruzadas
+            <div
+              className="flex items-center gap-4 px-5 py-2.5 shrink-0"
+              style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.3)' }}
+            >
+              <div className="flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5" style={{ color: 'var(--neon-green)' }} />
+                <span className="text-[11px] text-gray-400">
+                  <span style={{ color: 'var(--neon-green)' }}>{requisicoesDisponiveis.length} OS(s)</span> cruzadas
+                </span>
+              </div>
+              <div className="flex items-center gap-3 ml-auto">
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full" style={{ background: 'var(--neon-green)', boxShadow: '0 0 4px var(--neon-green)' }} />
+                  <span className="text-[11px] text-gray-300">
+                    <span style={{ color: 'var(--neon-green)' }} className="font-bold">{totalQtdAlocadas}</span> OS
                   </span>
                 </div>
-                <div className="flex items-center gap-3 ml-auto">
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--neon-green)', boxShadow: '0 0 4px var(--neon-green)' }} />
-                    <span className="text-[10px] text-gray-300">
-                      <span style={{ color: 'var(--neon-green)' }} className="font-bold">{totalQtdAlocadas}</span> OS
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-gray-600" />
-                    <span className="text-[10px] text-gray-400">
-                      <span className="text-gray-300 font-bold">{totalQtdOFS}</span> OFS
-                    </span>
-                  </div>
+                <div className="flex items-center gap-1">
+                  <div className="w-2 h-2 rounded-full bg-gray-600" />
+                  <span className="text-[11px] text-gray-400">
+                    <span className="text-gray-300 font-bold">{totalQtdOFS}</span> OFS
+                  </span>
                 </div>
               </div>
+            </div>
 
-              {/* NFs grouped list */}
-              <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(var(--neon-green-rgb),0.3) transparent', maxHeight: 'calc(100vh - 240px)' }}>
-                {allNFs.map((nf, nfIdx) => {
-                  const nfPecas = allPecas.filter(p => p.nfIndex === nfIdx);
-                  const nfAlocadas = nfPecas.filter(p => p.os_alocada_id).length;
-                  const isCollapsed = collapsedNFs[nfIdx];
+            <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(var(--neon-green-rgb),0.3) transparent' }}>
+              {allNFs.map((nf, nfIdx) => {
+                const nfPecas = allPecas.filter(p => p.nfIndex === nfIdx);
+                const nfAlocadas = nfPecas.filter(p => p.os_alocada_id).length;
+                const isCollapsed = collapsedNFs[nfIdx];
 
-                  return (
-                    <div key={nfIdx} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
-                      {/* NF Header */}
-                      <button
-                        onClick={() => toggleNFCollapse(nfIdx)}
-                        className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.02]"
-                        style={{
-                          background: 'linear-gradient(90deg, rgba(0,212,255,0.05) 0%, transparent 100%)',
-                          borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.05)',
-                        }}
-                      >
-                        <ChevronRight
-                          className="w-4 h-4 text-gray-500 transition-transform"
-                          style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
-                        />
-                        <FileText className="w-4 h-4" style={{ color: '#00D4FF' }} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs font-black text-white">NF {nf.numeroNF}</span>
-                            {nf.delivery && (
-                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
-                                {nf.delivery}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            <span className="text-[10px] text-gray-500 truncate">{nf.fornecedor}</span>
-                            <span className="text-[10px]" style={{ color: 'var(--neon-green)' }}>
-                              R$ {nf.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                return (
+                  <div key={nfIdx} className="rounded-xl overflow-hidden" style={{ border: '1px solid rgba(255,255,255,0.08)' }}>
+                    <button
+                      onClick={() => toggleNFCollapse(nfIdx)}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-white/[0.02]"
+                      style={{
+                        background: 'linear-gradient(90deg, rgba(0,212,255,0.05) 0%, transparent 100%)',
+                        borderBottom: isCollapsed ? 'none' : '1px solid rgba(255,255,255,0.05)',
+                      }}
+                    >
+                      <ChevronRight
+                        className="w-4 h-4 text-gray-500 transition-transform"
+                        style={{ transform: isCollapsed ? 'rotate(0deg)' : 'rotate(90deg)' }}
+                      />
+                      <FileText className="w-4 h-4" style={{ color: '#00D4FF' }} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono text-xs font-black text-white">NF {nf.numeroNF}</span>
+                          {nf.delivery && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/20 text-cyan-400">
+                              {nf.delivery}
                             </span>
-                          </div>
+                          )}
                         </div>
-                        <div className="text-right shrink-0">
-                          <div className="text-[10px] text-gray-400">{nfPecas.length} pc</div>
-                          <div className="text-[10px]" style={{ color: nfAlocadas > 0 ? 'var(--neon-green)' : '#6B7280' }}>
-                            {nfAlocadas} alocadas
-                          </div>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-[10px] text-gray-500 truncate">{nf.fornecedor}</span>
+                          <span className="text-[10px]" style={{ color: 'var(--neon-green)' }}>
+                            R$ {nf.valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
                         </div>
-                      </button>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="text-[10px] text-gray-400">{nfPecas.length} pc</div>
+                        <div className="text-[10px]" style={{ color: nfAlocadas > 0 ? 'var(--neon-green)' : '#6B7280' }}>
+                          {nfAlocadas} alocadas
+                        </div>
+                      </div>
+                    </button>
 
-                      {/* NF Parts */}
-                      {!isCollapsed && (
-                        <div className="space-y-1 p-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
-                          {nfPecas.map((peca) => {
-                            const osCompativeis = requisicoesDisponiveis.filter(r => r.codigo_peca === peca.pn);
-                            const isAlocada = !!peca.os_alocada_id;
-                            const selectedReq = requisicoesDisponiveis.find(r => r.os_id === peca.os_alocada_id && r.codigo_peca === peca.pn);
-                            const priorityTag = selectedReq ? getPriorityTag(selectedReq) : null;
+                    {!isCollapsed && (
+                      <div className="space-y-1 p-2" style={{ background: 'rgba(0,0,0,0.2)' }}>
+                        {nfPecas.map((peca) => {
+                          const osCompativeis = requisicoesDisponiveis.filter(r => r.codigo_peca === peca.pn);
+                          const isAlocada = !!peca.os_alocada_id;
+                          const selectedReq = requisicoesDisponiveis.find(r => r.os_id === peca.os_alocada_id && r.codigo_peca === peca.pn);
+                          const priorityTag = selectedReq ? getPriorityTag(selectedReq) : null;
 
-                            return (
-                              <div
-                                key={peca.id_temp}
-                                className="flex flex-col gap-2 rounded-lg p-2.5 transition-all"
-                                style={{
-                                  background: isAlocada
-                                    ? 'rgba(var(--neon-green-rgb),0.04)'
-                                    : 'rgba(255,255,255,0.02)',
-                                  border: isAlocada
-                                    ? '1px solid rgba(var(--neon-green-rgb),0.2)'
-                                    : '1px solid rgba(255,255,255,0.05)',
-                                }}
-                              >
-                                <div className="flex items-center gap-2">
-                                  <span className="font-mono text-xs font-bold" style={{ color: '#00D4FF' }}>{peca.pn}</span>
-                                  {peca.valorComImpostos > 0 && (
-                                    <span className="text-[10px] text-gray-500 font-mono">R$ {peca.valorComImpostos.toFixed(2)}</span>
-                                  )}
-                                  {priorityTag && PRIORITY_LABELS[priorityTag] && (
-                                    <span
-                                      className="text-[9px] font-bold px-1.5 py-0.5 rounded ml-auto shrink-0"
-                                      style={{
-                                        background: PRIORITY_LABELS[priorityTag].bg,
-                                        border: `1px solid ${PRIORITY_LABELS[priorityTag].border}`,
-                                        color: PRIORITY_LABELS[priorityTag].color,
-                                      }}
-                                    >
-                                      {PRIORITY_LABELS[priorityTag].label}
-                                    </span>
-                                  )}
-                                  {isAlocada ? (
-                                    <CheckCircle className="w-3.5 h-3.5 shrink-0 ml-auto" style={{ color: 'var(--neon-green)' }} />
-                                  ) : (
-                                    <Package className="w-3.5 h-3.5 text-gray-600 shrink-0 ml-auto" />
-                                  )}
-                                </div>
-                                <p className="text-[10px] text-gray-500 truncate -mt-1">{peca.descricao}</p>
-
-                                <div className="relative">
-                                  <select
-                                    value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}|${peca.os_peca_id || ''}`}
-                                    onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
-                                    className="w-full appearance-none text-[11px] rounded-lg px-2.5 py-2 pr-7 outline-none transition-all"
+                          return (
+                            <div
+                              key={peca.id_temp}
+                              className="flex flex-col gap-2 rounded-lg p-2.5 transition-all"
+                              style={{
+                                background: isAlocada
+                                  ? 'rgba(var(--neon-green-rgb),0.04)'
+                                  : 'rgba(255,255,255,0.02)',
+                                border: isAlocada
+                                  ? '1px solid rgba(var(--neon-green-rgb),0.2)'
+                                  : '1px solid rgba(255,255,255,0.05)',
+                              }}
+                            >
+                              <div className="flex items-center gap-2">
+                                <span className="font-mono text-xs font-bold" style={{ color: '#00D4FF' }}>{peca.pn}</span>
+                                {peca.valorComImpostos > 0 && (
+                                  <span className="text-[10px] text-gray-500 font-mono">R$ {peca.valorComImpostos.toFixed(2)}</span>
+                                )}
+                                {priorityTag && PRIORITY_LABELS[priorityTag] && (
+                                  <span
+                                    className="text-[9px] font-bold px-1.5 py-0.5 rounded ml-auto shrink-0"
                                     style={{
-                                      background: isAlocada ? 'rgba(var(--neon-green-rgb),0.06)' : 'rgba(0,0,0,0.4)',
-                                      border: isAlocada ? '1px solid rgba(var(--neon-green-rgb),0.35)' : '1px solid rgba(255,255,255,0.1)',
-                                      color: isAlocada ? 'var(--neon-green)' : '#9CA3AF',
+                                      background: PRIORITY_LABELS[priorityTag].bg,
+                                      border: `1px solid ${PRIORITY_LABELS[priorityTag].border}`,
+                                      color: PRIORITY_LABELS[priorityTag].color,
                                     }}
                                   >
-                                    <option value="||" style={{ background: '#111', color: '#9CA3AF' }}>
-                                      Enviar para Estoque Livre (OFS)
-                                    </option>
-                                    {osCompativeis.map(req => {
-                                      if (!req.os) return null;
-                                      const daysOpen = (Date.now() - new Date(req.os.created_at).getTime()) / 86400000;
-                                      const isAtrasada = daysOpen > 10;
-                                      return (
-                                        <option key={req.id} value={`${req.os_id}|${req.id}|${req.os_peca_id || ''}`} style={{ background: '#111', color: '#fff' }}>
-                                          OS {req.os.numero_os_samsung || req.os.numero_os_interna}
-                                          {' '}- {req.os.tipo_os || ''}
-                                          {isAtrasada ? ' - ATRASADA' : ''}
-                                          {req.os.tipo_os === 'LP' ? ' - GARANTIA' : ''}
-                                        </option>
-                                      );
-                                    })}
-                                  </select>
-                                  <ChevronDown
-                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
-                                    style={{ color: isAlocada ? 'var(--neon-green)' : '#6B7280' }}
-                                  />
-                                </div>
+                                    {PRIORITY_LABELS[priorityTag].label}
+                                  </span>
+                                )}
+                                {isAlocada ? (
+                                  <CheckCircle className="w-3.5 h-3.5 shrink-0 ml-auto" style={{ color: 'var(--neon-green)' }} />
+                                ) : (
+                                  <Package className="w-3.5 h-3.5 text-gray-600 shrink-0 ml-auto" />
+                                )}
                               </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
+                              <p className="text-[10px] text-gray-500 truncate -mt-1">{peca.descricao}</p>
 
-              {/* Footer */}
-              <div
-                className="flex items-center justify-between px-4 py-3 gap-2"
-                style={{
-                  borderTop: '1px solid rgba(var(--neon-green-rgb),0.15)',
-                  background: 'rgba(0,0,0,0.5)',
-                  borderRadius: '0 0 16px 16px',
-                }}
-              >
-                <div className="flex items-center gap-1.5">
-                  <Brain className="w-3.5 h-3.5" style={{ color: 'var(--neon-green)' }} />
-                  <span className="text-[10px] text-gray-400">
-                    <span style={{ color: 'var(--neon-green)' }} className="font-black">{totalQtdAlocadas}</span>
-                    <span className="text-gray-600"> / </span>
-                    <span className="text-gray-300 font-bold">{allPecas.length}</span>
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleCancelImport}
-                    className="px-3 py-2 rounded-lg text-xs font-medium transition-all"
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid rgba(255,255,255,0.1)',
-                      color: '#9CA3AF',
-                    }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleConfirmAllImport}
-                    disabled={isSaving}
-                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black transition-all disabled:opacity-50"
-                    style={{
-                      background: isSaving ? 'rgba(var(--neon-green-rgb),0.4)' : 'var(--neon-green)',
-                      color: '#000',
-                      boxShadow: isSaving ? 'none' : '0 0 16px rgba(var(--neon-green-rgb),0.3)',
-                    }}
-                  >
-                    {isSaving ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                        Processando...
-                      </>
-                    ) : (
-                      <>
-                        <Zap className="w-3.5 h-3.5" />
-                        Gerar Entrada e Etiquetas
-                      </>
+                              <div className="relative">
+                                <select
+                                  value={`${peca.os_alocada_id}|${peca.requisicao_alocada_id}|${peca.os_peca_id || ''}`}
+                                  onChange={(e) => handleAlocacaoChange(peca.id_temp, e.target.value)}
+                                  className="w-full appearance-none text-[11px] rounded-lg px-2.5 py-2 pr-7 outline-none transition-all"
+                                  style={{
+                                    background: isAlocada ? 'rgba(var(--neon-green-rgb),0.06)' : 'rgba(0,0,0,0.4)',
+                                    border: isAlocada ? '1px solid rgba(var(--neon-green-rgb),0.35)' : '1px solid rgba(255,255,255,0.1)',
+                                    color: isAlocada ? 'var(--neon-green)' : '#9CA3AF',
+                                  }}
+                                >
+                                  <option value="||" style={{ background: '#111', color: '#9CA3AF' }}>
+                                    Enviar para Estoque Livre (OFS)
+                                  </option>
+                                  {osCompativeis.map(req => {
+                                    if (!req.os) return null;
+                                    const daysOpen = (Date.now() - new Date(req.os.created_at).getTime()) / 86400000;
+                                    const isAtrasada = daysOpen > 10;
+                                    return (
+                                      <option key={req.id} value={`${req.os_id}|${req.id}|${req.os_peca_id || ''}`} style={{ background: '#111', color: '#fff' }}>
+                                        OS {req.os.numero_os_samsung || req.os.numero_os_interna}
+                                        {' '}- {req.os.tipo_os || ''}
+                                        {isAtrasada ? ' - ATRASADA' : ''}
+                                        {req.os.tipo_os === 'LP' ? ' - GARANTIA' : ''}
+                                      </option>
+                                    );
+                                  })}
+                                </select>
+                                <ChevronDown
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none"
+                                  style={{ color: isAlocada ? 'var(--neon-green)' : '#6B7280' }}
+                                />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     )}
-                  </button>
-                </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div
+              className="flex items-center justify-between px-5 py-4 gap-3 shrink-0"
+              style={{
+                borderTop: '1px solid rgba(var(--neon-green-rgb),0.15)',
+                background: 'rgba(0,0,0,0.5)',
+                borderRadius: '0 0 16px 16px',
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <Brain className="w-4 h-4" style={{ color: 'var(--neon-green)' }} />
+                <span className="text-xs text-gray-400">
+                  <span style={{ color: 'var(--neon-green)' }} className="font-black">{totalQtdAlocadas}</span>
+                  <span className="text-gray-600"> / </span>
+                  <span className="text-gray-300 font-bold">{allPecas.length}</span>
+                </span>
               </div>
-            </>
-          )}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleCancelImport}
+                  className="px-4 py-2.5 rounded-lg text-xs font-medium transition-all"
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    color: '#9CA3AF',
+                  }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleConfirmAllImport}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-black transition-all disabled:opacity-50"
+                  style={{
+                    background: isSaving ? 'rgba(var(--neon-green-rgb),0.4)' : 'var(--neon-green)',
+                    color: '#000',
+                    boxShadow: isSaving ? 'none' : '0 0 16px rgba(var(--neon-green-rgb),0.3)',
+                  }}
+                >
+                  {isSaving ? (
+                    <>
+                      <div className="w-3.5 h-3.5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Zap className="w-3.5 h-3.5" />
+                      Gerar Entrada e Etiquetas
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1170,11 +1264,95 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           </div>
         )}
 
-        {nfs.length > 0 && (
-          <div>
-            <h3 className="text-xs font-black tracking-[0.2em] uppercase mb-4" style={{ color: '#00D4FF' }}>
+        <div>
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+            <h3 className="text-xs font-black tracking-[0.2em] uppercase" style={{ color: '#00D4FF' }}>
               Notas Fiscais ({nfTotal})
             </h3>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={handleExportReport}
+                disabled={exportingReport || nfTotal === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40"
+                style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)', color: '#00D4FF' }}
+                title="Exportar relatorio completo em Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" />
+                {exportingReport ? 'Exportando...' : 'Relatorio'}
+              </button>
+              <button
+                onClick={handleExportAllXmls}
+                disabled={exportingXmls || nfTotal === 0}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40"
+                style={{ background: 'rgba(255,191,0,0.08)', border: '1px solid rgba(255,191,0,0.25)', color: '#FFBF00' }}
+                title="Baixar todos os XMLs do filtro atual"
+              >
+                <Archive className="w-3.5 h-3.5" />
+                {exportingXmls ? 'Baixando...' : 'Exportar XMLs'}
+              </button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 mb-4 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={nfSearch}
+                onChange={(e) => {
+                  setNfSearch(e.target.value);
+                  triggerSearch(e.target.value, nfDateFrom, nfDateTo);
+                }}
+                placeholder="Buscar NF, PN, delivery, fornecedor, chave..."
+                className="w-full pl-9 pr-3 py-2 rounded-lg text-xs outline-none transition-all"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-gray-500 shrink-0" />
+              <input
+                type="date"
+                value={nfDateFrom}
+                onChange={(e) => {
+                  setNfDateFrom(e.target.value);
+                  setNfPage(0);
+                  loadNFs(0, nfSearch, e.target.value, nfDateTo);
+                }}
+                className="px-2 py-2 rounded-lg text-xs outline-none"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#9CA3AF' }}
+              />
+              <span className="text-xs text-gray-600">ate</span>
+              <input
+                type="date"
+                value={nfDateTo}
+                onChange={(e) => {
+                  setNfDateTo(e.target.value);
+                  setNfPage(0);
+                  loadNFs(0, nfSearch, nfDateFrom, e.target.value);
+                }}
+                className="px-2 py-2 rounded-lg text-xs outline-none"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.1)', color: '#9CA3AF' }}
+              />
+              {(nfSearch || nfDateFrom || nfDateTo) && (
+                <button
+                  onClick={() => {
+                    setNfSearch('');
+                    setNfDateFrom('');
+                    setNfDateTo('');
+                    setNfPage(0);
+                    loadNFs(0, '', '', '');
+                  }}
+                  className="px-2 py-2 rounded-lg text-[10px] font-bold transition-colors hover:bg-white/5"
+                  style={{ color: '#FF0064' }}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+          </div>
+
+          {nfs.length > 0 ? (
+            <>
             <div className="space-y-2">
               {nfs.map(nf => (
                 <div
@@ -1286,18 +1464,21 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 </div>
               </div>
             )}
-          </div>
-        )}
-
-        {nfs.length === 0 && !uploading && !isSaving && (
-          <div className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="p-5 rounded-2xl mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-              <Package className="w-10 h-10 text-gray-700" />
+            </>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="p-5 rounded-2xl mb-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                <Package className="w-10 h-10 text-gray-700" />
+              </div>
+              <p className="text-gray-500 font-medium">
+                {nfSearch || nfDateFrom || nfDateTo ? 'Nenhuma NF encontrada com os filtros aplicados' : 'Nenhuma NF importada ainda'}
+              </p>
+              <p className="text-xs text-gray-600 mt-1">
+                {nfSearch || nfDateFrom || nfDateTo ? 'Tente alterar os filtros de busca' : 'Faca upload de um XML para comecar'}
+              </p>
             </div>
-            <p className="text-gray-500 font-medium">Nenhuma NF importada ainda</p>
-            <p className="text-xs text-gray-600 mt-1">Faca upload de um XML para comecar</p>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </>
   );
