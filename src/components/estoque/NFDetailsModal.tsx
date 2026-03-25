@@ -37,6 +37,7 @@ interface NFDetails {
   pdf_url: string | null;
   processada: boolean;
   created_at: string;
+  unidade_id: string;
 }
 
 export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
@@ -362,7 +363,7 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
           }))}
           nfId={nf.id}
           nfNumero={nf.numero_nf}
-          unidadeId={pecas[0]?.id || ''}
+          unidadeId={nf.unidade_id}
           onGenerate={(labels) => {
             setGeneratedLabels(labels);
             setShowLabelSelector(false);
