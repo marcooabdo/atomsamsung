@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
+import JSZip from 'jszip';
 import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
@@ -859,14 +860,15 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       }
 
       const { data: xmlsData } = await query;
-      if (!xmlsData || xmlsData.length === 0) {
+      const validXmls = xmlsData?.filter(x => x.xml_conteudo) || [];
+      if (validXmls.length === 0) {
         setError('Nenhum XML disponivel para download');
         return;
       }
 
-      for (const nfXml of xmlsData) {
-        if (!nfXml.xml_conteudo) continue;
-        const blob = new Blob([nfXml.xml_conteudo], { type: 'application/xml' });
+      if (validXmls.length === 1) {
+        const nfXml = validXmls[0];
+        const blob = new Blob([nfXml.xml_conteudo!], { type: 'application/xml' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
@@ -875,10 +877,24 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        await new Promise(r => setTimeout(r, 100));
+      } else {
+        const zip = new JSZip();
+        for (const nfXml of validXmls) {
+          const filename = nfXml.chave_acesso ? `${nfXml.chave_acesso}.xml` : `NF_${nfXml.numero_nf}.xml`;
+          zip.file(filename, nfXml.xml_conteudo!);
+        }
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+        const url = URL.createObjectURL(zipBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `XMLs_NFs_${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       }
 
-      setSuccessMsg(`${xmlsData.length} XMLs baixados com sucesso`);
+      setSuccessMsg(`${validXmls.length} XML${validXmls.length > 1 ? 's' : ''} baixado${validXmls.length > 1 ? 's' : ''} com sucesso`);
     } catch (err: any) {
       setError(`Erro ao exportar XMLs: ${err.message}`);
     } finally {
