@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { X, Download, Package, Truck, FileText, ExternalLink, Printer } from 'lucide-react';
 import { LabelSelector } from './LabelSelector';
@@ -163,7 +164,7 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
 
   if (!isOpen) return null;
 
-  return (
+  return createPortal(
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="premium-card w-full max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <div className="flex items-center justify-between p-6 border-b border-[#00D4FF]/20">
@@ -381,6 +382,7 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
           }}
         />
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
