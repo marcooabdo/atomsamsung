@@ -9,7 +9,7 @@ import {
 import {
   validarFechamentoOS,
   salvarAlertasFechamento,
-  criarAlertasGIAAudit,
+  criarAlertasGIAWarranty,
   executarFechamentoOS,
   type AlertaFechamento,
   type ValidacaoResultado,
@@ -60,7 +60,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
       await salvarAlertasFechamento(osId, unidadeId, allAlertas);
 
       if (allAlertas.length > 0) {
-        await criarAlertasGIAAudit(osId, osNumero, unidadeId, allAlertas);
+        await criarAlertasGIAWarranty(osId, osNumero, unidadeId, allAlertas);
       }
     } catch {
       setResultado({
@@ -195,7 +195,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
                 <Zap className="w-6 h-6 text-cyan-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
               </div>
               <div className="text-center">
-                <p className="text-sm font-bold text-white">GIA Audit analisando...</p>
+                <p className="text-sm font-bold text-white">GIA Warranty analisando...</p>
                 <p className="text-xs text-gray-500 mt-1">Verificando todas as regras de fechamento</p>
               </div>
             </div>

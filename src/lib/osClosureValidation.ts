@@ -405,7 +405,7 @@ export async function salvarAlertasFechamento(
   await supabase.from('os_alertas_fechamento').insert(rows);
 }
 
-export async function criarAlertasGIAAudit(
+export async function criarAlertasGIAWarranty(
   osId: string,
   osNumero: string,
   unidadeId: string,
@@ -439,7 +439,7 @@ export async function criarAlertasGIAAudit(
     .from('gia_mural_tarefas')
     .select('id')
     .eq('os_id', osId)
-    .eq('gia_source', 'GIA Audit')
+    .eq('gia_source', 'GIA Warranty')
     .eq('status', 'pendente')
     .maybeSingle();
 
@@ -452,8 +452,8 @@ export async function criarAlertasGIAAudit(
     }).eq('id', existing.id);
   } else {
     await supabase.from('gia_mural_tarefas').insert({
-      gia_source: 'GIA Audit',
-      gia_responsavel: 'GIA Audit',
+      gia_source: 'GIA Warranty',
+      gia_responsavel: 'GIA Warranty',
       prioridade: bloqueios.length > 0 ? 'alta' : 'normal',
       titulo,
       descricao,
