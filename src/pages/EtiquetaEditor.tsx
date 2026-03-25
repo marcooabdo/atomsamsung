@@ -6,7 +6,8 @@ import JsBarcode from 'jsbarcode';
 import {
   Printer, Save, FolderOpen, Plus, Trash2, Type, BarChart3,
   Minus, Square, Copy, AlignLeft, AlignCenter, AlignRight,
-  Bold, ChevronDown, Star, X, Loader2, Image as ImageIcon, Upload
+  Bold, ChevronDown, Star, X, Loader2, Image as ImageIcon, Upload,
+  Check, Building2
 } from 'lucide-react';
 
 interface ElementoEtiqueta {
@@ -100,6 +101,7 @@ export default function EtiquetaEditor() {
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [unidadeSelecionada, setUnidadeSelecionada] = useState<string | null>(null);
+  const [unidadesSalvar, setUnidadesSalvar] = useState<string[]>([]);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -246,35 +248,68 @@ export default function EtiquetaEditor() {
   };
 
   const salvarTemplate = async (comoNovo = false) => {
-    if (!unidadeId) {
-      alert('Selecione uma unidade primeiro');
+    const targetUnits = needsUnitSelector && unidadesSalvar.length > 0
+      ? unidadesSalvar
+      : unidadeId ? [unidadeId] : [];
+
+    if (targetUnits.length === 0) {
+      alert('Selecione ao menos uma unidade');
       return;
     }
     setSaving(true);
 
-    const templateData = {
-      unidade_id: unidadeId,
-      nome: nomeTemplate,
-      largura_mm: larguraMm,
-      altura_mm: alturaMm,
-      elementos: elementos,
-      is_padrao: templateAtual?.is_padrao || templates.length === 0
-    };
-
     try {
+      const primaryUnit = unidadeId || targetUnits[0];
+
       if (templateAtual && !comoNovo) {
         await supabase
           .from('etiquetas_templates')
-          .update(templateData)
+          .update({
+            unidade_id: primaryUnit,
+            nome: nomeTemplate,
+            largura_mm: larguraMm,
+            altura_mm: alturaMm,
+            elementos: elementos,
+            is_padrao: templateAtual.is_padrao,
+          })
           .eq('id', templateAtual.id);
+
+        const extraUnits = targetUnits.filter(uid => uid !== primaryUnit);
+        if (extraUnits.length > 0) {
+          const rows = extraUnits.map(uid => ({
+            unidade_id: uid,
+            nome: nomeTemplate,
+            largura_mm: larguraMm,
+            altura_mm: alturaMm,
+            elementos: elementos,
+            is_padrao: false,
+          }));
+          await supabase.from('etiquetas_templates').insert(rows);
+        }
       } else {
-        const { data } = await supabase
-          .from('etiquetas_templates')
-          .insert(templateData)
-          .select()
-          .single();
-        if (data) {
-          setTemplateAtual(data);
+        const rows = targetUnits.map((uid, i) => ({
+          unidade_id: uid,
+          nome: nomeTemplate,
+          largura_mm: larguraMm,
+          altura_mm: alturaMm,
+          elementos: elementos,
+          is_padrao: i === 0 && templates.length === 0,
+        }));
+
+        if (rows.length === 1) {
+          const { data } = await supabase
+            .from('etiquetas_templates')
+            .insert(rows[0])
+            .select()
+            .single();
+          if (data) setTemplateAtual(data);
+        } else {
+          const { data } = await supabase
+            .from('etiquetas_templates')
+            .insert(rows)
+            .select();
+          const mine = data?.find(t => t.unidade_id === primaryUnit);
+          if (mine) setTemplateAtual(mine);
         }
       }
       await loadTemplates();
@@ -922,7 +957,10 @@ export default function EtiquetaEditor() {
             <FolderOpen className="w-4 h-4" /> Templates
           </button>
           <button
-            onClick={() => setShowSaveModal(true)}
+            onClick={() => {
+              setUnidadesSalvar(unidadeId ? [unidadeId] : []);
+              setShowSaveModal(true);
+            }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 text-sm"
           >
             <Save className="w-4 h-4" /> Salvar
@@ -1453,20 +1491,6 @@ export default function EtiquetaEditor() {
           <div className="bg-[#1A1A2E] rounded-xl border border-white/10 w-full max-w-md p-6">
             <h3 className="font-semibold mb-4">Salvar Template</h3>
             <div className="space-y-4">
-              {needsUnitSelector && (
-                <div>
-                  <label className="text-sm text-gray-400">Unidade</label>
-                  <select
-                    value={unidadeSelecionada || ''}
-                    onChange={(e) => setUnidadeSelecionada(e.target.value || null)}
-                    className="w-full mt-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
-                  >
-                    {unidades.map(u => (
-                      <option key={u.id} value={u.id} className="bg-[#1A1A2E]">{u.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
               <div>
                 <label className="text-sm text-gray-400">Nome do Template</label>
                 <input
@@ -1476,7 +1500,63 @@ export default function EtiquetaEditor() {
                   className="w-full mt-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg"
                 />
               </div>
-              <div className="flex gap-2">
+              {needsUnitSelector && (
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm text-gray-400 flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5" />
+                      Unidades
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (unidadesSalvar.length === unidades.length) {
+                          setUnidadesSalvar(unidadeId ? [unidadeId] : []);
+                        } else {
+                          setUnidadesSalvar(unidades.map(u => u.id));
+                        }
+                      }}
+                      className="text-xs text-cyan-400 hover:text-cyan-300 transition-colors"
+                    >
+                      {unidadesSalvar.length === unidades.length ? 'Desmarcar todas' : 'Selecionar todas'}
+                    </button>
+                  </div>
+                  <div className="space-y-1 max-h-48 overflow-y-auto rounded-lg border border-white/10 p-2">
+                    {unidades.map(u => {
+                      const selected = unidadesSalvar.includes(u.id);
+                      return (
+                        <button
+                          key={u.id}
+                          type="button"
+                          onClick={() => {
+                            setUnidadesSalvar(prev =>
+                              selected ? prev.filter(id => id !== u.id) : [...prev, u.id]
+                            );
+                          }}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left text-sm transition-all ${
+                            selected
+                              ? 'bg-cyan-500/15 text-cyan-300 border border-cyan-500/30'
+                              : 'bg-white/5 text-gray-400 border border-transparent hover:bg-white/10 hover:text-gray-300'
+                          }`}
+                        >
+                          <div className={`w-4 h-4 rounded flex items-center justify-center flex-shrink-0 transition-colors ${
+                            selected ? 'bg-cyan-500 text-black' : 'border border-white/20'
+                          }`}>
+                            {selected && <Check className="w-3 h-3" />}
+                          </div>
+                          <span className="truncate">{u.nome}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {unidadesSalvar.length > 0 && (
+                    <p className="text-xs text-gray-500 mt-1.5">
+                      {unidadesSalvar.length} unidade{unidadesSalvar.length !== 1 ? 's' : ''} selecionada{unidadesSalvar.length !== 1 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
+              <div className="flex gap-2 pt-1">
                 <button
                   onClick={() => setShowSaveModal(false)}
                   className="flex-1 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20"
@@ -1494,8 +1574,8 @@ export default function EtiquetaEditor() {
                 )}
                 <button
                   onClick={() => salvarTemplate(false)}
-                  disabled={saving}
-                  className="flex-1 px-4 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-400 font-medium"
+                  disabled={saving || (needsUnitSelector && unidadesSalvar.length === 0)}
+                  className="flex-1 px-4 py-2 bg-cyan-500 text-black rounded-lg hover:bg-cyan-400 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {saving ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : templateAtual ? 'Atualizar' : 'Salvar'}
                 </button>
