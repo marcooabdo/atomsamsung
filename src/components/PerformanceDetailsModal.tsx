@@ -7,7 +7,7 @@ interface PerformanceOS {
   tipo_os: 'LP' | 'OW';
   cliente_nome: string;
   created_at: string;
-  data_fechamento: string | null;
+  fechada_em: string | null;
   coluna_kanban: string;
   tempo_resolucao_dias: number;
   valor_total: number;
@@ -44,7 +44,7 @@ export function PerformanceDetailsModal({ isOpen, onClose, metric, title, osList
     const ws = XLSX.utils.json_to_sheet(osList.map(os => ({
       'Número OS': os.numero_os, 'Tipo': os.tipo_os, 'Cliente': os.cliente_nome,
       'Data Abertura': new Date(os.created_at).toLocaleDateString('pt-BR'),
-      'Data Fechamento': os.data_fechamento ? new Date(os.data_fechamento).toLocaleDateString('pt-BR') : 'Em aberto',
+      'Data Fechamento': os.fechada_em ? new Date(os.fechada_em).toLocaleDateString('pt-BR') : 'Em aberto',
       'Status': os.status_final === 'aprovado' ? 'Aprovado' : os.status_final === 'reprovado' ? 'Reprovado' : 'Em aberto',
       'Tempo (dias)': os.tempo_resolucao_dias, 'Valor Total': `R$ ${os.valor_total.toFixed(2)}`, 'Coluna': os.coluna_kanban
     })));
@@ -159,7 +159,7 @@ export function PerformanceDetailsModal({ isOpen, onClose, metric, title, osList
                     </td>
                     <td className="p-4"><span className="text-sm" style={{ color: 'var(--text-primary)' }}>{os.cliente_nome}</span></td>
                     <td className="p-4"><span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{new Date(os.created_at).toLocaleDateString('pt-BR')}</span></td>
-                    <td className="p-4"><span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.data_fechamento ? new Date(os.data_fechamento).toLocaleDateString('pt-BR') : '-'}</span></td>
+                    <td className="p-4"><span className="text-xs" style={{ color: 'var(--text-secondary)' }}>{os.fechada_em ? new Date(os.fechada_em).toLocaleDateString('pt-BR') : '-'}</span></td>
                     <td className="p-4">
                       <div className="flex items-center gap-2 w-fit px-2 py-1 rounded"
                         style={{ color: se.color, background: `rgba(${se.rgb},0.10)`, border: `1px solid rgba(${se.rgb},0.3)` }}>

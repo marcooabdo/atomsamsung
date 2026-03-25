@@ -54,7 +54,7 @@ interface PerformanceOS {
   tipo_os: 'LP' | 'OW';
   cliente_nome: string;
   created_at: string;
-  data_fechamento: string | null;
+  fechada_em: string | null;
   coluna_kanban: string;
   tempo_resolucao_dias: number;
   valor_total: number;
@@ -152,7 +152,7 @@ export function Dashboard() {
       const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
         let q = supabase
           .from('os')
-          .select('id, coluna_kanban, tipo_os, valor_total, data_fechamento, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
+          .select('id, coluna_kanban, tipo_os, valor_total, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
@@ -188,7 +188,7 @@ export function Dashboard() {
 
       osFechadas.forEach(os => {
         const inicio = new Date(os.created_at);
-        const fim = os.data_fechamento ? new Date(os.data_fechamento) : new Date();
+        const fim = os.fechada_em ? new Date(os.fechada_em) : new Date();
         const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
         totalDiasResolucao += dias;
         countResolucao++;
@@ -386,7 +386,7 @@ export function Dashboard() {
             tipo_os: cotacao.tipo_os,
             cliente_nome: cotacao.cliente_nome || 'Cliente nao informado',
             created_at: cotacao.created_at,
-            data_fechamento: cotacao.aprovada_em || cotacao.reprovada_em,
+            fechada_em: cotacao.aprovada_em || cotacao.reprovada_em,
             coluna_kanban: cotacao.status,
             tempo_resolucao_dias: dias,
             valor_total: 0,
@@ -416,7 +416,7 @@ export function Dashboard() {
             tipo_os: os.tipo_os,
             cliente_nome: os.cliente_nome || 'Cliente nao informado',
             created_at: os.created_at,
-            data_fechamento: os.orcamento_aprovado_em || os.orcamento_aprovado_reprovado_em,
+            fechada_em: os.orcamento_aprovado_em || os.orcamento_aprovado_reprovado_em,
             coluna_kanban: os.coluna_kanban,
             tempo_resolucao_dias: dias,
             valor_total: os.valor_total || 0,
@@ -443,7 +443,7 @@ export function Dashboard() {
 
         const performanceList: PerformanceOS[] = osList.map(os => {
           const inicio = new Date(os.created_at);
-          const fim = os.data_fechamento ? new Date(os.data_fechamento) : new Date();
+          const fim = os.fechada_em ? new Date(os.fechada_em) : new Date();
           const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
 
           let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
@@ -457,7 +457,7 @@ export function Dashboard() {
             tipo_os: os.tipo_os,
             cliente_nome: os.cliente_nome || 'Cliente nao informado',
             created_at: os.created_at,
-            data_fechamento: os.data_fechamento,
+            fechada_em: os.fechada_em,
             coluna_kanban: os.coluna_kanban,
             tempo_resolucao_dias: dias,
             valor_total: os.valor_total || 0,

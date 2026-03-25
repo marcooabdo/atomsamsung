@@ -37,29 +37,26 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
   }
 
   return (
-    <>
-      <motion.div
-        layout
-        initial={{ opacity: 0, y: -10, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9, x: 50, filter: 'blur(4px)' }}
-        transition={{ duration: 0.28, type: 'spring', stiffness: 320, damping: 26, delay: index * 0.025 }}
-        className="relative rounded-xl overflow-hidden cursor-pointer select-none"
-        style={{
-          background: isAlta
-            ? 'var(--bg-card)'
-            : 'var(--bg-card)',
-          border: `1px solid ${isAlta ? 'rgba(239,68,68,0.4)' : hovered ? `${accentColor}50` : `${accentColor}22`}`,
-          boxShadow: hovered
-            ? isAlta ? '0 4px 18px rgba(239,68,68,0.18)' : `0 4px 18px ${accentColor}14`
-            : isAlta ? '0 2px 10px rgba(239,68,68,0.1)' : '0 2px 8px rgba(0,0,0,0.4)',
-          transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
-          transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
-        }}
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
-        onClick={() => setShowModal(true)}
-      >
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -10, scale: 0.97 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.9, x: 50, filter: 'blur(4px)' }}
+      transition={{ duration: 0.28, type: 'spring', stiffness: 320, damping: 26, delay: index * 0.025 }}
+      className="relative rounded-xl overflow-hidden cursor-pointer select-none"
+      style={{
+        background: 'var(--bg-card)',
+        border: `1px solid ${isAlta ? 'rgba(239,68,68,0.4)' : hovered ? `${accentColor}50` : `${accentColor}22`}`,
+        boxShadow: hovered
+          ? isAlta ? '0 4px 18px rgba(239,68,68,0.18)' : `0 4px 18px ${accentColor}14`
+          : isAlta ? '0 2px 10px rgba(239,68,68,0.1)' : '0 2px 8px rgba(0,0,0,0.4)',
+        transform: hovered ? 'translateY(-1px)' : 'translateY(0)',
+        transition: 'all 0.18s cubic-bezier(0.4,0,0.2,1)',
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onClick={() => setShowModal(true)}
+    >
         <div
           className="absolute top-0 left-0 right-0 h-px"
           style={{
@@ -178,8 +175,6 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
             </button>
           </div>
         </div>
-      </motion.div>
-
       <AnimatePresence>
         {showModal && (
           <TaskDetailModal
@@ -191,6 +186,6 @@ export function TaskCard({ task, onComplete, completing, accentColor, index }: T
           />
         )}
       </AnimatePresence>
-    </>
+    </motion.div>
   );
 }

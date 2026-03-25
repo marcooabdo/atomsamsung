@@ -310,7 +310,7 @@ const CHECK_MAP: Record<string, (os: OSData, pecas: OSPeca[], pagamentos: Pagame
 export async function validarFechamentoOS(osId: string): Promise<ValidacaoResultado> {
   const { data: osData } = await supabase
     .from('os')
-    .select('id, numero_os_samsung, numero_os_interna, tipo_os, tipo_atendimento, tipo_orcamento, unidade_id, valor_total, valor_pago, valor_pecas, valor_servicos, saldo_restante, status_pagamento, vendedor_responsavel_id, is_cortesia, coluna_kanban')
+    .select('id, numero_os_samsung, numero_os_interna, tipo_os, tipo_atendimento, tipo_orcamento, unidade_id, valor_total, valor_pago, valor_pecas, valor_servicos, saldo_restante, status_pagamento, vendedor_responsavel_id, is_cortesia, coluna_kanban, cotacao_id')
     .eq('id', osId)
     .maybeSingle();
 
@@ -334,10 +334,10 @@ export async function validarFechamentoOS(osId: string): Promise<ValidacaoResult
     supabase.from('pagamentos').select('id, valor, forma_pagamento').eq('os_id', osId),
     supabase.from('nf_emitidas').select('id, tipo, status').eq('os_id', osId),
     supabase.from('os_servicos').select('id, descricao, valor_total').eq('os_id', osId),
-    supabase.from('cotacoes').select('id').eq('os_id', osId).maybeSingle().then(async (cotRes) => {
-      if (!cotRes.data?.id) return { data: [] };
-      return supabase.from('cotacoes_pecas').select('id, pn, markup_aplicado, valor_final_unitario').eq('cotacao_id', cotRes.data.id);
-    }),
+    (async () => {
+      if (!osData.cotacao_id) return { data: [] };
+      return supabase.from('cotacoes_pecas').select('id, pn, markup_aplicado, valor_final_unitario').eq('cotacao_id', osData.cotacao_id);
+    })(),
     loadRegras(os.unidade_id),
   ]);
 
