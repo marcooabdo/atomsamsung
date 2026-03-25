@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
 import { ConfiguracoesPermissoes } from '../components/ConfiguracoesPermissoes';
+import { ConfiguracoesRegrasFechamento } from '../components/ConfiguracoesRegrasFechamento';
 
-type Tab = 'unidades' | 'usuarios' | 'permissoes' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf';
+type Tab = 'unidades' | 'usuarios' | 'permissoes' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'regras_fechamento';
 
 interface Unidade {
   id: string;
@@ -137,6 +138,7 @@ export function Configuracoes() {
   const [selectedUnidadeTaxa, setSelectedUnidadeTaxa] = useState<string>(canSeeAllUnits ? '' : userUnitId);
   const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>(canSeeAllUnits ? '' : userUnitId);
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>(canSeeAllUnits ? '' : userUnitId);
+  const [selectedUnidadeRegras, setSelectedUnidadeRegras] = useState<string>(canSeeAllUnits ? '' : userUnitId);
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
@@ -800,7 +802,8 @@ export function Configuracoes() {
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false }
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
+    { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2553,6 +2556,10 @@ export function Configuracoes() {
 
                 {activeTab === 'permissoes' && (
                   <ConfiguracoesPermissoes />
+                )}
+
+                {activeTab === 'regras_fechamento' && (
+                  <ConfiguracoesRegrasFechamento selectedUnidade={selectedUnidadeRegras} />
                 )}
 
               </>

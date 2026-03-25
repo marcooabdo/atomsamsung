@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -20,6 +20,7 @@ import { gerarRelatorioOS } from '../lib/relatorioOS';
 import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import { SuccessModal } from './SuccessModal';
 import { ConvertTipoOSModal } from './ConvertTipoOSModal';
+import { FecharOSModal } from './FecharOSModal';
 import type { Database } from '../lib/database.types';
 
 interface WhatsAppConversa {
@@ -160,6 +161,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [mostrarErroRequisicao, setMostrarErroRequisicao] = useState(false);
   const [erroRequisicaoMsg, setErroRequisicaoMsg] = useState('');
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
+  const [mostrarFecharOS, setMostrarFecharOS] = useState(false);
   const [movendoOS, setMovendoOS] = useState(false);
   const [mostrarConfirmacaoMover, setMostrarConfirmacaoMover] = useState(false);
   const [colunaDestino, setColunaDestino] = useState<{ id: string; label: string } | null>(null);
@@ -2847,6 +2849,25 @@ Não haverá cobrança ao cliente.`
                 </div>
               )}
             </div>
+
+            <button
+              onClick={() => setMostrarFecharOS(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all"
+              style={{
+                background: os.coluna_kanban === 'os_fechada'
+                  ? 'rgba(57,255,20,0.1)'
+                  : 'linear-gradient(135deg, rgba(255,0,100,0.15) 0%, rgba(255,107,53,0.08) 100%)',
+                border: os.coluna_kanban === 'os_fechada'
+                  ? '1px solid rgba(57,255,20,0.3)'
+                  : '1px solid rgba(255,0,100,0.4)',
+                color: os.coluna_kanban === 'os_fechada' ? '#39FF14' : '#FF0064',
+                boxShadow: `0 0 10px ${os.coluna_kanban === 'os_fechada' ? 'rgba(57,255,20,0.15)' : 'rgba(255,0,100,0.15)'}`,
+              }}
+              title="Validar e fechar OS"
+            >
+              <ShieldCheck className="w-4 h-4" />
+              FECHAR OS
+            </button>
 
             {os?.numero_os_samsung && (
               <button
@@ -5633,6 +5654,20 @@ Não haverá cobrança ao cliente.`
           onClose={() => setMostrarModalConvertTipo(false)}
           onSuccess={() => {
             setMostrarModalConvertTipo(false);
+            onReload?.();
+            onClose();
+          }}
+        />
+      )}
+
+      {os && (
+        <FecharOSModal
+          isOpen={mostrarFecharOS}
+          onClose={() => setMostrarFecharOS(false)}
+          osId={os.id}
+          osNumero={os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+          unidadeId={os.unidade_id}
+          onSuccess={() => {
             onReload?.();
             onClose();
           }}

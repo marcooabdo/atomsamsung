@@ -11,7 +11,7 @@ import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle, ShieldAlert } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -650,7 +650,8 @@ export function Kanban() {
           ),
           unidade:unidades!os_unidade_id_fkey(nome),
           tecnico_agendado:usuarios!os_tecnico_agendado_id_fkey(nome),
-          tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome)
+          tecnico_designado:usuarios!os_tecnico_designado_id_fkey(nome),
+          alertas_fechamento:os_alertas_fechamento(id, severidade, regra_titulo, resolvido)
         `);
 
       // Verificar se o usuario pode ver todas as unidades (master/diretoria SEM unidade vinculada)
@@ -2500,6 +2501,24 @@ export function Kanban() {
                                   />
                                 </div>
                               )}
+                              {(() => {
+                                const alertas = (os as any).alertas_fechamento?.filter((a: any) => !a.resolvido) || [];
+                                const bloqueios = alertas.filter((a: any) => a.severidade === 'bloqueante');
+                                if (alertas.length === 0) return null;
+                                return (
+                                  <div
+                                    className="p-1 rounded-md flex-shrink-0 flex items-center gap-0.5"
+                                    style={{
+                                      backgroundColor: bloqueios.length > 0 ? 'rgba(255,0,100,0.12)' : 'rgba(255,191,0,0.12)',
+                                      border: `1px solid ${bloqueios.length > 0 ? 'rgba(255,0,100,0.35)' : 'rgba(255,191,0,0.35)'}`,
+                                    }}
+                                    title={`${alertas.length} alerta(s) de fechamento${bloqueios.length > 0 ? ` (${bloqueios.length} bloqueante(s))` : ''}`}
+                                  >
+                                    <ShieldAlert className="w-3 h-3" style={{ color: bloqueios.length > 0 ? '#FF0064' : '#FFBF00', filter: `drop-shadow(0 0 3px ${bloqueios.length > 0 ? 'rgba(255,0,100,0.6)' : 'rgba(255,191,0,0.6)'})` }} />
+                                    <span className="text-[8px] font-black" style={{ color: bloqueios.length > 0 ? '#FF0064' : '#FFBF00' }}>{alertas.length}</span>
+                                  </div>
+                                );
+                              })()}
                             </div>
                           </div>
 
