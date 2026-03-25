@@ -1,9 +1,10 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
+import { EmitirNFModal } from './EmitirNFModal';
 
 interface Peca {
   id: string;
@@ -91,6 +92,9 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const [localColeta, setLocalColeta] = useState<string | null>(peca.data_coleta_transportadora || null);
   const [localCredito, setLocalCredito] = useState<string | null>(peca.data_retorno_credito || null);
 
+  const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
+  const [nfEmitidas, setNfEmitidas] = useState<any[]>([]);
+
   const neonGreen = themeInfo.neonGreen;
   const themeAccent = themeInfo.accent;
   const modalBg = isDark ? themeInfo.bg : '#ffffff';
@@ -111,7 +115,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const loadDetalhes = async () => {
     setLoadingHistorico(true);
     try {
-      const [detRes, histRes] = await Promise.all([
+      const [detRes, histRes, nfRes] = await Promise.all([
         supabase
           .from('estoque_pecas')
           .select('*, nf:nf_id(numero_nf, fornecedor), os:os_id(numero_os_interna, numero_os_samsung)')
@@ -123,6 +127,12 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           .eq('peca_id', peca.id)
           .order('created_at', { ascending: false })
           .limit(30),
+        supabase
+          .from('nf_emitidas')
+          .select('id, numero, serie, status, valor_total, created_at, nuvem_fiscal_id, pdf_url, xml_url, response_api')
+          .filter('response_api->pecas', 'cs', `[{"id":"${peca.id}"}]`)
+          .order('created_at', { ascending: false })
+          .limit(10),
       ]);
 
       if (detRes.data) {
@@ -132,6 +142,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         setLocalCredito((det as any).data_retorno_credito || null);
       }
       setHistorico((histRes.data || []) as unknown as HistoricoItem[]);
+      setNfEmitidas(nfRes.data || []);
     } finally {
       setLoadingHistorico(false);
     }
@@ -570,6 +581,81 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             </div>
           )}
 
+          {/* NFs Emitidas para esta peca */}
+          {nfEmitidas.length > 0 && (
+            <div className="rounded-xl p-5" style={{ background: cardBg, border: `1px solid ${cardBorder}` }}>
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-4 h-4" style={{ color: '#FFA500' }} />
+                <h3 className="text-xs font-bold uppercase tracking-wider" style={{ color: '#FFA500' }}>
+                  Notas Fiscais Emitidas ({nfEmitidas.length})
+                </h3>
+              </div>
+              <div className="space-y-2">
+                {nfEmitidas.map((nfe: any) => {
+                  const statusColors: Record<string, { bg: string; text: string; label: string }> = {
+                    emitida: { bg: 'rgba(34,197,94,0.15)', text: '#22c55e', label: 'Emitida' },
+                    pendente: { bg: 'rgba(255,191,0,0.15)', text: '#FFBF00', label: 'Pendente' },
+                    processando: { bg: 'rgba(0,212,255,0.15)', text: '#00D4FF', label: 'Processando' },
+                    erro: { bg: 'rgba(239,68,68,0.15)', text: '#ef4444', label: 'Erro' },
+                    cancelada: { bg: 'rgba(107,114,128,0.15)', text: '#6b7280', label: 'Cancelada' },
+                  };
+                  const sc = statusColors[nfe.status] || statusColors.pendente;
+                  return (
+                    <div
+                      key={nfe.id}
+                      className="flex items-center justify-between p-3 rounded-lg"
+                      style={{ background: isDark ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.02)', border: `1px solid ${cardBorder}` }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div>
+                          <span className="font-mono font-bold text-sm" style={{ color: textPrimary }}>
+                            NF-e {nfe.numero}
+                          </span>
+                          {nfe.serie && (
+                            <span className="text-xs ml-1" style={{ color: textMuted }}>Serie {nfe.serie}</span>
+                          )}
+                          <div className="text-xs mt-0.5" style={{ color: textMuted }}>
+                            {new Date(nfe.created_at).toLocaleString('pt-BR')}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span
+                          className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                          style={{ background: sc.bg, color: sc.text, border: `1px solid ${sc.text}40` }}
+                        >
+                          {sc.label}
+                        </span>
+                        {nfe.pdf_url && (
+                          <a
+                            href={nfe.pdf_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 rounded"
+                            style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.3)' }}
+                          >
+                            PDF
+                          </a>
+                        )}
+                        {nfe.xml_url && (
+                          <a
+                            href={nfe.xml_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-xs px-2 py-1 rounded"
+                            style={{ background: 'rgba(0,212,255,0.15)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.3)' }}
+                          >
+                            XML
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Localizacao */}
           <div>
             <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Localizacao Fisica</p>
@@ -666,7 +752,21 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         </div>
 
         {/* Footer actions */}
-        <div className="shrink-0 px-6 py-4 flex gap-3" style={{ borderTop: `1px solid ${headerBorder}` }}>
+        <div className="shrink-0 px-6 py-4 flex gap-3 flex-wrap" style={{ borderTop: `1px solid ${headerBorder}` }}>
+          {['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'].includes(currentStatus) && (
+            <button
+              onClick={() => setShowEmitirNFModal(true)}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors"
+              style={{
+                background: 'rgba(255,165,0,0.12)',
+                border: '1px solid rgba(255,165,0,0.45)',
+                color: '#FFA500',
+              }}
+            >
+              <RotateCcw className="w-4 h-4" />
+              Emitir NF Devolucao
+            </button>
+          )}
           <button
             onClick={handleGerarEtiqueta}
             disabled={generatingLabel}
@@ -694,6 +794,24 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
         <LabelGenerator
           labels={labelData}
           onClose={() => setShowLabelGenerator(false)}
+        />
+      )}
+
+      {showEmitirNFModal && (
+        <EmitirNFModal
+          pecas={[{
+            id: peca.id,
+            pn: peca.pn,
+            descricao: peca.descricao || '',
+            valor_com_impostos: peca.valor_com_impostos,
+            id_numerico: peca.id_numerico,
+          }]}
+          unidadeId={peca.unidade_id}
+          onClose={() => setShowEmitirNFModal(false)}
+          onSuccess={() => {
+            setShowEmitirNFModal(false);
+            loadDetalhes();
+          }}
         />
       )}
     </div>

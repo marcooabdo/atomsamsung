@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X } from 'lucide-react';
+import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
 import { LocationSelector } from './LocationSelector';
 import { EmitirNFModal } from './EmitirNFModal';
 import { PecaDetailsModal } from './PecaDetailsModal';
+
+type SortField = 'id' | 'nf_date' | 'pn';
+type SortDirection = 'asc' | 'desc';
 
 type EstoquePeca = Database['public']['Tables']['estoque_pecas']['Row'] & {
   nf_data_emissao?: string;
@@ -37,6 +40,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [selectedPecas, setSelectedPecas] = useState<Set<string>>(new Set());
   const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
   const [despachandoSamsung, setDespachandoSamsung] = useState(false);
+
+  const [sortField, setSortField] = useState<SortField>('nf_date');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
 
   useEffect(() => {
     loadPecas();
@@ -99,12 +105,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery,
         os_numero: peca.os?.numero_os_samsung || peca.os?.numero_os_interna || null,
       }));
-
-      enrichedPecas.sort((a, b) => {
-        const dateA = a.nf_data_emissao ? new Date(a.nf_data_emissao).getTime() : 0;
-        const dateB = b.nf_data_emissao ? new Date(b.nf_data_emissao).getTime() : 0;
-        return dateA - dateB;
-      });
 
       setPecas(enrichedPecas);
     } catch (error) {
@@ -311,7 +311,41 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     return pecas.filter(p => selectedPecas.has(p.id));
   };
 
-  const currentPagePecas = filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortField(field);
+      setSortDirection('asc');
+    }
+    setCurrentPage(1);
+  };
+
+  const getSortIcon = (field: SortField) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3.5 h-3.5 opacity-40" />;
+    return sortDirection === 'asc'
+      ? <ArrowUp className="w-3.5 h-3.5" />
+      : <ArrowDown className="w-3.5 h-3.5" />;
+  };
+
+  const sortedPecas = [...filteredPecas].sort((a, b) => {
+    const dir = sortDirection === 'asc' ? 1 : -1;
+    switch (sortField) {
+      case 'id':
+        return ((a.id_numerico || 0) - (b.id_numerico || 0)) * dir;
+      case 'nf_date': {
+        const dateA = a.nf_data_emissao ? new Date(a.nf_data_emissao).getTime() : 0;
+        const dateB = b.nf_data_emissao ? new Date(b.nf_data_emissao).getTime() : 0;
+        return (dateA - dateB) * dir;
+      }
+      case 'pn':
+        return a.pn.localeCompare(b.pn) * dir;
+      default:
+        return 0;
+    }
+  });
+
+  const currentPagePecas = sortedPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const allCurrentPageSelected = currentPagePecas.length > 0 && currentPagePecas.every(p => selectedPecas.has(p.id));
 
   if (loading) {
@@ -398,6 +432,28 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         )}
       </div>
 
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 uppercase tracking-wider mr-1">Ordenar:</span>
+        {([
+          { field: 'id' as SortField, label: 'ID' },
+          { field: 'nf_date' as SortField, label: 'Data NF' },
+          { field: 'pn' as SortField, label: 'Part Number' },
+        ]).map(opt => (
+          <button
+            key={opt.field}
+            onClick={() => toggleSort(opt.field)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              sortField === opt.field
+                ? 'bg-[#00D4FF]/15 text-[#00D4FF] border border-[#00D4FF]/40'
+                : 'bg-gray-800/60 text-gray-400 border border-gray-700 hover:border-gray-600 hover:text-gray-300'
+            }`}
+          >
+            {getSortIcon(opt.field)}
+            {opt.label}
+          </button>
+        ))}
+      </div>
+
       {selectedPecas.size > 0 && (
         <div className="flex items-center justify-between p-3 rounded-lg bg-[#FFA500]/10 border border-[#FFA500]/30">
           <div className="flex items-center gap-3">
@@ -426,7 +482,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-gray-400">
-          Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredPecas.length)} a {Math.min(currentPage * itemsPerPage, filteredPecas.length)} de {filteredPecas.length} peças
+          Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, sortedPecas.length)} a {Math.min(currentPage * itemsPerPage, sortedPecas.length)} de {sortedPecas.length} pecas
         </span>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-400">Itens por página:</span>
@@ -446,18 +502,19 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredPecas.length === 0 ? (
+        {sortedPecas.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhuma peça encontrada</p>
+            <p className="text-gray-400">Nenhuma peca encontrada</p>
           </div>
         ) : (
-          filteredPecas.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((peca) => {
+          currentPagePecas.map((peca) => {
             const { cardClass, indicator } = getLogisticaReversaStyle(peca);
             return (
               <div
                 key={peca.id}
-                className={`premium-card p-4 hover-lift relative transition-all ${
+                onClick={() => setSelectedPeca(peca)}
+                className={`premium-card p-4 hover-lift relative transition-all cursor-pointer ${
                   selectedPecas.has(peca.id)
                     ? 'ring-2 ring-[#FFA500] bg-[#FFA500]/5'
                     : cardClass
@@ -465,7 +522,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
               >
                 {isElegibleForNF(peca) ? (
                   <button
-                    onClick={() => toggleSelectPeca(peca.id)}
+                    onClick={(e) => { e.stopPropagation(); toggleSelectPeca(peca.id); }}
                     className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
                       selectedPecas.has(peca.id)
                         ? 'bg-[#FFA500] text-black'
@@ -601,11 +658,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setSelectedPeca(peca)}
+                    onClick={(e) => { e.stopPropagation(); setSelectedPeca(peca); }}
                     className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-[#00D4FF]/10 text-[#00D4FF] rounded-lg hover:bg-[#00D4FF]/20 transition text-sm border border-[#00D4FF]/30"
                   >
                     <Eye className="w-4 h-4" />
-                    Ver Detalhes
+                    Detalhes
                   </button>
                 </div>
               </div>
@@ -614,7 +671,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         )}
       </div>
 
-      {filteredPecas.length > itemsPerPage && (
+      {sortedPecas.length > itemsPerPage && (
         <div className="flex items-center justify-center gap-2 mt-6">
           <button
             onClick={() => setCurrentPage(1)}
@@ -631,9 +688,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             ‹
           </button>
 
-          {Array.from({ length: Math.ceil(filteredPecas.length / itemsPerPage) }, (_, i) => i + 1)
+          {Array.from({ length: Math.ceil(sortedPecas.length / itemsPerPage) }, (_, i) => i + 1)
             .filter(page => {
-              const totalPages = Math.ceil(filteredPecas.length / itemsPerPage);
+              const totalPages = Math.ceil(sortedPecas.length / itemsPerPage);
               if (totalPages <= 7) return true;
               if (page === 1 || page === totalPages) return true;
               if (Math.abs(page - currentPage) <= 1) return true;
@@ -661,15 +718,15 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             ))}
 
           <button
-            onClick={() => setCurrentPage(p => Math.min(Math.ceil(filteredPecas.length / itemsPerPage), p + 1))}
-            disabled={currentPage >= Math.ceil(filteredPecas.length / itemsPerPage)}
+            onClick={() => setCurrentPage(p => Math.min(Math.ceil(sortedPecas.length / itemsPerPage), p + 1))}
+            disabled={currentPage >= Math.ceil(sortedPecas.length / itemsPerPage)}
             className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             ›
           </button>
           <button
-            onClick={() => setCurrentPage(Math.ceil(filteredPecas.length / itemsPerPage))}
-            disabled={currentPage >= Math.ceil(filteredPecas.length / itemsPerPage)}
+            onClick={() => setCurrentPage(Math.ceil(sortedPecas.length / itemsPerPage))}
+            disabled={currentPage >= Math.ceil(sortedPecas.length / itemsPerPage)}
             className="px-3 py-2 bg-gray-800 text-gray-300 rounded-lg hover:bg-gray-700 transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
           >
             »
@@ -678,8 +735,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       )}
 
       <div className="flex items-center justify-between text-sm text-gray-400 mt-6">
-        <span>Total: <span className="text-[#00D4FF] font-bold">{filteredPecas.length}</span> peças</span>
-        <span>Valor total: <span className="text-[#39FF14] font-bold">R$ {filteredPecas.reduce((sum, p) => sum + p.valor_com_impostos, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
+        <span>Total: <span className="text-[#00D4FF] font-bold">{sortedPecas.length}</span> pecas</span>
+        <span>Valor total: <span className="text-[#39FF14] font-bold">R$ {sortedPecas.reduce((sum, p) => sum + p.valor_com_impostos, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
       </div>
 
       {selectedPeca && (
