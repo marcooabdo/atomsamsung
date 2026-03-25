@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import * as XLSX from 'xlsx';
@@ -984,7 +985,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         nfId={selectedNFId || ''}
       />
 
-      {showPreviewPanel && (
+      {showPreviewPanel && createPortal(
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div
             className="w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
@@ -1255,7 +1256,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* MAIN CONTENT */}
