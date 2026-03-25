@@ -1053,7 +1053,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <div className="flex items-start justify-between mb-3">
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-2">
-                                <p className="font-bold text-white">{req.descricao}</p>
+                                <p className="font-bold font-mono text-[#00D4FF]">{req.codigo_peca}</p>
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
                                   style={{
@@ -1063,7 +1063,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                     border: '1px solid'
                                   }}
                                 >
-                                  🔒 BLOQUEADA
+                                  BLOQUEADA
                                 </span>
                                 <span
                                   className="px-2 py-1 rounded text-xs font-bold uppercase"
@@ -1077,9 +1077,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                   PEDIDO ATIVO
                                 </span>
                               </div>
-                              <p className="text-xs text-gray-400 mb-2">
-                                PN: <span className="font-mono font-bold">{req.codigo_peca}</span>
-                              </p>
+                              <p className="text-xs text-gray-400 mb-2">{req.descricao}</p>
                               <p className="text-xs text-gray-500 mb-2">
                                 Qtd: {req.quantidade_requisitada} • IDs disponíveis: {req.ids_disponiveis_count || 0}
                               </p>
@@ -1211,11 +1209,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <p className="font-medium text-gray-200">{req.descricao}</p>
+                              <p className="font-bold font-mono text-[#00D4FF]">{req.codigo_peca}</p>
                               {getStatusBadge(req.status)}
                             </div>
+                            <p className="text-xs text-gray-400 mb-1">{req.descricao}</p>
                             <div className="text-xs text-gray-400 space-y-1">
-                              <p>Código: <span className="font-mono text-gray-300">{req.codigo_peca}</span></p>
                               <p>Quantidade: <span className="text-[#39FF14]">{req.quantidade_requisitada}</span></p>
                               {req.peca_estoque && (
                                 <div>
@@ -1549,14 +1547,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <p className="font-bold text-white">{req.descricao}</p>
+                              <p className="font-bold font-mono text-[#00D4FF]">{req.codigo_peca}</p>
                               {getStatusBadge(req.status)}
                             </div>
+                            <p className="text-xs text-gray-400 mb-2">{req.descricao}</p>
                             <div className="space-y-2 text-sm">
-                              <div className="flex items-center gap-2">
-                                <span className="text-gray-400">Part Number:</span>
-                                <span className="font-mono font-bold text-gray-200">{req.codigo_peca}</span>
-                              </div>
                               <div className="flex items-center gap-2">
                                 <span className="text-gray-400">Quantidade:</span>
                                 <span className="text-[#39FF14] font-bold">{req.quantidade_requisitada}</span>

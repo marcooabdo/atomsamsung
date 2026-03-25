@@ -61,13 +61,13 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
         <form onSubmit={handleSubmit} className="p-6 space-y-6">
           <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4 space-y-2">
             <div>
-              <p className="text-xs text-gray-500 uppercase">Descrição</p>
-              <p className="text-sm text-gray-200 font-medium">{requisicao.descricao}</p>
+              <p className="text-xs text-gray-500 uppercase">Part Number</p>
+              <p className="text-base text-[#00D4FF] font-bold font-mono">{requisicao.codigo_peca}</p>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="text-xs text-gray-500 uppercase">Part Number</p>
-                <p className="text-sm text-gray-200 font-mono">{requisicao.codigo_peca}</p>
+                <p className="text-xs text-gray-500 uppercase">Descricao</p>
+                <p className="text-xs text-gray-300">{requisicao.descricao}</p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 uppercase">Quantidade</p>

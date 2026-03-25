@@ -956,8 +956,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                                       const isAtrasada = daysOpen > 10;
                                       return (
                                         <option key={req.id} value={`${req.os_id}|${req.id}|${req.os_peca_id || ''}`} style={{ background: '#111', color: '#fff' }}>
-                                          OS {req.os.numero_os_interna}
-                                          {req.os.numero_os_samsung ? ` (${req.os.numero_os_samsung})` : ''}
+                                          OS {req.os.numero_os_samsung || req.os.numero_os_interna}
                                           {' '}- {req.os.tipo_os || ''}
                                           {isAtrasada ? ' - ATRASADA' : ''}
                                           {req.os.tipo_os === 'LP' ? ' - GARANTIA' : ''}

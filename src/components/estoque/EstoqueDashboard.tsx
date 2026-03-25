@@ -146,8 +146,8 @@ export function EstoqueDashboard({ stats, onRegistrarPreco }: EstoqueDashboardPr
               >
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <p className="font-bold text-gray-200">{peca.descricao}</p>
-                    <span className="text-xs font-mono text-gray-400">({peca.codigo_peca})</span>
+                    <p className="font-bold font-mono text-[#00D4FF]">{peca.codigo_peca}</p>
+                    <span className="text-xs text-gray-400 truncate">{peca.descricao}</span>
                   </div>
                   <div className="flex items-center gap-3 text-xs text-gray-500">
                     <span>{peca.count} requisições</span>
