@@ -863,17 +863,19 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {getStatusBadge(peca.status)}
                       {getAgeBadge(getDaysFromEmission(peca.nf_data_emissao))}
-                      {DEVOLVIDA_STATUSES.includes(peca.status) && (peca as any).tipo_devolucao && (() => {
+                      {DEVOLVIDA_STATUSES.includes(peca.status) && (() => {
+                        const tipo = (peca as any).tipo_devolucao;
                         const tipoCfg: Record<string, { label: string; cls: string }> = {
-                          nova: { label: 'Nova', cls: 'bg-green-500/20 text-green-400 border-green-500/40' },
-                          nova_com_defeito: { label: 'Defeito', cls: 'bg-red-500/20 text-red-400 border-red-500/40' },
-                          usada: { label: 'Usada', cls: 'bg-gray-500/20 text-gray-400 border-gray-500/40' },
+                          nova: { label: 'Condição: Nova', cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-400/50' },
+                          nova_com_defeito: { label: 'Condição: Defeito', cls: 'bg-red-500/20 text-red-300 border-red-400/50' },
+                          usada: { label: 'Condição: Usada', cls: 'bg-amber-500/20 text-amber-300 border-amber-400/50' },
                         };
-                        const cfg = tipoCfg[(peca as any).tipo_devolucao] || null;
-                        if (!cfg) return null;
+                        const cfg = tipo ? tipoCfg[tipo] : null;
+                        const label = cfg?.label || 'Condição: N/A';
+                        const cls = cfg?.cls || 'bg-gray-500/20 text-gray-400 border-gray-500/40';
                         return (
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${cfg.cls}`}>
-                            {cfg.label}
+                          <span className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase border ${cls}`}>
+                            {label}
                           </span>
                         );
                       })()}

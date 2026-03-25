@@ -14,6 +14,7 @@ interface Peca {
   status: string;
   valor_com_impostos: number;
   condicao: string;
+  tipo_devolucao?: string | null;
   nf_delivery: string | null;
   localizacao: string | null;
   id_numerico: number | null;
@@ -118,7 +119,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
       const [detRes, histRes, nfRes] = await Promise.all([
         supabase
           .from('estoque_pecas')
-          .select('*, nf:nf_id(numero_nf, fornecedor), os:os_id(numero_os_interna, numero_os_samsung)')
+          .select('*, nf:nf_id(numero_nf, fornecedor), os:os_id(numero_os_interna, numero_os_samsung), estoque_devolucoes!peca_id(tipo_devolucao), requisicoes_pecas!peca_estoque_id(tipo_devolucao)')
           .eq('id', peca.id)
           .maybeSingle(),
         supabase
@@ -136,7 +137,11 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
       ]);
 
       if (detRes.data) {
-        const det = detRes.data as unknown as PecaDetalhada;
+        const raw = detRes.data as any;
+        const devTipo = raw.estoque_devolucoes?.[0]?.tipo_devolucao
+          || raw.requisicoes_pecas?.find((r: any) => r.tipo_devolucao)?.tipo_devolucao
+          || null;
+        const det = { ...raw, tipo_devolucao_resolved: devTipo } as unknown as PecaDetalhada;
         setPecaDetalhada(det);
         setLocalColeta((det as any).data_coleta_transportadora || null);
         setLocalCredito((det as any).data_retorno_credito || null);
@@ -370,8 +375,21 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
                 </p>
               </div>
               <div>
-                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Condicao</p>
-                <p className="capitalize" style={{ color: textSecondary }}>{peca.condicao}</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>Condição</p>
+                {(() => {
+                  const tipo = (pecaDetalhada as any)?.tipo_devolucao_resolved || peca.tipo_devolucao || peca.condicao;
+                  const labels: Record<string, { text: string; color: string }> = {
+                    nova: { text: 'Nova', color: '#34d399' },
+                    nova_com_defeito: { text: 'Nova com Defeito', color: '#f87171' },
+                    usada: { text: 'Usada', color: '#fbbf24' },
+                  };
+                  const cfg = tipo ? labels[tipo] : null;
+                  return (
+                    <p className="capitalize font-semibold" style={{ color: cfg?.color || textSecondary }}>
+                      {cfg?.text || tipo || '-'}
+                    </p>
+                  );
+                })()}
               </div>
               {pecaDetalhada?.nf && (
                 <div>
