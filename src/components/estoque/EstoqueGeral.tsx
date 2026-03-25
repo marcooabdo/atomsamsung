@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
 import { LabelGenerator } from './LabelGenerator';
@@ -40,6 +41,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [selectedPecas, setSelectedPecas] = useState<Set<string>>(new Set());
   const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
   const [despachandoSamsung, setDespachandoSamsung] = useState(false);
+  const [exportingReport, setExportingReport] = useState(false);
 
   const [sortField, setSortField] = useState<SortField>('nf_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -151,6 +153,191 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       alert(`Erro ao despachar peças para Samsung: ${error?.message || error}`);
     } finally {
       setDespachandoSamsung(false);
+    }
+  };
+
+  const handleExportReport = async () => {
+    setExportingReport(true);
+    try {
+      const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
+      const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
+
+      let query = supabase
+        .from('estoque_pecas')
+        .select(`
+          *,
+          estoque_nfs(numero_nf, data_emissao, fornecedor, delivery, chave_acesso),
+          os:os_id(numero_os_interna, numero_os_samsung, cliente_nome, status, coluna_kanban, tipo_os, tipo_atendimento),
+          unidades:unidade_id(nome),
+          tecnico:tecnico_id(nome),
+          requisicoes_pecas!peca_estoque_id(
+            id, status, gi_postada_em, tipo_devolucao, motivo_devolucao, created_at,
+            os:os_id(numero_os_interna, numero_os_samsung)
+          )
+        `);
+
+      if (canSeeAllUnits) {
+        if (selectedUnidade && selectedUnidade !== '' && selectedUnidade !== 'all') {
+          query = query.eq('unidade_id', selectedUnidade);
+        }
+      } else if (unidadeFilter) {
+        query = query.eq('unidade_id', unidadeFilter);
+      }
+
+      if (!showArquivadas) {
+        query = query.neq('status', 'arquivada');
+      }
+
+      if (statusFilter !== 'all') {
+        query = query.eq('status', statusFilter);
+      }
+
+      const { data: allPecas, error } = await query;
+      if (error) throw error;
+
+      const pecaIds = (allPecas || []).map(p => p.id);
+      let nfMap: Record<string, any[]> = {};
+      if (pecaIds.length > 0) {
+        const { data: nfs } = await supabase
+          .from('nf_emitidas')
+          .select('id, numero, serie, status, valor_total, created_at, pdf_url, xml_url, response_api')
+          .or(pecaIds.map(id => `response_api->pecas.cs.[{"id":"${id}"}]`).slice(0, 50).join(','));
+
+        if (nfs) {
+          for (const nf of nfs) {
+            const pecasNf = (nf.response_api as any)?.pecas || [];
+            for (const pNf of pecasNf) {
+              if (!nfMap[pNf.id]) nfMap[pNf.id] = [];
+              nfMap[pNf.id].push(nf);
+            }
+          }
+        }
+      }
+
+      const STATUS_LABELS: Record<string, string> = {
+        disponivel: 'Disponivel',
+        reservada: 'Reservada',
+        vinculada_tecnico: 'Com Tecnico',
+        em_rota: 'Em Rota',
+        em_uso: 'Em Uso',
+        usada: 'Usada',
+        devolucao_pendente: 'Devolucao Pendente',
+        devolvida_nova: 'Devolvida Nova',
+        devolvida_defeito: 'Devolvida c/ Defeito',
+        devolvida_samsung: 'Devolvida Samsung',
+        usada_upc: 'Usada UPC',
+        arquivada: 'Arquivada',
+      };
+
+      const fmtDate = (d: string | null | undefined) => {
+        if (!d) return '';
+        try { return new Date(d).toLocaleDateString('pt-BR'); } catch { return ''; }
+      };
+
+      const fmtDateTime = (d: string | null | undefined) => {
+        if (!d) return '';
+        try { return new Date(d).toLocaleString('pt-BR'); } catch { return ''; }
+      };
+
+      const calcDaysInStock = (dataEntrada: string | null | undefined) => {
+        if (!dataEntrada) return '';
+        const d = new Date(dataEntrada);
+        const today = new Date();
+        return Math.ceil(Math.abs(today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+      };
+
+      const rows = (allPecas || []).map((p: any) => {
+        const nf = p.estoque_nfs;
+        const os = p.os;
+        const unidade = p.unidades;
+        const tecnico = p.tecnico;
+        const req = p.requisicoes_pecas?.[0];
+        const nfsDevolucao = nfMap[p.id] || [];
+        const nfDev = nfsDevolucao[0];
+
+        return {
+          'ID': p.id_numerico || '',
+          'Part Number': p.pn || '',
+          'Descricao': p.descricao || '',
+          'Status': STATUS_LABELS[p.status] || p.status || '',
+          'Condicao': p.condicao || '',
+          'Valor c/ Impostos': p.valor_com_impostos || 0,
+          'Delivery': nf?.delivery || '',
+          'NF Entrada': nf?.numero_nf || '',
+          'Fornecedor': nf?.fornecedor || '',
+          'Chave Acesso NF': nf?.chave_acesso || '',
+          'Data Emissao NF': fmtDate(nf?.data_emissao),
+          'Data Entrada Estoque': fmtDate(p.data_entrada),
+          'Dias no Estoque': calcDaysInStock(p.data_entrada || nf?.data_emissao),
+          'Ultima Movimentacao': fmtDateTime(p.data_ultima_movimentacao),
+          'Localizacao': p.localizacao || '',
+          'Unidade': unidade?.nome || '',
+          'OS Vinculada': os?.numero_os_interna || '',
+          'OS Samsung': os?.numero_os_samsung || '',
+          'Cliente OS': os?.cliente_nome || '',
+          'Status OS': os?.coluna_kanban || os?.status || '',
+          'Tipo OS': os?.tipo_os || '',
+          'Tipo Atendimento': os?.tipo_atendimento || '',
+          'Tecnico': tecnico?.nome || '',
+          'Requisicao Status': req?.status || '',
+          'GI Postada Em': fmtDate(req?.gi_postada_em),
+          'OS da Requisicao': req?.os?.numero_os_samsung || req?.os?.numero_os_interna || '',
+          'Tipo Devolucao': req?.tipo_devolucao || '',
+          'Motivo Devolucao': req?.motivo_devolucao || '',
+          'Data Coleta Transportadora': fmtDate(p.data_coleta_transportadora),
+          'Data Retorno Credito': fmtDate(p.data_retorno_credito),
+          'NF Devolucao': nfDev ? `${nfDev.numero || ''}${nfDev.serie ? ` / Serie ${nfDev.serie}` : ''}` : '',
+          'Status NF Devolucao': nfDev?.status || '',
+          'PDF NF Devolucao': nfDev?.pdf_url || '',
+          'XML NF Devolucao': nfDev?.xml_url || '',
+          'Criado Em': fmtDateTime(p.created_at),
+          'Atualizado Em': fmtDateTime(p.updated_at),
+        };
+      });
+
+      if (rows.length === 0) {
+        alert('Nenhuma peca para exportar');
+        return;
+      }
+
+      const ws = XLSX.utils.json_to_sheet(rows);
+      const colWidths = Object.keys(rows[0]).map(k => ({
+        wch: Math.max(k.length + 2, 16)
+      }));
+      ws['!cols'] = colWidths;
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Estoque Geral');
+
+      const statusSummary: Record<string, { count: number; valor: number }> = {};
+      for (const p of allPecas || []) {
+        const label = STATUS_LABELS[p.status] || p.status || 'Outros';
+        if (!statusSummary[label]) statusSummary[label] = { count: 0, valor: 0 };
+        statusSummary[label].count++;
+        statusSummary[label].valor += p.valor_com_impostos || 0;
+      }
+
+      const summaryRows = Object.entries(statusSummary).map(([status, info]) => ({
+        'Status': status,
+        'Quantidade': info.count,
+        'Valor Total': info.valor,
+      }));
+      summaryRows.push({
+        'Status': 'TOTAL',
+        'Quantidade': (allPecas || []).length,
+        'Valor Total': (allPecas || []).reduce((s, p) => s + (p.valor_com_impostos || 0), 0),
+      });
+
+      const ws2 = XLSX.utils.json_to_sheet(summaryRows);
+      ws2['!cols'] = [{ wch: 24 }, { wch: 12 }, { wch: 16 }];
+      XLSX.utils.book_append_sheet(wb, ws2, 'Resumo por Status');
+
+      const dateStr = new Date().toISOString().split('T')[0];
+      XLSX.writeFile(wb, `Relatorio_Estoque_${dateStr}.xlsx`);
+    } catch (err: any) {
+      alert(`Erro ao exportar: ${err?.message || err}`);
+    } finally {
+      setExportingReport(false);
     }
   };
 
@@ -407,6 +594,30 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           />
           <span className="text-sm text-gray-300">Mostrar Arquivadas</span>
         </label>
+
+        <button
+          onClick={handleExportReport}
+          disabled={exportingReport}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all whitespace-nowrap disabled:opacity-60"
+          style={{
+            background: 'linear-gradient(135deg, rgba(34,197,94,0.3) 0%, rgba(34,197,94,0.1) 100%)',
+            border: '2px solid rgba(34,197,94,0.7)',
+            color: '#22c55e',
+            boxShadow: '0 0 15px rgba(34,197,94,0.2)'
+          }}
+        >
+          {exportingReport ? (
+            <>
+              <div className="w-4 h-4 border-2 border-green-400 border-t-transparent rounded-full animate-spin" />
+              Exportando...
+            </>
+          ) : (
+            <>
+              <Download className="w-4 h-4" />
+              Relatorio
+            </>
+          )}
+        </button>
 
         {selectedPecas.size > 0 && (
           <>
