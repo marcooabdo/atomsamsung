@@ -51,6 +51,12 @@ interface OSData {
   coluna_kanban: string;
 }
 
+const TIPO_ORCAMENTO_LP = ['samsung_contigo', 'acessorios'];
+
+export function isOrcamentoLP(os: { tipo_os?: string; tipo_orcamento?: string | null }): boolean {
+  return os.tipo_os === 'LP' || TIPO_ORCAMENTO_LP.includes(os.tipo_orcamento || '');
+}
+
 interface OSPeca {
   id: string;
   pn: string;
@@ -97,12 +103,12 @@ async function loadRegras(unidadeId: string): Promise<RegraFechamento[]> {
 }
 
 function regraApplies(regra: RegraFechamento, os: OSData): boolean {
-  const isLP = os.tipo_os === 'LP';
-  const isOW = os.tipo_os === 'OW';
+  const effectiveLP = isOrcamentoLP(os);
+  const isOW = os.tipo_os === 'OW' && !effectiveLP;
   const isIH = os.tipo_atendimento === 'IH';
   const isCI = os.tipo_atendimento === 'CI';
 
-  if (isLP && !regra.aplica_lp) return false;
+  if (effectiveLP && !regra.aplica_lp) return false;
   if (isOW && !regra.aplica_ow) return false;
   if (isIH && !regra.aplica_ih) return false;
   if (isCI && !regra.aplica_ci) return false;
@@ -225,7 +231,9 @@ function checkPagamentoIntegral(os: OSData): AlertaFechamento | null {
   };
 }
 
-function checkNFSeEmitida(nfs: NFEmitida[]): AlertaFechamento | null {
+function checkNFSeEmitida(os: OSData, nfs: NFEmitida[]): AlertaFechamento | null {
+  if (isOrcamentoLP(os)) return null;
+
   const nfse = nfs.find(n => n.tipo === 'nfse' && n.status === 'emitida');
   if (nfse) return null;
 
@@ -294,7 +302,7 @@ const CHECK_MAP: Record<string, (os: OSData, pecas: OSPeca[], pagamentos: Pagame
   SERVICO_ADICIONADO: (os, _p, _pg, _n, s) => checkServicoAdicionado(os, s),
   PAGAMENTO_REGISTRADO: (_os, _p, pg) => checkPagamentoRegistrado(pg),
   PAGAMENTO_INTEGRAL: (os) => checkPagamentoIntegral(os),
-  NFSE_EMITIDA: (_os, _p, _pg, nfs) => checkNFSeEmitida(nfs),
+  NFSE_EMITIDA: (os, _p, _pg, nfs) => checkNFSeEmitida(os, nfs),
   NFE_EMITIDA: (_os, pecas, _pg, nfs) => checkNFeEmitida(nfs, pecas),
   VALOR_ZERO: (os, pecas, _pg, _n, servicos) => checkValorZero(os, pecas, servicos),
 };
@@ -419,24 +427,43 @@ export async function criarAlertasGIAAudit(
   }
 
   const descricao = linhas.join('\n');
+  const titulo = `OS ${osNumero} - ${bloqueios.length + avisos.length} desvio(s) no fechamento`;
+  const metadata = {
+    tipo: 'fechamento_os',
+    total_bloqueios: bloqueios.length,
+    total_alertas: avisos.length,
+    regras: alertas.map(a => a.regra_codigo),
+  };
 
-  await supabase.from('gia_mural_tarefas').insert({
-    gia_source: 'GIA Audit',
-    gia_responsavel: 'GIA Audit',
-    prioridade: bloqueios.length > 0 ? 'alta' : 'normal',
-    titulo: `OS ${osNumero} - ${bloqueios.length + avisos.length} desvio(s) no fechamento`,
-    descricao,
-    status: 'pendente',
-    unidade_id: unidadeId,
-    os_id: osId,
-    os_numero: osNumero,
-    metadata: {
-      tipo: 'fechamento_os',
-      total_bloqueios: bloqueios.length,
-      total_alertas: avisos.length,
-      regras: alertas.map(a => a.regra_codigo),
-    },
-  });
+  const { data: existing } = await supabase
+    .from('gia_mural_tarefas')
+    .select('id')
+    .eq('os_id', osId)
+    .eq('gia_source', 'GIA Audit')
+    .eq('status', 'pendente')
+    .maybeSingle();
+
+  if (existing) {
+    await supabase.from('gia_mural_tarefas').update({
+      titulo,
+      descricao,
+      prioridade: bloqueios.length > 0 ? 'alta' : 'normal',
+      metadata,
+    }).eq('id', existing.id);
+  } else {
+    await supabase.from('gia_mural_tarefas').insert({
+      gia_source: 'GIA Audit',
+      gia_responsavel: 'GIA Audit',
+      prioridade: bloqueios.length > 0 ? 'alta' : 'normal',
+      titulo,
+      descricao,
+      status: 'pendente',
+      unidade_id: unidadeId,
+      os_id: osId,
+      os_numero: osNumero,
+      metadata,
+    });
+  }
 }
 
 export async function executarFechamentoOS(

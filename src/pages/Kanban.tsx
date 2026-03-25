@@ -11,7 +11,8 @@ import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle, ShieldAlert } from 'lucide-react';
+import { FecharOSModal } from '../components/FecharOSModal';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -164,7 +165,8 @@ export function Kanban() {
     status: true,
     iniciarReparo: true,
     analiseConcluida: true,
-    tecnico: true
+    tecnico: true,
+    fecharOS: true
   };
   const [badgeFilters, setBadgeFilters] = useState(() => {
     try {
@@ -216,6 +218,9 @@ export function Kanban() {
   const [buscarOSNumero, setBuscarOSNumero] = useState('');
   const [buscarOSLoading, setBuscarOSLoading] = useState(false);
   const [buscarOSResult, setBuscarOSResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
+  const [showFecharOSModal, setShowFecharOSModal] = useState(false);
+  const [fecharOSCardData, setFecharOSCardData] = useState<{ id: string; numero: string; unidadeId: string } | null>(null);
+  const [pendingFecharOSDrop, setPendingFecharOSDrop] = useState<{ card: OS; position: number | undefined } | null>(null);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -947,6 +952,15 @@ export function Kanban() {
 
     const colunaOrigem = COLUNAS_KANBAN.find(c => c.id === draggedCard.coluna_kanban);
     const colunaDestino = COLUNAS_KANBAN.find(c => c.id === targetColumn);
+
+    if (targetColumn === 'fechar_os' && !isSameColumn) {
+      const osNumero = draggedCard.numero_os_samsung || draggedCard.numero_os_interna || 'S/N';
+      setFecharOSCardData({ id: draggedCard.id, numero: String(osNumero), unidadeId: draggedCard.unidade_id });
+      setPendingFecharOSDrop({ card: draggedCard, position: finalPosition });
+      setShowFecharOSModal(true);
+      setDraggedCard(null);
+      return;
+    }
 
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
     const isOrigemOSNova = draggedCard.coluna_kanban === 'os_nova';
@@ -1862,7 +1876,8 @@ export function Kanban() {
                       { key: 'sla', label: 'Tempo na Etapa' },
                       { key: 'status', label: 'Status Samsung' },
                       { key: 'iniciarReparo', label: 'Iniciar Reparo' },
-                      { key: 'analiseConcluida', label: 'Análise Concluída' }
+                      { key: 'analiseConcluida', label: 'Análise Concluída' },
+                      { key: 'fecharOS', label: 'Fechar OS' }
                     ].map(({ key, label }) => (
                       <div
                         key={key}
@@ -3084,6 +3099,29 @@ export function Kanban() {
                                 </button>
                               </div>
                             )}
+
+                            {badgeFilters.fecharOS && (coluna.id === 'fechar_os' || coluna.id === 'aguardando_fechamento') && (
+                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(34,197,94,0.2)' }}>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const osNumero = os.numero_os_samsung || os.numero_os_interna || 'S/N';
+                                    setFecharOSCardData({ id: os.id, numero: String(osNumero), unidadeId: os.unidade_id });
+                                    setShowFecharOSModal(true);
+                                  }}
+                                  className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
+                                  style={{
+                                    background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
+                                    border: '1px solid rgba(34,197,94,0.6)',
+                                    color: '#22C55E',
+                                    boxShadow: '0 0 10px rgba(34,197,94,0.2)'
+                                  }}
+                                >
+                                  <ShieldCheck className="w-3.5 h-3.5" />
+                                  FECHAR OS
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
                         )}
@@ -3249,6 +3287,26 @@ export function Kanban() {
           }}
           onSuccess={() => {
             setPendingOQCDrop(null);
+            loadKanbanData();
+          }}
+        />
+      )}
+
+      {showFecharOSModal && fecharOSCardData && (
+        <FecharOSModal
+          isOpen={showFecharOSModal}
+          osId={fecharOSCardData.id}
+          osNumero={fecharOSCardData.numero}
+          unidadeId={fecharOSCardData.unidadeId}
+          onClose={() => {
+            setShowFecharOSModal(false);
+            setFecharOSCardData(null);
+            setPendingFecharOSDrop(null);
+          }}
+          onSuccess={() => {
+            setShowFecharOSModal(false);
+            setFecharOSCardData(null);
+            setPendingFecharOSDrop(null);
             loadKanbanData();
           }}
         />

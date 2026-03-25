@@ -2824,6 +2824,11 @@ Não haverá cobrança ao cliente.`
                       <button
                         key={coluna.id}
                         onClick={() => {
+                          if (coluna.id === 'fechar_os') {
+                            setMostrarMoverPara(false);
+                            setMostrarFecharOS(true);
+                            return;
+                          }
                           setColunaDestino(coluna);
                           setMostrarConfirmacaoMover(true);
                         }}
