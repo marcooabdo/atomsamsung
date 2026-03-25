@@ -109,16 +109,20 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         query = query.eq('status', statusFilter);
       }
 
-      const { count: totalCount } = await supabase
-        .from('estoque_pecas')
-        .select('id', { count: 'exact', head: true });
+      const PAGE_SIZE = 1000;
+      let allData: any[] = [];
+      let from = 0;
+      let hasMore = true;
 
-      const fetchLimit = Math.max(totalCount || 5000, 5000);
-      query = query.limit(fetchLimit);
+      while (hasMore) {
+        const { data: batch, error: batchError } = await query.range(from, from + PAGE_SIZE - 1);
+        if (batchError) throw batchError;
+        allData = allData.concat(batch || []);
+        hasMore = (batch?.length || 0) === PAGE_SIZE;
+        from += PAGE_SIZE;
+      }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
+      const data = allData;
 
       const enrichedPecas = (data || []).map((peca: any) => {
         const devTipo = peca.estoque_devolucoes?.[0]?.tipo_devolucao
