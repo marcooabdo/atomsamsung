@@ -827,7 +827,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const nfIds = nfsData.map(n => n.id);
       const { data: pecasData } = await supabase
         .from('estoque_pecas')
-        .select('*, os:os_id(numero_os_interna, numero_os_samsung), nf:nf_id(numero_nf, delivery, fornecedor)')
+        .select('*, os:os_id(numero_os_interna, numero_os_samsung), nf:nf_id(numero_nf, delivery, fornecedor, data_emissao)')
         .in('nf_id', nfIds)
         .order('pn');
 
@@ -836,7 +836,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const nfMeta = parseXMLMeta(nfXmlMap[p.nf_id]);
         return {
           'NF': p.nf?.numero_nf || '',
-          'Data Emissão': p.data_entrada ? new Date(p.data_entrada).toLocaleDateString('pt-BR') : '',
+          'Data Emissão': p.nf?.data_emissao ? new Date(p.nf.data_emissao).toLocaleDateString('pt-BR') : '',
           'Fornecedor': p.nf?.fornecedor || '',
           'Destinatário': nfMeta.destinatario,
           'Nat. Operação': nfMeta.natOp,

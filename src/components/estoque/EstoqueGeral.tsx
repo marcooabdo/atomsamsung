@@ -27,8 +27,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [pecas, setPecas] = useState<EstoquePeca[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [showArquivadas, setShowArquivadas] = useState(false);
+  const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem('estoque_geral_status_filter') || 'all');
+  const [showArquivadas, setShowArquivadas] = useState(() => sessionStorage.getItem('estoque_geral_show_arquivadas') === 'true');
   const [selectedPeca, setSelectedPeca] = useState<EstoquePeca | null>(null);
   const [showLabelSelector, setShowLabelSelector] = useState(false);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
@@ -45,6 +45,14 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
   const [sortField, setSortField] = useState<SortField>('nf_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
+
+  useEffect(() => {
+    sessionStorage.setItem('estoque_geral_status_filter', statusFilter);
+  }, [statusFilter]);
+
+  useEffect(() => {
+    sessionStorage.setItem('estoque_geral_show_arquivadas', String(showArquivadas));
+  }, [showArquivadas]);
 
   useEffect(() => {
     loadPecas();
