@@ -74,10 +74,14 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           requisicoes_pecas!peca_estoque_id(
             id,
             status,
+            tipo_devolucao,
             quantidade_requisitada,
             created_at,
             requisitado_por,
             usuarios:requisitado_por(nome)
+          ),
+          estoque_devolucoes!peca_id(
+            tipo_devolucao
           )
         `);
 
@@ -101,12 +105,18 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       if (error) throw error;
 
-      const enrichedPecas = (data || []).map((peca: any) => ({
-        ...peca,
-        nf_data_emissao: peca.estoque_nfs?.data_emissao,
-        nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery,
-        os_numero: peca.os?.numero_os_samsung || peca.os?.numero_os_interna || null,
-      }));
+      const enrichedPecas = (data || []).map((peca: any) => {
+        const devTipo = peca.estoque_devolucoes?.[0]?.tipo_devolucao
+          || peca.requisicoes_pecas?.find((r: any) => r.tipo_devolucao)?.tipo_devolucao
+          || null;
+        return {
+          ...peca,
+          nf_data_emissao: peca.estoque_nfs?.data_emissao,
+          nf_delivery: peca.estoque_etiquetas?.[0]?.delivery || peca.estoque_nfs?.delivery,
+          os_numero: peca.os?.numero_os_samsung || peca.os?.numero_os_interna || null,
+          tipo_devolucao: devTipo,
+        };
+      });
 
       setPecas(enrichedPecas);
     } catch (error) {
@@ -167,13 +177,14 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         .select(`
           *,
           estoque_nfs(numero_nf, data_emissao, fornecedor, delivery, chave_acesso),
-          os:os_id(numero_os_interna, numero_os_samsung, cliente_nome, status, coluna_kanban, tipo_os, tipo_atendimento),
+          os:os_id(numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, tipo_os, tipo_atendimento),
           unidades:unidade_id(nome),
           tecnico:tecnico_id(nome),
           requisicoes_pecas!peca_estoque_id(
             id, status, gi_postada_em, tipo_devolucao, motivo_devolucao, created_at,
-            os:os_id(numero_os_interna, numero_os_samsung)
-          )
+            req_os:os_id(numero_os_interna, numero_os_samsung)
+          ),
+          estoque_devolucoes!peca_id(tipo_devolucao)
         `);
 
       if (canSeeAllUnits) {
@@ -246,57 +257,63 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         return Math.ceil(Math.abs(today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
       };
 
+      const TIPO_DEV_LABELS: Record<string, string> = {
+        nova: 'Nova',
+        nova_com_defeito: 'Nova c/ Defeito',
+        usada: 'Usada',
+      };
+
       const rows = (allPecas || []).map((p: any) => {
         const nf = p.estoque_nfs;
         const os = p.os;
         const unidade = p.unidades;
         const tecnico = p.tecnico;
         const req = p.requisicoes_pecas?.[0];
+        const devTipo = p.estoque_devolucoes?.[0]?.tipo_devolucao || req?.tipo_devolucao || '';
         const nfsDevolucao = nfMap[p.id] || [];
         const nfDev = nfsDevolucao[0];
 
         return {
           'ID': p.id_numerico || '',
           'Part Number': p.pn || '',
-          'Descricao': p.descricao || '',
+          'Descrição': p.descricao || '',
           'Status': STATUS_LABELS[p.status] || p.status || '',
-          'Condicao': p.condicao || '',
+          'Tipo Devolução': TIPO_DEV_LABELS[devTipo] || devTipo || '',
           'Valor c/ Impostos': p.valor_com_impostos || 0,
-          'Delivery': nf?.delivery || '',
+          'Delivery': nf?.delivery || p.delivery || '',
           'NF Entrada': nf?.numero_nf || '',
           'Fornecedor': nf?.fornecedor || '',
           'Chave Acesso NF': nf?.chave_acesso || '',
-          'Data Emissao NF': fmtDate(nf?.data_emissao),
+          'Data Emissão NF': fmtDate(nf?.data_emissao),
           'Data Entrada Estoque': fmtDate(p.data_entrada),
           'Dias no Estoque': calcDaysInStock(p.data_entrada || nf?.data_emissao),
-          'Ultima Movimentacao': fmtDateTime(p.data_ultima_movimentacao),
-          'Localizacao': p.localizacao || '',
+          'Última Movimentação': fmtDateTime(p.data_ultima_movimentacao),
+          'Localização': p.localizacao || '',
           'Unidade': unidade?.nome || '',
           'OS Vinculada': os?.numero_os_interna || '',
           'OS Samsung': os?.numero_os_samsung || '',
           'Cliente OS': os?.cliente_nome || '',
-          'Status OS': os?.coluna_kanban || os?.status || '',
+          'Coluna Kanban': os?.coluna_kanban || '',
           'Tipo OS': os?.tipo_os || '',
           'Tipo Atendimento': os?.tipo_atendimento || '',
-          'Tecnico': tecnico?.nome || '',
-          'Requisicao Status': req?.status || '',
+          'Técnico': tecnico?.nome || '',
+          'Requisição Status': req?.status || '',
           'GI Postada Em': fmtDate(req?.gi_postada_em),
-          'OS da Requisicao': req?.os?.numero_os_samsung || req?.os?.numero_os_interna || '',
-          'Tipo Devolucao': req?.tipo_devolucao || '',
-          'Motivo Devolucao': req?.motivo_devolucao || '',
+          'OS da Requisição': req?.req_os?.numero_os_samsung || req?.req_os?.numero_os_interna || '',
+          'Motivo Devolução': req?.motivo_devolucao || '',
           'Data Coleta Transportadora': fmtDate(p.data_coleta_transportadora),
-          'Data Retorno Credito': fmtDate(p.data_retorno_credito),
-          'NF Devolucao': nfDev ? `${nfDev.numero || ''}${nfDev.serie ? ` / Serie ${nfDev.serie}` : ''}` : '',
-          'Status NF Devolucao': nfDev?.status || '',
-          'PDF NF Devolucao': nfDev?.pdf_url || '',
-          'XML NF Devolucao': nfDev?.xml_url || '',
+          'Data Retorno Crédito': fmtDate(p.data_retorno_credito),
+          'NF Devolução': nfDev ? `${nfDev.numero || ''}${nfDev.serie ? ` / Série ${nfDev.serie}` : ''}` : '',
+          'Status NF Devolução': nfDev?.status || '',
+          'PDF NF Devolução': nfDev?.pdf_url || '',
+          'XML NF Devolução': nfDev?.xml_url || '',
           'Criado Em': fmtDateTime(p.created_at),
           'Atualizado Em': fmtDateTime(p.updated_at),
         };
       });
 
       if (rows.length === 0) {
-        alert('Nenhuma peca para exportar');
+        alert('Nenhuma peça para exportar');
         return;
       }
 
@@ -456,8 +473,34 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const ARCHIVED_STATUSES = ['arquivada'];
   const DEVOLVIDA_STATUSES = ['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung'];
 
+  const getSelectionCategory = (): 'devolvida' | 'normal' | null => {
+    if (selectedPecas.size === 0) return null;
+    const firstId = Array.from(selectedPecas)[0];
+    const firstPeca = pecas.find(p => p.id === firstId);
+    if (!firstPeca) return null;
+    return DEVOLVIDA_STATUSES.includes(firstPeca.status) ? 'devolvida' : 'normal';
+  };
+
   const isSelectable = (peca: EstoquePeca) => {
-    return !ARCHIVED_STATUSES.includes(peca.status);
+    if (ARCHIVED_STATUSES.includes(peca.status)) return false;
+    const currentCategory = getSelectionCategory();
+    if (currentCategory === null) return true;
+    if (selectedPecas.has(peca.id)) return true;
+    const pecaCategory = DEVOLVIDA_STATUSES.includes(peca.status) ? 'devolvida' : 'normal';
+    return pecaCategory === currentCategory;
+  };
+
+  const getBlockedReason = (peca: EstoquePeca): string | null => {
+    if (ARCHIVED_STATUSES.includes(peca.status)) return 'Peça arquivada';
+    const currentCategory = getSelectionCategory();
+    if (currentCategory === null || selectedPecas.has(peca.id)) return null;
+    const pecaCategory = DEVOLVIDA_STATUSES.includes(peca.status) ? 'devolvida' : 'normal';
+    if (pecaCategory !== currentCategory) {
+      return currentCategory === 'devolvida'
+        ? 'Não é possível misturar peças devolvidas com peças normais'
+        : 'Não é possível misturar peças normais com peças devolvidas';
+    }
+    return null;
   };
 
   const toggleSelectPeca = (pecaId: string) => {
@@ -698,7 +741,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           <div className="flex items-center gap-3">
             <CheckSquare className="w-5 h-5 text-[#FFA500]" />
             <span className="text-sm text-[#FFA500] font-medium">
-              {selectedPecas.size} {selectedPecas.size === 1 ? 'peca selecionada' : 'pecas selecionadas'}
+              {selectedPecas.size} {selectedPecas.size === 1 ? 'peça selecionada' : 'peças selecionadas'}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -706,14 +749,14 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
               onClick={toggleSelectAll}
               className="text-xs text-gray-300 hover:text-white px-3 py-1.5 rounded bg-gray-800 hover:bg-gray-700 transition"
             >
-              {allCurrentPageSelected ? 'Desmarcar pagina' : 'Selecionar pagina'}
+              {allCurrentPageSelected ? 'Desmarcar página' : 'Selecionar página'}
             </button>
             <button
               onClick={clearSelection}
               className="text-xs text-red-400 hover:text-red-300 px-3 py-1.5 rounded bg-red-500/10 hover:bg-red-500/20 transition flex items-center gap-1"
             >
               <X className="w-3 h-3" />
-              Limpar selecao
+              Limpar seleção
             </button>
           </div>
         </div>
@@ -721,7 +764,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
 
       <div className="flex items-center justify-between mb-4">
         <span className="text-sm text-gray-400">
-          Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, sortedPecas.length)} a {Math.min(currentPage * itemsPerPage, sortedPecas.length)} de {sortedPecas.length} pecas
+          Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, sortedPecas.length)} a {Math.min(currentPage * itemsPerPage, sortedPecas.length)} de {sortedPecas.length} peças
         </span>
         <div className="flex items-center gap-2">
           <span className="text-sm text-gray-400">Itens por página:</span>
@@ -744,7 +787,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         {sortedPecas.length === 0 ? (
           <div className="col-span-full text-center py-12">
             <Package className="w-12 h-12 text-gray-600 mx-auto mb-4" />
-            <p className="text-gray-400">Nenhuma peca encontrada</p>
+            <p className="text-gray-400">Nenhuma peça encontrada</p>
           </div>
         ) : (
           currentPagePecas.map((peca) => {
@@ -761,31 +804,37 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                     : cardClass
                 }`}
               >
-                {isSelectable(peca) ? (
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toggleSelectPeca(peca.id); }}
-                    className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
-                      selectedPecas.has(peca.id)
-                        ? DEVOLVIDA_STATUSES.includes(peca.status)
-                          ? 'bg-[#00D4FF] text-black'
-                          : 'bg-[#FFA500] text-black'
-                        : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
-                    }`}
-                  >
-                    {selectedPecas.has(peca.id) ? (
-                      <CheckSquare className="w-5 h-5" />
-                    ) : (
+                {(() => {
+                  const blockedReason = getBlockedReason(peca);
+                  if (isSelectable(peca)) {
+                    return (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); toggleSelectPeca(peca.id); }}
+                        className={`absolute top-3 right-3 p-1.5 rounded-lg transition-all z-10 ${
+                          selectedPecas.has(peca.id)
+                            ? DEVOLVIDA_STATUSES.includes(peca.status)
+                              ? 'bg-[#00D4FF] text-black'
+                              : 'bg-[#FFA500] text-black'
+                            : 'bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white'
+                        }`}
+                      >
+                        {selectedPecas.has(peca.id) ? (
+                          <CheckSquare className="w-5 h-5" />
+                        ) : (
+                          <Square className="w-5 h-5" />
+                        )}
+                      </button>
+                    );
+                  }
+                  return (
+                    <div
+                      className="absolute top-3 right-3 p-1.5 rounded-lg z-10 bg-gray-800/50 text-gray-600 cursor-not-allowed"
+                      title={blockedReason || 'Peça não selecionável'}
+                    >
                       <Square className="w-5 h-5" />
-                    )}
-                  </button>
-                ) : (
-                  <div
-                    className="absolute top-3 right-3 p-1.5 rounded-lg z-10 bg-gray-800/50 text-gray-600 cursor-not-allowed"
-                    title="Peca arquivada"
-                  >
-                    <Square className="w-5 h-5" />
-                  </div>
-                )}
+                    </div>
+                  );
+                })()}
 
                 <div className="flex items-start justify-between mb-3 pr-10">
                   <div className="flex-1">
@@ -814,6 +863,20 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                     <div className="flex items-center gap-2 flex-wrap">
                       {getStatusBadge(peca.status)}
                       {getAgeBadge(getDaysFromEmission(peca.nf_data_emissao))}
+                      {DEVOLVIDA_STATUSES.includes(peca.status) && (peca as any).tipo_devolucao && (() => {
+                        const tipoCfg: Record<string, { label: string; cls: string }> = {
+                          nova: { label: 'Nova', cls: 'bg-green-500/20 text-green-400 border-green-500/40' },
+                          nova_com_defeito: { label: 'Defeito', cls: 'bg-red-500/20 text-red-400 border-red-500/40' },
+                          usada: { label: 'Usada', cls: 'bg-gray-500/20 text-gray-400 border-gray-500/40' },
+                        };
+                        const cfg = tipoCfg[(peca as any).tipo_devolucao] || null;
+                        if (!cfg) return null;
+                        return (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${cfg.cls}`}>
+                            {cfg.label}
+                          </span>
+                        );
+                      })()}
                       {(() => {
                         const requisicaoAprovada = (peca as any).requisicoes_pecas?.find(
                           (req: any) => req.status === 'atendida'
@@ -974,7 +1037,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       )}
 
       <div className="flex items-center justify-between text-sm text-gray-400 mt-6">
-        <span>Total: <span className="text-[#00D4FF] font-bold">{sortedPecas.length}</span> pecas</span>
+        <span>Total: <span className="text-[#00D4FF] font-bold">{sortedPecas.length}</span> peças</span>
         <span>Valor total: <span className="text-[#39FF14] font-bold">R$ {sortedPecas.reduce((sum, p) => sum + p.valor_com_impostos, 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span></span>
       </div>
 

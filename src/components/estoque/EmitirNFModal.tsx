@@ -180,7 +180,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
 
   const handleSalvarDestinatario = async () => {
     if (!destinatario.nome || !destinatario.documento) {
-      setMensagem({ tipo: 'error', texto: 'Nome e documento sao obrigatorios' });
+      setMensagem({ tipo: 'error', texto: 'Nome e documento são obrigatórios' });
       return;
     }
 
@@ -205,7 +205,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
         });
 
       if (error) throw error;
-      setMensagem({ tipo: 'success', texto: 'Destinatario salvo com sucesso!' });
+      setMensagem({ tipo: 'success', texto: 'Destinatário salvo com sucesso!' });
       loadData();
     } catch (error: any) {
       setMensagem({ tipo: 'error', texto: error.message || 'Erro ao salvar' });
@@ -214,12 +214,12 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
 
   const handleEmitirNF = async () => {
     if (!selectedConfig) {
-      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrizacao de NF-e' });
+      setMensagem({ tipo: 'error', texto: 'Selecione uma parametrização de NF-e' });
       return;
     }
 
     if (!destinatario.nome || !destinatario.documento) {
-      setMensagem({ tipo: 'error', texto: 'Preencha os dados do destinatario' });
+      setMensagem({ tipo: 'error', texto: 'Preencha os dados do destinatário' });
       return;
     }
 
@@ -322,7 +322,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">Emitir NF-e de Produtos</h2>
-              <p className="text-sm text-gray-400">{pecas.length} {pecas.length === 1 ? 'peca selecionada' : 'pecas selecionadas'}</p>
+              <p className="text-sm text-gray-400">{pecas.length} {pecas.length === 1 ? 'peça selecionada' : 'peças selecionadas'}</p>
             </div>
           </div>
           <button
@@ -354,14 +354,14 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-[#FFA500] uppercase tracking-wider flex items-center gap-2">
                     <FileText className="w-4 h-4" />
-                    Tipo de Operacao
+                    Tipo de Operação
                   </h3>
                 </div>
 
                 {nfConfigs.length === 0 ? (
                   <div className="text-center py-6 text-gray-400">
                     <AlertCircle className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                    <p>Nenhuma parametrizacao de NF-e cadastrada.</p>
+                    <p>Nenhuma parametrização de NF-e cadastrada.</p>
                     <p className="text-xs mt-1">Configure em Atom Core Settings &gt; Nota Fiscal</p>
                   </div>
                 ) : (
@@ -370,7 +370,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                       onClick={() => setShowConfigDropdown(!showConfigDropdown)}
                       className="w-full flex items-center justify-between px-4 py-3 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 hover:border-[#FFA500]/50 transition-colors"
                     >
-                      <span>{selectedConfigData?.nome || 'Selecione o tipo de operacao'}</span>
+                      <span>{selectedConfigData?.nome || 'Selecione o tipo de operação'}</span>
                       <ChevronDown className={`w-5 h-5 transition-transform ${showConfigDropdown ? 'rotate-180' : ''}`} />
                     </button>
 
@@ -386,7 +386,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                           >
                             <div className="font-medium">{config.nome}</div>
                             <div className="text-xs text-gray-500 mt-0.5">
-                              CFOP: {config.cfop || '-'} | Serie: {config.serie || '1'}
+                              CFOP: {config.cfop || '-'} | Série: {config.serie || '1'}
                             </div>
                           </button>
                         ))}
@@ -416,7 +416,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                       />
                     </div>
                     <div className="col-span-2">
-                      <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operacao</label>
+                      <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operação</label>
                       <input
                         type="text"
                         value={naturezaOperacao}
@@ -432,7 +432,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
                     <User className="w-4 h-4" />
-                    Destinatario
+                    Destinatário
                   </h3>
 
                   {destinatariosSalvos.length > 0 && (
@@ -466,13 +466,13 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                 <div className="space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div className="col-span-2">
-                      <label className="block text-[10px] text-gray-500 mb-1">Nome/Razao Social *</label>
+                      <label className="block text-[10px] text-gray-500 mb-1">Nome/Razão Social *</label>
                       <input
                         type="text"
                         value={destinatario.nome}
                         onChange={(e) => setDestinatario(prev => ({ ...prev, nome: e.target.value }))}
                         className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        placeholder="Nome completo ou Razao Social"
+                        placeholder="Nome completo ou Razão Social"
                       />
                     </div>
                     <div>
@@ -503,7 +503,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                         value={destinatario.inscricao_estadual}
                         onChange={(e) => setDestinatario(prev => ({ ...prev, inscricao_estadual: e.target.value }))}
                         className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                        placeholder="Inscricao Estadual"
+                        placeholder="Inscrição Estadual"
                       />
                     </div>
                     <div>
@@ -537,7 +537,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                       />
                     </div>
                     <div>
-                      <label className="block text-[10px] text-gray-500 mb-1">Numero</label>
+                      <label className="block text-[10px] text-gray-500 mb-1">Número</label>
                       <input
                         type="text"
                         value={destinatario.numero}
@@ -582,19 +582,19 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                       onChange={(e) => setSalvarDestinatario(e.target.checked)}
                       className="w-4 h-4 rounded border-gray-600 bg-gray-800 text-[#00D4FF] focus:ring-[#00D4FF]"
                     />
-                    <span className="text-sm text-gray-300">Salvar destinatario para uso futuro</span>
+                    <span className="text-sm text-gray-300">Salvar destinatário para uso futuro</span>
                   </label>
                 </div>
               </div>
 
               <div className="premium-card p-4">
-                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Observacoes</h3>
+                <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3">Observações</h3>
                 <textarea
                   value={observacoes}
                   onChange={(e) => setObservacoes(e.target.value)}
                   className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500] resize-none"
                   rows={3}
-                  placeholder="Observacoes adicionais..."
+                  placeholder="Observações adicionais..."
                 />
               </div>
             </div>
@@ -607,14 +607,14 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                     Preview da NF-e
                   </h3>
                   <span className="text-xs px-2 py-1 rounded bg-[#FFA500]/20 text-[#FFA500] font-mono">
-                    N. {getProximoNumero()} | Serie {getSerie()}
+                    N. {getProximoNumero()} | Série {getSerie()}
                   </span>
                 </div>
 
                 <div className="border border-gray-700 rounded-lg overflow-hidden">
                   <div className="bg-gradient-to-r from-[#00D4FF]/10 to-[#FFA500]/10 p-3 border-b border-gray-700">
                     <div className="text-center">
-                      <p className="text-xs text-gray-500 uppercase">Nota Fiscal Eletronica</p>
+                      <p className="text-xs text-gray-500 uppercase">Nota Fiscal Eletrônica</p>
                       <p className="text-lg font-bold text-white">{unidade?.nome || 'Emitente'}</p>
                     </div>
                   </div>
@@ -627,8 +627,8 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
                         <p className="text-gray-400">{unidade?.cidade}, {unidade?.estado}</p>
                       </div>
                       <div>
-                        <p className="text-gray-500 uppercase mb-1">Destinatario</p>
-                        <p className="text-white font-medium">{destinatario.nome || 'Nao informado'}</p>
+                        <p className="text-gray-500 uppercase mb-1">Destinatário</p>
+                        <p className="text-white font-medium">{destinatario.nome || 'Não informado'}</p>
                         <p className="text-gray-400">{formatCPFCNPJ(destinatario.documento) || '-'}</p>
                       </div>
                     </div>
@@ -672,7 +672,7 @@ export function EmitirNFModal({ pecas, unidadeId, onClose, onSuccess }: EmitirNF
               <div className="premium-card p-4">
                 <h3 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 flex items-center gap-2">
                   <Package className="w-4 h-4" />
-                  Pecas Selecionadas
+                  Peças Selecionadas
                 </h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto">
                   {pecas.map(peca => (
