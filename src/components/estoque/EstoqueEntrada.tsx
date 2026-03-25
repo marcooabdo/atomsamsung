@@ -23,10 +23,10 @@ interface NF {
   fornecedor: string;
   data_emissao: string;
   valor_total: number;
-  qtd_pecas: number;
   processada: boolean;
   created_at: string;
   xml_conteudo: string | null;
+  delivery?: string | null;
 }
 
 interface RequisicaoPendente {
@@ -648,7 +648,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const totalPecas = allPecas.length;
       const totalAlocadas = allPecas.filter(p => p.os_alocada_id).length;
       setSuccessMsg(
-        `${allNFs.length} NF(s) processadas com sucesso! ${totalPecas} pecas registradas. ${totalAlocadas > 0 ? `${totalAlocadas} alocadas em OS automaticamente.` : ''}`
+        `${allNFs.length} NF(s) processadas com sucesso! ${totalPecas} peças registradas. ${totalAlocadas > 0 ? `${totalAlocadas} alocadas em OS automaticamente.` : ''}`
       );
 
       setShowPreviewPanel(false);
@@ -662,7 +662,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       loadNFs();
     } catch (err: any) {
-      setError(`Falha na importacao: ${err.message}`);
+      setError(`Falha na importação: ${err.message}`);
     } finally {
       setIsSaving(false);
     }
@@ -681,7 +681,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
   const handleDownloadNFPDF = async (nf: NF) => {
     if (!nf.chave_acesso) {
-      setError('Chave de acesso nao disponivel para esta NF');
+      setError('Chave de acesso não disponível para esta NF');
       return;
     }
     setDownloadingNFId(nf.id);
@@ -720,7 +720,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           .eq('id', nf.id)
           .maybeSingle();
         if (error || !data?.xml_conteudo) {
-          setError('XML nao disponivel para esta NF');
+          setError('XML não disponível para esta NF');
           return;
         }
         xmlContent = data.xml_conteudo;
@@ -740,7 +740,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   };
 
   const handleDeleteNF = async (nf: NF) => {
-    if (!confirm(`Deseja excluir a NF ${nf.numero_nf}? Todas as pecas vinculadas serao removidas.`)) return;
+    if (!confirm(`Deseja excluir a NF ${nf.numero_nf}? Todas as peças vinculadas serão removidas.`)) return;
     setDeletingNFId(nf.id);
     try {
       const { error } = await supabase.from('estoque_nfs').delete().eq('id', nf.id);
@@ -762,7 +762,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       let query = supabase
         .from('estoque_nfs')
-        .select('id, numero_nf, chave_acesso, fornecedor, data_emissao, valor_total, delivery, qtd_pecas, processada, created_at')
+        .select('id, numero_nf, chave_acesso, fornecedor, data_emissao, valor_total, delivery, processada, created_at')
         .eq('unidade_id', unidadeFilter)
         .order('created_at', { ascending: false });
 
@@ -775,7 +775,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       const { data: nfsData } = await query;
       if (!nfsData || nfsData.length === 0) {
-        setError('Nenhuma NF encontrada para exportar');
+        setError('Nenhuma NF encontrada para exportar.');
         return;
       }
 
@@ -791,10 +791,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         'Fornecedor': p.nf?.fornecedor || '',
         'Delivery': p.nf?.delivery || '',
         'Part Number': p.pn,
-        'Descricao': p.descricao,
-        'ID Unico': p.id_unico || '',
+        'Descrição': p.descricao,
+        'ID Único': p.id_unico || '',
         'Qtd': 1,
-        'Valor Unitario': p.valor_unitario_sem_imposto || 0,
+        'Valor Unitário': p.valor_unitario_sem_imposto || 0,
         'Valor c/ Impostos': p.valor_com_impostos || 0,
         'ICMS Valor': p.icms_valor || 0,
         'ICMS %': p.icms_aliquota || 0,
@@ -815,15 +815,19 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const colWidths = Object.keys(rows[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
       ws['!cols'] = colWidths;
       const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, 'Relatorio NFs');
+      XLSX.utils.book_append_sheet(wb, ws, 'Relatório NFs');
 
+      const pecasByNf = (pecasData || []).reduce((acc: Record<string, number>, p: any) => {
+        if (p.nf_id) acc[p.nf_id] = (acc[p.nf_id] || 0) + 1;
+        return acc;
+      }, {});
       const nfSummary = nfsData.map(n => ({
         'NF': n.numero_nf,
         'Fornecedor': n.fornecedor,
         'Delivery': n.delivery || '',
-        'Data Emissao': n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '',
+        'Data Emissão': n.data_emissao ? new Date(n.data_emissao).toLocaleDateString('pt-BR') : '',
         'Valor Total': n.valor_total,
-        'Qtd Pecas': n.qtd_pecas,
+        'Qtd Peças': pecasByNf[n.id] || 0,
         'Status': n.processada ? 'Processada' : 'Pendente',
         'Chave Acesso': n.chave_acesso || '',
       }));
@@ -831,8 +835,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       ws2['!cols'] = Object.keys(nfSummary[0] || {}).map(k => ({ wch: Math.max(k.length + 2, 14) }));
       XLSX.utils.book_append_sheet(wb, ws2, 'Resumo NFs');
 
-      XLSX.writeFile(wb, `Relatorio_NFs_${new Date().toISOString().split('T')[0]}.xlsx`);
-      setSuccessMsg(`Relatorio exportado com ${rows.length} pecas de ${nfsData.length} NFs`);
+      XLSX.writeFile(wb, `Relatório_NFs_${new Date().toISOString().split('T')[0]}.xlsx`);
+      setSuccessMsg(`Relatório exportado com ${rows.length} peças de ${nfsData.length} NFs`);
     } catch (err: any) {
       setError(`Erro ao exportar: ${err.message}`);
     } finally {
@@ -862,7 +866,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const { data: xmlsData } = await query;
       const validXmls = xmlsData?.filter(x => x.xml_conteudo) || [];
       if (validXmls.length === 0) {
-        setError('Nenhum XML disponivel para download');
+        setError('Nenhum XML disponível para download');
         return;
       }
 
@@ -963,7 +967,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                     </span>
                   </div>
                   <p className="text-[11px] text-gray-500 mt-0.5">
-                    {allPecas.length} pecas | {totalQtdAlocadas} alocadas | {totalQtdOFS} OFS
+                    {allPecas.length} peças | {totalQtdAlocadas} alocadas | {totalQtdOFS} OFS
                   </p>
                 </div>
               </div>
@@ -1258,7 +1262,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           >
             <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" style={{ color: '#FF0064' }} />
             <div>
-              <p className="text-sm font-bold" style={{ color: '#FF0064' }}>Erro na importacao</p>
+              <p className="text-sm font-bold" style={{ color: '#FF0064' }}>Erro na importação</p>
               <pre className="text-xs text-red-300 mt-1 whitespace-pre-wrap font-mono">{error}</pre>
             </div>
             <button onClick={() => setError(null)} className="ml-auto shrink-0">
@@ -1291,10 +1295,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 disabled={exportingReport || nfTotal === 0}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40"
                 style={{ background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.25)', color: '#00D4FF' }}
-                title="Exportar relatorio completo em Excel"
+                title="Exportar relatório completo em Excel"
               >
                 <FileSpreadsheet className="w-3.5 h-3.5" />
-                {exportingReport ? 'Exportando...' : 'Relatorio'}
+                {exportingReport ? 'Exportando...' : 'Relatório'}
               </button>
               <button
                 onClick={handleExportAllXmls}
@@ -1401,10 +1405,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                       <span className="text-xs text-gray-500">{nf.fornecedor}</span>
                       <span className="text-xs text-gray-600">-</span>
                       <span className="text-xs text-gray-500">{new Date(nf.data_emissao).toLocaleDateString('pt-BR')}</span>
-                      {nf.qtd_pecas > 0 && (
+                      {nf.delivery && (
                         <>
                           <span className="text-xs text-gray-600">-</span>
-                          <span className="text-xs text-gray-500">{nf.qtd_pecas} pecas</span>
+                          <span className="text-xs text-gray-500">{nf.delivery}</span>
                         </>
                       )}
                     </div>
