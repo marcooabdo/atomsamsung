@@ -42,6 +42,7 @@ interface LabelData {
   id_sequencial?: string;
   codigo_barras?: string;
   data_emissao?: string;
+  nf_data_emissao?: string;
   part_number?: string;
   descricao?: string;
   delivery?: string;
@@ -56,14 +57,15 @@ interface LabelData {
 const VARIAVEIS_DISPONIVEIS = [
   { var: '{{peca_codigo}}', label: 'Codigo da Peca', exemplo: 'GH82-12345' },
   { var: '{{peca_descricao}}', label: 'Descricao', exemplo: 'Display LCD' },
-  { var: '{{peca_id}}', label: 'ID Sequencial', exemplo: 'P-00123' },
+  { var: '{{peca_id}}', label: 'ID da Peca', exemplo: '#342' },
   { var: '{{nf_numero}}', label: 'Numero da NF', exemplo: '12345' },
   { var: '{{nf_delivery}}', label: 'Delivery', exemplo: 'DEL123456' },
+  { var: '{{nf_data_emissao}}', label: 'Data Emissao NF', exemplo: '12/02/2026' },
   { var: '{{data_entrada}}', label: 'Data de Entrada', exemplo: '12/02/2026' },
   { var: '{{data_atual}}', label: 'Data Atual', exemplo: '12/02/2026' },
   { var: '{{localizacao}}', label: 'Localizacao', exemplo: 'A1-B2' },
   { var: '{{tecnico_nome}}', label: 'Tecnico', exemplo: 'Joao Silva' },
-  { var: '{{os_numero}}', label: 'OS Interna', exemplo: 'G1234' },
+  { var: '{{os_numero}}', label: 'Numero OS (Samsung > Interna)', exemplo: '4175123456' },
   { var: '{{os_samsung}}', label: 'OS Samsung', exemplo: '4175123456' },
   { var: '{{unidade_nome}}', label: 'Unidade', exemplo: 'Matriz' },
 ];
@@ -578,6 +580,15 @@ export default function EtiquetaEditor() {
     setResizeHandle(null);
   };
 
+  const formatDateBR = (dateStr: string): string => {
+    if (!dateStr) return '';
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return dateStr;
+      return d.toLocaleDateString('pt-BR');
+    } catch { return dateStr; }
+  };
+
   const substituirVariaveis = (texto: string, dados: LabelData): string => {
     return texto
       .replace(/\{\{peca_codigo\}\}/g, dados.part_number || dados.codigo_barras || '')
@@ -585,11 +596,12 @@ export default function EtiquetaEditor() {
       .replace(/\{\{peca_id\}\}/g, dados.id_sequencial || '')
       .replace(/\{\{nf_numero\}\}/g, dados.nf_numero || '')
       .replace(/\{\{nf_delivery\}\}/g, dados.delivery || '')
-      .replace(/\{\{data_entrada\}\}/g, dados.data_emissao || '')
+      .replace(/\{\{nf_data_emissao\}\}/g, formatDateBR(dados.nf_data_emissao || ''))
+      .replace(/\{\{data_entrada\}\}/g, formatDateBR(dados.data_emissao || ''))
       .replace(/\{\{data_atual\}\}/g, new Date().toLocaleDateString('pt-BR'))
       .replace(/\{\{localizacao\}\}/g, dados.localizacao || '')
       .replace(/\{\{tecnico_nome\}\}/g, dados.tecnico_nome || '')
-      .replace(/\{\{os_numero\}\}/g, dados.os_numero || '')
+      .replace(/\{\{os_numero\}\}/g, dados.os_samsung || dados.os_numero || '')
       .replace(/\{\{os_samsung\}\}/g, dados.os_samsung || '')
       .replace(/\{\{unidade_nome\}\}/g, dados.unidade_nome || '');
   };

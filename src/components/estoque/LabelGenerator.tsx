@@ -2,12 +2,13 @@ import { useRef, useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useReactToPrint } from 'react-to-print';
 import JsBarcode from 'jsbarcode';
-import { Printer, X, Edit3, ExternalLink } from 'lucide-react';
+import { Printer, X, CreditCard as Edit3, ExternalLink } from 'lucide-react';
 
 interface LabelData {
   id_sequencial: string;
   codigo_barras: string;
   data_emissao: string;
+  nf_data_emissao?: string;
   part_number: string;
   descricao?: string;
   delivery?: string;

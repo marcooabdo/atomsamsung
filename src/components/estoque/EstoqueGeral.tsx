@@ -109,6 +109,13 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         query = query.eq('status', statusFilter);
       }
 
+      const { count: totalCount } = await supabase
+        .from('estoque_pecas')
+        .select('id', { count: 'exact', head: true });
+
+      const fetchLimit = Math.max(totalCount || 5000, 5000);
+      query = query.limit(fetchLimit);
+
       const { data, error } = await query;
 
       if (error) throw error;

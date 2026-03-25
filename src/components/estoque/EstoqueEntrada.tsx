@@ -437,7 +437,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     let seq = 1;
 
     for (const peca of pecasInseridas) {
-      const idSequencial = peca.id_unico || `NF${nfRecord.numero_nf.padStart(6, '0')}-${seq.toString().padStart(3, '0')}`;
+      const idSequencial = peca.id_numerico
+        ? `#${peca.id_numerico}`
+        : (peca.id_unico || `NF${nfRecord.numero_nf.padStart(6, '0')}-${seq.toString().padStart(3, '0')}`);
       let codigoBarras = '';
       try {
         const { data } = await supabase.rpc('gerar_codigo_barras');
@@ -445,6 +447,16 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       } catch {}
       if (!codigoBarras) {
         codigoBarras = (Date.now().toString() + Math.floor(Math.random() * 1000000)).padStart(12, '0').substring(0, 12);
+      }
+
+      let osNumeroSmart = '';
+      if (peca.os_id) {
+        const { data: osData } = await supabase
+          .from('os')
+          .select('numero_os_samsung, numero_os_interna')
+          .eq('id', peca.os_id)
+          .maybeSingle();
+        osNumeroSmart = osData?.numero_os_samsung || osData?.numero_os_interna || '';
       }
 
       labelsData.push({
@@ -455,7 +467,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         descricao: peca.descricao,
         delivery: nfData.delivery,
         nf_numero: nfRecord.numero_nf,
-        os_numero: peca.os_id ? '' : undefined,
+        nf_data_emissao: nfData.dataEmissao || '',
+        os_numero: osNumeroSmart,
       });
       seq++;
     }

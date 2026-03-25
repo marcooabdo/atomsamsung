@@ -59,15 +59,16 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
 
         const { data: pecaIds } = await supabase
           .from('estoque_pecas')
-          .select('id_unico')
+          .select('id_numerico, id_unico, estoque_nfs(data_emissao), os:os_id(numero_os_samsung, numero_os_interna)')
           .eq('nf_id', nfId || '')
           .eq('pn', item.part_number)
           .order('created_at');
 
         for (let i = 0; i < item.quantidade; i++) {
-          const idFromDb = pecaIds?.[i]?.id_unico;
-          const idSequencial = idFromDb
-            || (nfNumero
+          const pecaRecord = pecaIds?.[i];
+          const idSequencial = pecaRecord?.id_numerico
+            ? `#${pecaRecord.id_numerico}`
+            : (nfNumero
               ? `NF${nfNumero.padStart(6, '0')}-${globalSeq.toString().padStart(3, '0')}`
               : `P-${item.part_number.substring(0, 6).toUpperCase()}-${globalSeq.toString().padStart(3, '0')}`);
 
@@ -84,6 +85,10 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
             codigoBarras = (Date.now().toString() + Math.floor(Math.random() * 1000000)).padStart(12, '0').substring(0, 12);
           }
 
+          const nfDataEmissao = (pecaRecord as any)?.estoque_nfs?.data_emissao || '';
+          const osRecord = (pecaRecord as any)?.os;
+          const osNumeroSmart = osRecord?.numero_os_samsung || osRecord?.numero_os_interna || '';
+
           const labelData = {
             unidade_id: unidadeId,
             nf_id: nfId || null,
@@ -95,6 +100,8 @@ export function LabelSelector({ items, nfId, nfNumero, unidadeId, onGenerate, on
             delivery: item.delivery,
             localizacao: localizacao,
             data_emissao: new Date().toISOString(),
+            nf_data_emissao: nfDataEmissao,
+            os_numero: osNumeroSmart,
             quantidade_impressoes: 0
           };
 
