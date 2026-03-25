@@ -846,7 +846,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           'Descrição': p.descricao,
           'NCM': detMeta.ncm,
           'CFOP': detMeta.cfop,
-          'ID Único': p.id_unico || '',
+          'ID': p.id_sequencial || '',
           'Qtd': 1,
           'Valor Unitário': p.valor_unitario_sem_imposto || 0,
           'Valor c/ Impostos': p.valor_com_impostos || 0,
