@@ -76,7 +76,7 @@ type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | null;
 
 export default function EtiquetaEditor() {
   const [searchParams] = useSearchParams();
-  const { usuario, unidadeSelecionada } = useAuth();
+  const { usuario, unidadeAtual, unidades } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -99,10 +99,20 @@ export default function EtiquetaEditor() {
   const [resizeStart, setResizeStart] = useState({ x: 0, y: 0 });
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [unidadeSelecionada, setUnidadeSelecionada] = useState<string | null>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const unidadeId = unidadeSelecionada || usuario?.unidade_id || null;
+  const needsUnitSelector = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const unidadeId = unidadeSelecionada || unidadeAtual || usuario?.unidade_id || null;
+
+  useEffect(() => {
+    if (!unidadeSelecionada && unidadeAtual) {
+      setUnidadeSelecionada(unidadeAtual);
+    } else if (!unidadeSelecionada && unidades.length > 0 && needsUnitSelector) {
+      setUnidadeSelecionada(unidades[0].id);
+    }
+  }, [unidadeAtual, unidades, needsUnitSelector]);
 
   useEffect(() => {
     const init = async () => {
@@ -884,6 +894,17 @@ export default function EtiquetaEditor() {
       <div className="bg-[#1A1A2E] border-b border-white/10 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-bold text-cyan-400">Editor de Etiquetas</h1>
+          {needsUnitSelector && (
+            <select
+              value={unidadeSelecionada || ''}
+              onChange={(e) => setUnidadeSelecionada(e.target.value || null)}
+              className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white"
+            >
+              {unidades.map(u => (
+                <option key={u.id} value={u.id} className="bg-[#1A1A2E]">{u.nome}</option>
+              ))}
+            </select>
+          )}
           <div className="flex items-center gap-2 text-sm text-gray-400">
             <span>{larguraMm}mm x {alturaMm}mm</span>
             {templateAtual?.is_padrao && (
@@ -1432,6 +1453,20 @@ export default function EtiquetaEditor() {
           <div className="bg-[#1A1A2E] rounded-xl border border-white/10 w-full max-w-md p-6">
             <h3 className="font-semibold mb-4">Salvar Template</h3>
             <div className="space-y-4">
+              {needsUnitSelector && (
+                <div>
+                  <label className="text-sm text-gray-400">Unidade</label>
+                  <select
+                    value={unidadeSelecionada || ''}
+                    onChange={(e) => setUnidadeSelecionada(e.target.value || null)}
+                    className="w-full mt-1 px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white"
+                  >
+                    {unidades.map(u => (
+                      <option key={u.id} value={u.id} className="bg-[#1A1A2E]">{u.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="text-sm text-gray-400">Nome do Template</label>
                 <input
