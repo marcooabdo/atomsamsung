@@ -104,8 +104,8 @@ export function getGiaAgents(neonGreen: string = '#39FF14'): GIAAgentConfig[] {
     headerGradient: 'linear-gradient(135deg, rgba(255,165,0,0.12), rgba(255,165,0,0.04))',
   },
   {
-    name: 'GIA Warranty',
-    shortName: 'WARRANTY',
+    name: 'GIA Audit',
+    shortName: 'AUDIT',
     color: '#FFA500',
     maxLoad: 4,
     bgGradient: 'rgba(255,165,0,0.05)',

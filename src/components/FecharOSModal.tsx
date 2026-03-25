@@ -14,6 +14,7 @@ import {
   type AlertaFechamento,
   type ValidacaoResultado,
 } from '../lib/osClosureValidation';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 
 interface FecharOSModalProps {
@@ -86,6 +87,29 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
     if (!usuario) return;
     setFechando(true);
     try {
+      if (forceClose && resultado) {
+        const allAlertas = [...resultado.bloqueios, ...resultado.alertas];
+        if (allAlertas.length > 0) {
+          const linhas = ['[FECHAMENTO FORCADO] OS fechada com os seguintes desvios pendentes:'];
+          const bloqs = allAlertas.filter(a => a.severidade === 'bloqueante');
+          const avs = allAlertas.filter(a => a.severidade === 'alerta');
+          if (bloqs.length > 0) {
+            linhas.push('', `BLOQUEIOS IGNORADOS (${bloqs.length}):`);
+            bloqs.forEach(b => linhas.push(`  - ${b.regra_titulo}: ${b.mensagem}`));
+          }
+          if (avs.length > 0) {
+            linhas.push('', `ALERTAS IGNORADOS (${avs.length}):`);
+            avs.forEach(a => linhas.push(`  - ${a.regra_titulo}: ${a.mensagem}`));
+          }
+          linhas.push('', `Fechamento forcado por: ${usuario.nome || usuario.id}`);
+          await supabase.from('os_comentarios').insert({
+            os_id: osId,
+            usuario_id: usuario.id,
+            comentario: linhas.join('\n'),
+            is_system: true,
+          });
+        }
+      }
       const res = await executarFechamentoOS(osId, usuario.id);
       if (res.success) {
         onSuccess();

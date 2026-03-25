@@ -36,7 +36,7 @@ export function MuralMissoes() {
   const [activeAgentIdx, setActiveAgentIdx] = useState(0);
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isMaster = usuario?.perfil === 'master';
+  const isMaster = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
 
   const loadTasks = useCallback(async () => {
     let query = supabase
