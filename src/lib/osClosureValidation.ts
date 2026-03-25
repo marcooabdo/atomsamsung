@@ -409,7 +409,8 @@ export async function criarAlertasGIAWarranty(
   osId: string,
   osNumero: string,
   unidadeId: string,
-  alertas: AlertaFechamento[]
+  alertas: AlertaFechamento[],
+  userId?: string
 ): Promise<void> {
   if (alertas.length === 0) return;
 
@@ -462,6 +463,27 @@ export async function criarAlertasGIAWarranty(
       os_id: osId,
       os_numero: osNumero,
       metadata,
+    });
+  }
+
+  if (userId) {
+    const comentarioLinhas = [`[GIA WARRANTY] Analise de fechamento - ${bloqueios.length + avisos.length} desvio(s) encontrado(s):`];
+    if (bloqueios.length > 0) {
+      comentarioLinhas.push('');
+      comentarioLinhas.push(`BLOQUEIOS (${bloqueios.length}):`);
+      bloqueios.forEach(b => comentarioLinhas.push(`  - ${b.regra_titulo}: ${b.mensagem}`));
+    }
+    if (avisos.length > 0) {
+      comentarioLinhas.push('');
+      comentarioLinhas.push(`ALERTAS (${avisos.length}):`);
+      avisos.forEach(a => comentarioLinhas.push(`  - ${a.regra_titulo}: ${a.mensagem}`));
+    }
+
+    await supabase.from('os_comentarios').insert({
+      os_id: osId,
+      usuario_id: userId,
+      comentario: comentarioLinhas.join('\n'),
+      is_system: true,
     });
   }
 }

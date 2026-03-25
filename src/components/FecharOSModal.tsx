@@ -60,7 +60,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
       await salvarAlertasFechamento(osId, unidadeId, allAlertas);
 
       if (allAlertas.length > 0) {
-        await criarAlertasGIAWarranty(osId, osNumero, unidadeId, allAlertas);
+        await criarAlertasGIAWarranty(osId, osNumero, unidadeId, allAlertas, usuario?.id);
       }
     } catch {
       setResultado({
