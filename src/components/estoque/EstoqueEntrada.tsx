@@ -8,9 +8,10 @@ import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
   ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
-  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive
+  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
+import { LocationSelector } from './LocationSelector';
 
 interface EstoqueEntradaProps {
   selectedUnidade: string;
@@ -69,6 +70,10 @@ interface PecaExpandida {
   requisicao_alocada_id: string;
   os_peca_id?: string | null;
   taxes: ProdutoTaxes;
+  localizacao: string;
+  bin_id: string;
+  localizacao_sugerida: string;
+  bin_id_sugerido: string;
 }
 
 interface NFParsed {
@@ -122,6 +127,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [totalFiles, setTotalFiles] = useState(0);
   const [isSaving, setIsSaving] = useState(false);
   const [collapsedNFs, setCollapsedNFs] = useState<Record<number, boolean>>({});
+  const [locationSelectorPeca, setLocationSelectorPeca] = useState<{ id_temp: string; pn: string } | null>(null);
 
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -370,6 +376,22 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const sortedReqs = reqs.sort((a, b) => getPriorityScore(b) - getPriorityScore(a));
       setRequisicoesDisponiveis(sortedReqs);
 
+      const locationSuggestions = new Map<string, { bin_id: string; localizacao: string }>();
+      for (const pn of allPns) {
+        try {
+          const { data: sugData } = await supabase.rpc('sugerir_localizacao', {
+            pn_busca: pn,
+            unidade_atual: unidadeId,
+          });
+          if (sugData && sugData.length > 0) {
+            locationSuggestions.set(pn, {
+              bin_id: sugData[0].bin_id,
+              localizacao: sugData[0].localizacao_completa,
+            });
+          }
+        } catch {}
+      }
+
       const pecasParaAlocar: PecaExpandida[] = [];
       let reqsDisponiveis = [...sortedReqs];
 
@@ -390,6 +412,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               alocadaOsPecaId = match.os_peca_id;
             }
 
+            const suggestion = locationSuggestions.get(normalizePn(prod.pn));
+
             pecasParaAlocar.push({
               id_temp: crypto.randomUUID(),
               nfIndex: nfIdx,
@@ -401,6 +425,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               requisicao_alocada_id: alocadaReqId,
               os_peca_id: alocadaOsPecaId,
               taxes: prod.taxes,
+              localizacao: suggestion?.localizacao || '',
+              bin_id: suggestion?.bin_id || '',
+              localizacao_sugerida: suggestion?.localizacao || '',
+              bin_id_sugerido: suggestion?.bin_id || '',
             });
           }
         });
@@ -427,6 +455,36 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       prev.map(p =>
         p.id_temp === id_temp
           ? { ...p, os_alocada_id: os_id, requisicao_alocada_id: req_id, os_peca_id }
+          : p
+      )
+    );
+  };
+
+  const handleLocationChange = (id_temp: string, binId: string, locationText: string) => {
+    setAllPecas(prev =>
+      prev.map(p =>
+        p.id_temp === id_temp
+          ? { ...p, bin_id: binId, localizacao: locationText }
+          : p
+      )
+    );
+  };
+
+  const handleLocationClear = (id_temp: string) => {
+    setAllPecas(prev =>
+      prev.map(p =>
+        p.id_temp === id_temp
+          ? { ...p, bin_id: '', localizacao: '' }
+          : p
+      )
+    );
+  };
+
+  const applyLocationToAllSamePn = (sourcePeca: PecaExpandida) => {
+    setAllPecas(prev =>
+      prev.map(p =>
+        p.pn === sourcePeca.pn && !p.localizacao
+          ? { ...p, bin_id: sourcePeca.bin_id, localizacao: sourcePeca.localizacao }
           : p
       )
     );
@@ -469,6 +527,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         nf_numero: nfRecord.numero_nf,
         nf_data_emissao: nfData.dataEmissao || '',
         os_numero: osNumeroSmart,
+        localizacao: peca.localizacao || '',
       });
       seq++;
     }
@@ -558,6 +617,8 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             status: peca.os_alocada_id ? 'reservada' : 'disponivel',
             os_id: peca.os_alocada_id || null,
             data_entrada: new Date().toISOString(),
+            localizacao: peca.localizacao || null,
+            bin_id: peca.bin_id || null,
           };
         });
 
@@ -1206,6 +1267,37 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                                   style={{ color: isAlocada ? 'var(--neon-green)' : '#6B7280' }}
                                 />
                               </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <MapPin className="w-3 h-3 shrink-0" style={{ color: peca.localizacao ? '#00D4FF' : '#4B5563' }} />
+                                <div
+                                  className="flex-1 flex items-center gap-1 min-w-0 rounded-lg px-2 py-1.5 cursor-pointer transition-all"
+                                  style={{
+                                    background: peca.localizacao ? 'rgba(0,212,255,0.06)' : 'rgba(0,0,0,0.3)',
+                                    border: peca.localizacao ? '1px solid rgba(0,212,255,0.25)' : '1px solid rgba(255,255,255,0.06)',
+                                  }}
+                                  onClick={() => setLocationSelectorPeca({ id_temp: peca.id_temp, pn: peca.pn })}
+                                >
+                                  <span className="text-[10px] truncate" style={{ color: peca.localizacao ? '#00D4FF' : '#6B7280' }}>
+                                    {peca.localizacao || 'Sem localização - clique para definir'}
+                                  </span>
+                                  {peca.localizacao_sugerida && peca.localizacao === peca.localizacao_sugerida && (
+                                    <span className="text-[8px] font-bold px-1 py-0.5 rounded shrink-0"
+                                      style={{ background: 'rgba(0,212,255,0.12)', color: '#00D4FF', border: '1px solid rgba(0,212,255,0.2)' }}>
+                                      SUGERIDA
+                                    </span>
+                                  )}
+                                </div>
+                                {peca.localizacao && (
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleLocationClear(peca.id_temp); }}
+                                    className="p-0.5 rounded hover:bg-white/10 transition-colors shrink-0"
+                                    title="Remover localização"
+                                  >
+                                    <X className="w-3 h-3 text-gray-500" />
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           );
                         })}
@@ -1271,6 +1363,29 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           </div>
         </div>,
         document.body
+      )}
+
+      {locationSelectorPeca && (
+        <LocationSelector
+          partNumber={locationSelectorPeca.pn}
+          currentUnidadeId={selectedUnidade || usuario?.unidade_id || ''}
+          onSelect={(binId, locationText) => {
+            handleLocationChange(locationSelectorPeca.id_temp, binId, locationText);
+            const currentPeca = allPecas.find(p => p.id_temp === locationSelectorPeca.id_temp);
+            if (currentPeca) {
+              const samePnWithoutLoc = allPecas.filter(p => p.pn === currentPeca.pn && !p.localizacao && p.id_temp !== currentPeca.id_temp);
+              if (samePnWithoutLoc.length > 0) {
+                setAllPecas(prev => prev.map(p =>
+                  p.pn === currentPeca.pn && !p.localizacao
+                    ? { ...p, bin_id: binId, localizacao: locationText }
+                    : p
+                ));
+              }
+            }
+            setLocationSelectorPeca(null);
+          }}
+          onClose={() => setLocationSelectorPeca(null)}
+        />
       )}
 
       {/* MAIN CONTENT */}
