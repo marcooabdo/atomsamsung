@@ -36,7 +36,7 @@ export function MuralMissoes() {
   const [activeAgentIdx, setActiveAgentIdx] = useState(0);
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const isMaster = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+  const canSeeAll = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria' || usuario?.tipo === 'administrador';
 
   const loadTasks = useCallback(async () => {
     let query = supabase
@@ -45,14 +45,14 @@ export function MuralMissoes() {
       .eq('status', 'pendente')
       .order('created_at', { ascending: true });
 
-    if (!isMaster && unidadeAtual) {
+    if (!canSeeAll && unidadeAtual) {
       query = query.or(`unidade_id.eq.${unidadeAtual},unidade_id.is.null`);
     }
 
     const { data, error } = await query;
     if (!error && data) setTasks(sortTasks(data as MuralTarefa[]));
     setLoading(false);
-  }, [unidadeAtual, isMaster]);
+  }, [unidadeAtual, canSeeAll]);
 
   useEffect(() => {
     loadTasks();
@@ -61,7 +61,7 @@ export function MuralMissoes() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'gia_mural_tarefas' }, (payload) => {
         if (payload.eventType === 'INSERT') {
           const t = payload.new as MuralTarefa;
-          const belongsToUnit = isMaster || !t.unidade_id || t.unidade_id === unidadeAtual;
+          const belongsToUnit = canSeeAll || !t.unidade_id || t.unidade_id === unidadeAtual;
           if (t.status === 'pendente' && belongsToUnit) {
             setTasks((prev) => sortTasks([...prev, t]));
             setNewTaskFlash(true);
