@@ -5,7 +5,7 @@ import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain,
   ChevronDown, Cpu, GripHorizontal, Minus, Maximize2,
-  Tag, ChevronRight
+  Tag, ChevronRight, Code, ChevronLeft, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 
@@ -24,6 +24,7 @@ interface NF {
   qtd_pecas: number;
   processada: boolean;
   created_at: string;
+  xml_conteudo: string | null;
 }
 
 interface RequisicaoPendente {
@@ -101,6 +102,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [downloadingNFId, setDownloadingNFId] = useState<string | null>(null);
   const [deletingNFId, setDeletingNFId] = useState<string | null>(null);
+  const [nfPage, setNfPage] = useState(0);
+  const [nfTotal, setNfTotal] = useState(0);
+  const NF_PER_PAGE = 15;
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
@@ -158,19 +162,30 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   }, [isDragging]);
 
   useEffect(() => {
-    loadNFs();
+    setNfPage(0);
+    loadNFs(0);
   }, [selectedUnidade]);
 
-  const loadNFs = async () => {
+  const loadNFs = async (page = nfPage) => {
     try {
       const unidadeFilter = selectedUnidade || usuario?.unidade_id;
       if (!unidadeFilter) return;
+      const from = page * NF_PER_PAGE;
+      const to = from + NF_PER_PAGE - 1;
+
+      const { count } = await supabase
+        .from('estoque_nfs')
+        .select('id', { count: 'exact', head: true })
+        .eq('unidade_id', unidadeFilter);
+
+      setNfTotal(count || 0);
+
       const { data, error } = await supabase
         .from('estoque_nfs')
         .select('*')
         .eq('unidade_id', unidadeFilter)
         .order('created_at', { ascending: false })
-        .limit(20);
+        .range(from, to);
       if (error) throw error;
       setNfs(data || []);
     } catch (err) {}
@@ -707,6 +722,35 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
   };
 
+  const handleDownloadXML = async (nf: NF) => {
+    try {
+      let xmlContent = nf.xml_conteudo;
+      if (!xmlContent) {
+        const { data, error } = await supabase
+          .from('estoque_nfs')
+          .select('xml_conteudo')
+          .eq('id', nf.id)
+          .maybeSingle();
+        if (error || !data?.xml_conteudo) {
+          setError('XML nao disponivel para esta NF');
+          return;
+        }
+        xmlContent = data.xml_conteudo;
+      }
+      const blob = new Blob([xmlContent], { type: 'application/xml' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `NF_${nf.numero_nf}.xml`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError('Erro ao baixar XML');
+    }
+  };
+
   const handleDeleteNF = async (nf: NF) => {
     if (!confirm(`Deseja excluir a NF ${nf.numero_nf}? Todas as pecas vinculadas serao removidas.`)) return;
     setDeletingNFId(nf.id);
@@ -1129,7 +1173,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         {nfs.length > 0 && (
           <div>
             <h3 className="text-xs font-black tracking-[0.2em] uppercase mb-4" style={{ color: '#00D4FF' }}>
-              Notas Fiscais Recentes
+              Notas Fiscais ({nfTotal})
             </h3>
             <div className="space-y-2">
               {nfs.map(nf => (
@@ -1187,6 +1231,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                         )}
                       </button>
                     )}
+                    <button onClick={() => handleDownloadXML(nf)} title="Baixar XML" className="p-2 rounded-lg transition-colors hover:bg-white/5">
+                      <Code className="w-4 h-4 text-gray-400 hover:text-[#FFBF00] transition-colors" />
+                    </button>
                     <button onClick={() => handleDeleteNF(nf)} disabled={deletingNFId === nf.id} title="Excluir NF" className="p-2 rounded-lg transition-colors hover:bg-red-500/10 disabled:opacity-40">
                       {deletingNFId === nf.id ? (
                         <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
@@ -1198,6 +1245,47 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 </div>
               ))}
             </div>
+
+            {nfTotal > NF_PER_PAGE && (
+              <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                <span className="text-xs text-gray-500">
+                  {nfPage * NF_PER_PAGE + 1}-{Math.min((nfPage + 1) * NF_PER_PAGE, nfTotal)} de {nfTotal}
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => { setNfPage(0); loadNFs(0); }}
+                    disabled={nfPage === 0}
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-30"
+                  >
+                    <ChevronsLeft className="w-4 h-4 text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => { const p = nfPage - 1; setNfPage(p); loadNFs(p); }}
+                    disabled={nfPage === 0}
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-30"
+                  >
+                    <ChevronLeft className="w-4 h-4 text-gray-400" />
+                  </button>
+                  <span className="text-xs text-gray-400 px-3">
+                    {nfPage + 1} / {Math.ceil(nfTotal / NF_PER_PAGE)}
+                  </span>
+                  <button
+                    onClick={() => { const p = nfPage + 1; setNfPage(p); loadNFs(p); }}
+                    disabled={(nfPage + 1) * NF_PER_PAGE >= nfTotal}
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-30"
+                  >
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  </button>
+                  <button
+                    onClick={() => { const p = Math.ceil(nfTotal / NF_PER_PAGE) - 1; setNfPage(p); loadNFs(p); }}
+                    disabled={(nfPage + 1) * NF_PER_PAGE >= nfTotal}
+                    className="p-1.5 rounded-lg transition-colors hover:bg-white/5 disabled:opacity-30"
+                  >
+                    <ChevronsRight className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
