@@ -168,7 +168,7 @@ export function EmitirNFSeModal({
   const loadData = async () => {
     setLoading(true);
     try {
-      const [configsRes, unidadeRes] = await Promise.all([
+      const queries: Promise<any>[] = [
         supabase
           .from('nf_configuracoes')
           .select('*')
@@ -181,11 +181,39 @@ export function EmitirNFSeModal({
           .select('id, nome, cnpj, razao_social, cidade, estado, cep, rua, numero, bairro')
           .eq('id', unidadeId)
           .maybeSingle()
-      ]);
+      ];
+
+      if (osId) {
+        queries.push(
+          supabase
+            .from('os')
+            .select('cliente_nome, cliente_cpf_cnpj, cliente_telefone, cliente_email, cliente_logradouro, cliente_numero, cliente_bairro, cliente_cep, cliente_cidade, cliente_estado')
+            .eq('id', osId)
+            .maybeSingle()
+        );
+      }
+
+      const [configsRes, unidadeRes, osRes] = await Promise.all(queries);
 
       const cfgs = configsRes.data || [];
       setConfigs(cfgs);
       setUnidade(unidadeRes.data);
+
+      if (osRes?.data) {
+        const os = osRes.data;
+        setForm(prev => ({
+          ...prev,
+          tomadorNome: prev.tomadorNome || os.cliente_nome || '',
+          tomadorDocumento: prev.tomadorDocumento || (os.cliente_cpf_cnpj || '').replace(/\D/g, ''),
+          tomadorEmail: prev.tomadorEmail || os.cliente_email || '',
+          tomadorLogradouro: prev.tomadorLogradouro || os.cliente_logradouro || '',
+          tomadorNumero: prev.tomadorNumero || os.cliente_numero || '',
+          tomadorBairro: prev.tomadorBairro || os.cliente_bairro || '',
+          tomadorCep: prev.tomadorCep || (os.cliente_cep || '').replace(/\D/g, ''),
+          tomadorMunicipio: prev.tomadorMunicipio || os.cliente_cidade || '',
+          tomadorUF: prev.tomadorUF || os.cliente_estado || '',
+        }));
+      }
 
       if (cfgs.length > 0 && !form.configId) {
         applyConfig(cfgs[0]);
