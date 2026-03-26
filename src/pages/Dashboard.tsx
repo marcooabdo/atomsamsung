@@ -568,23 +568,28 @@ export function Dashboard() {
           const Icon = stat.icon;
 
           const calculateProgress = () => {
-            // Se tem meta, calcular baseado na meta
             if (stat.hasGoal && stat.goal && stat.goal > 0) {
               const numValue = typeof stat.value === 'string'
-                ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.')) || 0
-                : stat.value;
+                ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0
+                : (stat.value as number);
               return Math.min(100, (numValue / stat.goal) * 100);
             }
 
-            // Se NÃO tem meta, mostrar progresso visual baseado no valor
-            if (!stat.hasGoal) {
-              const numValue = typeof stat.value === 'number' ? stat.value : 0;
-              // Para valores sem meta, usar uma escala visual (ex: até 50 = 100%)
-              return Math.min(100, (numValue / 50) * 100);
+            if (stat.hasGoal && (!stat.goal || stat.goal === 0)) {
+              const numValue = typeof stat.value === 'string'
+                ? parseFloat(stat.value.replace('R$', '').replace(/\./g, '').replace(',', '.').trim()) || 0
+                : (stat.value as number);
+              if (numValue <= 0) return 0;
+              return 40;
             }
 
-            // Se tem hasGoal mas não tem meta configurada, retornar 0
-            return 0;
+            const numValue = typeof stat.value === 'number' ? stat.value : 0;
+            if (numValue <= 0) return 0;
+            const allNumericValues = statCards
+              .filter(s => !s.hasGoal && typeof s.value === 'number')
+              .map(s => s.value as number);
+            const maxValue = Math.max(...allNumericValues, 1);
+            return Math.min(100, (numValue / maxValue) * 100);
           };
 
           return (
@@ -840,9 +845,11 @@ export function Dashboard() {
               </div>
               <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
                 <div className="h-full rounded-full transition-all duration-1000" style={{
-                  width: !stats.metaEficiencia || stats.eficienciaOperacional === 0
+                  width: stats.eficienciaOperacional === 0
                     ? '0%'
-                    : `${Math.min(100, (stats.metaEficiencia / Math.max(stats.eficienciaOperacional, 0.1)) * 100)}%`,
+                    : stats.metaEficiencia && stats.metaEficiencia > 0
+                      ? `${Math.min(100, (stats.metaEficiencia / Math.max(stats.eficienciaOperacional, 0.1)) * 100)}%`
+                      : `${Math.min(100, Math.max(10, 100 - (stats.eficienciaOperacional / 30) * 100))}%`,
                   background: 'linear-gradient(90deg, #0EA5E9 0%, #3B82F6 100%)',
                   boxShadow: '0 0 8px rgba(14,165,233,0.4)'
                 }} />
