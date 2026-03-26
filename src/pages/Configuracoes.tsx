@@ -35,6 +35,8 @@ interface Unidade {
   longitude: number | null;
   crt: number | null;
   limite_credito_gspn: number | null;
+  codigo_ibge_municipio: string | null;
+  codigo_ibge_uf: string | null;
   created_at: string;
 }
 
@@ -178,6 +180,8 @@ export function Configuracoes() {
     samsung_token: '',
     crt: '' as unknown as number,
     limite_credito_gspn: '' as unknown as number,
+    codigo_ibge_municipio: '',
+    codigo_ibge_uf: '',
   });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
@@ -298,6 +302,8 @@ export function Configuracoes() {
             samsung_token: unidade.samsung_token || '',
             crt: unidade.crt ?? ('' as unknown as number),
             limite_credito_gspn: unidade.limite_credito_gspn ?? ('' as unknown as number),
+            codigo_ibge_municipio: unidade.codigo_ibge_municipio || '',
+            codigo_ibge_uf: unidade.codigo_ibge_uf || '',
           });
           break;
         case 'usuarios':
@@ -345,6 +351,8 @@ export function Configuracoes() {
         samsung_token: '',
         crt: '' as unknown as number,
         limite_credito_gspn: '' as unknown as number,
+        codigo_ibge_municipio: '',
+        codigo_ibge_uf: '',
       });
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
@@ -409,6 +417,8 @@ export function Configuracoes() {
             samsung_token: formUnidade.samsung_token || null,
             crt: formUnidade.crt ? Number(formUnidade.crt) : null,
             limite_credito_gspn: formUnidade.limite_credito_gspn ? Number(formUnidade.limite_credito_gspn) : null,
+            codigo_ibge_municipio: formUnidade.codigo_ibge_municipio || null,
+            codigo_ibge_uf: formUnidade.codigo_ibge_uf || null,
           };
           if (editingId) {
             const { error } = await supabase.from('unidades').update(unidadeData).eq('id', editingId);
@@ -911,6 +921,28 @@ export function Configuracoes() {
                             value={formUnidade.cnae}
                             onChange={(e) => setFormUnidade({...formUnidade, cnae: e.target.value})}
                             placeholder="0000-0/00"
+                            className="neon-input"
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Código IBGE Município</label>
+                          <input
+                            type="text"
+                            value={formUnidade.codigo_ibge_municipio}
+                            onChange={(e) => setFormUnidade({...formUnidade, codigo_ibge_municipio: e.target.value})}
+                            placeholder="0000000"
+                            className="neon-input"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-400 uppercase mb-2">Código IBGE UF</label>
+                          <input
+                            type="text"
+                            value={formUnidade.codigo_ibge_uf}
+                            onChange={(e) => setFormUnidade({...formUnidade, codigo_ibge_uf: e.target.value})}
+                            placeholder="00"
                             className="neon-input"
                           />
                         </div>
