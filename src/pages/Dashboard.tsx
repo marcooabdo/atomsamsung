@@ -181,10 +181,20 @@ export function Dashboard() {
         return q;
       });
 
-      const osAbertasList = (await osAbertasQuery) as any[];
+      let totalOSQuery = supabase
+        .from('os')
+        .select('*', { count: 'exact', head: true });
+      if (unidadeFilter) totalOSQuery = totalOSQuery.eq('unidade_id', unidadeFilter);
+
+      const [osAbertasList, totalOSResult] = await Promise.all([
+        osAbertasQuery as Promise<any[]>,
+        totalOSQuery,
+      ]);
+
       const osAbertas = osAbertasList.length;
       const osAbertasLP = osAbertasList.filter(os => os.tipo_os === 'LP').length;
       const osAbertasOW = osAbertasList.filter(os => os.tipo_os === 'OW').length;
+      const totalOSCount = totalOSResult.count || 0;
 
       const osListLP = osList.filter(os => os.tipo_os === 'LP');
       const osListOW = osList.filter(os => os.tipo_os === 'OW');
@@ -317,7 +327,7 @@ export function Dashboard() {
       const metas = metasQuery.data;
 
       setStats({
-        totalOS: osList.length,
+        totalOS: totalOSCount,
         totalOSLP: osListLP.length,
         totalOSOW: osListOW.length,
         osAbertas,
@@ -501,8 +511,8 @@ export function Dashboard() {
   };
 
   const statCards = [
-    { title: 'Total de OS', value: stats.totalOS, subtitle: `LP: ${stats.totalOSLP} | OW: ${stats.totalOSOW}`, icon: FileText, color: '#0EA5E9', hasGoal: false },
-    { title: 'OS Abertas', value: stats.osAbertas, subtitle: `LP: ${stats.osAbertasLP} | OW: ${stats.osAbertasOW}`, icon: Activity, color: '#3B82F6', hasGoal: false },
+    { title: 'Total de OS', value: stats.totalOS, icon: FileText, color: '#0EA5E9', hasGoal: false },
+    { title: 'OS Abertas', value: stats.osAbertas, icon: Activity, color: '#3B82F6', hasGoal: false },
     { title: 'Cotacoes Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
     { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
     { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
