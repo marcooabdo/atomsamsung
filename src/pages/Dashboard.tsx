@@ -188,8 +188,8 @@ export function Dashboard() {
 
       const osListLP = osList.filter(os => os.tipo_os === 'LP');
       const osListOW = osList.filter(os => os.tipo_os === 'OW');
-      const receitaLP = osListLP.reduce((sum, os) => sum + (os.valor_total || 0), 0);
-      const receitaOW = osListOW.reduce((sum, os) => sum + (os.valor_total || 0), 0);
+      const receitaLP = osListLP.reduce((sum, os) => sum + (Number(os.valor_total) || 0), 0);
+      const receitaOW = osListOW.reduce((sum, os) => sum + (Number(os.valor_total) || 0), 0);
 
       const kanbanCountMap: Record<string, number> = {};
       osList.forEach(os => {
