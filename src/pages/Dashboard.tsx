@@ -130,10 +130,13 @@ export function Dashboard() {
   }, []);
 
   useEffect(() => {
+    if (usuario && usuario.unidade_id && !selectedUnidade) {
+      setSelectedUnidade(usuario.unidade_id);
+    }
+  }, [usuario]);
+
+  useEffect(() => {
     if (usuario) {
-      if (usuario.unidade_id && !selectedUnidade) {
-        setSelectedUnidade(usuario.unidade_id);
-      }
       loadDashboardData();
     }
   }, [usuario, selectedUnidade, dataInicio, dataFim]);
@@ -156,8 +159,7 @@ export function Dashboard() {
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
-        if (!canSeeAllUnits && unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
-        else if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+        if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
         return q;
       }) as any[];
 
@@ -204,8 +206,7 @@ export function Dashboard() {
           .lte('created_at', `${dataFim}T23:59:59`)
           .eq('tipo_os', 'OW')
           .range(from, to);
-        if (!canSeeAllUnits && unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
-        else if (selectedUnidade) q = q.eq('unidade_id', selectedUnidade);
+        if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
         return q;
       }) as any[];
 
@@ -229,10 +230,8 @@ export function Dashboard() {
         .lte('created_at', `${dataFim}T23:59:59`)
         .in('status', ['pendente_preenchimento', 'enviada']);
 
-      if (!canSeeAllUnits && unidadeFilter) {
+      if (unidadeFilter) {
         cotacoesPendentesQuery = cotacoesPendentesQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        cotacoesPendentesQuery = cotacoesPendentesQuery.eq('unidade_id', selectedUnidade);
       }
 
       let cotacoesAprovadasQuery = supabase
@@ -242,10 +241,8 @@ export function Dashboard() {
         .lte('created_at', `${dataFim}T23:59:59`)
         .eq('status', 'aprovada');
 
-      if (!canSeeAllUnits && unidadeFilter) {
+      if (unidadeFilter) {
         cotacoesAprovadasQuery = cotacoesAprovadasQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        cotacoesAprovadasQuery = cotacoesAprovadasQuery.eq('unidade_id', selectedUnidade);
       }
 
       let pecasQuery = supabase
@@ -253,10 +250,8 @@ export function Dashboard() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'disponivel');
 
-      if (!canSeeAllUnits && unidadeFilter) {
+      if (unidadeFilter) {
         pecasQuery = pecasQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        pecasQuery = pecasQuery.eq('unidade_id', selectedUnidade);
       }
 
       let agendamentosQuery = supabase
@@ -267,10 +262,8 @@ export function Dashboard() {
         .neq('coluna_kanban', 'os_fechada')
         .not('data_agendamento', 'is', null);
 
-      if (!canSeeAllUnits && unidadeFilter) {
+      if (unidadeFilter) {
         agendamentosQuery = agendamentosQuery.eq('unidade_id', unidadeFilter);
-      } else if (selectedUnidade) {
-        agendamentosQuery = agendamentosQuery.eq('unidade_id', selectedUnidade);
       }
 
       const mesAtual = new Date();
@@ -338,10 +331,8 @@ export function Dashboard() {
           .eq('tipo_os', 'OW')
           .in('status', ['aprovada', 'reprovada', 'reprovada_refeita']);
 
-        if (!canSeeAllUnits && unidadeFilter) {
+        if (unidadeFilter) {
           cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
-        } else if (selectedUnidade) {
-          cotacoesQuery = cotacoesQuery.eq('unidade_id', selectedUnidade);
         }
 
         const { data: cotacoesData } = await cotacoesQuery;
@@ -355,10 +346,8 @@ export function Dashboard() {
           .eq('tipo_os', 'OW')
           .not('orcamento_aprovado_em', 'is', null);
 
-        if (!canSeeAllUnits && unidadeFilter) {
+        if (unidadeFilter) {
           osQuery = osQuery.eq('unidade_id', unidadeFilter);
-        } else if (selectedUnidade) {
-          osQuery = osQuery.eq('unidade_id', selectedUnidade);
         }
 
         const { data: osData } = await osQuery;
@@ -432,10 +421,8 @@ export function Dashboard() {
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`);
 
-        if (!canSeeAllUnits && unidadeFilter) {
+        if (unidadeFilter) {
           query = query.eq('unidade_id', unidadeFilter);
-        } else if (selectedUnidade) {
-          query = query.eq('unidade_id', selectedUnidade);
         }
 
         const { data: osData } = await query;
