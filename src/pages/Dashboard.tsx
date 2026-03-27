@@ -31,7 +31,11 @@ interface KanbanColumnCount {
 
 interface DashboardStats {
   totalOS: number;
+  totalOSLP: number;
+  totalOSOW: number;
   osAbertas: number;
+  osAbertasLP: number;
+  osAbertasOW: number;
   cotacoesPendentes: number;
   cotacoesAprovadas: number;
   pecasDisponiveis: number;
@@ -99,7 +103,11 @@ export function Dashboard() {
   const { usuario } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalOS: 0,
+    totalOSLP: 0,
+    totalOSOW: 0,
     osAbertas: 0,
+    osAbertasLP: 0,
+    osAbertasOW: 0,
     cotacoesPendentes: 0,
     cotacoesAprovadas: 0,
     pecasDisponiveis: 0,
@@ -163,9 +171,25 @@ export function Dashboard() {
         return q;
       }) as any[];
 
-      const osAbertas = osList.filter(os => os.coluna_kanban !== 'os_fechada').length;
-      const receitaLP = osList.filter(os => os.tipo_os === 'LP').reduce((sum, os) => sum + (os.valor_total || 0), 0);
-      const receitaOW = osList.filter(os => os.tipo_os === 'OW').reduce((sum, os) => sum + (os.valor_total || 0), 0);
+      const osAbertasQuery = fetchAllPages<Record<string, unknown>>((from, to) => {
+        let q = supabase
+          .from('os')
+          .select('id, tipo_os, coluna_kanban, unidade_id')
+          .neq('coluna_kanban', 'os_fechada')
+          .range(from, to);
+        if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
+        return q;
+      });
+
+      const osAbertasList = (await osAbertasQuery) as any[];
+      const osAbertas = osAbertasList.length;
+      const osAbertasLP = osAbertasList.filter(os => os.tipo_os === 'LP').length;
+      const osAbertasOW = osAbertasList.filter(os => os.tipo_os === 'OW').length;
+
+      const osListLP = osList.filter(os => os.tipo_os === 'LP');
+      const osListOW = osList.filter(os => os.tipo_os === 'OW');
+      const receitaLP = osListLP.reduce((sum, os) => sum + (os.valor_total || 0), 0);
+      const receitaOW = osListOW.reduce((sum, os) => sum + (os.valor_total || 0), 0);
 
       const kanbanCountMap: Record<string, number> = {};
       osList.forEach(os => {
@@ -294,7 +318,11 @@ export function Dashboard() {
 
       setStats({
         totalOS: osList.length,
+        totalOSLP: osListLP.length,
+        totalOSOW: osListOW.length,
         osAbertas,
+        osAbertasLP,
+        osAbertasOW,
         cotacoesPendentes: cotacoesPendentesResult.count || 0,
         cotacoesAprovadas: cotacoesAprovadasResult.count || 0,
         pecasDisponiveis: pecasResult.count || 0,
@@ -473,13 +501,13 @@ export function Dashboard() {
   };
 
   const statCards = [
-    { title: 'Total de OS', value: stats.totalOS, icon: FileText, color: '#0EA5E9', hasGoal: false },
-    { title: 'OS Abertas', value: stats.osAbertas, icon: Activity, color: '#3B82F6', hasGoal: false },
+    { title: 'Total de OS', value: stats.totalOS, subtitle: `LP: ${stats.totalOSLP} | OW: ${stats.totalOSOW}`, icon: FileText, color: '#0EA5E9', hasGoal: false },
+    { title: 'OS Abertas', value: stats.osAbertas, subtitle: `LP: ${stats.osAbertasLP} | OW: ${stats.osAbertasOW}`, icon: Activity, color: '#3B82F6', hasGoal: false },
     { title: 'Cotacoes Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
     { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
     { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
     { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
-    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
+    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), subtitle: `${stats.totalOSLP} OS no periodo`, icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -487,7 +515,7 @@ export function Dashboard() {
       }
       setShowGoalsModal(true);
     } },
-    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
+    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), subtitle: `${stats.totalOSOW} OS no periodo`, icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -656,6 +684,12 @@ export function Dashboard() {
               >
                 {stat.value}
               </p>
+
+              {'subtitle' in stat && stat.subtitle && (
+                <p className="text-[10px] font-medium mb-1" style={{ color: `${stat.color}99` }}>
+                  {stat.subtitle}
+                </p>
+              )}
 
               {stat.hasGoal && stat.goal && (
                 <p className="text-[10px] text-gray-500 mb-2">
