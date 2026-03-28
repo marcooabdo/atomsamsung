@@ -42,6 +42,7 @@ interface DashboardStats {
   agendamentos: number;
   receitaLP: number;
   receitaOW: number;
+  osLPFechadas: number;
   osAtrasadas: number;
   eficienciaOperacional: number;
   taxaAprovacao: number;
@@ -50,6 +51,7 @@ interface DashboardStats {
   metaReceitaOW?: number;
   metaEficiencia?: number;
   metaTaxaAprovacao?: number;
+  metaLPContagem?: number;
 }
 
 interface PerformanceOS {
@@ -114,6 +116,7 @@ export function Dashboard() {
     agendamentos: 0,
     receitaLP: 0,
     receitaOW: 0,
+    osLPFechadas: 0,
     osAtrasadas: 0,
     eficienciaOperacional: 0,
     taxaAprovacao: 0,
@@ -198,7 +201,8 @@ export function Dashboard() {
 
       const osListLP = osList.filter(os => os.tipo_os === 'LP');
       const osListOW = osList.filter(os => os.tipo_os === 'OW');
-      const receitaLP = osListLP.reduce((sum, os) => sum + (Number(os.valor_total) || 0), 0);
+      const receitaLP = osListLP.length;
+      const osLPFechadas = osListLP.filter(os => os.coluna_kanban === 'os_fechada').length;
       const receitaOW = osListOW.reduce((sum, os) => sum + (Number(os.valor_total) || 0), 0);
 
       const kanbanCountMap: Record<string, number> = {};
@@ -302,6 +306,7 @@ export function Dashboard() {
 
       const mesAtual = new Date();
       let metasQuery = { data: null as any };
+      let metaLPQuery = { data: null as any };
       if (unidadeFilter) {
         metasQuery = await supabase
           .from('metas_performance')
@@ -309,6 +314,14 @@ export function Dashboard() {
           .eq('unidade_id', unidadeFilter)
           .eq('ano', mesAtual.getFullYear())
           .eq('mes', mesAtual.getMonth() + 1)
+          .maybeSingle();
+
+        const mesRef = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), 1).toISOString().split('T')[0];
+        metaLPQuery = await supabase
+          .from('skywalker_lp_unidade')
+          .select('meta_lp, realizado_lp')
+          .eq('unidade_id', unidadeFilter)
+          .eq('mes_referencia', mesRef)
           .maybeSingle();
       }
 
@@ -325,6 +338,7 @@ export function Dashboard() {
       ]);
 
       const metas = metasQuery.data;
+      const metaLP = metaLPQuery.data;
 
       setStats({
         totalOS: totalOSCount,
@@ -339,6 +353,7 @@ export function Dashboard() {
         agendamentos: agendamentosResult.count || 0,
         receitaLP,
         receitaOW,
+        osLPFechadas,
         osAtrasadas: 0,
         eficienciaOperacional,
         taxaAprovacao,
@@ -347,6 +362,7 @@ export function Dashboard() {
         metaReceitaOW: metas ? Number(metas.meta_receita_ow) : undefined,
         metaEficiencia: metas ? Number(metas.meta_eficiencia_operacional) : undefined,
         metaTaxaAprovacao: metas ? Number(metas.meta_taxa_aprovacao) : undefined,
+        metaLPContagem: metaLP ? Number(metaLP.meta_lp) : undefined,
       });
     } catch (error) {
       // ignored
@@ -517,7 +533,7 @@ export function Dashboard() {
     { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
     { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
     { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
-    { title: 'Receita LP', value: formatCurrency(stats.receitaLP), subtitle: `${stats.totalOSLP} OS no periodo`, icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaReceitaLP, onClick: () => {
+    { title: 'Receita LP', value: stats.receitaLP, subtitle: `${stats.osLPFechadas} fechadas no periodo`, icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaLPContagem, isCount: true, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -703,7 +719,7 @@ export function Dashboard() {
 
               {stat.hasGoal && stat.goal && (
                 <p className="text-[10px] text-gray-500 mb-2">
-                  Meta: {formatCurrency(stat.goal)}
+                  {'isCount' in stat && stat.isCount ? `Meta: ${stat.goal} OS` : `Meta: ${formatCurrency(stat.goal)}`}
                 </p>
               )}
 
