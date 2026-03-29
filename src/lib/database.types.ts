@@ -735,6 +735,7 @@ export type Database = {
           valor_unitario: number | null
           valor_total: number | null
           cotacao_peca_id: string | null
+          type_unidade: string | null
           created_at: string
           updated_at: string
         }
@@ -758,6 +759,7 @@ export type Database = {
           valor_unitario?: number | null
           valor_total?: number | null
           cotacao_peca_id?: string | null
+          type_unidade?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -781,6 +783,7 @@ export type Database = {
           valor_unitario?: number | null
           valor_total?: number | null
           cotacao_peca_id?: string | null
+          type_unidade?: string | null
           created_at?: string
           updated_at?: string
         }
