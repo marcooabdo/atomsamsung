@@ -149,12 +149,35 @@ function getDateRange(periodo: string, customStart?: string, customEnd?: string)
   return { start: `${monthAgo.toISOString().split('T')[0]}T00:00:00`, end: `${now.toISOString().split('T')[0]}T23:59:59` };
 }
 
-async function exportToExcel(data: Record<string, any>[], filename: string) {
+async function exportToExcel(data: Record<string, any>[], filename: string, extraSheets?: { name: string; data: Record<string, any>[] }[]) {
   const xlsx = await import('xlsx');
-  const ws = xlsx.utils.json_to_sheet(data);
   const wb = xlsx.utils.book_new();
+  const ws = xlsx.utils.json_to_sheet(data);
   xlsx.utils.book_append_sheet(wb, ws, 'Dados');
+  if (extraSheets) {
+    for (const sheet of extraSheets) {
+      const s = xlsx.utils.json_to_sheet(sheet.data);
+      xlsx.utils.book_append_sheet(wb, s, sheet.name);
+    }
+  }
   xlsx.writeFile(wb, `${filename}.xlsx`);
+}
+
+async function fetchAllRows<T>(
+  buildQuery: (from: number, to: number) => any
+): Promise<T[]> {
+  const PAGE = 1000;
+  let all: T[] = [];
+  let from = 0;
+  let hasMore = true;
+  while (hasMore) {
+    const { data } = await buildQuery(from, from + PAGE - 1);
+    const rows = (data || []) as T[];
+    all = all.concat(rows);
+    hasMore = rows.length === PAGE;
+    from += PAGE;
+  }
+  return all;
 }
 
 export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
@@ -211,16 +234,17 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       setTagMap(map);
     }
 
-    const [conversasResult, colunasResult, metricsResult, finalizadasResult] = await Promise.all([
-      (() => {
+    const [allConversas, colunasResult, metricsResult, allFinalizadas] = await Promise.all([
+      fetchAllRows<any>((from, to) => {
         let query = supabase
           .from('atom_connect_conversas')
           .select('*, atom_connect_pipeline_colunas(nome, cor)')
           .gte('created_at', start)
-          .lte('created_at', end);
+          .lte('created_at', end)
+          .range(from, to);
         if (effectiveUnidadeId) query = query.eq('unidade_id', effectiveUnidadeId);
         return query;
-      })(),
+      }),
       (() => {
         let query = supabase
           .from('atom_connect_pipeline_colunas')
@@ -232,7 +256,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       supabase.rpc('get_atom_connect_response_metrics', {
         p_unidade_id: effectiveUnidadeId || null
       }),
-      (() => {
+      fetchAllRows<FinalizadaConversa>((from, to) => {
         let query = supabase
           .from('atom_connect_conversas')
           .select('id, cliente_nome, cliente_telefone, resultado_conversa, valor_orcamento, resumo_fechamento, proxima_acao_data, proxima_acao_descricao, tags_oportunidade, finalizado_at, finalizado_por, created_at, atendente_id')
@@ -240,17 +264,17 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
           .gte('finalizado_at', start)
           .lte('finalizado_at', end)
           .order('finalizado_at', { ascending: false })
-          .limit(500);
+          .range(from, to);
         if (effectiveUnidadeId) query = query.eq('unidade_id', effectiveUnidadeId);
         return query;
-      })()
+      })
     ]);
 
-    const conversas = (conversasResult.data || []).filter((c: any) => !c.is_interno);
+    const conversas = allConversas.filter((c: any) => !c.is_interno);
     const colunas = colunasResult.data || [];
     const metrics = metricsResult.data as ResponseMetrics | null;
 
-    setFinalizadas((finalizadasResult.data || []) as FinalizadaConversa[]);
+    setFinalizadas(allFinalizadas);
 
     const conversasPorColuna = colunas.map(col => ({
       coluna: col.nome,
@@ -298,8 +322,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     if (metrics?.per_attendant) {
       metrics.per_attendant.forEach(a => allAttendantIds.add(a.atendente_id));
     }
-    const finData = finalizadasResult.data || [];
-    for (const f of finData) {
+    for (const f of allFinalizadas) {
       if (f.atendente_id) allAttendantIds.add(f.atendente_id);
       if (f.finalizado_por) allAttendantIds.add(f.finalizado_por);
     }
@@ -423,23 +446,53 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     for (const a of stats.topAtendentes) {
       rows.push({ 'Metrica': a.nome, 'Valor': a.atendimentos });
     }
-    await exportToExcel(rows, `dashboard_atom_connect_${new Date().toISOString().split('T')[0]}`);
+
+    const attendantRows = perAttendant
+      .sort((a, b) => a.avg_first_response_seconds - b.avg_first_response_seconds)
+      .map(att => ({
+        'Atendente': attendantNames[att.atendente_id] || att.atendente_id,
+        'TMA (1a Resposta)': formatDuration(att.avg_first_response_seconds),
+        'TME (Entre Respostas)': formatDuration(att.avg_between_response_seconds),
+        'Total Atendimentos': att.total_conversations,
+        'Total Respostas': att.total_responses,
+      }));
+
+    await exportToExcel(
+      rows,
+      `dashboard_atom_connect_${new Date().toISOString().split('T')[0]}`,
+      attendantRows.length > 0 ? [{ name: 'TMA TME Atendentes', data: attendantRows }] : undefined
+    );
   };
 
   const handleExportHistorico = async () => {
-    const rows = filteredFinalizadas.map(conv => ({
-      'Cliente': conv.cliente_nome || '',
-      'Telefone': formatPhone(conv.cliente_telefone),
-      'Resultado': RESULTADO_MAP[conv.resultado_conversa || '']?.label || conv.resultado_conversa || '',
-      'Valor (R$)': conv.valor_orcamento || '',
-      'Observacoes': conv.resumo_fechamento || '',
-      'Follow-up Data': conv.proxima_acao_data ? new Date(conv.proxima_acao_data).toLocaleDateString('pt-BR') : '',
-      'Follow-up Descricao': conv.proxima_acao_descricao || '',
-      'Tags': (conv.tags_oportunidade || []).map(t => tagMap[t]?.label || t).join(', '),
-      'Finalizado em': conv.finalizado_at ? formatDateFull(conv.finalizado_at) : '',
-      'Finalizado por': conv.finalizado_por ? (attendantNames[conv.finalizado_por] || conv.finalizado_por) : '',
-      'Criado em': formatDateFull(conv.created_at),
-    }));
+    const attMetricsMap: Record<string, { tma: number; tme: number }> = {};
+    for (const att of perAttendant) {
+      attMetricsMap[att.atendente_id] = {
+        tma: att.avg_first_response_seconds,
+        tme: att.avg_between_response_seconds,
+      };
+    }
+
+    const rows = filteredFinalizadas.map(conv => {
+      const attId = conv.atendente_id || conv.finalizado_por || '';
+      const attMetric = attMetricsMap[attId];
+      return {
+        'Cliente': conv.cliente_nome || '',
+        'Telefone': formatPhone(conv.cliente_telefone),
+        'Atendente': attId ? (attendantNames[attId] || attId) : '',
+        'Resultado': RESULTADO_MAP[conv.resultado_conversa || '']?.label || conv.resultado_conversa || '',
+        'Valor (R$)': conv.valor_orcamento || '',
+        'Observacoes': conv.resumo_fechamento || '',
+        'TMA (1a Resposta)': attMetric ? formatDuration(attMetric.tma) : '',
+        'TME (Entre Respostas)': attMetric ? formatDuration(attMetric.tme) : '',
+        'Follow-up Data': conv.proxima_acao_data ? new Date(conv.proxima_acao_data).toLocaleDateString('pt-BR') : '',
+        'Follow-up Descricao': conv.proxima_acao_descricao || '',
+        'Tags': (conv.tags_oportunidade || []).map(t => tagMap[t]?.label || t).join(', '),
+        'Finalizado em': conv.finalizado_at ? formatDateFull(conv.finalizado_at) : '',
+        'Finalizado por': conv.finalizado_por ? (attendantNames[conv.finalizado_por] || conv.finalizado_por) : '',
+        'Criado em': formatDateFull(conv.created_at),
+      };
+    });
     await exportToExcel(rows, `historico_atendimentos_${new Date().toISOString().split('T')[0]}`);
   };
 
