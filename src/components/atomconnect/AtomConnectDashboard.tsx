@@ -3,7 +3,8 @@ import {
   MessageSquare, Users, Clock, TrendingUp, BarChart3, Target,
   Inbox, AlertTriangle, Timer, UserCheck, Phone, Zap, ChevronDown,
   ChevronUp, ShoppingCart, Send, X as XIcon, Calendar, FileText,
-  DollarSign, Tag, Bell, ArrowRight, Info, PhoneOff, Undo2, Eye
+  DollarSign, Tag, Bell, ArrowRight, Info, PhoneOff, Undo2, Eye,
+  Download, Filter
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -124,6 +125,38 @@ const formatDateShort = (dateStr: string): string => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
 };
 
+const formatDateFull = (dateStr: string): string => {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+};
+
+function getDateRange(periodo: string, customStart?: string, customEnd?: string): { start: string; end: string } {
+  const now = new Date();
+  if (periodo === 'personalizado' && customStart && customEnd) {
+    return { start: `${customStart}T00:00:00`, end: `${customEnd}T23:59:59` };
+  }
+  if (periodo === 'hoje') {
+    const dayStr = now.toISOString().split('T')[0];
+    return { start: `${dayStr}T00:00:00`, end: `${dayStr}T23:59:59` };
+  }
+  if (periodo === 'semana') {
+    const weekAgo = new Date(now);
+    weekAgo.setDate(weekAgo.getDate() - 6);
+    return { start: `${weekAgo.toISOString().split('T')[0]}T00:00:00`, end: `${now.toISOString().split('T')[0]}T23:59:59` };
+  }
+  const monthAgo = new Date(now);
+  monthAgo.setDate(monthAgo.getDate() - 29);
+  return { start: `${monthAgo.toISOString().split('T')[0]}T00:00:00`, end: `${now.toISOString().split('T')[0]}T23:59:59` };
+}
+
+async function exportToExcel(data: Record<string, any>[], filename: string) {
+  const xlsx = await import('xlsx');
+  const ws = xlsx.utils.json_to_sheet(data);
+  const wb = xlsx.utils.book_new();
+  xlsx.utils.book_append_sheet(wb, ws, 'Dados');
+  xlsx.writeFile(wb, `${filename}.xlsx`);
+}
+
 export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const { unidadeAtual } = useAuth();
   const [stats, setStats] = useState({
@@ -137,7 +170,10 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const [responseMetrics, setResponseMetrics] = useState<ResponseMetrics | null>(null);
   const [attendantNames, setAttendantNames] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
-  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes'>('hoje');
+  const [periodo, setPeriodo] = useState<'hoje' | 'semana' | 'mes' | 'personalizado'>('mes');
+  const [customStart, setCustomStart] = useState('');
+  const [customEnd, setCustomEnd] = useState('');
+  const [showCustomDates, setShowCustomDates] = useState(false);
   const [showAllWaiting, setShowAllWaiting] = useState(false);
   const [expandedAttendant, setExpandedAttendant] = useState(false);
   const [finalizadas, setFinalizadas] = useState<FinalizadaConversa[]>([]);
@@ -149,10 +185,20 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const effectiveUnidadeId = unidadeId || unidadeAtual;
 
   useEffect(() => {
-    loadStats();
+    if (periodo !== 'personalizado') loadStats();
   }, [effectiveUnidadeId, periodo]);
 
+  const applyCustomDates = () => {
+    if (customStart && customEnd) loadStats();
+  };
+
+  const { start: dateStart, end: dateEnd } = getDateRange(periodo, customStart, customEnd);
+
   const loadStats = async () => {
+    setLoading(true);
+
+    const { start, end } = getDateRange(periodo, customStart, customEnd);
+
     const { data: tagsData } = await supabase
       .from('atom_connect_tags_oportunidade')
       .select('value, label, color')
@@ -169,7 +215,9 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       (() => {
         let query = supabase
           .from('atom_connect_conversas')
-          .select('*, atom_connect_pipeline_colunas(nome, cor)');
+          .select('*, atom_connect_pipeline_colunas(nome, cor)')
+          .gte('created_at', start)
+          .lte('created_at', end);
         if (effectiveUnidadeId) query = query.eq('unidade_id', effectiveUnidadeId);
         return query;
       })(),
@@ -189,8 +237,10 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
           .from('atom_connect_conversas')
           .select('id, cliente_nome, cliente_telefone, resultado_conversa, valor_orcamento, resumo_fechamento, proxima_acao_data, proxima_acao_descricao, tags_oportunidade, finalizado_at, finalizado_por, created_at, atendente_id')
           .not('resultado_conversa', 'is', null)
+          .gte('finalizado_at', start)
+          .lte('finalizado_at', end)
           .order('finalizado_at', { ascending: false })
-          .limit(100);
+          .limit(500);
         if (effectiveUnidadeId) query = query.eq('unidade_id', effectiveUnidadeId);
         return query;
       })()
@@ -216,10 +266,14 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
 
     const semAtendente = conversas.filter(c => !c.atendente_id).length;
 
+    const startDate = new Date(start);
+    const endDate = new Date(end);
+    const diffDays = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+    const days = Math.max(1, diffDays);
+
     const conversasPorDia: { dia: string; count: number }[] = [];
-    const days = periodo === 'hoje' ? 1 : periodo === 'semana' ? 7 : 30;
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date();
+      const d = new Date(endDate);
       d.setDate(d.getDate() - i);
       const dayStr = d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
       const count = conversas.filter(c => {
@@ -324,6 +378,71 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     }));
   }, [finalizadas]);
 
+  const handleExportDashboard = async () => {
+    const rows: Record<string, any>[] = [];
+    rows.push({
+      'Metrica': 'Total de Conversas', 'Valor': stats.totalConversas
+    });
+    rows.push({
+      'Metrica': 'Conversas Hoje', 'Valor': stats.conversasHoje
+    });
+    rows.push({
+      'Metrica': 'Sem Atendente', 'Valor': stats.semAtendente
+    });
+    rows.push({
+      'Metrica': 'Tempo Medio 1a Resposta', 'Valor': formatDuration(responseMetrics?.avg_first_response_seconds || 0)
+    });
+    rows.push({
+      'Metrica': 'Tempo Medio Entre Respostas', 'Valor': formatDuration(responseMetrics?.avg_between_response_seconds || 0)
+    });
+    rows.push({
+      'Metrica': 'SLA Expirado', 'Valor': responseMetrics?.sla_expired_count || 0
+    });
+    rows.push({
+      'Metrica': 'Vendas Realizadas', 'Valor': opportunityStats.vendas
+    });
+    rows.push({
+      'Metrica': 'Valor Vendas', 'Valor': opportunityStats.valorVendas
+    });
+    rows.push({
+      'Metrica': 'Orcamentos Pendentes', 'Valor': opportunityStats.orcamentos
+    });
+    rows.push({
+      'Metrica': 'Orcamentos Recusados', 'Valor': opportunityStats.recusados
+    });
+    rows.push({
+      'Metrica': 'Taxa de Conversao', 'Valor': `${opportunityStats.taxaConversao.toFixed(1)}%`
+    });
+    rows.push({ 'Metrica': '', 'Valor': '' });
+    rows.push({ 'Metrica': '--- Conversas por Estagio ---', 'Valor': '' });
+    for (const col of stats.conversasPorColuna) {
+      rows.push({ 'Metrica': col.coluna, 'Valor': col.count });
+    }
+    rows.push({ 'Metrica': '', 'Valor': '' });
+    rows.push({ 'Metrica': '--- Ranking Atendentes ---', 'Valor': '' });
+    for (const a of stats.topAtendentes) {
+      rows.push({ 'Metrica': a.nome, 'Valor': a.atendimentos });
+    }
+    await exportToExcel(rows, `dashboard_atom_connect_${new Date().toISOString().split('T')[0]}`);
+  };
+
+  const handleExportHistorico = async () => {
+    const rows = filteredFinalizadas.map(conv => ({
+      'Cliente': conv.cliente_nome || '',
+      'Telefone': formatPhone(conv.cliente_telefone),
+      'Resultado': RESULTADO_MAP[conv.resultado_conversa || '']?.label || conv.resultado_conversa || '',
+      'Valor (R$)': conv.valor_orcamento || '',
+      'Observacoes': conv.resumo_fechamento || '',
+      'Follow-up Data': conv.proxima_acao_data ? new Date(conv.proxima_acao_data).toLocaleDateString('pt-BR') : '',
+      'Follow-up Descricao': conv.proxima_acao_descricao || '',
+      'Tags': (conv.tags_oportunidade || []).map(t => tagMap[t]?.label || t).join(', '),
+      'Finalizado em': conv.finalizado_at ? formatDateFull(conv.finalizado_at) : '',
+      'Finalizado por': conv.finalizado_por ? (attendantNames[conv.finalizado_por] || conv.finalizado_por) : '',
+      'Criado em': formatDateFull(conv.created_at),
+    }));
+    await exportToExcel(rows, `historico_atendimentos_${new Date().toISOString().split('T')[0]}`);
+  };
+
   if (loading) {
     return (
       <div className="h-full flex items-center justify-center">
@@ -352,24 +471,75 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
 
   return (
     <div className="h-full overflow-y-auto p-6 space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="text-xl font-bold text-white">Dashboard</h2>
-        <div className="flex items-center gap-2 bg-white/5 rounded-lg p-1">
-          {(['hoje', 'semana', 'mes'] as const).map(p => (
-            <button
-              key={p}
-              onClick={() => setPeriodo(p)}
-              className={`px-4 py-2 rounded-md text-sm transition-colors ${
-                periodo === p ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Semana' : 'Mes'}
-            </button>
-          ))}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportDashboard}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 border border-white/10 text-sm text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+          >
+            <Download className="w-4 h-4" />
+            Exportar
+          </button>
+          <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
+            {(['hoje', 'semana', 'mes', 'personalizado'] as const).map(p => (
+              <button
+                key={p}
+                onClick={() => {
+                  setPeriodo(p);
+                  if (p === 'personalizado') {
+                    setShowCustomDates(true);
+                    if (!customStart || !customEnd) {
+                      const now = new Date();
+                      const monthAgo = new Date(now);
+                      monthAgo.setDate(monthAgo.getDate() - 29);
+                      setCustomStart(monthAgo.toISOString().split('T')[0]);
+                      setCustomEnd(now.toISOString().split('T')[0]);
+                    }
+                  } else {
+                    setShowCustomDates(false);
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                  periodo === p ? 'bg-white/10 text-white' : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {p === 'hoje' ? 'Hoje' : p === 'semana' ? 'Semana' : p === 'mes' ? 'Mes' : 'Personalizado'}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Follow-up Alerts */}
+      {showCustomDates && periodo === 'personalizado' && (
+        <div className="flex items-center gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
+          <Filter className="w-4 h-4 text-gray-400 flex-shrink-0" />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={customStart}
+              onChange={(e) => setCustomStart(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30"
+            />
+            <span className="text-gray-500 text-sm">ate</span>
+            <input
+              type="date"
+              value={customEnd}
+              onChange={(e) => setCustomEnd(e.target.value)}
+              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-white/30"
+            />
+          </div>
+          <button
+            onClick={applyCustomDates}
+            disabled={!customStart || !customEnd}
+            className="px-4 py-1.5 rounded-lg text-sm font-medium text-white transition-colors disabled:opacity-40"
+            style={{ backgroundColor: accentColor }}
+          >
+            Aplicar
+          </button>
+        </div>
+      )}
+
       {followUps.length > 0 && showFollowUps && (
         <div className="rounded-xl border border-amber-500/30 overflow-hidden" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(249,115,22,0.08))' }}>
           <div className="flex items-center justify-between px-5 py-3 border-b border-amber-500/20">
@@ -424,7 +594,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       )}
 
-      {/* Row 1: Core Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="p-5 rounded-xl bg-white/5 border border-white/10">
           <div className="flex items-center justify-between mb-3">
@@ -455,7 +624,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       </div>
 
-      {/* Row 2: Response Time Metrics + SLA */}
       <div className="grid grid-cols-4 gap-4">
         <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
           <div className="absolute top-0 left-0 w-1 h-full rounded-l-xl" style={{ backgroundColor: firstResponseColor }} />
@@ -525,7 +693,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       </div>
 
-      {/* Waiting contacts list */}
       {allWaiting.length > 1 && (
         <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
           <button
@@ -584,7 +751,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       )}
 
-      {/* Opportunity Conversion Stats */}
       {finalizadas.length > 0 && (
         <div className="grid grid-cols-4 gap-4">
           <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
@@ -648,27 +814,36 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
         </div>
       ) : (
         <>
-          {/* Opportunities List + Resultado Chart */}
           {finalizadas.length > 0 && (
             <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex flex-col" style={{ maxHeight: 520 }}>
+              <div className="col-span-2 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex flex-col" style={{ maxHeight: 600 }}>
                 <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 flex-shrink-0">
                   <div className="flex items-center gap-2.5">
                     <FileText className="w-5 h-5" style={{ color: accentColor }} />
                     <h3 className="text-base font-semibold text-white">Historico de Atendimentos</h3>
                     <span className="text-xs text-gray-500 bg-white/5 px-2 py-0.5 rounded-full">{filteredFinalizadas.length}</span>
                   </div>
-                  <select
-                    value={oportunidadesFilter}
-                    onChange={(e) => setOportunidadesFilter(e.target.value)}
-                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
-                  >
-                    <option value="all" className="bg-[#12122a]">Todos os resultados</option>
-                    <option value="follow_up" className="bg-[#12122a]">Com follow-up</option>
-                    {Object.entries(RESULTADO_MAP).map(([key, val]) => (
-                      <option key={key} value={key} className="bg-[#12122a]">{val.label}</option>
-                    ))}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={oportunidadesFilter}
+                      onChange={(e) => setOportunidadesFilter(e.target.value)}
+                      className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                    >
+                      <option value="all" className="bg-[#12122a]">Todos os resultados</option>
+                      <option value="follow_up" className="bg-[#12122a]">Com follow-up</option>
+                      {Object.entries(RESULTADO_MAP).map(([key, val]) => (
+                        <option key={key} value={key} className="bg-[#12122a]">{val.label}</option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleExportHistorico}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 text-xs text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                      title="Exportar historico para Excel"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                      Excel
+                    </button>
+                  </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
@@ -710,7 +885,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
                                 </span>
                               </div>
                               <p className="text-[11px] text-white/30 truncate mt-0.5">
-                                {conv.resumo_fechamento || 'Sem resumo'}
+                                {conv.resumo_fechamento || 'Sem observacoes'}
                               </p>
                             </div>
                             <div className="flex items-center gap-3 flex-shrink-0">
@@ -731,17 +906,23 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
                             <div className="px-5 pb-4 pt-1 space-y-2.5">
                               {conv.resumo_fechamento && (
                                 <div className="p-3 rounded-lg bg-white/[0.03] border border-white/[0.06]">
-                                  <p className="text-xs text-white/50 mb-1 font-medium">Resumo</p>
+                                  <p className="text-xs text-white/50 mb-1 font-medium">Observacoes</p>
                                   <p className="text-xs text-white/70 leading-relaxed whitespace-pre-wrap">{conv.resumo_fechamento}</p>
                                 </div>
                               )}
-                              <div className="flex items-center gap-4 text-xs text-white/40">
+                              <div className="flex items-center gap-4 text-xs text-white/40 flex-wrap">
                                 <span className="flex items-center gap-1">
                                   <Phone className="w-3 h-3" />
                                   {formatPhone(conv.cliente_telefone)}
                                 </span>
+                                {conv.atendente_id && attendantNames[conv.atendente_id] && (
+                                  <span>Atendente: {attendantNames[conv.atendente_id]}</span>
+                                )}
                                 {conv.finalizado_por && attendantNames[conv.finalizado_por] && (
-                                  <span>Finalizado por {attendantNames[conv.finalizado_por]}</span>
+                                  <span>Finalizado por: {attendantNames[conv.finalizado_por]}</span>
+                                )}
+                                {conv.finalizado_at && (
+                                  <span>Em: {formatDateFull(conv.finalizado_at)}</span>
                                 )}
                                 {conv.proxima_acao_data && (
                                   <span className="flex items-center gap-1 text-amber-400">
@@ -829,7 +1010,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
           )}
 
-          {/* Per-attendant response times */}
           {perAttendant.length > 0 && (
             <div className="rounded-xl bg-white/5 border border-white/10 overflow-hidden">
               <button
@@ -906,7 +1086,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
           )}
 
-          {/* Charts */}
           <div className="grid grid-cols-2 gap-6">
             <div className="p-6 rounded-xl bg-white/5 border border-white/10">
               <h3 className="text-lg font-semibold text-white mb-4">Conversas por Estagio</h3>
@@ -986,7 +1165,6 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
           </div>
 
-          {/* Ranking */}
           <div className="p-6 rounded-xl bg-white/5 border border-white/10">
             <h3 className="text-lg font-semibold text-white mb-4">Ranking de Atendentes</h3>
             <div className="space-y-3">
