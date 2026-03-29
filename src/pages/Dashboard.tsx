@@ -166,7 +166,7 @@ export function Dashboard() {
       const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
         let q = supabase
           .from('os')
-          .select('id, coluna_kanban, tipo_os, valor_total, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
+          .select('id, coluna_kanban, tipo_os, valor_total, valor_pago, status_pagamento, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
@@ -203,7 +203,8 @@ export function Dashboard() {
       const osListOW = osList.filter(os => os.tipo_os === 'OW');
       const receitaLP = osListLP.length;
       const osLPFechadas = osListLP.filter(os => os.coluna_kanban === 'os_fechada').length;
-      const receitaOW = osListOW.reduce((sum, os) => sum + (Number(os.valor_total) || 0), 0);
+      const osOWPagas = osListOW.filter(os => os.status_pagamento === 'pago');
+      const receitaOW = osOWPagas.reduce((sum, os) => sum + (Number(os.valor_pago) || 0), 0);
 
       const kanbanCountMap: Record<string, number> = {};
       osList.forEach(os => {
@@ -343,7 +344,7 @@ export function Dashboard() {
       setStats({
         totalOS: totalOSCount,
         totalOSLP: osListLP.length,
-        totalOSOW: osListOW.length,
+        totalOSOW: osOWPagas.length,
         osAbertas,
         osAbertasLP,
         osAbertasOW,
