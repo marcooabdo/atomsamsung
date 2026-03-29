@@ -133,6 +133,13 @@ export function NotasFiscais() {
   const [emittingId, setEmittingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ tipo: 'success' | 'error'; texto: string } | null>(null);
   const [showPayload, setShowPayload] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     loadData();
@@ -654,10 +661,26 @@ export function NotasFiscais() {
 
       {/* Lista de Notas Fiscais */}
       <div className="premium-card p-6">
-        <h3 className="text-lg font-bold text-[#00D4FF] mb-4 flex items-center gap-2">
-          <FileText className="w-5 h-5" />
-          Notas Fiscais ({filteredNotas.length})
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-bold text-[#00D4FF] flex items-center gap-2">
+            <FileText className="w-5 h-5" />
+            Notas Fiscais ({filteredNotas.length})
+          </h3>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all"
+            style={{
+              backgroundColor: 'rgba(0, 212, 255, 0.1)',
+              border: '1px solid rgba(0, 212, 255, 0.4)',
+              color: '#00D4FF',
+              opacity: refreshing ? 0.6 : 1
+            }}
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Atualizando...' : 'Atualizar'}
+          </button>
+        </div>
 
         <div className="space-y-3">
           {filteredNotas.length === 0 ? (
