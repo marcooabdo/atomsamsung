@@ -166,7 +166,7 @@ export function Dashboard() {
       const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
         let q = supabase
           .from('os')
-          .select('id, coluna_kanban, tipo_os, valor_total, valor_pago, status_pagamento, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
+          .select('id, coluna_kanban, tipo_os, valor_total, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
@@ -203,8 +203,16 @@ export function Dashboard() {
       const osListOW = osList.filter(os => os.tipo_os === 'OW');
       const receitaLP = osListLP.length;
       const osLPFechadas = osListLP.filter(os => os.coluna_kanban === 'os_fechada').length;
-      const osOWPagas = osListOW.filter(os => os.status_pagamento === 'pago');
-      const receitaOW = osOWPagas.reduce((sum, os) => sum + (Number(os.valor_pago) || 0), 0);
+      let pagamentosOWQuery = supabase
+        .from('pagamentos')
+        .select('os_id, valor_liquido, os:os_id!inner(tipo_os)')
+        .eq('os.tipo_os', 'OW')
+        .gte('data_lancamento', `${dataInicio}T00:00:00`)
+        .lte('data_lancamento', `${dataFim}T23:59:59`);
+      if (unidadeFilter) pagamentosOWQuery = pagamentosOWQuery.eq('unidade_id', unidadeFilter);
+      const { data: pagamentosOW } = await pagamentosOWQuery;
+      const receitaOW = (pagamentosOW || []).reduce((sum: number, p: any) => sum + (Number(p.valor_liquido) || 0), 0);
+      const totalOWComPagamento = new Set((pagamentosOW || []).map((p: any) => p.os_id)).size;
 
       const kanbanCountMap: Record<string, number> = {};
       osList.forEach(os => {
@@ -344,7 +352,7 @@ export function Dashboard() {
       setStats({
         totalOS: totalOSCount,
         totalOSLP: osListLP.length,
-        totalOSOW: osOWPagas.length,
+        totalOSOW: totalOWComPagamento,
         osAbertas,
         osAbertasLP,
         osAbertasOW,
