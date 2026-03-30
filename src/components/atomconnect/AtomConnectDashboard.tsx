@@ -188,7 +188,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
     semAtendente: 0,
     conversasPorColuna: [] as { coluna: string; count: number; cor: string }[],
     conversasPorDia: [] as { dia: string; count: number }[],
-    topAtendentes: [] as { nome: string; atendimentos: number }[]
+    topAtendentes: [] as { id: string; nome: string; atendimentos: number }[]
   });
   const [responseMetrics, setResponseMetrics] = useState<ResponseMetrics | null>(null);
   const [attendantNames, setAttendantNames] = useState<Record<string, string>>({});
@@ -307,11 +307,11 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       conversasPorDia.push({ dia: dayStr, count });
     }
 
-    const atendenteMap: Record<string, { nome: string; count: number }> = {};
+    const atendenteMap: Record<string, { id: string; nome: string; count: number }> = {};
     for (const c of conversas) {
       if (c.atendente_id) {
         if (!atendenteMap[c.atendente_id]) {
-          atendenteMap[c.atendente_id] = { nome: c.atendente_id, count: 0 };
+          atendenteMap[c.atendente_id] = { id: c.atendente_id, nome: c.atendente_id, count: 0 };
         }
         atendenteMap[c.atendente_id].count++;
       }
@@ -347,8 +347,8 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
 
     const topAtendentes = Object.values(atendenteMap)
       .sort((a, b) => b.count - a.count)
-      .slice(0, 5)
-      .map(a => ({ nome: a.nome, atendimentos: a.count }));
+      .slice(0, 10)
+      .map(a => ({ id: a.id, nome: a.nome, atendimentos: a.count }));
 
     setStats({
       totalConversas: conversas.length,
@@ -621,6 +621,9 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
                       <p className="text-sm font-medium text-white truncate">
                         {f.cliente_nome || formatPhone(f.cliente_telefone)}
                       </p>
+                      {f.cliente_nome && f.cliente_telefone && (
+                        <p className="text-[11px] text-gray-500 truncate">{formatPhone(f.cliente_telefone)}</p>
+                      )}
                       <p className="text-[11px] text-white/40 truncate">
                         {f.proxima_acao_descricao || f.resumo_fechamento || 'Sem descricao'}
                       </p>
@@ -1226,28 +1229,44 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
                   Nenhum atendente com conversas atribuidas
                 </p>
               ) : (
-                stats.topAtendentes.map((atendente, index) => (
-                  <div
-                    key={atendente.nome}
-                    className="flex items-center gap-4 p-3 rounded-lg bg-white/5"
-                  >
+                stats.topAtendentes.map((atendente, index) => {
+                  const attMetrics = perAttendant.find(a => a.atendente_id === atendente.id);
+                  return (
                     <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm"
-                      style={{
-                        backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : `${accentColor}20`,
-                        color: index < 3 ? '#000' : accentColor
-                      }}
+                      key={atendente.id}
+                      className="flex items-center gap-4 p-3 rounded-lg bg-white/5"
                     >
-                      {index + 1}
+                      <div
+                        className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm flex-shrink-0"
+                        style={{
+                          backgroundColor: index === 0 ? '#FFD700' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : `${accentColor}20`,
+                          color: index < 3 ? '#000' : accentColor
+                        }}
+                      >
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white truncate">{atendente.nome}</p>
+                        <p className="text-xs text-gray-400">
+                          {atendente.atendimentos} conversa{atendente.atendimentos !== 1 ? 's' : ''}
+                        </p>
+                      </div>
+                      {attMetrics && (
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <div className="text-right">
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">TMA</p>
+                            <p className="text-xs font-medium text-emerald-400">{formatDuration(attMetrics.avg_first_response_seconds)}</p>
+                          </div>
+                          <div className="w-px h-6 bg-white/10" />
+                          <div className="text-right">
+                            <p className="text-[10px] text-gray-500 uppercase tracking-wider">TME</p>
+                            <p className="text-xs font-medium text-blue-400">{formatDuration(attMetrics.avg_between_response_seconds)}</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-white">{atendente.nome}</p>
-                      <p className="text-xs text-gray-400">
-                        {atendente.atendimentos} conversa{atendente.atendimentos !== 1 ? 's' : ''}
-                      </p>
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
