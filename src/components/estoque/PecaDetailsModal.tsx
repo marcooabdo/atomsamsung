@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw, ShieldCheck, ShieldX } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
@@ -97,6 +97,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
   const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
   const [nfEmitidas, setNfEmitidas] = useState<any[]>([]);
+  const [auditInfo, setAuditInfo] = useState<{ status: string | null; os_numero: string | null; tipo_os: string | null; is_cortesia: boolean } | null>(null);
 
   const neonGreen = themeInfo.neonGreen;
   const themeAccent = themeInfo.accent;
@@ -150,6 +151,22 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
       }
       setHistorico((histRes.data || []) as unknown as HistoricoItem[]);
       setNfEmitidas(nfRes.data || []);
+
+      const { data: osPecaAudit } = await supabase
+        .from('os_pecas')
+        .select('auditado_samsung_status, is_cortesia_samsung, os:os_id(numero_os_interna, numero_os_samsung, tipo_os)')
+        .eq('estoque_peca_id', peca.id)
+        .not('auditado_samsung_status', 'is', null)
+        .maybeSingle();
+      if (osPecaAudit) {
+        const osRef = osPecaAudit.os as any;
+        setAuditInfo({
+          status: osPecaAudit.auditado_samsung_status,
+          os_numero: osRef?.numero_os_samsung || osRef?.numero_os_interna || null,
+          tipo_os: osRef?.tipo_os || null,
+          is_cortesia: osPecaAudit.is_cortesia_samsung || false,
+        });
+      }
     } finally {
       setLoadingHistorico(false);
     }
@@ -348,6 +365,37 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
               <div>
                 <p className="text-xs uppercase tracking-wider font-bold" style={{ color: isDark ? 'rgba(57,255,20,0.70)' : 'rgba(21,128,61,0.80)' }}>OS Alocada</p>
                 <p className="font-bold font-mono text-base" style={{ color: neonGreen }}>{osLabel}</p>
+              </div>
+            </div>
+          )}
+
+          {auditInfo && (
+            <div
+              className="flex items-center gap-3 px-4 py-3 rounded-xl"
+              style={{
+                background: auditInfo.status === 'Y'
+                  ? isDark ? 'rgba(16,185,129,0.08)' : 'rgba(16,185,129,0.08)'
+                  : isDark ? 'rgba(239,68,68,0.08)' : 'rgba(239,68,68,0.08)',
+                border: `1px solid ${auditInfo.status === 'Y' ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'}`,
+              }}
+            >
+              {auditInfo.status === 'Y' ? (
+                <ShieldCheck className="w-5 h-5 shrink-0" style={{ color: '#10b981' }} />
+              ) : (
+                <ShieldX className="w-5 h-5 shrink-0" style={{ color: '#ef4444' }} />
+              )}
+              <div>
+                <p className="text-xs uppercase tracking-wider font-bold" style={{ color: auditInfo.status === 'Y' ? '#10b981' : '#ef4444' }}>
+                  {auditInfo.status === 'Y'
+                    ? (auditInfo.tipo_os === 'OW' ? 'Peca paga pelo cliente' : 'Peca auditada e paga pela Samsung')
+                    : 'Peca glosada pela Samsung'}
+                  {auditInfo.is_cortesia && ' (Cortesia)'}
+                </p>
+                {auditInfo.os_numero && (
+                  <p className="text-sm font-medium" style={{ color: isDark ? '#d1d5db' : '#374151' }}>
+                    OS {auditInfo.os_numero}
+                  </p>
+                )}
               </div>
             </div>
           )}

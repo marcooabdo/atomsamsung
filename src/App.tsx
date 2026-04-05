@@ -28,6 +28,7 @@ import { OrcamentoPublico } from './pages/OrcamentoPublico';
 import CustomerIntelligence from './pages/CustomerIntelligence';
 import AtomConnect from './pages/AtomConnect';
 import { MuralMissoes } from './pages/MuralMissoes';
+import { AtomAudit } from './pages/AtomAudit';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -305,6 +306,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <MuralMissoes />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/audit"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <AtomAudit />
               </Layout>
             </ProtectedRoute>
           }
