@@ -7,8 +7,9 @@ import CaixaModule from '../components/finance/CaixaModule';
 import LancamentosModule from '../components/finance/LancamentosModule';
 import ConsumoPecasModule from '../components/finance/ConsumoPecasModule';
 import PendenciasSamsungModule from '../components/finance/PendenciasSamsungModule';
+import ReceitaDeslocamentoModule from '../components/finance/ReceitaDeslocamentoModule';
 import {
-  DollarSign, TrendingUp, Wallet, Package, AlertTriangle,
+  DollarSign, TrendingUp, Wallet, Package, AlertTriangle, Truck,
   Filter, LayoutDashboard, Receipt, FileText, Building2
 } from 'lucide-react';
 
@@ -18,6 +19,7 @@ const TABS = [
   { id: 'lancamentos', label: 'Lancamentos', icon: Receipt },
   { id: 'consumo', label: 'Consumo Pecas', icon: Package },
   { id: 'pendencias', label: 'Pendencias Samsung', icon: AlertTriangle },
+  { id: 'deslocamento', label: 'Receita KM', icon: Truck },
 ];
 
 export function Financeiro() {
@@ -168,6 +170,14 @@ export function Financeiro() {
 
         {activeTab === 'pendencias' && (
           <PendenciasSamsungModule
+            unidadeId={getUnidadeIdForQuery()}
+            dataInicio={dataInicio}
+            dataFim={dataFim}
+          />
+        )}
+
+        {activeTab === 'deslocamento' && (
+          <ReceitaDeslocamentoModule
             unidadeId={getUnidadeIdForQuery()}
             dataInicio={dataInicio}
             dataFim={dataFim}
