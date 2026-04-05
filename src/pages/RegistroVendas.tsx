@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin, Building2 } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin, Building2, Download } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -464,6 +465,41 @@ export function RegistroVendas() {
       .reduce((sum, v) => sum + v.preco, 0)
   };
 
+  const handleExportExcel = () => {
+    const tipoLabels: Record<string, string> = {
+      store_plus: 'Store+',
+      smb: 'SMB',
+      seguro_care: 'Seguro Care+'
+    };
+    const statusLabels: Record<string, string> = {
+      pendente: 'Pendente',
+      concluido: 'Concluído',
+      cancelado: 'Cancelado'
+    };
+
+    const data = vendasFiltradas.map(v => ({
+      'Número': v.numero_venda || '',
+      'Cliente': v.cliente_nome || '',
+      'Produto': v.produto_nome || '',
+      'Vendedor': v.vendedor?.nome || '',
+      'Tipo': tipoLabels[v.tipo_venda] || v.tipo_venda,
+      'Valor': v.preco,
+      'Status': statusLabels[v.status] || v.status,
+      'Avaliação': v.avaliacao_validada ? 'Validada' : v.avaliacao_url ? 'Pendente' : '-',
+      'Skywalker': v.enviado_skywalker ? 'Sim' : 'Não'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    ws['!cols'] = [
+      { wch: 12 }, { wch: 25 }, { wch: 30 }, { wch: 20 },
+      { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 12 }, { wch: 12 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Vendas');
+    XLSX.writeFile(wb, `registro_vendas_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  };
+
   const getStatusBadge = (status: string) => {
     const configs = {
       pendente: { color: '#F59E0B', icon: Clock, label: 'Pendente' },
@@ -518,14 +554,24 @@ export function RegistroVendas() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
-          style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Nova Venda
-        </button>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
+            style={{ backgroundColor: '#10B98120', color: '#10B981', border: '1px solid #10B98140' }}
+          >
+            <Download className="w-4 h-4" />
+            Exportar Excel
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
+            style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+          >
+            <Plus className="w-4 h-4" />
+            Nova Venda
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
