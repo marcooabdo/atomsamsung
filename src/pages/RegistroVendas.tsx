@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin, Building2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
@@ -518,14 +518,44 @@ export function RegistroVendas() {
             </p>
           </div>
         </div>
-        <button
-          onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
-          style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
-        >
-          <Plus className="w-4 h-4" />
-          Nova Venda
-        </button>
+        <div className="flex items-center gap-4">
+          {canSeeAllUnits ? (
+            <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+              <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+                <Building2 className="w-4 h-4" />
+                Filtrar por Unidade
+              </label>
+              <select
+                value={filtros.unidade_id}
+                onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
+                className="neon-input"
+              >
+                <option value="all">Todas as Unidades</option>
+                {unidades.map(u => (
+                  <option key={u.id} value={u.id}>{u.nome}</option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+              <div className="flex items-center gap-3">
+                <Building2 className="w-5 h-5 text-[#00D4FF]" />
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wider">Unidade</p>
+                  <p className="text-sm font-semibold text-[#00D4FF]">{unidades.find(u => u.id === usuario?.unidade_id)?.nome || 'Sua Unidade'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <button
+            onClick={() => handleOpenModal()}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
+            style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+          >
+            <Plus className="w-4 h-4" />
+            Nova Venda
+          </button>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -570,7 +600,7 @@ export function RegistroVendas() {
           <h3 className="font-medium" style={{ color: 'var(--text-primary)' }}>Filtros</h3>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-secondary)' }} />
             <input
@@ -618,24 +648,6 @@ export function RegistroVendas() {
               <option key={u.id} value={u.id}>{u.nome}</option>
             ))}
           </select>
-
-          {canSeeAllUnits ? (
-            <select
-              value={filtros.unidade_id}
-              onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
-              className="rounded-lg px-3 py-2 text-sm"
-              style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
-            >
-              <option value="all">Todas as Unidades</option>
-              {unidades.map(u => (
-                <option key={u.id} value={u.id}>{u.nome}</option>
-              ))}
-            </select>
-          ) : (
-            <span className="rounded-lg px-3 py-2 text-sm font-medium" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-accent)' }}>
-              {unidades.find(u => u.id === usuario?.unidade_id)?.nome || 'Sua Unidade'}
-            </span>
-          )}
         </div>
       </div>
 
