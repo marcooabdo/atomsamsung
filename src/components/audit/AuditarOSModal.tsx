@@ -20,10 +20,13 @@ interface AuditOS {
   valor_pecas: number | null;
   valor_servicos: number | null;
   coluna_kanban: string | null;
+  status_samsung_desc: string | null;
+  status_samsung_reason: string | null;
   auditado_km_valor: number | null;
   auditado_mao_obra_valor: number | null;
   auditado_imposto_valor: number | null;
   auditado_status: boolean;
+  auditado_observacao: string | null;
   unidade_id: string;
 }
 
@@ -78,6 +81,7 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
   const [maoObra, setMaoObra] = useState('');
   const [imposto, setImposto] = useState('');
   const [kmValor, setKmValor] = useState('');
+  const [observacao, setObservacao] = useState('');
 
   const [pecaEdits, setPecaEdits] = useState<Record<string, {
     status: string | null;
@@ -97,7 +101,7 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
     try {
       const { data: osData, error: osErr } = await supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, tipo_os, tipo_atendimento, cliente_cidade, cliente_estado, aparelho_modelo, valor_total, valor_pecas, valor_servicos, coluna_kanban, auditado_km_valor, auditado_mao_obra_valor, auditado_imposto_valor, auditado_status, unidade_id')
+        .select('id, numero_os_interna, numero_os_samsung, tipo_os, tipo_atendimento, cliente_cidade, cliente_estado, aparelho_modelo, valor_total, valor_pecas, valor_servicos, coluna_kanban, status_samsung_desc, status_samsung_reason, auditado_km_valor, auditado_mao_obra_valor, auditado_imposto_valor, auditado_status, auditado_observacao, unidade_id')
         .eq('id', osId)
         .maybeSingle();
       if (osErr) throw osErr;
@@ -110,6 +114,7 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
       setMaoObra(osData.auditado_mao_obra_valor?.toString() || '');
       setImposto(osData.auditado_imposto_valor?.toString() || '');
       setKmValor(osData.auditado_km_valor?.toString() || '');
+      setObservacao(osData.auditado_observacao || '');
 
       const { data: unidadeData } = await supabase
         .from('unidades')
@@ -201,6 +206,7 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
       osUpdates.auditado_km_valor = kmValor ? parseFloat(kmValor) : null;
       osUpdates.auditado_mao_obra_valor = maoObra ? parseFloat(maoObra) : null;
       osUpdates.auditado_imposto_valor = imposto ? parseFloat(imposto) : null;
+      osUpdates.auditado_observacao = observacao.trim() || null;
 
       const allPecasAudited = pecas.length === 0 || pecas.every(p => pecaEdits[p.id]?.status === 'Y' || pecaEdits[p.id]?.status === 'X');
       const hasKm = os.tipo_atendimento === 'IH' ? !!kmValor : true;
@@ -353,9 +359,37 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
                 <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Modelo do Aparelho</label>
                 <input type="text" value={modelo} onChange={e => setModelo(e.target.value)} className="neon-input w-full" placeholder="SM-A155M" />
               </div>
-              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5">
-                <p className="text-xs text-gray-500 mb-2">Status da OS no Kanban</p>
-                <p className="text-sm text-white font-medium">{os.coluna_kanban || 'Sem status'}</p>
+              <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+                <p className="text-xs text-gray-500 uppercase tracking-wider">Status Samsung</p>
+                {os.status_samsung_desc ? (
+                  <div>
+                    <p className={`text-sm font-semibold ${
+                      os.status_samsung_desc === 'REPARO COMPLETO' ? 'text-emerald-400' :
+                      os.status_samsung_desc === 'PENDENTE' ? 'text-amber-400' :
+                      (os.status_samsung_desc || '').includes('DESIGNADO') ? 'text-cyan-400' :
+                      (os.status_samsung_desc || '').includes('RECUSADO') ? 'text-red-400' :
+                      'text-white'
+                    }`}>
+                      {os.status_samsung_desc}
+                    </p>
+                    {os.status_samsung_reason && (
+                      <p className="text-xs text-gray-500 mt-1">{os.status_samsung_reason}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-600">Sem status Samsung</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Observacao da Auditoria</label>
+                <textarea
+                  value={observacao}
+                  onChange={e => setObservacao(e.target.value)}
+                  rows={3}
+                  className="neon-input w-full resize-none"
+                  placeholder="Ex: Orcamento recusado pelo cliente, OS sem reparo, etc."
+                />
               </div>
             </div>
           )}

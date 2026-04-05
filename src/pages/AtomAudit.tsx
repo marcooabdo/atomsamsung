@@ -22,12 +22,15 @@ interface OSAudit {
   cliente_estado: string | null;
   aparelho_modelo: string | null;
   coluna_kanban: string | null;
+  status_samsung_desc: string | null;
+  status_samsung_reason: string | null;
   valor_total: number | null;
   valor_pecas: number | null;
   auditado_km_valor: number | null;
   auditado_mao_obra_valor: number | null;
   auditado_imposto_valor: number | null;
   auditado_status: boolean;
+  auditado_observacao: string | null;
   created_at: string;
   unidade_id: string;
   pecas_count: number;
@@ -63,7 +66,7 @@ export function AtomAudit() {
 
   const [auditingOSId, setAuditingOSId] = useState<string | null>(null);
 
-  const [kanbanStatuses, setKanbanStatuses] = useState<string[]>([]);
+  const [samsungStatuses, setSamsungStatuses] = useState<string[]>([]);
 
   useEffect(() => {
     const today = new Date();
@@ -98,7 +101,7 @@ export function AtomAudit() {
     try {
       let query = supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, tipo_os, tipo_atendimento, cliente_cidade, cliente_estado, aparelho_modelo, coluna_kanban, valor_total, valor_pecas, auditado_km_valor, auditado_mao_obra_valor, auditado_imposto_valor, auditado_status, created_at, unidade_id')
+        .select('id, numero_os_interna, numero_os_samsung, tipo_os, tipo_atendimento, cliente_cidade, cliente_estado, aparelho_modelo, coluna_kanban, status_samsung_desc, status_samsung_reason, valor_total, valor_pecas, auditado_km_valor, auditado_mao_obra_valor, auditado_imposto_valor, auditado_status, auditado_observacao, created_at, unidade_id')
         .gte('created_at', `${dataInicio}T00:00:00`)
         .lte('created_at', `${dataFim}T23:59:59`)
         .order('created_at', { ascending: false });
@@ -152,11 +155,15 @@ export function AtomAudit() {
 
       const statusSet = new Set<string>();
       const enriched: OSAudit[] = allOS.map(os => {
-        if (os.coluna_kanban) statusSet.add(os.coluna_kanban);
+        const sDesc = (os.status_samsung_desc || '').trim();
+        if (sDesc && sDesc !== 'NOT_FOUND' && sDesc !== 'FOUND') statusSet.add(sDesc);
         const pm = pecasMap[os.id] || { count: 0, y: 0, x: 0, pending: 0, custoGspn: 0 };
         return {
           ...os,
+          status_samsung_desc: sDesc || null,
+          status_samsung_reason: (os.status_samsung_reason || '').trim() || null,
           auditado_status: os.auditado_status || false,
+          auditado_observacao: os.auditado_observacao || null,
           pecas_count: pm.count,
           pecas_y: pm.y,
           pecas_x: pm.x,
@@ -165,7 +172,7 @@ export function AtomAudit() {
         };
       });
 
-      setKanbanStatuses(Array.from(statusSet).sort());
+      setSamsungStatuses(Array.from(statusSet).sort());
       setOsList(enriched);
     } catch (err) {
       console.error('Error loading audit data:', err);
@@ -199,7 +206,7 @@ export function AtomAudit() {
     }
     if (filtroCidade) list = list.filter(o => o.cliente_cidade === filtroCidade);
     if (filtroModelo) list = list.filter(o => o.aparelho_modelo === filtroModelo);
-    if (filtroStatus.length > 0) list = list.filter(o => o.coluna_kanban && filtroStatus.includes(o.coluna_kanban));
+    if (filtroStatus.length > 0) list = list.filter(o => o.status_samsung_desc && filtroStatus.includes(o.status_samsung_desc));
     if (showOnlyPending) list = list.filter(o => !o.auditado_status);
 
     list.sort((a, b) => {
@@ -263,7 +270,8 @@ export function AtomAudit() {
       'OS Interna': o.numero_os_interna,
       'Tipo': o.tipo_os,
       'Atendimento': o.tipo_atendimento,
-      'Status Kanban': o.coluna_kanban || '',
+      'Status Samsung': o.status_samsung_desc || '',
+      'Motivo Samsung': o.status_samsung_reason || '',
       'Cidade': o.cliente_cidade || '',
       'Modelo': o.aparelho_modelo || '',
       'Mao de Obra R$': o.auditado_mao_obra_valor || 0,
@@ -274,6 +282,7 @@ export function AtomAudit() {
       'Pecas X': o.pecas_x,
       'Pecas Pendentes': o.pecas_pending,
       'Auditada': o.auditado_status ? 'SIM' : 'NAO',
+      'Observacao': o.auditado_observacao || '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();
@@ -480,14 +489,14 @@ export function AtomAudit() {
             <option value="">Todos Modelos</option>
             {modelosDisponiveis.map(m => <option key={m} value={m}>{m}</option>)}
           </select>
-          {kanbanStatuses.length > 0 && (
+          {samsungStatuses.length > 0 && (
             <select
               value={filtroStatus.length === 1 ? filtroStatus[0] : ''}
               onChange={e => { setFiltroStatus(e.target.value ? [e.target.value] : []); setPage(0); }}
-              className="neon-input text-xs max-w-[180px]"
+              className="neon-input text-xs max-w-[200px]"
             >
-              <option value="">Todos Status</option>
-              {kanbanStatuses.map(s => <option key={s} value={s}>{s}</option>)}
+              <option value="">Todos Status Samsung</option>
+              {samsungStatuses.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
           )}
         </div>
@@ -504,7 +513,7 @@ export function AtomAudit() {
             <thead>
               <tr className="border-b border-white/5 bg-white/[0.015]">
                 <th className="text-left px-4 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">OS</th>
-                <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Status Samsung</th>
                 <th className="text-center px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider">Tipo</th>
                 <th className="text-left px-3 py-3 text-[10px] font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:text-white" onClick={() => toggleSort('cidade')}>
                   <span className="flex items-center gap-1">Cidade <SortIcon field="cidade" /></span>
@@ -547,11 +556,31 @@ export function AtomAudit() {
                         )}
                       </div>
                     </td>
-                    <td className="px-3 py-3">
+                    <td className="px-3 py-3 max-w-[180px]">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-gray-400 truncate max-w-[120px]">{os.coluna_kanban || '-'}</span>
+                        {os.status_samsung_desc ? (
+                          <div className="min-w-0">
+                            <p className={`text-xs font-medium truncate ${
+                              os.status_samsung_desc === 'REPARO COMPLETO' ? 'text-emerald-400' :
+                              os.status_samsung_desc === 'PENDENTE' ? 'text-amber-400' :
+                              os.status_samsung_desc.includes('DESIGNADO') ? 'text-cyan-400' :
+                              os.status_samsung_desc.includes('RECUSADO') ? 'text-red-400' :
+                              'text-gray-300'
+                            }`}>
+                              {os.status_samsung_desc}
+                            </p>
+                            {os.status_samsung_reason && (
+                              <p className="text-[10px] text-gray-600 truncate" title={os.status_samsung_reason}>{os.status_samsung_reason}</p>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-700">-</span>
+                        )}
                         {isAuditada && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />}
                       </div>
+                      {os.auditado_observacao && (
+                        <p className="text-[10px] text-amber-500/70 truncate mt-0.5" title={os.auditado_observacao}>{os.auditado_observacao}</p>
+                      )}
                     </td>
                     <td className="px-3 py-3 text-center">
                       <div className="flex items-center justify-center gap-1">
