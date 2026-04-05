@@ -518,47 +518,45 @@ export function RegistroVendas() {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-4">
-          {canSeeAllUnits ? (
-            <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
-              <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-                <Building2 className="w-4 h-4" />
-                Filtrar por Unidade
-              </label>
-              <select
-                value={filtros.unidade_id}
-                onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
-                className="neon-input"
-              >
-                <option value="all">Todas as Unidades</option>
-                {unidades.map(u => (
-                  <option key={u.id} value={u.id}>{u.nome}</option>
-                ))}
-              </select>
-            </div>
-          ) : (
-            <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
-              <div className="flex items-center gap-3">
-                <Building2 className="w-5 h-5 text-[#00D4FF]" />
-                <div>
-                  <p className="text-xs text-gray-400 uppercase tracking-wider">Unidade</p>
-                  <p className="text-sm font-semibold text-[#00D4FF]">{unidades.find(u => u.id === usuario?.unidade_id)?.nome || 'Sua Unidade'}</p>
-                </div>
-              </div>
-            </div>
-          )}
-          <button
-            onClick={() => handleOpenModal()}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
-            style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
-          >
-            <Plus className="w-4 h-4" />
-            Nova Venda
-          </button>
-        </div>
+        <button
+          onClick={() => handleOpenModal()}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
+          style={{ backgroundColor: 'var(--text-accent)', color: 'var(--text-on-accent)' }}
+        >
+          <Plus className="w-4 h-4" />
+          Nova Venda
+        </button>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {canSeeAllUnits ? (
+          <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20 flex flex-col justify-center">
+            <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
+              <Building2 className="w-4 h-4" />
+              Filtrar por Unidade
+            </label>
+            <select
+              value={filtros.unidade_id}
+              onChange={(e) => setFiltros({ ...filtros, unidade_id: e.target.value })}
+              className="neon-input"
+            >
+              <option value="all">Todas as Unidades</option>
+              {unidades.map(u => (
+                <option key={u.id} value={u.id}>{u.nome}</option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20 flex items-center">
+            <div className="flex items-center gap-3">
+              <Building2 className="w-5 h-5 text-[#00D4FF]" />
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider">Unidade</p>
+                <p className="text-sm font-semibold text-[#00D4FF]">{unidades.find(u => u.id === usuario?.unidade_id)?.nome || 'Sua Unidade'}</p>
+              </div>
+            </div>
+          </div>
+        )}
         <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>Total de Vendas</p>
