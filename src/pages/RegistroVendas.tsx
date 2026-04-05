@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin, Building2, Download } from 'lucide-react';
+import { ShoppingCart, Plus, Filter, Search, CreditCard as Edit2, Trash2, Eye, X, TrendingUp, AlertCircle, CheckCircle, Clock, Upload, Star, FileText, MapPin, Building2, Download, BarChart3 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
+import { VendasDashboard } from '../components/vendas/VendasDashboard';
 
 interface Venda {
   id: string;
@@ -77,6 +78,7 @@ export function RegistroVendas() {
   const [unidades, setUnidades] = useState<Unidade[]>([]);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [showDashboard, setShowDashboard] = useState(false);
 
   const isGestor = usuario?.tipo && ['master', 'diretor', 'gerente', 'administrador'].includes(usuario.tipo);
 
@@ -538,6 +540,18 @@ export function RegistroVendas() {
     );
   }
 
+  if (showDashboard) {
+    return (
+      <VendasDashboard
+        vendas={vendas}
+        unidades={unidades}
+        canSeeAllUnits={canSeeAllUnits}
+        userUnidadeId={usuario?.unidade_id}
+        onBack={() => setShowDashboard(false)}
+      />
+    );
+  }
+
   return (
     <div className="space-y-6">
       <header className="flex items-center justify-between flex-wrap gap-4">
@@ -555,6 +569,14 @@ export function RegistroVendas() {
           </div>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowDashboard(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
+            style={{ backgroundColor: '#3B82F620', color: '#3B82F6', border: '1px solid #3B82F640' }}
+          >
+            <BarChart3 className="w-4 h-4" />
+            Ver Dashboard
+          </button>
           <button
             onClick={handleExportExcel}
             className="flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium text-sm transition-all hover:scale-105"
