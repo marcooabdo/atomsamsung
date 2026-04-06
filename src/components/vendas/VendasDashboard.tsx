@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { Trophy, Package, TrendingUp, ArrowLeft, ShoppingCart, Users, Building2, DollarSign } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, PieChart, Pie } from 'recharts';
+import { Trophy, Package, TrendingUp, ArrowLeft, ShoppingCart, Users, DollarSign, Medal } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface Venda {
   id: string;
@@ -32,9 +32,68 @@ interface Props {
   onBack: () => void;
 }
 
-const CHART_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#06B6D4', '#8B5CF6', '#EC4899', '#14B8A6', '#F97316', '#6366F1'];
+const PODIUM_COLORS = ['#F59E0B', '#94A3B8', '#CD7F32'];
+const BAR_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#06B6D4', '#EC4899', '#EF4444', '#14B8A6', '#F97316'];
 const TIPO_LABELS: Record<string, string> = { store_plus: 'Store+', smb: 'SMB', seguro_care: 'Seguro Care+' };
 const TIPO_COLORS: Record<string, string> = { store_plus: '#3B82F6', smb: '#F59E0B', seguro_care: '#10B981' };
+
+const formatCurrency = (val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+
+function RankingList({ items, valueKey, valueFormatter, emptyIcon: EmptyIcon, emptyText }: {
+  items: { nome: string; qtd: number; valor: number }[];
+  valueKey: 'valor' | 'qtd';
+  valueFormatter: (item: { nome: string; qtd: number; valor: number }) => string;
+  emptyIcon: React.ElementType;
+  emptyText: string;
+}) {
+  if (items.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 opacity-50">
+        <EmptyIcon className="w-12 h-12 mb-3" style={{ color: 'var(--text-secondary)' }} />
+        <p style={{ color: 'var(--text-secondary)' }}>{emptyText}</p>
+      </div>
+    );
+  }
+
+  const maxVal = Math.max(...items.map(i => i[valueKey]));
+
+  return (
+    <div className="space-y-3">
+      {items.map((item, i) => {
+        const pct = maxVal > 0 ? (item[valueKey] / maxVal) * 100 : 0;
+        const color = i < 3 ? PODIUM_COLORS[i] : BAR_COLORS[i % BAR_COLORS.length];
+
+        return (
+          <div key={i} className="group">
+            <div className="flex items-center gap-3 mb-1.5">
+              <div
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0"
+                style={{ backgroundColor: `${color}20`, color }}
+              >
+                {i < 3 ? <Medal className="w-4 h-4" /> : i + 1}
+              </div>
+              <p className="flex-1 text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                {item.nome}
+              </p>
+              <p className="text-sm font-bold shrink-0 tabular-nums" style={{ color }}>
+                {valueFormatter(item)}
+              </p>
+            </div>
+            <div className="ml-10 h-2 rounded-full overflow-hidden" style={{ backgroundColor: 'var(--border-primary)' }}>
+              <div
+                className="h-full rounded-full transition-all duration-700 ease-out"
+                style={{ width: `${pct}%`, backgroundColor: color, opacity: 0.85 }}
+              />
+            </div>
+            <p className="ml-10 text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+              {item.qtd} {item.qtd === 1 ? 'venda' : 'vendas'} &middot; {formatCurrency(item.valor)} total
+            </p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export function VendasDashboard({ vendas, unidades, canSeeAllUnits, userUnidadeId, onBack }: Props) {
   const [filtroUnidade, setFiltroUnidade] = useState(canSeeAllUnits ? 'all' : (userUnidadeId || 'all'));
@@ -103,22 +162,6 @@ export function VendasDashboard({ vendas, unidades, canSeeAllUnits, userUnidadeI
     ticketMedio: vendasFiltradas.length > 0 ? vendasFiltradas.reduce((s, v) => s + v.preco, 0) / vendasFiltradas.length : 0,
     vendedoresAtivos: new Set(vendasFiltradas.map(v => v.vendedor_id)).size
   }), [vendasFiltradas]);
-
-  const formatCurrency = (val: number) => `R$ ${val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-
-  const CustomBarTooltip = ({ active, payload, label }: any) => {
-    if (!active || !payload?.length) return null;
-    return (
-      <div className="rounded-lg p-3 shadow-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-        <p className="text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>{label}</p>
-        {payload.map((p: any, i: number) => (
-          <p key={i} className="text-xs" style={{ color: p.color }}>
-            {p.name === 'valor' ? formatCurrency(p.value) : `${p.value} vendas`}
-          </p>
-        ))}
-      </div>
-    );
-  };
 
   return (
     <div className="space-y-6">
@@ -208,57 +251,13 @@ export function VendasDashboard({ vendas, unidades, canSeeAllUnits, userUnidadeI
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ranking por valor total vendido</p>
             </div>
           </div>
-
-          {topVendedores.length > 0 ? (
-            <>
-              <div className="h-[280px] mb-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topVendedores.slice(0, 8)} layout="vertical" margin={{ left: 0, right: 20 }}>
-                    <XAxis type="number" tickFormatter={(v) => `R$${(v / 1000).toFixed(0)}k`} tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="nome" width={100} tick={{ fill: '#9CA3AF', fontSize: 12 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomBarTooltip />} />
-                    <Bar dataKey="valor" radius={[0, 6, 6, 0]} barSize={24}>
-                      {topVendedores.slice(0, 8).map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2 max-h-[240px] overflow-y-auto">
-                {topVendedores.map((v, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 rounded-lg transition-colors"
-                    style={{ backgroundColor: i < 3 ? `${CHART_COLORS[i]}08` : 'transparent', border: `1px solid ${i < 3 ? CHART_COLORS[i] + '30' : 'var(--border-primary)'}` }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                      style={{
-                        backgroundColor: i < 3 ? `${CHART_COLORS[i]}20` : '#37415120',
-                        color: i < 3 ? CHART_COLORS[i] : '#6B7280'
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{v.nome}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{v.qtd} {v.qtd === 1 ? 'venda' : 'vendas'}</p>
-                    </div>
-                    <p className="text-sm font-bold shrink-0" style={{ color: i < 3 ? CHART_COLORS[i] : '#10B981' }}>
-                      {formatCurrency(v.valor)}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 opacity-50">
-              <Users className="w-12 h-12 mb-3" style={{ color: 'var(--text-secondary)' }} />
-              <p style={{ color: 'var(--text-secondary)' }}>Nenhuma venda no periodo</p>
-            </div>
-          )}
+          <RankingList
+            items={topVendedores}
+            valueKey="valor"
+            valueFormatter={(item) => formatCurrency(item.valor)}
+            emptyIcon={Users}
+            emptyText="Nenhuma venda no periodo"
+          />
         </div>
 
         <div className="rounded-xl p-6" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
@@ -271,57 +270,13 @@ export function VendasDashboard({ vendas, unidades, canSeeAllUnits, userUnidadeI
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Ranking por quantidade vendida</p>
             </div>
           </div>
-
-          {topProdutos.length > 0 ? (
-            <>
-              <div className="h-[280px] mb-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={topProdutos.slice(0, 8)} layout="vertical" margin={{ left: 0, right: 20 }}>
-                    <XAxis type="number" tick={{ fill: '#6B7280', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="nome" width={120} tick={{ fill: '#9CA3AF', fontSize: 11 }} axisLine={false} tickLine={false} />
-                    <Tooltip content={<CustomBarTooltip />} />
-                    <Bar dataKey="qtd" name="qtd" radius={[0, 6, 6, 0]} barSize={24}>
-                      {topProdutos.slice(0, 8).map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-2 max-h-[240px] overflow-y-auto">
-                {topProdutos.map((p, i) => (
-                  <div
-                    key={i}
-                    className="flex items-center gap-3 p-3 rounded-lg transition-colors"
-                    style={{ backgroundColor: i < 3 ? `${CHART_COLORS[i]}08` : 'transparent', border: `1px solid ${i < 3 ? CHART_COLORS[i] + '30' : 'var(--border-primary)'}` }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
-                      style={{
-                        backgroundColor: i < 3 ? `${CHART_COLORS[i]}20` : '#37415120',
-                        color: i < 3 ? CHART_COLORS[i] : '#6B7280'
-                      }}
-                    >
-                      {i + 1}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>{p.nome}</p>
-                      <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{formatCurrency(p.valor)} total</p>
-                    </div>
-                    <div className="px-3 py-1 rounded-full text-xs font-bold shrink-0" style={{ backgroundColor: `${CHART_COLORS[i % CHART_COLORS.length]}20`, color: CHART_COLORS[i % CHART_COLORS.length] }}>
-                      {p.qtd}x
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-16 opacity-50">
-              <Package className="w-12 h-12 mb-3" style={{ color: 'var(--text-secondary)' }} />
-              <p style={{ color: 'var(--text-secondary)' }}>Nenhum produto no periodo</p>
-            </div>
-          )}
+          <RankingList
+            items={topProdutos}
+            valueKey="qtd"
+            valueFormatter={(item) => `${item.qtd}x`}
+            emptyIcon={Package}
+            emptyText="Nenhum produto no periodo"
+          />
         </div>
       </div>
 
