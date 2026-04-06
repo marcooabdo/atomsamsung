@@ -11,6 +11,7 @@ import {
   Truck, TrendingUp, Package, AlertTriangle, ChevronDown, ChevronUp,
   ScanSearch
 } from 'lucide-react';
+import { AuditLPIHPanel } from '../components/audit/AuditLPIHPanel';
 
 interface OSAudit {
   id: string;
@@ -248,6 +249,11 @@ export function AtomAudit() {
       .map(([modelo, receita]) => ({ modelo, receita: Math.round(receita * 100) / 100 }));
   }, [filteredOS]);
 
+  const lpIhOSList = useMemo(() =>
+    filteredOS.filter(o => o.tipo_os === 'LP' && o.tipo_atendimento === 'IH'),
+    [filteredOS]
+  );
+
   const pagedOS = useMemo(() => filteredOS.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE), [filteredOS, page]);
   const totalPages = Math.ceil(filteredOS.length / PAGE_SIZE);
 
@@ -395,6 +401,10 @@ export function AtomAudit() {
             </ResponsiveContainer>
           </div>
         </div>
+      )}
+
+      {lpIhOSList.length > 0 && (
+        <AuditLPIHPanel osList={lpIhOSList} onOSUpdated={loadData} />
       )}
 
       <div className="premium-card p-4 space-y-3">
