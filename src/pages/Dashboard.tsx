@@ -19,7 +19,8 @@ import {
   Settings,
   Calendar,
   Filter,
-  Brain
+  Brain,
+  Search
 } from 'lucide-react';
 
 interface KanbanColumnCount {
@@ -150,7 +151,7 @@ export function Dashboard() {
     if (usuario) {
       loadDashboardData();
     }
-  }, [usuario, selectedUnidade, dataInicio, dataFim]);
+  }, [usuario, selectedUnidade]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
@@ -561,16 +562,14 @@ export function Dashboard() {
     { title: 'OS com Alerta', value: stats.osAtrasadas, icon: AlertCircle, color: '#EF4444', hasGoal: false }
   ];
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="futuristic-loader"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative">
+      {loading && (
+        <div className="absolute inset-0 bg-black/30 backdrop-blur-[1px] z-50 flex items-center justify-center rounded-xl">
+          <div className="futuristic-loader" />
+        </div>
+      )}
+
       <UnitFilter
         unidades={unidades}
         selectedUnidade={selectedUnidade}
@@ -606,6 +605,14 @@ export function Dashboard() {
             />
           </div>
         </div>
+        <button
+          onClick={() => { if (dataInicio && dataFim && usuario) loadDashboardData(); }}
+          disabled={loading}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium bg-cyan-500/15 border border-cyan-500/40 text-cyan-400 hover:bg-cyan-500/25 transition-all duration-200 disabled:opacity-50"
+        >
+          <Search className="w-3.5 h-3.5" />
+          {loading ? 'Buscando...' : 'Buscar'}
+        </button>
         <div className="ml-auto flex items-center gap-3">
           <div className="px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
             <span className="text-cyan-400 text-sm font-medium">{formatDateLabel()}</span>
