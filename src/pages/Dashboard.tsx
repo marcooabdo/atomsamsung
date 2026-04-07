@@ -180,6 +180,8 @@ export function Dashboard() {
           .from('os')
           .select('id, tipo_os, coluna_kanban, unidade_id')
           .neq('coluna_kanban', 'os_fechada')
+          .gte('created_at', `${dataInicio}T00:00:00`)
+          .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
         if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
         return q;
@@ -187,7 +189,9 @@ export function Dashboard() {
 
       let totalOSQuery = supabase
         .from('os')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', `${dataInicio}T00:00:00`)
+        .lte('created_at', `${dataFim}T23:59:59`);
       if (unidadeFilter) totalOSQuery = totalOSQuery.eq('unidade_id', unidadeFilter);
 
       const [osAbertasList, totalOSResult] = await Promise.all([
