@@ -69,12 +69,17 @@ export function AtomAudit() {
 
   const [samsungStatuses, setSamsungStatuses] = useState<string[]>([]);
 
+  const [initialLoaded, setInitialLoaded] = useState(false);
+
   useEffect(() => {
     const today = new Date();
     const firstDay = new Date(today.getFullYear(), today.getMonth(), 1);
-    setDataInicio(firstDay.toISOString().split('T')[0]);
-    setDataFim(today.toISOString().split('T')[0]);
+    const inicio = firstDay.toISOString().split('T')[0];
+    const fim = today.toISOString().split('T')[0];
+    setDataInicio(inicio);
+    setDataFim(fim);
     loadUnidades();
+    setInitialLoaded(true);
   }, []);
 
   useEffect(() => {
@@ -86,8 +91,8 @@ export function AtomAudit() {
   }, [usuario]);
 
   useEffect(() => {
-    if (dataInicio && dataFim) loadData();
-  }, [dataInicio, dataFim, selectedUnidade, tipoGarantia, tipoAtendimentoFilter]);
+    if (initialLoaded && dataInicio && dataFim) loadData();
+  }, [initialLoaded, selectedUnidade, tipoGarantia, tipoAtendimentoFilter]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
@@ -426,6 +431,13 @@ export function AtomAudit() {
             <input type="date" value={dataInicio} onChange={e => setDataInicio(e.target.value)} className="neon-input text-xs" />
             <span className="text-gray-600 text-xs">ate</span>
             <input type="date" value={dataFim} onChange={e => setDataFim(e.target.value)} className="neon-input text-xs" />
+            <button
+              onClick={() => { if (dataInicio && dataFim) loadData(); }}
+              disabled={loading}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+            >
+              {loading ? 'Buscando...' : 'Buscar'}
+            </button>
           </div>
 
           <div className="flex items-center gap-1 bg-[#111128] rounded-lg p-1 border border-white/5">
