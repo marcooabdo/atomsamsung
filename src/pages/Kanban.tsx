@@ -1,7 +1,6 @@
-// v2.0.2 - Fixed os_pecas and cotacoes_pecas foreign keys
-import { useEffect, useState, useRef, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { supabase, formatTipoAtendimentoShort } from '../lib/supabase';
+// v2.1.0 - Virtualized columns, memoized cards, debounced search
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
@@ -12,7 +11,9 @@ import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
 import { FecharOSModal } from '../components/FecharOSModal';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, Package, MapPin, Calendar, CheckCircle, DollarSign, Eye, EyeOff, RefreshCw, Copy, Filter, ChevronDown, Download, User, ArrowRightLeft, X, Settings, MessageCircle, ShieldAlert, ShieldCheck } from 'lucide-react';
+import { useDebounce } from '../components/kanban/useDebounce';
+import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -119,8 +120,7 @@ const COLUNAS_IH = [
 ];
 
 export function Kanban() {
-  const { user, usuario } = useAuth();
-  const navigate = useNavigate();
+  const { usuario } = useAuth();
   const [osData, setOsData] = useState<Record<string, OS[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -222,6 +222,12 @@ export function Kanban() {
   const [fecharOSCardData, setFecharOSCardData] = useState<{ id: string; numero: string; unidadeId: string } | null>(null);
   const [pendingFecharOSDrop, setPendingFecharOSDrop] = useState<{ card: OS; position: number | undefined } | null>(null);
 
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  const debouncedTipoOSFilters = useDebounce(tipoOSFilters, 200);
+  const debouncedTipoAtendimentoFilters = useDebounce(tipoAtendimentoFilters, 200);
+  const debouncedTecnicoFilters = useDebounce(tecnicoFilters, 200);
+  const debouncedMinDiasAbertos = useDebounce(minDiasAbertos, 300);
+
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
       return '#ffffff';
@@ -254,85 +260,12 @@ export function Kanban() {
     return null;
   };
 
-  const getTATLimite = (tipoOS: string, tipoAtendimento: string): number => {
-    if (tipoOS === 'LP') {
-      return tipoAtendimento === 'CI' ? 3 : 6;
-    } else {
-      return tipoAtendimento === 'CI' ? 5 : 10;
-    }
-  };
-
-  const getTATColor = (createdAt: string, tipoOS: string, tipoAtendimento: string) => {
-    const diasAberto = Math.floor(
-      (new Date().getTime() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const limite = getTATLimite(tipoOS, tipoAtendimento);
-    const percentual = (diasAberto / limite) * 100;
-
-    if (percentual <= 70) {
-      return {
-        background: 'linear-gradient(135deg, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0.15) 100%)',
-        color: '#10b981',
-        border: '1px solid rgba(16,185,129,0.5)',
-        boxShadow: '0 0 8px rgba(16,185,129,0.3)'
-      };
-    } else if (percentual <= 100) {
-      return {
-        background: 'linear-gradient(135deg, rgba(251,191,36,0.3) 0%, rgba(251,191,36,0.15) 100%)',
-        color: '#fbbf24',
-        border: '1px solid rgba(251,191,36,0.5)',
-        boxShadow: '0 0 8px rgba(251,191,36,0.3)'
-      };
-    } else {
-      return {
-        background: 'linear-gradient(135deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.15) 100%)',
-        color: '#ef4444',
-        border: '1px solid rgba(239,68,68,0.5)',
-        boxShadow: '0 0 8px rgba(239,68,68,0.3)'
-      };
-    }
-  };
-
-  const formatTempoNaEtapa = (updatedAt: string) => {
-    const now = new Date();
-    const updated = new Date(updatedAt);
-    const diffMs = now.getTime() - updated.getTime();
-
-    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    const parts = [];
-    if (dias > 0) parts.push(`${dias}d`);
-    if (horas > 0) parts.push(`${horas}h`);
-    if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
-
-    return parts.join(' ');
-  };
-
   const calcularTAT = (createdAt: string) => {
     const now = new Date();
     const created = new Date(createdAt);
     const diffMs = now.getTime() - created.getTime();
     const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
     return dias;
-  };
-
-  const formatTAT = (createdAt: string) => {
-    const now = new Date();
-    const created = new Date(createdAt);
-    const diffMs = now.getTime() - created.getTime();
-
-    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const horas = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutos = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-
-    const parts = [];
-    if (dias > 0) parts.push(`${dias}d`);
-    if (horas > 0) parts.push(`${horas}h`);
-    if (minutos > 0 || parts.length === 0) parts.push(`${minutos}m`);
-
-    return parts.join(' ');
   };
 
   useEffect(() => {
@@ -547,61 +480,6 @@ export function Kanban() {
     } finally {
       setBuscarOSLoading(false);
     }
-  };
-
-  const calcularValorPecas = (os: any) => {
-    if (!os.requisicoes || os.requisicoes.length === 0) return 0;
-    return os.requisicoes.reduce((total: number, req: any) => {
-      const preco = req.valor_peca || 0;
-      return total + preco;
-    }, 0);
-  };
-
-  const calcularValorGSPN = (os: any) => {
-    let totalGSPN = 0;
-
-    // Somar valor_base_gspn de cotacoes_pecas
-    if (os.cotacao_pecas && os.cotacao_pecas.length > 0) {
-      totalGSPN += os.cotacao_pecas.reduce((total: number, peca: any) => {
-        const valorBase = peca.valor_base_gspn || 0;
-        const quantidade = peca.quantidade || 1;
-        return total + (valorBase * quantidade);
-      }, 0);
-    }
-
-    // Somar valor_gspn de os_pecas
-    if (os.os_pecas && os.os_pecas.length > 0) {
-      totalGSPN += os.os_pecas.reduce((total: number, peca: any) => {
-        const valorGSPN = peca.valor_gspn || 0;
-        const quantidade = peca.quantidade || 1;
-        return total + (valorGSPN * quantidade);
-      }, 0);
-    }
-
-    return totalGSPN;
-  };
-
-  const calcularSubtotal = (os: any) => {
-    if (os.tipo_os !== 'OW') return null;
-    const valorTotal = os.valor_total || 0;
-    const valorDesconto = os.valor_desconto_calculado || 0;
-    return valorTotal + valorDesconto;
-  };
-
-  const calcularLucro = (os: any) => {
-    if (os.tipo_os !== 'OW') return null;
-
-    // Receita líquida (valor_total já tem o desconto aplicado)
-    const receitaLiquida = os.valor_total || 0;
-
-    // Custo das peças GSPN (valor base sem markup)
-    const custoPecasGSPN = calcularValorGSPN(os);
-
-    // Taxas de cartão dos pagamentos
-    const taxasCartao = (os.pagamentos || []).reduce((sum: number, pag: any) => sum + (pag.taxa_valor || 0), 0);
-
-    // Lucro = Receita Líquida - Custo Peças GSPN - Taxas Cartão
-    return receitaLiquida - custoPecasGSPN - taxasCartao;
   };
 
   const loadKanbanData = async () => {
@@ -1621,27 +1499,27 @@ export function Kanban() {
 
     const result = Object.keys(osData).reduce((acc, coluna) => {
       let filtered = osData[coluna].filter(os => {
-        const searchResult = performUniversalSearch(os, searchTerm);
+        const searchResult = performUniversalSearch(os, debouncedSearchTerm);
 
         if (searchResult.matches && searchResult.source === 'hidden') {
           newMatchSource[os.id] = 'hidden';
         }
 
-        const matchesTipoOS = tipoOSFilters.length === 0 ||
-          tipoOSFilters.some(filter => {
+        const matchesTipoOS = debouncedTipoOSFilters.length === 0 ||
+          debouncedTipoOSFilters.some(filter => {
             if (filter === 'SC / ACC') {
               return os.tipo_orcamento === 'samsung_contigo' || os.tipo_orcamento === 'acessorios';
             }
             return os.tipo_os === filter;
           });
 
-        const matchesTipoAtendimento = tipoAtendimentoFilters.length === 0 ||
-          (os.tipo_atendimento && tipoAtendimentoFilters.includes(os.tipo_atendimento));
+        const matchesTipoAtendimento = debouncedTipoAtendimentoFilters.length === 0 ||
+          (os.tipo_atendimento && debouncedTipoAtendimentoFilters.includes(os.tipo_atendimento));
 
-        const matchesTecnico = tecnicoFilters.length === 0 ||
-          (os.tecnico_designado_id && tecnicoFilters.includes(os.tecnico_designado_id));
+        const matchesTecnico = debouncedTecnicoFilters.length === 0 ||
+          (os.tecnico_designado_id && debouncedTecnicoFilters.includes(os.tecnico_designado_id));
 
-        const matchesTAT = minDiasAbertos === 0 || calcularTAT(os.created_at) >= minDiasAbertos;
+        const matchesTAT = debouncedMinDiasAbertos === 0 || calcularTAT(os.created_at) >= debouncedMinDiasAbertos;
 
         return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
       });
@@ -1669,15 +1547,15 @@ export function Kanban() {
     }, {} as Record<string, OS[]>);
 
     return { filteredData: result, computedMatchSource: newMatchSource };
-  }, [osData, searchTerm, tipoOSFilters, tipoAtendimentoFilters, tecnicoFilters, minDiasAbertos, columnSortOrder, columnSortDir]);
+  }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, columnSortOrder, columnSortDir]);
 
   useEffect(() => {
-    if (searchTerm && Object.keys(computedMatchSource).length > 0) {
+    if (debouncedSearchTerm && Object.keys(computedMatchSource).length > 0) {
       setSearchMatchSource(computedMatchSource);
-    } else if (!searchTerm) {
+    } else if (!debouncedSearchTerm) {
       setSearchMatchSource({});
     }
-  }, [computedMatchSource, searchTerm]);
+  }, [computedMatchSource, debouncedSearchTerm]);
 
   const availableTipoOS = Array.from(new Set([
     ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
@@ -1687,6 +1565,37 @@ export function Kanban() {
   const availableTipoAtendimento = Array.from(new Set(
     Object.values(osData).flat().map(os => os.tipo_atendimento).filter(Boolean)
   )).sort() as string[];
+
+  const handleCardClick = useCallback((os: OS) => {
+    setSelectedOSId(os.id);
+    setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
+    setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
+  }, []);
+
+  const handleCardAnalise = useCallback((os: OS) => {
+    setSelectedOSForAnalise({
+      id: os.id,
+      numero: os.numero_os_samsung || os.numero_os_interna || 'S/N'
+    });
+    setShowAnaliseModal(true);
+  }, []);
+
+  const handleCardIniciarReparo = useCallback((os: OS) => {
+    setSelectedOSForReparo({
+      id: os.id,
+      numero: os.numero_os_samsung || os.numero_os_interna || 'S/N',
+      tecnicoId: os.tecnico_designado_id,
+      tecnicoNome: (os as any).tecnico_designado?.nome || null,
+      unidadeId: os.unidade_id
+    });
+    setShowIniciarReparoModal(true);
+  }, []);
+
+  const handleCardFecharOS = useCallback((os: OS) => {
+    const osNumero = os.numero_os_samsung || os.numero_os_interna || 'S/N';
+    setFecharOSCardData({ id: os.id, numero: String(osNumero), unidadeId: os.unidade_id });
+    setShowFecharOSModal(true);
+  }, []);
 
   const getVisibleColumns = () => {
     const hasSCACCFilter = tipoOSFilters.includes('SC / ACC') || tipoOSFilters.includes('SC') || tipoOSFilters.includes('ACC');
@@ -2353,836 +2262,28 @@ export function Kanban() {
                       )}
                     </div>
 
-                    <div className="flex-1 min-h-0 overflow-y-auto cyber-scrollbar px-3 pb-3">
-                      {filteredData[coluna.id]?.map((os, index) => (
-                        <div key={os.id} className="relative mb-2">
-                          {/* Linha indicadora de drop */}
-                          {draggedCard &&
-                           draggedCard.coluna_kanban === coluna.id &&
-                           columnSortOrder[coluna.id] === 'sequencia' &&
-                           dragOverPosition === index &&
-                           dragOverColumn === coluna.id && (
-                            <div
-                              className="absolute -top-1 left-0 right-0 h-0.5 z-10"
-                              style={{
-                                background: `linear-gradient(90deg, transparent 0%, ${coluna.color} 50%, transparent 100%)`,
-                                boxShadow: `0 0 8px ${coluna.color}`
-                              }}
-                            />
-                          )}
-                        {coluna.id === 'os_fechada' ? (
-                          <div
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, os)}
-                            onDragEnd={handleDragEnd}
-                            onDragOver={(e) => handleCardDragOver(e, coluna.id, index)}
-                            onClick={() => {
-                              setSelectedOSId(os.id);
-                              setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
-                              setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
-                            }}
-                            className="rounded-lg p-2 cursor-pointer group relative overflow-hidden"
-                            style={{
-                              background: 'linear-gradient(135deg, rgba(255,255,255,0.02) 0%, rgba(0,0,0,0.2) 100%)',
-                              border: `1px solid ${getTextColor(coluna.id, coluna.color)}20`,
-                              boxShadow: `0 1px 4px rgba(0,0,0,0.2)`,
-                              transition: 'all 0.3s ease',
-                              opacity: draggedCard?.id === os.id ? 0.4 : 1
-                            }}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}50`;
-                              e.currentTarget.style.boxShadow = `0 2px 8px ${coluna.color}20`;
-                              e.currentTarget.style.transform = 'translateY(-1px)';
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}20`;
-                              e.currentTarget.style.boxShadow = `0 1px 4px rgba(0,0,0,0.2)`;
-                              e.currentTarget.style.transform = 'translateY(0)';
-                            }}
-                          >
-                            <div className="flex items-center gap-2">
-                              <CheckCircle className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-[10px] text-white truncate">
-                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
-                                </p>
-                                <p className="text-[9px] text-gray-400 truncate">{os.cliente_nome}</p>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                        <div
-                          key={os.id}
-                          draggable
-                          onDragStart={(e) => handleDragStart(e, os)}
-                          onDragEnd={handleDragEnd}
-                          onDragOver={(e) => handleCardDragOver(e, coluna.id, index)}
-                          onClick={() => {
-                            setSelectedOSId(os.id);
-                            setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
-                            setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
-                          }}
-                          className="rounded-xl p-3 cursor-pointer group relative overflow-hidden"
-                          style={{
-                            background: 'var(--glass-bg)',
-                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}15`,
-                            boxShadow: `var(--card-shadow)`,
-                            backdropFilter: 'blur(12px)',
-                            transition: 'all 0.25s ease',
-                            opacity: draggedCard?.id === os.id ? 0.4 : 1
-                          }}
-                          onMouseEnter={(e) => {
-                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}45`;
-                            e.currentTarget.style.boxShadow = `0 6px 20px ${coluna.color}18, 0 0 16px ${coluna.color}10`;
-                            e.currentTarget.style.transform = 'translateY(-2px)';
-                          }}
-                          onMouseLeave={(e) => {
-                            e.currentTarget.style.borderColor = `${getTextColor(coluna.id, coluna.color)}15`;
-                            e.currentTarget.style.boxShadow = `var(--card-shadow)`;
-                            e.currentTarget.style.transform = 'translateY(0)';
-                          }}
-                        >
-                          <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
-                            background: `linear-gradient(90deg, ${coluna.color}, ${coluna.color}40, transparent)`,
-                          }}></div>
-
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                                <h5 className="font-bold text-xs truncate" style={{
-                                  color: 'var(--text-primary)',
-                                }}>
-                                  {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
-                                </h5>
-                                {searchMatchSource[os.id] === 'hidden' && (
-                                  <div
-                                    className="p-0.5 rounded flex-shrink-0"
-                                    style={{
-                                      background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.2) 0%, rgba(var(--neon-green-rgb),0.1) 100%)',
-                                      border: '1px solid rgba(var(--neon-green-rgb),0.4)',
-                                      boxShadow: '0 0 8px rgba(var(--neon-green-rgb),0.3)'
-                                    }}
-                                    title="Correspondência encontrada em comentários, peças ou histórico"
-                                  >
-                                    <Search className="w-2.5 h-2.5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
-                                  </div>
-                                )}
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const textToCopy = os.numero_os_samsung || os.numero_os_interna || '';
-                                    navigator.clipboard.writeText(textToCopy);
-                                    const btn = e.currentTarget;
-                                    const originalHTML = btn.innerHTML;
-                                    btn.innerHTML = '<span style="color: #39FF14;">✓</span>';
-                                    setTimeout(() => {
-                                      btn.innerHTML = originalHTML;
-                                    }, 1000);
-                                  }}
-                                  className="p-0.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
-                                  title="Copiar número da OS"
-                                >
-                                  <Copy className="w-3 h-3 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
-                                </button>
-                              </div>
-                              <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
-                            </div>
-                            <div className="flex items-center gap-1 flex-shrink-0">
-                              {os.cliente_telefone && (
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const phone = os.cliente_telefone!.replace(/\D/g, '');
-                                    navigate(`/atom-connect?os_id=${os.id}&phone=${phone}`);
-                                  }}
-                                  className="p-1 rounded-md transition-all opacity-0 group-hover:opacity-100"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
-                                    border: '1px solid rgba(0,212,255,0.3)',
-                                  }}
-                                  title="Abrir conversa no Atom Connect"
-                                >
-                                  <MessageCircle className="w-3 h-3 text-cyan-400" style={{ filter: 'drop-shadow(0 0 3px #00D4FF)' }} />
-                                </button>
-                              )}
-                              {os.alerta_divergencia_gspn && (
-                                <div className="p-1 rounded-md flex-shrink-0" style={{
-                                  backgroundColor: 'rgba(255,0,100,0.15)',
-                                  border: '1px solid rgba(255,0,100,0.4)'
-                                }}>
-                                  <AlertCircle
-                                    className="w-3 h-3 text-[#FF0064]"
-                                    style={{ filter: 'drop-shadow(0 0 4px rgba(255, 0, 100, 0.8))' }}
-                                  />
-                                </div>
-                              )}
-                              {(() => {
-                                const alertas = (os as any).alertas_fechamento?.filter((a: any) => !a.resolvido) || [];
-                                const bloqueios = alertas.filter((a: any) => a.severidade === 'bloqueante');
-                                if (alertas.length === 0) return null;
-                                return (
-                                  <div
-                                    className="p-1 rounded-md flex-shrink-0 flex items-center gap-0.5"
-                                    style={{
-                                      backgroundColor: bloqueios.length > 0 ? 'rgba(255,0,100,0.12)' : 'rgba(255,191,0,0.12)',
-                                      border: `1px solid ${bloqueios.length > 0 ? 'rgba(255,0,100,0.35)' : 'rgba(255,191,0,0.35)'}`,
-                                    }}
-                                    title={`${alertas.length} alerta(s) de fechamento${bloqueios.length > 0 ? ` (${bloqueios.length} bloqueante(s))` : ''}`}
-                                  >
-                                    <ShieldAlert className="w-3 h-3" style={{ color: bloqueios.length > 0 ? '#FF0064' : '#FFBF00', filter: `drop-shadow(0 0 3px ${bloqueios.length > 0 ? 'rgba(255,0,100,0.6)' : 'rgba(255,191,0,0.6)'})` }} />
-                                    <span className="text-[8px] font-black" style={{ color: bloqueios.length > 0 ? '#FF0064' : '#FFBF00' }}>{alertas.length}</span>
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </div>
-
-                          <div className="space-y-1.5 text-xs">
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                style={{
-                                  background: os.tipo_atendimento === 'IH'
-                                    ? 'linear-gradient(135deg, rgba(16,185,129,0.25) 0%, rgba(16,185,129,0.1) 100%)'
-                                    : 'linear-gradient(135deg, rgba(249,115,22,0.25) 0%, rgba(249,115,22,0.1) 100%)',
-                                  color: os.tipo_atendimento === 'IH' ? '#10b981' : '#f97316',
-                                  border: `1px solid ${os.tipo_atendimento === 'IH' ? 'rgba(16,185,129,0.5)' : 'rgba(249,115,22,0.5)'}`,
-                                  boxShadow: `0 0 8px ${os.tipo_atendimento === 'IH' ? 'rgba(16,185,129,0.2)' : 'rgba(249,115,22,0.2)'}`
-                                }}
-                              >
-                                {formatTipoAtendimentoShort(os.tipo_atendimento)}
-                              </span>
-                              <span
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                style={{
-                                  background: os.tipo_os === 'LP'
-                                    ? 'linear-gradient(135deg, rgba(255,165,0,0.25) 0%, rgba(255,165,0,0.1) 100%)'
-                                    : 'linear-gradient(135deg, rgba(var(--accent-rgb),0.25) 0%, rgba(var(--accent-rgb),0.1) 100%)',
-                                  color: os.tipo_os === 'LP' ? '#FFA500' : 'var(--text-accent)',
-                                  border: `1px solid ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.5)' : 'rgba(var(--accent-rgb),0.5)'}`,
-                                  boxShadow: `0 0 8px ${os.tipo_os === 'LP' ? 'rgba(255,165,0,0.2)' : 'rgba(var(--accent-rgb),0.2)'}`
-                                }}
-                              >
-                                {os.tipo_os}
-                              </span>
-                              {os.tipo_orcamento === 'samsung_contigo' && (
-                                <span
-                                  className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(255,165,0,0.25) 0%, rgba(255,165,0,0.1) 100%)',
-                                    color: '#FFA500',
-                                    border: '1px solid rgba(255,165,0,0.5)',
-                                    boxShadow: '0 0 8px rgba(255,165,0,0.2)'
-                                  }}
-                                  title="Samsung Contigo"
-                                >
-                                  SC
-                                </span>
-                              )}
-                              <span
-                                className="px-1.5 py-0.5 rounded text-[9px] font-bold ml-auto"
-                                style={getTATColor(os.created_at, os.tipo_os, os.tipo_atendimento)}
-                                title={`TAT: ${calcularTAT(os.created_at)}d - Limite: ${getTATLimite(os.tipo_os, os.tipo_atendimento)}d (${os.tipo_os} ${os.tipo_atendimento})`}
-                              >
-                                TAT: {calcularTAT(os.created_at)}d
-                              </span>
-                            </div>
-
-                            {(os as any).versao_orcamento > 1 && (
-                              <div className="mt-1.5 rounded-md p-1.5"
-                                style={{
-                                  background: 'linear-gradient(135deg, rgba(255,0,100,0.15) 0%, rgba(255,0,100,0.05) 100%)',
-                                  border: '1px solid rgba(255,0,100,0.4)',
-                                  boxShadow: '0 0 10px rgba(255,0,100,0.2)',
-                                  animation: 'pulse 2s infinite'
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <AlertCircle className="w-3 h-3 text-[#FF0064] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #FF0064)' }} />
-                                  <span
-                                    className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                    style={{
-                                      background: 'linear-gradient(135deg, rgba(255,0,100,0.3) 0%, rgba(255,0,100,0.15) 100%)',
-                                      color: '#FF0064',
-                                      border: '1px solid rgba(255,0,100,0.5)'
-                                    }}
-                                  >
-                                    {(os as any).versao_orcamento}o ORCAMENTO
-                                  </span>
-                                </div>
-                              </div>
-                            )}
-
-                            {badgeFilters.status && os.numero_os_samsung && ((os as any).status_samsung_desc || (os as any).status_samsung_reason) && (
-                              <div className="mt-1.5 rounded-md p-1.5"
-                                style={{
-                                  background: 'linear-gradient(135deg, rgba(139,92,246,0.1) 0%, rgba(139,92,246,0.03) 100%)',
-                                  border: '1px solid rgba(139,92,246,0.3)',
-                                  boxShadow: '0 0 10px rgba(139,92,246,0.1)'
-                                }}
-                              >
-                                <div className="text-[9px] space-y-1">
-                                  {(os as any).status_samsung_desc && (
-                                    <>
-                                      <span className="text-[#8B5CF6] font-bold block">Status:</span>
-                                      <span className="text-gray-200 font-medium block">{(os as any).status_samsung_desc}</span>
-                                    </>
-                                  )}
-                                  {(os as any).status_samsung_reason && (
-                                    <>
-                                      <span className="text-[#8B5CF6] font-bold block mt-1">Motivo:</span>
-                                      <span className="text-gray-200 font-medium block">{(os as any).status_samsung_reason}</span>
-                                    </>
-                                  )}
-                                </div>
-                              </div>
-                            )}
-
-                            {badgeFilters.pecaTransito && (() => {
-                              const pecasEmTransito = (os as any).requisicoes?.filter((req: any) =>
-                                req.status === 'pedido_feito'
-                              ) || [];
-
-                              if (pecasEmTransito.length === 0) return null;
-
-                              return (
-                                <div className="mt-1.5 rounded-md p-1.5 space-y-1"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
-                                    border: '1px solid rgba(var(--accent-rgb),0.3)',
-                                    boxShadow: '0 0 10px rgba(var(--accent-rgb),0.1)'
-                                  }}
-                                >
-                                  <div className="flex items-center gap-1.5">
-                                    <Package className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                      style={{
-                                        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.15) 100%)',
-                                        color: 'var(--text-accent)',
-                                        border: '1px solid rgba(var(--accent-rgb),0.5)'
-                                      }}
-                                    >
-                                      {pecasEmTransito.length} PEÇA{pecasEmTransito.length > 1 ? 'S' : ''} EM TRÂNSITO
-                                    </span>
-                                  </div>
-                                  {pecasEmTransito.map((req: any) => {
-                                    const diasDesdeRequisicao = Math.floor(
-                                      (Date.now() - new Date(req.created_at).getTime()) / (1000 * 60 * 60 * 24)
-                                    );
-
-                                    return (
-                                      <div key={req.id} className="text-[9px] space-y-0.5 pl-1">
-                                        <div className="flex items-center justify-between">
-                                          <span className="text-gray-300 truncate flex-1 pr-1">{req.codigo_peca}</span>
-                                          <span className="text-[#FFBF00] font-bold flex-shrink-0">{diasDesdeRequisicao}d</span>
-                                        </div>
-                                        {req.numero_pedido_samsung && req.numero_pedido_samsung !== 'N/A' && !req.numero_pedido_samsung.startsWith('PENDENTE-') && (
-                                          <div className="text-[#00D4FF] font-mono truncate">
-                                            Pedido: {req.numero_pedido_samsung}
-                                          </div>
-                                        )}
-                                        {req.peca_estoque?.delivery && (
-                                          <div className="text-[#39FF14] font-mono truncate">
-                                            Delivery: {req.peca_estoque.delivery}
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  })}
-                                </div>
-                              );
-                            })()}
-
-                            {badgeFilters.agendamento && os.data_agendamento && os.tecnico_agendado_id && os.confirmado_com_cliente && (
-                              <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
-                                style={{
-                                  borderColor: 'rgba(var(--neon-green-rgb),0.3)',
-                                  background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.1)'
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <Calendar className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--neon-green))' }} />
-                                  <div className="flex-1 min-w-0">
-                                    <div className="flex items-center gap-1.5 mb-0.5">
-                                      <span
-                                        className="px-1.5 py-0.5 rounded text-[9px] font-bold"
-                                        style={{
-                                          background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)',
-                                          color: 'var(--neon-green)',
-                                          border: '1px solid rgba(var(--neon-green-rgb),0.5)'
-                                        }}
-                                      >
-                                        AGENDADO
-                                      </span>
-                                      <CheckCircle className="w-2.5 h-2.5 text-[#39FF14]" />
-                                    </div>
-                                    <p className="text-[10px] text-gray-300 font-medium">
-                                      {new Date(os.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
-                                    </p>
-                                    {(os as any).tecnico_agendado?.nome && (
-                                      <p className="text-[9px] text-gray-500 truncate">{(os as any).tecnico_agendado.nome}</p>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {badgeFilters.tecnico && os.tecnico_designado_id && (os as any).tecnico_designado?.nome && (
-                              <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
-                                style={{
-                                  borderColor: 'rgba(var(--accent-rgb),0.3)',
-                                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.1) 0%, rgba(var(--accent-rgb),0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(var(--accent-rgb),0.1)'
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <User className="w-3 h-3 text-[#00D4FF] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
-                                  <div className="flex-1 min-w-0">
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
-                                      style={{
-                                        background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.3) 0%, rgba(var(--accent-rgb),0.15) 100%)',
-                                        color: 'var(--text-accent)',
-                                        border: '1px solid rgba(var(--accent-rgb),0.5)'
-                                      }}
-                                    >
-                                      TÉCNICO
-                                    </span>
-                                    <p className="text-[10px] text-gray-300 font-medium truncate">{(os as any).tecnico_designado.nome}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {badgeFilters.financeiro && mostrarInfoFinanceira && os.valor_total && os.valor_total > 0 && (
-                              <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
-                                style={{
-                                  borderColor: os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.3)' :
-                                               os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.3)' : 'rgba(255,0,100,0.3)',
-                                  background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)' :
-                                                   os.status_pagamento === 'parcial' ? 'linear-gradient(135deg, rgba(255,191,0,0.1) 0%, rgba(255,191,0,0.03) 100%)' : 'linear-gradient(135deg, rgba(255,0,100,0.1) 0%, rgba(255,0,100,0.03) 100%)',
-                                  boxShadow: `0 0 10px ${os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.1)' : os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.1)' : 'rgba(255,0,100,0.1)'}`
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <DollarSign className="w-3 h-3 flex-shrink-0"
-                                    style={{
-                                      color: os.status_pagamento === 'pago' ? 'var(--neon-green)' :
-                                             os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064',
-                                      filter: `drop-shadow(0 0 4px ${os.status_pagamento === 'pago' ? 'var(--neon-green)' : os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064'})`
-                                    }}
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-1"
-                                      style={{
-                                        background: os.status_pagamento === 'pago' ? 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)' :
-                                                           os.status_pagamento === 'parcial' ? 'linear-gradient(135deg, rgba(255,191,0,0.3) 0%, rgba(255,191,0,0.15) 100%)' : 'linear-gradient(135deg, rgba(255,0,100,0.3) 0%, rgba(255,0,100,0.15) 100%)',
-                                        color: os.status_pagamento === 'pago' ? 'var(--neon-green)' :
-                                               os.status_pagamento === 'parcial' ? '#FFBF00' : '#FF0064',
-                                        border: `1px solid ${os.status_pagamento === 'pago' ? 'rgba(var(--neon-green-rgb),0.5)' :
-                                                              os.status_pagamento === 'parcial' ? 'rgba(255,191,0,0.5)' : 'rgba(255,0,100,0.5)'}`
-                                      }}
-                                    >
-                                      {os.status_pagamento === 'pago' ? 'PAGO' :
-                                       os.status_pagamento === 'parcial' ? 'PARCIAL' : 'PENDENTE'}
-                                    </span>
-                                    <div className="text-[10px] space-y-0.5">
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-gray-500">Total:</span>
-                                        <span className="text-white font-mono font-bold">R$ {(os.valor_total || 0).toFixed(2)}</span>
-                                      </div>
-                                      {os.valor_pago > 0 && (
-                                        <div className="flex justify-between items-center">
-                                          <span className="text-gray-500">Pago:</span>
-                                          <span className="text-[#39FF14] font-mono">R$ {(os.valor_pago || 0).toFixed(2)}</span>
-                                        </div>
-                                      )}
-                                      <div className="flex justify-between items-center">
-                                        <span className="text-gray-500">Saldo:</span>
-                                        <span className={`font-mono font-bold ${(os.saldo_restante || 0) > 0 ? 'text-[#FFBF00]' : 'text-[#39FF14]'}`}>
-                                          R$ {(os.saldo_restante || 0).toFixed(2)}
-                                        </span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-
-                            {badgeFilters.lucro && mostrarInfoFinanceira && (() => {
-                              const valorPecas = calcularValorPecas(os);
-                              const valorGSPN = calcularValorGSPN(os);
-                              const lucro = calcularLucro(os);
-                              const subtotal = calcularSubtotal(os);
-
-                              if (!valorPecas && !valorGSPN && !subtotal) return null;
-
-                              return (
-                                <div className="space-y-1 mt-1.5 pt-1.5 border-t" style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}>
-                                  {valorPecas > 0 && (
-                                    <div className="flex items-center justify-between gap-1.5">
-                                      <span className="text-[10px] font-bold" style={{
-                                        color: 'var(--text-accent)',
-                                        textShadow: '0 0 6px rgba(var(--accent-rgb),0.5)'
-                                      }}>PEÇAS:</span>
-                                      <span className="font-mono text-white text-[10px] font-bold">
-                                        R$ {valorPecas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {valorGSPN > 0 && (
-                                    <div className="flex items-center justify-between gap-1.5">
-                                      <span className="text-[10px] font-bold" style={{
-                                        color: '#FFA500',
-                                        textShadow: '0 0 6px rgba(255,165,0,0.5)'
-                                      }}>GSPN:</span>
-                                      <span className="font-mono text-[#FFA500] text-[10px] font-bold">
-                                        R$ {valorGSPN.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {os.tipo_os === 'OW' && subtotal && subtotal > 0 && (
-                                    <div className="flex items-center justify-between gap-1.5">
-                                      <span className="text-[10px] font-bold" style={{
-                                        color: 'var(--text-accent)',
-                                        textShadow: '0 0 6px rgba(var(--accent-rgb),0.5)'
-                                      }}>ORÇAM:</span>
-                                      <span className="font-mono text-[#00F5FF] text-[10px] font-bold">
-                                        R$ {subtotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </span>
-                                    </div>
-                                  )}
-                                  {os.tipo_os === 'OW' && lucro !== null && subtotal && subtotal > 0 && (
-                                    <div className="flex items-center justify-between gap-1.5">
-                                      <span className="text-[10px] font-bold" style={{
-                                        color: lucro >= 0 ? 'var(--neon-green)' : '#FF0064',
-                                        textShadow: `0 0 6px ${lucro >= 0 ? 'rgba(var(--neon-green-rgb),0.5)' : 'rgba(255,0,100,0.5)'}`
-                                      }}>LUCRO:</span>
-                                      <span className={`font-mono text-[10px] font-bold ${lucro >= 0 ? 'text-[#39FF14]' : 'text-[#FF0064]'}`}>
-                                        R$ {lucro.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                      </span>
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })()}
-                            {badgeFilters.sla && (
-                              <div
-                                className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t"
-                                style={{ borderColor: `${getTextColor(coluna.id, coluna.color)}20` }}
-                              >
-                                <Clock className="w-3 h-3 text-[#FFBF00]" style={{ filter: 'drop-shadow(0 0 4px #FFBF00)' }} />
-                                <span className="text-[#FFBF00] font-bold text-[10px]">
-                                  Tempo na Etapa: {formatTempoNaEtapa(os.updated_at)}
-                                </span>
-                              </div>
-                            )}
-                            {badgeFilters.pedidoAtivo && (os as any).requisicoes?.filter((r: any) => r.status === 'pedido_feito').map((req: any) => (
-                              <div
-                                key={req.id}
-                                className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
-                                style={{
-                                  borderColor: 'rgba(255,191,0,0.3)',
-                                  background: 'linear-gradient(135deg, rgba(255,191,0,0.1) 0%, rgba(255,191,0,0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(255,191,0,0.1)'
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <Package className="w-3 h-3 text-[#FFBF00] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px #FFBF00)' }} />
-                                  <div className="flex-1 min-w-0">
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
-                                      style={{
-                                        background: 'linear-gradient(135deg, rgba(255,191,0,0.3) 0%, rgba(255,191,0,0.15) 100%)',
-                                        color: '#FFBF00',
-                                        border: '1px solid rgba(255,191,0,0.5)'
-                                      }}
-                                    >
-                                      PEDIDO ATIVO
-                                    </span>
-                                    <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
-                                    <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
-                                    <div className="flex flex-col gap-1 mt-0.5">
-                                      {req.is_lote && req.pecas_lote?.length > 0 ? (
-                                        <>
-                                          {req.pecas_lote.map((peca: any) => (
-                                            <div key={peca.id} className="flex items-center gap-1.5 flex-wrap">
-                                              {peca.estoque_etiquetas?.[0]?.id_sequencial && (
-                                                <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
-                                              )}
-                                              {peca.estoque_etiquetas?.[0]?.delivery && (
-                                                <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
-                                              )}
-                                              {peca.gi_postada_em && (
-                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
-                                                  GI {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} por {peca.usuario_gi_postado?.nome || 'N/A'}
-                                                </span>
-                                              )}
-                                              {!peca.gi_postada_em && req.status === 'gi_postada' && (
-                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                                                  GI Pendente
-                                                </span>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </>
-                                      ) : (
-                                        <div className="flex items-center gap-1.5">
-                                          {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
-                                            <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
-                                          )}
-                                          {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
-                                            <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                            {badgeFilters.comTecnico && (os as any).requisicoes?.filter((r: any) => ['atendida', 'em_uso', 'gi_postada'].includes(r.status)).map((req: any) => (
-                              <div
-                                key={req.id}
-                                className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
-                                style={{
-                                  borderColor: 'rgba(var(--neon-green-rgb),0.3)',
-                                  background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
-                                  boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.1)'
-                                }}
-                              >
-                                <div className="flex items-center gap-1.5">
-                                  <Package className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 4px var(--neon-green))' }} />
-                                  <div className="flex-1 min-w-0">
-                                    <span
-                                      className="px-1.5 py-0.5 rounded text-[9px] font-bold inline-block mb-0.5"
-                                      style={{
-                                        background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.3) 0%, rgba(var(--neon-green-rgb),0.15) 100%)',
-                                        color: 'var(--neon-green)',
-                                        border: '1px solid rgba(var(--neon-green-rgb),0.5)'
-                                      }}
-                                    >
-                                      {req.status === 'atendida' ? 'COM TÉCNICO' : req.status === 'em_uso' ? 'EM USO' : 'GI PENDENTE'}
-                                    </span>
-                                    <p className="text-[10px] text-gray-300 font-medium truncate">{req.peca_estoque?.pn || req.codigo_peca}</p>
-                                    <p className="text-[9px] text-gray-400 truncate">{req.descricao}</p>
-                                    <div className="flex flex-col gap-1 mt-0.5">
-                                      {req.is_lote && req.pecas_lote?.length > 0 ? (
-                                        <>
-                                          {req.pecas_lote.map((peca: any) => (
-                                            <div key={peca.id} className="flex items-center gap-1.5 flex-wrap">
-                                              {peca.estoque_etiquetas?.[0]?.id_sequencial && (
-                                                <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {peca.estoque_etiquetas[0].id_sequencial}</span>
-                                              )}
-                                              {peca.estoque_etiquetas?.[0]?.delivery && (
-                                                <span className="text-[8px] text-orange-400">{peca.estoque_etiquetas[0].delivery}</span>
-                                              )}
-                                              {peca.gi_postada_em && (
-                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-[#39FF14]/20 text-[#39FF14] border border-[#39FF14]/30">
-                                                  GI {new Date(peca.gi_postada_em).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })} por {peca.usuario_gi_postado?.nome || 'N/A'}
-                                                </span>
-                                              )}
-                                              {!peca.gi_postada_em && req.status === 'gi_postada' && (
-                                                <span className="text-[7px] px-1.5 py-0.5 rounded bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
-                                                  GI Pendente
-                                                </span>
-                                              )}
-                                            </div>
-                                          ))}
-                                        </>
-                                      ) : (
-                                        <div className="flex items-center gap-1.5">
-                                          {req.peca_estoque?.estoque_etiquetas?.[0]?.id_sequencial && (
-                                            <span className="text-[8px] text-cyan-400 font-mono font-bold">ID: {req.peca_estoque.estoque_etiquetas[0].id_sequencial}</span>
-                                          )}
-                                          {req.peca_estoque?.estoque_etiquetas?.[0]?.delivery && (
-                                            <span className="text-[8px] text-orange-400">Delivery: {req.peca_estoque.estoque_etiquetas[0].delivery}</span>
-                                          )}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-
-                            {badgeFilters.iniciarReparo && coluna.id === 'os_nova' && os.tipo_atendimento === 'CI' && os.tipo_orcamento !== 'samsung_contigo' && os.tipo_orcamento !== 'acessorios' && (
-                              <div className="mt-2 pt-2 border-t space-y-2" style={{ borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
-                                {os.tecnico_designado_id && (os as any).tecnico_designado && (
-                                  <div className="rounded-lg p-2" style={{
-                                    background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.1) 0%, rgba(var(--neon-green-rgb),0.03) 100%)',
-                                    border: '1px solid rgba(var(--neon-green-rgb),0.3)'
-                                  }}>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <div className="flex items-center gap-2 min-w-0">
-                                        <User className="w-3 h-3 text-[#39FF14] flex-shrink-0" />
-                                        <div className="min-w-0">
-                                          <p className="text-[9px] text-gray-400">Técnico:</p>
-                                          <p className="text-[10px] font-bold text-[#39FF14] truncate">
-                                            {(os as any).tecnico_designado.nome}
-                                          </p>
-                                        </div>
-                                      </div>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setSelectedOSForReparo({
-                                            id: os.id,
-                                            numero: os.numero_os_samsung || os.numero_os_interna || 'S/N',
-                                            tecnicoId: os.tecnico_designado_id,
-                                            tecnicoNome: (os as any).tecnico_designado?.nome || null,
-                                            unidadeId: os.unidade_id
-                                          });
-                                          setShowIniciarReparoModal(true);
-                                        }}
-                                        className="p-1.5 rounded hover:bg-white/10 transition-colors flex-shrink-0"
-                                        title="Alterar técnico"
-                                      >
-                                        <ArrowRightLeft className="w-3 h-3 text-[#FFBF00]" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {!os.tecnico_designado_id && (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedOSForReparo({
-                                        id: os.id,
-                                        numero: os.numero_os_samsung || os.numero_os_interna || 'S/N',
-                                        tecnicoId: null,
-                                        tecnicoNome: null,
-                                        unidadeId: os.unidade_id
-                                      });
-                                      setShowIniciarReparoModal(true);
-                                    }}
-                                    className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
-                                    style={{
-                                      background: 'linear-gradient(135deg, rgba(var(--neon-green-rgb),0.2) 0%, rgba(var(--neon-green-rgb),0.05) 100%)',
-                                      border: '1px solid var(--neon-green)',
-                                      color: 'var(--neon-green)',
-                                      boxShadow: '0 0 10px rgba(var(--neon-green-rgb),0.2)'
-                                    }}
-                                  >
-                                    <User className="w-3.5 h-3.5" />
-                                    INICIAR REPARO
-                                  </button>
-                                )}
-                              </div>
-                            )}
-
-                            {badgeFilters.analiseConcluida && coluna.id === 'diagnostico' && (
-                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(var(--accent-rgb),0.2)' }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    setSelectedOSForAnalise({
-                                      id: os.id,
-                                      numero: os.numero_os_samsung || os.numero_os_interna || 'S/N'
-                                    });
-                                    setShowAnaliseModal(true);
-                                  }}
-                                  className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
-                                    border: '1px solid var(--text-accent)',
-                                    color: 'var(--text-accent)',
-                                    boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
-                                  }}
-                                >
-                                  <CheckCircle className="w-3.5 h-3.5" />
-                                  ANÁLISE CONCLUÍDA
-                                </button>
-                              </div>
-                            )}
-
-                            {badgeFilters.fecharOS && (coluna.id === 'fechar_os' || coluna.id === 'aguardando_fechamento') && (
-                              <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(34,197,94,0.2)' }}>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    const osNumero = os.numero_os_samsung || os.numero_os_interna || 'S/N';
-                                    setFecharOSCardData({ id: os.id, numero: String(osNumero), unidadeId: os.unidade_id });
-                                    setShowFecharOSModal(true);
-                                  }}
-                                  className="w-full px-3 py-2 rounded-lg font-bold text-xs transition-all duration-300 flex items-center justify-center gap-2"
-                                  style={{
-                                    background: 'linear-gradient(135deg, rgba(34,197,94,0.2) 0%, rgba(34,197,94,0.05) 100%)',
-                                    border: '1px solid rgba(34,197,94,0.6)',
-                                    color: '#22C55E',
-                                    boxShadow: '0 0 10px rgba(34,197,94,0.2)'
-                                  }}
-                                >
-                                  <ShieldCheck className="w-3.5 h-3.5" />
-                                  FECHAR OS
-                                </button>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        )}
-
-                          {/* Linha indicadora após este card (para o caso de ser o último ou drop no final) */}
-                          {draggedCard &&
-                           draggedCard.coluna_kanban === coluna.id &&
-                           columnSortOrder[coluna.id] === 'sequencia' &&
-                           dragOverPosition === index + 1 &&
-                           dragOverColumn === coluna.id && (
-                            <div
-                              className="absolute -bottom-1 left-0 right-0 h-0.5 z-10"
-                              style={{
-                                background: `linear-gradient(90deg, transparent 0%, ${coluna.color} 50%, transparent 100%)`,
-                                boxShadow: `0 0 8px ${coluna.color}`
-                              }}
-                            />
-                          )}
-                        </div>
-                      ))}
-
-                      {/* Área de drop no final da lista */}
-                      {draggedCard && draggedCard.coluna_kanban === coluna.id && columnSortOrder[coluna.id] === 'sequencia' && filteredData[coluna.id]?.length > 0 && (
-                        <div
-                          onDragOver={(e) => {
-                            e.preventDefault();
-                            e.stopPropagation();
-                            setDragOverColumn(coluna.id);
-                            setDragOverPosition(filteredData[coluna.id].length);
-                          }}
-                          onDrop={(e) => handleDrop(e, coluna.id)}
-                          className="h-8 rounded transition-all"
-                          style={{
-                            border: dragOverPosition === filteredData[coluna.id].length && dragOverColumn === coluna.id
-                              ? `2px dashed ${coluna.color}`
-                              : '2px dashed transparent'
-                          }}
-                        />
-                      )}
-
-                      {(!filteredData[coluna.id] || filteredData[coluna.id].length === 0) && (
-                        <div className="flex flex-col items-center justify-center py-8 text-center">
-                          <div
-                            className="w-12 h-12 rounded-xl flex items-center justify-center mb-2"
-                            style={{
-                              background: `linear-gradient(135deg, ${coluna.color}15 0%, ${coluna.color}05 100%)`,
-                              border: `1px dashed ${coluna.color}30`,
-                              boxShadow: `0 0 15px ${coluna.color}10, inset 0 0 10px ${coluna.color}05`
-                            }}
-                          >
-                            <ColumnIcon
-                              className="w-6 h-6"
-                              style={{ color: `${getTextColor(coluna.id, coluna.color)}60` }}
-                            />
-                          </div>
-                          <p className="text-gray-600 text-[10px] uppercase tracking-wider font-bold">
-                            Vazio
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <VirtualizedColumn
+                      cards={filteredData[coluna.id] || []}
+                      colunaId={coluna.id}
+                      colunaColor={coluna.color}
+                      textColor={getTextColor(coluna.id, coluna.color)}
+                      badgeFilters={badgeFilters}
+                      mostrarInfoFinanceira={mostrarInfoFinanceira}
+                      searchMatchSource={searchMatchSource}
+                      draggedCard={draggedCard}
+                      columnSortOrder={columnSortOrder[coluna.id] || 'sequencia'}
+                      dragOverColumn={dragOverColumn}
+                      dragOverPosition={dragOverPosition}
+                      onDragStart={handleDragStart}
+                      onDragEnd={handleDragEnd}
+                      onCardDragOver={handleCardDragOver}
+                      onDrop={handleDrop}
+                      onCardClick={handleCardClick}
+                      onAnalise={handleCardAnalise}
+                      onIniciarReparo={handleCardIniciarReparo}
+                      onFecharOS={handleCardFecharOS}
+                      ColumnIcon={coluna.icon}
+                    />
                   </div>
                 </div>
               );
