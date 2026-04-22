@@ -465,7 +465,7 @@ export function Kanban() {
         return;
       }
 
-      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os', {
+      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -523,7 +523,7 @@ export function Kanban() {
         return;
       }
 
-      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/por-os', {
+      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os/por-os', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

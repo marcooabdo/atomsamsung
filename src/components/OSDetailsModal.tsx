@@ -192,7 +192,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
         return;
       }
 
-      const response = await fetch('https://groupglobal.app.n8n.cloud/webhook/atualizar-os/one', {
+      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os/one', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
