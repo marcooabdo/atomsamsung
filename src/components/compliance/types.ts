@@ -45,10 +45,10 @@ export interface OcorrenciaComDetalhes extends Ocorrencia {
 }
 
 export const CATEGORIAS: { value: CategoriaOcorrencia; label: string; color: string }[] = [
-  { value: 'dano_veiculo', label: 'Dano em Veiculo', color: '#FF6B6B' },
+  { value: 'dano_veiculo', label: 'Dano em Veículo', color: '#FF6B6B' },
   { value: 'multa', label: 'Multa', color: '#FFD93D' },
   { value: 'extravio', label: 'Extravio', color: '#FF9F43' },
-  { value: 'pecas', label: 'Pecas', color: '#4ADE80' },
+  { value: 'pecas', label: 'Peças', color: '#4ADE80' },
   { value: 'outros', label: 'Outros', color: '#00D4FF' },
 ];
 
