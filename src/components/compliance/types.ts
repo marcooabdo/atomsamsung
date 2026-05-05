@@ -1,4 +1,4 @@
-export type CategoriaOcorrencia = 'dano_veiculo' | 'multa' | 'extravio' | 'outros';
+export type CategoriaOcorrencia = 'dano_veiculo' | 'multa' | 'extravio' | 'pecas' | 'outros';
 export type TipoDeducao = 'folha' | 'premiacao';
 export type StatusOcorrencia = 'aberto' | 'em_pagamento' | 'quitado';
 
@@ -48,6 +48,7 @@ export const CATEGORIAS: { value: CategoriaOcorrencia; label: string; color: str
   { value: 'dano_veiculo', label: 'Dano em Veiculo', color: '#FF6B6B' },
   { value: 'multa', label: 'Multa', color: '#FFD93D' },
   { value: 'extravio', label: 'Extravio', color: '#FF9F43' },
+  { value: 'pecas', label: 'Pecas', color: '#4ADE80' },
   { value: 'outros', label: 'Outros', color: '#00D4FF' },
 ];
 

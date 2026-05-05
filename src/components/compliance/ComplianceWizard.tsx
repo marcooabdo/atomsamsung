@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { X, ChevronRight, ChevronLeft, Car, AlertTriangle, PackageX, HelpCircle, Users, Calendar, CheckCircle2, Trash2 } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Car, AlertTriangle, PackageX, HelpCircle, Users, Calendar, CheckCircle2, Trash2, Package } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { CATEGORIAS, formatBRL, type CategoriaOcorrencia, type TipoDeducao } from './types';
@@ -8,6 +8,8 @@ interface UsuarioMinimo {
   id: string;
   nome: string;
   foto_url: string | null;
+  unidade_id: string | null;
+  unidade_nome?: string | null;
 }
 
 interface ResponsavelForm {
@@ -25,6 +27,7 @@ const categoryIcons: Record<CategoriaOcorrencia, typeof Car> = {
   dano_veiculo: Car,
   multa: AlertTriangle,
   extravio: PackageX,
+  pecas: Package,
   outros: HelpCircle,
 };
 
@@ -61,17 +64,32 @@ export function ComplianceWizard({ open, onClose, onCreated }: Props) {
   }, [open]);
 
   useEffect(() => {
-    if (!open || !usuario?.unidade_id) return;
+    if (!open || !usuario) return;
     (async () => {
-      const { data } = await supabase
+      const isMaster = usuario.tipo === 'master' || usuario.tipo === 'administrador';
+      let query = supabase
         .from('usuarios')
-        .select('id, nome, foto_url')
+        .select('id, nome, foto_url, unidade_id')
         .eq('ativo', true)
-        .eq('unidade_id', usuario.unidade_id)
         .order('nome');
-      if (data) setUsuarios(data);
+      if (!isMaster && usuario.unidade_id) {
+        query = query.eq('unidade_id', usuario.unidade_id);
+      }
+      const { data } = await query;
+      if (!data) return;
+
+      if (isMaster) {
+        const unidadeIds = [...new Set(data.map(u => u.unidade_id).filter(Boolean))] as string[];
+        const { data: unidades } = unidadeIds.length > 0
+          ? await supabase.from('unidades').select('id, nome').in('id', unidadeIds)
+          : { data: [] };
+        const unidadeMap = new Map((unidades || []).map(u => [u.id, u.nome]));
+        setUsuarios(data.map(u => ({ ...u, unidade_nome: u.unidade_id ? unidadeMap.get(u.unidade_id) || null : null })));
+      } else {
+        setUsuarios(data);
+      }
     })();
-  }, [open, usuario?.unidade_id]);
+  }, [open, usuario?.id]);
 
   const totalPercentual = useMemo(
     () => responsaveis.reduce((s, r) => s + (Number(r.percentual) || 0), 0),
@@ -306,7 +324,9 @@ export function ComplianceWizard({ open, onClose, onCreated }: Props) {
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}>
                   <option value="">Selecione um colaborador...</option>
                   {usuarios.filter(u => !responsaveis.some(r => r.usuario_id === u.id)).map(u => (
-                    <option key={u.id} value={u.id}>{u.nome}</option>
+                    <option key={u.id} value={u.id}>
+                      {u.nome}{u.unidade_nome ? ` — ${u.unidade_nome}` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
@@ -329,7 +349,15 @@ export function ComplianceWizard({ open, onClose, onCreated }: Props) {
                         {u?.foto_url ? <img src={u.foto_url} alt="" className="w-full h-full object-cover" /> : <Users className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{u?.nome}</div>
+                        <div className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                          {u?.nome}
+                          {u?.unidade_nome && (
+                            <span className="ml-2 text-[10px] font-normal uppercase tracking-wider px-1.5 py-0.5 rounded"
+                              style={{ background: 'rgba(var(--accent-rgb),0.1)', color: 'var(--text-accent)' }}>
+                              {u.unidade_nome}
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs font-mono" style={{ color: 'var(--text-accent)' }}>{formatBRL(valor)}</div>
                       </div>
                       <div className="flex items-center gap-2">
