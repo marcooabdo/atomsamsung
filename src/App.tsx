@@ -29,6 +29,7 @@ import CustomerIntelligence from './pages/CustomerIntelligence';
 import AtomConnect from './pages/AtomConnect';
 import { MuralMissoes } from './pages/MuralMissoes';
 import { AtomAudit } from './pages/AtomAudit';
+import { Compliance } from './pages/Compliance';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -306,6 +307,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <MuralMissoes />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/compliance"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <Compliance />
               </Layout>
             </ProtectedRoute>
           }

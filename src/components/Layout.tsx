@@ -29,7 +29,8 @@ import {
   Radio,
   Target,
   Truck,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -50,6 +51,7 @@ const allMenuItems = [
   { id: 'skywalker', permKey: 'menu_skywalker', label: 'Skywalker', icon: Rocket, path: '/skywalker' },
   { id: 'financeiro', permKey: 'menu_financeiro', label: 'ATOM Finance', icon: DollarSign, path: '/financeiro' },
   { id: 'audit', permKey: 'menu_financeiro', label: 'ATOM Audit', icon: ShieldCheck, path: '/audit', glow: true },
+  { id: 'compliance', permKey: 'menu_financeiro', label: 'ATOM Compliance', icon: ShieldAlert, path: '/compliance', glow: true },
   { id: 'notas-fiscais', permKey: 'menu_nf', label: 'Notas Fiscais', icon: FileText, path: '/notas-fiscais' },
   { id: 'ofs', permKey: 'menu_cotacoes', label: 'OFS Gateway', icon: ClipboardList, path: '/ofs' },
   { id: 'configuracoes', permKey: 'menu_configuracoes', label: 'ATOM Core Settings', icon: Settings, path: '/configuracoes' },
