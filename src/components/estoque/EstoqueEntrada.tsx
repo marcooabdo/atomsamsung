@@ -564,6 +564,15 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const nfData = allNFs[nfIdx];
         const nfPecas = allPecas.filter(p => p.nfIndex === nfIdx);
 
+        // Check for duplicate NF before inserting
+        const duplicateCheck = nfData.chaveAcesso
+          ? await supabase.from('estoque_nfs').select('id, numero_nf').eq('chave_acesso', nfData.chaveAcesso).maybeSingle()
+          : await supabase.from('estoque_nfs').select('id, numero_nf').eq('numero_nf', nfData.numeroNF).eq('unidade_id', unidadeId).maybeSingle();
+
+        if (duplicateCheck.data) {
+          throw new Error(`NF ${nfData.numeroNF} ja foi importada anteriormente (ID: ${duplicateCheck.data.id}). Importe apenas NFs novas.`);
+        }
+
         const { data: nfRecord, error: nfError } = await supabase
           .from('estoque_nfs')
           .insert({
