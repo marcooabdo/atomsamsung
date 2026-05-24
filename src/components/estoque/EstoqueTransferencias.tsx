@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2 } from 'lucide-react';
 import { useModal } from '../../contexts/ModalContext';
@@ -46,11 +47,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     loadData();
   }, [selectedUnidade]);
 
-  useEffect(() => {
-    const hasModal = !!(modalVerPedido || modalSelecionarID || modalRegistrarValor || modalPedirPeca || modalJustificativa);
-    document.body.style.overflow = hasModal ? 'hidden' : '';
-    return () => { document.body.style.overflow = ''; };
-  }, [modalVerPedido, modalSelecionarID, modalRegistrarValor, modalPedirPeca, modalJustificativa]);
 
   const loadData = async () => {
     await loadRequisicoes();
@@ -597,7 +593,6 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
   const handleVerPedido = (requisicao: any) => {
     setModalVerPedido(requisicao);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRefazerPedido = async (requisicao: any) => {
@@ -1746,16 +1741,18 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         />
       )}
 
-      {modalVerPedido && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      {modalVerPedido && createPortal(
+        <div
+          className="fixed inset-0 flex items-center justify-center p-4"
+          style={{ zIndex: 9999, backgroundColor: 'rgba(0,0,0,0.8)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setModalVerPedido(null); }}
+        >
           <div className="premium-card max-w-2xl w-full">
             <div className="border-b border-[#00D4FF]/20 p-6 flex items-center justify-between">
-              <div>
-                <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
-                  <Package className="w-6 h-6" />
-                  Detalhes do Pedido
-                </h2>
-              </div>
+              <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
+                <Package className="w-6 h-6" />
+                Detalhes do Pedido
+              </h2>
               <button onClick={() => setModalVerPedido(null)} className="p-2 hover:bg-[#00D4FF]/10 rounded-lg transition-colors">
                 <X className="w-5 h-5 text-[#00D4FF]" />
               </button>
@@ -1814,7 +1811,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
