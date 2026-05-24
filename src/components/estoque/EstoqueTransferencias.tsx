@@ -46,6 +46,12 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     loadData();
   }, [selectedUnidade]);
 
+  useEffect(() => {
+    const hasModal = !!(modalVerPedido || modalSelecionarID || modalRegistrarValor || modalPedirPeca || modalJustificativa);
+    document.body.style.overflow = hasModal ? 'hidden' : '';
+    return () => { document.body.style.overflow = ''; };
+  }, [modalVerPedido, modalSelecionarID, modalRegistrarValor, modalPedirPeca, modalJustificativa]);
+
   const loadData = async () => {
     await loadRequisicoes();
   };
@@ -591,6 +597,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
   const handleVerPedido = (requisicao: any) => {
     setModalVerPedido(requisicao);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleRefazerPedido = async (requisicao: any) => {
