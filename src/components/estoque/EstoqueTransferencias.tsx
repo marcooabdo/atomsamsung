@@ -31,9 +31,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const [requisicoesAgrupadas, setRequisicoesAgrupadas] = useState<RequisicaoAgrupada[]>([]);
   const [pedidosAtivos, setPedidosAtivos] = useState<RequisicaoAgrupada[]>([]);
   const [loading, setLoading] = useState(true);
-  const [osExpandida, setOsExpandida] = useState<string | null>(null);
-  const [osExpandidaPedido, setOsExpandidaPedido] = useState<string | null>(null);
-  const [osExpandidaAtendida, setOsExpandidaAtendida] = useState<string | null>(null);
+  const [osExpandida, setOsExpandida] = useState<string>('');
+  const [osExpandidaPedido, setOsExpandidaPedido] = useState<string>('');
+  const [osExpandidaAtendida, setOsExpandidaAtendida] = useState<string>('');
   const [modalSelecionarID, setModalSelecionarID] = useState<any>(null);
   const [modalPedirPeca, setModalPedirPeca] = useState<any>(null);
   const [modalRegistrarValor, setModalRegistrarValor] = useState<any>(null);
@@ -1023,11 +1023,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                 <div key={grupo.os_id} className="premium-card border-[#FF0064]/30">
                   <div
                     className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                    onClick={() => setOsExpandidaPedido(osExpandidaPedido === grupo.os_id ? null : grupo.os_id)}
+                    onClick={() => { const k = grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`; setOsExpandidaPedido(osExpandidaPedido === k ? '' : k); }}
                   >
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        {osExpandidaPedido === grupo.os_id ? (
+                        {osExpandidaPedido === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) ? (
                           <ChevronDown className="w-5 h-5 text-[#FF0064]" />
                         ) : (
                           <ChevronRight className="w-5 h-5 text-gray-500" />
@@ -1046,7 +1046,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                     </div>
                   </div>
 
-                  {osExpandidaPedido === grupo.os_id && (
+                  {osExpandidaPedido === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) && (
                     <div className="border-t border-gray-800 p-4 space-y-3">
                       {grupo.requisicoes.map((req: any) => (
                         <div key={req.id} className="bg-[#FF0064]/5 border border-[#FF0064]/20 rounded-lg p-4">
@@ -1160,11 +1160,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               <div key={grupo.os_id} className="premium-card">
                 <div
                   className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                  onClick={() => setOsExpandida(osExpandida === grupo.os_id ? null : grupo.os_id)}
+                  onClick={() => { const k = grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`; setOsExpandida(osExpandida === k ? '' : k); }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {osExpandida === grupo.os_id ? (
+                      {osExpandida === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) ? (
                         <ChevronDown className="w-5 h-5 text-[#00D4FF]" />
                       ) : (
                         <ChevronRight className="w-5 h-5 text-gray-500" />
@@ -1202,7 +1202,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                   </div>
                 </div>
 
-                {osExpandida === grupo.os_id && (
+                {osExpandida === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) && (
                   <div className="border-t border-[#00D4FF]/20 p-4 space-y-3">
                     {grupo.requisicoes.map((req) => (
                       <div key={req.id} className="bg-black/30 rounded-lg p-4">
@@ -1500,11 +1500,11 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
               <div key={grupo.os_id} className="premium-card border-[#39FF14]/30">
                 <div
                   className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
-                  onClick={() => setOsExpandidaAtendida(osExpandidaAtendida === grupo.os_id ? null : grupo.os_id)}
+                  onClick={() => { const k = grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`; setOsExpandidaAtendida(osExpandidaAtendida === k ? '' : k); }}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      {osExpandidaAtendida === grupo.os_id ? (
+                      {osExpandidaAtendida === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) ? (
                         <ChevronDown className="w-5 h-5 text-[#39FF14]" />
                       ) : (
                         <ChevronRight className="w-5 h-5 text-gray-500" />
@@ -1533,7 +1533,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                   </div>
                 </div>
 
-                {osExpandidaAtendida === grupo.os_id && (
+                {osExpandidaAtendida === (grupo.os_id ?? `null-${grupo.numero_os_samsung ?? grupo.numero_os_interna ?? 'x'}`) && (
                   <div className="border-t border-[#39FF14]/20 p-4 space-y-3">
                     {grupo.requisicoes
                       .filter((req: any) => req.status === 'atendida' || req.status === 'gi_postada' || req.status === 'devolvida')
