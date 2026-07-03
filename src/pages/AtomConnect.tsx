@@ -84,7 +84,8 @@ export default function AtomConnect() {
     let query = supabase
       .from('atom_connect_conversas')
       .select('*')
-      .order('ultima_mensagem_at', { ascending: false });
+      .order('ultima_mensagem_at', { ascending: false })
+      .limit(500);
 
     const filterUnidade = selectedUnidadeFilter || unidadeAtual;
     if (filterUnidade) {
@@ -105,8 +106,6 @@ export default function AtomConnect() {
 
   useEffect(() => {
     loadConversas();
-    const interval = setInterval(loadConversas, 30000);
-    return () => clearInterval(interval);
   }, [loadConversas]);
 
   useEffect(() => {

@@ -260,13 +260,16 @@ export function Kanban() {
     return null;
   };
 
-  const calcularTAT = (createdAt: string) => {
+  const tatCache = useRef<Map<string, number>>(new Map());
+
+  const calcularTAT = useCallback((createdAt: string) => {
+    if (tatCache.current.has(createdAt)) return tatCache.current.get(createdAt)!;
     const now = new Date();
     const created = new Date(createdAt);
-    const diffMs = now.getTime() - created.getTime();
-    const dias = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+    const dias = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+    tatCache.current.set(createdAt, dias);
     return dias;
-  };
+  }, []);
 
   useEffect(() => {
     loadUnidades();
@@ -492,12 +495,6 @@ export function Kanban() {
             numero_cotacao,
             taxa_para_cliente
           ),
-          cotacao_pecas:cotacoes_pecas(
-            pn,
-            descricao,
-            valor_base_gspn,
-            quantidade
-          ),
           os_pecas:os_pecas(
             pn,
             descricao,
@@ -524,9 +521,6 @@ export function Kanban() {
                 delivery
               )
             )
-          ),
-          comentarios:os_comentarios(
-            comentario
           ),
           pagamentos:pagamentos(
             taxa_valor
@@ -1431,10 +1425,9 @@ export function Kanban() {
       return { matches: true, source: 'visible' };
     }
 
-    // Busca em peças (cotacao_pecas e os_pecas) - inclui delivery e ID da etiqueta
-    const cotacaoPecas = (os as any).cotacao_pecas || [];
+    // Busca em peças (os_pecas)
     const osPecas = (os as any).os_pecas || [];
-    const allPecas = [...cotacaoPecas, ...osPecas];
+    const allPecas = [...osPecas];
 
     const matchesPecas = allPecas.some((peca: any) => {
       // Busca básica em código e descrição
@@ -1478,16 +1471,6 @@ export function Kanban() {
     });
 
     if (matchesRequisicoes) {
-      return { matches: true, source: 'hidden' };
-    }
-
-    // Busca em comentários
-    const comentarios = (os as any).comentarios || [];
-    const matchesComentarios = comentarios.some((comentario: any) =>
-      comentario.comentario && comentario.comentario.toLowerCase().includes(searchLower)
-    );
-
-    if (matchesComentarios) {
       return { matches: true, source: 'hidden' };
     }
 
@@ -1557,14 +1540,14 @@ export function Kanban() {
     }
   }, [computedMatchSource, debouncedSearchTerm]);
 
-  const availableTipoOS = Array.from(new Set([
+  const availableTipoOS = useMemo(() => Array.from(new Set([
     ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
     'SC / ACC'
-  ])).sort() as string[];
+  ])).sort() as string[], [osData]);
 
-  const availableTipoAtendimento = Array.from(new Set(
+  const availableTipoAtendimento = useMemo(() => Array.from(new Set(
     Object.values(osData).flat().map(os => os.tipo_atendimento).filter(Boolean)
-  )).sort() as string[];
+  )).sort() as string[], [osData]);
 
   const handleCardClick = useCallback((os: OS) => {
     setSelectedOSId(os.id);

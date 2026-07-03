@@ -187,17 +187,19 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       .from('atom_connect_mensagens')
       .select('*')
       .eq('conversa_id', conversa.id)
-      .order('created_at', { ascending: true });
+      .order('created_at', { ascending: false })
+      .limit(150);
 
     if (!error && data) {
-      setMensagens(data);
+      const ordered = data.reverse();
+      setMensagens(ordered);
       setTimeout(() => {
         if (messagesContainerRef.current) {
           messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
         }
       }, 150);
 
-      const senderIds = [...new Set(data.filter(m => m.enviado_por).map(m => m.enviado_por))];
+      const senderIds = [...new Set(ordered.filter(m => m.enviado_por).map(m => m.enviado_por))];
       if (senderIds.length > 0) {
         const idsToLoad = senderIds.filter(id => id && !usersCache[id]);
         if (idsToLoad.length > 0) {
