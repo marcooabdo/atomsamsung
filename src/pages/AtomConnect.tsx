@@ -81,27 +81,46 @@ export default function AtomConnect() {
   const deepLinkProcessedRef = useRef(false);
 
   const loadConversas = useCallback(async () => {
-    let query = supabase
-      .from('atom_connect_conversas')
-      .select('*')
-      .order('ultima_mensagem_at', { ascending: false })
-      .limit(500);
-
     const filterUnidade = selectedUnidadeFilter || unidadeAtual;
-    if (filterUnidade) {
-      query = query.eq('unidade_id', filterUnidade);
-    } else if (usuario?.nivel !== 'master' && usuario?.unidade_id) {
-      query = query.eq('unidade_id', usuario.unidade_id);
-    }
+    const buildQuery = (finalizadas: boolean) => {
+      let q = supabase
+        .from('atom_connect_conversas')
+        .select('*')
+        .order('ultima_mensagem_at', { ascending: false });
 
-    const { data, error } = await query;
+      if (filterUnidade) {
+        q = q.eq('unidade_id', filterUnidade);
+      } else if (usuario?.nivel !== 'master' && usuario?.unidade_id) {
+        q = q.eq('unidade_id', usuario.unidade_id);
+      }
 
-    if (!error && data) {
-      setConversas(data);
-      const unread = data.reduce((acc, c) => acc + (c.mensagens_nao_lidas || 0), 0);
+      if (finalizadas) {
+        q = q.eq('coluna_pipeline', 'finalizado_nps');
+      } else {
+        q = q.neq('coluna_pipeline', 'finalizado_nps');
+      }
+
+      return q;
+    };
+
+    // Fase 1: carrega conversas ativas imediatamente
+    const { data: ativas, error } = await buildQuery(false);
+    if (!error && ativas) {
+      setConversas(ativas);
+      const unread = ativas.reduce((acc, c) => acc + (c.mensagens_nao_lidas || 0), 0);
       setUnreadCount(unread);
     }
     setLoading(false);
+
+    // Fase 2: carrega finalizadas em background sem bloquear a UI
+    const { data: finalizadas } = await buildQuery(true);
+    if (finalizadas && finalizadas.length > 0) {
+      setConversas(prev => {
+        const existingIds = new Set(prev.map(c => c.id));
+        const novas = finalizadas.filter(c => !existingIds.has(c.id));
+        return novas.length > 0 ? [...prev, ...novas] : prev;
+      });
+    }
   }, [selectedUnidadeFilter, unidadeAtual, usuario]);
 
   useEffect(() => {
