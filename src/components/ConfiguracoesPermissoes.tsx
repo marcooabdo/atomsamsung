@@ -24,7 +24,8 @@ import {
   Target,
   Radio,
   Layers,
-  Truck
+  Truck,
+  ShieldCheck
 } from 'lucide-react';
 
 interface PerfilPermissions {
@@ -117,6 +118,7 @@ const MENU_ITEMS: MenuItem[] = [
   },
   { id: 'menu_nf', label: 'Notas Fiscais', icon: Receipt },
   { id: 'menu_cotacoes', label: 'OFS Gateway', icon: Filter },
+  { id: 'menu_atom_audit', label: 'ATOM Audit', icon: ShieldCheck },
   {
     id: 'menu_configuracoes', label: 'ATOM Core Settings', icon: Settings,
     subItems: [
