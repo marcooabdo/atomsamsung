@@ -1,4 +1,5 @@
 import { memo, useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { formatTipoAtendimentoShort } from '../../lib/supabase';
 import {
@@ -184,17 +185,43 @@ export const KanbanCard = memo(function KanbanCard({
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveSearch, setMoveSearch] = useState('');
   const moveRef = useRef<HTMLDivElement>(null);
+  const moveBtnRef = useRef<HTMLButtonElement>(null);
+  const [dropdownPos, setDropdownPos] = useState<{ top: number; left: number } | null>(null);
 
   useEffect(() => {
     if (!moveOpen) return;
     function handleClick(e: MouseEvent) {
-      if (moveRef.current && !moveRef.current.contains(e.target as Node)) {
+      if (moveRef.current && !moveRef.current.contains(e.target as Node) &&
+          moveBtnRef.current && !moveBtnRef.current.contains(e.target as Node)) {
         setMoveOpen(false);
         setMoveSearch('');
       }
     }
+    function handleScroll() {
+      setMoveOpen(false);
+      setMoveSearch('');
+    }
     document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    window.addEventListener('scroll', handleScroll, true);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('scroll', handleScroll, true);
+    };
+  }, [moveOpen]);
+
+  useEffect(() => {
+    if (moveOpen && moveBtnRef.current) {
+      const rect = moveBtnRef.current.getBoundingClientRect();
+      const dropdownWidth = 240;
+      const dropdownHeight = 280;
+      let left = rect.right - dropdownWidth;
+      let top = rect.bottom + 6;
+      if (left < 8) left = 8;
+      if (top + dropdownHeight > window.innerHeight) {
+        top = rect.top - dropdownHeight - 6;
+      }
+      setDropdownPos({ top, left });
+    }
   }, [moveOpen]);
 
   const filteredColunas = allColunas.filter(c =>
@@ -300,8 +327,9 @@ export const KanbanCard = memo(function KanbanCard({
             </button>
           )}
           {/* Move button */}
-          <div className="relative" ref={moveRef}>
+          <div className="relative">
             <button
+              ref={moveBtnRef}
               onClick={(e) => {
                 e.stopPropagation();
                 setMoveOpen(o => !o);
@@ -319,14 +347,17 @@ export const KanbanCard = memo(function KanbanCard({
               <ChevronsUpDown className="w-3 h-3 text-[#FFBF00]" style={{ filter: 'drop-shadow(0 0 3px rgba(255,191,0,0.6))' }} />
             </button>
 
-            {moveOpen && (
+            {moveOpen && dropdownPos && createPortal(
               <div
-                className="absolute right-0 top-full mt-1 z-[9999] rounded-xl overflow-hidden"
+                ref={moveRef}
+                className="fixed z-[99999] rounded-xl overflow-hidden"
                 style={{
-                  width: 220,
+                  top: dropdownPos.top,
+                  left: dropdownPos.left,
+                  width: 240,
                   background: 'linear-gradient(135deg, #0d1117 0%, #0a0a0a 100%)',
                   border: '1px solid rgba(255,255,255,0.12)',
-                  boxShadow: '0 16px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.4)',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.9), 0 0 30px rgba(0,0,0,0.5)',
                 }}
                 onClick={e => e.stopPropagation()}
               >
@@ -356,7 +387,7 @@ export const KanbanCard = memo(function KanbanCard({
                     />
                   </div>
                 </div>
-                <div className="overflow-y-auto max-h-48" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                <div className="overflow-y-auto max-h-56" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
                   {filteredColunas.length === 0 ? (
                     <p className="text-[10px] text-gray-600 text-center py-4">Nenhuma coluna encontrada</p>
                   ) : filteredColunas.map(col => (
@@ -383,7 +414,8 @@ export const KanbanCard = memo(function KanbanCard({
                     </button>
                   ))}
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
           </div>
           {os.alerta_divergencia_gspn && (
