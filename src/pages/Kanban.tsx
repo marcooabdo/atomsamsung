@@ -1581,6 +1581,52 @@ export function Kanban() {
     setShowFecharOSModal(true);
   }, []);
 
+  const handleCardMoveToColumn = useCallback(async (os: OS, targetColumn: string) => {
+    if (os.coluna_kanban === targetColumn) return;
+
+    if (targetColumn === 'fechar_os') {
+      const osNumero = os.numero_os_samsung || os.numero_os_interna || 'S/N';
+      setFecharOSCardData({ id: os.id, numero: String(osNumero), unidadeId: os.unidade_id });
+      setPendingFecharOSDrop({ card: os, position: undefined });
+      setShowFecharOSModal(true);
+      return;
+    }
+
+    try {
+      const cardsDestino = (osData[targetColumn] || []);
+      const ultimoCard = cardsDestino[cardsDestino.length - 1];
+      const novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
+
+      const { error } = await supabase
+        .from('os')
+        .update({
+          coluna_kanban: targetColumn,
+          sequencia_coluna: novaSequencia,
+          bloqueio_movimentacao_automatica: false,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', os.id);
+
+      if (error) throw error;
+
+      const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
+
+      setOsData(prev => {
+        const next = { ...prev };
+        if (os.coluna_kanban) {
+          next[os.coluna_kanban] = (next[os.coluna_kanban] || []).filter(o => o.id !== os.id);
+        }
+        const newCards = [...(next[targetColumn] || []), updatedCard];
+        newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
+        next[targetColumn] = newCards;
+        return next;
+      });
+    } catch (err: any) {
+      setErrorModalData({ title: 'Erro ao Mover OS', message: err?.message || 'Erro desconhecido' });
+      setShowErrorModal(true);
+    }
+  }, [osData]);
+
   const getVisibleColumns = () => {
     const hasSCACCFilter = tipoOSFilters.includes('SC / ACC') || tipoOSFilters.includes('SC') || tipoOSFilters.includes('ACC');
     const hasCIFilter = tipoAtendimentoFilters.includes('CI');
@@ -2266,6 +2312,8 @@ export function Kanban() {
                       onAnalise={handleCardAnalise}
                       onIniciarReparo={handleCardIniciarReparo}
                       onFecharOS={handleCardFecharOS}
+                      onMoveOS={handleCardMoveToColumn}
+                      allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
                       ColumnIcon={coluna.icon}
                     />
                   </div>

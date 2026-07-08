@@ -27,6 +27,8 @@ interface VirtualizedColumnProps {
   onAnalise: (os: OS) => void;
   onIniciarReparo: (os: OS) => void;
   onFecharOS: (os: OS) => void;
+  onMoveOS: (os: OS, targetColumn: string) => void;
+  allColunas: { id: string; label: string }[];
   ColumnIcon: React.ElementType;
 }
 
@@ -35,7 +37,7 @@ export function VirtualizedColumn({
   mostrarInfoFinanceira, searchMatchSource, draggedCard, columnSortOrder,
   dragOverColumn, dragOverPosition, onDragStart, onDragEnd,
   onCardDragOver, onDrop, onCardClick, onAnalise, onIniciarReparo, onFecharOS,
-  ColumnIcon
+  onMoveOS, allColunas, ColumnIcon
 }: VirtualizedColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -171,6 +173,8 @@ export function VirtualizedColumn({
                 onAnalise={onAnalise}
                 onIniciarReparo={onIniciarReparo}
                 onFecharOS={onFecharOS}
+                onMoveOS={onMoveOS}
+                allColunas={allColunas}
                 index={realIndex}
               />
 

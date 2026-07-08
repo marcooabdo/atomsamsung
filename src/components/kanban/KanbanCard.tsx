@@ -1,10 +1,10 @@
-import { memo } from 'react';
+import { memo, useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { formatTipoAtendimentoShort } from '../../lib/supabase';
 import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
-  ShieldAlert, ShieldCheck
+  ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight,
 } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 
@@ -41,6 +41,8 @@ export interface KanbanCardProps {
   onAnalise: (os: OS) => void;
   onIniciarReparo: (os: OS) => void;
   onFecharOS: (os: OS) => void;
+  onMoveOS: (os: OS, targetColumn: string) => void;
+  allColunas: { id: string; label: string }[];
   index: number;
 }
 
@@ -176,9 +178,29 @@ export const ClosedOSCard = memo(function ClosedOSCard({
 export const KanbanCard = memo(function KanbanCard({
   os, colunaId, colunaColor, textColor, badgeFilters, mostrarInfoFinanceira,
   searchMatchSource, isDragged, onDragStart, onDragEnd, onCardDragOver,
-  onCardClick, onAnalise, onIniciarReparo, onFecharOS, index
+  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, allColunas, index
 }: KanbanCardProps) {
   const navigate = useNavigate();
+  const [moveOpen, setMoveOpen] = useState(false);
+  const [moveSearch, setMoveSearch] = useState('');
+  const moveRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!moveOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (moveRef.current && !moveRef.current.contains(e.target as Node)) {
+        setMoveOpen(false);
+        setMoveSearch('');
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [moveOpen]);
+
+  const filteredColunas = allColunas.filter(c =>
+    c.id !== colunaId &&
+    c.label.toLowerCase().includes(moveSearch.toLowerCase())
+  );
 
   if (colunaId === 'os_fechada') {
     return (
@@ -277,6 +299,93 @@ export const KanbanCard = memo(function KanbanCard({
               <MessageCircle className="w-3 h-3 text-cyan-400" style={{ filter: 'drop-shadow(0 0 3px #00D4FF)' }} />
             </button>
           )}
+          {/* Move button */}
+          <div className="relative" ref={moveRef}>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setMoveOpen(o => !o);
+                setMoveSearch('');
+              }}
+              className="p-1 rounded-md transition-all opacity-0 group-hover:opacity-100"
+              style={{
+                background: moveOpen
+                  ? 'linear-gradient(135deg, rgba(255,191,0,0.25) 0%, rgba(255,191,0,0.1) 100%)'
+                  : 'linear-gradient(135deg, rgba(255,191,0,0.12) 0%, rgba(255,191,0,0.04) 100%)',
+                border: `1px solid ${moveOpen ? 'rgba(255,191,0,0.5)' : 'rgba(255,191,0,0.25)'}`,
+              }}
+              title="Mover OS para outra coluna"
+            >
+              <ChevronsUpDown className="w-3 h-3 text-[#FFBF00]" style={{ filter: 'drop-shadow(0 0 3px rgba(255,191,0,0.6))' }} />
+            </button>
+
+            {moveOpen && (
+              <div
+                className="absolute right-0 top-full mt-1 z-[9999] rounded-xl overflow-hidden"
+                style={{
+                  width: 220,
+                  background: 'linear-gradient(135deg, #0d1117 0%, #0a0a0a 100%)',
+                  border: '1px solid rgba(255,255,255,0.12)',
+                  boxShadow: '0 16px 40px rgba(0,0,0,0.8), 0 0 20px rgba(0,0,0,0.4)',
+                }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="px-3 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                  <p className="text-[10px] font-black text-[#FFBF00] uppercase tracking-wider mb-2">Mover para</p>
+                  <div className="relative">
+                    <Search className="w-3 h-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-500" />
+                    <input
+                      autoFocus
+                      type="text"
+                      placeholder="Buscar coluna..."
+                      value={moveSearch}
+                      onChange={e => setMoveSearch(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter' && filteredColunas.length > 0) {
+                          onMoveOS(os, filteredColunas[0].id);
+                          setMoveOpen(false);
+                          setMoveSearch('');
+                        }
+                        if (e.key === 'Escape') {
+                          setMoveOpen(false);
+                          setMoveSearch('');
+                        }
+                      }}
+                      className="w-full pl-6 pr-2 py-1.5 rounded-lg text-[11px] bg-white/5 text-white placeholder-gray-600 outline-none"
+                      style={{ border: '1px solid rgba(255,255,255,0.08)' }}
+                    />
+                  </div>
+                </div>
+                <div className="overflow-y-auto max-h-48" style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgba(255,255,255,0.1) transparent' }}>
+                  {filteredColunas.length === 0 ? (
+                    <p className="text-[10px] text-gray-600 text-center py-4">Nenhuma coluna encontrada</p>
+                  ) : filteredColunas.map(col => (
+                    <button
+                      key={col.id}
+                      onClick={() => {
+                        onMoveOS(os, col.id);
+                        setMoveOpen(false);
+                        setMoveSearch('');
+                      }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-left transition-colors"
+                      style={{ color: 'var(--text-secondary)' }}
+                      onMouseEnter={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'rgba(255,191,0,0.08)';
+                        (e.currentTarget as HTMLElement).style.color = '#FFBF00';
+                      }}
+                      onMouseLeave={e => {
+                        (e.currentTarget as HTMLElement).style.background = 'transparent';
+                        (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)';
+                      }}
+                    >
+                      <span className="text-[11px] font-medium truncate pr-2">{col.label}</span>
+                      <ChevronRight className="w-3 h-3 flex-shrink-0 opacity-40" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
           {os.alerta_divergencia_gspn && (
             <div className="p-1 rounded-md flex-shrink-0" style={{
               backgroundColor: 'rgba(255,0,100,0.15)',
