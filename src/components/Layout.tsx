@@ -30,6 +30,7 @@ import {
   Target,
   Truck,
   ShieldCheck,
+  Archive,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -42,6 +43,7 @@ const allMenuItems = [
   { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
   { id: 'dashboard', permKey: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
   { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
+  { id: 'os-arquivadas', permKey: 'menu_kanban', label: 'OS Arquivadas', icon: Archive, path: '/os-arquivadas' },
   { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
   { id: 'chat', permKey: 'menu_chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'otimizador', permKey: 'menu_otimizador', label: 'GIA Logistic', icon: Truck, path: '/otimizador' },

@@ -29,6 +29,7 @@ import CustomerIntelligence from './pages/CustomerIntelligence';
 import AtomConnect from './pages/AtomConnect';
 import { MuralMissoes } from './pages/MuralMissoes';
 import { AtomAudit } from './pages/AtomAudit';
+import { OSArquivadas } from './pages/OSArquivadas';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -317,6 +318,17 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <AtomAudit />
+              </Layout>
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/os-arquivadas"
+          element={
+            <ProtectedRoute>
+              <Layout>
+                <OSArquivadas />
               </Layout>
             </ProtectedRoute>
           }

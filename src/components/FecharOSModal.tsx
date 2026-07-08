@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   X, ShieldCheck, ShieldAlert, ShieldX, Loader2, CheckCircle,
   AlertTriangle, XCircle, Package, DollarSign, FileText, Wrench,
-  Lock, Unlock, ChevronDown, ChevronUp, Zap,
+  Lock, Unlock, ChevronDown, ChevronUp, Zap, Archive,
 } from 'lucide-react';
 import {
   validarFechamentoOS,
@@ -38,6 +38,8 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
   const [loading, setLoading] = useState(true);
   const [resultado, setResultado] = useState<ValidacaoResultado | null>(null);
   const [fechando, setFechando] = useState(false);
+  const [arquivando, setArquivando] = useState(false);
+  const [osFechada, setOsFechada] = useState(false);
   const [expandedCategories, setExpandedCategories] = useState<Record<string, boolean>>({
     pecas: true, financeiro: true, fiscal: true, operacional: true,
   });
@@ -53,6 +55,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
     setLoading(true);
     setResultado(null);
     setForceClose(false);
+    setOsFechada(false);
     try {
       const res = await validarFechamentoOS(osId);
       setResultado(res);
@@ -141,11 +144,27 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
       }
       const res = await executarFechamentoOS(osId, usuario.id);
       if (res.success) {
+        setOsFechada(true);
+      }
+    } finally {
+      setFechando(false);
+    }
+  }
+
+  async function handleArquivar() {
+    if (!usuario) return;
+    setArquivando(true);
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ arquivada: true, updated_at: new Date().toISOString() })
+        .eq('id', osId);
+      if (!error) {
         onSuccess();
         onClose();
       }
     } finally {
-      setFechando(false);
+      setArquivando(false);
     }
   }
 
@@ -394,55 +413,95 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
                 className="px-6 py-4 shrink-0 flex items-center justify-between gap-3"
                 style={{ borderTop: '1px solid rgba(255,255,255,0.08)', background: 'rgba(0,0,0,0.4)' }}
               >
-                <div className="flex items-center gap-2">
-                  {!resultado.aprovado && resultado.bloqueios.length > 0 && (
-                    <button
-                      onClick={() => setForceClose(!forceClose)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
-                      style={{
-                        background: forceClose ? 'rgba(255,0,100,0.15)' : 'rgba(255,255,255,0.05)',
-                        border: `1px solid ${forceClose ? 'rgba(255,0,100,0.4)' : 'rgba(255,255,255,0.1)'}`,
-                        color: forceClose ? '#FF0064' : '#94a3b8',
-                      }}
-                    >
-                      {forceClose ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-                      {forceClose ? 'Forcado ativo' : 'Forcar fechamento'}
-                    </button>
-                  )}
-                </div>
+                {osFechada ? (
+                  <div className="w-full flex flex-col items-center gap-3 py-2">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-5 h-5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 6px rgba(57,255,20,0.6))' }} />
+                      <span className="text-sm font-black text-[#39FF14]">OS fechada com sucesso!</span>
+                    </div>
+                    <p className="text-xs text-gray-400 text-center">
+                      Deseja arquivar esta OS para removê-la do pipeline ativo?
+                    </p>
+                    <div className="flex items-center gap-3 mt-1">
+                      <button
+                        onClick={() => { onSuccess(); onClose(); }}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-400 transition-all hover:bg-white/5"
+                        style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        Manter no Pipeline
+                      </button>
+                      <button
+                        onClick={handleArquivar}
+                        disabled={arquivando}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          background: 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
+                          color: '#000',
+                          boxShadow: '0 0 20px rgba(0,212,255,0.35)',
+                        }}
+                      >
+                        {arquivando ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Archive className="w-4 h-4" />
+                        )}
+                        {arquivando ? 'Arquivando...' : 'ARQUIVAR'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2">
+                      {!resultado.aprovado && resultado.bloqueios.length > 0 && (
+                        <button
+                          onClick={() => setForceClose(!forceClose)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-bold transition-all"
+                          style={{
+                            background: forceClose ? 'rgba(255,0,100,0.15)' : 'rgba(255,255,255,0.05)',
+                            border: `1px solid ${forceClose ? 'rgba(255,0,100,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                            color: forceClose ? '#FF0064' : '#94a3b8',
+                          }}
+                        >
+                          {forceClose ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
+                          {forceClose ? 'Forcado ativo' : 'Forcar fechamento'}
+                        </button>
+                      )}
+                    </div>
 
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={onClose}
-                    className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-400 transition-all hover:bg-white/5"
-                    style={{ border: '1px solid rgba(255,255,255,0.1)' }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={handleFechar}
-                    disabled={!canClose || fechando}
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                    style={{
-                      background: canClose
-                        ? forceClose
-                          ? 'linear-gradient(135deg, #FF0064 0%, #FF6B35 100%)'
-                          : 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)'
-                        : 'rgba(255,255,255,0.05)',
-                      color: canClose ? '#000' : '#666',
-                      boxShadow: canClose ? `0 0 20px ${forceClose ? 'rgba(255,0,100,0.3)' : 'rgba(57,255,20,0.3)'}` : 'none',
-                    }}
-                  >
-                    {fechando ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : canClose ? (
-                      <ShieldCheck className="w-4 h-4" />
-                    ) : (
-                      <ShieldX className="w-4 h-4" />
-                    )}
-                    {fechando ? 'Fechando...' : forceClose ? 'FORCAR FECHAMENTO' : 'FECHAR OS'}
-                  </button>
-                </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={onClose}
+                        className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-400 transition-all hover:bg-white/5"
+                        style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={handleFechar}
+                        disabled={!canClose || fechando}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                        style={{
+                          background: canClose
+                            ? forceClose
+                              ? 'linear-gradient(135deg, #FF0064 0%, #FF6B35 100%)'
+                              : 'linear-gradient(135deg, #39FF14 0%, #00D4FF 100%)'
+                            : 'rgba(255,255,255,0.05)',
+                          color: canClose ? '#000' : '#666',
+                          boxShadow: canClose ? `0 0 20px ${forceClose ? 'rgba(255,0,100,0.3)' : 'rgba(57,255,20,0.3)'}` : 'none',
+                        }}
+                      >
+                        {fechando ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : canClose ? (
+                          <ShieldCheck className="w-4 h-4" />
+                        ) : (
+                          <ShieldX className="w-4 h-4" />
+                        )}
+                        {fechando ? 'Fechando...' : forceClose ? 'FORCAR FECHAMENTO' : 'FECHAR OS'}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
             </>
           ) : null}

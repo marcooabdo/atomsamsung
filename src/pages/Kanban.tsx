@@ -546,6 +546,7 @@ export function Kanban() {
       } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
       }
+      query = query.neq('arquivada', true);
       const allData: any[] = [];
       let from = 0;
       const pageSize = 1000;
