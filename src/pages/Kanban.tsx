@@ -1627,6 +1627,25 @@ export function Kanban() {
     }
   }, [osData]);
 
+  const handleArchiveOS = useCallback(async (os: OS) => {
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ arquivada: true, updated_at: new Date().toISOString() })
+        .eq('id', os.id);
+      if (error) throw error;
+      setOsData(prev => {
+        const next = { ...prev };
+        const col = os.coluna_kanban || 'os_fechada';
+        next[col] = (next[col] || []).filter(c => c.id !== os.id);
+        return next;
+      });
+    } catch (err: any) {
+      setErrorModalData({ title: 'Erro ao Arquivar', message: err?.message || 'Erro desconhecido' });
+      setShowErrorModal(true);
+    }
+  }, []);
+
   const getVisibleColumns = () => {
     const hasSCACCFilter = tipoOSFilters.includes('SC / ACC') || tipoOSFilters.includes('SC') || tipoOSFilters.includes('ACC');
     const hasCIFilter = tipoAtendimentoFilters.includes('CI');
@@ -2313,6 +2332,7 @@ export function Kanban() {
                       onIniciarReparo={handleCardIniciarReparo}
                       onFecharOS={handleCardFecharOS}
                       onMoveOS={handleCardMoveToColumn}
+                      onArchive={handleArchiveOS}
                       allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
                       ColumnIcon={coluna.icon}
                     />

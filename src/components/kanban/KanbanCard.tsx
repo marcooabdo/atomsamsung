@@ -5,7 +5,7 @@ import { formatTipoAtendimentoShort } from '../../lib/supabase';
 import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
-  ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight,
+  ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight, Archive,
 } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 
@@ -43,6 +43,7 @@ export interface KanbanCardProps {
   onIniciarReparo: (os: OS) => void;
   onFecharOS: (os: OS) => void;
   onMoveOS: (os: OS, targetColumn: string) => void;
+  onArchive?: (os: OS) => void;
   allColunas: { id: string; label: string }[];
   index: number;
 }
@@ -135,8 +136,8 @@ function calcularLucro(os: any) {
 
 export const ClosedOSCard = memo(function ClosedOSCard({
   os, colunaId, colunaColor, textColor, isDragged,
-  onDragStart, onDragEnd, onCardDragOver, onCardClick, index
-}: Pick<KanbanCardProps, 'os' | 'colunaId' | 'colunaColor' | 'textColor' | 'isDragged' | 'onDragStart' | 'onDragEnd' | 'onCardDragOver' | 'onCardClick' | 'index'>) {
+  onDragStart, onDragEnd, onCardDragOver, onCardClick, onArchive, index
+}: Pick<KanbanCardProps, 'os' | 'colunaId' | 'colunaColor' | 'textColor' | 'isDragged' | 'onDragStart' | 'onDragEnd' | 'onCardDragOver' | 'onCardClick' | 'index'> & { onArchive?: (os: OS) => void }) {
   return (
     <div
       draggable
@@ -171,6 +172,22 @@ export const ClosedOSCard = memo(function ClosedOSCard({
           </p>
           <p className="text-[9px] text-gray-400 truncate">{os.cliente_nome}</p>
         </div>
+        {onArchive && (
+          <button
+            onClick={(e) => { e.stopPropagation(); onArchive(os); }}
+            className="px-2 py-1 rounded-md text-[9px] font-bold transition-all opacity-0 group-hover:opacity-100 flex items-center gap-1"
+            style={{
+              background: 'linear-gradient(135deg, rgba(251,146,60,0.2) 0%, rgba(251,146,60,0.05) 100%)',
+              border: '1px solid rgba(251,146,60,0.5)',
+              color: '#FB923C',
+              boxShadow: '0 0 8px rgba(251,146,60,0.2)'
+            }}
+            title="Arquivar OS"
+          >
+            <Archive className="w-3 h-3" />
+            ARQUIVAR
+          </button>
+        )}
       </div>
     </div>
   );
@@ -179,7 +196,7 @@ export const ClosedOSCard = memo(function ClosedOSCard({
 export const KanbanCard = memo(function KanbanCard({
   os, colunaId, colunaColor, textColor, badgeFilters, mostrarInfoFinanceira,
   searchMatchSource, isDragged, onDragStart, onDragEnd, onCardDragOver,
-  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, allColunas, index
+  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, index
 }: KanbanCardProps) {
   const navigate = useNavigate();
   const [moveOpen, setMoveOpen] = useState(false);
@@ -197,7 +214,8 @@ export const KanbanCard = memo(function KanbanCard({
         setMoveSearch('');
       }
     }
-    function handleScroll() {
+    function handleScroll(e: Event) {
+      if (moveRef.current && moveRef.current.contains(e.target as Node)) return;
       setMoveOpen(false);
       setMoveSearch('');
     }
@@ -234,7 +252,7 @@ export const KanbanCard = memo(function KanbanCard({
       <ClosedOSCard
         os={os} colunaId={colunaId} colunaColor={colunaColor} textColor={textColor}
         isDragged={isDragged} onDragStart={onDragStart} onDragEnd={onDragEnd}
-        onCardDragOver={onCardDragOver} onCardClick={onCardClick} index={index}
+        onCardDragOver={onCardDragOver} onCardClick={onCardClick} onArchive={onArchive} index={index}
       />
     );
   }
