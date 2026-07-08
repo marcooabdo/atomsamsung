@@ -10,7 +10,7 @@ type OS = {
   numero_os_samsung: string | null;
   numero_os_interna: string | null;
   cliente_nome: string | null;
-  modelo_aparelho: string | null;
+  aparelho_modelo: string | null;
   tipo_os: string | null;
   tipo_atendimento: string | null;
   coluna_kanban: string | null;
@@ -53,7 +53,7 @@ export function OSArquivadas() {
           numero_os_samsung,
           numero_os_interna,
           cliente_nome,
-          modelo_aparelho,
+          aparelho_modelo,
           tipo_os,
           tipo_atendimento,
           coluna_kanban,
@@ -75,7 +75,7 @@ export function OSArquivadas() {
 
       if (searchTerm.trim()) {
         query = query.or(
-          `numero_os_samsung.ilike.%${searchTerm.trim()}%,numero_os_interna.ilike.%${searchTerm.trim()}%,cliente_nome.ilike.%${searchTerm.trim()}%,modelo_aparelho.ilike.%${searchTerm.trim()}%`
+          `numero_os_samsung.ilike.%${searchTerm.trim()}%,numero_os_interna.ilike.%${searchTerm.trim()}%,cliente_nome.ilike.%${searchTerm.trim()}%,aparelho_modelo.ilike.%${searchTerm.trim()}%`
         );
       }
 
@@ -97,11 +97,13 @@ export function OSArquivadas() {
   useEffect(() => {
     setPage(0);
     loadArquivadas(0);
-  }, [selectedUnidade, searchTerm]);
+  }, [loadArquivadas]);
 
   useEffect(() => {
-    loadArquivadas(page);
-  }, [page]);
+    if (page > 0) {
+      loadArquivadas(page);
+    }
+  }, [page, loadArquivadas]);
 
   async function handleRestaurar(osId: string) {
     setRestaurando(osId);
@@ -235,7 +237,7 @@ export function OSArquivadas() {
                       </td>
                       <td className="px-4 py-3">
                         <span className="text-sm" style={{ color: 'var(--text-secondary)' }}>
-                          {item.modelo_aparelho || '—'}
+                          {item.aparelho_modelo || '—'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
