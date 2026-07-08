@@ -7,7 +7,8 @@ import { Archive, Search, RotateCcw, Loader2, FileX, ChevronLeft, ChevronRight }
 
 type OS = {
   id: string;
-  numero_os: string;
+  numero_os_samsung: string | null;
+  numero_os_interna: string | null;
   cliente_nome: string | null;
   modelo_aparelho: string | null;
   tipo_os: string | null;
@@ -28,12 +29,19 @@ export function OSArquivadas() {
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedUnidade, setSelectedUnidade] = useState<string>('');
+  const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [restaurando, setRestaurando] = useState<string | null>(null);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+
+  useEffect(() => {
+    supabase.from('unidades').select('id, nome').order('nome').then(({ data }) => {
+      setUnidades(data || []);
+    });
+  }, []);
 
   const loadArquivadas = useCallback(async (currentPage = 0) => {
     setLoading(true);
@@ -42,7 +50,8 @@ export function OSArquivadas() {
         .from('os')
         .select(`
           id,
-          numero_os,
+          numero_os_samsung,
+          numero_os_interna,
           cliente_nome,
           modelo_aparelho,
           tipo_os,
@@ -66,7 +75,7 @@ export function OSArquivadas() {
 
       if (searchTerm.trim()) {
         query = query.or(
-          `numero_os.ilike.%${searchTerm.trim()}%,cliente_nome.ilike.%${searchTerm.trim()}%,modelo_aparelho.ilike.%${searchTerm.trim()}%`
+          `numero_os_samsung.ilike.%${searchTerm.trim()}%,numero_os_interna.ilike.%${searchTerm.trim()}%,cliente_nome.ilike.%${searchTerm.trim()}%,modelo_aparelho.ilike.%${searchTerm.trim()}%`
         );
       }
 
@@ -142,6 +151,7 @@ export function OSArquivadas() {
         <div className="flex items-center gap-3 flex-wrap">
           {canSeeAllUnits && (
             <UnitFilter
+              unidades={unidades}
               selectedUnidade={selectedUnidade}
               onUnidadeChange={setSelectedUnidade}
             />
@@ -215,7 +225,7 @@ export function OSArquivadas() {
                     >
                       <td className="px-4 py-3">
                         <span className="text-sm font-black" style={{ color: 'var(--text-accent)' }}>
-                          {item.numero_os}
+                          {item.numero_os_samsung || item.numero_os_interna || 'S/N'}
                         </span>
                       </td>
                       <td className="px-4 py-3">
