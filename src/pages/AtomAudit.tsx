@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../lib/supabase';
+import { normalizarCidade } from '../lib/cidadeNormalize';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import AuditarOSModal from '../components/audit/AuditarOSModal';
@@ -189,7 +190,7 @@ export function AtomAudit() {
 
   const cidadesDisponiveis = useMemo(() => {
     const set = new Set<string>();
-    osList.forEach(o => { if (o.cliente_cidade) set.add(o.cliente_cidade); });
+    osList.forEach(o => { if (o.cliente_cidade) set.add(normalizarCidade(o.cliente_cidade)); });
     return Array.from(set).sort();
   }, [osList]);
 
@@ -210,7 +211,7 @@ export function AtomAudit() {
         o.aparelho_modelo?.toLowerCase().includes(term)
       );
     }
-    if (filtroCidade) list = list.filter(o => o.cliente_cidade === filtroCidade);
+    if (filtroCidade) list = list.filter(o => normalizarCidade(o.cliente_cidade) === filtroCidade);
     if (filtroModelo) list = list.filter(o => o.aparelho_modelo === filtroModelo);
     if (filtroStatus.length > 0) list = list.filter(o => o.status_samsung_desc && filtroStatus.includes(o.status_samsung_desc));
     if (showOnlyPending) list = list.filter(o => !o.auditado_status);
@@ -283,7 +284,7 @@ export function AtomAudit() {
       'Atendimento': o.tipo_atendimento,
       'Status Samsung': o.status_samsung_desc || '',
       'Motivo Samsung': o.status_samsung_reason || '',
-      'Cidade': o.cliente_cidade || '',
+      'Cidade': normalizarCidade(o.cliente_cidade),
       'Modelo': o.aparelho_modelo || '',
       'Mao de Obra R$': o.auditado_mao_obra_valor || 0,
       'Imposto R$': o.auditado_imposto_valor || 0,
@@ -615,7 +616,7 @@ export function AtomAudit() {
                       </div>
                     </td>
                     <td className="px-3 py-3 text-sm text-gray-300 max-w-[120px] truncate">
-                      {os.cliente_cidade || <span className="text-gray-600">-</span>}
+                      {normalizarCidade(os.cliente_cidade) || <span className="text-gray-600">-</span>}
                     </td>
                     <td className="px-3 py-3 text-xs text-gray-400 max-w-[120px] truncate">
                       {os.aparelho_modelo || <span className="text-gray-600">-</span>}

@@ -2,6 +2,7 @@ import { memo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { formatTipoAtendimentoShort } from '../../lib/supabase';
+import { normalizarCidade } from '../../lib/cidadeNormalize';
 import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
@@ -521,6 +522,7 @@ export const KanbanCard = memo(function KanbanCard({
 
         {/* City badge */}
         {os.cliente_cidade && (() => {
+          const cidadeDisplay = normalizarCidade(os.cliente_cidade);
           const cidadeNorm = os.cliente_cidade.trim().toLowerCase();
           const rotaMatch = rotas.find(r =>
             r.cidades?.some(c => c.trim().toLowerCase() === cidadeNorm)
@@ -538,9 +540,9 @@ export const KanbanCard = memo(function KanbanCard({
                     border: `1px solid ${cor}45`,
                     boxShadow: `0 0 6px ${cor}20`
                   }}
-                  title={`${os.cliente_cidade} - ${rotaMatch.nome}`}
+                  title={`${cidadeDisplay} - ${rotaMatch.nome}`}
                 >
-                  {os.cliente_cidade}
+                  {cidadeDisplay}
                 </span>
               </div>
             );
@@ -556,9 +558,9 @@ export const KanbanCard = memo(function KanbanCard({
                   border: '1px solid rgba(251,191,36,0.35)',
                   boxShadow: '0 0 6px rgba(251,191,36,0.15)'
                 }}
-                title={`${os.cliente_cidade} - Sem rota designada`}
+                title={`${cidadeDisplay} - Sem rota designada`}
               >
-                {os.cliente_cidade}
+                {cidadeDisplay}
               </span>
             </div>
           );

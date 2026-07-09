@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { normalizarCidade } from '../lib/cidadeNormalize';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -3481,7 +3482,7 @@ Não haverá cobrança ao cliente.`
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Cidade</p>
-                        <p className="text-sm text-gray-300">{os.cliente_cidade || '-'}</p>
+                        <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}</p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Estado</p>

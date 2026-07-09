@@ -1,6 +1,7 @@
 // v2.1.0 - Virtualized columns, memoized cards, debounced search
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { normalizarCidade } from '../lib/cidadeNormalize';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
@@ -3077,7 +3078,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
           row['Cliente Email'] = os.cliente_email || '';
           row['Cliente Endereço'] = os.cliente_endereco || '';
           row['Cliente CEP'] = os.cliente_cep || '';
-          row['Cliente Cidade'] = os.cliente_cidade || '';
+          row['Cliente Cidade'] = normalizarCidade(os.cliente_cidade);
           row['Cliente Estado'] = os.cliente_estado || '';
           row['Cliente VIP'] = os.cliente_vip ? 'Sim' : 'Não';
         }
@@ -3250,7 +3251,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
             'Data Agendamento': a.data_agendamento ? new Date(a.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR') : '',
             'Período': a.periodo_agendamento || '',
             'Técnico Designado': nomeTecnico,
-            'Cidade': os?.cliente_cidade || '',
+            'Cidade': normalizarCidade(os?.cliente_cidade),
             'Endereço': os?.cliente_endereco || '',
             'Bairro': os?.cliente_bairro || '',
             'CEP': os?.cliente_cep || '',

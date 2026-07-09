@@ -1,5 +1,6 @@
 import { MapPin, Clock, Package, Phone, Navigation, CheckCircle, AlertCircle } from 'lucide-react';
 import { getStatusColor, getStatusLabel } from './CustomMarker';
+import { normalizarCidade } from '../../lib/cidadeNormalize';
 
 interface OSListCardProps {
   agendamento: any;
@@ -89,7 +90,7 @@ export function OSListCard({ agendamento, isSelected, onClick, showDistance, dis
             <span className="line-clamp-2">
               {agendamento.cliente_endereco}
               {agendamento.cliente_bairro && `, ${agendamento.cliente_bairro}`}
-              {agendamento.cliente_cidade && ` - ${agendamento.cliente_cidade}`}
+              {agendamento.cliente_cidade && ` - ${normalizarCidade(agendamento.cliente_cidade)}`}
             </span>
           </div>
         )}

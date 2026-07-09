@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { normalizarCidade } from '../lib/cidadeNormalize';
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -4540,7 +4541,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Cidade</p>
-                            <p className="text-sm text-gray-300">{os.cliente_cidade || '-'}</p>
+                            <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}</p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Estado</p>
@@ -6530,7 +6531,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                 </div>
                 <div className="ml-auto text-right">
                   <p className="text-xs font-bold" style={{ color: '#FFBF00' }}>
-                    {os.cliente_cidade || 'Sem cidade'}
+                    {normalizarCidade(os.cliente_cidade) || 'Sem cidade'}
                   </p>
                   {os.cliente_bairro && (
                     <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
@@ -6546,7 +6547,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                   A cidade
                 </p>
                 <p className="text-lg font-bold my-1" style={{ color: '#FFBF00' }}>
-                  {os.cliente_cidade || 'SEM CIDADE'}
+                  {normalizarCidade(os.cliente_cidade) || 'SEM CIDADE'}
                 </p>
                 <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
                   pertence a qual rota?
