@@ -6,7 +6,6 @@ import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
 import { OSLPModal } from '../components/OSLPModal';
-import { JobStatusCard } from '../components/JobStatusCard';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
@@ -142,6 +141,7 @@ export function Kanban() {
   const [selectedOSTipoOrcamento, setSelectedOSTipoOrcamento] = useState<string | null>(null);
   const [selectedOSInitialTab, setSelectedOSInitialTab] = useState<string | undefined>(undefined);
   const [lastUserCommentMap, setLastUserCommentMap] = useState<Record<string, string>>({});
+  const [commentReadMap, setCommentReadMap] = useState<Record<string, string>>({});
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [criarOSOW, setCriarOSOW] = useState(false);
   const [criarOSSCACC, setCriarOSSCACC] = useState(false);
@@ -640,6 +640,23 @@ export function Kanban() {
             }
           }
           setLastUserCommentMap(lastCommentMap);
+        }
+
+        // Load read timestamps for current user
+        if (usuario?.id) {
+          const { data: leituraData } = await supabase
+            .from('os_comentarios_leitura')
+            .select('os_id, last_read_at')
+            .eq('usuario_id', usuario.id)
+            .in('os_id', allOsIds);
+
+          if (leituraData) {
+            const readMap: Record<string, string> = {};
+            for (const l of leituraData) {
+              if (l.os_id) readMap[l.os_id] = l.last_read_at;
+            }
+            setCommentReadMap(readMap);
+          }
         }
       }
 
@@ -1599,6 +1616,8 @@ export function Kanban() {
     setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
     setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
     setSelectedOSInitialTab('comentarios');
+    // Mark as read locally immediately
+    setCommentReadMap(prev => ({ ...prev, [os.id]: new Date().toISOString() }));
   }, []);
 
   const handleCardAnalise = useCallback((os: OS) => {
@@ -1637,24 +1656,44 @@ export function Kanban() {
       return;
     }
 
+    // Validar rota: se a cidade não tem rota cadastrada, exibir modal obrigatório
+    const cidadeOS = os.cliente_cidade;
+    const rotaEncontrada = findRotaByCidade(cidadeOS);
+
+    if (!rotaEncontrada) {
+      setMandatoryRoutePickerOS(os);
+      setPendingMandatoryMove({ targetColumn, position: undefined });
+      return;
+    }
+
     try {
       const cardsDestino = (osData[targetColumn] || []);
       const ultimoCard = cardsDestino[cardsDestino.length - 1];
       const novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
 
+      const updateData: any = {
+        coluna_kanban: targetColumn,
+        sequencia_coluna: novaSequencia,
+        bloqueio_movimentacao_automatica: false,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Se a OS não tem rota_id, vincular a rota encontrada
+      if (!os.rota_id && rotaEncontrada) {
+        const rotaReal = rotas.find(r => r.coluna_kanban === rotaEncontrada.coluna);
+        if (rotaReal) {
+          updateData.rota_id = rotaReal.id;
+        }
+      }
+
       const { error } = await supabase
         .from('os')
-        .update({
-          coluna_kanban: targetColumn,
-          sequencia_coluna: novaSequencia,
-          bloqueio_movimentacao_automatica: false,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', os.id);
 
       if (error) throw error;
 
-      const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
+      const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: updateData.rota_id || os.rota_id };
 
       setOsData(prev => {
         const next = { ...prev };
@@ -1670,7 +1709,7 @@ export function Kanban() {
       setErrorModalData({ title: 'Erro ao Mover OS', message: err?.message || 'Erro desconhecido' });
       setShowErrorModal(true);
     }
-  }, [osData]);
+  }, [osData, rotas, findRotaByCidade]);
 
   const handleArchiveOS = useCallback(async (os: OS) => {
     try {
@@ -1733,20 +1772,11 @@ export function Kanban() {
 
   return (
     <div className="h-[calc(100vh-56px)] flex flex-col gap-1.5 overflow-hidden">
-      {/* Container para UnitFilter e JobStatusCard lado a lado */}
-      <div className={`grid gap-1.5 ${selectedUnidade ? 'grid-cols-[41%_58%]' : 'grid-cols-1'}`}>
-        <UnitFilter
-          unidades={unidades}
-          selectedUnidade={selectedUnidade}
-          onUnidadeChange={handleUnidadeChange}
-        />
-
-        {selectedUnidade && (
-          <JobStatusCard
-            unidadeId={selectedUnidade}
-          />
-        )}
-      </div>
+      <UnitFilter
+        unidades={unidades}
+        selectedUnidade={selectedUnidade}
+        onUnidadeChange={handleUnidadeChange}
+      />
 
       <div className="premium-card p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
         <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">
@@ -1762,7 +1792,7 @@ export function Kanban() {
                 background: 'rgba(var(--accent-rgb),0.15)',
                 color: 'var(--text-accent)',
                 border: '1px solid rgba(var(--accent-rgb),0.3)'
-              }}>{osData.filter(os => os.coluna_kanban !== 'os_fechada').length}</span>
+              }}>{Object.entries(osData).reduce((sum, [col, cards]) => col === 'os_fechada' ? sum : sum + cards.length, 0)}</span>
             </div>
           </div>
 
@@ -2390,6 +2420,7 @@ export function Kanban() {
                       rotas={rotas}
                       ColumnIcon={coluna.icon}
                       lastUserCommentMap={lastUserCommentMap}
+                      commentReadMap={commentReadMap}
                     />
                   </div>
                 </div>
@@ -2527,6 +2558,7 @@ export function Kanban() {
       {showExportModal && (
         <ExportModal
           osData={Object.values(filteredData).flat()}
+          rotas={rotas}
           onClose={() => setShowExportModal(false)}
         />
       )}
@@ -2845,10 +2877,11 @@ export function Kanban() {
 
 interface ExportModalProps {
   osData: OS[];
+  rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   onClose: () => void;
 }
 
-function ExportModal({ osData, onClose }: ExportModalProps) {
+function ExportModal({ osData, rotas, onClose }: ExportModalProps) {
   const [exportConfig, setExportConfig] = useState({
     dadosBasicos: true,
     dadosCliente: true,
@@ -2995,6 +3028,12 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
           row['Cliente Endereço'] = os.cliente_endereco || '';
           row['Cliente CEP'] = os.cliente_cep || '';
           row['Cliente Cidade'] = normalizarCidade(os.cliente_cidade);
+          row['Rota'] = (() => {
+            if (!os.cliente_cidade) return '';
+            const cidadeNorm = normalizarCidade(os.cliente_cidade).toLowerCase().trim();
+            const rota = rotas.find(r => r.cidades.some(c => normalizarCidade(c).toLowerCase().trim() === cidadeNorm));
+            return rota?.nome || '';
+          })();
           row['Cliente Estado'] = os.cliente_estado || '';
           row['Cliente VIP'] = os.cliente_vip ? 'Sim' : 'Não';
         }
@@ -3219,7 +3258,7 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
         </div>
 
         <div className="mb-4 text-sm text-gray-300">
-          {osData.length} OS serão exportadas
+          {Object.values(osData).reduce((sum, cards) => sum + cards.length, 0)} OS serão exportadas
         </div>
 
         <div className="space-y-3 mb-6">

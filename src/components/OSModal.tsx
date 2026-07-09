@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -316,6 +316,36 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
       setLoading(false);
     }
   }, [osId, mode]);
+
+  // Load user preference for system comments visibility
+  const prefLoaded = useRef(false);
+  useEffect(() => {
+    if (!usuario?.id || prefLoaded.current) return;
+    prefLoaded.current = true;
+    (async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('mostrar_comentarios_sistema')
+        .eq('id', usuario.id)
+        .maybeSingle();
+      if (data && typeof data.mostrar_comentarios_sistema === 'boolean') {
+        setMostrarComentariosSistema(data.mostrar_comentarios_sistema);
+      }
+    })();
+  }, [usuario?.id]);
+
+  // Mark comments as read when viewing comments tab
+  useEffect(() => {
+    if (abaAtiva === 'comentarios' && osId && usuario?.id) {
+      supabase
+        .from('os_comentarios_leitura')
+        .upsert(
+          { usuario_id: usuario.id, os_id: osId, last_read_at: new Date().toISOString() },
+          { onConflict: 'usuario_id,os_id' }
+        )
+        .then();
+    }
+  }, [abaAtiva, osId, usuario?.id]);
 
   // Carrega markups quando a OS for carregada (para OW)
   useEffect(() => {
@@ -5121,7 +5151,17 @@ Não haverá cobrança ao cliente.`
                   type="checkbox"
                   id="mostrarSistema"
                   checked={mostrarComentariosSistema}
-                  onChange={(e) => setMostrarComentariosSistema(e.target.checked)}
+                  onChange={(e) => {
+                    const val = e.target.checked;
+                    setMostrarComentariosSistema(val);
+                    if (usuario?.id) {
+                      supabase
+                        .from('usuarios')
+                        .update({ mostrar_comentarios_sistema: val })
+                        .eq('id', usuario.id)
+                        .then();
+                    }
+                  }}
                   className="w-4 h-4"
                 />
                 <label htmlFor="mostrarSistema" className="text-xs text-gray-400">

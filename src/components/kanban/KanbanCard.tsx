@@ -49,6 +49,7 @@ export interface KanbanCardProps {
   rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   index: number;
   lastUserCommentDate?: string;
+  hasUnreadComments?: boolean;
 }
 
 function getTATLimite(tipoOS: string, tipoAtendimento: string): number {
@@ -199,7 +200,7 @@ export const ClosedOSCard = memo(function ClosedOSCard({
 export const KanbanCard = memo(function KanbanCard({
   os, colunaId, colunaColor, textColor, badgeFilters, mostrarInfoFinanceira,
   searchMatchSource, isDragged, onDragStart, onDragEnd, onCardDragOver,
-  onCardClick, onOpenComments, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, rotas, index, lastUserCommentDate
+  onCardClick, onOpenComments, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, rotas, index, lastUserCommentDate, hasUnreadComments
 }: KanbanCardProps) {
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveSearch, setMoveSearch] = useState('');
@@ -335,7 +336,7 @@ export const KanbanCard = memo(function KanbanCard({
                 e.stopPropagation();
                 onOpenComments(os);
               }}
-              className="p-1 rounded-md transition-all opacity-0 group-hover:opacity-100"
+              className={`relative p-1 rounded-md transition-all ${hasUnreadComments ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
                 border: '1px solid rgba(0,212,255,0.3)',
@@ -343,6 +344,9 @@ export const KanbanCard = memo(function KanbanCard({
               title="Abrir comentarios"
             >
               <MessageCircle className="w-3 h-3 text-cyan-400" style={{ filter: 'drop-shadow(0 0 3px #00D4FF)' }} />
+              {hasUnreadComments && (
+                <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+              )}
             </button>
           )}
           {/* Move button */}

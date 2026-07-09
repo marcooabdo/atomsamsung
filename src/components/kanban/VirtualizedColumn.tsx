@@ -35,6 +35,7 @@ interface VirtualizedColumnProps {
   rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   ColumnIcon: React.ElementType;
   lastUserCommentMap?: Record<string, string>;
+  commentReadMap?: Record<string, string>;
 }
 
 export function VirtualizedColumn({
@@ -42,7 +43,7 @@ export function VirtualizedColumn({
   mostrarInfoFinanceira, searchMatchSource, searchActive, draggedCard, columnSortOrder,
   dragOverColumn, dragOverPosition, onDragStart, onDragEnd,
   onCardDragOver, onDrop, onCardClick, onOpenComments, onAnalise, onIniciarReparo, onFecharOS,
-  onMoveOS, onArchive, allColunas, rotas, ColumnIcon, lastUserCommentMap
+  onMoveOS, onArchive, allColunas, rotas, ColumnIcon, lastUserCommentMap, commentReadMap
 }: VirtualizedColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -161,6 +162,7 @@ export function VirtualizedColumn({
                 rotas={rotas}
                 index={index}
                 lastUserCommentDate={lastUserCommentMap?.[os.id]}
+                hasUnreadComments={!!(lastUserCommentMap?.[os.id] && (!commentReadMap?.[os.id] || lastUserCommentMap[os.id] > commentReadMap[os.id]))}
               />
             </div>
           ))}
@@ -225,6 +227,7 @@ export function VirtualizedColumn({
                 rotas={rotas}
                 index={realIndex}
                 lastUserCommentDate={lastUserCommentMap?.[os.id]}
+                hasUnreadComments={!!(lastUserCommentMap?.[os.id] && (!commentReadMap?.[os.id] || lastUserCommentMap[os.id] > commentReadMap[os.id]))}
               />
 
               {/* Drop indicator below last card */}

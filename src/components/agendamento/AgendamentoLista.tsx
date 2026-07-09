@@ -54,7 +54,7 @@ export function AgendamentoLista({
   } | null>(null);
 
   const handlePrint = useReactToPrint({
-    content: () => pdfRef.current,
+    contentRef: pdfRef,
     documentTitle: `Agendamento_${pdfData?.agendamento?.os?.numero_os_samsung || 'SN'}`,
   });
 

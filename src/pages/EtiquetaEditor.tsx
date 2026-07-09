@@ -84,7 +84,7 @@ export default function EtiquetaEditor() {
   const [templateAtual, setTemplateAtual] = useState<Template | null>(null);
   const [elementos, setElementos] = useState<ElementoEtiqueta[]>([]);
   const [elementoSelecionado, setElementoSelecionado] = useState<string | null>(null);
-  const [larguraMm, setLarguraMm] = useState(40);
+  const [larguraMm, setLarguraMm] = useState(70);
   const [alturaMm, setAlturaMm] = useState(40);
   const [nomeTemplate, setNomeTemplate] = useState('Novo Template');
   const [showTemplates, setShowTemplates] = useState(false);
@@ -167,7 +167,7 @@ export default function EtiquetaEditor() {
         tipo: 'texto',
         x: 2,
         y: 2,
-        largura: 36,
+        largura: 66,
         altura: 5,
         conteudo: '{{peca_id}}',
         fonte_tamanho: 11,
@@ -179,9 +179,9 @@ export default function EtiquetaEditor() {
       {
         id: 'el-2',
         tipo: 'texto',
-        x: 2,
-        y: 7,
-        largura: 20,
+        x: 40,
+        y: 2,
+        largura: 28,
         altura: 4,
         conteudo: '{{data_entrada}}',
         fonte_tamanho: 8,
@@ -194,9 +194,9 @@ export default function EtiquetaEditor() {
         id: 'el-3',
         tipo: 'codigo_barras',
         x: 2,
-        y: 12,
-        largura: 36,
-        altura: 14,
+        y: 8,
+        largura: 66,
+        altura: 16,
         conteudo: '{{peca_codigo}}',
         fonte_tamanho: 8,
         fonte_negrito: false,
@@ -207,8 +207,8 @@ export default function EtiquetaEditor() {
         id: 'el-4',
         tipo: 'texto',
         x: 2,
-        y: 27,
-        largura: 36,
+        y: 26,
+        largura: 66,
         altura: 4,
         conteudo: '{{peca_descricao}}',
         fonte_tamanho: 7,
@@ -221,9 +221,9 @@ export default function EtiquetaEditor() {
         id: 'el-5',
         tipo: 'texto',
         x: 2,
-        y: 33,
-        largura: 36,
-        altura: 5,
+        y: 32,
+        largura: 66,
+        altura: 6,
         conteudo: '{{localizacao}}',
         fonte_tamanho: 9,
         fonte_negrito: true,

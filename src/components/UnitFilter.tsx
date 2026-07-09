@@ -23,41 +23,28 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
   if (!canSeeAllUnits) {
     if (!userUnidade) {
       return (
-        <div className="premium-card p-3 bg-red-500/10 border border-red-500/30">
-          <div className="flex items-center gap-3">
-            <Building2 className="w-5 h-5 text-red-400" />
-            <div>
-              <p className="text-xs text-red-400 uppercase tracking-wider">Erro de Configuração</p>
-              <p className="text-sm font-semibold text-red-300">Usuario sem unidade vinculada</p>
-            </div>
-          </div>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30">
+          <Building2 className="w-4 h-4 text-red-400" />
+          <span className="text-xs font-semibold text-red-300">Sem unidade vinculada</span>
         </div>
       );
     }
     const unidade = unidades.find(u => u.id === userUnidade);
     return (
-      <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
-        <div className="flex items-center gap-3">
-          <Building2 className="w-5 h-5 text-[#00D4FF]" />
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wider">Unidade</p>
-            <p className="text-sm font-semibold text-[#00D4FF]">{unidade?.nome || 'Carregando...'}</p>
-          </div>
-        </div>
+      <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+        <Building2 className="w-4 h-4 text-[#00D4FF]" />
+        <span className="text-xs font-semibold text-[#00D4FF]">{unidade?.nome || 'Carregando...'}</span>
       </div>
     );
   }
 
   return (
-    <div className="premium-card p-3 bg-[#00D4FF]/5 border border-[#00D4FF]/20">
-      <label className="block text-xs text-gray-400 uppercase tracking-wider mb-2 flex items-center gap-2">
-        <Building2 className="w-4 h-4" />
-        Filtrar por Unidade
-      </label>
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/20">
+      <Building2 className="w-4 h-4 text-[#00D4FF]" />
       <select
         value={selectedUnidade}
         onChange={(e) => onUnidadeChange(e.target.value)}
-        className="neon-input"
+        className="neon-input py-1 text-xs"
       >
         <option value="">Todas as Unidades</option>
         {unidades.map(u => (

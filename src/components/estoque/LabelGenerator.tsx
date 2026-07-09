@@ -29,7 +29,7 @@ export function LabelGenerator({ labels, onClose }: LabelGeneratorProps) {
   const [showOptions, setShowOptions] = useState(true);
 
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: `Etiquetas_${new Date().toISOString().split('T')[0]}`,
   });
 

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
@@ -278,6 +278,23 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  // Load user preference for system comments visibility
+  const prefLoaded = useRef(false);
+  useEffect(() => {
+    if (!usuario?.id || prefLoaded.current) return;
+    prefLoaded.current = true;
+    (async () => {
+      const { data } = await supabase
+        .from('usuarios')
+        .select('mostrar_comentarios_sistema')
+        .eq('id', usuario.id)
+        .maybeSingle();
+      if (data && typeof data.mostrar_comentarios_sistema === 'boolean') {
+        setMostrarComentariosSistema(data.mostrar_comentarios_sistema);
+      }
+    })();
+  }, [usuario?.id]);
 
   // Timer progressivo enquanto o job está rodando
   useEffect(() => {
@@ -5543,7 +5560,17 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                       <input
                         type="checkbox"
                         checked={mostrarComentariosSistema}
-                        onChange={(e) => setMostrarComentariosSistema(e.target.checked)}
+                        onChange={(e) => {
+                          const val = e.target.checked;
+                          setMostrarComentariosSistema(val);
+                          if (usuario?.id) {
+                            supabase
+                              .from('usuarios')
+                              .update({ mostrar_comentarios_sistema: val })
+                              .eq('id', usuario.id)
+                              .then();
+                          }
+                        }}
                       />
                       Mostrar logs do sistema
                     </label>
