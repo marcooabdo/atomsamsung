@@ -4422,6 +4422,49 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
                     </div>
                   </div>
 
+                  {/* Segunda OS */}
+                  <div className="col-span-2">
+                    <div className="premium-card p-4">
+                      <div className="flex items-center gap-4 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 uppercase font-bold">Segunda OS:</span>
+                          <button
+                            onClick={async () => {
+                              const novoValor = !(os as any).tem_segunda_os;
+                              const { error } = await supabase
+                                .from('os')
+                                .update({ tem_segunda_os: novoValor, numero_segunda_os: novoValor ? (os as any).numero_segunda_os : null })
+                                .eq('id', os.id);
+                              if (!error) setOS({ ...os, tem_segunda_os: novoValor, numero_segunda_os: novoValor ? (os as any).numero_segunda_os : null } as any);
+                            }}
+                            className="relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none"
+                            style={{ backgroundColor: (os as any).tem_segunda_os ? '#3B82F6' : '#4B5563' }}
+                          >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${(os as any).tem_segunda_os ? 'translate-x-6' : 'translate-x-1'}`} />
+                          </button>
+                        </div>
+                        {(os as any).tem_segunda_os && (
+                          <div className="flex items-center gap-2 flex-1">
+                            <label className="text-xs text-gray-500">N da 2a OS:</label>
+                            <input
+                              type="text"
+                              defaultValue={(os as any).numero_segunda_os || ''}
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim() || null;
+                                if (val !== ((os as any).numero_segunda_os || null)) {
+                                  const { error } = await supabase.from('os').update({ numero_segunda_os: val }).eq('id', os.id);
+                                  if (!error) setOS({ ...os, numero_segunda_os: val } as any);
+                                }
+                              }}
+                              placeholder="Numero da segunda OS"
+                              className="bg-[#1a1a2e] border border-gray-700 rounded-lg px-3 py-1.5 text-sm text-gray-200 focus:border-blue-500 outline-none w-48"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div>
                     <h3 className="text-sm font-bold uppercase tracking-wider mb-4 flex items-center gap-2" style={{
                       color: os.tipo_os === 'OW' ? 'var(--text-accent)' : '#FFA500'

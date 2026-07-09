@@ -3064,6 +3064,10 @@ function ExportModal({ osData, onClose }: ExportModalProps) {
 
           // Adicionar Análise Técnica
           row['Análise Técnica'] = analiseTecnicaData[os.id] || '';
+
+          // Segunda OS
+          row['Tem Segunda OS'] = os.tem_segunda_os ? 'Sim' : 'Não';
+          row['Número Segunda OS'] = os.numero_segunda_os || '';
         }
 
         if (exportConfig.dadosCliente) {
