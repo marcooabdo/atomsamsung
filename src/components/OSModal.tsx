@@ -22,6 +22,7 @@ import { gerarPDFOrdemServico } from '../lib/pdfOS';
 import { SuccessModal } from './SuccessModal';
 import { ConvertTipoOSModal } from './ConvertTipoOSModal';
 import { FecharOSModal } from './FecharOSModal';
+import { RouteSelectionModal } from './kanban/RouteSelectionModal';
 import type { Database } from '../lib/database.types';
 
 interface WhatsAppConversa {
@@ -171,6 +172,11 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [mostrarSucessoMover, setMostrarSucessoMover] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
+
+  // Route validation states
+  const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
+  const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
+  const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
 
   // Estados para WhatsApp Chat
   const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
@@ -410,10 +416,42 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
 
       if (error) throw error;
       setOS(data);
+
+      if (data?.unidade_id) {
+        loadRotasUnidade(data.unidade_id);
+      }
     } catch (error) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadRotasUnidade = async (unidadeIdParam: string) => {
+    try {
+      const { data } = await supabase
+        .from('rotas')
+        .select('id, nome, cidades, coluna_kanban')
+        .eq('unidade_id', unidadeIdParam)
+        .eq('ativa', true);
+      if (data) setRotasUnidade(data);
+    } catch {}
+  };
+
+  const normalizeCidadeLocal = (cidade: string | null | undefined): string => {
+    if (!cidade) return '';
+    return cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  };
+
+  const findRotaByCidade = (cidade: string | null | undefined): { coluna: string; nome: string } | null => {
+    if (!cidade) return null;
+    const cidadeNormalizada = normalizeCidadeLocal(cidade);
+    for (const rota of rotasUnidade) {
+      const cidadesNormalizadas = rota.cidades.map(c => normalizeCidadeLocal(c));
+      if (cidadesNormalizadas.includes(cidadeNormalizada)) {
+        return { coluna: rota.coluna_kanban, nome: rota.nome };
+      }
+    }
+    return null;
   };
 
   const formatPhoneNumber = (phone: string): string => {
@@ -2653,7 +2691,7 @@ Não haverá cobrança ao cliente.`
     }
   };
 
-  const moverOS = async (targetColumn: string) => {
+  const moverOS = async (targetColumn: string, extraUpdates?: Record<string, any>) => {
     if (!os || movendoOS) return;
 
     if (targetColumn === 'controle_qualidade' && os.coluna_kanban !== 'controle_qualidade') {
@@ -2668,7 +2706,8 @@ Não haverá cobrança ao cliente.`
         .from('os')
         .update({
           coluna_kanban: targetColumn,
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
+          ...(extraUpdates || {})
         })
         .eq('id', os.id);
 
@@ -2680,6 +2719,79 @@ Não haverá cobrança ao cliente.`
       alert(`Erro ao mover OS: ${error.message}`);
     } finally {
       setMovendoOS(false);
+    }
+  };
+
+  const handleRouteSelectAndMove = async (rotaColumn: string, cidadeCorrigida: string) => {
+    if (!os) return;
+
+    const rotaColorMap: Record<string, { nome: string; cor: string }> = {
+      'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
+      'rota_vermelha': { nome: 'Rota Vermelha', cor: '#EF4444' },
+      'rota_azul': { nome: 'Rota Azul', cor: '#3B82F6' },
+      'rota_verde': { nome: 'Rota Verde', cor: '#10B981' },
+      'rota_rosa': { nome: 'Rota Rosa', cor: '#EC4899' },
+      'rota_amarela': { nome: 'Rota Amarela', cor: '#EAB308' },
+      'rota_laranja': { nome: 'Rota Laranja', cor: '#F97316' },
+    };
+
+    const cidadeOS = cidadeCorrigida || os.cliente_cidade;
+    let rotaSelecionada = rotasUnidade.find(r => r.coluna_kanban === rotaColumn);
+    let rotaIdReal = rotaSelecionada?.id || null;
+
+    try {
+      if (!rotaSelecionada && os.unidade_id) {
+        const rotaInfo = rotaColorMap[rotaColumn];
+        const cidadesIniciais = cidadeOS ? [cidadeOS] : [];
+        const { data: novaRota, error: errCriar } = await supabase
+          .from('rotas')
+          .insert({
+            nome: rotaInfo.nome,
+            cor: rotaInfo.cor,
+            coluna_kanban: rotaColumn,
+            cidades: cidadesIniciais,
+            ativa: true,
+            unidade_id: os.unidade_id
+          })
+          .select()
+          .single();
+
+        if (!errCriar && novaRota) {
+          rotaSelecionada = novaRota;
+          rotaIdReal = novaRota.id;
+          setRotasUnidade(prev => [...prev, novaRota]);
+        }
+      } else if (cidadeOS && rotaSelecionada) {
+        const cidadeNormalizada = normalizeCidadeLocal(cidadeOS);
+        const cidadesNormalizadas = rotaSelecionada.cidades.map(c => normalizeCidadeLocal(c));
+
+        if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
+          const novasCidades = [...rotaSelecionada.cidades, cidadeOS];
+          await supabase
+            .from('rotas')
+            .update({ cidades: novasCidades })
+            .eq('id', rotaSelecionada.id);
+          setRotasUnidade(prev => prev.map(r =>
+            r.id === rotaSelecionada!.id ? { ...r, cidades: novasCidades } : r
+          ));
+        }
+      }
+
+      setMostrarSelecionarRotaObrigatoria(false);
+
+      if (colunaDestinoAposSelecionarRota) {
+        const targetCol = colunaDestinoAposSelecionarRota;
+        setColunaDestinoAposSelecionarRota(null);
+
+        const extraUpdates: Record<string, any> = { rota_id: rotaIdReal };
+        if (cidadeCorrigida && cidadeCorrigida.trim() !== '' && cidadeCorrigida !== os.cliente_cidade) {
+          extraUpdates.cliente_cidade = cidadeCorrigida.trim();
+        }
+
+        await moverOS(targetCol.id, extraUpdates);
+      }
+    } catch (error: any) {
+      alert(`Erro ao definir rota: ${error.message}`);
     }
   };
 
@@ -2842,6 +2954,17 @@ Não haverá cobrança ao cliente.`
                             setMostrarFecharOS(true);
                             return;
                           }
+
+                          const cidadeOS = os?.cliente_cidade;
+                          const rotaEncontrada = findRotaByCidade(cidadeOS);
+
+                          if (!rotaEncontrada) {
+                            setColunaDestinoAposSelecionarRota(coluna);
+                            setMostrarMoverPara(false);
+                            setMostrarSelecionarRotaObrigatoria(true);
+                            return;
+                          }
+
                           setColunaDestino(coluna);
                           setMostrarConfirmacaoMover(true);
                         }}
@@ -5486,6 +5609,19 @@ Não haverá cobrança ao cliente.`
           }}
         />
       )}
+
+      <RouteSelectionModal
+        isOpen={mostrarSelecionarRotaObrigatoria}
+        cidade={os?.cliente_cidade || ''}
+        clienteNome={os?.cliente_nome}
+        osNumero={os?.numero_os_samsung || os?.numero_os_interna || 'S/N'}
+        clienteBairro={os?.cliente_bairro}
+        onSelectRoute={handleRouteSelectAndMove}
+        onCancel={() => {
+          setMostrarSelecionarRotaObrigatoria(false);
+          setColunaDestinoAposSelecionarRota(null);
+        }}
+      />
 
       {mostrarConfirmacaoMover && colunaDestino && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">

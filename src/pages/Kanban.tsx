@@ -11,6 +11,7 @@ import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
+import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
 import { useDebounce } from '../components/kanban/useDebounce';
 import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
@@ -841,26 +842,20 @@ export function Kanban() {
     }
 
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
-    const isOrigemOSNova = draggedCard.coluna_kanban === 'os_nova';
-    const isOSIH = draggedCard.tipo_atendimento === 'IH';
 
-    // REGRA: OS IH SEMPRE DEVE ter rota (cor) designada para ser movida
-    // Verificar se a cidade tem uma cor de rota cadastrada
-    if (isOSIH && isOrigemOSNova && !isSameColumn) {
+    // Verificar se a cidade tem uma cor de rota cadastrada antes de qualquer movimentação
+    if (!isSameColumn) {
       const cidadeOS = draggedCard.cliente_cidade;
       const rotaEncontrada = findRotaByCidade(cidadeOS);
 
       if (!rotaEncontrada) {
-        // Cidade NAO tem cor de rota cadastrada - mostrar modal para escolher qual cor pertence
         setMandatoryRoutePickerOS(draggedCard);
         setPendingMandatoryMove({ targetColumn, position: finalPosition });
         setDraggedCard(null);
         return;
       }
 
-      // Se a cidade TEM rota cadastrada mas a OS não tem rota_id, definir automaticamente
       if (!draggedCard.rota_id) {
-        // Buscar a rota real para usar o ID UUID
         const rotaReal = rotas.find(r => r.coluna_kanban === rotaEncontrada.coluna);
         draggedCard.rota_id = rotaReal?.id || null;
       }
@@ -1257,13 +1252,13 @@ export function Kanban() {
     }
   };
 
-  const handleMandatoryRouteSelect = async (rotaColumn: string) => {
+  const handleMandatoryRouteSelect = async (rotaColumn: string, cidadeCorrigidaParam?: string) => {
     if (!mandatoryRoutePickerOS || !pendingMandatoryMove) return;
 
     const osId = mandatoryRoutePickerOS.id;
     const prevColumn = mandatoryRoutePickerOS.coluna_kanban;
     const { targetColumn, position: finalPosition } = pendingMandatoryMove;
-    const cidadeOS = mandatoryRoutePickerOS.cliente_cidade;
+    const cidadeOS = cidadeCorrigidaParam && cidadeCorrigidaParam.trim() !== '' ? cidadeCorrigidaParam.trim() : mandatoryRoutePickerOS.cliente_cidade;
 
     const rotaColorMap: Record<string, { nome: string; cor: string }> = {
       'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
@@ -1342,8 +1337,8 @@ export function Kanban() {
       }
 
       // Normalizar e corrigir nome da cidade
-      const cidadeAtual = mandatoryRoutePickerOS.cliente_cidade;
-      let cidadeCorrigida = cidadeAtual;
+      const cidadeAtual = cidadeOS;
+      let cidadeCorrigida = cidadeAtual || mandatoryRoutePickerOS.cliente_cidade;
 
       if (rotaSelecionada && cidadeAtual) {
         const cidadeNormalizada = normalizeCidade(cidadeAtual);
@@ -2795,139 +2790,18 @@ export function Kanban() {
         </div>
       )}
 
-      {mandatoryRoutePickerOS && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
-          <div
-            className="rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom"
-            style={{
-              backgroundColor: 'var(--bg-card)',
-              border: '2px solid #F59E0B',
-              backdropFilter: 'blur(20px)',
-              minWidth: 420,
-              maxWidth: 500,
-              animation: 'slideUp 0.25s ease-out',
-            }}
-          >
-            <div className="p-4 border-b" style={{ borderColor: '#F59E0B30', background: 'linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.05))' }}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ backgroundColor: '#F59E0B20' }}>
-                  <AlertCircle className="w-6 h-6" style={{ color: '#F59E0B' }} />
-                </div>
-                <div>
-                  <span className="text-sm font-bold" style={{ color: '#F59E0B' }}>
-                    COR DE ROTA NAO CADASTRADA
-                  </span>
-                  <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                    Defina qual cor de rota esta cidade pertence
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3 mt-3 p-2 rounded-lg" style={{ backgroundColor: 'rgba(255,255,255,0.05)' }}>
-                <div>
-                  <p className="text-xs font-semibold" style={{ color: 'var(--text-accent)' }}>
-                    {mandatoryRoutePickerOS.numero_os_samsung || mandatoryRoutePickerOS.numero_os_interna || 'S/N'}
-                  </p>
-                  <p className="text-[11px]" style={{ color: 'var(--text-secondary)' }}>
-                    {mandatoryRoutePickerOS.cliente_nome}
-                  </p>
-                </div>
-                <div className="ml-auto text-right">
-                  <p className="text-xs font-bold" style={{ color: '#FFBF00' }}>
-                    {mandatoryRoutePickerOS.cliente_cidade || 'Sem cidade'}
-                  </p>
-                  {mandatoryRoutePickerOS.cliente_bairro && (
-                    <p className="text-[10px]" style={{ color: 'var(--text-tertiary)' }}>
-                      {mandatoryRoutePickerOS.cliente_bairro}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="p-4">
-              <div className="mb-4 p-3 rounded-lg text-center" style={{ background: 'linear-gradient(135deg, rgba(255,191,0,0.15), rgba(245,158,11,0.08))' }}>
-                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  A cidade
-                </p>
-                <p className="text-lg font-bold my-1" style={{ color: '#FFBF00' }}>
-                  {mandatoryRoutePickerOS.cliente_cidade || 'SEM CIDADE'}
-                </p>
-                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>
-                  pertence a qual rota?
-                </p>
-              </div>
-              <p className="text-xs font-medium uppercase tracking-wider mb-3 text-center" style={{ color: 'var(--text-secondary)' }}>
-                Selecione a cor da rota
-              </p>
-              <div className="grid grid-cols-4 gap-2">
-                {[
-                  { kanban: 'rota_preta', label: 'Preta', cor: '#1a1a1a', border: '#555' },
-                  { kanban: 'rota_vermelha', label: 'Vermelha', cor: '#EF4444', border: '#EF4444' },
-                  { kanban: 'rota_azul', label: 'Azul', cor: '#3B82F6', border: '#3B82F6' },
-                  { kanban: 'rota_verde', label: 'Verde', cor: '#10B981', border: '#10B981' },
-                  { kanban: 'rota_rosa', label: 'Rosa', cor: '#EC4899', border: '#EC4899' },
-                  { kanban: 'rota_amarela', label: 'Amarela', cor: '#EAB308', border: '#EAB308' },
-                  { kanban: 'rota_laranja', label: 'Laranja', cor: '#F97316', border: '#F97316' },
-                ].map(rota => (
-                  <button
-                    key={rota.kanban}
-                    onClick={() => handleMandatoryRouteSelect(rota.kanban)}
-                    className="flex flex-col items-center gap-1.5 p-3 rounded-xl transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      backgroundColor: rota.cor + '15',
-                      border: `2px solid ${rota.border}40`,
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.borderColor = rota.border;
-                      e.currentTarget.style.boxShadow = `0 0 16px ${rota.cor}40`;
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.borderColor = rota.border + '40';
-                      e.currentTarget.style.boxShadow = 'none';
-                    }}
-                  >
-                    <div
-                      className="w-8 h-8 rounded-full"
-                      style={{
-                        backgroundColor: rota.cor,
-                        border: rota.cor === '#1a1a1a' ? '2px solid #555' : 'none',
-                        boxShadow: `0 0 12px ${rota.cor}60`,
-                      }}
-                    />
-                    <span className="text-[11px] font-semibold" style={{ color: rota.cor === '#1a1a1a' ? 'var(--text-primary)' : rota.cor }}>
-                      {rota.label}
-                    </span>
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 p-3 rounded-lg" style={{ background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.3)' }}>
-                <p className="text-[10px] text-center" style={{ color: 'rgba(59,130,246,0.9)' }}>
-                  A cidade sera automaticamente cadastrada na rota selecionada. Nas proximas vezes, esta cidade ja tera sua rota definida.
-                </p>
-              </div>
-              <button
-                onClick={() => {
-                  setMandatoryRoutePickerOS(null);
-                  setPendingMandatoryMove(null);
-                }}
-                className="w-full mt-3 px-4 py-2.5 rounded-lg transition-all text-sm font-medium"
-                style={{
-                  backgroundColor: 'rgba(239,68,68,0.1)',
-                  border: '1px solid rgba(239,68,68,0.3)',
-                  color: '#EF4444',
-                }}
-              >
-                Cancelar Movimentacao
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      <style>{`
-        @keyframes slideUp {
-          from { transform: translateY(40px); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-      `}</style>
+      <RouteSelectionModal
+        isOpen={!!mandatoryRoutePickerOS}
+        cidade={mandatoryRoutePickerOS?.cliente_cidade || ''}
+        clienteNome={mandatoryRoutePickerOS?.cliente_nome}
+        osNumero={mandatoryRoutePickerOS?.numero_os_samsung || mandatoryRoutePickerOS?.numero_os_interna || 'S/N'}
+        clienteBairro={mandatoryRoutePickerOS?.cliente_bairro}
+        onSelectRoute={(rotaColumn, cidadeCorrigida) => handleMandatoryRouteSelect(rotaColumn, cidadeCorrigida)}
+        onCancel={() => {
+          setMandatoryRoutePickerOS(null);
+          setPendingMandatoryMove(null);
+        }}
+      />
     </div>
   );
 }
