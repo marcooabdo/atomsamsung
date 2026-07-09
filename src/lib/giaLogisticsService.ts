@@ -28,6 +28,7 @@ export interface OSLogistica {
   rota_id: string | null;
   whatsapp_sent_at: string | null;
   data_agendamento: string | null;
+  tipo_os: string | null;
 }
 
 export interface RotaOtimizada {
@@ -170,7 +171,7 @@ export async function buscarOSsDaRota(unidadeId: string, colunaKanban: string): 
       'cliente_endereco, cliente_logradouro, cliente_numero, cliente_bairro, ' +
       'cliente_cidade, cliente_cep, aparelho_linha, tecnico_agendado_id, ' +
       'lat, lng, status_agendamento_gia, coluna_kanban, confirmado_com_cliente, ' +
-      'unidade_id, rota_id, whatsapp_sent_at, data_agendamento'
+      'unidade_id, rota_id, whatsapp_sent_at, data_agendamento, tipo_os'
     )
     .eq('unidade_id', unidadeId)
     .eq('coluna_kanban', colunaKanban)

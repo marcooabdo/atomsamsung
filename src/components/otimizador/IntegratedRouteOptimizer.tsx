@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   Play, RefreshCw, AlertCircle, MapPin, CheckCircle2,
-  Send, Trash2, Plus, Route, CalendarCheck, Info,
+  Send, Trash2, Plus, Route, CalendarCheck, Info, Repeat2,
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import {
@@ -244,6 +244,24 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
       const { minutosUsados: mu } = filtrarPorJanelaTempo(novaLista, tecnicoSelecionado);
       setMinutosUsados(mu);
     }
+  };
+
+  const toggleTipoOS = async (os: OSLogistica) => {
+    const novoTipo = os.tipo_os === 'LP' ? 'OW' : 'LP';
+    const { error } = await supabase
+      .from('os')
+      .update({ tipo_os: novoTipo })
+      .eq('id', os.id);
+    if (error) {
+      setErro(`Erro ao alterar tipo da OS: ${error.message}`);
+      return;
+    }
+    const atualizarLista = (lista: OSLogistica[]) =>
+      lista.map(o => o.id === os.id ? { ...o, tipo_os: novoTipo } : o);
+    setOsAprovadas(atualizarLista);
+    setTodasOsDaRota(atualizarLista);
+    setOsPendentes(atualizarLista);
+    setSobras(prev => prev.map(s => s.os.id === os.id ? { ...s, os: { ...s.os, tipo_os: novoTipo } } : s));
   };
 
   const otimizarRota = async () => {
@@ -642,6 +660,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                       ordem={idx + 1}
                       disabled={etapa !== 'processar' && etapa !== 'roteirizar'}
                       onRemover={() => moverParaSobras(os)}
+                      onToggleTipoOS={toggleTipoOS}
                     />
                   ))}
                 </div>
@@ -749,13 +768,31 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 </div>
               ) : (
                 <div className="divide-y" style={{ borderColor: 'var(--border-primary)' }}>
-                  {sobras.map(item => (
+                  {sobras.map(item => {
+                    const tipoOS = item.os.tipo_os || 'OW';
+                    const isLP = tipoOS === 'LP';
+                    return (
                     <div key={item.os.id} className="p-4">
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
-                            OS {item.os.numero_os_samsung || item.os.numero_os_interna || item.os.id.slice(0, 8)}
-                          </p>
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
+                              OS {item.os.numero_os_samsung || item.os.numero_os_interna || item.os.id.slice(0, 8)}
+                            </p>
+                            <button
+                              onClick={() => toggleTipoOS(item.os)}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold cursor-pointer transition-all hover:scale-105"
+                              style={{
+                                backgroundColor: isLP ? '#10B98115' : '#6B728015',
+                                color: isLP ? '#10B981' : '#9CA3AF',
+                                border: `1px solid ${isLP ? '#10B98130' : '#6B728030'}`,
+                              }}
+                              title={`Clique para alterar para ${isLP ? 'OW' : 'LP'}`}
+                            >
+                              <Repeat2 className="w-3 h-3" />
+                              {tipoOS}
+                            </button>
+                          </div>
                           <p className="text-xs truncate" style={{ color: 'var(--text-secondary)' }}>{item.os.cliente_nome}</p>
                           <p className="text-xs truncate" style={{ color: 'var(--text-tertiary)' }}>{item.os.aparelho_linha ?? 'Linha N/A'}</p>
                         </div>
@@ -781,7 +818,8 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                         {item.motivoLabel}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -904,14 +942,18 @@ function OSCard({
   ordem,
   disabled,
   onRemover,
+  onToggleTipoOS,
 }: {
   os: OSLogistica;
   ordem: number;
   disabled: boolean;
   onRemover: () => void;
+  onToggleTipoOS?: (os: OSLogistica) => void;
 }) {
   const numOS = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
   const endereco = [os.cliente_logradouro, os.cliente_numero, os.cliente_bairro].filter(Boolean).join(', ');
+  const tipoOS = os.tipo_os || 'OW';
+  const isLP = tipoOS === 'LP';
 
   return (
     <div className="flex items-center gap-3 px-5 py-3">
@@ -922,8 +964,21 @@ function OSCard({
         {ordem}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>OS {numOS}</span>
+          <button
+            onClick={() => onToggleTipoOS?.(os)}
+            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold cursor-pointer transition-all hover:scale-105"
+            style={{
+              backgroundColor: isLP ? '#10B98115' : '#6B728015',
+              color: isLP ? '#10B981' : '#9CA3AF',
+              border: `1px solid ${isLP ? '#10B98130' : '#6B728030'}`,
+            }}
+            title={`Clique para alterar para ${isLP ? 'OW' : 'LP'}`}
+          >
+            <Repeat2 className="w-3 h-3" />
+            {tipoOS}
+          </button>
           {os.aparelho_linha && (
             <span
               className="px-1.5 py-0.5 rounded text-xs"
