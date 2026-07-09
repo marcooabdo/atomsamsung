@@ -67,7 +67,7 @@ const COLUNAS_KANBAN = [
   { id: 'saw', label: 'SAW' },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC' },
   { id: 'reparo_concluido', label: 'Reparo Concluído' },
-  { id: 'aguardando_fechamento', label: 'Cliente Buscar' },
+  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
   { id: 'fechar_os', label: 'Fechar OS' },
   { id: 'os_fechada', label: 'OS Fechada' },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados' }
@@ -203,7 +203,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
   const [novaPecaDescricaoOW, setNovaPecaDescricaoOW] = useState('');
   const [novaPecaValorGSPN, setNovaPecaValorGSPN] = useState('');
   const [novaPecaQuantidadeOW, setNovaPecaQuantidadeOW] = useState(1);
-  const [novaPecaTypeUnidade, setNovaPecaTypeUnidade] = useState('UN');
   const [markups, setMarkups] = useState<any[]>([]);
   const [adicionandoPecaOW, setAdicionandoPecaOW] = useState(false);
   const [sugestoesPecasOW, setSugestoesPecasOW] = useState<Array<{
@@ -222,7 +221,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
   const [editandoValorTotal, setEditandoValorTotal] = useState<Record<string, string>>({});
 
   // Estados para edição inline de valores de peças manuais
-  const [editandoValorPeca, setEditandoValorPeca] = useState<Record<string, { unitario: string; quantidade: string; typeUnidade: string }>>({});
+  const [editandoValorPeca, setEditandoValorPeca] = useState<Record<string, { unitario: string; quantidade: string }>>({});
   const [removendoPecaId, setRemovendoPecaId] = useState<string | null>(null);
 
   // Estados temporários para modo de criação
@@ -1177,7 +1176,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
           valor_unitario: novoUnitario,
           valor_total: novoUnitario * novaQtd,
           quantidade: novaQtd,
-          type_unidade: edicao.typeUnidade || 'UN'
+          type_unidade: 'UN'
         })
         .eq('id', pecaId);
       if (error) throw error;
@@ -1228,7 +1227,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
           valor_total: valorTotal,
           status: 'manual',
           numero_os_samsung: os?.numero_os_samsung,
-          type_unidade: novaPecaTypeUnidade
+          type_unidade: 'UN'
         });
 
       if (insertError) throw insertError;
@@ -1244,7 +1243,6 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
       setNovaPecaDescricaoOW('');
       setNovaPecaValorGSPN('');
       setNovaPecaQuantidadeOW(1);
-      setNovaPecaTypeUnidade('UN');
       setSugestoesPecasOW([]);
 
       await loadPecas();
@@ -3959,7 +3957,7 @@ Não haverá cobrança ao cliente.`
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Valor Base (R$) *
+                        Valor Base Unitario (R$) *
                       </label>
                       <input
                         type="number"
@@ -4000,27 +3998,6 @@ Não haverá cobrança ao cliente.`
                           Requisicao em lote ({novaPecaQuantidadeOW} un.)
                         </p>
                       )}
-                    </div>
-                    <div>
-                      <label className="text-xs text-gray-400 uppercase block mb-2">
-                        Unidade
-                      </label>
-                      <select
-                        value={novaPecaTypeUnidade}
-                        onChange={(e) => setNovaPecaTypeUnidade(e.target.value)}
-                        className="neon-input w-full"
-                        style={{ height: '38px' }}
-                      >
-                        <option value="UN">UN - Unidade</option>
-                        <option value="PC">PC - Peça</option>
-                        <option value="KG">KG - Quilograma</option>
-                        <option value="MT">MT - Metro</option>
-                        <option value="LT">LT - Litro</option>
-                        <option value="CX">CX - Caixa</option>
-                        <option value="PT">PT - Pacote</option>
-                        <option value="PR">PR - Par</option>
-                        <option value="JG">JG - Jogo</option>
-                      </select>
                     </div>
                     <div>
                       <label className="text-xs text-gray-400 uppercase block mb-2">
@@ -4298,7 +4275,7 @@ Não haverá cobrança ao cliente.`
                                 </p>
                                 {(peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && !editandoValorPeca[peca.id] && (
                                   <button
-                                    onClick={() => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { unitario: String(Number(peca.valor_unitario || 0).toFixed(2)), quantidade: String(peca.quantidade || 1), typeUnidade: (peca as any).type_unidade || 'UN' } }))}
+                                    onClick={() => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { unitario: String(Number(peca.valor_unitario || 0).toFixed(2)), quantidade: String(peca.quantidade || 1) } }))}
                                     className="p-1 rounded transition-all hover:opacity-80"
                                     style={{ backgroundColor: '#39FF1420', border: '1px solid #39FF1460', color: '#39FF14' }}
                                     title="Editar quantidade e valor unitário"
@@ -4333,24 +4310,6 @@ Não haverá cobrança ao cliente.`
                                       className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                                       autoFocus
                                     />
-                                  </div>
-                                  <div className="flex items-center gap-1">
-                                    <span className="text-xs text-gray-500">Un:</span>
-                                    <select
-                                      value={editandoValorPeca[peca.id].typeUnidade}
-                                      onChange={(e) => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], typeUnidade: e.target.value } }))}
-                                      className="px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                                    >
-                                      <option value="UN">UN</option>
-                                      <option value="PC">PC</option>
-                                      <option value="KG">KG</option>
-                                      <option value="MT">MT</option>
-                                      <option value="LT">LT</option>
-                                      <option value="CX">CX</option>
-                                      <option value="PT">PT</option>
-                                      <option value="PR">PR</option>
-                                      <option value="JG">JG</option>
-                                    </select>
                                   </div>
                                   <button
                                     onClick={() => handleSalvarValoresPecaManual(peca.id)}

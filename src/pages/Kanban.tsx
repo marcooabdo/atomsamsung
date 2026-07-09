@@ -48,7 +48,7 @@ const COLUNAS_KANBAN = [
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
   { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
-  { id: 'aguardando_fechamento', label: 'Cliente Buscar', color: '#F59E0B', icon: Clock },
+  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
   { id: 'fechar_os', label: 'Fechar OS', color: '#22C55E', icon: Zap },
   { id: 'os_fechada', label: 'OS Fechada', color: '#6B7280', icon: Zap },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados', color: '#EF4444', icon: AlertCircle }
@@ -1762,7 +1762,7 @@ export function Kanban() {
                 background: 'rgba(var(--accent-rgb),0.15)',
                 color: 'var(--text-accent)',
                 border: '1px solid rgba(var(--accent-rgb),0.3)'
-              }}>{osData.length} OS</span>
+              }}>{osData.filter(os => os.coluna_kanban !== 'os_fechada').length}</span>
             </div>
           </div>
 

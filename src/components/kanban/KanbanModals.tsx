@@ -188,7 +188,7 @@ export function PecasAtivasBlockModal({ isOpen, onClose, pecas, statusLabels }: 
                 'Aguardando Peça',
                 'Peça em Trânsito',
                 'Peça Disponível',
-                'Cliente Buscar',
+                'Aguardando Fechamento',
                 'Fechar OS'
               ].map((col, idx) => (
                 <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded">
