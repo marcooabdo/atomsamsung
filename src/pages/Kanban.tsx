@@ -2319,6 +2319,7 @@ export function Kanban() {
                       badgeFilters={badgeFilters}
                       mostrarInfoFinanceira={mostrarInfoFinanceira}
                       searchMatchSource={searchMatchSource}
+                      searchActive={!!debouncedSearchTerm}
                       draggedCard={draggedCard}
                       columnSortOrder={columnSortOrder[coluna.id] || 'sequencia'}
                       dragOverColumn={dragOverColumn}

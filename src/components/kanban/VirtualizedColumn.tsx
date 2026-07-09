@@ -15,6 +15,7 @@ interface VirtualizedColumnProps {
   badgeFilters: BadgeFilters;
   mostrarInfoFinanceira: boolean;
   searchMatchSource: Record<string, 'hidden' | 'visible'>;
+  searchActive: boolean;
   draggedCard: OS | null;
   columnSortOrder: string;
   dragOverColumn: string | null;
@@ -36,7 +37,7 @@ interface VirtualizedColumnProps {
 
 export function VirtualizedColumn({
   cards, colunaId, colunaColor, textColor, badgeFilters,
-  mostrarInfoFinanceira, searchMatchSource, draggedCard, columnSortOrder,
+  mostrarInfoFinanceira, searchMatchSource, searchActive, draggedCard, columnSortOrder,
   dragOverColumn, dragOverPosition, onDragStart, onDragEnd,
   onCardDragOver, onDrop, onCardClick, onAnalise, onIniciarReparo, onFecharOS,
   onMoveOS, onArchive, allColunas, rotas, ColumnIcon
@@ -121,6 +122,44 @@ export function VirtualizedColumn({
             <ColumnIcon className="w-6 h-6" style={{ color: `${textColor}60` }} />
           </div>
           <p className="text-gray-600 text-[10px] uppercase tracking-wider font-bold">Vazio</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (searchActive) {
+    return (
+      <div
+        ref={scrollRef}
+        className="flex-1 min-h-0 overflow-y-auto cyber-scrollbar px-3 pb-3"
+      >
+        <div className="space-y-2">
+          {cards.map((os, index) => (
+            <div key={os.id}>
+              <KanbanCard
+                os={os}
+                colunaId={colunaId}
+                colunaColor={colunaColor}
+                textColor={textColor}
+                badgeFilters={badgeFilters}
+                mostrarInfoFinanceira={mostrarInfoFinanceira}
+                searchMatchSource={searchMatchSource}
+                isDragged={draggedCard?.id === os.id}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd}
+                onCardDragOver={onCardDragOver}
+                onCardClick={onCardClick}
+                onAnalise={onAnalise}
+                onIniciarReparo={onIniciarReparo}
+                onFecharOS={onFecharOS}
+                onMoveOS={onMoveOS}
+                onArchive={onArchive}
+                allColunas={allColunas}
+                rotas={rotas}
+                index={index}
+              />
+            </div>
+          ))}
         </div>
       </div>
     );
