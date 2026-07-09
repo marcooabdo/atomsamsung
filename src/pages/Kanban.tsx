@@ -650,13 +650,22 @@ export function Kanban() {
         }
       }
 
-      // Carregar rotas da unidade para validação de cidades IH
+      // Carregar rotas para validação de cidades IH
       const unidadeParaRotas = selectedUnidade || usuario?.unidade_id;
       if (unidadeParaRotas) {
         const { data: rotasData } = await supabase
           .from('rotas')
           .select('id, nome, cor, cidades, coluna_kanban')
           .eq('unidade_id', unidadeParaRotas)
+          .eq('ativa', true);
+
+        if (rotasData) {
+          setRotas(rotasData);
+        }
+      } else {
+        const { data: rotasData } = await supabase
+          .from('rotas')
+          .select('id, nome, cor, cidades, coluna_kanban')
           .eq('ativa', true);
 
         if (rotasData) {
