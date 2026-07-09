@@ -36,7 +36,7 @@ export function DiagnosticoBlockModal({ isOpen, onClose }: DiagnosticoBlockModal
             <ol className="text-sm text-blue-800 space-y-1 ml-4 list-decimal">
               <li>Clique em <span className="font-medium">"Análise Concluída"</span> no card da OS</li>
               <li>Descreva a análise realizada</li>
-              <li>A OS será movida automaticamente para <span className="font-medium">"Negociação em Andamento"</span></li>
+              <li>A OS será movida automaticamente para <span className="font-medium">"Enviar Orçamento"</span></li>
             </ol>
           </div>
 
@@ -188,7 +188,7 @@ export function PecasAtivasBlockModal({ isOpen, onClose, pecas, statusLabels }: 
                 'Aguardando Peça',
                 'Peça em Trânsito',
                 'Peça Disponível',
-                'Aguardando Fechamento',
+                'Cliente Buscar',
                 'Fechar OS'
               ].map((col, idx) => (
                 <span key={idx} className="bg-green-100 text-green-800 px-2 py-1 rounded">

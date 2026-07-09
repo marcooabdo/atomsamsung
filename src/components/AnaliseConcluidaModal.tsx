@@ -41,7 +41,7 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
 
       // Determinar a próxima coluna baseado nas regras de negócio
       let proximaColuna = 'negociacao_em_andamento';
-      let mensagemMovimentacao = 'OS movida para "Negociação em Andamento"';
+      let mensagemMovimentacao = 'OS movida para "Enviar Orçamento"';
 
       // Verifica se deve pular a negociação (LP ou OW com cortesia)
       const devePularNegociacao = osData?.tipo_os === 'LP' ||

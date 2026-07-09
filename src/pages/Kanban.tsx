@@ -22,8 +22,8 @@ type OS = Database['public']['Tables']['os']['Row'];
 
 const COLUNAS_KANBAN = [
   { id: 'os_nova', label: 'OS Nova', color: '#0EA5E9', icon: Zap },
-  { id: 'diagnostico', label: 'Diagnóstico', color: '#06B6D4', icon: Activity },
-  { id: 'negociacao_em_andamento', label: 'Negociação em Andamento', color: '#F59E0B', icon: Clock },
+  { id: 'diagnostico', label: 'Diagnóstico/Triagem', color: '#06B6D4', icon: Activity },
+  { id: 'negociacao_em_andamento', label: 'Enviar Orçamento', color: '#F59E0B', icon: Clock },
   { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação', color: '#F97316', icon: Clock },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado', color: '#10B981', icon: Zap },
   { id: 'aguardando_peca', label: 'Aguardando Peça', color: '#8B5CF6', icon: Clock },
@@ -47,7 +47,7 @@ const COLUNAS_KANBAN = [
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
   { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
-  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
+  { id: 'aguardando_fechamento', label: 'Cliente Buscar', color: '#F59E0B', icon: Clock },
   { id: 'fechar_os', label: 'Fechar OS', color: '#22C55E', icon: Zap },
   { id: 'os_fechada', label: 'OS Fechada', color: '#6B7280', icon: Zap },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados', color: '#EF4444', icon: AlertCircle }
@@ -1732,6 +1732,11 @@ export function Kanban() {
             }}>
               <Activity className="w-4 h-4 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
               <h3 className="tech-heading text-sm text-[#00D4FF] tracking-widest">KANBAN</h3>
+              <span className="ml-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{
+                background: 'rgba(var(--accent-rgb),0.15)',
+                color: 'var(--text-accent)',
+                border: '1px solid rgba(var(--accent-rgb),0.3)'
+              }}>{osData.length} OS</span>
             </div>
           </div>
 

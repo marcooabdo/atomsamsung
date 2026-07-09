@@ -46,8 +46,8 @@ interface WhatsAppConversa {
 
 const COLUNAS_KANBAN = [
   { id: 'os_nova', label: 'OS Nova' },
-  { id: 'diagnostico', label: 'Diagnóstico' },
-  { id: 'negociacao_em_andamento', label: 'Negociação em Andamento' },
+  { id: 'diagnostico', label: 'Diagnóstico/Triagem' },
+  { id: 'negociacao_em_andamento', label: 'Enviar Orçamento' },
   { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação' },
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
   { id: 'aguardando_peca', label: 'Aguardando Peça' },
@@ -66,7 +66,7 @@ const COLUNAS_KANBAN = [
   { id: 'saw', label: 'SAW' },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC' },
   { id: 'reparo_concluido', label: 'Reparo Concluído' },
-  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
+  { id: 'aguardando_fechamento', label: 'Cliente Buscar' },
   { id: 'fechar_os', label: 'Fechar OS' },
   { id: 'os_fechada', label: 'OS Fechada' },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados' }
