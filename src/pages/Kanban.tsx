@@ -213,7 +213,7 @@ export function Kanban() {
   const [infoModalData, setInfoModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
   const [mandatoryRoutePickerOS, setMandatoryRoutePickerOS] = useState<OS | null>(null);
   const [pendingMandatoryMove, setPendingMandatoryMove] = useState<{ targetColumn: string; position?: number } | null>(null);
-  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
+  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>>([]);
   const [showBuscarOSModal, setShowBuscarOSModal] = useState(false);
   const [buscarOSNumero, setBuscarOSNumero] = useState('');
   const [buscarOSLoading, setBuscarOSLoading] = useState(false);
@@ -619,7 +619,7 @@ export function Kanban() {
       if (unidadeParaRotas) {
         const { data: rotasData } = await supabase
           .from('rotas')
-          .select('id, nome, cidades, coluna_kanban')
+          .select('id, nome, cor, cidades, coluna_kanban')
           .eq('unidade_id', unidadeParaRotas)
           .eq('ativa', true);
 
@@ -2334,6 +2334,7 @@ export function Kanban() {
                       onMoveOS={handleCardMoveToColumn}
                       onArchive={handleArchiveOS}
                       allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
+                      rotas={rotas}
                       ColumnIcon={coluna.icon}
                     />
                   </div>

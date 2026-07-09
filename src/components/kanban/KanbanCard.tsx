@@ -5,7 +5,7 @@ import { formatTipoAtendimentoShort } from '../../lib/supabase';
 import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
-  ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight, Archive,
+  ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight, Archive, MapPin, AlertTriangle,
 } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 
@@ -45,6 +45,7 @@ export interface KanbanCardProps {
   onMoveOS: (os: OS, targetColumn: string) => void;
   onArchive?: (os: OS) => void;
   allColunas: { id: string; label: string }[];
+  rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   index: number;
 }
 
@@ -196,7 +197,7 @@ export const ClosedOSCard = memo(function ClosedOSCard({
 export const KanbanCard = memo(function KanbanCard({
   os, colunaId, colunaColor, textColor, badgeFilters, mostrarInfoFinanceira,
   searchMatchSource, isDragged, onDragStart, onDragEnd, onCardDragOver,
-  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, index
+  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, rotas, index
 }: KanbanCardProps) {
   const navigate = useNavigate();
   const [moveOpen, setMoveOpen] = useState(false);
@@ -517,6 +518,51 @@ export const KanbanCard = memo(function KanbanCard({
             TAT: {calcularTAT(os.created_at)}d
           </span>
         </div>
+
+        {/* City badge */}
+        {os.cliente_cidade && (() => {
+          const cidadeNorm = os.cliente_cidade.trim().toLowerCase();
+          const rotaMatch = rotas.find(r =>
+            r.cidades?.some(c => c.trim().toLowerCase() === cidadeNorm)
+          );
+          const cor = rotaMatch?.cor || null;
+          if (cor) {
+            return (
+              <div className="flex items-center gap-1 mt-1">
+                <MapPin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: cor, filter: `drop-shadow(0 0 3px ${cor})` }} />
+                <span
+                  className="px-1.5 py-0.5 rounded text-[9px] font-bold truncate"
+                  style={{
+                    background: `${cor}18`,
+                    color: cor,
+                    border: `1px solid ${cor}45`,
+                    boxShadow: `0 0 6px ${cor}20`
+                  }}
+                  title={`${os.cliente_cidade} - ${rotaMatch.nome}`}
+                >
+                  {os.cliente_cidade}
+                </span>
+              </div>
+            );
+          }
+          return (
+            <div className="flex items-center gap-1 mt-1">
+              <AlertTriangle className="w-2.5 h-2.5 flex-shrink-0 text-[#FBBF24]" style={{ filter: 'drop-shadow(0 0 3px #FBBF24)' }} />
+              <span
+                className="px-1.5 py-0.5 rounded text-[9px] font-bold truncate"
+                style={{
+                  background: 'rgba(251,191,36,0.12)',
+                  color: '#FBBF24',
+                  border: '1px solid rgba(251,191,36,0.35)',
+                  boxShadow: '0 0 6px rgba(251,191,36,0.15)'
+                }}
+                title={`${os.cliente_cidade} - Sem rota designada`}
+              >
+                {os.cliente_cidade}
+              </span>
+            </div>
+          );
+        })()}
 
         {/* Versao orcamento */}
         {(os as any).versao_orcamento > 1 && (

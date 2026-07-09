@@ -30,6 +30,7 @@ interface VirtualizedColumnProps {
   onMoveOS: (os: OS, targetColumn: string) => void;
   onArchive?: (os: OS) => void;
   allColunas: { id: string; label: string }[];
+  rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   ColumnIcon: React.ElementType;
 }
 
@@ -38,7 +39,7 @@ export function VirtualizedColumn({
   mostrarInfoFinanceira, searchMatchSource, draggedCard, columnSortOrder,
   dragOverColumn, dragOverPosition, onDragStart, onDragEnd,
   onCardDragOver, onDrop, onCardClick, onAnalise, onIniciarReparo, onFecharOS,
-  onMoveOS, onArchive, allColunas, ColumnIcon
+  onMoveOS, onArchive, allColunas, rotas, ColumnIcon
 }: VirtualizedColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -177,6 +178,7 @@ export function VirtualizedColumn({
                 onMoveOS={onMoveOS}
                 onArchive={onArchive}
                 allColunas={allColunas}
+                rotas={rotas}
                 index={realIndex}
               />
 
