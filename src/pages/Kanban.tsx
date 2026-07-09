@@ -156,6 +156,7 @@ export function Kanban() {
   const badgeFilterRef = useRef<HTMLDivElement>(null);
   const tipoFilterRef = useRef<HTMLDivElement>(null);
   const actionMenuRef = useRef<HTMLDivElement>(null);
+  const columnsScrollRef = useRef<HTMLDivElement>(null);
   const [showActionMenu, setShowActionMenu] = useState(false);
   const defaultBadgeFilters = {
     pedidoAtivo: true,
@@ -1544,6 +1545,20 @@ export function Kanban() {
     }
   }, [computedMatchSource, debouncedSearchTerm]);
 
+  useEffect(() => {
+    if (!debouncedSearchTerm || !columnsScrollRef.current) return;
+    const firstColWithResults = COLUNAS_KANBAN.find(col =>
+      filteredData[col.id] && filteredData[col.id].length > 0
+    );
+    if (firstColWithResults) {
+      const colIndex = COLUNAS_KANBAN.findIndex(c => c.id === firstColWithResults.id);
+      const columnWidth = 288 + 16; // w-72 (288px) + gap-4 (16px)
+      columnsScrollRef.current.scrollTo({ left: colIndex * columnWidth, behavior: 'smooth' });
+    } else {
+      columnsScrollRef.current.scrollTo({ left: 0, behavior: 'smooth' });
+    }
+  }, [debouncedSearchTerm, filteredData]);
+
   const availableTipoOS = useMemo(() => Array.from(new Set([
     ...Object.values(osData).flat().map(os => os.tipo_os).filter(Boolean),
     'SC / ACC'
@@ -2152,6 +2167,7 @@ export function Kanban() {
         </div>
 
         <div
+          ref={columnsScrollRef}
           className="flex-1 min-h-0 overflow-x-auto overflow-y-hidden cyber-scrollbar"
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
