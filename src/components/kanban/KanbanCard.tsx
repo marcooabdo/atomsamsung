@@ -1,6 +1,5 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { useNavigate } from 'react-router-dom';
 import { formatTipoAtendimentoShort } from '../../lib/supabase';
 import { normalizarCidade } from '../../lib/cidadeNormalize';
 import {
@@ -40,6 +39,7 @@ export interface KanbanCardProps {
   onDragEnd: (e: React.DragEvent) => void;
   onCardDragOver: (e: React.DragEvent, colunaId: string, index: number) => void;
   onCardClick: (os: OS) => void;
+  onOpenComments?: (os: OS) => void;
   onAnalise: (os: OS) => void;
   onIniciarReparo: (os: OS) => void;
   onFecharOS: (os: OS) => void;
@@ -48,6 +48,7 @@ export interface KanbanCardProps {
   allColunas: { id: string; label: string }[];
   rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   index: number;
+  lastUserCommentDate?: string;
 }
 
 function getTATLimite(tipoOS: string, tipoAtendimento: string): number {
@@ -198,9 +199,8 @@ export const ClosedOSCard = memo(function ClosedOSCard({
 export const KanbanCard = memo(function KanbanCard({
   os, colunaId, colunaColor, textColor, badgeFilters, mostrarInfoFinanceira,
   searchMatchSource, isDragged, onDragStart, onDragEnd, onCardDragOver,
-  onCardClick, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, rotas, index
+  onCardClick, onOpenComments, onAnalise, onIniciarReparo, onFecharOS, onMoveOS, onArchive, allColunas, rotas, index, lastUserCommentDate
 }: KanbanCardProps) {
-  const navigate = useNavigate();
   const [moveOpen, setMoveOpen] = useState(false);
   const [moveSearch, setMoveSearch] = useState('');
   const moveRef = useRef<HTMLDivElement>(null);
@@ -329,19 +329,18 @@ export const KanbanCard = memo(function KanbanCard({
           <p className="text-[10px] text-gray-500 truncate">{os.cliente_nome}</p>
         </div>
         <div className="flex items-center gap-1 flex-shrink-0">
-          {os.cliente_telefone && (
+          {onOpenComments && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                const phone = os.cliente_telefone!.replace(/\D/g, '');
-                navigate(`/atom-connect?os_id=${os.id}&phone=${phone}`);
+                onOpenComments(os);
               }}
               className="p-1 rounded-md transition-all opacity-0 group-hover:opacity-100"
               style={{
                 background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
                 border: '1px solid rgba(0,212,255,0.3)',
               }}
-              title="Abrir conversa no Atom Connect"
+              title="Abrir comentarios"
             >
               <MessageCircle className="w-3 h-3 text-cyan-400" style={{ filter: 'drop-shadow(0 0 3px #00D4FF)' }} />
             </button>
@@ -565,6 +564,27 @@ export const KanbanCard = memo(function KanbanCard({
             </div>
           );
         })()}
+
+        {/* Last user comment date */}
+        {lastUserCommentDate && (
+          <div className="flex items-center gap-1 mt-1">
+            <MessageCircle className="w-2.5 h-2.5 flex-shrink-0 text-gray-500" />
+            <span className="text-[9px] text-gray-500">
+              {(() => {
+                const d = new Date(lastUserCommentDate);
+                const now = new Date();
+                const diffMs = now.getTime() - d.getTime();
+                const diffMin = Math.floor(diffMs / 60000);
+                const diffH = Math.floor(diffMs / 3600000);
+                const diffD = Math.floor(diffMs / 86400000);
+                if (diffMin < 60) return `${diffMin}min atras`;
+                if (diffH < 24) return `${diffH}h atras`;
+                if (diffD < 7) return `${diffD}d atras`;
+                return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+              })()}
+            </span>
+          </div>
+        )}
 
         {/* Versao orcamento */}
         {(os as any).versao_orcamento > 1 && (

@@ -111,11 +111,12 @@ interface OSModalProps {
   onReload?: () => void;
   mode?: 'view' | 'create';
   tipoOS?: 'OW' | 'NA';
+  initialTab?: string;
 }
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' }: OSModalProps) {
+export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW', initialTab }: OSModalProps) {
   const { usuario } = useAuth();
   const { showAlert } = useModal();
   const [os, setOS] = useState<OS | null>(null);
@@ -131,7 +132,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW' 
   const [checklistsVinculados, setChecklistsVinculados] = useState<any[]>([]);
   const [showAddChecklistModal, setShowAddChecklistModal] = useState(false);
   const [novoComentario, setNovoComentario] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('dados');
+  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>((initialTab as AbaAtiva) || 'dados');
   const [loading, setLoading] = useState(true);
   const [refazendoOrcamento, setRefazendoOrcamento] = useState(false);
   const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);

@@ -25,6 +25,7 @@ interface VirtualizedColumnProps {
   onCardDragOver: (e: React.DragEvent, colunaId: string, index: number) => void;
   onDrop: (e: React.DragEvent, colunaId: string) => void;
   onCardClick: (os: OS) => void;
+  onOpenComments?: (os: OS) => void;
   onAnalise: (os: OS) => void;
   onIniciarReparo: (os: OS) => void;
   onFecharOS: (os: OS) => void;
@@ -33,14 +34,15 @@ interface VirtualizedColumnProps {
   allColunas: { id: string; label: string }[];
   rotas: Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>;
   ColumnIcon: React.ElementType;
+  lastUserCommentMap?: Record<string, string>;
 }
 
 export function VirtualizedColumn({
   cards, colunaId, colunaColor, textColor, badgeFilters,
   mostrarInfoFinanceira, searchMatchSource, searchActive, draggedCard, columnSortOrder,
   dragOverColumn, dragOverPosition, onDragStart, onDragEnd,
-  onCardDragOver, onDrop, onCardClick, onAnalise, onIniciarReparo, onFecharOS,
-  onMoveOS, onArchive, allColunas, rotas, ColumnIcon
+  onCardDragOver, onDrop, onCardClick, onOpenComments, onAnalise, onIniciarReparo, onFecharOS,
+  onMoveOS, onArchive, allColunas, rotas, ColumnIcon, lastUserCommentMap
 }: VirtualizedColumnProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [scrollTop, setScrollTop] = useState(0);
@@ -149,6 +151,7 @@ export function VirtualizedColumn({
                 onDragEnd={onDragEnd}
                 onCardDragOver={onCardDragOver}
                 onCardClick={onCardClick}
+                onOpenComments={onOpenComments}
                 onAnalise={onAnalise}
                 onIniciarReparo={onIniciarReparo}
                 onFecharOS={onFecharOS}
@@ -157,6 +160,7 @@ export function VirtualizedColumn({
                 allColunas={allColunas}
                 rotas={rotas}
                 index={index}
+                lastUserCommentDate={lastUserCommentMap?.[os.id]}
               />
             </div>
           ))}
@@ -211,6 +215,7 @@ export function VirtualizedColumn({
                 onDragEnd={onDragEnd}
                 onCardDragOver={onCardDragOver}
                 onCardClick={onCardClick}
+                onOpenComments={onOpenComments}
                 onAnalise={onAnalise}
                 onIniciarReparo={onIniciarReparo}
                 onFecharOS={onFecharOS}
@@ -219,6 +224,7 @@ export function VirtualizedColumn({
                 allColunas={allColunas}
                 rotas={rotas}
                 index={realIndex}
+                lastUserCommentDate={lastUserCommentMap?.[os.id]}
               />
 
               {/* Drop indicator below last card */}

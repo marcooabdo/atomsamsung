@@ -140,6 +140,8 @@ export function Kanban() {
   const [selectedOSId, setSelectedOSId] = useState<string | null>(null);
   const [selectedOSTipo, setSelectedOSTipo] = useState<'LP' | 'OW' | 'NA' | null>(null);
   const [selectedOSTipoOrcamento, setSelectedOSTipoOrcamento] = useState<string | null>(null);
+  const [selectedOSInitialTab, setSelectedOSInitialTab] = useState<string | undefined>(undefined);
+  const [lastUserCommentMap, setLastUserCommentMap] = useState<Record<string, string>>({});
   const [criarOSLP, setCriarOSLP] = useState(false);
   const [criarOSOW, setCriarOSOW] = useState(false);
   const [criarOSSCACC, setCriarOSSCACC] = useState(false);
@@ -619,6 +621,27 @@ export function Kanban() {
       }, {} as Record<string, OS[]>);
 
       setOsData(grouped);
+
+      // Load last user comment timestamp for each OS
+      const allOsIds = (data || []).map(os => os.id);
+      if (allOsIds.length > 0) {
+        const { data: comentariosData } = await supabase
+          .from('os_comentarios')
+          .select('os_id, created_at')
+          .in('os_id', allOsIds)
+          .or('is_system.is.null,is_system.eq.false')
+          .order('created_at', { ascending: false });
+
+        if (comentariosData) {
+          const lastCommentMap: Record<string, string> = {};
+          for (const c of comentariosData) {
+            if (c.os_id && !lastCommentMap[c.os_id]) {
+              lastCommentMap[c.os_id] = c.created_at;
+            }
+          }
+          setLastUserCommentMap(lastCommentMap);
+        }
+      }
 
       // Carregar rotas da unidade para validação de cidades IH
       const unidadeParaRotas = selectedUnidade || usuario?.unidade_id;
@@ -1568,6 +1591,14 @@ export function Kanban() {
     setSelectedOSId(os.id);
     setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
     setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
+    setSelectedOSInitialTab(undefined);
+  }, []);
+
+  const handleOpenComments = useCallback((os: OS) => {
+    setSelectedOSId(os.id);
+    setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
+    setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
+    setSelectedOSInitialTab('comentarios');
   }, []);
 
   const handleCardAnalise = useCallback((os: OS) => {
@@ -2349,6 +2380,7 @@ export function Kanban() {
                       onCardDragOver={handleCardDragOver}
                       onDrop={handleDrop}
                       onCardClick={handleCardClick}
+                      onOpenComments={handleOpenComments}
                       onAnalise={handleCardAnalise}
                       onIniciarReparo={handleCardIniciarReparo}
                       onFecharOS={handleCardFecharOS}
@@ -2357,6 +2389,7 @@ export function Kanban() {
                       allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
                       rotas={rotas}
                       ColumnIcon={coluna.icon}
+                      lastUserCommentMap={lastUserCommentMap}
                     />
                   </div>
                 </div>
@@ -2373,8 +2406,10 @@ export function Kanban() {
             setSelectedOSId(null);
             setSelectedOSTipo(null);
             setSelectedOSTipoOrcamento(null);
+            setSelectedOSInitialTab(undefined);
           }}
           onReload={loadKanbanData}
+          initialTab={selectedOSInitialTab}
         />
       )}
 
@@ -2385,9 +2420,11 @@ export function Kanban() {
             setSelectedOSId(null);
             setSelectedOSTipo(null);
             setSelectedOSTipoOrcamento(null);
+            setSelectedOSInitialTab(undefined);
           }}
           onReload={loadKanbanData}
           mode="view"
+          initialTab={selectedOSInitialTab}
         />
       )}
 

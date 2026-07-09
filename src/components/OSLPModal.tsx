@@ -86,11 +86,12 @@ interface OSLPModalProps {
   mode?: 'create' | 'view';
   tipoOS?: 'LP' | 'OW';
   modoSCACC?: boolean;
+  initialTab?: string;
 }
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false }: OSLPModalProps) {
+export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false, initialTab }: OSLPModalProps) {
   const { usuario } = useAuth();
   const { showAlert, showInfo, showSuccess, showError, showConfirm } = useModal();
   const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
@@ -103,7 +104,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
   const [anexos, setAnexos] = useState<OSAnexo[]>([]);
   const [checklist, setChecklist] = useState<any[]>([]);
   const [novoComentario, setNovoComentario] = useState('');
-  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>('dados');
+  const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>((initialTab as AbaAtiva) || 'dados');
   const [loading, setLoading] = useState(currentMode === 'view');
   const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);
   const [mostrarModalConversao, setMostrarModalConversao] = useState(false);
