@@ -28,9 +28,7 @@ const COLUNAS_KANBAN = [
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado', color: '#10B981', icon: Zap },
   { id: 'aguardando_peca', label: 'Aguardando Peça', color: '#8B5CF6', icon: Clock },
   { id: 'peca_em_transito', label: 'Peça em Trânsito', color: '#3B82F6', icon: Activity },
-  { id: 'peca_disponivel', label: 'Peça Disponível', color: '#06B6D4', icon: Zap },
   { id: 'em_reparo_ci', label: 'Em Reparo CI', color: '#0EA5E9', icon: Activity },
-  { id: 'disponivel_ih', label: 'Disponível IH', color: '#10B981', icon: Activity },
   { id: 'rota_preta', label: 'Rota Preta', color: '#1a1a1a', icon: MapPin },
   { id: 'rota_vermelha', label: 'Rota Vermelha', color: '#EF4444', icon: MapPin },
   { id: 'rota_azul', label: 'Rota Azul', color: '#3B82F6', icon: MapPin },
@@ -38,17 +36,16 @@ const COLUNAS_KANBAN = [
   { id: 'rota_rosa', label: 'Rota Rosa', color: '#EC4899', icon: MapPin },
   { id: 'rota_amarela', label: 'Rota Amarela', color: '#EAB308', icon: MapPin },
   { id: 'rota_laranja', label: 'Rota Laranja', color: '#F97316', icon: MapPin },
-  { id: 'em_rota_ih', label: 'Em Rota IH', color: '#10B981', icon: Activity },
-  { id: 'saw', label: 'SAW', color: '#14B8A6', icon: Activity },
+  { id: 'em_rota_ih', label: 'Agendado', color: '#10B981', icon: Activity },
   { id: 'instalacao_inicial', label: 'Instalação Inicial', color: '#7C3AED', icon: Activity },
   { id: 'service_handling', label: 'Service Handling', color: '#DB2777', icon: Activity },
   { id: 'return_handling', label: 'Return Handling', color: '#D97706', icon: Activity },
   { id: 'trade_up', label: 'Trade Up', color: '#0891B2', icon: Activity },
+  { id: 'saw', label: 'SAW', color: '#14B8A6', icon: Activity },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
   { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
-  { id: 'fechar_os', label: 'Fechar OS', color: '#22C55E', icon: Zap },
   { id: 'os_fechada', label: 'OS Fechada', color: '#6B7280', icon: Zap },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados', color: '#EF4444', icon: AlertCircle }
 ];
@@ -60,9 +57,7 @@ const COLUNAS_SC_ACC = [
   'orcamento_aprovado',
   'aguardando_peca',
   'peca_em_transito',
-  'peca_disponivel',
   'aguardando_fechamento',
-  'fechar_os',
   'os_fechada',
   'orcamentos_rejeitados'
 ];
@@ -74,18 +69,16 @@ const COLUNAS_CI = [
   'orcamento_aprovado',
   'aguardando_peca',
   'peca_em_transito',
-  'peca_disponivel',
   'aguardando_fechamento',
-  'fechar_os',
   'os_fechada',
   'orcamentos_rejeitados',
   'diagnostico',
   'em_reparo_ci',
-  'saw',
   'instalacao_inicial',
   'service_handling',
   'return_handling',
   'trade_up',
+  'saw',
   'controle_qualidade',
   'qa_bt',
   'reparo_concluido'
@@ -98,13 +91,10 @@ const COLUNAS_IH = [
   'orcamento_aprovado',
   'aguardando_peca',
   'peca_em_transito',
-  'peca_disponivel',
   'aguardando_fechamento',
-  'fechar_os',
   'os_fechada',
   'orcamentos_rejeitados',
   'diagnostico',
-  'disponivel_ih',
   'rota_preta',
   'rota_vermelha',
   'rota_azul',
@@ -113,11 +103,11 @@ const COLUNAS_IH = [
   'rota_amarela',
   'rota_laranja',
   'em_rota_ih',
-  'saw',
   'instalacao_inicial',
   'service_handling',
   'return_handling',
   'trade_up',
+  'saw',
   'controle_qualidade',
   'qa_bt',
   'reparo_concluido'
@@ -872,7 +862,7 @@ export function Kanban() {
     const colunaOrigem = COLUNAS_KANBAN.find(c => c.id === draggedCard.coluna_kanban);
     const colunaDestino = COLUNAS_KANBAN.find(c => c.id === targetColumn);
 
-    if (targetColumn === 'fechar_os' && !isSameColumn) {
+    if (targetColumn === 'os_fechada' && !isSameColumn) {
       const osNumero = draggedCard.numero_os_samsung || draggedCard.numero_os_interna || 'S/N';
       setFecharOSCardData({ id: draggedCard.id, numero: String(osNumero), unidadeId: draggedCard.unidade_id });
       setPendingFecharOSDrop({ card: draggedCard, position: finalPosition });
@@ -1012,7 +1002,6 @@ export function Kanban() {
       // Colunas permitidas mesmo com peças ativas (relacionadas ao fluxo de peças e rotas)
       const colunasPermitidas = [
         'peca_em_transito',
-        'peca_disponivel',
         'aguardando_peca',
         'rota_preta',
         'rota_vermelha',
@@ -1025,7 +1014,7 @@ export function Kanban() {
         'reparo_concluido',
         'em_reparo_ci',
         'aguardando_fechamento',
-        'fechar_os'
+        'os_fechada'
       ];
 
       // IMPORTANTE: Se não há peças ativas, permite mover para qualquer coluna
@@ -1111,7 +1100,7 @@ export function Kanban() {
         return newData;
       });
 
-      if (targetColumn === 'peca_disponivel' && updatedCard.cliente_cidade) {
+      if (targetColumn === 'peca_em_transito' && updatedCard.cliente_cidade) {
         setRoutePickerOS(updatedCard);
       }
     } catch (error: any) {
@@ -1149,7 +1138,6 @@ export function Kanban() {
 
       const colunasPermitidas = [
         'peca_em_transito',
-        'peca_disponivel',
         'aguardando_peca',
         'rota_preta',
         'rota_vermelha',
@@ -1162,7 +1150,7 @@ export function Kanban() {
         'reparo_concluido',
         'em_reparo_ci',
         'aguardando_fechamento',
-        'fechar_os'
+        'os_fechada'
       ];
 
       if (pecasAtivas.length > 0 && !colunasPermitidas.includes(targetColumn)) {
@@ -1242,7 +1230,7 @@ export function Kanban() {
         return newData;
       });
 
-      if (targetColumn === 'peca_disponivel' && updatedCard.cliente_cidade) {
+      if (targetColumn === 'peca_em_transito' && updatedCard.cliente_cidade) {
         setRoutePickerOS(updatedCard);
       }
     } catch (error: any) {
@@ -1648,7 +1636,7 @@ export function Kanban() {
   const handleCardMoveToColumn = useCallback(async (os: OS, targetColumn: string) => {
     if (os.coluna_kanban === targetColumn) return;
 
-    if (targetColumn === 'fechar_os') {
+    if (targetColumn === 'os_fechada') {
       const osNumero = os.numero_os_samsung || os.numero_os_interna || 'S/N';
       setFecharOSCardData({ id: os.id, numero: String(osNumero), unidadeId: os.unidade_id });
       setPendingFecharOSDrop({ card: os, position: undefined });

@@ -182,7 +182,7 @@ export function PecasAtivasBlockModal({ isOpen, onClose, pecas, statusLabels }: 
             <div className="flex flex-wrap gap-2 text-xs">
               {[
                 'Rotas (Preta, Vermelha, Azul, Verde, Rosa, Amarela, Laranja)',
-                'Em Rota IH',
+                'Agendado',
                 'Reparo Concluído',
                 'Em Reparo CI',
                 'Aguardando Peça',

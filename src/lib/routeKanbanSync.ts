@@ -96,7 +96,7 @@ class RouteKanbanSyncService {
         .update({
           concluida: true,
           concluida_em: new Date().toISOString(),
-          coluna_kanban: 'fechar_os'
+          coluna_kanban: 'os_fechada'
         })
         .eq('id', osId);
 

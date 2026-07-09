@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Save, X, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
+import { Plus, CreditCard as Edit2, Trash2, Save, X, ChevronUp, ChevronDown, AlertTriangle } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 
@@ -30,10 +30,10 @@ const PRIORIDADES = [
 
 const COLUNAS_KANBAN = [
   'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao',
-  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel',
+  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito',
   'em_reparo_ci', 'rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde',
   'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih', 'reparo_concluido',
-  'aguardando_fechamento', 'fechar_os', 'os_fechada', 'orcamentos_rejeitados'
+  'aguardando_fechamento', 'os_fechada', 'orcamentos_rejeitados'
 ];
 
 export default function ConfiguracaoPrioridades() {

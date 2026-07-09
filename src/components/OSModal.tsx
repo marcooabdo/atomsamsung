@@ -53,9 +53,7 @@ const COLUNAS_KANBAN = [
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
   { id: 'aguardando_peca', label: 'Aguardando Peça' },
   { id: 'peca_em_transito', label: 'Peça em Trânsito' },
-  { id: 'peca_disponivel', label: 'Peça Disponível' },
   { id: 'em_reparo_ci', label: 'Em Reparo CI' },
-  { id: 'disponivel_ih', label: 'Disponível IH' },
   { id: 'rota_preta', label: 'Rota Preta' },
   { id: 'rota_vermelha', label: 'Rota Vermelha' },
   { id: 'rota_azul', label: 'Rota Azul' },
@@ -63,12 +61,11 @@ const COLUNAS_KANBAN = [
   { id: 'rota_rosa', label: 'Rota Rosa' },
   { id: 'rota_amarela', label: 'Rota Amarela' },
   { id: 'rota_laranja', label: 'Rota Laranja' },
-  { id: 'em_rota_ih', label: 'Em Rota IH' },
+  { id: 'em_rota_ih', label: 'Agendado' },
   { id: 'saw', label: 'SAW' },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC' },
   { id: 'reparo_concluido', label: 'Reparo Concluído' },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
-  { id: 'fechar_os', label: 'Fechar OS' },
   { id: 'os_fechada', label: 'OS Fechada' },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados' }
 ];
@@ -2978,7 +2975,7 @@ Não haverá cobrança ao cliente.`
                       <button
                         key={coluna.id}
                         onClick={() => {
-                          if (coluna.id === 'fechar_os') {
+                          if (coluna.id === 'os_fechada') {
                             setMostrarMoverPara(false);
                             setMostrarFecharOS(true);
                             return;

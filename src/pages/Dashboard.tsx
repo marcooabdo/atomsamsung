@@ -93,7 +93,6 @@ const KANBAN_LABELS: Record<string, { label: string; color: string }> = {
   orcamentos_rejeitados: { label: 'Orc. Rejeitado', color: '#EF4444' },
   aguardando_peca: { label: 'Aguardando Peca', color: '#F97316' },
   peca_em_transito: { label: 'Peca em Transito', color: '#06B6D4' },
-  peca_disponivel: { label: 'Peca Disponivel', color: '#14B8A6' },
   em_reparo: { label: 'Em Reparo', color: '#10B981' },
   em_reparo_ci: { label: 'Reparo CI', color: '#22C55E' },
   rota_azul: { label: 'Rota Azul', color: '#3B82F6' },

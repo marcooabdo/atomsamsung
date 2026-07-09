@@ -129,7 +129,6 @@ export function AgendaMobile() {
       'rota_amarela': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
       'rota_laranja': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
       'aguardando_peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
-      'peca_disponivel': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
       'os_nova': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' }
     };
     return statusMap[os.coluna_kanban] || { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };

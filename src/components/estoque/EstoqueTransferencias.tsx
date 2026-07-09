@@ -391,8 +391,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           throw osError;
         }
 
-        let destinoColuna = 'peca_disponivel';
-        let mensagemDestino = 'Peça Disponível';
+        let destinoColuna = 'peca_em_transito';
+        let mensagemDestino = 'Peça em Trânsito';
 
         // Lógica de roteamento automático APENAS para OS IH
         if (osCompleta?.tipo_atendimento === 'IH' && osCompleta?.cliente_cidade && osCompleta?.unidade_id) {
@@ -430,7 +430,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         }
 
 
-        const mensagemComentario = destinoColuna === 'peca_disponivel'
+        const mensagemComentario = destinoColuna === 'peca_em_transito'
           ? `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida para "${mensagemDestino}"`
           : `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida automaticamente para "${mensagemDestino}"`;
 
@@ -441,8 +441,8 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           is_system: true
         });
 
-        const mensagemAlerta = destinoColuna === 'peca_disponivel'
-          ? 'Transferência confirmada! Todas as peças foram vinculadas. OS movida para "Peça Disponível".'
+        const mensagemAlerta = destinoColuna === 'peca_em_transito'
+          ? 'Transferência confirmada! Todas as peças foram vinculadas. OS movida para "Peça em Trânsito".'
           : `Transferência confirmada! Todas as peças foram vinculadas. OS movida automaticamente para "${mensagemDestino}".`;
 
         showAlert({

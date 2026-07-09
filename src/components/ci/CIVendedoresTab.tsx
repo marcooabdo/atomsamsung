@@ -34,9 +34,9 @@ const CATEGORY_CONFIG = [
 ];
 
 const PIPELINE_STAGES = [
-  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel',
-  'em_reparo_ci', 'disponivel_ih', 'em_rota_ih', 'saw', 'controle_qualidade',
-  'reparo_concluido', 'aguardando_fechamento', 'fechar_os', 'os_fechada',
+  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito',
+  'em_reparo_ci', 'em_rota_ih', 'saw', 'controle_qualidade',
+  'reparo_concluido', 'aguardando_fechamento', 'os_fechada',
   'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao',
 ];
 

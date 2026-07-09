@@ -53,8 +53,8 @@ export function AnaliseConcluidaModal({ isOpen, osId, osNumero, onClose, onSucce
           proximaColuna = 'em_reparo_ci';
           mensagemMovimentacao = '✅ OS movida automaticamente para "EM REPARO CI" (Sem necessidade de negociação)';
         } else if (osData?.tipo_atendimento === 'IH') {
-          proximaColuna = 'disponivel_ih';
-          mensagemMovimentacao = '✅ OS movida automaticamente para "DISPONÍVEL IH" (Sem necessidade de negociação)';
+          proximaColuna = 'em_rota_ih';
+          mensagemMovimentacao = '✅ OS movida automaticamente para "AGENDADO" (Sem necessidade de negociação)';
         }
       }
 

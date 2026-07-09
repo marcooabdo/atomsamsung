@@ -45,7 +45,6 @@ const COLUNAS_KANBAN = [
   { id: 'orcamento_aprovado', label: 'Orçamento Aprovado' },
   { id: 'aguardando_peca', label: 'Aguardando Peça' },
   { id: 'peca_em_transito', label: 'Peça em Trânsito' },
-  { id: 'peca_disponivel', label: 'Peça Disponível' },
   { id: 'em_reparo_ci', label: 'Em Reparo CI' },
   { id: 'rota_preta', label: 'Rota Preta' },
   { id: 'rota_vermelha', label: 'Rota Vermelha' },
@@ -54,10 +53,9 @@ const COLUNAS_KANBAN = [
   { id: 'rota_rosa', label: 'Rota Rosa' },
   { id: 'rota_amarela', label: 'Rota Amarela' },
   { id: 'rota_laranja', label: 'Rota Laranja' },
-  { id: 'em_rota_ih', label: 'Em Rota IH' },
+  { id: 'em_rota_ih', label: 'Agendado' },
   { id: 'reparo_concluido', label: 'Reparo Concluído' },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
-  { id: 'fechar_os', label: 'Fechar OS' },
   { id: 'os_fechada', label: 'OS Fechada' },
   { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados' }
 ];
@@ -1719,7 +1717,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
 
 
       // Mover OS para "Aguardando Peça" se não estiver lá ainda
-      const colunasQueNaoPrecisamMover = ['aguardando_peca', 'peca_em_transito', 'peca_disponivel'];
+      const colunasQueNaoPrecisamMover = ['aguardando_peca', 'peca_em_transito'];
       if (os?.coluna_kanban && !colunasQueNaoPrecisamMover.includes(os.coluna_kanban)) {
         const { error: updateError } = await supabase
           .from('os')

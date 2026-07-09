@@ -65,7 +65,7 @@ export default function GestaoRotas() {
       .from('os')
       .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_cidade, cliente_bairro, cliente_endereco, cliente_cep, tipo_atendimento, tipo_os, coluna_kanban, lat, lng, created_at, unidade_id')
       .eq('unidade_id', selectedUnidade)
-      .eq('coluna_kanban', 'peca_disponivel')
+      .eq('coluna_kanban', 'peca_em_transito')
       .order('created_at', { ascending: true });
 
     setPecaDisponivelOS(osDisponivel || []);
@@ -175,7 +175,7 @@ export default function GestaoRotas() {
   };
 
   const moveBackToDisponivel = async (osId: string) => {
-    await supabase.from('os').update({ coluna_kanban: 'peca_disponivel' }).eq('id', osId);
+    await supabase.from('os').update({ coluna_kanban: 'peca_em_transito' }).eq('id', osId);
     await loadData();
     refresh();
   };

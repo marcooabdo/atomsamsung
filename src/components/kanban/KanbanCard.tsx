@@ -1063,7 +1063,7 @@ export const KanbanCard = memo(function KanbanCard({
         )}
 
         {/* Fechar OS */}
-        {badgeFilters.fecharOS && (colunaId === 'fechar_os' || colunaId === 'aguardando_fechamento') && (
+        {badgeFilters.fecharOS && (colunaId === 'os_fechada' || colunaId === 'aguardando_fechamento') && (
           <div className="mt-2 pt-2 border-t" style={{ borderColor: 'rgba(34,197,94,0.2)' }}>
             <button
               onClick={(e) => { e.stopPropagation(); onFecharOS(os); }}

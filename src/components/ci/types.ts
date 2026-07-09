@@ -1,18 +1,16 @@
 export const APPROVED_STAGES = [
-  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito', 'peca_disponivel',
-  'em_reparo_ci', 'disponivel_ih', 'em_rota_ih', 'saw', 'instalacao_inicial',
+  'orcamento_aprovado', 'aguardando_peca', 'peca_em_transito',
+  'em_reparo_ci', 'em_rota_ih', 'saw', 'instalacao_inicial',
   'service_handling', 'return_handling', 'trade_up', 'controle_qualidade',
-  'reparo_concluido', 'aguardando_fechamento', 'fechar_os', 'os_fechada'
+  'reparo_concluido', 'aguardando_fechamento', 'os_fechada'
 ];
 
 export const KANBAN_LABELS: Record<string, string> = {
   'orcamento_aprovado': 'Orc. Aprovado',
   'aguardando_peca': 'Aguardando Peca',
   'peca_em_transito': 'Peca em Transito',
-  'peca_disponivel': 'Peca Disponivel',
   'em_reparo_ci': 'Em Reparo',
-  'disponivel_ih': 'Disponivel IH',
-  'em_rota_ih': 'Em Rota IH',
+  'em_rota_ih': 'Agendado',
   'saw': 'SAW',
   'instalacao_inicial': 'Instalacao Inicial',
   'service_handling': 'Service Handling',
@@ -21,7 +19,6 @@ export const KANBAN_LABELS: Record<string, string> = {
   'controle_qualidade': 'Controle Qualidade',
   'reparo_concluido': 'Reparo Concluido',
   'aguardando_fechamento': 'Aguard. Fechamento',
-  'fechar_os': 'Fechar OS',
   'os_fechada': 'OS Fechada'
 };
 
@@ -29,9 +26,7 @@ export const KANBAN_COLORS: Record<string, string> = {
   'orcamento_aprovado': 'text-amber-400 bg-amber-500/20 border-amber-500/30',
   'aguardando_peca': 'text-orange-400 bg-orange-500/20 border-orange-500/30',
   'peca_em_transito': 'text-blue-400 bg-blue-500/20 border-blue-500/30',
-  'peca_disponivel': 'text-cyan-400 bg-cyan-500/20 border-cyan-500/30',
   'em_reparo_ci': 'text-sky-400 bg-sky-500/20 border-sky-500/30',
-  'disponivel_ih': 'text-teal-400 bg-teal-500/20 border-teal-500/30',
   'em_rota_ih': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
   'saw': 'text-green-400 bg-green-500/20 border-green-500/30',
   'instalacao_inicial': 'text-violet-400 bg-violet-500/20 border-violet-500/30',
@@ -41,7 +36,6 @@ export const KANBAN_COLORS: Record<string, string> = {
   'controle_qualidade': 'text-lime-400 bg-lime-500/20 border-lime-500/30',
   'reparo_concluido': 'text-emerald-400 bg-emerald-500/20 border-emerald-500/30',
   'aguardando_fechamento': 'text-yellow-400 bg-yellow-500/20 border-yellow-500/30',
-  'fechar_os': 'text-green-400 bg-green-500/20 border-green-500/30',
   'os_fechada': 'text-emerald-300 bg-emerald-500/20 border-emerald-500/30'
 };
 
