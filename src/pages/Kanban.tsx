@@ -44,6 +44,7 @@ const COLUNAS_KANBAN = [
   { id: 'return_handling', label: 'Return Handling', color: '#D97706', icon: Activity },
   { id: 'trade_up', label: 'Trade Up', color: '#0891B2', icon: Activity },
   { id: 'controle_qualidade', label: 'Controle de Qualidade / OQC', color: '#2563EB', icon: CheckCircle },
+  { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED', icon: CheckCircle },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981', icon: Zap },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B', icon: Clock },
   { id: 'fechar_os', label: 'Fechar OS', color: '#22C55E', icon: Zap },
@@ -85,6 +86,7 @@ const COLUNAS_CI = [
   'return_handling',
   'trade_up',
   'controle_qualidade',
+  'qa_bt',
   'reparo_concluido'
 ];
 
@@ -116,6 +118,7 @@ const COLUNAS_IH = [
   'return_handling',
   'trade_up',
   'controle_qualidade',
+  'qa_bt',
   'reparo_concluido'
 ];
 
