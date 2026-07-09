@@ -532,15 +532,19 @@ export const KanbanCard = memo(function KanbanCard({
           );
           const cor = rotaMatch?.cor || null;
           if (cor) {
+            const isDarkRoute = cor.toLowerCase() === '#1a1a1a' || cor.toLowerCase() === '#000000';
+            const textColor = isDarkRoute ? '#ffffff' : cor;
+            const bgColor = isDarkRoute ? `${cor}90` : `${cor}18`;
+            const borderColor = isDarkRoute ? `${cor}` : `${cor}45`;
             return (
               <div className="flex items-center gap-1 mt-1">
-                <MapPin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: cor, filter: `drop-shadow(0 0 3px ${cor})` }} />
+                <MapPin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: isDarkRoute ? '#aaa' : cor, filter: `drop-shadow(0 0 3px ${cor})` }} />
                 <span
                   className="px-1.5 py-0.5 rounded text-[9px] font-bold truncate"
                   style={{
-                    background: `${cor}18`,
-                    color: cor,
-                    border: `1px solid ${cor}45`,
+                    background: bgColor,
+                    color: textColor,
+                    border: `1px solid ${borderColor}`,
                     boxShadow: `0 0 6px ${cor}20`
                   }}
                   title={`${cidadeDisplay} - ${rotaMatch.nome}`}
