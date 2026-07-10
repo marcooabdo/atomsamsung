@@ -1999,7 +1999,7 @@ Não haverá cobrança ao cliente.`
           quantidade_requisitada: peca.quantidade || 1,
           status: 'pendente',
           requisitado_por: usuario?.id,
-          numero_os_samsung: os?.numero_os_samsung,
+          numero_os_samsung: os?.numero_os_samsung || os?.numero_os_interna,
           unidade_id: os?.unidade_id
         });
 
@@ -2119,7 +2119,7 @@ Não haverá cobrança ao cliente.`
           status: 'pendente',
           requisitado_por: usuario?.id,
           unidade_id: os?.unidade_id,
-          numero_os_samsung: os?.numero_os_samsung
+          numero_os_samsung: os?.numero_os_samsung || os?.numero_os_interna
         })
         .select()
         .single();

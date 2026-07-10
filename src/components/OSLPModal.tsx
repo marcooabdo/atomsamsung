@@ -1708,7 +1708,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         quantidade_requisitada: peca.quantidade,
         status: 'pendente',
         requisitado_por: usuario?.id,
-        numero_os_samsung: os?.numero_os_samsung,
+        numero_os_samsung: os?.numero_os_samsung || os?.numero_os_interna,
         unidade_id: os?.unidade_id,
         tecnico_id: os?.tecnico_agendado_id || null
       }).select();
@@ -1829,7 +1829,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           status: 'pendente',
           requisitado_por: usuario?.id,
           unidade_id: os?.unidade_id,
-          numero_os_samsung: os?.numero_os_samsung
+          numero_os_samsung: os?.numero_os_samsung || os?.numero_os_interna
         })
         .select()
         .single();
