@@ -166,7 +166,7 @@ export function Dashboard() {
       const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
         let q = supabase
           .from('os')
-          .select('id, coluna_kanban, tipo_os, valor_total, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_reprovado_em, unidade_id')
+          .select('id, coluna_kanban, tipo_os, valor_total, fechada_em, created_at, orcamento_aprovado, orcamento_aprovado_em, unidade_id')
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
@@ -265,7 +265,7 @@ export function Dashboard() {
       const cotacoesReprovadas = cotacoes.filter(c => c.status === 'reprovada' || c.status === 'reprovada_refeita');
 
       const osOWAprovadas = osList.filter(os => os.tipo_os === 'OW' && os.orcamento_aprovado === true);
-      const osOWReprovadas = osList.filter(os => os.tipo_os === 'OW' && os.orcamento_aprovado_reprovado_em !== null && os.orcamento_aprovado !== true);
+      const osOWReprovadas = osList.filter(os => os.tipo_os === 'OW' && os.orcamento_aprovado === false && os.fechada_em !== null);
 
       const totalOrcamentosFinalizados = cotacoesAprovadas.length + cotacoesReprovadas.length + osOWAprovadas.length + osOWReprovadas.length;
       const totalAprovados = cotacoesAprovadas.length + osOWAprovadas.length;
@@ -454,16 +454,12 @@ export function Dashboard() {
           const inicio = new Date(os.created_at);
           const fim = os.orcamento_aprovado_em
             ? new Date(os.orcamento_aprovado_em)
-            : os.orcamento_aprovado_reprovado_em
-            ? new Date(os.orcamento_aprovado_reprovado_em)
             : new Date();
           const dias = Math.ceil((fim.getTime() - inicio.getTime()) / (1000 * 60 * 60 * 24));
 
           let status_final: 'aprovado' | 'reprovado' | 'aberto' = 'aberto';
           if (os.orcamento_aprovado === true) {
             status_final = 'aprovado';
-          } else if (os.orcamento_aprovado_reprovado_em !== null && os.orcamento_aprovado !== true) {
-            status_final = 'reprovado';
           }
 
           return {
@@ -472,7 +468,7 @@ export function Dashboard() {
             tipo_os: os.tipo_os,
             cliente_nome: os.cliente_nome || 'Cliente nao informado',
             created_at: os.created_at,
-            fechada_em: os.orcamento_aprovado_em || os.orcamento_aprovado_reprovado_em,
+            fechada_em: os.orcamento_aprovado_em,
             coluna_kanban: os.coluna_kanban,
             tempo_resolucao_dias: dias,
             valor_total: os.valor_total || 0,

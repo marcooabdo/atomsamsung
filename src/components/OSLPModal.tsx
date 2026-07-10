@@ -1828,7 +1828,8 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
           quantidade_requisitada: peca.quantidade || 1,
           status: 'pendente',
           requisitado_por: usuario?.id,
-          unidade_id: os?.unidade_id
+          unidade_id: os?.unidade_id,
+          numero_os_samsung: os?.numero_os_samsung
         })
         .select()
         .single();
