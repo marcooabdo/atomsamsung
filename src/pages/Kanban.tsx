@@ -10,11 +10,12 @@ import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
 import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
+import { PecasInfoModal } from '../components/kanban/PecasInfoModal';
 import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
 import { useDebounce } from '../components/kanban/useDebounce';
 import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings, Info } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -209,6 +210,7 @@ export function Kanban() {
   const [errorModalData, setErrorModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
   const [showInfoModal, setShowInfoModal] = useState(false);
   const [infoModalData, setInfoModalData] = useState<{ title: string; message: string }>({ title: '', message: '' });
+  const [showPecasInfoModal, setShowPecasInfoModal] = useState(false);
   const [mandatoryRoutePickerOS, setMandatoryRoutePickerOS] = useState<OS | null>(null);
   const [pendingMandatoryMove, setPendingMandatoryMove] = useState<{ targetColumn: string; position?: number } | null>(null);
   const [rotas, setRotas] = useState<Array<{ id: string; nome: string; cor: string | null; cidades: string[]; coluna_kanban: string }>>([]);
@@ -2287,6 +2289,23 @@ export function Kanban() {
                           </h4>
                         </div>
                         <div className="flex items-center gap-1.5">
+                          {coluna.id === 'aguardando_peca' && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPecasInfoModal(true);
+                              }}
+                              className="p-1 rounded-md transition-all hover:scale-110"
+                              style={{
+                                background: 'linear-gradient(135deg, #8B5CF620 0%, #8B5CF610 100%)',
+                                border: '1px solid #8B5CF640',
+                                color: '#8B5CF6'
+                              }}
+                              title="Info Pecas Requisitadas"
+                            >
+                              <Info className="w-3 h-3" />
+                            </button>
+                          )}
                           <div className="relative" data-sort-dropdown>
                             <button
                               onClick={(e) => {
@@ -2612,6 +2631,12 @@ export function Kanban() {
         }}
         title={infoModalData.title}
         message={infoModalData.message}
+      />
+
+      <PecasInfoModal
+        show={showPecasInfoModal}
+        onClose={() => setShowPecasInfoModal(false)}
+        osCards={(filteredData['aguardando_peca'] || []) as any}
       />
 
       {showBuscarOSModal && (
