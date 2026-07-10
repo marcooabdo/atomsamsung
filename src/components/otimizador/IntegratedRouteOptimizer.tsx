@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Play, RefreshCw, AlertCircle, MapPin, CheckCircle2,
   Send, Trash2, Plus, Route, CalendarCheck, Info, Repeat2,
@@ -73,6 +73,21 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
   const [showLinhaModal, setShowLinhaModal] = useState(false);
   const [listaParaFiltrarDepoisDaLinha, setListaParaFiltrarDepoisDaLinha] = useState<OSLogistica[]>([]);
   const [linhasDisponiveis, setLinhasDisponiveis] = useState<string[]>(['Samsung', 'Apple', 'Motorola', 'Xiaomi', 'LG', 'Sony', 'Nokia', 'Outros']);
+
+  const tecnicosFiltrados = useMemo(() => {
+    if (!rotaSelecionada) return tecnicos;
+    const coluna = rotaSelecionada.coluna_kanban;
+    if (coluna.startsWith('rota_')) {
+      return tecnicos.filter(t => t.tipo === 'tecnico_ih');
+    }
+    return tecnicos.filter(t => t.tipo === 'tecnico');
+  }, [tecnicos, rotaSelecionada]);
+
+  useEffect(() => {
+    if (tecnicoSelecionado && !tecnicosFiltrados.some(t => t.id === tecnicoSelecionado.id)) {
+      setTecnicoSelecionado(null);
+    }
+  }, [tecnicosFiltrados]);
 
   useEffect(() => {
     carregarDados();
@@ -466,12 +481,12 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 <label className="block text-xs font-medium mb-2" style={{ color: 'var(--text-secondary)' }}>Técnico</label>
                 <select
                   value={tecnicoSelecionado?.id ?? ''}
-                  onChange={e => setTecnicoSelecionado(tecnicos.find(t => t.id === e.target.value) ?? null)}
+                  onChange={e => setTecnicoSelecionado(tecnicosFiltrados.find(t => t.id === e.target.value) ?? null)}
                   className="w-full px-3 py-2.5 rounded-lg text-sm focus:outline-none"
                   style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }}
                 >
                   <option value="">Selecionar técnico...</option>
-                  {tecnicos.map(t => (
+                  {tecnicosFiltrados.map(t => (
                     <option key={t.id} value={t.id}>{t.nome}</option>
                   ))}
                 </select>

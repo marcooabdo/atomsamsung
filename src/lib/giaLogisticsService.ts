@@ -57,6 +57,7 @@ export interface RotaColuna {
 export interface TecnicoLogistica {
   id: string;
   nome: string;
+  tipo: string;
   habilidades: string[] | null;
   horario_inicio_expediente: string | null;
   horario_fim_expediente: string | null;
@@ -155,7 +156,7 @@ export async function buscarRotasColuna(unidadeId: string): Promise<RotaColuna[]
 export async function buscarTecnicosLogistica(unidadeId: string): Promise<TecnicoLogistica[]> {
   const { data } = await supabase
     .from('usuarios')
-    .select('id, nome, habilidades, horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, horario_almoco_inicio')
+    .select('id, nome, tipo, habilidades, horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos, horario_almoco_inicio')
     .eq('unidade_id', unidadeId)
     .in('tipo', ['tecnico', 'tecnico_ih'])
     .eq('ativo', true)
