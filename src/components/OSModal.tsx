@@ -1075,6 +1075,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
 
       await loadPecas();
       await loadComentarios();
+      onReload?.();
     } catch (error) {
       showAlert({ message: 'Erro ao salvar valor GSPN', type: 'error' });
     } finally {
@@ -1117,6 +1118,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
 
       await loadPecas();
       await loadOS();
+      onReload?.();
     } catch (error: any) {
       showAlert({ message: 'Erro ao salvar valor: ' + (error?.message || ''), type: 'error' });
     }
@@ -1157,6 +1159,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
 
       await loadPecas();
       await loadOS();
+      onReload?.();
     } catch (error: any) {
       showAlert({ message: 'Erro ao salvar valor total: ' + (error?.message || ''), type: 'error' });
     }
@@ -1274,6 +1277,7 @@ export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW',
 
       await loadPecas();
       await loadComentarios();
+      onReload?.();
       showAlert({ message: `Peca adicionada com sucesso!${quantidade > 1 ? ` (${quantidade} unidades)` : ''}`, type: 'success' });
     } catch (error: any) {
       showAlert({ message: `Erro ao adicionar peca: ${error.message}`, type: 'error' });
