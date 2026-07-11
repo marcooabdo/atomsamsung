@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
-import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2 } from 'lucide-react';
+import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2, Copy } from 'lucide-react';
 import { useModal } from '../../contexts/ModalContext';
 import { ModalSelecionarID } from './ModalSelecionarID';
 import { ModalPedirPeca } from './ModalPedirPeca';
@@ -1073,8 +1073,15 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                         )}
                         <Package className="w-5 h-5 text-[#FF0064]" />
                         <div>
-                          <p className="font-bold text-white">
+                          <p className="font-bold text-white flex items-center gap-2">
                             OS {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
+                            <button
+                              onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grupo.numero_os_samsung || grupo.numero_os_interna || ''); }}
+                              className="p-1 rounded hover:bg-white/10 transition-colors"
+                              title="Copiar número da OS"
+                            >
+                              <Copy className="w-3.5 h-3.5 text-gray-400 hover:text-white" />
+                            </button>
                           </p>
                           <p className="text-xs text-gray-400">
                             {grupo.totalPecas} peça(s) com pedido ativo
@@ -1225,6 +1232,13 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <p className="font-bold text-gray-200">
                             OS: {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
                           </p>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grupo.numero_os_samsung || grupo.numero_os_interna || ''); }}
+                            className="p-1 rounded hover:bg-white/10 transition-colors"
+                            title="Copiar número da OS"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-gray-400 hover:text-white" />
+                          </button>
                           <BadgeTipoOS tipo={grupo.tipo_os} />
                         </div>
                         <div className="flex items-center gap-3 mt-1">
@@ -1578,6 +1592,13 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <p className="font-bold text-white">
                             OS {grupo.numero_os_samsung || grupo.numero_os_interna || 'N/A'}
                           </p>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(grupo.numero_os_samsung || grupo.numero_os_interna || ''); }}
+                            className="p-1 rounded hover:bg-white/10 transition-colors"
+                            title="Copiar número da OS"
+                          >
+                            <Copy className="w-3.5 h-3.5 text-gray-400 hover:text-white" />
+                          </button>
                           <BadgeTipoOS tipo={grupo.tipo_os} />
                         </div>
                         <p className="text-xs text-gray-400">
