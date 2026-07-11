@@ -80,7 +80,7 @@ export function DevolucaoModal({ isOpen, onClose, onConfirm, requisicao, tipoOS,
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.6)' }}>
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-4" style={{ background: 'rgba(0,0,0,0.6)' }} onClick={e => e.stopPropagation()}>
       <div
         className="rounded-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
         style={{ background: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.3)', boxShadow: 'var(--card-shadow)' }}
