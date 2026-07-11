@@ -2370,6 +2370,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         .from('os')
         .update({
           coluna_kanban: targetColumn,
+          bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', os.id);
@@ -2377,6 +2378,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       if (error) throw error;
 
       setMostrarMoverPara(false);
+      onReload?.();
       setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);
@@ -6969,7 +6971,6 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
         isOpen={mostrarSucessoMover}
         onClose={() => {
           setMostrarSucessoMover(false);
-          onReload?.();
           onClose();
         }}
         title="Sucesso"
