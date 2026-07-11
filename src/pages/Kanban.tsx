@@ -1581,9 +1581,10 @@ export function Kanban() {
       const reqsFiltradas = reqs.filter((r: any) => statusFiltro.includes(r.status));
 
       for (const req of reqsFiltradas) {
-        const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
-        const valor = (req.valor_peca && req.valor_peca > 0) ? req.valor_peca : valorGSPN;
-        if (valor && valor > 0) {
+        const valorGSPN = parseFloat(pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn) || 0;
+        const valorReq = parseFloat(req.valor_peca) || 0;
+        const valor = valorReq > 0 ? valorReq : valorGSPN;
+        if (valor > 0) {
           total += valor;
         }
       }
@@ -1592,11 +1593,11 @@ export function Kanban() {
   };
 
   const valorTotalAguardandoPeca = useMemo(() => {
-    return calcularValorPecasColuna(filteredData['aguardando_peca'] || [], ['requisitada']);
+    return calcularValorPecasColuna(filteredData['aguardando_peca'] || [], ['pendente', 'requisitada']);
   }, [filteredData]);
 
   const valorTotalPecaEmTransito = useMemo(() => {
-    return calcularValorPecasColuna(filteredData['peca_em_transito'] || [], ['pedido_feito', 'em_transito']);
+    return calcularValorPecasColuna(filteredData['peca_em_transito'] || [], ['pendente', 'requisitada', 'pedido_feito', 'em_transito']);
   }, [filteredData]);
 
   useEffect(() => {
