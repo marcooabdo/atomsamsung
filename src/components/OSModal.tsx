@@ -2737,6 +2737,7 @@ Não haverá cobrança ao cliente.`
         .from('os')
         .update({
           coluna_kanban: targetColumn,
+          bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString(),
           ...(extraUpdates || {})
         })
