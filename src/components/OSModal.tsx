@@ -2746,6 +2746,7 @@ Não haverá cobrança ao cliente.`
       if (error) throw error;
 
       setMostrarMoverPara(false);
+      onReload?.();
       setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);
@@ -5880,7 +5881,6 @@ Não haverá cobrança ao cliente.`
         isOpen={mostrarSucessoMover}
         onClose={() => {
           setMostrarSucessoMover(false);
-          onReload?.();
           onClose();
         }}
         title="Sucesso"
