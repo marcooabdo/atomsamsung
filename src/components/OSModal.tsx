@@ -106,6 +106,7 @@ interface OSModalProps {
   osId: string | null;
   onClose: () => void;
   onReload?: () => void;
+  onMoveOS?: (osId: string, fromColumn: string, toColumn: string) => void;
   mode?: 'view' | 'create';
   tipoOS?: 'OW' | 'NA';
   initialTab?: string;
@@ -113,7 +114,7 @@ interface OSModalProps {
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'OW', initialTab }: OSModalProps) {
+export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipoOS = 'OW', initialTab }: OSModalProps) {
   const { usuario } = useAuth();
   const { showAlert } = useModal();
   const [os, setOS] = useState<OS | null>(null);
@@ -2746,7 +2747,7 @@ Não haverá cobrança ao cliente.`
       if (error) throw error;
 
       setMostrarMoverPara(false);
-      onReload?.();
+      onMoveOS?.(os.id, os.coluna_kanban, targetColumn);
       setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);

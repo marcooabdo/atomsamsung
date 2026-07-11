@@ -81,6 +81,7 @@ interface OSLPModalProps {
   osId: string | null;
   onClose: () => void;
   onReload?: () => void;
+  onMoveOS?: (osId: string, fromColumn: string, toColumn: string) => void;
   mode?: 'create' | 'view';
   tipoOS?: 'LP' | 'OW';
   modoSCACC?: boolean;
@@ -89,7 +90,7 @@ interface OSLPModalProps {
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP', modoSCACC = false, initialTab }: OSLPModalProps) {
+export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipoOS = 'LP', modoSCACC = false, initialTab }: OSLPModalProps) {
   const { usuario } = useAuth();
   const { showAlert, showInfo, showSuccess, showError, showConfirm } = useModal();
   const [currentOsId, setCurrentOsId] = useState<string | null>(osId);
@@ -2378,7 +2379,7 @@ export function OSLPModal({ osId, onClose, onReload, mode = 'view', tipoOS = 'LP
       if (error) throw error;
 
       setMostrarMoverPara(false);
-      onReload?.();
+      onMoveOS?.(os.id, os.coluna_kanban, targetColumn);
       setMostrarSucessoMover(true);
     } catch (error: any) {
       alert(`Erro ao mover OS: ${error.message}`);

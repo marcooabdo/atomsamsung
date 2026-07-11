@@ -681,6 +681,21 @@ export function Kanban() {
     }
   };
 
+  const handleModalMoveOS = (osId: string, fromColumn: string, toColumn: string) => {
+    setOsData(prevData => {
+      const newData = { ...prevData };
+      const sourceCards = newData[fromColumn] || [];
+      const movedCard = sourceCards.find(c => c.id === osId);
+      if (!movedCard) return prevData;
+      newData[fromColumn] = sourceCards.filter(c => c.id !== osId);
+      const destCards = [...(newData[toColumn] || [])];
+      const lastSeq = destCards.length > 0 ? (destCards[destCards.length - 1]?.sequencia_coluna ?? 0) + 1 : 0;
+      destCards.push({ ...movedCard, coluna_kanban: toColumn, sequencia_coluna: lastSeq });
+      newData[toColumn] = destCards;
+      return newData;
+    });
+  };
+
   const handleDragStart = (e: React.DragEvent, os: OS) => {
     if (os.coluna_kanban === 'diagnostico') {
       e.preventDefault();
@@ -2501,6 +2516,7 @@ export function Kanban() {
             setSelectedOSInitialTab(undefined);
           }}
           onReload={loadKanbanData}
+          onMoveOS={handleModalMoveOS}
           initialTab={selectedOSInitialTab}
         />
       )}
@@ -2515,6 +2531,7 @@ export function Kanban() {
             setSelectedOSInitialTab(undefined);
           }}
           onReload={loadKanbanData}
+          onMoveOS={handleModalMoveOS}
           mode="view"
           initialTab={selectedOSInitialTab}
         />
