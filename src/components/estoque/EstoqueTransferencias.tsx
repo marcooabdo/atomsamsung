@@ -421,6 +421,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           .from('os')
           .update({
             coluna_kanban: destinoColuna,
+            bloqueio_movimentacao_automatica: false,
             updated_at: new Date().toISOString()
           })
           .eq('id', requisicao.os_id);
@@ -728,6 +729,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .from('os')
         .update({
           coluna_kanban: 'peca_em_transito',
+          bloqueio_movimentacao_automatica: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', requisicao.os_id);
@@ -790,6 +792,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           .from('os')
           .update({
             coluna_kanban: 'peca_em_transito',
+            bloqueio_movimentacao_automatica: false,
             updated_at: new Date().toISOString()
           })
           .eq('id', requisicao.os_id);

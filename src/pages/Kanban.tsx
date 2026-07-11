@@ -1085,7 +1085,7 @@ export function Kanban() {
         .update({
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
-          bloqueio_movimentacao_automatica: false,
+          bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', draggedCard.id)
@@ -1219,6 +1219,7 @@ export function Kanban() {
         .update({
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
+          bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
         })
         .eq('id', draggedCard.id);
@@ -1265,7 +1266,7 @@ export function Kanban() {
     try {
       const { error } = await supabase
         .from('os')
-        .update({ coluna_kanban: targetColumn, bloqueio_movimentacao_automatica: false, updated_at: new Date().toISOString() })
+        .update({ coluna_kanban: targetColumn, bloqueio_movimentacao_automatica: true, updated_at: new Date().toISOString() })
         .eq('id', osId);
       if (error) throw error;
 
@@ -1572,20 +1573,19 @@ export function Kanban() {
     return { filteredData: result, computedMatchSource: newMatchSource };
   }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, columnSortOrder, columnSortDir]);
 
-  const valorTotalAguardandoPeca = useMemo(() => {
-    const cards = filteredData['aguardando_peca'] || [];
+  const calcularValorPecasColuna = (cards: any[]) => {
     let total = 0;
     for (const os of cards) {
       const reqs = (os as any).requisicoes || [];
       const pecasOS = (os as any).os_pecas || [];
       for (const req of reqs) {
-        if (req.status === 'requisitada' || req.status === 'pendente' || req.status === 'aguardando') {
+        if (req.status === 'requisitada' || req.status === 'pendente' || req.status === 'aguardando' || req.status === 'pedido_feito') {
           const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
           const valor = req.valor_peca ?? valorGSPN;
           if (valor && valor > 0) total += valor;
         }
       }
-      if (reqs.filter((r: any) => r.status === 'requisitada' || r.status === 'pendente' || r.status === 'aguardando').length === 0 && reqs.length > 0) {
+      if (reqs.filter((r: any) => ['requisitada', 'pendente', 'aguardando', 'pedido_feito'].includes(r.status)).length === 0 && reqs.length > 0) {
         for (const req of reqs) {
           const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
           const valor = req.valor_peca ?? valorGSPN;
@@ -1594,6 +1594,14 @@ export function Kanban() {
       }
     }
     return total;
+  };
+
+  const valorTotalAguardandoPeca = useMemo(() => {
+    return calcularValorPecasColuna(filteredData['aguardando_peca'] || []);
+  }, [filteredData]);
+
+  const valorTotalPecaEmTransito = useMemo(() => {
+    return calcularValorPecasColuna(filteredData['peca_em_transito'] || []);
   }, [filteredData]);
 
   useEffect(() => {
@@ -1697,7 +1705,7 @@ export function Kanban() {
       const updateData: any = {
         coluna_kanban: targetColumn,
         sequencia_coluna: novaSequencia,
-        bloqueio_movimentacao_automatica: false,
+        bloqueio_movimentacao_automatica: true,
         updated_at: new Date().toISOString(),
       };
 
@@ -2328,6 +2336,23 @@ export function Kanban() {
                               title="Clique para ver detalhes das pecas"
                             >
                               R$ {valorTotalAguardandoPeca.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </button>
+                          )}
+                          {coluna.id === 'peca_em_transito' && valorTotalPecaEmTransito > 0 && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setShowPecasInfoModal(true);
+                              }}
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all hover:scale-105 cursor-pointer"
+                              style={{
+                                background: 'linear-gradient(135deg, #3B82F620 0%, #3B82F610 100%)',
+                                border: '1px solid #3B82F640',
+                                color: '#3B82F6'
+                              }}
+                              title="Valor total das pecas em transito"
+                            >
+                              R$ {valorTotalPecaEmTransito.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </button>
                           )}
                           <div className="relative" data-sort-dropdown>
