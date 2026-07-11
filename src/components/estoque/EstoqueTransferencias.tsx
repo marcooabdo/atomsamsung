@@ -261,6 +261,88 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     }
   };
 
+  const verificarEMoverOSAutomaticamente = async (osId: string, nomeUsuario: string): Promise<string | null> => {
+    const { data: todasRequisicoes } = await supabase
+      .from('requisicoes_pecas')
+      .select('id, status')
+      .eq('os_id', osId)
+      .not('status', 'in', '(cancelada,reprovada)');
+
+    if (!todasRequisicoes || todasRequisicoes.length === 0) return null;
+
+    const temPendente = todasRequisicoes.some(r =>
+      r.status === 'pendente' || r.status === 'pedido_feito'
+    );
+
+    if (temPendente) return null;
+
+    const todasAtendidas = todasRequisicoes.every(r =>
+      r.status === 'atendida' || r.status === 'em_uso' || r.status === 'gi_postada' || r.status === 'devolvida' || r.status === 'devolucao_pendente'
+    );
+
+    if (!todasAtendidas) return null;
+
+    const { data: osCompleta } = await supabase
+      .from('os')
+      .select('tipo_atendimento, rota_id, unidade_id, coluna_kanban, cliente_cidade')
+      .eq('id', osId)
+      .single();
+
+    if (!osCompleta) return null;
+
+    let destinoColuna = 'peca_em_transito';
+    let mensagemDestino = 'Peça em Trânsito';
+
+    if (osCompleta.tipo_atendimento === 'IH') {
+      if (osCompleta.rota_id) {
+        const { data: rota } = await supabase
+          .from('rotas')
+          .select('nome, coluna_kanban')
+          .eq('id', osCompleta.rota_id)
+          .eq('ativa', true)
+          .maybeSingle();
+
+        if (rota && rota.coluna_kanban) {
+          destinoColuna = rota.coluna_kanban;
+          mensagemDestino = rota.nome;
+        }
+      } else if (osCompleta.cliente_cidade && osCompleta.unidade_id) {
+        const { data: rota } = await supabase
+          .from('rotas')
+          .select('nome, coluna_kanban')
+          .contains('cidades', [osCompleta.cliente_cidade])
+          .eq('ativa', true)
+          .eq('unidade_id', osCompleta.unidade_id)
+          .maybeSingle();
+
+        if (rota && rota.coluna_kanban) {
+          destinoColuna = rota.coluna_kanban;
+          mensagemDestino = rota.nome;
+        }
+      }
+    }
+
+    if (destinoColuna === osCompleta.coluna_kanban) return null;
+
+    await supabase
+      .from('os')
+      .update({
+        coluna_kanban: destinoColuna,
+        bloqueio_movimentacao_automatica: false,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', osId);
+
+    await supabase.from('os_comentarios').insert({
+      os_id: osId,
+      usuario_id: user.id,
+      comentario: `Todas as peças foram vinculadas por ${nomeUsuario} - OS movida automaticamente para "${mensagemDestino}"`,
+      is_system: true
+    });
+
+    return `Transferência confirmada! Todas as peças vinculadas. OS movida para "${mensagemDestino}".`;
+  };
+
   const handleConfirmarTransferencia = async (requisicaoId: string, pecaEstoqueId: string) => {
     try {
       const requisicao = modalSelecionarID;
@@ -359,97 +441,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       });
 
 
-      // Verificar se todas as peças da OS foram atendidas
-      // Importante: precisamos aguardar um pouco para garantir que a transação foi confirmada
-      await new Promise(resolve => setTimeout(resolve, 100));
+      // Verificar se todas as peças da OS foram atendidas e mover automaticamente
+      const resultadoMovimentacao = await verificarEMoverOSAutomaticamente(requisicao.os_id, userData?.nome || 'Estoque');
 
-      const { data: todasRequisicoes, error: reqCheckError } = await supabase
-        .from('requisicoes_pecas')
-        .select('id, status')
-        .eq('os_id', requisicao.os_id);
-
-      if (reqCheckError) {
-        throw reqCheckError;
-      }
-
-
-      const todasAtendidas = todasRequisicoes?.every(r =>
-        r.status === 'atendida' || r.status === 'gi_postada' || r.status === 'devolvida'
-      );
-
-
-      if (todasAtendidas) {
-
-        // Buscar dados completos da OS para roteamento
-        const { data: osCompleta, error: osError } = await supabase
-          .from('os')
-          .select('tipo_atendimento, cliente_cidade, unidade_id, coluna_kanban')
-          .eq('id', requisicao.os_id)
-          .single();
-
-        if (osError) {
-          throw osError;
-        }
-
-        let destinoColuna = 'peca_em_transito';
-        let mensagemDestino = 'Peça em Trânsito';
-
-        // Lógica de roteamento automático APENAS para OS IH
-        if (osCompleta?.tipo_atendimento === 'IH' && osCompleta?.cliente_cidade && osCompleta?.unidade_id) {
-
-          // Buscar rota que contenha a cidade E pertença à mesma unidade da OS
-          const { data: rota, error: rotaError } = await supabase
-            .from('rotas')
-            .select('nome, coluna_kanban')
-            .contains('cidades', [osCompleta.cliente_cidade])
-            .eq('ativa', true)
-            .eq('unidade_id', osCompleta.unidade_id)
-            .maybeSingle();
-
-          if (rotaError) {
-          } else if (rota && rota.coluna_kanban) {
-            destinoColuna = rota.coluna_kanban;
-            mensagemDestino = rota.nome;
-          } else {
-          }
-        } else {
-        }
-
-
-        // Mover OS para destino apropriado
-        const { error: updateOsError } = await supabase
-          .from('os')
-          .update({
-            coluna_kanban: destinoColuna,
-            bloqueio_movimentacao_automatica: false,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', requisicao.os_id);
-
-        if (updateOsError) {
-          throw updateOsError;
-        }
-
-
-        const mensagemComentario = destinoColuna === 'peca_em_transito'
-          ? `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida para "${mensagemDestino}"`
-          : `Todas as peças foram vinculadas por ${userData?.nome || 'Estoque'} - OS movida automaticamente para "${mensagemDestino}"`;
-
-        await supabase.from('os_comentarios').insert({
-          os_id: requisicao.os_id,
-          usuario_id: user.id,
-          comentario: mensagemComentario,
-          is_system: true
-        });
-
-        const mensagemAlerta = destinoColuna === 'peca_em_transito'
-          ? 'Transferência confirmada! Todas as peças foram vinculadas. OS movida para "Peça em Trânsito".'
-          : `Transferência confirmada! Todas as peças foram vinculadas. OS movida automaticamente para "${mensagemDestino}".`;
-
+      if (resultadoMovimentacao) {
         showAlert({
           type: 'success',
           title: 'Sucesso',
-          message: mensagemAlerta
+          message: resultadoMovimentacao
         });
       } else {
         showAlert({ type: 'success', title: 'Sucesso', message: 'Transferência confirmada com sucesso!' });
@@ -536,11 +535,22 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         is_system: true
       });
 
-      showAlert({
-        type: 'success',
-        title: 'Sucesso',
-        message: `${pecaIds.length} peças vinculadas com sucesso!`
-      });
+      // Verificar se todas as peças da OS foram atendidas e mover automaticamente
+      const resultadoMovimentacao = await verificarEMoverOSAutomaticamente(requisicao.os_id, userData?.nome || 'Estoque');
+
+      if (resultadoMovimentacao) {
+        showAlert({
+          type: 'success',
+          title: 'Sucesso',
+          message: resultadoMovimentacao
+        });
+      } else {
+        showAlert({
+          type: 'success',
+          title: 'Sucesso',
+          message: `${pecaIds.length} peças vinculadas com sucesso!`
+        });
+      }
       setModalSelecionarID(null);
       await loadData();
     } catch (error) {
