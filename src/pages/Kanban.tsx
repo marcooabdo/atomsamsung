@@ -15,7 +15,7 @@ import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
 import { useDebounce } from '../components/kanban/useDebounce';
 import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings, Info } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -1572,6 +1572,30 @@ export function Kanban() {
     return { filteredData: result, computedMatchSource: newMatchSource };
   }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, columnSortOrder, columnSortDir]);
 
+  const valorTotalAguardandoPeca = useMemo(() => {
+    const cards = filteredData['aguardando_peca'] || [];
+    let total = 0;
+    for (const os of cards) {
+      const reqs = (os as any).requisicoes || [];
+      const pecasOS = (os as any).os_pecas || [];
+      for (const req of reqs) {
+        if (req.status === 'requisitada' || req.status === 'pendente' || req.status === 'aguardando') {
+          const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
+          const valor = req.valor_peca ?? valorGSPN;
+          if (valor && valor > 0) total += valor;
+        }
+      }
+      if (reqs.filter((r: any) => r.status === 'requisitada' || r.status === 'pendente' || r.status === 'aguardando').length === 0 && reqs.length > 0) {
+        for (const req of reqs) {
+          const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
+          const valor = req.valor_peca ?? valorGSPN;
+          if (valor && valor > 0) total += valor;
+        }
+      }
+    }
+    return total;
+  }, [filteredData]);
+
   useEffect(() => {
     if (debouncedSearchTerm && Object.keys(computedMatchSource).length > 0) {
       setSearchMatchSource(computedMatchSource);
@@ -2289,21 +2313,21 @@ export function Kanban() {
                           </h4>
                         </div>
                         <div className="flex items-center gap-1.5">
-                          {coluna.id === 'aguardando_peca' && (
+                          {coluna.id === 'aguardando_peca' && valorTotalAguardandoPeca > 0 && (
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 setShowPecasInfoModal(true);
                               }}
-                              className="p-1 rounded-md transition-all hover:scale-110"
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all hover:scale-105 cursor-pointer"
                               style={{
-                                background: 'linear-gradient(135deg, #8B5CF620 0%, #8B5CF610 100%)',
-                                border: '1px solid #8B5CF640',
-                                color: '#8B5CF6'
+                                background: 'linear-gradient(135deg, #10B98120 0%, #10B98110 100%)',
+                                border: '1px solid #10B98140',
+                                color: '#10B981'
                               }}
-                              title="Info Pecas Requisitadas"
+                              title="Clique para ver detalhes das pecas"
                             >
-                              <Info className="w-3 h-3" />
+                              R$ {valorTotalAguardandoPeca.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                             </button>
                           )}
                           <div className="relative" data-sort-dropdown>

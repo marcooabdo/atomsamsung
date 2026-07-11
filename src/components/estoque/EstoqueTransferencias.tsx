@@ -58,7 +58,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         .from('requisicoes_pecas')
         .select(`
           *,
-          os:os(numero_os_samsung, numero_os_interna, coluna_kanban, tipo_os),
+          os:os(numero_os_samsung, numero_os_interna, coluna_kanban, tipo_os, os_pecas(pn, valor_gspn)),
           peca_estoque:estoque_pecas(
             id_numerico,
             valor_com_impostos,
@@ -555,12 +555,36 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     try {
       const requisicao = modalRegistrarValor;
 
+      // Check if OS has a different valor_gspn for this part
+      const { data: osPecas } = await supabase
+        .from('os_pecas')
+        .select('valor_gspn')
+        .eq('os_id', requisicao.os_id)
+        .eq('pn', requisicao.codigo_peca)
+        .maybeSingle();
+
+      if (osPecas?.valor_gspn && Math.abs(osPecas.valor_gspn - valor) > 0.01) {
+        showAlert({
+          type: 'error',
+          title: 'Valor Divergente na OS',
+          message: `O valor informado (R$ ${valor.toFixed(2)}) é diferente do valor cadastrado na OS (R$ ${Number(osPecas.valor_gspn).toFixed(2)}). Corrija o valor na OS antes de prosseguir, ou registre o valor correto aqui.`
+        });
+        return;
+      }
+
       await supabase
         .from('requisicoes_pecas')
         .update({
           valor_peca: valor
         })
         .eq('id', requisicao.id);
+
+      // Also update os_pecas.valor_gspn to keep in sync
+      await supabase
+        .from('os_pecas')
+        .update({ valor_gspn: valor })
+        .eq('os_id', requisicao.os_id)
+        .eq('pn', requisicao.codigo_peca);
 
       const { data: userData } = await supabase
         .from('usuarios')
@@ -1087,6 +1111,18 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                 <p className="text-xs text-gray-400 mb-3 flex items-center gap-1">
                                   <DollarSign className="w-3 h-3 text-[#39FF14]" />
                                   <span className="text-[#39FF14] font-bold">Valor GSPN: R$ {Number(req.valor_peca).toFixed(2)}</span>
+                                  {(() => {
+                                    const osPecaValor = req.os?.os_pecas?.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn;
+                                    if (osPecaValor && Math.abs(Number(osPecaValor) - Number(req.valor_peca)) > 0.01) {
+                                      return (
+                                        <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-[10px] font-bold">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          OS: R$ {Number(osPecaValor).toFixed(2)} - DIVERGENTE
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </p>
                               )}
                               {req.observacoes_pedido && (
@@ -1243,9 +1279,21 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                                 </div>
                               )}
                               {req.valor_peca && (
-                                <p className="flex items-center gap-1">
+                                <p className="flex items-center gap-1 flex-wrap">
                                   <DollarSign className="w-3 h-3 text-[#39FF14]" />
                                   <span className="text-[#39FF14] font-bold">Valor GSPN: R$ {Number(req.valor_peca).toFixed(2)}</span>
+                                  {(() => {
+                                    const osPecaValor = req.os?.os_pecas?.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn;
+                                    if (osPecaValor && Math.abs(Number(osPecaValor) - Number(req.valor_peca)) > 0.01) {
+                                      return (
+                                        <span className="ml-2 flex items-center gap-1 px-2 py-0.5 rounded bg-red-500/20 border border-red-500/40 text-red-400 text-[10px] font-bold">
+                                          <AlertTriangle className="w-3 h-3" />
+                                          OS: R$ {Number(osPecaValor).toFixed(2)} - DIVERGENTE
+                                        </span>
+                                      );
+                                    }
+                                    return null;
+                                  })()}
                                 </p>
                               )}
                             </div>
