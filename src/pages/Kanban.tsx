@@ -1573,34 +1573,18 @@ export function Kanban() {
     return { filteredData: result, computedMatchSource: newMatchSource };
   }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, columnSortOrder, columnSortDir]);
 
-  const calcularValorPecasColuna = (cards: any[]) => {
+  const calcularValorPecasColuna = (cards: any[], statusFiltro: string[]) => {
     let total = 0;
     for (const os of cards) {
       const reqs = (os as any).requisicoes || [];
       const pecasOS = (os as any).os_pecas || [];
-      const statusAtivos = ['requisitada', 'pendente', 'aguardando', 'pedido_feito', 'em_transito'];
-      const reqsAtivas = reqs.filter((r: any) => statusAtivos.includes(r.status));
+      const reqsFiltradas = reqs.filter((r: any) => statusFiltro.includes(r.status));
 
-      if (reqsAtivas.length > 0) {
-        const pnsContabilizados = new Set<string>();
-        for (const req of reqsAtivas) {
-          const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
-          const valor = (req.valor_peca && req.valor_peca > 0) ? req.valor_peca : valorGSPN;
-          if (valor && valor > 0) {
-            total += valor;
-            if (req.codigo_peca) pnsContabilizados.add(req.codigo_peca);
-          }
-        }
-        for (const peca of pecasOS) {
-          if (!pnsContabilizados.has(peca.pn) && peca.valor_gspn && peca.valor_gspn > 0) {
-            total += peca.valor_gspn;
-          }
-        }
-      } else {
-        for (const peca of pecasOS) {
-          if (peca.valor_gspn && peca.valor_gspn > 0) {
-            total += peca.valor_gspn;
-          }
+      for (const req of reqsFiltradas) {
+        const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
+        const valor = (req.valor_peca && req.valor_peca > 0) ? req.valor_peca : valorGSPN;
+        if (valor && valor > 0) {
+          total += valor;
         }
       }
     }
@@ -1608,11 +1592,11 @@ export function Kanban() {
   };
 
   const valorTotalAguardandoPeca = useMemo(() => {
-    return calcularValorPecasColuna(filteredData['aguardando_peca'] || []);
+    return calcularValorPecasColuna(filteredData['aguardando_peca'] || [], ['requisitada']);
   }, [filteredData]);
 
   const valorTotalPecaEmTransito = useMemo(() => {
-    return calcularValorPecasColuna(filteredData['peca_em_transito'] || []);
+    return calcularValorPecasColuna(filteredData['peca_em_transito'] || [], ['pedido_feito', 'em_transito']);
   }, [filteredData]);
 
   useEffect(() => {
