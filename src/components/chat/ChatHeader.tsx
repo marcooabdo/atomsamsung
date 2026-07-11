@@ -14,6 +14,7 @@ interface ConversationInfo {
   other_user?: {
     id: string;
     nome: string;
+    foto_url?: string | null;
     status?: string;
     last_seen_at?: string;
   };
@@ -92,6 +93,12 @@ export function ChatHeader({ conversation, onBack, onRefresh }: ChatHeaderProps)
             ) : (
               <Users className="w-5 h-5 text-[#00D4FF]" />
             )
+          ) : conversation.other_user?.foto_url ? (
+            <img
+              src={conversation.other_user.foto_url}
+              alt={displayName || ''}
+              className="w-full h-full object-cover"
+            />
           ) : (
             <span className="text-[#00D4FF] font-semibold text-lg">
               {displayName?.charAt(0).toUpperCase()}

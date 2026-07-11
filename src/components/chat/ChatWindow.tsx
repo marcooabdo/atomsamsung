@@ -20,6 +20,7 @@ interface ConversationInfo {
   other_user?: {
     id: string;
     nome: string;
+    foto_url?: string | null;
     status?: string;
     last_seen_at?: string;
   };
@@ -78,7 +79,7 @@ export function ChatWindow({ conversationId, userId, onBack }: ChatWindowProps) 
       if (conv.tipo === 'direct') {
         const { data: otherParticipant } = await supabase
           .from('chat_participants')
-          .select('user_id, usuarios(id, nome)')
+          .select('user_id, usuarios(id, nome, foto_url)')
           .eq('conversation_id', conversationId)
           .neq('user_id', userId)
           .maybeSingle();
