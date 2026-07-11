@@ -1578,18 +1578,29 @@ export function Kanban() {
     for (const os of cards) {
       const reqs = (os as any).requisicoes || [];
       const pecasOS = (os as any).os_pecas || [];
-      for (const req of reqs) {
-        if (req.status === 'requisitada' || req.status === 'pendente' || req.status === 'aguardando' || req.status === 'pedido_feito') {
+      const statusAtivos = ['requisitada', 'pendente', 'aguardando', 'pedido_feito', 'em_transito'];
+      const reqsAtivas = reqs.filter((r: any) => statusAtivos.includes(r.status));
+
+      if (reqsAtivas.length > 0) {
+        const pnsContabilizados = new Set<string>();
+        for (const req of reqsAtivas) {
           const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
-          const valor = req.valor_peca ?? valorGSPN;
-          if (valor && valor > 0) total += valor;
+          const valor = (req.valor_peca && req.valor_peca > 0) ? req.valor_peca : valorGSPN;
+          if (valor && valor > 0) {
+            total += valor;
+            if (req.codigo_peca) pnsContabilizados.add(req.codigo_peca);
+          }
         }
-      }
-      if (reqs.filter((r: any) => ['requisitada', 'pendente', 'aguardando', 'pedido_feito'].includes(r.status)).length === 0 && reqs.length > 0) {
-        for (const req of reqs) {
-          const valorGSPN = pecasOS.find((p: any) => p.pn === req.codigo_peca)?.valor_gspn ?? null;
-          const valor = req.valor_peca ?? valorGSPN;
-          if (valor && valor > 0) total += valor;
+        for (const peca of pecasOS) {
+          if (!pnsContabilizados.has(peca.pn) && peca.valor_gspn && peca.valor_gspn > 0) {
+            total += peca.valor_gspn;
+          }
+        }
+      } else {
+        for (const peca of pecasOS) {
+          if (peca.valor_gspn && peca.valor_gspn > 0) {
+            total += peca.valor_gspn;
+          }
         }
       }
     }

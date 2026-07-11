@@ -81,7 +81,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         .from('chat_messages')
         .select(`
           *,
-          usuarios!chat_messages_sender_id_fkey(nome)
+          usuarios!chat_messages_sender_id_fkey(nome, foto_url)
         `)
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: false })
@@ -108,6 +108,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
             return {
               ...msg,
               sender_name: sender?.nome || 'Usuário',
+              sender_photo: sender?.foto_url || null,
               read_by: reads?.map(r => r.user_id) || []
             };
           }
@@ -115,6 +116,7 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
           return {
             ...msg,
             sender_name: sender?.nome || 'Usuário',
+            sender_photo: sender?.foto_url || null,
             read_by: []
           };
         })
@@ -152,13 +154,14 @@ export const ChatMessageList = forwardRef<ChatMessageListRef, ChatMessageListPro
         async (payload) => {
           const { data: sender } = await supabase
             .from('usuarios')
-            .select('nome')
+            .select('nome, foto_url')
             .eq('id', payload.new.sender_id)
             .maybeSingle();
 
           const newMessage = {
             ...payload.new,
-            sender_name: sender?.nome || 'Usuário'
+            sender_name: sender?.nome || 'Usuário',
+            sender_photo: sender?.foto_url || null
           };
 
           setMessages(prev => {
