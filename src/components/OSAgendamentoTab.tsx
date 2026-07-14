@@ -11,7 +11,11 @@ const TIPOS_REPARO_IH = [
   'Troca de compressor',
   'Troca de cesto',
   'Troca de serpentina',
-  'Troca de peca (simples)'
+  'Troca de peca (simples)',
+  'Coleta/Entrega',
+  'Coleta',
+  'Visita Técnica',
+  'Instalação Inicial'
 ];
 
 interface OSAgendamentoTabProps {
@@ -62,6 +66,9 @@ export function OSAgendamentoTab({
   const [cancelamentoModal, setCancelamentoModal] = useState<{ aberto: boolean; agendamentoId: string | null }>({ aberto: false, agendamentoId: null });
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
   const [salvandoCancelamento, setSalvandoCancelamento] = useState(false);
+  const [novoTipoReparo, setNovoTipoReparo] = useState('');
+  const [mostrarNovoTipo, setMostrarNovoTipo] = useState(false);
+  const [tiposCustom, setTiposCustom] = useState<string[]>([]);
 
   useEffect(() => {
     loadTecnicos();
@@ -390,12 +397,67 @@ export function OSAgendamentoTab({
               className="neon-input w-full"
             >
               <option value="">Selecione o tipo de reparo</option>
-              {TIPOS_REPARO_IH.map((tipo) => (
+              {[...TIPOS_REPARO_IH, ...tiposCustom].map((tipo) => (
                 <option key={tipo} value={tipo}>
                   {tipo}
                 </option>
               ))}
             </select>
+
+            {!mostrarNovoTipo ? (
+              <button
+                type="button"
+                onClick={() => setMostrarNovoTipo(true)}
+                className="mt-2 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-200"
+                style={{ color: '#FFA500', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.25)' }}
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,165,0,0.15)'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,165,0,0.08)'; }}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                ADICIONAR NOVO TIPO
+              </button>
+            ) : (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={novoTipoReparo}
+                  onChange={(e) => setNovoTipoReparo(e.target.value)}
+                  placeholder="Nome do novo tipo..."
+                  className="neon-input flex-1 text-sm"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && novoTipoReparo.trim()) {
+                      setTiposCustom(prev => [...prev, novoTipoReparo.trim()]);
+                      setFormData({ ...formData, tipo_reparo: novoTipoReparo.trim() });
+                      setNovoTipoReparo('');
+                      setMostrarNovoTipo(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (novoTipoReparo.trim()) {
+                      setTiposCustom(prev => [...prev, novoTipoReparo.trim()]);
+                      setFormData({ ...formData, tipo_reparo: novoTipoReparo.trim() });
+                      setNovoTipoReparo('');
+                      setMostrarNovoTipo(false);
+                    }
+                  }}
+                  className="p-2 rounded-lg transition-all duration-200"
+                  style={{ color: '#39FF14', background: 'rgba(57,255,20,0.10)', border: '1px solid rgba(57,255,20,0.3)' }}
+                >
+                  <CheckCircle className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMostrarNovoTipo(false); setNovoTipoReparo(''); }}
+                  className="p-2 rounded-lg transition-all duration-200"
+                  style={{ color: '#EF4444', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)' }}
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
         )}
 
