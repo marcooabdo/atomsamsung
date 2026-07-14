@@ -3,6 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
+
+function sanitizeGSPNValue(raw: string): string {
+  let cleaned = raw.replace(/[^\d.,]/g, '');
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  if (lastSep === -1) return cleaned;
+  const intPart = cleaned.substring(0, lastSep).replace(/[.,]/g, '');
+  const decPart = cleaned.substring(lastSep + 1);
+  return intPart + '.' + decPart;
+}
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { buscarCEP, formatarCEP } from '../lib/cep';
@@ -3136,10 +3147,18 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                           Valor GSPN (R$)
                         </label>
                         <input
-                          type="number"
-                          step="0.01"
+                          type="text"
+                          inputMode="decimal"
                           value={novaPecaValor}
                           onChange={(e) => setNovaPecaValor(e.target.value)}
+                          onPaste={(e) => {
+                            e.preventDefault();
+                            const pasted = e.clipboardData.getData('text');
+                            setNovaPecaValor(sanitizeGSPNValue(pasted));
+                          }}
+                          onBlur={() => {
+                            if (novaPecaValor) setNovaPecaValor(sanitizeGSPNValue(novaPecaValor));
+                          }}
                           className="neon-input w-full"
                           placeholder="0.00"
                         />
@@ -4772,10 +4791,18 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         <div className="flex gap-2">
                           <div className="flex-1">
                             <input
-                              type="number"
-                              step="0.01"
+                              type="text"
+                              inputMode="decimal"
                               value={novaPecaValor}
                               onChange={(e) => setNovaPecaValor(e.target.value)}
+                              onPaste={(e) => {
+                                e.preventDefault();
+                                const pasted = e.clipboardData.getData('text');
+                                setNovaPecaValor(sanitizeGSPNValue(pasted));
+                              }}
+                              onBlur={() => {
+                                if (novaPecaValor) setNovaPecaValor(sanitizeGSPNValue(novaPecaValor));
+                              }}
                               className="neon-input w-full"
                               placeholder="0.00"
                             />

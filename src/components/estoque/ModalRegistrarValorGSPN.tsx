@@ -2,6 +2,17 @@ import { useState } from 'react';
 import { X, DollarSign } from 'lucide-react';
 import { useModal } from '../../contexts/ModalContext';
 
+function sanitizeGSPNValue(raw: string): string {
+  let cleaned = raw.replace(/[^\d.,]/g, '');
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  if (lastSep === -1) return cleaned;
+  const intPart = cleaned.substring(0, lastSep).replace(/[.,]/g, '');
+  const decPart = cleaned.substring(lastSep + 1);
+  return intPart + '.' + decPart;
+}
+
 interface ModalRegistrarValorGSPNProps {
   requisicao: any;
   onConfirm: (valor: number) => void;
@@ -16,7 +27,7 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const valor = parseFloat(valorGSPN);
+    const valor = parseFloat(sanitizeGSPNValue(valorGSPN));
     if (isNaN(valor) || valor <= 0) {
       showAlert({
         type: 'error',
@@ -82,11 +93,18 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
               Valor da Peça no GSPN (R$) *
             </label>
             <input
-              type="number"
-              step="0.01"
-              min="0"
+              type="text"
+              inputMode="decimal"
               value={valorGSPN}
               onChange={(e) => setValorGSPN(e.target.value)}
+              onPaste={(e) => {
+                e.preventDefault();
+                const pasted = e.clipboardData.getData('text');
+                setValorGSPN(sanitizeGSPNValue(pasted));
+              }}
+              onBlur={() => {
+                if (valorGSPN) setValorGSPN(sanitizeGSPNValue(valorGSPN));
+              }}
               placeholder="0.00"
               className="neon-input w-full"
               required

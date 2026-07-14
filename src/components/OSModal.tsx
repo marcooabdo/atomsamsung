@@ -3,6 +3,17 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
+
+function sanitizeGSPNValue(raw: string): string {
+  let cleaned = raw.replace(/[^\d.,]/g, '');
+  const lastComma = cleaned.lastIndexOf(',');
+  const lastDot = cleaned.lastIndexOf('.');
+  const lastSep = Math.max(lastComma, lastDot);
+  if (lastSep === -1) return cleaned;
+  const intPart = cleaned.substring(0, lastSep).replace(/[.,]/g, '');
+  const decPart = cleaned.substring(lastSep + 1);
+  return intPart + '.' + decPart;
+}
 import { useAuth } from '../contexts/AuthContext';
 import { useModal } from '../contexts/ModalContext';
 import { OSChecklistTab } from './OSChecklistTab';
@@ -1024,7 +1035,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
       return;
     }
 
-    const valorNum = parseFloat(valorEditado);
+    const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
     if (isNaN(valorNum) || valorNum <= 0) {
       showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
@@ -4209,12 +4220,20 @@ Não haverá cobrança ao cliente.`
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
                                     <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
+                                      type="text"
+                                      inputMode="decimal"
                                       placeholder="0.00"
                                       value={editandoValorGSPN[peca.id]}
                                       onChange={(e) => setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        const pasted = e.clipboardData.getData('text');
+                                        setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: sanitizeGSPNValue(pasted) }));
+                                      }}
+                                      onBlur={() => {
+                                        const val = editandoValorGSPN[peca.id];
+                                        if (val) setEditandoValorGSPN(prev => ({ ...prev, [peca.id]: sanitizeGSPNValue(val) }));
+                                      }}
                                       className="neon-input w-28 text-xs py-1"
                                       disabled={salvandoValorGSPN[peca.id]}
                                       autoFocus
