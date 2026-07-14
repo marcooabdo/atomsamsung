@@ -5254,7 +5254,7 @@ Não haverá cobrança ao cliente.`
       </div>
 
       {mostrarModalConversao && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[60] flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
           <div className="premium-card w-full max-w-2xl border-[#FFA500]">
             <div className="p-6 border-b border-[#FFA500]/20">
               <div className="flex items-center justify-between">
@@ -5463,7 +5463,7 @@ Não haverá cobrança ao cliente.`
       )}
 
       {mostrarModalServico && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4" onClick={e => e.stopPropagation()}>
           <div className="absolute inset-0 bg-black/90 backdrop-blur-sm" onClick={() => setMostrarModalServico(false)}></div>
           <div className="relative bg-[#0A0F1E] border border-[#00D4FF]/30 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" style={{
             boxShadow: '0 0 40px rgba(var(--accent-rgb),0.2)'
@@ -5675,7 +5675,7 @@ Não haverá cobrança ao cliente.`
       />
 
       {mostrarConfirmacaoMover && colunaDestino && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4" onClick={e => e.stopPropagation()}>
           <div className="premium-card w-full max-w-md">
             <div className="p-6 border-b border-[#00D4FF]/20">
               <div className="flex items-center gap-3">
@@ -5821,7 +5821,7 @@ Não haverá cobrança ao cliente.`
       </AnimatePresence>
 
       {mostrarErroRequisicaoExistente && erroRequisicaoInfo && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4" onClick={e => e.stopPropagation()}>
           <div className="premium-card w-full max-w-lg">
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">
@@ -5871,7 +5871,7 @@ Não haverá cobrança ao cliente.`
       )}
 
       {mostrarErroRequisicao && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[70] p-4" onClick={e => e.stopPropagation()}>
           <div className="premium-card w-full max-w-lg">
             <div className="p-6">
               <div className="flex items-center gap-4 mb-6">

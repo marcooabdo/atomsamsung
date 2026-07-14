@@ -14,7 +14,7 @@ export function SuccessModal({ isOpen, onClose, title, message }: SuccessModalPr
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.6)' }}
-      onClick={onClose}
+      onClick={(e) => { e.stopPropagation(); onClose(); }}
     >
       <div
         className="w-full max-w-md rounded-xl"
