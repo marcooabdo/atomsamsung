@@ -1242,13 +1242,13 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
   // Funções auxiliares para cálculos de pagamento
   const calcularTaxaValor = () => {
-    const valor = parseFloat(novoPagamentoValor) || 0;
+    const valor = parseFloat(sanitizeGSPNValue(novoPagamentoValor)) || 0;
     const taxa = parseFloat(novoPagamentoTaxa) || 0;
     return (valor * taxa) / 100;
   };
 
   const calcularValorLiquido = () => {
-    const valor = parseFloat(novoPagamentoValor) || 0;
+    const valor = parseFloat(sanitizeGSPNValue(novoPagamentoValor)) || 0;
     return valor - calcularTaxaValor();
   };
 
@@ -3567,12 +3567,21 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                               </div>
                               <div className="text-right min-w-[100px]">
                                 <input
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
+                                  inputMode="decimal"
                                   value={servico.valor_unitario}
                                   onChange={(e) => {
+                                    const val = e.target.value;
                                     setServicosAdicionados(servicosAdicionados.map(s =>
-                                      s.codigo === servico.codigo ? { ...s, valor_unitario: parseFloat(e.target.value) || 0 } : s
+                                      s.codigo === servico.codigo ? { ...s, valor_unitario: parseFloat(sanitizeGSPNValue(val)) || 0 } : s
+                                    ));
+                                  }}
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const pasted = e.clipboardData.getData('text');
+                                    const val = parseFloat(sanitizeGSPNValue(pasted)) || 0;
+                                    setServicosAdicionados(servicosAdicionados.map(s =>
+                                      s.codigo === servico.codigo ? { ...s, valor_unitario: val } : s
                                     ));
                                   }}
                                   className="neon-input w-24 text-right text-sm py-1 px-2"
@@ -4008,11 +4017,16 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                               </div>
                               <div className="text-right min-w-[100px]">
                                 <input
-                                  type="number"
-                                  step="0.01"
+                                  type="text"
+                                  inputMode="decimal"
                                   defaultValue={servico.valor_unitario}
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const pasted = e.clipboardData.getData('text');
+                                    e.currentTarget.value = sanitizeGSPNValue(pasted);
+                                  }}
                                   onBlur={async (e) => {
-                                    const novoValor = parseFloat(e.target.value) || 0;
+                                    const novoValor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
                                     await supabase
                                       .from('os_servicos')
                                       .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
@@ -4072,12 +4086,19 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                 Valor (R$)
                               </label>
                               <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 value={pag.valor}
                                 onChange={(e) => {
                                   const novosPagamentos = [...pagamentosTemporarios];
-                                  novosPagamentos[index].valor = parseFloat(e.target.value) || 0;
+                                  novosPagamentos[index].valor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
+                                  setPagamentosTemporarios(novosPagamentos);
+                                }}
+                                onPaste={(e) => {
+                                  e.preventDefault();
+                                  const pasted = e.clipboardData.getData('text');
+                                  const novosPagamentos = [...pagamentosTemporarios];
+                                  novosPagamentos[index].valor = parseFloat(sanitizeGSPNValue(pasted)) || 0;
                                   setPagamentosTemporarios(novosPagamentos);
                                 }}
                                 className="neon-input w-full"
@@ -4939,11 +4960,16 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       <div className="flex items-center gap-2">
                                         <span className="text-xs text-gray-500">Unit: R$</span>
                                         <input
-                                          type="number"
-                                          step="0.01"
+                                          type="text"
+                                          inputMode="decimal"
                                           defaultValue={Number(peca.valor_unitario || 0).toFixed(2)}
+                                          onPaste={(e) => {
+                                            e.preventDefault();
+                                            const pasted = e.clipboardData.getData('text');
+                                            e.currentTarget.value = sanitizeGSPNValue(pasted);
+                                          }}
                                           onBlur={async (e) => {
-                                            const novoValor = parseFloat(e.target.value) || 0;
+                                            const novoValor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
                                             if (novoValor === peca.valor_unitario) return;
 
                                             try {
@@ -5350,11 +5376,16 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                 </div>
                                 <div className="text-right min-w-[100px]">
                                   <input
-                                    type="number"
-                                    step="0.01"
+                                    type="text"
+                                    inputMode="decimal"
                                     defaultValue={servico.valor_unitario}
+                                    onPaste={(e) => {
+                                      e.preventDefault();
+                                      const pasted = e.clipboardData.getData('text');
+                                      e.currentTarget.value = sanitizeGSPNValue(pasted);
+                                    }}
                                     onBlur={async (e) => {
-                                      const novoValor = parseFloat(e.target.value) || 0;
+                                      const novoValor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
                                       await supabase
                                         .from('os_servicos')
                                         .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
@@ -6116,11 +6147,18 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                 <div className="relative">
                   <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 w-6 h-6 text-[#39FF14]" />
                   <input
-                    type="number"
-                    step="0.01"
-                    min="0"
+                    type="text"
+                    inputMode="decimal"
                     value={novoPagamentoValor}
                     onChange={(e) => setNovoPagamentoValor(e.target.value)}
+                    onPaste={(e) => {
+                      e.preventDefault();
+                      const pasted = e.clipboardData.getData('text');
+                      setNovoPagamentoValor(sanitizeGSPNValue(pasted));
+                    }}
+                    onBlur={() => {
+                      if (novoPagamentoValor) setNovoPagamentoValor(sanitizeGSPNValue(novoPagamentoValor));
+                    }}
                     placeholder="0,00"
                     className="neon-input pl-14 text-2xl font-bold"
                     style={{ height: '60px' }}
@@ -6213,7 +6251,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </div>
                     </div>
 
-                    {parseFloat(novoPagamentoTaxa) > 0 && parseFloat(novoPagamentoValor) > 0 && (
+                    {parseFloat(novoPagamentoTaxa) > 0 && parseFloat(sanitizeGSPNValue(novoPagamentoValor)) > 0 && (
                       <div className="premium-card p-4 bg-gradient-to-br from-[#FFBF00]/20 to-transparent border-2 border-[#FFBF00]/40">
                         <div className="grid grid-cols-3 gap-4 text-center">
                           <div>
@@ -6238,7 +6276,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </div>
                     )}
 
-                    {parseFloat(novoPagamentoTaxa) > 0 && novoPagamentoTaxaPagaPor === 'empresa' && parseFloat(novoPagamentoValor) > 0 && (
+                    {parseFloat(novoPagamentoTaxa) > 0 && novoPagamentoTaxaPagaPor === 'empresa' && parseFloat(sanitizeGSPNValue(novoPagamentoValor)) > 0 && (
                       <div className="flex items-start gap-2 p-3 rounded-lg bg-[#FFBF00]/10 border border-[#FFBF00]/30">
                         <AlertCircle className="w-4 h-4 text-[#FFBF00] flex-shrink-0 mt-0.5" />
                         <p className="text-xs text-[#FFBF00]">
@@ -6359,7 +6397,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
               </button>
               <button
                 onClick={() => {
-                  const valorNum = parseFloat(novoPagamentoValor);
+                  const valorNum = parseFloat(sanitizeGSPNValue(novoPagamentoValor));
                   if (!novoPagamentoValor || isNaN(valorNum) || valorNum <= 0) {
                     alert('Digite um valor válido maior que zero');
                     return;

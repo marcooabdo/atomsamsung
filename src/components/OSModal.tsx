@@ -1099,7 +1099,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
     const valorEditado = editandoValorFinal[pecaId];
     if (!valorEditado && valorEditado !== '0') return;
 
-    const valorNum = parseFloat(valorEditado);
+    const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
     if (isNaN(valorNum) || valorNum < 0) {
       showAlert({ message: 'Valor invalido', type: 'warning' });
       return;
@@ -1140,7 +1140,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
     const valorEditado = editandoValorTotal[pecaId];
     if (!valorEditado && valorEditado !== '0') return;
 
-    const valorNum = parseFloat(valorEditado);
+    const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
     if (isNaN(valorNum) || valorNum < 0) {
       showAlert({ message: 'Valor total invalido', type: 'warning' });
       return;
@@ -1208,7 +1208,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
     const edicao = editandoValorPeca[pecaId];
     if (!edicao) return;
 
-    const novoUnitario = parseFloat(edicao.unitario) || 0;
+    const novoUnitario = parseFloat(sanitizeGSPNValue(edicao.unitario)) || 0;
     const novaQtd = parseInt(edicao.quantidade) || 1;
 
     try {
@@ -1242,7 +1242,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
       return;
     }
 
-    const valorGSPNNum = parseFloat(novaPecaValorGSPN);
+    const valorGSPNNum = parseFloat(sanitizeGSPNValue(novaPecaValorGSPN));
     if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
       showAlert({ message: 'Valor invalido', type: 'warning' });
       return;
@@ -4006,17 +4006,25 @@ Não haverá cobrança ao cliente.`
                         Valor Base Unitario (R$) *
                       </label>
                       <input
-                        type="number"
-                        step="0.01"
+                        type="text"
+                        inputMode="decimal"
                         value={novaPecaValorGSPN}
                         onChange={(e) => setNovaPecaValorGSPN(e.target.value)}
+                        onPaste={(e) => {
+                          e.preventDefault();
+                          const pasted = e.clipboardData.getData('text');
+                          setNovaPecaValorGSPN(sanitizeGSPNValue(pasted));
+                        }}
+                        onBlur={() => {
+                          if (novaPecaValorGSPN) setNovaPecaValorGSPN(sanitizeGSPNValue(novaPecaValorGSPN));
+                        }}
                         className="neon-input w-full"
                         placeholder="0.00"
                       />
-                      {novaPecaValorGSPN && !isNaN(parseFloat(novaPecaValorGSPN)) && parseFloat(novaPecaValorGSPN) > 0 && (
+                      {novaPecaValorGSPN && !isNaN(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN))) && parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)) > 0 && (
                         <p className="text-xs mt-1" style={{ color: '#FFA500' }}>
                           Valor c/ Markup: R$ {(() => {
-                            const valor = calcularValorComMarkup(parseFloat(novaPecaValorGSPN));
+                            const valor = calcularValorComMarkup(parseFloat(sanitizeGSPNValue(novaPecaValorGSPN)));
                             return (isNaN(valor) || !isFinite(valor)) ? '0.00' : valor.toFixed(2);
                           })()}
                         </p>
@@ -4280,11 +4288,18 @@ Não haverá cobrança ao cliente.`
                                   <div className="flex items-center gap-1.5">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
                                     <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
+                                      type="text"
+                                      inputMode="decimal"
                                       value={editandoValorFinal[peca.id]}
                                       onChange={(e) => setEditandoValorFinal(prev => ({ ...prev, [peca.id]: e.target.value }))}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        const pasted = e.clipboardData.getData('text');
+                                        setEditandoValorFinal(prev => ({ ...prev, [peca.id]: sanitizeGSPNValue(pasted) }));
+                                      }}
+                                      onBlur={(e) => {
+                                        if (e.target.value) setEditandoValorFinal(prev => ({ ...prev, [peca.id]: sanitizeGSPNValue(prev[peca.id]) }));
+                                      }}
                                       className="w-24 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                                       autoFocus
                                     />
@@ -4356,11 +4371,18 @@ Não haverá cobrança ao cliente.`
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-gray-500">Unit R$</span>
                                     <input
-                                      type="number"
-                                      step="0.01"
-                                      min="0"
+                                      type="text"
+                                      inputMode="decimal"
                                       value={editandoValorPeca[peca.id].unitario}
                                       onChange={(e) => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], unitario: e.target.value } }))}
+                                      onPaste={(e) => {
+                                        e.preventDefault();
+                                        const pasted = e.clipboardData.getData('text');
+                                        setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], unitario: sanitizeGSPNValue(pasted) } }));
+                                      }}
+                                      onBlur={(e) => {
+                                        if (e.target.value) setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { ...prev[peca.id], unitario: sanitizeGSPNValue(prev[peca.id].unitario) } }));
+                                      }}
                                       className="w-20 px-2 py-1 text-xs rounded bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                                       autoFocus
                                     />
@@ -4828,11 +4850,16 @@ Não haverá cobrança ao cliente.`
                             </div>
                             <div className="text-right min-w-[100px]">
                               <input
-                                type="number"
-                                step="0.01"
+                                type="text"
+                                inputMode="decimal"
                                 defaultValue={servico.valor_unitario}
+                                onPaste={(e) => {
+                                  e.preventDefault();
+                                  const pasted = e.clipboardData.getData('text');
+                                  e.currentTarget.value = sanitizeGSPNValue(pasted);
+                                }}
                                 onBlur={async (e) => {
-                                  const novoValor = parseFloat(e.target.value) || 0;
+                                  const novoValor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
                                   const table = servico._table || 'cotacoes_servicos';
                                   await supabase
                                     .from(table)
