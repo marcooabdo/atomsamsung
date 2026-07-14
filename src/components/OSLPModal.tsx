@@ -1254,7 +1254,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
   useEffect(() => {
     const calcularMarkup = async () => {
-      const valorGSPN = parseFloat(novaPecaValor);
+      const valorGSPN = parseFloat(sanitizeGSPNValue(novaPecaValor));
 
       const tipoOrcamentoEfetivo = currentMode === 'view' ? (os?.tipo_orcamento || tipoOrcamento || 'normal') : (tipoOrcamento || 'normal');
       const isSCACCEfetivo = modoSCACC || tipoOrcamentoEfetivo === 'samsung_contigo' || tipoOrcamentoEfetivo === 'acessorios';
@@ -1380,7 +1380,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
       let pecasFinais = [...pecasAdicionadas];
       if (novaPecaCodigo && novaPecaDescricao) {
-        const valorPeca = parseFloat(novaPecaValor) || 0;
+        const valorPeca = parseFloat(sanitizeGSPNValue(novaPecaValor)) || 0;
         const valorComMarkup = novaPecaValorComMarkup || valorPeca;
         const quantidade = modoSCACC ? novaPecaQuantidade : 1;
         pecasFinais = [...pecasFinais, {
@@ -3196,7 +3196,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                             alert('Preencha código e descrição');
                             return;
                           }
-                          const valorPeca = parseFloat(novaPecaValor) || 0;
+                          const valorPeca = parseFloat(sanitizeGSPNValue(novaPecaValor)) || 0;
                           const valorComMarkup = novaPecaValorComMarkup || valorPeca;
                           const quantidade = modoSCACC ? novaPecaQuantidade : 1;
                           setPecasAdicionadas([...pecasAdicionadas, {
