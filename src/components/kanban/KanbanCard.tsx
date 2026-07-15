@@ -245,13 +245,13 @@ export const KanbanCard = memo(function KanbanCard({
     }
   }, [moveOpen]);
 
-  const pecasSemCodigoOuValor = colunaId === 'aguardando_peca'
-    ? ((os as any).requisicoes || []).filter((req: any) =>
-        !['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'].includes(req.status) &&
-        (!req.codigo_peca || !req.valor_peca)
-      )
-    : [];
-  const destaquePecaIncompleta = pecasSemCodigoOuValor.length > 0;
+  const destaquePecaIncompleta = colunaId === 'aguardando_peca' && (() => {
+    const requisicoes = (os as any).requisicoes || [];
+    if (requisicoes.length === 0) return true;
+    const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
+    const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
+    return pecasAtivas.length > 0 && pecasAtivas.every((req: any) => !req.codigo_peca);
+  })();
 
   const filteredColunas = allColunas.filter(c =>
     c.id !== colunaId &&
@@ -310,7 +310,7 @@ export const KanbanCard = memo(function KanbanCard({
         >
           <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
           <span className="text-[9px] font-bold text-[#EF4444]">
-            {pecasSemCodigoOuValor.length} PECA{pecasSemCodigoOuValor.length > 1 ? 'S' : ''} SEM CODIGO/VALOR
+            SEM CODIGO DE PECA
           </span>
         </div>
       )}
