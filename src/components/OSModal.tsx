@@ -3411,6 +3411,28 @@ Não haverá cobrança ao cliente.`
                       >
                         {os.tipo_atendimento}
                       </span>
+                      <button
+                        onClick={async () => {
+                          const novoTipo = os.tipo_atendimento === 'IH' ? 'CI' : 'IH';
+                          const { error } = await supabase.from('os').update({ tipo_atendimento: novoTipo }).eq('id', os.id);
+                          if (!error) {
+                            setOS({ ...os, tipo_atendimento: novoTipo });
+                            if (novoTipo !== 'IH' && abaAtiva === 'agendamento') setAbaAtiva('dados');
+                          }
+                        }}
+                        className="px-2 py-1 rounded text-xs font-medium flex items-center gap-1 transition-all duration-200"
+                        style={{
+                          background: 'rgba(var(--accent-rgb), 0.10)',
+                          border: '1px solid rgba(var(--accent-rgb), 0.3)',
+                          color: 'var(--text-accent)'
+                        }}
+                        onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb), 0.20)'; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(var(--accent-rgb), 0.10)'; }}
+                        title={os.tipo_atendimento === 'IH' ? 'Converter para CI (Centro)' : 'Converter para IH (In-Home)'}
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        {os.tipo_atendimento === 'IH' ? 'CI' : 'IH'}
+                      </button>
                       <span
                         className="px-3 py-1 rounded text-xs font-bold"
                         style={{
