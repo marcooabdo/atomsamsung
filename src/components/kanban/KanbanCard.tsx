@@ -245,6 +245,14 @@ export const KanbanCard = memo(function KanbanCard({
     }
   }, [moveOpen]);
 
+  const pecasSemCodigoOuValor = colunaId === 'aguardando_peca'
+    ? ((os as any).requisicoes || []).filter((req: any) =>
+        !['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'].includes(req.status) &&
+        (!req.codigo_peca || !req.valor_peca)
+      )
+    : [];
+  const destaquePecaIncompleta = pecasSemCodigoOuValor.length > 0;
+
   const filteredColunas = allColunas.filter(c =>
     c.id !== colunaId &&
     c.label.toLowerCase().includes(moveSearch.toLowerCase())
@@ -267,11 +275,11 @@ export const KanbanCard = memo(function KanbanCard({
       onDragEnd={onDragEnd}
       onDragOver={(e) => onCardDragOver(e, colunaId, index)}
       onClick={() => onCardClick(os)}
-      className="rounded-xl p-3 cursor-pointer group relative overflow-hidden"
+      className={`rounded-xl p-3 cursor-pointer group relative overflow-hidden${destaquePecaIncompleta ? ' animate-pulse-subtle' : ''}`}
       style={{
-        background: 'var(--glass-bg)',
-        border: `1px solid ${textColor}15`,
-        boxShadow: 'var(--card-shadow)',
+        background: destaquePecaIncompleta ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, var(--glass-bg) 40%)' : 'var(--glass-bg)',
+        border: destaquePecaIncompleta ? '1px solid rgba(239,68,68,0.5)' : `1px solid ${textColor}15`,
+        boxShadow: destaquePecaIncompleta ? '0 0 12px rgba(239,68,68,0.2), var(--card-shadow)' : 'var(--card-shadow)',
         backdropFilter: 'blur(12px)',
         transition: 'all 0.25s ease',
         opacity: isDragged ? 0.4 : 1
@@ -288,8 +296,24 @@ export const KanbanCard = memo(function KanbanCard({
       }}
     >
       <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
-        background: `linear-gradient(90deg, ${colunaColor}, ${colunaColor}40, transparent)`,
+        background: destaquePecaIncompleta
+          ? 'linear-gradient(90deg, #EF4444, #F97316, #EF4444)'
+          : `linear-gradient(90deg, ${colunaColor}, ${colunaColor}40, transparent)`,
       }}></div>
+
+      {destaquePecaIncompleta && (
+        <div className="mb-2 rounded-md px-2 py-1 flex items-center gap-1.5"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(249,115,22,0.08) 100%)',
+            border: '1px solid rgba(239,68,68,0.4)',
+          }}
+        >
+          <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
+          <span className="text-[9px] font-bold text-[#EF4444]">
+            {pecasSemCodigoOuValor.length} PECA{pecasSemCodigoOuValor.length > 1 ? 'S' : ''} SEM CODIGO/VALOR
+          </span>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-start justify-between mb-2">
