@@ -258,7 +258,14 @@ export const KanbanCard = memo(function KanbanCard({
     if (requisicoes.length === 0) return false;
     const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
     const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
-    return pecasAtivas.length > 0 && pecasAtivas.some((req: any) => req.codigo_peca && (!req.valor_peca || Number(req.valor_peca) === 0));
+    const osPecas = (os as any).os_pecas || [];
+    return pecasAtivas.length > 0 && pecasAtivas.some((req: any) => {
+      if (!req.codigo_peca) return false;
+      if (req.valor_peca && Number(req.valor_peca) > 0) return false;
+      const osPecaMatch = osPecas.find((p: any) => p.pn === req.codigo_peca || p.codigo === req.codigo_peca);
+      if (osPecaMatch && Number(osPecaMatch.valor_gspn) > 0) return false;
+      return true;
+    });
   })();
 
   const destaqueAlerta = destaquePecaIncompleta || destaquePecaSemValor;

@@ -497,6 +497,7 @@ export function Kanban() {
           ),
           os_pecas:os_pecas(
             pn,
+            codigo,
             descricao,
             valor_gspn,
             quantidade,
