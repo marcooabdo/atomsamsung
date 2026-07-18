@@ -1,0 +1,533 @@
+import { useState, useEffect, useMemo } from 'react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { UnitFilter } from '../components/UnitFilter';
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDown,
+  ArrowUp,
+  Calendar,
+  Clock,
+  Download,
+  Layers,
+  TrendingUp,
+  Zap,
+  Package,
+  DollarSign,
+  Users,
+  Wrench,
+  Target,
+  BarChart2,
+} from 'lucide-react';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
+
+const COLUNAS_KANBAN = [
+  { id: 'os_nova', label: 'OS Nova', color: '#0EA5E9' },
+  { id: 'diagnostico', label: 'Diagnóstico/Triagem', color: '#06B6D4' },
+  { id: 'negociacao_em_andamento', label: 'Enviar Orçamento', color: '#F59E0B' },
+  { id: 'aguardando_aprovacao', label: 'Aguardando Aprovação', color: '#F97316' },
+  { id: 'orcamento_aprovado', label: 'Orçamento Aprovado', color: '#10B981' },
+  { id: 'aguardando_peca', label: 'Aguardando Peça', color: '#8B5CF6' },
+  { id: 'peca_em_transito', label: 'Peça em Trânsito', color: '#3B82F6' },
+  { id: 'em_reparo_ci', label: 'Em Reparo CI', color: '#0EA5E9' },
+  { id: 'em_rota_ih', label: 'Agendado', color: '#10B981' },
+  { id: 'controle_qualidade', label: 'Controle de Qualidade', color: '#2563EB' },
+  { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED' },
+  { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981' },
+  { id: 'aguardando_fechamento', label: 'Aguardando Fechamento', color: '#F59E0B' },
+  { id: 'os_fechada', label: 'OS Fechada', color: '#6B7280' },
+  { id: 'orcamentos_rejeitados', label: 'Orçamentos Rejeitados', color: '#EF4444' },
+];
+
+interface OSRow {
+  id: string;
+  coluna_kanban: string;
+  created_at: string;
+  updated_at: string;
+  valor_total: number | null;
+  valor_liquido: number | null;
+  valor_bruto: number | null;
+  tipo_os: string | null;
+  tipo_atendimento: string | null;
+  unidade_id: string | null;
+}
+
+interface PecaRow {
+  id: string;
+  os_id: string;
+  codigo: string | null;
+  valor_unitario: number | null;
+  status_gspn: string | null;
+}
+
+export function Cockpit() {
+  const { usuario, unidades, unidadesAdicionais, allUserUnits } = useAuth();
+  const [selectedUnidade, setSelectedUnidade] = useState('');
+  const [osData, setOsData] = useState<OSRow[]>([]);
+  const [pecasAguardando, setPecasAguardando] = useState<PecaRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
+
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+
+  useEffect(() => {
+    if (usuario) loadData();
+  }, [usuario, selectedUnidade, unidadesAdicionais]);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      let query = supabase.from('os').select('id, coluna_kanban, created_at, updated_at, valor_total, valor_liquido, valor_bruto, tipo_os, tipo_atendimento, unidade_id').neq('arquivada', true);
+
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      } else if (!canSeeAllUnits) {
+        if (allUserUnits.length > 0) {
+          query = query.in('unidade_id', allUserUnits);
+        } else if (usuario?.unidade_id) {
+          query = query.eq('unidade_id', usuario.unidade_id);
+        }
+      }
+
+      const allOS: OSRow[] = [];
+      let from = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+      while (hasMore) {
+        const { data, error } = await query.range(from, from + pageSize - 1);
+        if (error) break;
+        if (data) allOS.push(...data);
+        hasMore = data?.length === pageSize;
+        from += pageSize;
+      }
+      setOsData(allOS);
+
+      // Load pecas for OS in "aguardando_peca"
+      const osAguardando = allOS.filter(os => os.coluna_kanban === 'aguardando_peca').map(os => os.id);
+      if (osAguardando.length > 0) {
+        const batchSize = 50;
+        const allPecas: PecaRow[] = [];
+        for (let i = 0; i < osAguardando.length; i += batchSize) {
+          const batch = osAguardando.slice(i, i + batchSize);
+          const { data: pecas } = await supabase.from('os_pecas').select('id, os_id, codigo, valor_unitario, status_gspn').in('os_id', batch);
+          if (pecas) allPecas.push(...pecas);
+        }
+        setPecasAguardando(allPecas);
+      } else {
+        setPecasAguardando([]);
+      }
+
+      // Daily stats for last 30 days
+      const last30Days: { date: string; abertas: number; fechadas: number }[] = [];
+      const now = new Date();
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const abertas = allOS.filter(os => os.created_at?.startsWith(dateStr)).length;
+        const fechadas = allOS.filter(os => os.coluna_kanban === 'os_fechada' && os.updated_at?.startsWith(dateStr)).length;
+        last30Days.push({ date: dateStr, abertas, fechadas });
+      }
+      setDailyStats(last30Days);
+    } catch (err) {
+      console.error('Cockpit load error:', err);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const columnStats = useMemo(() => {
+    const now = new Date();
+    return COLUNAS_KANBAN.map(col => {
+      const cards = osData.filter(os => os.coluna_kanban === col.id);
+      const count = cards.length;
+
+      let oldestDays = 0;
+      if (cards.length > 0) {
+        const oldest = cards.reduce((min, os) => {
+          const d = new Date(os.updated_at || os.created_at);
+          return d < min ? d : min;
+        }, new Date());
+        oldestDays = Math.floor((now.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24));
+      }
+
+      let erros = 0;
+      if (col.id === 'aguardando_peca') {
+        const osIds = new Set(cards.map(c => c.id));
+        const pecasRelevantes = pecasAguardando.filter(p => osIds.has(p.os_id));
+        const osComErro = new Set<string>();
+        pecasRelevantes.forEach(p => {
+          if (!p.codigo || p.valor_unitario === 0 || p.valor_unitario === null) {
+            osComErro.add(p.os_id);
+          }
+        });
+        erros = osComErro.size;
+      }
+
+      return { ...col, count, oldestDays, erros };
+    });
+  }, [osData, pecasAguardando]);
+
+  const kpis = useMemo(() => {
+    const totalOS = osData.length;
+    const osAbertas = osData.filter(os => os.coluna_kanban !== 'os_fechada').length;
+    const osFechadas = osData.filter(os => os.coluna_kanban === 'os_fechada').length;
+    const lpCount = osData.filter(os => os.tipo_atendimento === 'LP' || os.tipo_os === 'LP').length;
+    const owCount = osData.filter(os => os.tipo_atendimento === 'OW' || os.tipo_os === 'OW').length;
+    const ihCount = osData.filter(os => os.tipo_atendimento === 'IH' || os.tipo_os === 'IH').length;
+    const ciCount = osData.filter(os => os.tipo_atendimento === 'CI' || os.tipo_os === 'CI').length;
+
+    const valorTotal = osData.reduce((sum, os) => sum + (os.valor_bruto || os.valor_total || 0), 0);
+    const valorLiquido = osData.reduce((sum, os) => sum + (os.valor_liquido || 0), 0);
+
+    const avgDaysOpen = osAbertas > 0
+      ? osData.filter(os => os.coluna_kanban !== 'os_fechada').reduce((sum, os) => {
+          const days = Math.floor((Date.now() - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
+          return sum + days;
+        }, 0) / osAbertas
+      : 0;
+
+    return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorLiquido, avgDaysOpen };
+  }, [osData]);
+
+  const typeDistribution = useMemo(() => {
+    return [
+      { name: 'LP', value: kpis.lpCount, color: '#0EA5E9' },
+      { name: 'OW', value: kpis.owCount, color: '#F59E0B' },
+      { name: 'IH', value: kpis.ihCount, color: '#10B981' },
+      { name: 'CI', value: kpis.ciCount, color: '#8B5CF6' },
+      { name: 'Outros', value: kpis.totalOS - kpis.lpCount - kpis.owCount - kpis.ihCount - kpis.ciCount, color: '#6B7280' },
+    ].filter(t => t.value > 0);
+  }, [kpis]);
+
+  function exportCSV() {
+    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Erros Valor/Codigo\n';
+    const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.erros}`).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `cockpit_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function formatCurrency(value: number) {
+    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-2 border-[#00D4FF] border-t-transparent rounded-full animate-spin" />
+          <p className="text-gray-400 text-sm">Carregando Cockpit...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6 animate-fadeIn">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#00D4FF]/20 to-[#00D4FF]/5 border border-[#00D4FF]/30 flex items-center justify-center">
+            <Activity className="w-5 h-5 text-[#00D4FF]" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Cockpit Executivo</h1>
+            <p className="text-xs text-gray-500">Visao gerencial em tempo real</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <UnitFilter unidades={unidades} selectedUnidade={selectedUnidade} onUnidadeChange={setSelectedUnidade} />
+          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/20 transition-all">
+            <Download className="w-4 h-4" />
+            Exportar
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <KPICard icon={Layers} label="Total OS" value={kpis.totalOS.toString()} color="#00D4FF" />
+        <KPICard icon={Zap} label="OS Abertas" value={kpis.osAbertas.toString()} color="#F59E0B" />
+        <KPICard icon={Target} label="OS Fechadas" value={kpis.osFechadas.toString()} color="#10B981" />
+        <KPICard icon={Clock} label="Dias Medio Aberta" value={kpis.avgDaysOpen.toFixed(1)} color="#F97316" />
+        <KPICard icon={DollarSign} label="Faturamento Bruto" value={formatCurrency(kpis.valorTotal)} color="#39FF14" />
+      </div>
+
+      {/* Type breakdown */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <TypeBadge label="LP" count={kpis.lpCount} color="#0EA5E9" />
+        <TypeBadge label="OW" count={kpis.owCount} color="#F59E0B" />
+        <TypeBadge label="IH" count={kpis.ihCount} color="#10B981" />
+        <TypeBadge label="CI" count={kpis.ciCount} color="#8B5CF6" />
+      </div>
+
+      {/* Charts Row */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Line chart: OS opened/closed per day */}
+        <div className="lg:col-span-2 rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-[#00D4FF]" />
+            OS Abertas vs Fechadas (Ultimos 30 dias)
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={dailyStats}>
+                <defs>
+                  <linearGradient id="gradAbertas" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#00D4FF" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#00D4FF" stopOpacity={0} />
+                  </linearGradient>
+                  <linearGradient id="gradFechadas" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#39FF14" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#39FF14" stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" />
+                <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 10 }} tickFormatter={(v) => v.slice(5)} />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 10 }} />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 8 }} labelStyle={{ color: '#9ca3af' }} />
+                <Area type="monotone" dataKey="abertas" stroke="#00D4FF" fill="url(#gradAbertas)" strokeWidth={2} name="Abertas" />
+                <Area type="monotone" dataKey="fechadas" stroke="#39FF14" fill="url(#gradFechadas)" strokeWidth={2} name="Fechadas" />
+                <Legend wrapperStyle={{ paddingTop: 10 }} />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pie chart: Type distribution */}
+        <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-[#00D4FF]" />
+            Distribuicao por Tipo
+          </h3>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={typeDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  {typeDistribution.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      {/* Pipeline Status Table */}
+      <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-800/60 flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
+            <Layers className="w-4 h-4 text-[#00D4FF]" />
+            Status do Pipeline
+          </h3>
+          <span className="text-xs text-gray-500">{osData.length} OS no sistema</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-gray-800/40">
+                <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Etapa</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Qtd Cards</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Card Mais Antigo</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Erros</th>
+              </tr>
+            </thead>
+            <tbody>
+              {columnStats.filter(c => c.count > 0 || c.id === 'aguardando_peca').map((col) => (
+                <tr key={col.id} className="border-b border-gray-800/20 hover:bg-white/[0.02] transition-colors">
+                  <td className="px-5 py-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                      <span className="text-sm text-gray-300">{col.label}</span>
+                    </div>
+                  </td>
+                  <td className="text-center px-4 py-3">
+                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: `${col.color}20`, color: col.color }}>
+                      {col.count}
+                    </span>
+                  </td>
+                  <td className="text-center px-4 py-3">
+                    {col.count > 0 ? (
+                      <span className={`text-xs font-medium ${col.oldestDays > 7 ? 'text-red-400' : col.oldestDays > 3 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                        {col.oldestDays} dia{col.oldestDays !== 1 ? 's' : ''}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-600">-</span>
+                    )}
+                  </td>
+                  <td className="text-center px-4 py-3">
+                    {col.id === 'aguardando_peca' ? (
+                      col.erros > 0 ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
+                          <AlertTriangle className="w-3 h-3" />
+                          {col.erros} OS
+                        </span>
+                      ) : (
+                        <span className="text-xs text-green-400">OK</span>
+                      )
+                    ) : (
+                      <span className="text-xs text-gray-600">-</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-gray-700/50 bg-white/[0.02]">
+                <td className="px-5 py-3 text-sm font-semibold text-gray-300">Total</td>
+                <td className="text-center px-4 py-3">
+                  <span className="text-sm font-bold text-[#00D4FF]">{columnStats.reduce((s, c) => s + c.count, 0)}</span>
+                </td>
+                <td className="text-center px-4 py-3">
+                  <span className="text-xs text-gray-500">
+                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)}d
+                  </span>
+                </td>
+                <td className="text-center px-4 py-3">
+                  <span className="text-xs text-gray-500">
+                    {columnStats.find(c => c.id === 'aguardando_peca')?.erros || 0}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      </div>
+
+      {/* Bottom insights row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {/* Top bottlenecks */}
+        <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-yellow-400" />
+            Gargalos (Maior Tempo)
+          </h3>
+          <div className="space-y-3">
+            {columnStats
+              .filter(c => c.count > 0)
+              .sort((a, b) => b.oldestDays - a.oldestDays)
+              .slice(0, 5)
+              .map((col) => (
+                <div key={col.id} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                    <span className="text-xs text-gray-400">{col.label}</span>
+                  </div>
+                  <span className={`text-xs font-bold ${col.oldestDays > 7 ? 'text-red-400' : 'text-yellow-400'}`}>
+                    {col.oldestDays}d
+                  </span>
+                </div>
+              ))}
+          </div>
+        </div>
+
+        {/* Volume by column - bar chart */}
+        <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-[#00D4FF]" />
+            Volume por Etapa
+          </h3>
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={columnStats.filter(c => c.count > 0).slice(0, 8)} layout="vertical">
+                <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
+                <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} />
+                <YAxis type="category" dataKey="label" tick={{ fill: '#9ca3af', fontSize: 9 }} width={100} />
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 8 }} />
+                <Bar dataKey="count" name="OS" radius={[0, 4, 4, 0]}>
+                  {columnStats.filter(c => c.count > 0).slice(0, 8).map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Financial summary */}
+        <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <DollarSign className="w-4 h-4 text-[#39FF14]" />
+            Resumo Financeiro
+          </h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Faturamento Bruto</span>
+              <span className="text-sm font-bold text-white">{formatCurrency(kpis.valorTotal)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Valor Liquido</span>
+              <span className="text-sm font-bold text-[#39FF14]">{formatCurrency(kpis.valorLiquido)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Ticket Medio</span>
+              <span className="text-sm font-bold text-[#00D4FF]">
+                {kpis.osFechadas > 0 ? formatCurrency(kpis.valorTotal / kpis.osFechadas) : 'R$ 0,00'}
+              </span>
+            </div>
+            <div className="h-px bg-gray-800 my-2" />
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">OS sem valor</span>
+              <span className="text-sm font-bold text-red-400">
+                {osData.filter(os => !os.valor_total && !os.valor_bruto && os.coluna_kanban !== 'os_nova').length}
+              </span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Taxa Conversao</span>
+              <span className="text-sm font-bold text-green-400">
+                {kpis.totalOS > 0 ? ((kpis.osFechadas / kpis.totalOS) * 100).toFixed(1) : 0}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function KPICard({ icon: Icon, label, value, color }: { icon: any; label: string; value: string; color: string }) {
+  return (
+    <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-4 hover:border-opacity-100 transition-all" style={{ borderColor: `${color}30` }}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon className="w-4 h-4" style={{ color }} />
+        <span className="text-xs text-gray-500 uppercase tracking-wide">{label}</span>
+      </div>
+      <p className="text-xl font-bold text-white truncate">{value}</p>
+    </div>
+  );
+}
+
+function TypeBadge({ label, count, color }: { label: string; count: number; color: string }) {
+  return (
+    <div className="flex items-center justify-between px-4 py-3 rounded-lg border transition-all" style={{ borderColor: `${color}30`, backgroundColor: `${color}08` }}>
+      <span className="text-sm font-bold" style={{ color }}>{label}</span>
+      <span className="text-lg font-bold text-white">{count}</span>
+    </div>
+  );
+}
+
+export default Cockpit;
