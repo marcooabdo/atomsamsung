@@ -30,7 +30,6 @@ import AtomConnect from './pages/AtomConnect';
 import { MuralMissoes } from './pages/MuralMissoes';
 import { AtomAudit } from './pages/AtomAudit';
 import { OSArquivadas } from './pages/OSArquivadas';
-import VisaoGeral from './pages/VisaoGeral';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, usuario } = useAuth();
@@ -330,17 +329,6 @@ function AppContent() {
             <ProtectedRoute>
               <Layout>
                 <OSArquivadas />
-              </Layout>
-            </ProtectedRoute>
-          }
-        />
-
-        <Route
-          path="/visao-geral"
-          element={
-            <ProtectedRoute>
-              <Layout>
-                <VisaoGeral />
               </Layout>
             </ProtectedRoute>
           }

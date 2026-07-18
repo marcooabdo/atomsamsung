@@ -31,7 +31,6 @@ import {
   Truck,
   ShieldCheck,
   Archive,
-  BarChart3,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -43,7 +42,6 @@ const allMenuItems = [
   { id: 'mural-missoes', permKey: 'menu_mural_missoes', label: 'ATOM Command Center', icon: Target, path: '/mural-missoes', glow: true },
   { id: 'atom-connect', permKey: 'menu_atom_connect', label: 'ATOM Connect', icon: Radio, path: '/atom-connect', glow: true },
   { id: 'dashboard', permKey: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard, path: '/' },
-  { id: 'visao-geral', permKey: 'menu_visao_geral', label: 'Visao Executiva', icon: BarChart3, path: '/visao-geral' },
   { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'os-arquivadas', permKey: 'menu_kanban', label: 'OS Arquivadas', icon: Archive, path: '/os-arquivadas' },
   { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
