@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { OSData, PipelineRow } from '../../pages/GerencialDashboard';
-import { AlertTriangle, TrendingDown, Clock, Zap, AlertCircle } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, TrendingDown, Clock, Zap, CircleAlert as AlertCircle } from 'lucide-react';
 import { differenceInDays, differenceInHours } from 'date-fns';
 
 interface Props {
