@@ -253,6 +253,16 @@ export const KanbanCard = memo(function KanbanCard({
     return pecasAtivas.length > 0 && pecasAtivas.every((req: any) => !req.codigo_peca);
   })();
 
+  const destaquePecaSemValor = !destaquePecaIncompleta && colunaId === 'aguardando_peca' && (() => {
+    const requisicoes = (os as any).requisicoes || [];
+    if (requisicoes.length === 0) return false;
+    const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
+    const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
+    return pecasAtivas.length > 0 && pecasAtivas.some((req: any) => req.codigo_peca && (!req.valor_peca || Number(req.valor_peca) === 0));
+  })();
+
+  const destaqueAlerta = destaquePecaIncompleta || destaquePecaSemValor;
+
   const filteredColunas = allColunas.filter(c =>
     c.id !== colunaId &&
     c.label.toLowerCase().includes(moveSearch.toLowerCase())
@@ -275,11 +285,11 @@ export const KanbanCard = memo(function KanbanCard({
       onDragEnd={onDragEnd}
       onDragOver={(e) => onCardDragOver(e, colunaId, index)}
       onClick={() => onCardClick(os)}
-      className={`rounded-xl p-3 cursor-pointer group relative overflow-hidden${destaquePecaIncompleta ? ' animate-pulse-subtle' : ''}`}
+      className={`rounded-xl p-3 cursor-pointer group relative overflow-hidden${destaqueAlerta ? ' animate-pulse-subtle' : ''}`}
       style={{
-        background: destaquePecaIncompleta ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, var(--glass-bg) 40%)' : 'var(--glass-bg)',
-        border: destaquePecaIncompleta ? '1px solid rgba(239,68,68,0.5)' : `1px solid ${textColor}15`,
-        boxShadow: destaquePecaIncompleta ? '0 0 12px rgba(239,68,68,0.2), var(--card-shadow)' : 'var(--card-shadow)',
+        background: destaqueAlerta ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, var(--glass-bg) 40%)' : 'var(--glass-bg)',
+        border: destaqueAlerta ? '1px solid rgba(239,68,68,0.5)' : `1px solid ${textColor}15`,
+        boxShadow: destaqueAlerta ? '0 0 12px rgba(239,68,68,0.2), var(--card-shadow)' : 'var(--card-shadow)',
         backdropFilter: 'blur(12px)',
         transition: 'all 0.25s ease',
         opacity: isDragged ? 0.4 : 1
@@ -296,7 +306,7 @@ export const KanbanCard = memo(function KanbanCard({
       }}
     >
       <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
-        background: destaquePecaIncompleta
+        background: destaqueAlerta
           ? 'linear-gradient(90deg, #EF4444, #F97316, #EF4444)'
           : `linear-gradient(90deg, ${colunaColor}, ${colunaColor}40, transparent)`,
       }}></div>
@@ -311,6 +321,20 @@ export const KanbanCard = memo(function KanbanCard({
           <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
           <span className="text-[9px] font-bold text-[#EF4444]">
             SEM CODIGO DE PECA
+          </span>
+        </div>
+      )}
+
+      {destaquePecaSemValor && (
+        <div className="mb-2 rounded-md px-2 py-1 flex items-center gap-1.5"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239,68,68,0.15) 0%, rgba(249,115,22,0.08) 100%)',
+            border: '1px solid rgba(239,68,68,0.4)',
+          }}
+        >
+          <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
+          <span className="text-[9px] font-bold text-[#EF4444]">
+            PECA COM VALOR R$0
           </span>
         </div>
       )}
