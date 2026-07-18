@@ -153,15 +153,17 @@ export default function VisaoGeral() {
   const fetchData = async () => {
     setLoading(true);
     try {
-      const { data: colData } = await supabase.rpc('get_visao_geral_columns').select();
-
-      // Fallback: query directly if RPC doesn't exist
-      const { data: osData } = await supabase
+      const { data: osData, error } = await supabase
         .from('os')
         .select('id, coluna_kanban, tipo_os, tipo_atendimento, valor_total, created_at, updated_at, dias_na_etapa, numero_os_samsung, numero_os_interna, aparelho_modelo, status_pagamento, unidade_id, fechada_em, arquivada')
-        .eq('arquivada', false);
+        .eq('arquivada', false)
+        .limit(5000);
 
-      if (osData) setAllOS(osData as OSData[]);
+      if (error) {
+        console.error('Error fetching OS data:', error);
+      } else if (osData) {
+        setAllOS(osData as OSData[]);
+      }
       setLastRefresh(new Date());
     } catch (err) {
       console.error('Error fetching visao geral data:', err);
