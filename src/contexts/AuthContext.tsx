@@ -17,6 +17,8 @@ interface AuthContextType {
   loading: boolean;
   unidadeAtual: string | null;
   unidades: Unidade[];
+  unidadesAdicionais: string[];
+  allUserUnits: string[];
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUsuario?: (updatedUsuario: Usuario) => void;
@@ -30,8 +32,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [unidades, setUnidades] = useState<Unidade[]>([]);
+  const [unidadesAdicionais, setUnidadesAdicionais] = useState<string[]>([]);
 
   const unidadeAtual = usuario?.unidade_id || null;
+
+  const allUserUnits = unidadeAtual
+    ? [unidadeAtual, ...unidadesAdicionais]
+    : [...unidadesAdicionais];
 
   const loadUnidades = async () => {
     const { data } = await supabase
@@ -56,6 +63,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setUsuario(data);
           await loadUnidades();
+
+          const { data: extras } = await supabase
+            .from('usuario_unidades')
+            .select('unidade_id')
+            .eq('usuario_id', session.user.id);
+          setUnidadesAdicionais(extras?.map(r => r.unidade_id) || []);
         }
 
         setLoading(false);
@@ -76,9 +89,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
           setUsuario(data);
           await loadUnidades();
+
+          const { data: extras } = await supabase
+            .from('usuario_unidades')
+            .select('unidade_id')
+            .eq('usuario_id', session.user.id);
+          setUnidadesAdicionais(extras?.map(r => r.unidade_id) || []);
         } else {
           setUsuario(null);
           setUnidades([]);
+          setUnidadesAdicionais([]);
         }
       })();
     });
@@ -117,6 +137,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading,
     unidadeAtual,
     unidades,
+    unidadesAdicionais,
+    allUserUnits,
     signIn,
     signOut,
     updateUsuario,

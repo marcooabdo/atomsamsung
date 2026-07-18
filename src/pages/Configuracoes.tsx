@@ -184,6 +184,7 @@ export function Configuracoes() {
     codigo_ibge_uf: '',
   });
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
+  const [unidadesAdicionais, setUnidadesAdicionais] = useState<string[]>([]);
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
@@ -308,7 +309,12 @@ export function Configuracoes() {
           break;
         case 'usuarios':
           const usuario = usuarios.find(u => u.id === id);
-          if (usuario) setFormUsuario({ nome: usuario.nome, email: usuario.email, tipo: usuario.tipo, unidade_id: usuario.unidade_id || '', senha: '', ativo: usuario.ativo, numero_tecnico: usuario.numero_tecnico || '' });
+          if (usuario) {
+            setFormUsuario({ nome: usuario.nome, email: usuario.email, tipo: usuario.tipo, unidade_id: usuario.unidade_id || '', senha: '', ativo: usuario.ativo, numero_tecnico: usuario.numero_tecnico || '' });
+            supabase.from('usuario_unidades').select('unidade_id').eq('usuario_id', id).then(({ data }) => {
+              setUnidadesAdicionais(data?.map(r => r.unidade_id) || []);
+            });
+          }
           break;
         case 'servicos':
           const servico = servicos.find(s => s.id === id);
@@ -357,6 +363,7 @@ export function Configuracoes() {
       // Master e Diretoria podem escolher qualquer unidade, outros ficam restritos à sua unidade
       const defaultUnidadeId = (usuarioLogado?.tipo === 'master' || usuarioLogado?.tipo === 'diretoria') ? '' : (usuarioLogado?.unidade_id || '');
       setFormUsuario({ nome: '', email: '', tipo: 'tecnico', unidade_id: defaultUnidadeId, senha: '', ativo: true, numero_tecnico: '' });
+      setUnidadesAdicionais([]);
       const defaultUnitForForm = canSeeAllUnits ? '' : userUnitId;
       setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: defaultUnitForForm, ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: defaultUnitForForm, tipo_orcamento: 'normal', ativo: true });
@@ -489,6 +496,13 @@ export function Configuracoes() {
             if (!response.ok || !result.success) {
               throw new Error(result.error || result.msg || result.details || result.message || `Erro ${response.status}: ${responseText.slice(0, 200)}`);
             }
+            // Save additional units
+            await supabase.from('usuario_unidades').delete().eq('usuario_id', editingId);
+            if (unidadesAdicionais.length > 0) {
+              await supabase.from('usuario_unidades').insert(
+                unidadesAdicionais.map(uid => ({ usuario_id: editingId, unidade_id: uid }))
+              );
+            }
           } else {
             if (!formUsuario.senha) return alert('Senha e obrigatoria para novo usuario');
 
@@ -514,6 +528,13 @@ export function Configuracoes() {
             try { createResult = JSON.parse(createText); } catch { createResult = { error: createText || `Erro HTTP ${response.status}` }; }
             if (!response.ok || !createResult.success) {
               throw new Error(createResult.error || createResult.msg || createResult.details || createResult.message || `Erro ${response.status}: ${createText.slice(0, 200)}`);
+            }
+            // Save additional units for new user
+            if (createResult.user_id && unidadesAdicionais.length > 0) {
+              await supabase.from('usuario_unidades').delete().eq('usuario_id', createResult.user_id);
+              await supabase.from('usuario_unidades').insert(
+                unidadesAdicionais.map(uid => ({ usuario_id: createResult.user_id, unidade_id: uid }))
+              );
             }
           }
           break;
@@ -1189,6 +1210,42 @@ export function Configuracoes() {
                     {(usuarioLogado?.tipo !== 'master' && usuarioLogado?.tipo !== 'diretoria') && (
                       <p className="text-xs text-yellow-500 mt-1">
                         A unidade está bloqueada pois você só pode gerenciar usuários da sua unidade
+                      </p>
+                    )}
+                  </div>
+                  {/* Unidades Adicionais */}
+                  <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">
+                      Unidades Adicionais
+                    </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      Selecione unidades extras que este usuário pode acessar (além da unidade principal)
+                    </p>
+                    <div className="space-y-2 max-h-40 overflow-y-auto rounded-lg border border-gray-700/50 p-3">
+                      {unidades.filter(u => u.id !== formUsuario.unidade_id).map(u => (
+                        <label key={u.id} className="flex items-center gap-2 cursor-pointer hover:bg-white/5 rounded px-2 py-1 transition-colors">
+                          <input
+                            type="checkbox"
+                            checked={unidadesAdicionais.includes(u.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setUnidadesAdicionais([...unidadesAdicionais, u.id]);
+                              } else {
+                                setUnidadesAdicionais(unidadesAdicionais.filter(id => id !== u.id));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-gray-600"
+                          />
+                          <span className="text-sm text-gray-300">{u.nome}</span>
+                        </label>
+                      ))}
+                      {unidades.filter(u => u.id !== formUsuario.unidade_id).length === 0 && (
+                        <p className="text-xs text-gray-500 italic">Nenhuma outra unidade disponível</p>
+                      )}
+                    </div>
+                    {unidadesAdicionais.length > 0 && (
+                      <p className="text-xs mt-2" style={{ color: 'var(--text-accent)' }}>
+                        {unidadesAdicionais.length} unidade{unidadesAdicionais.length > 1 ? 's' : ''} adicional{unidadesAdicionais.length > 1 ? 'is' : ''} selecionada{unidadesAdicionais.length > 1 ? 's' : ''}
                       </p>
                     )}
                   </div>

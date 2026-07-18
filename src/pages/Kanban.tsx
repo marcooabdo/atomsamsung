@@ -115,7 +115,7 @@ const COLUNAS_IH = [
 ];
 
 export function Kanban() {
-  const { usuario } = useAuth();
+  const { usuario, unidadesAdicionais, allUserUnits } = useAuth();
   const [osData, setOsData] = useState<Record<string, OS[]>>({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -302,13 +302,13 @@ export function Kanban() {
   useEffect(() => {
     if (usuario) {
       const canSeeAllUnits = (usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id;
-      if (!canSeeAllUnits && usuario.unidade_id && !selectedUnidade) {
+      if (!canSeeAllUnits && usuario.unidade_id && !selectedUnidade && unidadesAdicionais.length === 0) {
         setSelectedUnidade(usuario.unidade_id);
       } else {
         loadKanbanData();
       }
     }
-  }, [usuario]);
+  }, [usuario, unidadesAdicionais]);
 
   useEffect(() => {
     if (usuario) {
@@ -538,12 +538,18 @@ export function Kanban() {
       // Usuarios comuns SEMPRE devem filtrar pela sua unidade - SEGURANCA CRITICA
       if (!canSeeAllUnits) {
         const unidadeObrigatoria = usuario?.unidade_id;
-        if (!unidadeObrigatoria) {
+        if (!unidadeObrigatoria && unidadesAdicionais.length === 0) {
           setOsData({});
           setLoading(false);
           return;
         }
-        query = query.eq('unidade_id', unidadeObrigatoria);
+        if (selectedUnidade) {
+          query = query.eq('unidade_id', selectedUnidade);
+        } else if (unidadesAdicionais.length > 0) {
+          query = query.in('unidade_id', allUserUnits);
+        } else {
+          query = query.eq('unidade_id', unidadeObrigatoria!);
+        }
       } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
       }

@@ -13,14 +13,13 @@ interface UnitFilterProps {
 }
 
 export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitFilterProps) {
-  const { usuario } = useAuth();
+  const { usuario, unidadesAdicionais } = useAuth();
 
-  // SEGURANCA: Apenas master/diretoria SEM unidade vinculada podem ver todas
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const userUnidade = usuario?.unidade_id;
+  const hasAdditionalUnits = unidadesAdicionais.length > 0;
 
-  // Usuario comum OU master/diretoria COM unidade vinculada: mostrar apenas sua unidade
-  if (!canSeeAllUnits) {
+  if (!canSeeAllUnits && !hasAdditionalUnits) {
     if (!userUnidade) {
       return (
         <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 border border-red-500/30">
@@ -38,6 +37,10 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
     );
   }
 
+  const availableUnits = canSeeAllUnits
+    ? unidades
+    : unidades.filter(u => u.id === userUnidade || unidadesAdicionais.includes(u.id));
+
   return (
     <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#00D4FF]/5 border border-[#00D4FF]/20">
       <Building2 className="w-4 h-4 text-[#00D4FF]" />
@@ -46,8 +49,9 @@ export function UnitFilter({ unidades, selectedUnidade, onUnidadeChange }: UnitF
         onChange={(e) => onUnidadeChange(e.target.value)}
         className="neon-input py-1 text-xs"
       >
-        <option value="">Todas as Unidades</option>
-        {unidades.map(u => (
+        {canSeeAllUnits && <option value="">Todas as Unidades</option>}
+        {!canSeeAllUnits && <option value="">Minhas Unidades</option>}
+        {availableUnits.map(u => (
           <option key={u.id} value={u.id}>{u.nome}</option>
         ))}
       </select>
