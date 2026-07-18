@@ -1,10 +1,7 @@
 import { useMemo } from 'react';
 import { OSData } from '../../pages/GerencialDashboard';
 import { differenceInDays } from 'date-fns';
-import {
-  FileText, CheckCircle, Clock, DollarSign,
-  Wrench, Truck, TrendingUp, Timer
-} from 'lucide-react';
+import { FileText, CircleCheck as CheckCircle, Clock, DollarSign, Wrench, Truck, TrendingUp, Timer } from 'lucide-react';
 
 interface Props {
   osList: OSData[];

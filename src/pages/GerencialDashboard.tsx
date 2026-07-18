@@ -6,7 +6,7 @@ import { PipelineTable } from '../components/gerencial/PipelineTable';
 import { ChartsSection } from '../components/gerencial/ChartsSection';
 import { FinancialSummary } from '../components/gerencial/FinancialSummary';
 import { InsightsPanel } from '../components/gerencial/InsightsPanel';
-import { RefreshCw, Download, Building2, BarChart3 } from 'lucide-react';
+import { RefreshCw, Download, Building2, ChartBar as BarChart3 } from 'lucide-react';
 import { format, subDays, differenceInHours, differenceInDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 

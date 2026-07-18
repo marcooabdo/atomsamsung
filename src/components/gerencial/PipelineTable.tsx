@@ -1,6 +1,6 @@
 import { PipelineRow } from '../../pages/GerencialDashboard';
 import { format, differenceInDays } from 'date-fns';
-import { AlertTriangle, Clock } from 'lucide-react';
+import { TriangleAlert as AlertTriangle, Clock } from 'lucide-react';
 
 interface Props {
   data: PipelineRow[];
