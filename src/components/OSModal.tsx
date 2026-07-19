@@ -1051,7 +1051,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
 
       // Calcula valores
       const valorGSPN = valorNum;
-      const valorComMarkup = (os?.tipo_os === 'OW' || os?.tipo_os === 'LP') ? calcularValorComMarkup(valorGSPN) : valorGSPN;
+      const valorComMarkup = os?.tipo_os === 'OW' ? calcularValorComMarkup(valorGSPN) : valorGSPN;
       const valorTotal = valorComMarkup * Math.max(peca.quantidade || 1, 1);
 
       // Atualiza a peça (corrige quantidade 0 para 1 se necessário)
