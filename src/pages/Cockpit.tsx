@@ -54,6 +54,7 @@ interface OSRow {
   coluna_kanban: string;
   created_at: string;
   updated_at: string;
+  coluna_kanban_desde: string | null;
   valor_total: number | null;
   valor_pecas: number | null;
   valor_servicos: number | null;
@@ -99,7 +100,7 @@ export function Cockpit() {
     try {
       let query = supabase
         .from('os')
-        .select('id, coluna_kanban, created_at, updated_at, valor_total, valor_pecas, valor_servicos, valor_pago, tipo_os, tipo_atendimento, unidade_id, numero_os_samsung, numero_os_interna')
+        .select('id, coluna_kanban, created_at, updated_at, coluna_kanban_desde, valor_total, valor_pecas, valor_servicos, valor_pago, tipo_os, tipo_atendimento, unidade_id, numero_os_samsung, numero_os_interna')
         .neq('arquivada', true);
 
       if (selectedUnidade) {
@@ -173,12 +174,23 @@ export function Cockpit() {
 
       let oldestDays = 0;
       let oldestOSLabel = '';
+      let oldestInStageDays = 0;
+      let oldestInStageOSLabel = '';
       if (cards.length > 0) {
         const oldestOS = cards.reduce((prev, os) => {
           return new Date(os.created_at) < new Date(prev.created_at) ? os : prev;
         }, cards[0]);
         oldestDays = Math.floor((now.getTime() - new Date(oldestOS.created_at).getTime()) / (1000 * 60 * 60 * 24));
         oldestOSLabel = oldestOS.numero_os_samsung || oldestOS.numero_os_interna || oldestOS.id.slice(0, 8);
+
+        const oldestInStage = cards.reduce((prev, os) => {
+          const prevDate = prev.coluna_kanban_desde || prev.updated_at || prev.created_at;
+          const osDate = os.coluna_kanban_desde || os.updated_at || os.created_at;
+          return new Date(osDate) < new Date(prevDate) ? os : prev;
+        }, cards[0]);
+        const stageDate = oldestInStage.coluna_kanban_desde || oldestInStage.updated_at || oldestInStage.created_at;
+        oldestInStageDays = Math.floor((now.getTime() - new Date(stageDate).getTime()) / (1000 * 60 * 60 * 24));
+        oldestInStageOSLabel = oldestInStage.numero_os_samsung || oldestInStage.numero_os_interna || oldestInStage.id.slice(0, 8);
       }
 
       // Count OS where pecas have valor_unitario < 0.01 (missing price)
@@ -199,7 +211,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, oldestOSLabel, semCodigoOuValor, osComProblema };
+      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, osComProblema };
     });
   }, [osData, pecasMap]);
 
@@ -373,6 +385,7 @@ export function Cockpit() {
                 <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Etapa</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Mais Antiga na Etapa</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Cod/Valor</th>
               </tr>
             </thead>
@@ -408,6 +421,24 @@ export function Cockpit() {
                       </div>
                     )}
                   </td>
+                  <td className="text-center px-4 py-3 relative">
+                    {col.count > 0 ? (
+                      <button
+                        onClick={() => setClickedOS(prev => prev === `stage_${col.id}` ? null : `stage_${col.id}`)}
+                        className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestInStageDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestInStageDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
+                      >
+                        {col.oldestInStageDays} dia{col.oldestInStageDays !== 1 ? 's' : ''}
+                      </button>
+                    ) : (
+                      <span className="text-xs text-gray-600">-</span>
+                    )}
+                    {clickedOS === `stage_${col.id}` && col.oldestInStageOSLabel && (
+                      <div className="absolute z-10 top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                        <span className="text-xs text-gray-400">OS: </span>
+                        <span className="text-xs font-mono text-[#00D4FF] font-semibold">{col.oldestInStageOSLabel}</span>
+                      </div>
+                    )}
+                  </td>
                   <td className="text-center px-4 py-3">
                     {col.semCodigoOuValor > 0 ? (
                       <button
@@ -433,6 +464,11 @@ export function Cockpit() {
                 <td className="text-center px-4 py-3">
                   <span className="text-xs text-gray-400 font-medium">
                     Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)} dias
+                  </span>
+                </td>
+                <td className="text-center px-4 py-3">
+                  <span className="text-xs text-gray-400 font-medium">
+                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestInStageDays), 0)} dias
                   </span>
                 </td>
                 <td className="text-center px-4 py-3">
