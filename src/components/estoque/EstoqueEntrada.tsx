@@ -8,7 +8,8 @@ import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
   ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
-  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin
+  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin,
+  Key, Loader2, RefreshCw, Clock, ArrowRight
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 import { LocationSelector } from './LocationSelector';
@@ -118,6 +119,16 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [nfDateTo, setNfDateTo] = useState('');
   const [exportingReport, setExportingReport] = useState(false);
   const [exportingXmls, setExportingXmls] = useState(false);
+  
+  // Sub-tab state
+  const [subTab, setSubTab] = useState<'upload' | 'pendentes'>('upload');
+  // Chave de acesso search
+  const [chaveAcesso, setChaveAcesso] = useState('');
+  const [buscandoChave, setBuscandoChave] = useState(false);
+  // Pendentes de entrada
+  const [nfsPendentes, setNfsPendentes] = useState<NF[]>([]);
+  const [loadingPendentes, setLoadingPendentes] = useState(false);
+  const [buscandoDistribuicao, setBuscandoDistribuicao] = useState(false);
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
@@ -134,6 +145,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   useEffect(() => {
     setNfPage(0);
     loadNFs(0, '', '', '');
+    loadNFsPendentes();
   }, [selectedUnidade]);
 
   const triggerSearch = (search: string, dateFrom: string, dateTo: string) => {
@@ -184,6 +196,133 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       if (error) throw error;
       setNfs(data || []);
     } catch (err) {}
+  };
+
+  const loadNFsPendentes = async () => {
+    try {
+      setLoadingPendentes(true);
+      const unidadeFilter = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : usuario?.unidade_id;
+      
+      let query = supabase
+        .from('estoque_nfs')
+        .select('*')
+        .eq('pendente_entrada', true)
+        .order('created_at', { ascending: false });
+      
+      if (unidadeFilter) {
+        query = query.eq('unidade_id', unidadeFilter);
+      }
+      
+      const { data, error } = await query;
+      if (error) throw error;
+      setNfsPendentes(data || []);
+    } catch (err) {
+      console.error('Erro ao carregar NFs pendentes:', err);
+    } finally {
+      setLoadingPendentes(false);
+    }
+  };
+
+  const handleBuscarPorChave = async () => {
+    const chave = chaveAcesso.replace(/[^\d]/g, '');
+    if (chave.length !== 44) {
+      alert('A chave de acesso deve conter exatamente 44 dígitos numéricos.');
+      return;
+    }
+
+    setBuscandoChave(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/consultar-nf-nuvemfiscal`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ chaveAcesso: chave }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        alert(result.error || 'Não foi possível localizar a NF para esta chave de acesso.');
+        return;
+      }
+
+      if (result.xml) {
+        const parsed = parseXML(result.xml);
+        setParsedNF(parsed);
+        setXmlContent(result.xml);
+        setShowPreview(true);
+        setChaveAcesso('');
+      } else {
+        alert('NF localizada mas o XML não está disponível.');
+      }
+    } catch (err) {
+      alert('Erro ao consultar NF. Tente novamente.');
+    } finally {
+      setBuscandoChave(false);
+    }
+  };
+
+  const handleBuscarDistribuicao = async () => {
+    setBuscandoDistribuicao(true);
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      const unidadeFilter = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : null;
+      
+      const response = await fetch(`${supabaseUrl}/functions/v1/buscar-nfs-distribuicao`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${supabaseKey}`,
+        },
+        body: JSON.stringify({ unidade_id: unidadeFilter }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        alert(result.error || 'Erro ao buscar NFs da distribuição.');
+        return;
+      }
+
+      alert(result.message || 'Busca concluída.');
+      await loadNFsPendentes();
+    } catch (err) {
+      alert('Erro ao buscar NFs da distribuição. Tente novamente.');
+    } finally {
+      setBuscandoDistribuicao(false);
+    }
+  };
+
+  const handleDarEntradaPendente = (nf: NF) => {
+    if (nf.xml_conteudo) {
+      const parsed = parseXML(nf.xml_conteudo);
+      setParsedNF(parsed);
+      setXmlContent(nf.xml_conteudo);
+      setShowPreview(true);
+    } else {
+      alert('Esta NF não possui XML disponível para dar entrada.');
+    }
+  };
+
+  const handleArquivarPendente = async (nfId: string) => {
+    if (!confirm('Tem certeza que deseja arquivar esta NF pendente? Ela será removida da lista de pendentes.')) return;
+    
+    try {
+      await supabase
+        .from('estoque_nfs')
+        .update({ pendente_entrada: false })
+        .eq('id', nfId);
+      
+      await loadNFsPendentes();
+    } catch (err) {
+      alert('Erro ao arquivar NF pendente.');
+    }
   };
 
   const parseXML = (xmlText: string): NFParsed => {
@@ -1399,6 +1538,40 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       {/* MAIN CONTENT */}
       <div className="space-y-6">
+        {/* Sub-tabs */}
+        <div className="flex items-center gap-1 p-1 rounded-xl" style={{ background: 'rgba(var(--accent-rgb),0.04)', border: '1px solid rgba(var(--accent-rgb),0.12)' }}>
+          <button
+            onClick={() => setSubTab('upload')}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all"
+            style={{
+              background: subTab === 'upload' ? 'rgba(var(--neon-green-rgb),0.15)' : 'transparent',
+              border: subTab === 'upload' ? '1px solid rgba(var(--neon-green-rgb),0.4)' : '1px solid transparent',
+              color: subTab === 'upload' ? 'var(--neon-green)' : 'var(--text-secondary)',
+            }}
+          >
+            <Upload className="w-4 h-4" />
+            Upload XML / Chave de Acesso
+          </button>
+          <button
+            onClick={() => { setSubTab('pendentes'); loadNFsPendentes(); }}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-bold transition-all relative"
+            style={{
+              background: subTab === 'pendentes' ? 'rgba(245,158,11,0.15)' : 'transparent',
+              border: subTab === 'pendentes' ? '1px solid rgba(245,158,11,0.4)' : '1px solid transparent',
+              color: subTab === 'pendentes' ? '#F59E0B' : 'var(--text-secondary)',
+            }}
+          >
+            <Clock className="w-4 h-4" />
+            Pendentes de Entrada
+            {nfsPendentes.length > 0 && (
+              <span className="ml-1 px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: 'rgba(245,158,11,0.2)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.4)' }}>
+                {nfsPendentes.length}
+              </span>
+            )}
+          </button>
+        </div>
+
+        {subTab === 'upload' && (<>
         {/* Upload Section */}
         <div
           className="rounded-2xl p-6"
@@ -1453,6 +1626,69 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 </label>
                 <span className="text-xs text-gray-500">Suporta multiplos arquivos simultaneos</span>
               </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Chave de Acesso Section */}
+        <div
+          className="rounded-2xl p-5"
+          style={{ background: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.15)', boxShadow: 'var(--card-shadow)' }}
+        >
+          <div className="flex items-start gap-4">
+            <div
+              className="p-3 rounded-xl shrink-0"
+              style={{
+                background: 'rgba(var(--accent-rgb),0.1)',
+                border: '1px solid rgba(var(--accent-rgb),0.3)',
+                boxShadow: '0 0 16px rgba(var(--accent-rgb),0.15)',
+              }}
+            >
+              <Key className="w-6 h-6" style={{ color: 'var(--text-accent)' }} />
+            </div>
+            <div className="flex-1">
+              <h4 className="font-black text-base tracking-wide mb-1" style={{ color: 'var(--text-accent)' }}>
+                CONSULTA POR CHAVE DE ACESSO
+              </h4>
+              <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                Cole a chave de acesso (44 digitos) da NF-e para buscar automaticamente via Nuvem Fiscal.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  value={chaveAcesso}
+                  onChange={(e) => setChaveAcesso(e.target.value.replace(/[^\d]/g, '').slice(0, 44))}
+                  placeholder="Cole a chave de acesso (44 dígitos)"
+                  maxLength={44}
+                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-mono focus:outline-none transition-all"
+                  style={{
+                    background: 'var(--bg-secondary)',
+                    border: '1px solid rgba(var(--accent-rgb),0.25)',
+                    color: 'var(--text-primary)',
+                  }}
+                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.5)'; }}
+                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.25)'; }}
+                  disabled={buscandoChave}
+                />
+                <button
+                  onClick={handleBuscarPorChave}
+                  disabled={buscandoChave || chaveAcesso.length !== 44}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'rgba(var(--accent-rgb),0.12)',
+                    border: '1px solid rgba(var(--accent-rgb),0.4)',
+                    color: 'var(--text-accent)',
+                  }}
+                >
+                  {buscandoChave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                  {buscandoChave ? 'Buscando...' : 'Buscar NF'}
+                </button>
+              </div>
+              {chaveAcesso.length > 0 && chaveAcesso.length < 44 && (
+                <p className="text-[11px] mt-2" style={{ color: 'var(--text-secondary)' }}>
+                  {chaveAcesso.length}/44 dígitos
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -1710,6 +1946,148 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             </div>
           )}
         </div>
+      </>)}
+
+        {subTab === 'pendentes' && (
+          <div className="space-y-4">
+            {/* Header with Buscar button */}
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-black text-lg" style={{ color: 'var(--text-primary)' }}>NFs Pendentes de Entrada</h3>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  NFs emitidas contra o CNPJ da unidade, aguardando processamento
+                </p>
+              </div>
+              <button
+                onClick={handleBuscarDistribuicao}
+                disabled={buscandoDistribuicao}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50"
+                style={{
+                  background: 'rgba(var(--accent-rgb),0.12)',
+                  border: '1px solid rgba(var(--accent-rgb),0.4)',
+                  color: 'var(--text-accent)',
+                }}
+              >
+                {buscandoDistribuicao ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+                {buscandoDistribuicao ? 'Buscando...' : 'Buscar Novas NFs'}
+              </button>
+            </div>
+
+            {/* Pending NFs List */}
+            {loadingPendentes ? (
+              <div className="flex items-center justify-center py-16">
+                <Loader2 className="w-6 h-6 animate-spin" style={{ color: 'var(--text-accent)' }} />
+                <span className="ml-3 text-sm" style={{ color: 'var(--text-secondary)' }}>Carregando NFs pendentes...</span>
+              </div>
+            ) : nfsPendentes.length > 0 ? (
+              <div className="space-y-3">
+                {nfsPendentes.map((nf: any) => (
+                  <div
+                    key={nf.id}
+                    className="rounded-xl p-4 transition-all hover:scale-[1.005]"
+                    style={{
+                      background: 'var(--bg-card)',
+                      border: '1px solid rgba(245,158,11,0.2)',
+                      boxShadow: 'var(--card-shadow)',
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4 flex-1">
+                        <div
+                          className="p-2.5 rounded-lg"
+                          style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.3)' }}
+                        >
+                          <FileText className="w-5 h-5" style={{ color: '#F59E0B' }} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <span className="font-black text-sm" style={{ color: 'var(--text-primary)' }}>
+                              NF {nf.numero_nf || '---'}
+                            </span>
+                            {nf.delivery && (
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                style={{ background: 'rgba(var(--accent-rgb),0.12)', color: 'var(--text-accent)', border: '1px solid rgba(var(--accent-rgb),0.3)' }}
+                              >
+                                DLV: {nf.delivery}
+                              </span>
+                            )}
+                            {nf.origem === 'distribuicao_automatica' && (
+                              <span
+                                className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                                style={{ background: 'rgba(16,185,129,0.12)', color: '#10B981', border: '1px solid rgba(16,185,129,0.3)' }}
+                              >
+                                AUTOMATICA
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-4 mt-1.5 flex-wrap">
+                            <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                              {nf.fornecedor || 'Fornecedor desconhecido'}
+                            </span>
+                            {nf.data_emissao && (
+                              <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
+                                Emissao: {new Date(nf.data_emissao + 'T12:00:00').toLocaleDateString('pt-BR')}
+                              </span>
+                            )}
+                            {nf.valor_total > 0 && (
+                              <span className="text-xs font-bold" style={{ color: '#10B981' }}>
+                                R$ {Number(nf.valor_total).toFixed(2)}
+                              </span>
+                            )}
+                            {nf.chave_acesso && (
+                              <span className="text-[10px] font-mono truncate max-w-[200px]" style={{ color: 'var(--text-secondary)' }}>
+                                Chave: ...{nf.chave_acesso.slice(-8)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <button
+                          onClick={() => handleDarEntradaPendente(nf)}
+                          className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all"
+                          style={{
+                            background: 'rgba(57,255,20,0.1)',
+                            border: '1px solid rgba(57,255,20,0.4)',
+                            color: '#39FF14',
+                          }}
+                        >
+                          <ArrowRight className="w-3.5 h-3.5" />
+                          DAR ENTRADA
+                        </button>
+                        <button
+                          onClick={() => handleArquivarPendente(nf.id)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs transition-all"
+                          style={{
+                            background: 'rgba(var(--accent-rgb),0.06)',
+                            border: '1px solid rgba(var(--accent-rgb),0.2)',
+                            color: 'var(--text-secondary)',
+                          }}
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          Arquivar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-16 text-center">
+                <div className="p-5 rounded-2xl mb-4" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.15)' }}>
+                  <CheckCircle className="w-10 h-10" style={{ color: 'rgba(245,158,11,0.4)' }} />
+                </div>
+                <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+                  Nenhuma NF pendente de entrada
+                </p>
+                <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
+                  Clique em "Buscar Novas NFs" para verificar se existem novas notas fiscais emitidas contra o CNPJ da unidade.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
