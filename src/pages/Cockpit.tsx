@@ -61,6 +61,7 @@ interface OSRow {
   tipo_atendimento: string | null;
   unidade_id: string | null;
   numero_os_samsung: string | null;
+  numero_os_interna: string | null;
 }
 
 interface PecaRow {
@@ -89,7 +90,7 @@ export function Cockpit() {
     try {
       let query = supabase
         .from('os')
-        .select('id, coluna_kanban, created_at, updated_at, valor_total, valor_pecas, valor_servicos, valor_pago, tipo_os, tipo_atendimento, unidade_id, numero_os_samsung')
+        .select('id, coluna_kanban, created_at, updated_at, valor_total, valor_pecas, valor_servicos, valor_pago, tipo_os, tipo_atendimento, unidade_id, numero_os_samsung, numero_os_interna')
         .neq('arquivada', true);
 
       if (selectedUnidade) {
@@ -162,12 +163,13 @@ export function Cockpit() {
       const count = cards.length;
 
       let oldestDays = 0;
+      let oldestOSLabel = '';
       if (cards.length > 0) {
-        const oldest = cards.reduce((min, os) => {
-          const d = new Date(os.created_at);
-          return d < min ? d : min;
-        }, new Date());
-        oldestDays = Math.floor((now.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24));
+        const oldestOS = cards.reduce((prev, os) => {
+          return new Date(os.created_at) < new Date(prev.created_at) ? os : prev;
+        }, cards[0]);
+        oldestDays = Math.floor((now.getTime() - new Date(oldestOS.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        oldestOSLabel = oldestOS.numero_os_interna || oldestOS.numero_os_samsung || oldestOS.id.slice(0, 8);
       }
 
       // Count OS without code or without price in pecas
@@ -185,7 +187,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, semCodigoOuValor };
+      return { ...col, count, oldestDays, oldestOSLabel, semCodigoOuValor };
     });
   }, [osData, pecasMap]);
 
@@ -358,6 +360,7 @@ export function Cockpit() {
               <tr className="border-b border-gray-800/40">
                 <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Etapa</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo (dias)</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Cod/Valor</th>
               </tr>
@@ -386,6 +389,15 @@ export function Cockpit() {
                     )}
                   </td>
                   <td className="text-center px-4 py-3">
+                    {col.oldestOSLabel ? (
+                      <span className="text-xs font-mono text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded">
+                        {col.oldestOSLabel}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-gray-600">-</span>
+                    )}
+                  </td>
+                  <td className="text-center px-4 py-3">
                     {col.semCodigoOuValor > 0 ? (
                       <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
                         <AlertTriangle className="w-3 h-3" />
@@ -408,6 +420,9 @@ export function Cockpit() {
                   <span className="text-xs text-gray-400 font-medium">
                     Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)} dias
                   </span>
+                </td>
+                <td className="text-center px-4 py-3">
+                  <span className="text-xs text-gray-500">-</span>
                 </td>
                 <td className="text-center px-4 py-3">
                   <span className="text-xs font-medium text-red-400">
