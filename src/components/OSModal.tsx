@@ -126,10 +126,16 @@ interface OSModalProps {
 
 type AbaAtiva = 'dados' | 'estoque' | 'checklist' | 'servicos' | 'pagamento' | 'nf' | 'anexos' | 'comentarios' | 'agendamento';
 
-export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipoOS = 'OW', initialTab }: OSModalProps) {
+export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'view', tipoOS = 'OW', initialTab }: OSModalProps) {
   const { usuario } = useAuth();
   const { showAlert } = useModal();
+  const [navigatedOsId, setNavigatedOsId] = useState<string | null>(null);
+  const osId = navigatedOsId || propOsId;
   const [os, setOS] = useState<OS | null>(null);
+
+  useEffect(() => {
+    setNavigatedOsId(null);
+  }, [propOsId]);
   const [pecas, setPecas] = useState<OSPeca[]>([]);
   const [servicos, setServicos] = useState<any[]>([]);
   const [requisicoes, setRequisicoes] = useState<RequisicaoPeca[]>([]);
@@ -3536,31 +3542,32 @@ Não haverá cobrança ao cliente.`
                   </div>
                   {osVinculadas.length > 0 ? (
                     <div className="space-y-2">
-                      {osVinculadas.map(osV => (
-                        <div
-                          key={osV.id}
-                          className="flex items-center justify-between p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/40 transition-colors cursor-pointer"
-                          onClick={() => {
-                            setOS(null);
-                            setTimeout(() => {
-                              setOS(osV);
-                            }, 50);
-                          }}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <p className="text-xs font-bold text-white truncate">
-                              {osV.numero_os_samsung || osV.numero_os_interna || 'S/N'}
-                              <span className="ml-2 text-[10px] text-gray-400 font-normal">
-                                {osV.coluna_kanban?.replace(/_/g, ' ')}
-                              </span>
-                            </p>
-                            <p className="text-[10px] text-gray-500">
-                              {osV.cliente_nome} {osV.aparelho_modelo ? `- ${osV.aparelho_modelo}` : ''}
-                            </p>
+                      {osVinculadas.map(osV => {
+                        const isPrincipal = os && new Date(osV.created_at) < new Date(os.created_at);
+                        return (
+                          <div
+                            key={osV.id}
+                            className="flex items-center justify-between p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/40 transition-colors cursor-pointer"
+                            onClick={() => setNavigatedOsId(osV.id)}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs font-bold text-white truncate">
+                                  {osV.numero_os_samsung || osV.numero_os_interna || 'S/N'}
+                                </p>
+                                <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold ${isPrincipal ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' : 'bg-gray-500/20 text-gray-300 border border-gray-500/30'}`}>
+                                  {isPrincipal ? 'PRINCIPAL' : 'SECUNDARIA'}
+                                </span>
+                              </div>
+                              <p className="text-[10px] text-gray-500">
+                                {osV.cliente_nome} {osV.aparelho_modelo ? `- ${osV.aparelho_modelo}` : ''}
+                                <span className="ml-1 text-gray-600">{osV.coluna_kanban?.replace(/_/g, ' ')}</span>
+                              </p>
+                            </div>
+                            <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
                           </div>
-                          <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <p className="text-xs text-gray-500 text-center py-2">Nenhuma OS vinculada</p>
@@ -6017,7 +6024,7 @@ Não haverá cobrança ao cliente.`
           onClose={() => setShowVincularModal(false)}
           currentOS={os}
           onVinculado={() => {
-            loadOsVinculadas(os.grupo_os_id || null);
+            loadOS();
             onReload?.();
           }}
         />

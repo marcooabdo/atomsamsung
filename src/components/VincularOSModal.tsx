@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Search, Link2, Unlink, Layers, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
@@ -16,6 +16,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
   const [linkedOS, setLinkedOS] = useState<any[]>([]);
   const [loadingLinked, setLoadingLinked] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const searchTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen && currentOS) {
@@ -27,17 +28,38 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
     };
   }, [isOpen, currentOS?.id]);
 
+  useEffect(() => {
+    if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    if (searchTerm.trim().length >= 2) {
+      searchTimeout.current = setTimeout(() => {
+        handleSearch();
+      }, 400);
+    } else {
+      setResults([]);
+    }
+    return () => {
+      if (searchTimeout.current) clearTimeout(searchTimeout.current);
+    };
+  }, [searchTerm]);
+
   const loadLinkedOS = async () => {
     if (!currentOS) return;
     setLoadingLinked(true);
     try {
-      if (currentOS.grupo_os_id) {
+      const { data: freshOS } = await supabase
+        .from('os')
+        .select('grupo_os_id')
+        .eq('id', currentOS.id)
+        .single();
+
+      const grupoId = freshOS?.grupo_os_id;
+      if (grupoId) {
         const { data } = await supabase
           .from('os')
           .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo')
-          .eq('grupo_os_id', currentOS.grupo_os_id)
+          .eq('grupo_os_id', grupoId)
           .neq('id', currentOS.id)
-          .order('created_at', { ascending: false });
+          .order('created_at', { ascending: true });
         setLinkedOS(data || []);
       } else {
         setLinkedOS([]);
@@ -56,6 +78,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
         .from('os')
         .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo, grupo_os_id, unidade_id')
         .neq('id', currentOS.id)
+        .eq('arquivada', false)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -67,8 +90,16 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
         `numero_os_samsung.ilike.%${term}%,numero_os_interna.ilike.%${term}%,cliente_nome.ilike.%${term}%,aparelho_imei.ilike.%${term}%,aparelho_numero_serie.ilike.%${term}%`
       );
 
+      const { data: freshOS } = await supabase
+        .from('os')
+        .select('grupo_os_id')
+        .eq('id', currentOS.id)
+        .single();
+
+      const currentGrupoId = freshOS?.grupo_os_id;
+
       const filtered = (data || []).filter(os => {
-        if (currentOS.grupo_os_id && os.grupo_os_id === currentOS.grupo_os_id) return false;
+        if (currentGrupoId && os.grupo_os_id === currentGrupoId) return false;
         return true;
       });
       setResults(filtered);
@@ -80,7 +111,13 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
   const vincularOS = async (targetOS: any) => {
     setActionLoading(targetOS.id);
     try {
-      let grupoId = currentOS.grupo_os_id;
+      const { data: freshCurrent } = await supabase
+        .from('os')
+        .select('grupo_os_id')
+        .eq('id', currentOS.id)
+        .single();
+
+      let grupoId = freshCurrent?.grupo_os_id;
 
       if (!grupoId && !targetOS.grupo_os_id) {
         const { data: novoGrupo, error: errGrupo } = await supabase
@@ -117,15 +154,21 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
     try {
       await supabase.from('os').update({ grupo_os_id: null }).eq('id', targetOS.id);
 
-      if (currentOS.grupo_os_id) {
+      const { data: freshCurrent } = await supabase
+        .from('os')
+        .select('grupo_os_id')
+        .eq('id', currentOS.id)
+        .single();
+
+      if (freshCurrent?.grupo_os_id) {
         const { data: remaining } = await supabase
           .from('os')
           .select('id')
-          .eq('grupo_os_id', currentOS.grupo_os_id);
+          .eq('grupo_os_id', freshCurrent.grupo_os_id);
 
         if (remaining && remaining.length <= 1) {
-          await supabase.from('os').update({ grupo_os_id: null }).eq('grupo_os_id', currentOS.grupo_os_id);
-          await supabase.from('os_grupos').delete().eq('id', currentOS.grupo_os_id);
+          await supabase.from('os').update({ grupo_os_id: null }).eq('grupo_os_id', freshCurrent.grupo_os_id);
+          await supabase.from('os_grupos').delete().eq('id', freshCurrent.grupo_os_id);
         }
       }
 
@@ -206,6 +249,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
                   onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
                   placeholder="N.OS Samsung, interna, cliente, IMEI..."
                   className="w-full pl-8 pr-3 py-2 bg-gray-800 border border-gray-600 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                  autoFocus
                 />
               </div>
               <button
@@ -248,7 +292,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
             </div>
           )}
 
-          {results.length === 0 && searchTerm && !loading && (
+          {results.length === 0 && searchTerm.trim().length >= 2 && !loading && (
             <p className="text-center text-xs text-gray-500 py-3">Nenhuma OS encontrada</p>
           )}
         </div>
