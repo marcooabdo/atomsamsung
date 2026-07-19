@@ -696,7 +696,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             onChange={(e) => setShowDevolucaoCompleta(e.target.checked)}
             className="rounded"
           />
-          <span className="text-sm text-gray-300">Mostrar Devolu\u00e7\u00e3o Completa</span>
+          <span className="text-sm text-gray-300">Mostrar Devolução Completa</span>
         </label>
 
         <button
