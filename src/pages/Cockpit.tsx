@@ -219,10 +219,10 @@ export function Cockpit() {
     const totalOS = osData.length;
     const osAbertas = osData.filter(os => os.coluna_kanban !== 'os_fechada').length;
     const osFechadas = osData.filter(os => os.coluna_kanban === 'os_fechada').length;
-    const lpCount = osData.filter(os => os.tipo_atendimento === 'LP' || os.tipo_os === 'LP').length;
-    const owCount = osData.filter(os => os.tipo_atendimento === 'OW' || os.tipo_os === 'OW').length;
-    const ihCount = osData.filter(os => os.tipo_atendimento === 'IH' || os.tipo_os === 'IH').length;
-    const ciCount = osData.filter(os => os.tipo_atendimento === 'CI' || os.tipo_os === 'CI').length;
+    const lpCount = osData.filter(os => os.tipo_os === 'LP').length;
+    const owCount = osData.filter(os => os.tipo_os === 'OW').length;
+    const ihCount = osData.filter(os => os.tipo_atendimento === 'IH').length;
+    const ciCount = osData.filter(os => os.tipo_atendimento === 'CI').length;
 
     const valorTotal = osData.reduce((sum, os) => sum + (os.valor_total || 0), 0);
     const valorPecas = osData.reduce((sum, os) => sum + (os.valor_pecas || 0), 0);
@@ -239,13 +239,19 @@ export function Cockpit() {
     return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorPecas, valorServicos, valorPago, avgDaysOpen };
   }, [osData]);
 
-  const typeDistribution = useMemo(() => {
+  const warrantyDistribution = useMemo(() => {
     return [
       { name: 'LP', value: kpis.lpCount, color: '#0EA5E9' },
       { name: 'OW', value: kpis.owCount, color: '#F59E0B' },
+      { name: 'Outros', value: kpis.totalOS - kpis.lpCount - kpis.owCount, color: '#6B7280' },
+    ].filter(t => t.value > 0);
+  }, [kpis]);
+
+  const serviceDistribution = useMemo(() => {
+    return [
       { name: 'IH', value: kpis.ihCount, color: '#10B981' },
-      { name: 'CI', value: kpis.ciCount, color: '#8B5CF6' },
-      { name: 'Outros', value: kpis.totalOS - kpis.lpCount - kpis.owCount - kpis.ihCount - kpis.ciCount, color: '#6B7280' },
+      { name: 'CI', value: kpis.ciCount, color: '#00D4FF' },
+      { name: 'Outros', value: kpis.totalOS - kpis.ihCount - kpis.ciCount, color: '#6B7280' },
     ].filter(t => t.value > 0);
   }, [kpis]);
 
@@ -316,7 +322,7 @@ export function Cockpit() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Line chart: OS opened/closed per day */}
         <div className="lg:col-span-2 rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
@@ -348,17 +354,37 @@ export function Cockpit() {
           </div>
         </div>
 
-        {/* Pie chart: Type distribution */}
+        {/* Pie chart: Garantia (LP/OW) */}
         <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
-            <BarChart2 className="w-4 h-4 text-[#00D4FF]" />
-            Distribuicao por Tipo
+            <BarChart2 className="w-4 h-4 text-[#0EA5E9]" />
+            Tipo de Garantia
           </h3>
-          <div className="h-64">
+          <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
-                <Pie data={typeDistribution} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                  {typeDistribution.map((entry, i) => (
+                <Pie data={warrantyDistribution} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  {warrantyDistribution.map((entry, i) => (
+                    <Cell key={i} fill={entry.color} />
+                  ))}
+                </Pie>
+                <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        {/* Pie chart: Servico (IH/CI) */}
+        <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
+          <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
+            <BarChart2 className="w-4 h-4 text-[#10B981]" />
+            Tipo de Servico
+          </h3>
+          <div className="h-52">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={serviceDistribution} cx="50%" cy="50%" innerRadius={40} outerRadius={70} dataKey="value" nameKey="name" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                  {serviceDistribution.map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Pie>
