@@ -247,7 +247,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        alert(result.error || 'Não foi possível localizar a NF para esta chave de acesso.');
+        const debugInfo = result.debug ? '\n\nDebug:\n' + result.debug.join('\n') : '';
+        const hint = result.hint ? '\n\n' + result.hint : '';
+        alert((result.error || 'Não foi possível localizar a NF para esta chave de acesso.') + hint + debugInfo);
         return;
       }
 
