@@ -164,7 +164,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           return;
         }
 
-        // Todas as requisições não-pedido aparecem
+        // Todas as requisições não-pedido aparecem (exceto canceladas e reprovadas)
+        if (req.status === 'cancelada' || req.status === 'reprovada') return;
+
         if (!agrupado[req.os_id]) {
           agrupado[req.os_id] = {
             os_id: req.os_id,
@@ -192,7 +194,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           agrupado[req.os_id].algunsAtendidas = true;
         }
 
-        if (req.peca_estoque?.valor_com_impostos) {
+        if (req.is_lote && req.pecas_lote && req.pecas_lote.length > 0) {
+          agrupado[req.os_id].valorTotal += req.pecas_lote.reduce((sum: number, p: any) => sum + Number(p.valor_com_impostos || 0), 0);
+        } else if (req.peca_estoque?.valor_com_impostos) {
           agrupado[req.os_id].valorTotal += Number(req.peca_estoque.valor_com_impostos) * Number(req.quantidade_requisitada);
         }
       });
@@ -1245,12 +1249,10 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <span className="text-xs text-gray-500">
                             {grupo.totalPecas} peça(s)
                           </span>
-                          {grupo.valorTotal > 0 && (
-                            <span className="text-xs text-[#39FF14] font-bold flex items-center gap-1">
-                              <DollarSign className="w-3 h-3" />
-                              R$ {grupo.valorTotal.toFixed(2)}
-                            </span>
-                          )}
+                          <span className="text-xs text-[#39FF14] font-bold flex items-center gap-1">
+                            <DollarSign className="w-3 h-3" />
+                            R$ {grupo.valorTotal.toFixed(2)}
+                          </span>
                         </div>
                       </div>
                     </div>
