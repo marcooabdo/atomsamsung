@@ -56,7 +56,6 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
         .from('os')
         .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo, grupo_os_id, unidade_id')
         .neq('id', currentOS.id)
-        .neq('arquivada', true)
         .order('created_at', { ascending: false })
         .limit(20);
 
@@ -65,7 +64,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
       }
 
       const { data } = await query.or(
-        `numero_os_samsung.ilike.%${term}%,numero_os_interna.ilike.%${term}%,cliente_nome.ilike.%${term}%,aparelho_imei.ilike.%${term}%,aparelho_nserie.ilike.%${term}%`
+        `numero_os_samsung.ilike.%${term}%,numero_os_interna.ilike.%${term}%,cliente_nome.ilike.%${term}%,aparelho_imei.ilike.%${term}%,aparelho_numero_serie.ilike.%${term}%`
       );
 
       const filtered = (data || []).filter(os => {
