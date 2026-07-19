@@ -142,7 +142,7 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative w-full max-w-lg bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-lg bg-[#1a1a2e] border border-gray-700 rounded-xl shadow-2xl overflow-hidden" onMouseDown={(e) => e.stopPropagation()} onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between p-4 border-b border-gray-700">
           <div className="flex items-center gap-2">
             <Layers className="w-5 h-5 text-blue-400" />
