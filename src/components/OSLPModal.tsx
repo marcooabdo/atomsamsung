@@ -1,8 +1,9 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
+import { VincularOSModal } from './VincularOSModal';
 
 function sanitizeGSPNValue(raw: string): string {
   let cleaned = raw.replace(/[^\d.,]/g, '');
@@ -119,6 +120,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
   const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);
   const [mostrarModalConversao, setMostrarModalConversao] = useState(false);
   const [motivoConversao, setMotivoConversao] = useState('');
+  const [showVincularModalLP, setShowVincularModalLP] = useState(false);
+  const [osVinculadasLP, setOsVinculadasLP] = useState<any[]>([]);
   const [confirmaConversao, setConfirmaConversao] = useState(false);
   const [convertendo, setConvertendo] = useState(false);
   const [mostrarMoverPara, setMostrarMoverPara] = useState(false);
@@ -794,6 +797,19 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       // Carregar rotas da unidade para validação IH
       if (data?.unidade_id) {
         await loadRotasUnidade(data.unidade_id);
+      }
+
+      // Carregar OS vinculadas do grupo
+      if (data?.grupo_os_id) {
+        const { data: vinculadas } = await supabase
+          .from('os')
+          .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo')
+          .eq('grupo_os_id', data.grupo_os_id)
+          .neq('id', osId!)
+          .order('created_at', { ascending: false });
+        setOsVinculadasLP(vinculadas || []);
+      } else {
+        setOsVinculadasLP([]);
       }
     } catch (error) {
     } finally {
@@ -4502,12 +4518,54 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                     </div>
                   </div>
 
-                  {/* Segunda OS */}
+                  {/* OS Vinculadas (Grupo) */}
                   <div className="col-span-2">
                     <div className="premium-card p-4">
-                      <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs text-gray-500 uppercase font-bold">Segunda OS:</span>
+                          <Layers className="w-4 h-4 text-blue-400" />
+                          <span className="text-xs text-gray-300 uppercase font-bold">OS Vinculadas</span>
+                          {osVinculadasLP.length > 0 && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                              {osVinculadasLP.length}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          onClick={() => setShowVincularModalLP(true)}
+                          className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 transition-colors flex items-center gap-1.5"
+                        >
+                          <Link2 className="w-3 h-3" />
+                          Vincular OS
+                        </button>
+                      </div>
+                      {osVinculadasLP.length > 0 && (
+                        <div className="space-y-2 mb-3">
+                          {osVinculadasLP.map(osV => (
+                            <div
+                              key={osV.id}
+                              className="flex items-center justify-between p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/40 transition-colors cursor-pointer"
+                              onClick={() => {
+                                setOS(null);
+                                setTimeout(() => setOS(osV), 50);
+                              }}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-bold text-white truncate">
+                                  {osV.numero_os_samsung || osV.numero_os_interna || 'S/N'}
+                                  <span className="ml-2 text-[10px] text-gray-400 font-normal">{osV.coluna_kanban?.replace(/_/g, ' ')}</span>
+                                </p>
+                                <p className="text-[10px] text-gray-500">{osV.cliente_nome} {osV.aparelho_modelo ? `- ${osV.aparelho_modelo}` : ''}</p>
+                              </div>
+                              <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Legacy Segunda OS */}
+                      <div className="flex items-center gap-4 flex-wrap pt-3 border-t border-gray-700/50">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-gray-500 uppercase font-bold">Segunda OS (legado):</span>
                           <button
                             onClick={async () => {
                               const novoValor = !(os as any).tem_segunda_os;
@@ -7064,6 +7122,26 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         title="Sucesso"
         message="OS movida com sucesso!"
       />
+
+      {os && (
+        <VincularOSModal
+          isOpen={showVincularModalLP}
+          onClose={() => setShowVincularModalLP(false)}
+          currentOS={os}
+          onVinculado={async () => {
+            if (os.grupo_os_id) {
+              const { data: vinculadas } = await supabase
+                .from('os')
+                .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo')
+                .eq('grupo_os_id', os.grupo_os_id)
+                .neq('id', os.id)
+                .order('created_at', { ascending: false });
+              setOsVinculadasLP(vinculadas || []);
+            }
+            onReload?.();
+          }}
+        />
+      )}
     </div>
   );
 }

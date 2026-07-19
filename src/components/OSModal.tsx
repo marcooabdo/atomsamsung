@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
+import { VincularOSModal } from './VincularOSModal';
 
 function sanitizeGSPNValue(raw: string): string {
   let cleaned = raw.replace(/[^\d.,]/g, '');
@@ -182,6 +183,8 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
   const [mostrarSucessoMover, setMostrarSucessoMover] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [, setTimeUpdate] = useState(0);
+  const [showVincularModal, setShowVincularModal] = useState(false);
+  const [osVinculadas, setOsVinculadas] = useState<any[]>([]);
 
   // Route validation states
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
@@ -459,10 +462,25 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
       if (data?.unidade_id) {
         loadRotasUnidade(data.unidade_id);
       }
+      loadOsVinculadas(data?.grupo_os_id || null);
     } catch (error) {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadOsVinculadas = async (grupoId: string | null) => {
+    if (!grupoId || !osId) {
+      setOsVinculadas([]);
+      return;
+    }
+    const { data } = await supabase
+      .from('os')
+      .select('id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, created_at, aparelho_modelo')
+      .eq('grupo_os_id', grupoId)
+      .neq('id', osId)
+      .order('created_at', { ascending: false });
+    setOsVinculadas(data || []);
   };
 
   const loadRotasUnidade = async (unidadeIdParam: string) => {
@@ -3495,12 +3513,63 @@ Não haverá cobrança ao cliente.`
                 </div>
               </div>
 
-              {/* Segunda OS */}
+              {/* OS Vinculadas (Grupo) */}
               {mode === 'view' && os && (
                 <div className="premium-card p-4">
-                  <div className="flex items-center gap-4 flex-wrap">
+                  <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-gray-500 uppercase font-bold">Segunda OS:</span>
+                      <Layers className="w-4 h-4 text-blue-400" />
+                      <span className="text-xs text-gray-300 uppercase font-bold">OS Vinculadas</span>
+                      {osVinculadas.length > 0 && (
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30">
+                          {osVinculadas.length}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      onClick={() => setShowVincularModal(true)}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-600/20 hover:bg-blue-600/30 text-blue-300 border border-blue-500/40 transition-colors flex items-center gap-1.5"
+                    >
+                      <Link2 className="w-3 h-3" />
+                      Vincular OS
+                    </button>
+                  </div>
+                  {osVinculadas.length > 0 ? (
+                    <div className="space-y-2">
+                      {osVinculadas.map(osV => (
+                        <div
+                          key={osV.id}
+                          className="flex items-center justify-between p-2.5 rounded-lg bg-blue-500/5 border border-blue-500/20 hover:border-blue-500/40 transition-colors cursor-pointer"
+                          onClick={() => {
+                            setOS(null);
+                            setTimeout(() => {
+                              setOS(osV);
+                            }, 50);
+                          }}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-bold text-white truncate">
+                              {osV.numero_os_samsung || osV.numero_os_interna || 'S/N'}
+                              <span className="ml-2 text-[10px] text-gray-400 font-normal">
+                                {osV.coluna_kanban?.replace(/_/g, ' ')}
+                              </span>
+                            </p>
+                            <p className="text-[10px] text-gray-500">
+                              {osV.cliente_nome} {osV.aparelho_modelo ? `- ${osV.aparelho_modelo}` : ''}
+                            </p>
+                          </div>
+                          <ChevronRight className="w-3.5 h-3.5 text-gray-500 flex-shrink-0" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-gray-500 text-center py-2">Nenhuma OS vinculada</p>
+                  )}
+
+                  {/* Legacy Segunda OS toggle */}
+                  <div className="flex items-center gap-4 flex-wrap mt-3 pt-3 border-t border-gray-700/50">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 uppercase font-bold">Segunda OS (legado):</span>
                       <button
                         onClick={async () => {
                           const novoValor = !(os as any).tem_segunda_os;
@@ -5978,6 +6047,17 @@ Não haverá cobrança ao cliente.`
           onSuccess={() => {
             onReload?.();
             onClose();
+          }}
+        />
+      )}
+      {os && (
+        <VincularOSModal
+          isOpen={showVincularModal}
+          onClose={() => setShowVincularModal(false)}
+          currentOS={os}
+          onVinculado={() => {
+            loadOsVinculadas(os.grupo_os_id || null);
+            onReload?.();
           }}
         />
       )}

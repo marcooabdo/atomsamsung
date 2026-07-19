@@ -221,6 +221,8 @@ export function Kanban() {
   const [showFecharOSModal, setShowFecharOSModal] = useState(false);
   const [fecharOSCardData, setFecharOSCardData] = useState<{ id: string; numero: string; unidadeId: string } | null>(null);
   const [pendingFecharOSDrop, setPendingFecharOSDrop] = useState<{ card: OS; position: number | undefined } | null>(null);
+  const [groupCountMap, setGroupCountMap] = useState<Record<string, number>>({});
+  const [groupMembersMap, setGroupMembersMap] = useState<Record<string, any[]>>({});
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const debouncedTipoOSFilters = useDebounce(tipoOSFilters, 200);
@@ -575,7 +577,37 @@ export function Kanban() {
         }
       }
 
-      const data = allData;
+      // === OS Grouping Logic ===
+      // For grouped OS, only the most recent (by created_at) is shown in Kanban
+      const grupoMap = new Map<string, any[]>();
+      for (const os of allData) {
+        if (os.grupo_os_id) {
+          if (!grupoMap.has(os.grupo_os_id)) {
+            grupoMap.set(os.grupo_os_id, []);
+          }
+          grupoMap.get(os.grupo_os_id)!.push(os);
+        }
+      }
+
+      const hiddenGroupedIds = new Set<string>();
+      const groupCountMap: Record<string, number> = {};
+      const groupMembersMap: Record<string, any[]> = {};
+
+      for (const [grupoId, members] of grupoMap.entries()) {
+        if (members.length <= 1) continue;
+        members.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        const representative = members[0];
+        groupCountMap[representative.id] = members.length;
+        groupMembersMap[representative.id] = members.slice(1);
+        for (let i = 1; i < members.length; i++) {
+          hiddenGroupedIds.add(members[i].id);
+        }
+      }
+
+      const data = allData.filter(os => !hiddenGroupedIds.has(os.id));
+      setGroupCountMap(groupCountMap);
+      setGroupMembersMap(groupMembersMap);
+      // === End OS Grouping Logic ===
 
       // Buscar peças do lote para requisições que têm lote
       const allRequisicoes = (data || []).flatMap(os => (os as any).requisicoes || []);
@@ -614,7 +646,8 @@ export function Kanban() {
           .filter(os => os.coluna_kanban === coluna.id)
           .map(os => ({
             ...os,
-            sequencia_coluna: os.sequencia_coluna ?? 0
+            sequencia_coluna: os.sequencia_coluna ?? 0,
+            _groupCount: groupCountMap[os.id] || 0
           }));
         return acc;
       }, {} as Record<string, OS[]>);
@@ -1535,6 +1568,25 @@ export function Kanban() {
 
     if (matchesRequisicoes) {
       return { matches: true, source: 'hidden' };
+    }
+
+    // Search within grouped OS members
+    const members = groupMembersMap[os.id];
+    if (members && members.length > 0) {
+      const matchesGroupMember = members.some((member: any) => {
+        const memberFields = [
+          member.numero_os_samsung,
+          member.numero_os_interna,
+          member.cliente_nome,
+          member.aparelho_imei,
+          member.aparelho_nserie,
+          member.defeito_relatado
+        ];
+        return memberFields.some(f => f && f.toString().toLowerCase().includes(searchLower));
+      });
+      if (matchesGroupMember) {
+        return { matches: true, source: 'hidden' };
+      }
     }
 
     return { matches: false, source: 'visible' };

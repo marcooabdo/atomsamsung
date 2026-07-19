@@ -6,6 +6,7 @@ import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
   ShieldAlert, ShieldCheck, ChevronsUpDown, ChevronRight, Archive, MapPin, AlertTriangle,
+  Layers,
 } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 
@@ -171,9 +172,16 @@ export const ClosedOSCard = memo(function ClosedOSCard({
       <div className="flex items-center gap-2">
         <CheckCircle className="w-3 h-3 text-[#39FF14] flex-shrink-0" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
         <div className="flex-1 min-w-0">
-          <p className="font-bold text-[10px] text-white truncate">
-            {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
-          </p>
+          <div className="flex items-center gap-1">
+            <p className="font-bold text-[10px] text-white truncate">
+              {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
+            </p>
+            {(os as any)._groupCount > 0 && (
+              <span className="inline-flex items-center gap-0.5 px-1 py-0 rounded text-[8px] font-bold text-blue-300 bg-blue-500/20 border border-blue-500/40">
+                <Layers className="w-2 h-2" />x{(os as any)._groupCount}
+              </span>
+            )}
+          </div>
           <p className="text-[9px] text-gray-400 truncate">{os.cliente_nome}</p>
         </div>
         {onArchive && (
@@ -364,6 +372,20 @@ export const KanbanCard = memo(function KanbanCard({
                 title="Correspondência encontrada em comentários, peças ou histórico"
               >
                 <Search className="w-2.5 h-2.5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 3px var(--neon-green))' }} />
+              </div>
+            )}
+            {(os as any)._groupCount > 0 && (
+              <div
+                className="px-1 py-0.5 rounded flex items-center gap-0.5 flex-shrink-0"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0.1) 100%)',
+                  border: '1px solid rgba(59,130,246,0.5)',
+                  boxShadow: '0 0 6px rgba(59,130,246,0.3)'
+                }}
+                title={`${(os as any)._groupCount} OS vinculadas neste grupo`}
+              >
+                <Layers className="w-2.5 h-2.5 text-blue-400" />
+                <span className="text-[8px] font-bold text-blue-300">x{(os as any)._groupCount}</span>
               </div>
             )}
             <button
