@@ -5,24 +5,16 @@ import { UnitFilter } from '../components/UnitFilter';
 import {
   Activity,
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
-  Calendar,
   Clock,
   Download,
   Layers,
   TrendingUp,
   Zap,
-  Package,
   DollarSign,
-  Users,
-  Wrench,
   Target,
   BarChart2,
 } from 'lucide-react';
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -62,11 +54,13 @@ interface OSRow {
   created_at: string;
   updated_at: string;
   valor_total: number | null;
-  valor_liquido: number | null;
-  valor_bruto: number | null;
+  valor_pecas: number | null;
+  valor_servicos: number | null;
+  valor_pago: number | null;
   tipo_os: string | null;
   tipo_atendimento: string | null;
   unidade_id: string | null;
+  numero_os_samsung: string | null;
 }
 
 interface PecaRow {
@@ -74,14 +68,13 @@ interface PecaRow {
   os_id: string;
   codigo: string | null;
   valor_unitario: number | null;
-  status_gspn: string | null;
 }
 
 export function Cockpit() {
   const { usuario, unidades, unidadesAdicionais, allUserUnits } = useAuth();
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [osData, setOsData] = useState<OSRow[]>([]);
-  const [pecasAguardando, setPecasAguardando] = useState<PecaRow[]>([]);
+  const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
@@ -94,7 +87,10 @@ export function Cockpit() {
   async function loadData() {
     setLoading(true);
     try {
-      let query = supabase.from('os').select('id, coluna_kanban, created_at, updated_at, valor_total, valor_liquido, valor_bruto, tipo_os, tipo_atendimento, unidade_id').neq('arquivada', true);
+      let query = supabase
+        .from('os')
+        .select('id, coluna_kanban, created_at, updated_at, valor_total, valor_pecas, valor_servicos, valor_pago, tipo_os, tipo_atendimento, unidade_id, numero_os_samsung')
+        .neq('arquivada', true);
 
       if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
@@ -113,26 +109,32 @@ export function Cockpit() {
       while (hasMore) {
         const { data, error } = await query.range(from, from + pageSize - 1);
         if (error) break;
-        if (data) allOS.push(...data);
-        hasMore = data?.length === pageSize;
+        if (data) allOS.push(...(data as OSRow[]));
+        hasMore = (data?.length || 0) === pageSize;
         from += pageSize;
       }
       setOsData(allOS);
 
-      // Load pecas for OS in "aguardando_peca"
-      const osAguardando = allOS.filter(os => os.coluna_kanban === 'aguardando_peca').map(os => os.id);
-      if (osAguardando.length > 0) {
-        const batchSize = 50;
-        const allPecas: PecaRow[] = [];
-        for (let i = 0; i < osAguardando.length; i += batchSize) {
-          const batch = osAguardando.slice(i, i + batchSize);
-          const { data: pecas } = await supabase.from('os_pecas').select('id, os_id, codigo, valor_unitario, status_gspn').in('os_id', batch);
-          if (pecas) allPecas.push(...pecas);
+      // Load pecas for all open OS to check missing code/value
+      const openOsIds = allOS.filter(os => os.coluna_kanban !== 'os_fechada').map(os => os.id);
+      const map = new Map<string, PecaRow[]>();
+      if (openOsIds.length > 0) {
+        const batchSize = 100;
+        for (let i = 0; i < openOsIds.length; i += batchSize) {
+          const batch = openOsIds.slice(i, i + batchSize);
+          const { data: pecas } = await supabase
+            .from('os_pecas')
+            .select('id, os_id, codigo, valor_unitario')
+            .in('os_id', batch);
+          if (pecas) {
+            for (const p of pecas as PecaRow[]) {
+              if (!map.has(p.os_id)) map.set(p.os_id, []);
+              map.get(p.os_id)!.push(p);
+            }
+          }
         }
-        setPecasAguardando(allPecas);
-      } else {
-        setPecasAguardando([]);
       }
+      setPecasMap(map);
 
       // Daily stats for last 30 days
       const last30Days: { date: string; abertas: number; fechadas: number }[] = [];
@@ -162,28 +164,30 @@ export function Cockpit() {
       let oldestDays = 0;
       if (cards.length > 0) {
         const oldest = cards.reduce((min, os) => {
-          const d = new Date(os.updated_at || os.created_at);
+          const d = new Date(os.created_at);
           return d < min ? d : min;
         }, new Date());
         oldestDays = Math.floor((now.getTime() - oldest.getTime()) / (1000 * 60 * 60 * 24));
       }
 
-      let erros = 0;
-      if (col.id === 'aguardando_peca') {
-        const osIds = new Set(cards.map(c => c.id));
-        const pecasRelevantes = pecasAguardando.filter(p => osIds.has(p.os_id));
-        const osComErro = new Set<string>();
-        pecasRelevantes.forEach(p => {
-          if (!p.codigo || p.valor_unitario === 0 || p.valor_unitario === null) {
-            osComErro.add(p.os_id);
-          }
-        });
-        erros = osComErro.size;
-      }
+      // Count OS without code or without price in pecas
+      let semCodigoOuValor = 0;
+      cards.forEach(os => {
+        const pecas = pecasMap.get(os.id);
+        if (pecas && pecas.length > 0) {
+          const hasIssue = pecas.some(p => !p.codigo || p.valor_unitario === null || p.valor_unitario === 0);
+          if (hasIssue) semCodigoOuValor++;
+        } else if (
+          col.id !== 'os_nova' && col.id !== 'os_fechada' && col.id !== 'orcamentos_rejeitados' &&
+          (!os.valor_total || os.valor_total === 0) && (!os.valor_pecas || os.valor_pecas === 0) && (!os.valor_servicos || os.valor_servicos === 0)
+        ) {
+          semCodigoOuValor++;
+        }
+      });
 
-      return { ...col, count, oldestDays, erros };
+      return { ...col, count, oldestDays, semCodigoOuValor };
     });
-  }, [osData, pecasAguardando]);
+  }, [osData, pecasMap]);
 
   const kpis = useMemo(() => {
     const totalOS = osData.length;
@@ -194,8 +198,10 @@ export function Cockpit() {
     const ihCount = osData.filter(os => os.tipo_atendimento === 'IH' || os.tipo_os === 'IH').length;
     const ciCount = osData.filter(os => os.tipo_atendimento === 'CI' || os.tipo_os === 'CI').length;
 
-    const valorTotal = osData.reduce((sum, os) => sum + (os.valor_bruto || os.valor_total || 0), 0);
-    const valorLiquido = osData.reduce((sum, os) => sum + (os.valor_liquido || 0), 0);
+    const valorTotal = osData.reduce((sum, os) => sum + (os.valor_total || 0), 0);
+    const valorPecas = osData.reduce((sum, os) => sum + (os.valor_pecas || 0), 0);
+    const valorServicos = osData.reduce((sum, os) => sum + (os.valor_servicos || 0), 0);
+    const valorPago = osData.reduce((sum, os) => sum + (os.valor_pago || 0), 0);
 
     const avgDaysOpen = osAbertas > 0
       ? osData.filter(os => os.coluna_kanban !== 'os_fechada').reduce((sum, os) => {
@@ -204,7 +210,7 @@ export function Cockpit() {
         }, 0) / osAbertas
       : 0;
 
-    return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorLiquido, avgDaysOpen };
+    return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorPecas, valorServicos, valorPago, avgDaysOpen };
   }, [osData]);
 
   const typeDistribution = useMemo(() => {
@@ -218,8 +224,8 @@ export function Cockpit() {
   }, [kpis]);
 
   function exportCSV() {
-    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Erros Valor/Codigo\n';
-    const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.erros}`).join('\n');
+    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Sem Codigo/Valor\n';
+    const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.semCodigoOuValor}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -272,7 +278,7 @@ export function Cockpit() {
         <KPICard icon={Zap} label="OS Abertas" value={kpis.osAbertas.toString()} color="#F59E0B" />
         <KPICard icon={Target} label="OS Fechadas" value={kpis.osFechadas.toString()} color="#10B981" />
         <KPICard icon={Clock} label="Dias Medio Aberta" value={kpis.avgDaysOpen.toFixed(1)} color="#F97316" />
-        <KPICard icon={DollarSign} label="Faturamento Bruto" value={formatCurrency(kpis.valorTotal)} color="#39FF14" />
+        <KPICard icon={DollarSign} label="Valor Total" value={formatCurrency(kpis.valorTotal)} color="#39FF14" />
       </div>
 
       {/* Type breakdown */}
@@ -337,12 +343,12 @@ export function Cockpit() {
         </div>
       </div>
 
-      {/* Pipeline Status Table */}
+      {/* Pipeline Status Table - ALL columns */}
       <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm overflow-hidden">
         <div className="px-5 py-4 border-b border-gray-800/60 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-gray-300 flex items-center gap-2">
             <Layers className="w-4 h-4 text-[#00D4FF]" />
-            Status do Pipeline
+            Pipeline Completo - Central ATOM
           </h3>
           <span className="text-xs text-gray-500">{osData.length} OS no sistema</span>
         </div>
@@ -351,28 +357,28 @@ export function Cockpit() {
             <thead>
               <tr className="border-b border-gray-800/40">
                 <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Etapa</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Qtd Cards</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Card Mais Antigo</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Erros</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Cod/Valor</th>
               </tr>
             </thead>
             <tbody>
-              {columnStats.filter(c => c.count > 0 || c.id === 'aguardando_peca').map((col) => (
+              {columnStats.map((col) => (
                 <tr key={col.id} className="border-b border-gray-800/20 hover:bg-white/[0.02] transition-colors">
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: col.color }} />
                       <span className="text-sm text-gray-300">{col.label}</span>
                     </div>
                   </td>
                   <td className="text-center px-4 py-3">
-                    <span className="inline-flex items-center justify-center min-w-[32px] px-2 py-0.5 rounded-full text-xs font-bold" style={{ backgroundColor: `${col.color}20`, color: col.color }}>
+                    <span className="inline-flex items-center justify-center min-w-[36px] px-2.5 py-1 rounded-full text-xs font-bold" style={{ backgroundColor: `${col.color}20`, color: col.color }}>
                       {col.count}
                     </span>
                   </td>
                   <td className="text-center px-4 py-3">
                     {col.count > 0 ? (
-                      <span className={`text-xs font-medium ${col.oldestDays > 7 ? 'text-red-400' : col.oldestDays > 3 ? 'text-yellow-400' : 'text-gray-400'}`}>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${col.oldestDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400'}`}>
                         {col.oldestDays} dia{col.oldestDays !== 1 ? 's' : ''}
                       </span>
                     ) : (
@@ -380,17 +386,13 @@ export function Cockpit() {
                     )}
                   </td>
                   <td className="text-center px-4 py-3">
-                    {col.id === 'aguardando_peca' ? (
-                      col.erros > 0 ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
-                          <AlertTriangle className="w-3 h-3" />
-                          {col.erros} OS
-                        </span>
-                      ) : (
-                        <span className="text-xs text-green-400">OK</span>
-                      )
+                    {col.semCodigoOuValor > 0 ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-red-400">
+                        <AlertTriangle className="w-3 h-3" />
+                        {col.semCodigoOuValor}
+                      </span>
                     ) : (
-                      <span className="text-xs text-gray-600">-</span>
+                      <span className="text-xs text-green-500">{col.count > 0 ? 'OK' : '-'}</span>
                     )}
                   </td>
                 </tr>
@@ -403,13 +405,13 @@ export function Cockpit() {
                   <span className="text-sm font-bold text-[#00D4FF]">{columnStats.reduce((s, c) => s + c.count, 0)}</span>
                 </td>
                 <td className="text-center px-4 py-3">
-                  <span className="text-xs text-gray-500">
-                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)}d
+                  <span className="text-xs text-gray-400 font-medium">
+                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)} dias
                   </span>
                 </td>
                 <td className="text-center px-4 py-3">
-                  <span className="text-xs text-gray-500">
-                    {columnStats.find(c => c.id === 'aguardando_peca')?.erros || 0}
+                  <span className="text-xs font-medium text-red-400">
+                    {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
                   </span>
                 </td>
               </tr>
@@ -428,7 +430,7 @@ export function Cockpit() {
           </h3>
           <div className="space-y-3">
             {columnStats
-              .filter(c => c.count > 0)
+              .filter(c => c.count > 0 && c.id !== 'os_fechada')
               .sort((a, b) => b.oldestDays - a.oldestDays)
               .slice(0, 5)
               .map((col) => (
@@ -437,7 +439,7 @@ export function Cockpit() {
                     <div className="w-2 h-2 rounded-full" style={{ backgroundColor: col.color }} />
                     <span className="text-xs text-gray-400">{col.label}</span>
                   </div>
-                  <span className={`text-xs font-bold ${col.oldestDays > 7 ? 'text-red-400' : 'text-yellow-400'}`}>
+                  <span className={`text-xs font-bold ${col.oldestDays > 14 ? 'text-red-400' : col.oldestDays > 7 ? 'text-yellow-400' : 'text-gray-300'}`}>
                     {col.oldestDays}d
                   </span>
                 </div>
@@ -453,13 +455,13 @@ export function Cockpit() {
           </h3>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={columnStats.filter(c => c.count > 0).slice(0, 8)} layout="vertical">
+              <BarChart data={columnStats.filter(c => c.count > 0 && c.id !== 'os_fechada').slice(0, 8)} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" horizontal={false} />
                 <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 10 }} />
-                <YAxis type="category" dataKey="label" tick={{ fill: '#9ca3af', fontSize: 9 }} width={100} />
+                <YAxis type="category" dataKey="label" tick={{ fill: '#9ca3af', fontSize: 9 }} width={110} />
                 <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #333', borderRadius: 8 }} />
                 <Bar dataKey="count" name="OS" radius={[0, 4, 4, 0]}>
-                  {columnStats.filter(c => c.count > 0).slice(0, 8).map((entry, i) => (
+                  {columnStats.filter(c => c.count > 0 && c.id !== 'os_fechada').slice(0, 8).map((entry, i) => (
                     <Cell key={i} fill={entry.color} />
                   ))}
                 </Bar>
@@ -476,24 +478,26 @@ export function Cockpit() {
           </h3>
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Faturamento Bruto</span>
+              <span className="text-xs text-gray-500">Valor Total OS</span>
               <span className="text-sm font-bold text-white">{formatCurrency(kpis.valorTotal)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Valor Liquido</span>
-              <span className="text-sm font-bold text-[#39FF14]">{formatCurrency(kpis.valorLiquido)}</span>
+              <span className="text-xs text-gray-500">Valor Pecas</span>
+              <span className="text-sm font-bold text-[#00D4FF]">{formatCurrency(kpis.valorPecas)}</span>
             </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Valor Servicos</span>
+              <span className="text-sm font-bold text-[#39FF14]">{formatCurrency(kpis.valorServicos)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-gray-500">Valor Pago</span>
+              <span className="text-sm font-bold text-green-400">{formatCurrency(kpis.valorPago)}</span>
+            </div>
+            <div className="h-px bg-gray-800 my-2" />
             <div className="flex justify-between items-center">
               <span className="text-xs text-gray-500">Ticket Medio</span>
               <span className="text-sm font-bold text-[#00D4FF]">
                 {kpis.osFechadas > 0 ? formatCurrency(kpis.valorTotal / kpis.osFechadas) : 'R$ 0,00'}
-              </span>
-            </div>
-            <div className="h-px bg-gray-800 my-2" />
-            <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">OS sem valor</span>
-              <span className="text-sm font-bold text-red-400">
-                {osData.filter(os => !os.valor_total && !os.valor_bruto && os.coluna_kanban !== 'os_nova').length}
               </span>
             </div>
             <div className="flex justify-between items-center">
