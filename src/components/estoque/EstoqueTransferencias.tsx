@@ -196,8 +196,10 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
         if (req.is_lote && req.pecas_lote && req.pecas_lote.length > 0) {
           agrupado[req.os_id].valorTotal += req.pecas_lote.reduce((sum: number, p: any) => sum + Number(p.valor_com_impostos || 0), 0);
+        } else if (req.valor_peca) {
+          agrupado[req.os_id].valorTotal += Number(req.valor_peca) * (Number(req.quantidade_requisitada) || 1);
         } else if (req.peca_estoque?.valor_com_impostos) {
-          agrupado[req.os_id].valorTotal += Number(req.peca_estoque.valor_com_impostos) * Number(req.quantidade_requisitada);
+          agrupado[req.os_id].valorTotal += Number(req.peca_estoque.valor_com_impostos) * (Number(req.quantidade_requisitada) || 1);
         }
       });
 
@@ -1249,8 +1251,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
                           <span className="text-xs text-gray-500">
                             {grupo.totalPecas} peça(s)
                           </span>
-                          <span className="text-xs text-[#39FF14] font-bold flex items-center gap-1">
-                            <DollarSign className="w-3 h-3" />
+                          <span className="text-xs text-[#39FF14] font-bold">
                             R$ {grupo.valorTotal.toFixed(2)}
                           </span>
                         </div>
