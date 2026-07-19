@@ -235,13 +235,27 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
       
+      // Get CNPJ from selected unidade
+      let cnpjToSend: string | null = null;
+      const unidadeFilter = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : usuario?.unidade_id;
+      if (unidadeFilter) {
+        const { data: unidadeData } = await supabase
+          .from('unidades')
+          .select('cnpj')
+          .eq('id', unidadeFilter)
+          .maybeSingle();
+        if (unidadeData?.cnpj) {
+          cnpjToSend = unidadeData.cnpj;
+        }
+      }
+      
       const response = await fetch(`${supabaseUrl}/functions/v1/consultar-nf-nuvemfiscal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseKey}`,
         },
-        body: JSON.stringify({ chaveAcesso: chave }),
+        body: JSON.stringify({ chaveAcesso: chave, cnpj: cnpjToSend }),
       });
 
       const result = await response.json();

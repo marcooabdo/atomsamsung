@@ -91,107 +91,68 @@ Deno.serve(async (req: Request) => {
 
     const token = await getAccessToken();
 
-    // Get empresas registered in Nuvem Fiscal
-    let empresasNF: { cpf_cnpj: string; razao_social: string }[] = [];
-    try {
-      const empResponse = await fetch(`${NUVEM_FISCAL_API}/empresas?$top=50`, {
-        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
-      });
-      if (empResponse.ok) {
-        const empData = await empResponse.json();
-        empresasNF = (empData.data || empData || []).map((e: any) => ({
-          cpf_cnpj: (e.cpf_cnpj || "").replace(/[^\d]/g, ""),
-          razao_social: e.razao_social || e.nome_fantasia || "",
-        }));
-      }
-    } catch {}
-
-    // Match with our unidades to know which unidade_id to assign
-    const { data: unidades } = await supabase
-      .from("unidades")
-      .select("id, nome, cnpj")
-      .not("cnpj", "is", null);
-
-    const unidadeMap = new Map<string, { id: string; nome: string }>();
-    for (const u of (unidades || [])) {
-      if (u.cnpj) {
-        unidadeMap.set(normalizeCnpj(u.cnpj), { id: u.id, nome: u.nome });
-      }
-    }
-
-    // Filter empresas: if unidade_id is specified, only use that one
-    let targetEmpresas = empresasNF;
+    // Get unidades to process
+    let unidades: any[] = [];
     if (unidade_id) {
-      const targetUnidade = (unidades || []).find((u: any) => u.id === unidade_id);
-      if (targetUnidade?.cnpj) {
-        const targetCnpj = normalizeCnpj(targetUnidade.cnpj);
-        targetEmpresas = empresasNF.filter(e => e.cpf_cnpj === targetCnpj);
-      }
+      const { data } = await supabase.from("unidades").select("id, nome, cnpj").eq("id", unidade_id).single();
+      if (data && data.cnpj) unidades = [data];
+    } else {
+      const { data } = await supabase.from("unidades").select("id, nome, cnpj").not("cnpj", "is", null);
+      unidades = (data || []).filter((u: any) => u.cnpj && u.cnpj.trim());
     }
 
-    if (targetEmpresas.length === 0) {
-      // Fallback: use DB CNPJs directly
-      if (unidade_id) {
-        const u = (unidades || []).find((u: any) => u.id === unidade_id);
-        if (u?.cnpj) {
-          targetEmpresas = [{ cpf_cnpj: normalizeCnpj(u.cnpj), razao_social: u.nome }];
-        }
-      } else {
-        targetEmpresas = (unidades || [])
-          .filter((u: any) => u.cnpj)
-          .map((u: any) => ({ cpf_cnpj: normalizeCnpj(u.cnpj), razao_social: u.nome }));
-      }
-    }
-
-    if (targetEmpresas.length === 0) {
+    if (unidades.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: "Nenhuma empresa com CNPJ encontrada para buscar distribuição." }),
+        JSON.stringify({ success: false, error: "Nenhuma unidade com CNPJ cadastrado encontrada." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Calculate date range: last 7 days
-    const dataInicio = new Date();
-    dataInicio.setDate(dataInicio.getDate() - 7);
-    const dataInicioStr = dataInicio.toISOString().split("T")[0];
+    const results: { unidade: string; cnpj: string; novas: number; existentes: number; totalRetornado: number; erros: string[] }[] = [];
 
-    const results: { unidade: string; cnpj: string; novas: number; existentes: number; erros: string[] }[] = [];
-
-    for (const empresa of targetEmpresas) {
-      const unidadeInfo = unidadeMap.get(empresa.cpf_cnpj);
-      const resultItem = {
-        unidade: unidadeInfo?.nome || empresa.razao_social || empresa.cpf_cnpj,
-        cnpj: empresa.cpf_cnpj,
-        novas: 0,
-        existentes: 0,
-        erros: [] as string[],
-      };
+    for (const unidade of unidades) {
+      const cnpj = normalizeCnpj(unidade.cnpj);
+      const resultItem = { unidade: unidade.nome, cnpj, novas: 0, existentes: 0, totalRetornado: 0, erros: [] as string[] };
 
       try {
-        // Fetch documents from distribution - last 7 days
-        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${empresa.cpf_cnpj}&$top=50&$orderby=dh_emissao desc`;
+        // Fetch ALL documents from distribution (production, last 50)
+        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&ambiente=1&$top=50&$orderby=dh_emissao desc`;
+        resultItem.erros.push(`URL: ${distUrl}`);
+
         const distResponse = await fetch(distUrl, {
           headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         });
 
+        const responseText = await distResponse.text();
+
         if (!distResponse.ok) {
-          const errText = await distResponse.text();
-          resultItem.erros.push(`API ${distResponse.status}: ${errText.slice(0, 150)}`);
+          resultItem.erros.push(`Status ${distResponse.status}: ${responseText.slice(0, 200)}`);
           results.push(resultItem);
           continue;
         }
 
-        const distData = await distResponse.json();
+        let distData: any;
+        try {
+          distData = JSON.parse(responseText);
+        } catch {
+          resultItem.erros.push(`JSON parse error: ${responseText.slice(0, 100)}`);
+          results.push(resultItem);
+          continue;
+        }
+
         const documentos = distData.data || [];
-        resultItem.erros.push(`Total docs retornados: ${documentos.length}`);
+        resultItem.totalRetornado = documentos.length;
+        resultItem.erros.push(`Total docs retornados pela API: ${documentos.length}`);
+
+        if (documentos.length === 0) {
+          resultItem.erros.push("A API retornou 0 documentos. Verifique se a distribuição NF-e já realizou ao menos uma consulta ao SEFAZ.");
+          results.push(resultItem);
+          continue;
+        }
 
         for (const doc of documentos) {
           const chave = doc.chave || "";
           if (!chave || chave.length !== 44) continue;
-
-          // Check emission date
-          const dhEmissao = doc.dh_emissao || "";
-          if (dhEmissao && dhEmissao.split("T")[0] < dataInicioStr) continue;
 
           // Check if already exists
           const { data: existing } = await supabase
@@ -226,11 +187,11 @@ Deno.serve(async (req: Request) => {
             chave_acesso: chave,
             numero_nf: nfData?.numeroNF || doc.numero_documento || "",
             fornecedor: nfData?.fornecedor || doc.nome_emitente || "",
-            data_emissao: nfData?.dataEmissao || (dhEmissao ? dhEmissao.split("T")[0] : null),
+            data_emissao: nfData?.dataEmissao || (doc.dh_emissao ? doc.dh_emissao.split("T")[0] : null),
             valor_total: nfData?.valorTotal || doc.valor_nfe || 0,
             delivery,
             xml_conteudo: xmlContent,
-            unidade_id: unidadeInfo?.id || unidade_id || null,
+            unidade_id: unidade.id,
             processada: false,
             pendente_entrada: true,
             origem: "distribuicao_automatica",
@@ -240,7 +201,7 @@ Deno.serve(async (req: Request) => {
 
           const { error: insertError } = await supabase.from("estoque_nfs").insert(insertData);
           if (insertError) {
-            resultItem.erros.push(`Insert error: ${insertError.message}`);
+            resultItem.erros.push(`Insert ${chave.slice(-8)}: ${insertError.message}`);
           } else {
             resultItem.novas++;
           }
@@ -259,7 +220,6 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         message: `Busca concluída: ${totalNovas} novas NFs encontradas, ${totalExistentes} já existentes.`,
-        empresasConsultadas: targetEmpresas.length,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
