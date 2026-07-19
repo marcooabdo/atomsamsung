@@ -191,39 +191,54 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
       const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
 
-      let query = supabase
-        .from('estoque_pecas')
-        .select(`
-          *,
-          estoque_nfs(numero_nf, data_emissao, fornecedor, delivery, chave_acesso),
-          os:os_id(numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, tipo_os, tipo_atendimento),
-          unidades:unidade_id(nome),
-          tecnico:tecnico_id(nome),
-          requisicoes_pecas!peca_estoque_id(
-            id, status, gi_postada_em, tipo_devolucao, motivo_devolucao, created_at,
-            req_os:os_id(numero_os_interna, numero_os_samsung)
-          ),
-          estoque_devolucoes!peca_id(tipo_devolucao)
-        `);
+      const EXPORT_PAGE_SIZE = 1000;
+      let allPecas: any[] = [];
+      let exportFrom = 0;
+      let exportHasMore = true;
 
-      if (canSeeAllUnits) {
-        if (selectedUnidade && selectedUnidade !== '' && selectedUnidade !== 'all') {
-          query = query.eq('unidade_id', selectedUnidade);
+      while (exportHasMore) {
+        let pageQuery = supabase
+          .from('estoque_pecas')
+          .select(`
+            *,
+            estoque_nfs(numero_nf, data_emissao, fornecedor, delivery, chave_acesso),
+            os:os_id(numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, tipo_os, tipo_atendimento),
+            unidades:unidade_id(nome),
+            tecnico:tecnico_id(nome),
+            requisicoes_pecas!peca_estoque_id(
+              id, status, gi_postada_em, tipo_devolucao, motivo_devolucao, created_at,
+              req_os:os_id(numero_os_interna, numero_os_samsung)
+            ),
+            estoque_devolucoes!peca_id(tipo_devolucao)
+          `)
+          .range(exportFrom, exportFrom + EXPORT_PAGE_SIZE - 1);
+
+        if (canSeeAllUnits) {
+          if (selectedUnidade && selectedUnidade !== '' && selectedUnidade !== 'all') {
+            pageQuery = pageQuery.eq('unidade_id', selectedUnidade);
+          }
+        } else if (unidadeFilter) {
+          pageQuery = pageQuery.eq('unidade_id', unidadeFilter);
         }
-      } else if (unidadeFilter) {
-        query = query.eq('unidade_id', unidadeFilter);
-      }
 
-      if (!showArquivadas) {
-        query = query.neq('status', 'arquivada');
-      }
+        if (!showArquivadas) {
+          pageQuery = pageQuery.neq('status', 'arquivada');
+        }
 
-      if (statusFilter !== 'all') {
-        query = query.eq('status', statusFilter);
-      }
+        if (statusFilter !== 'all') {
+          pageQuery = pageQuery.eq('status', statusFilter);
+        }
 
-      const { data: allPecas, error } = await query;
-      if (error) throw error;
+        const { data: pageData, error: pageError } = await pageQuery;
+        if (pageError) throw pageError;
+
+        allPecas = allPecas.concat(pageData || []);
+        if (!pageData || pageData.length < EXPORT_PAGE_SIZE) {
+          exportHasMore = false;
+        } else {
+          exportFrom += EXPORT_PAGE_SIZE;
+        }
+      }
 
       const pecaIds = (allPecas || []).map(p => p.id);
       let nfMap: Record<string, any[]> = {};
