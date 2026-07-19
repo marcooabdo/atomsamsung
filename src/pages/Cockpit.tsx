@@ -13,9 +13,7 @@ import {
   DollarSign,
   Target,
   BarChart2,
-  Pencil,
   X,
-  Save,
 } from 'lucide-react';
 import {
   XAxis,
@@ -86,7 +84,7 @@ export function Cockpit() {
   const [osData, setOsData] = useState<OSRow[]>([]);
   const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
-  const [editModal, setEditModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
+  const [listModal, setListModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
   const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
@@ -179,7 +177,7 @@ export function Cockpit() {
           return new Date(os.created_at) < new Date(prev.created_at) ? os : prev;
         }, cards[0]);
         oldestDays = Math.floor((now.getTime() - new Date(oldestOS.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        oldestOSLabel = oldestOS.numero_os_interna || oldestOS.numero_os_samsung || oldestOS.id.slice(0, 8);
+        oldestOSLabel = oldestOS.numero_os_samsung || oldestOS.numero_os_interna || oldestOS.id.slice(0, 8);
       }
 
       // Count OS where pecas have valor_unitario < 0.01 (missing price)
@@ -193,7 +191,7 @@ export function Cockpit() {
             semCodigoOuValor++;
             osComProblema.push({
               osId: os.id,
-              osLabel: os.numero_os_interna || os.numero_os_samsung || os.id.slice(0, 8),
+              osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
               pecas,
             });
           }
@@ -413,12 +411,11 @@ export function Cockpit() {
                   <td className="text-center px-4 py-3">
                     {col.semCodigoOuValor > 0 ? (
                       <button
-                        onClick={() => setEditModal({ open: true, osList: col.osComProblema })}
+                        onClick={() => setListModal({ open: true, osList: col.osComProblema })}
                         className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 hover:underline transition-colors cursor-pointer"
                       >
                         <AlertTriangle className="w-3 h-3" />
                         {col.semCodigoOuValor}
-                        <Pencil className="w-3 h-3 ml-0.5" />
                       </button>
                     ) : (
                       <span className="text-xs text-green-500">{col.count > 0 ? 'OK' : '-'}</span>
@@ -542,96 +539,39 @@ export function Cockpit() {
         </div>
       </div>
 
-      {/* Edit Pecas Modal */}
-      {editModal.open && (
-        <EditPecasModal
-          osList={editModal.osList}
-          onClose={() => setEditModal({ open: false, osList: [] })}
-          onSaved={() => { setEditModal({ open: false, osList: [] }); loadData(); }}
+      {/* List OS Modal */}
+      {listModal.open && (
+        <ListOSModal
+          osList={listModal.osList}
+          onClose={() => setListModal({ open: false, osList: [] })}
         />
       )}
     </div>
   );
 }
 
-function EditPecasModal({ osList, onClose, onSaved }: { osList: PecaIssueOS[]; onClose: () => void; onSaved: () => void }) {
-  const [editedValues, setEditedValues] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-
-  function handleChange(pecaId: string, value: string) {
-    setEditedValues(prev => ({ ...prev, [pecaId]: value }));
-  }
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const updates = Object.entries(editedValues).filter(([, v]) => v !== '');
-      for (const [pecaId, val] of updates) {
-        const numVal = parseFloat(val.replace(',', '.'));
-        if (!isNaN(numVal) && numVal >= 0) {
-          await supabase.from('os_pecas').update({ valor_unitario: numVal, valor_total: numVal }).eq('id', pecaId);
-        }
-      }
-      onSaved();
-    } catch (err) {
-      console.error('Error saving:', err);
-    } finally {
-      setSaving(false);
-    }
-  }
-
+function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-2xl max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+      <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            Pecas Sem Valor ({osList.length} OS)
+            OS Sem Valor nas Pecas ({osList.length})
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
             <X className="w-4 h-4 text-gray-400" />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto p-5 space-y-4">
-          {osList.map(os => (
-            <div key={os.osId} className="border border-gray-800/60 rounded-lg p-4">
-              <p className="text-sm font-semibold text-gray-300 mb-3">OS: <span className="text-[#00D4FF] font-mono">{os.osLabel}</span></p>
-              <div className="space-y-2">
-                {os.pecas.map(peca => {
-                  const hasIssue = peca.valor_unitario === null || Number(peca.valor_unitario) < 0.01;
-                  return (
-                    <div key={peca.id} className="flex items-center gap-3 bg-gray-900/50 rounded-lg px-3 py-2">
-                      <div className="flex-1 min-w-0">
-                        <span className="text-xs text-gray-400">{peca.codigo || 'Sem codigo'}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-500">R$</span>
-                        <input
-                          type="text"
-                          defaultValue={peca.valor_unitario != null ? Number(peca.valor_unitario).toFixed(2) : '0.00'}
-                          onChange={(e) => handleChange(peca.id, e.target.value)}
-                          className={`w-24 px-2 py-1 rounded text-xs text-right font-mono border bg-gray-800/80 text-white focus:outline-none focus:border-[#00D4FF] transition-colors ${hasIssue ? 'border-red-500/50' : 'border-gray-700'}`}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="space-y-2">
+            {osList.map(os => (
+              <div key={os.osId} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-900/50 border border-gray-800/40">
+                <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
+                <span className="text-xs text-gray-500">{os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} peca(s)</span>
               </div>
-            </div>
-          ))}
-        </div>
-        <div className="flex items-center justify-end gap-3 px-5 py-4 border-t border-gray-800">
-          <button onClick={onClose} className="px-4 py-2 text-xs text-gray-400 hover:text-white transition-colors">
-            Cancelar
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || Object.keys(editedValues).length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] text-xs font-medium hover:bg-[#00D4FF]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            <Save className="w-3.5 h-3.5" />
-            {saving ? 'Salvando...' : 'Salvar'}
-          </button>
+            ))}
+          </div>
         </div>
       </div>
     </div>
