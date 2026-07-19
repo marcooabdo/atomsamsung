@@ -4307,7 +4307,7 @@ Não haverá cobrança ao cliente.`
                               {/* ── VALOR UNITÁRIO COM MARKUP ── */}
                               {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || peca.valor_gspn > 0 || peca.valor_unitario > 0) && !(peca as any)._isOrphanReq && (
                                 editandoValorFinal[peca.id] !== undefined ? (
-                                  <div className="flex items-center gap-1.5">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
                                     <input
                                       type="text"
@@ -4327,19 +4327,19 @@ Não haverá cobrança ao cliente.`
                                     />
                                     <button
                                       onClick={() => handleSalvarValorFinal(peca.id)}
-                                      className="p-1 rounded transition-all"
+                                      className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all"
                                       style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
-                                      title="Salvar"
                                     >
                                       <Save className="w-3 h-3" />
+                                      Salvar
                                     </button>
                                     <button
                                       onClick={() => setEditandoValorFinal(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                      className="p-1 rounded transition-all"
+                                      className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all"
                                       style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                      title="Cancelar"
                                     >
                                       <X className="w-3 h-3" />
+                                      Cancelar
                                     </button>
                                   </div>
                                 ) : (
@@ -4411,19 +4411,19 @@ Não haverá cobrança ao cliente.`
                                   </div>
                                   <button
                                     onClick={() => handleSalvarValoresPecaManual(peca.id)}
-                                    className="p-1.5 rounded transition-all"
+                                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all"
                                     style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', border: '1px solid rgba(var(--neon-green-rgb),0.35)', color: 'var(--neon-green)' }}
-                                    title="Salvar"
                                   >
-                                    <Save className="w-3.5 h-3.5" />
+                                    <Save className="w-3 h-3" />
+                                    Salvar
                                   </button>
                                   <button
                                     onClick={() => setEditandoValorPeca(prev => { const n = { ...prev }; delete n[peca.id]; return n; })}
-                                    className="p-1.5 rounded transition-all"
+                                    className="flex items-center gap-1 px-2 py-1 rounded text-xs font-medium transition-all"
                                     style={{ backgroundColor: '#FF006420', border: '1px solid #FF006460', color: '#FF0064' }}
-                                    title="Cancelar"
                                   >
-                                    <X className="w-3.5 h-3.5" />
+                                    <X className="w-3 h-3" />
+                                    Cancelar
                                   </button>
                                 </div>
                               )}
