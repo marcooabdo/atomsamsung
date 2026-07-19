@@ -85,6 +85,7 @@ export function Cockpit() {
   const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [listModal, setListModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
+  const [clickedOS, setClickedOS] = useState<string | null>(null);
   const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
@@ -371,7 +372,6 @@ export function Cockpit() {
               <tr className="border-b border-gray-800/40">
                 <th className="text-left px-5 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Etapa</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Prazo (dias)</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Cod/Valor</th>
               </tr>
@@ -390,22 +390,22 @@ export function Cockpit() {
                       {col.count}
                     </span>
                   </td>
-                  <td className="text-center px-4 py-3">
+                  <td className="text-center px-4 py-3 relative">
                     {col.count > 0 ? (
-                      <span className={`text-xs font-semibold px-2 py-0.5 rounded ${col.oldestDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400'}`}>
+                      <button
+                        onClick={() => setClickedOS(prev => prev === col.id ? null : col.id)}
+                        className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
+                      >
                         {col.oldestDays} dia{col.oldestDays !== 1 ? 's' : ''}
-                      </span>
+                      </button>
                     ) : (
                       <span className="text-xs text-gray-600">-</span>
                     )}
-                  </td>
-                  <td className="text-center px-4 py-3">
-                    {col.oldestOSLabel ? (
-                      <span className="text-xs font-mono text-gray-300 bg-gray-800/60 px-2 py-0.5 rounded">
-                        {col.oldestOSLabel}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-gray-600">-</span>
+                    {clickedOS === col.id && col.oldestOSLabel && (
+                      <div className="absolute z-10 top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
+                        <span className="text-xs text-gray-400">OS: </span>
+                        <span className="text-xs font-mono text-[#00D4FF] font-semibold">{col.oldestOSLabel}</span>
+                      </div>
                     )}
                   </td>
                   <td className="text-center px-4 py-3">
@@ -434,9 +434,6 @@ export function Cockpit() {
                   <span className="text-xs text-gray-400 font-medium">
                     Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)} dias
                   </span>
-                </td>
-                <td className="text-center px-4 py-3">
-                  <span className="text-xs text-gray-500">-</span>
                 </td>
                 <td className="text-center px-4 py-3">
                   <span className="text-xs font-medium text-red-400">
