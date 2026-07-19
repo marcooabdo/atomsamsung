@@ -198,6 +198,12 @@ export function Kanban() {
       return saved ? parseInt(saved) || 0 : 0;
     } catch { return 0; }
   });
+  const [rotaFilters, setRotaFilters] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('kanban_rota_filters');
+      return saved ? JSON.parse(saved) : [];
+    } catch { return []; }
+  });
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
   const [routePickerOS, setRoutePickerOS] = useState<OS | null>(null);
@@ -229,6 +235,7 @@ export function Kanban() {
   const debouncedTipoAtendimentoFilters = useDebounce(tipoAtendimentoFilters, 200);
   const debouncedTecnicoFilters = useDebounce(tecnicoFilters, 200);
   const debouncedMinDiasAbertos = useDebounce(minDiasAbertos, 300);
+  const debouncedRotaFilters = useDebounce(rotaFilters, 200);
 
   const getTextColor = (colunaId: string, originalColor: string) => {
     if (colunaId === 'rota_preta') {
@@ -296,6 +303,10 @@ export function Kanban() {
   useEffect(() => {
     localStorage.setItem('kanban_min_dias_abertos', String(minDiasAbertos));
   }, [minDiasAbertos]);
+
+  useEffect(() => {
+    localStorage.setItem('kanban_rota_filters', JSON.stringify(rotaFilters));
+  }, [rotaFilters]);
 
   useEffect(() => {
     loadTecnicos();
@@ -1619,7 +1630,14 @@ export function Kanban() {
 
         const matchesTAT = debouncedMinDiasAbertos === 0 || calcularTAT(os.created_at) >= debouncedMinDiasAbertos;
 
-        return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT;
+        const matchesRota = debouncedRotaFilters.length === 0 ||
+          debouncedRotaFilters.includes(os.rota_id) ||
+          debouncedRotaFilters.some((rotaId: string) => {
+            const rota = rotas.find(r => r.id === rotaId);
+            return rota && os.coluna_kanban === rota.coluna_kanban;
+          });
+
+        return searchResult.matches && matchesTipoOS && matchesTipoAtendimento && matchesTecnico && matchesTAT && matchesRota;
       });
 
       const sortOrder = columnSortOrder[coluna] || 'sequencia';
@@ -1645,7 +1663,7 @@ export function Kanban() {
     }, {} as Record<string, OS[]>);
 
     return { filteredData: result, computedMatchSource: newMatchSource };
-  }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, columnSortOrder, columnSortDir]);
+  }, [osData, debouncedSearchTerm, debouncedTipoOSFilters, debouncedTipoAtendimentoFilters, debouncedTecnicoFilters, debouncedMinDiasAbertos, debouncedRotaFilters, rotas, columnSortOrder, columnSortDir]);
 
   const calcularValorPecasColuna = (cards: any[], statusFiltro: string[]) => {
     let total = 0;
@@ -1946,10 +1964,10 @@ export function Kanban() {
                   <button
                     onClick={() => { setShowTipoFilter(true); setShowActionMenu(false); }}
                     className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#FFBF00]/10"
-                    style={{ color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) ? '#FFBF00' : '#6B7280' }}
+                    style={{ color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0) ? '#FFBF00' : '#6B7280' }}
                   >
                     <Filter className="w-4 h-4" />
-                    FILTROS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length + tecnicoFilters.length + (minDiasAbertos > 0 ? 1 : 0)})`}
+                    FILTROS {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0) && `(${tipoOSFilters.length + tipoAtendimentoFilters.length + tecnicoFilters.length + rotaFilters.length + (minDiasAbertos > 0 ? 1 : 0)})`}
                   </button>
                   <button
                     onClick={() => { setShowExportModal(true); setShowActionMenu(false); }}
@@ -2247,6 +2265,41 @@ export function Kanban() {
                     />
                   </div>
 
+                  {/* Route Filter */}
+                  {rotas.length > 0 && (
+                    <div className="pt-3 mt-3 border-t border-[#FFBF00]/30">
+                      <label className="text-[10px] text-[#FFBF00] mb-1.5 block font-bold">ROTA</label>
+                      <div className="flex flex-wrap gap-1.5">
+                        {rotas.map(rota => {
+                          const isSelected = rotaFilters.includes(rota.id);
+                          return (
+                            <button
+                              key={rota.id}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRotaFilters(prev =>
+                                  isSelected ? prev.filter(id => id !== rota.id) : [...prev, rota.id]
+                                );
+                              }}
+                              className="px-2 py-1 rounded text-[10px] font-bold transition-all"
+                              style={{
+                                background: isSelected
+                                  ? `${rota.cor || '#6B7280'}30`
+                                  : 'rgba(255,191,0,0.05)',
+                                border: `1px solid ${isSelected ? (rota.cor || '#6B7280') : 'rgba(255,191,0,0.2)'}`,
+                                color: isSelected ? (rota.cor || '#FFBF00') : '#9CA3AF',
+                                boxShadow: isSelected ? `0 0 6px ${rota.cor || '#6B7280'}40` : 'none'
+                              }}
+                            >
+                              <span className="inline-block w-2 h-2 rounded-full mr-1" style={{ backgroundColor: rota.cor || '#6B7280' }} />
+                              {rota.nome}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex gap-2 pt-3 mt-3 border-t border-[#FFBF00]/30">
                     <button
                       onClick={(e) => {
@@ -2271,6 +2324,7 @@ export function Kanban() {
                         setTipoAtendimentoFilters([]);
                         setTecnicoFilters([]);
                         setMinDiasAbertos(0);
+                        setRotaFilters([]);
                       }}
                       className="flex-1 px-2 py-1.5 rounded text-[10px] font-bold transition-colors"
                       style={{
