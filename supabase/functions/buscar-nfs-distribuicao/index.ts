@@ -11,6 +11,7 @@ const NUVEM_FISCAL_CLIENT_ID = "kfrx2HqLfTfOjM6MIkku";
 const NUVEM_FISCAL_CLIENT_SECRET = "x9mrWhVT2x4tvs5ZEbz6oC3BGTWu8maeJGNLPaDT";
 const NUVEM_FISCAL_AUDIENCE = "https://api.nuvemfiscal.com.br/";
 const NUVEM_FISCAL_TOKEN_URL = "https://auth.nuvemfiscal.com.br/oauth/token";
+const NUVEM_FISCAL_API = "https://api.nuvemfiscal.com.br";
 
 async function getAccessToken(): Promise<string> {
   const params = new URLSearchParams({
@@ -18,7 +19,7 @@ async function getAccessToken(): Promise<string> {
     client_id: NUVEM_FISCAL_CLIENT_ID,
     client_secret: NUVEM_FISCAL_CLIENT_SECRET,
     audience: NUVEM_FISCAL_AUDIENCE,
-    scope: "nfe distribuicao-nfe",
+    scope: "empresa nfe distribuicao-nfe",
   });
 
   const response = await fetch(NUVEM_FISCAL_TOKEN_URL, {
@@ -88,52 +89,109 @@ Deno.serve(async (req: Request) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get units to process
-    let unidades: any[] = [];
-    if (unidade_id) {
-      const { data } = await supabase.from("unidades").select("id, nome, cnpj").eq("id", unidade_id).single();
-      if (data && data.cnpj) unidades = [data];
-    } else {
-      const { data } = await supabase.from("unidades").select("id, nome, cnpj").not("cnpj", "is", null);
-      unidades = (data || []).filter((u: any) => u.cnpj && u.cnpj.trim());
+    const token = await getAccessToken();
+
+    // Get empresas registered in Nuvem Fiscal
+    let empresasNF: { cpf_cnpj: string; razao_social: string }[] = [];
+    try {
+      const empResponse = await fetch(`${NUVEM_FISCAL_API}/empresas?$top=50`, {
+        headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+      });
+      if (empResponse.ok) {
+        const empData = await empResponse.json();
+        empresasNF = (empData.data || empData || []).map((e: any) => ({
+          cpf_cnpj: (e.cpf_cnpj || "").replace(/[^\d]/g, ""),
+          razao_social: e.razao_social || e.nome_fantasia || "",
+        }));
+      }
+    } catch {}
+
+    // Match with our unidades to know which unidade_id to assign
+    const { data: unidades } = await supabase
+      .from("unidades")
+      .select("id, nome, cnpj")
+      .not("cnpj", "is", null);
+
+    const unidadeMap = new Map<string, { id: string; nome: string }>();
+    for (const u of (unidades || [])) {
+      if (u.cnpj) {
+        unidadeMap.set(normalizeCnpj(u.cnpj), { id: u.id, nome: u.nome });
+      }
     }
 
-    if (unidades.length === 0) {
+    // Filter empresas: if unidade_id is specified, only use that one
+    let targetEmpresas = empresasNF;
+    if (unidade_id) {
+      const targetUnidade = (unidades || []).find((u: any) => u.id === unidade_id);
+      if (targetUnidade?.cnpj) {
+        const targetCnpj = normalizeCnpj(targetUnidade.cnpj);
+        targetEmpresas = empresasNF.filter(e => e.cpf_cnpj === targetCnpj);
+      }
+    }
+
+    if (targetEmpresas.length === 0) {
+      // Fallback: use DB CNPJs directly
+      if (unidade_id) {
+        const u = (unidades || []).find((u: any) => u.id === unidade_id);
+        if (u?.cnpj) {
+          targetEmpresas = [{ cpf_cnpj: normalizeCnpj(u.cnpj), razao_social: u.nome }];
+        }
+      } else {
+        targetEmpresas = (unidades || [])
+          .filter((u: any) => u.cnpj)
+          .map((u: any) => ({ cpf_cnpj: normalizeCnpj(u.cnpj), razao_social: u.nome }));
+      }
+    }
+
+    if (targetEmpresas.length === 0) {
       return new Response(
-        JSON.stringify({ success: false, error: "Nenhuma unidade com CNPJ cadastrado encontrada." }),
+        JSON.stringify({ success: false, error: "Nenhuma empresa com CNPJ encontrada para buscar distribuição." }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const token = await getAccessToken();
-    const results: { unidade: string; novas: number; existentes: number; erros: string[] }[] = [];
+    // Calculate date range: last 7 days
+    const dataInicio = new Date();
+    dataInicio.setDate(dataInicio.getDate() - 7);
+    const dataInicioStr = dataInicio.toISOString().split("T")[0];
 
-    for (const unidade of unidades) {
-      const cnpj = normalizeCnpj(unidade.cnpj);
-      const unidadeResult = { unidade: unidade.nome, novas: 0, existentes: 0, erros: [] as string[] };
+    const results: { unidade: string; cnpj: string; novas: number; existentes: number; erros: string[] }[] = [];
+
+    for (const empresa of targetEmpresas) {
+      const unidadeInfo = unidadeMap.get(empresa.cpf_cnpj);
+      const resultItem = {
+        unidade: unidadeInfo?.nome || empresa.razao_social || empresa.cpf_cnpj,
+        cnpj: empresa.cpf_cnpj,
+        novas: 0,
+        existentes: 0,
+        erros: [] as string[],
+      };
 
       try {
-        // Fetch recent documents from distribution
-        const distUrl = `https://api.nuvemfiscal.com.br/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&$top=50&$orderBy=dh_emissao desc`;
+        // Fetch documents from distribution - last 7 days
+        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${empresa.cpf_cnpj}&$top=50&$orderby=dh_emissao desc`;
         const distResponse = await fetch(distUrl, {
           headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
         });
 
         if (!distResponse.ok) {
           const errText = await distResponse.text();
-          unidadeResult.erros.push(`Erro ao buscar distribuição: ${distResponse.status} - ${errText}`);
-          results.push(unidadeResult);
+          resultItem.erros.push(`API ${distResponse.status}: ${errText.slice(0, 150)}`);
+          results.push(resultItem);
           continue;
         }
 
         const distData = await distResponse.json();
         const documentos = distData.data || [];
+        resultItem.erros.push(`Total docs retornados: ${documentos.length}`);
 
         for (const doc of documentos) {
           const chave = doc.chave || "";
-          const nsu = doc.nsu || doc.id || "";
-
           if (!chave || chave.length !== 44) continue;
+
+          // Check emission date
+          const dhEmissao = doc.dh_emissao || "";
+          if (dhEmissao && dhEmissao.split("T")[0] < dataInicioStr) continue;
 
           // Check if already exists
           const { data: existing } = await supabase
@@ -143,7 +201,7 @@ Deno.serve(async (req: Request) => {
             .maybeSingle();
 
           if (existing) {
-            unidadeResult.existentes++;
+            resultItem.existentes++;
             continue;
           }
 
@@ -151,55 +209,47 @@ Deno.serve(async (req: Request) => {
           let xmlContent: string | null = null;
           if (doc.id) {
             try {
-              const xmlUrl = `https://api.nuvemfiscal.com.br/distribuicao/nfe/documentos/${doc.id}/xml`;
+              const xmlUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${doc.id}/xml`;
               const xmlResponse = await fetch(xmlUrl, {
                 headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" },
               });
               if (xmlResponse.ok) {
                 xmlContent = await xmlResponse.text();
               }
-            } catch {
-              // XML download failed
-            }
+            } catch {}
           }
 
-          // Extract NF data
-          let nfData: any = null;
-          if (xmlContent) {
-            nfData = extractNFDataFromXML(xmlContent);
-          }
-
+          const nfData = xmlContent ? extractNFDataFromXML(xmlContent) : null;
           const delivery = xmlContent ? extractDeliveryFromXML(xmlContent) : null;
 
-          // Insert as pending
           const insertData: any = {
             chave_acesso: chave,
             numero_nf: nfData?.numeroNF || doc.numero_documento || "",
             fornecedor: nfData?.fornecedor || doc.nome_emitente || "",
-            data_emissao: nfData?.dataEmissao || doc.dh_emissao?.split("T")[0] || null,
+            data_emissao: nfData?.dataEmissao || (dhEmissao ? dhEmissao.split("T")[0] : null),
             valor_total: nfData?.valorTotal || doc.valor_nfe || 0,
             delivery,
             xml_conteudo: xmlContent,
-            unidade_id: unidade.id,
+            unidade_id: unidadeInfo?.id || unidade_id || null,
             processada: false,
             pendente_entrada: true,
             origem: "distribuicao_automatica",
-            nsu: String(nsu),
+            nsu: String(doc.nsu || doc.id || ""),
             manifestada: false,
           };
 
           const { error: insertError } = await supabase.from("estoque_nfs").insert(insertData);
           if (insertError) {
-            unidadeResult.erros.push(`Erro ao inserir NF ${chave.slice(0, 8)}...: ${insertError.message}`);
+            resultItem.erros.push(`Insert error: ${insertError.message}`);
           } else {
-            unidadeResult.novas++;
+            resultItem.novas++;
           }
         }
       } catch (err) {
-        unidadeResult.erros.push(`Erro geral: ${err instanceof Error ? err.message : "desconhecido"}`);
+        resultItem.erros.push(`Error: ${err instanceof Error ? err.message : "unknown"}`);
       }
 
-      results.push(unidadeResult);
+      results.push(resultItem);
     }
 
     const totalNovas = results.reduce((acc, r) => acc + r.novas, 0);
@@ -209,6 +259,7 @@ Deno.serve(async (req: Request) => {
       JSON.stringify({
         success: true,
         message: `Busca concluída: ${totalNovas} novas NFs encontradas, ${totalExistentes} já existentes.`,
+        empresasConsultadas: targetEmpresas.length,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

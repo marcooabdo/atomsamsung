@@ -247,9 +247,12 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const result = await response.json();
 
       if (!response.ok || !result.success) {
-        const debugInfo = result.debug ? '\n\nDebug:\n' + result.debug.join('\n') : '';
+        console.log('[Nuvem Fiscal Debug]', result.debug);
         const hint = result.hint ? '\n\n' + result.hint : '';
-        alert((result.error || 'Não foi possível localizar a NF para esta chave de acesso.') + hint + debugInfo);
+        const manifestMsg = result.manifestacaoTriggered 
+          ? '\n\nA manifestação foi enviada ao SEFAZ. Tente novamente em 2-3 minutos.'
+          : '';
+        alert((result.error || 'Não foi possível localizar a NF para esta chave de acesso.') + hint + manifestMsg);
         return;
       }
 
@@ -288,11 +291,16 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const result = await response.json();
 
       if (!response.ok) {
+        console.log('[Distribuição Debug]', result);
         alert(result.error || 'Erro ao buscar NFs da distribuição.');
         return;
       }
 
-      alert(result.message || 'Busca concluída.');
+      console.log('[Distribuição Resultado]', result);
+      const detalhes = (result.results || [])
+        .map((r: any) => `${r.unidade}: ${r.novas} novas, ${r.existentes} existentes${r.erros?.length ? ' (' + r.erros.join('; ') + ')' : ''}`)
+        .join('\n');
+      alert((result.message || 'Busca concluída.') + (detalhes ? '\n\nDetalhes:\n' + detalhes : ''));
       await loadNFsPendentes();
     } catch (err) {
       alert('Erro ao buscar NFs da distribuição. Tente novamente.');

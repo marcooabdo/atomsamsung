@@ -11,6 +11,7 @@ const NUVEM_FISCAL_CLIENT_ID = "kfrx2HqLfTfOjM6MIkku";
 const NUVEM_FISCAL_CLIENT_SECRET = "x9mrWhVT2x4tvs5ZEbz6oC3BGTWu8maeJGNLPaDT";
 const NUVEM_FISCAL_AUDIENCE = "https://api.nuvemfiscal.com.br/";
 const NUVEM_FISCAL_TOKEN_URL = "https://auth.nuvemfiscal.com.br/oauth/token";
+const NUVEM_FISCAL_API = "https://api.nuvemfiscal.com.br";
 
 async function getAccessToken(): Promise<string> {
   const params = new URLSearchParams({
@@ -37,6 +38,26 @@ async function getAccessToken(): Promise<string> {
     throw new Error(`Auth response missing access_token: ${JSON.stringify(data)}`);
   }
   return data.access_token;
+}
+
+async function listEmpresasNuvemFiscal(token: string): Promise<{ cpf_cnpj: string; razao_social: string }[]> {
+  const response = await fetch(`${NUVEM_FISCAL_API}/empresas?$top=50`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+    },
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Empresas list failed (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  return (data.data || data || []).map((e: any) => ({
+    cpf_cnpj: (e.cpf_cnpj || "").replace(/[^\d]/g, ""),
+    razao_social: e.razao_social || e.nome_fantasia || "",
+  }));
 }
 
 function extractDeliveryFromXML(xmlContent: string): string | null {
@@ -84,33 +105,41 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Step 2: Get all company CNPJs from the database
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Step 2: List empresas registered in Nuvem Fiscal
+    let empresas: { cpf_cnpj: string; razao_social: string }[] = [];
+    try {
+      empresas = await listEmpresasNuvemFiscal(token);
+      debugLog.push(`Empresas NF: ${empresas.length} (${empresas.map(e => e.cpf_cnpj).join(", ")})`);
+    } catch (err) {
+      debugLog.push(`Empresas list error: ${err instanceof Error ? err.message : "unknown"}`);
+    }
 
-    const { data: unidades } = await supabase
-      .from("unidades")
-      .select("id, nome, cnpj")
-      .not("cnpj", "is", null);
-
-    const cnpjs = (unidades || [])
-      .filter((u: any) => u.cnpj && u.cnpj.trim())
-      .map((u: any) => ({
-        id: u.id,
-        nome: u.nome,
-        cnpj: u.cnpj.replace(/[^\d]/g, ""),
-      }));
-
-    debugLog.push(`Found ${cnpjs.length} CNPJs`);
+    // If no empresas from API, fall back to DB CNPJs
+    if (empresas.length === 0) {
+      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      const { data: unidades } = await supabase
+        .from("unidades")
+        .select("cnpj, nome")
+        .not("cnpj", "is", null);
+      empresas = (unidades || [])
+        .filter((u: any) => u.cnpj && u.cnpj.trim())
+        .map((u: any) => ({
+          cpf_cnpj: u.cnpj.replace(/[^\d]/g, ""),
+          razao_social: u.nome || "",
+        }));
+      debugLog.push(`Fallback to DB: ${empresas.length} CNPJs`);
+    }
 
     let xmlContent: string | null = null;
+    let manifestacaoTriggered = false;
 
-    // Step 3: Try distribution endpoint for each CNPJ
-    for (const empresa of cnpjs) {
+    // Step 3: Try distribution endpoint for each registered empresa
+    for (const empresa of empresas) {
       try {
-        const distUrl = `https://api.nuvemfiscal.com.br/distribuicao/nfe/documentos?cpf_cnpj=${empresa.cnpj}&chave=${chave}&$top=1`;
-        debugLog.push(`Trying dist: ${empresa.nome} (${empresa.cnpj})`);
+        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${empresa.cpf_cnpj}&chave=${chave}&$top=1`;
+        debugLog.push(`Dist query: ${empresa.razao_social} (${empresa.cpf_cnpj})`);
 
         const distResponse = await fetch(distUrl, {
           headers: {
@@ -119,19 +148,28 @@ Deno.serve(async (req: Request) => {
           },
         });
 
+        const responseText = await distResponse.text();
+
         if (!distResponse.ok) {
-          const errText = await distResponse.text();
-          debugLog.push(`Dist ${empresa.cnpj}: ${distResponse.status} - ${errText.slice(0, 100)}`);
+          debugLog.push(`  -> ${distResponse.status}: ${responseText.slice(0, 150)}`);
           continue;
         }
 
-        const distData = await distResponse.json();
-        debugLog.push(`Dist ${empresa.cnpj}: ${(distData.data || []).length} docs found`);
+        let distData: any;
+        try {
+          distData = JSON.parse(responseText);
+        } catch {
+          debugLog.push(`  -> Parse error: ${responseText.slice(0, 100)}`);
+          continue;
+        }
 
-        if (distData.data && distData.data.length > 0) {
-          const doc = distData.data[0];
+        const docs = distData.data || [];
+        debugLog.push(`  -> ${docs.length} docs found`);
+
+        if (docs.length > 0) {
+          const doc = docs[0];
           if (doc.id) {
-            const xmlUrl = `https://api.nuvemfiscal.com.br/distribuicao/nfe/documentos/${doc.id}/xml`;
+            const xmlUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${doc.id}/xml`;
             const xmlResponse = await fetch(xmlUrl, {
               headers: {
                 Authorization: `Bearer ${token}`,
@@ -140,87 +178,112 @@ Deno.serve(async (req: Request) => {
             });
             if (xmlResponse.ok) {
               xmlContent = await xmlResponse.text();
-              debugLog.push(`XML downloaded from dist (${empresa.nome})`);
+              debugLog.push(`  -> XML downloaded OK`);
               break;
             } else {
-              debugLog.push(`XML download failed: ${xmlResponse.status}`);
+              debugLog.push(`  -> XML download: ${xmlResponse.status}`);
             }
           }
         }
       } catch (err) {
-        debugLog.push(`Dist error for ${empresa.cnpj}: ${err instanceof Error ? err.message : "unknown"}`);
+        debugLog.push(`  -> Error: ${err instanceof Error ? err.message : "unknown"}`);
       }
     }
 
-    // Step 4: Try NF-e listing endpoint (for NFs emitted through Nuvem Fiscal)
-    if (!xmlContent) {
-      try {
-        const nfeListUrl = `https://api.nuvemfiscal.com.br/nfe?chave=${chave}&$top=1`;
-        debugLog.push("Trying /nfe endpoint");
-        const nfeListResponse = await fetch(nfeListUrl, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
+    // Step 4: If not found, try to manifest the NF (ciência da operação) to pull from SEFAZ
+    if (!xmlContent && empresas.length > 0) {
+      // Determine which empresa is the recipient (the CNPJ in positions 7-20 of the chave is the EMITTER, not the recipient)
+      // We try manifestation with each empresa
+      for (const empresa of empresas) {
+        try {
+          debugLog.push(`Manifesting for ${empresa.cpf_cnpj}...`);
+          const manifestUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/manifestacoes`;
+          const manifestResponse = await fetch(manifestUrl, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+              Accept: "application/json",
+            },
+            body: JSON.stringify({
+              cpf_cnpj: empresa.cpf_cnpj,
+              chave: chave,
+              tipo_evento: "ciencia_operacao",
+            }),
+          });
 
-        if (nfeListResponse.ok) {
-          const nfeListData = await nfeListResponse.json();
-          debugLog.push(`/nfe result: ${(nfeListData.data || []).length} docs`);
-          if (nfeListData.data && nfeListData.data.length > 0) {
-            const nfeId = nfeListData.data[0].id;
-            const xmlUrl = `https://api.nuvemfiscal.com.br/nfe/${nfeId}/xml/nota`;
-            const xmlResponse = await fetch(xmlUrl, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-                Accept: "application/xml",
-              },
+          const manifestText = await manifestResponse.text();
+          if (manifestResponse.ok || manifestResponse.status === 201 || manifestResponse.status === 202) {
+            debugLog.push(`  -> Manifestação OK: ${manifestText.slice(0, 100)}`);
+            manifestacaoTriggered = true;
+            
+            // Wait a moment and try to get the document again
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            const retryUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${empresa.cpf_cnpj}&chave=${chave}&$top=1`;
+            const retryResponse = await fetch(retryUrl, {
+              headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
             });
-            if (xmlResponse.ok) {
-              xmlContent = await xmlResponse.text();
-              debugLog.push("XML downloaded from /nfe");
+            
+            if (retryResponse.ok) {
+              const retryData = await retryResponse.json();
+              const docs = retryData.data || [];
+              if (docs.length > 0 && docs[0].id) {
+                const xmlUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docs[0].id}/xml`;
+                const xmlResponse = await fetch(xmlUrl, {
+                  headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" },
+                });
+                if (xmlResponse.ok) {
+                  xmlContent = await xmlResponse.text();
+                  debugLog.push(`  -> XML after manifest OK`);
+                  break;
+                }
+              }
             }
+          } else {
+            debugLog.push(`  -> Manifest ${manifestResponse.status}: ${manifestText.slice(0, 150)}`);
           }
-        } else {
-          const errText = await nfeListResponse.text();
-          debugLog.push(`/nfe error: ${nfeListResponse.status} - ${errText.slice(0, 100)}`);
+        } catch (err) {
+          debugLog.push(`  -> Manifest error: ${err instanceof Error ? err.message : "unknown"}`);
         }
-      } catch (err) {
-        debugLog.push(`/nfe exception: ${err instanceof Error ? err.message : "unknown"}`);
       }
     }
 
     // Step 5: Fallback to consultadanfe.com
     if (!xmlContent) {
       try {
-        debugLog.push("Trying consultadanfe.com fallback");
-        const danfeXmlUrl = `https://consultadanfe.com/danfe/xml/${chave}`;
-        const danfeResponse = await fetch(danfeXmlUrl, {
+        debugLog.push("Trying consultadanfe.com");
+        const danfeResponse = await fetch(`https://consultadanfe.com/danfe/xml/${chave}`, {
           headers: { "User-Agent": "Mozilla/5.0" },
         });
         if (danfeResponse.ok) {
           const text = await danfeResponse.text();
           if (text.includes("<nfeProc") || text.includes("<NFe") || text.includes("<infNFe")) {
             xmlContent = text;
-            debugLog.push("XML from consultadanfe.com OK");
+            debugLog.push("  -> consultadanfe OK");
           } else {
-            debugLog.push(`consultadanfe.com: response not XML (${text.slice(0, 50)}...)`);
+            debugLog.push(`  -> Not XML: ${text.slice(0, 60)}`);
           }
         } else {
-          debugLog.push(`consultadanfe.com: ${danfeResponse.status}`);
+          debugLog.push(`  -> ${danfeResponse.status}`);
         }
       } catch (err) {
-        debugLog.push(`consultadanfe.com error: ${err instanceof Error ? err.message : "unknown"}`);
+        debugLog.push(`  -> Error: ${err instanceof Error ? err.message : "unknown"}`);
       }
     }
 
     if (!xmlContent) {
+      const hint = manifestacaoTriggered
+        ? "A manifestação (ciência da operação) foi enviada ao SEFAZ. Aguarde alguns minutos e tente novamente — o SEFAZ pode levar até 5 min para disponibilizar o XML."
+        : "Verifique se: 1) O CNPJ destinatário desta NF está cadastrado como empresa no Nuvem Fiscal com certificado digital ativo; 2) A distribuição NF-e está habilitada para essa empresa no Console Nuvem Fiscal.";
+
       return new Response(
         JSON.stringify({
           success: false,
           error: "Não foi possível localizar o XML da NF-e para esta chave de acesso.",
-          hint: "Verifique se: 1) A chave está correta; 2) A NF foi emitida contra um dos CNPJs cadastrados; 3) A distribuição NF-e está habilitada na Nuvem Fiscal.",
+          hint,
           chaveAcesso: chave,
+          manifestacaoTriggered,
           debug: debugLog,
         }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
