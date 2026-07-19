@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { RotateCcw, AlertTriangle, CheckCircle, Clock, XCircle, ChevronDown, ChevronRight, DollarSign, Eye } from 'lucide-react';
+import { RotateCcw, AlertTriangle, CheckCircle, Clock, XCircle, ChevronDown, ChevronRight, DollarSign, Eye, X } from 'lucide-react';
 import { BadgeTipoOS } from './BadgeTipoOS';
 import { AprovarDevolucaoModal } from './AprovarDevolucaoModal';
+import { CancelarGIModal } from '../CancelarGIModal';
 
 type SubTab = 'nova' | 'defeito' | 'usada';
 
@@ -31,6 +32,8 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
   const [showAprovadas, setShowAprovadas] = useState(false);
   const [requisicaoParaAprovar, setRequisicaoParaAprovar] = useState<any>(null);
   const [mostrarModalAprovar, setMostrarModalAprovar] = useState(false);
+  const [requisicaoCancelarGI, setRequisicaoCancelarGI] = useState<any>(null);
+  const [mostrarModalCancelarGI, setMostrarModalCancelarGI] = useState(false);
 
   useEffect(() => {
     loadDevolucoes();
@@ -466,6 +469,94 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
     }
   };
 
+  const handleCancelarDespacho = async (requisicao: any, motivo: string, pecasSelecionadas?: string[]) => {
+    try {
+      const { data: userData } = await supabase
+        .from('usuarios')
+        .select('nome')
+        .eq('id', user.id)
+        .single();
+
+      const nomeUsuario = userData?.nome || 'Estoque';
+
+      if (requisicao.is_lote && pecasSelecionadas && pecasSelecionadas.length > 0) {
+        await supabase
+          .from('estoque_pecas')
+          .update({
+            gi_postada_em: null,
+            gi_postada_por: null,
+            gi_cancelada_em: new Date().toISOString(),
+            gi_cancelada_por: user.id
+          })
+          .in('id', pecasSelecionadas);
+
+        const pecasComGIRestantes = requisicao.pecas_lote?.filter((p: any) =>
+          !pecasSelecionadas.includes(p.id) && p.gi_postada_em
+        ) || [];
+
+        if (pecasComGIRestantes.length === 0) {
+          await supabase
+            .from('requisicoes_pecas')
+            .update({ status: 'atendida', gi_postada_em: null })
+            .eq('id', requisicao.id);
+        }
+
+        for (const pecaId of pecasSelecionadas) {
+          await supabase.from('estoque_historico').insert({
+            peca_id: pecaId,
+            usuario_id: user.id,
+            acao: 'gi_cancelada',
+            status_anterior: 'vinculada_tecnico',
+            status_novo: 'vinculada_tecnico',
+            observacao: `Despacho Samsung cancelado por ${nomeUsuario} - Motivo: ${motivo}`
+          });
+        }
+      } else {
+        await supabase
+          .from('requisicoes_pecas')
+          .update({ status: 'atendida', gi_postada_em: null })
+          .eq('id', requisicao.id);
+
+        if (requisicao.peca_estoque_id) {
+          await supabase
+            .from('estoque_pecas')
+            .update({
+              gi_postada_em: null,
+              gi_postada_por: null,
+              gi_cancelada_em: new Date().toISOString(),
+              gi_cancelada_por: user.id
+            })
+            .eq('id', requisicao.peca_estoque_id);
+
+          await supabase.from('estoque_historico').insert({
+            peca_id: requisicao.peca_estoque_id,
+            usuario_id: user.id,
+            acao: 'gi_cancelada',
+            status_anterior: 'vinculada_tecnico',
+            status_novo: 'vinculada_tecnico',
+            observacao: `Despacho Samsung cancelado por ${nomeUsuario} - Motivo: ${motivo}`
+          });
+        }
+      }
+
+      if (requisicao.os_id) {
+        await supabase.from('os_comentarios').insert({
+          os_id: requisicao.os_id,
+          usuario_id: user.id,
+          comentario: `Despacho Samsung cancelado por ${nomeUsuario}\nPeça: ${requisicao.descricao} (${requisicao.codigo_peca})\nMotivo: ${motivo}`,
+          is_system: true
+        });
+      }
+
+      alert('Despacho Samsung cancelado com sucesso!');
+      setMostrarModalCancelarGI(false);
+      setRequisicaoCancelarGI(null);
+      loadDevolucoes();
+    } catch (error) {
+      alert('Erro ao cancelar despacho');
+    }
+  };
+
   const subTabs = [
     { id: 'nova' as SubTab, label: 'Peça Nova', icon: CheckCircle },
     { id: 'defeito' as SubTab, label: 'Nova c/ Defeito', icon: AlertTriangle },
@@ -693,6 +784,23 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
                                 <XCircle className="w-4 h-4" />
                                 REPROVAR DEVOLUÇÃO
                               </button>
+                              {req.status === 'gi_postada' && (
+                                <button
+                                  onClick={() => {
+                                    setRequisicaoCancelarGI(req);
+                                    setMostrarModalCancelarGI(true);
+                                  }}
+                                  className="flex-1 neon-button flex items-center justify-center gap-2 text-xs px-4 py-2"
+                                  style={{
+                                    backgroundColor: '#F59E0B10',
+                                    borderColor: '#F59E0B',
+                                    color: '#F59E0B'
+                                  }}
+                                >
+                                  <X className="w-4 h-4" />
+                                  CANCELAR DESPACHO
+                                </button>
+                              )}
                             </div>
                           </div>
                         );
@@ -802,6 +910,33 @@ export function EstoqueDevolucoes({ selectedUnidade, user }: EstoqueDevolucoesPr
             await handleAprovarDevolucao(requisicaoParaAprovar, foto, qrCode);
           }}
           requisicao={requisicaoParaAprovar}
+        />
+      )}
+
+      {mostrarModalCancelarGI && requisicaoCancelarGI && (
+        <CancelarGIModal
+          isOpen={mostrarModalCancelarGI}
+          onClose={() => {
+            setMostrarModalCancelarGI(false);
+            setRequisicaoCancelarGI(null);
+          }}
+          onConfirm={async (motivo, pecasSelecionadas) => {
+            await handleCancelarDespacho(requisicaoCancelarGI, motivo, pecasSelecionadas);
+          }}
+          requisicao={{
+            codigo_peca: requisicaoCancelarGI.codigo_peca,
+            descricao: requisicaoCancelarGI.descricao
+          }}
+          isLote={requisicaoCancelarGI.is_lote && requisicaoCancelarGI.pecas_lote?.length > 1}
+          pecasLote={requisicaoCancelarGI.is_lote ? requisicaoCancelarGI.pecas_lote?.map((p: any) => ({
+            id: p.id,
+            id_numerico: p.id_numerico,
+            valor_com_impostos: '0',
+            delivery: p.delivery,
+            gi_postada_em: p.gi_postada_em,
+            gi_postada_por: null,
+            usuario_gi_postado: null
+          })) : undefined}
         />
       )}
     </div>
