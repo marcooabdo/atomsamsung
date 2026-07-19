@@ -28,7 +28,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState(() => sessionStorage.getItem('estoque_geral_status_filter') || 'all');
-  const [showArquivadas, setShowArquivadas] = useState(() => sessionStorage.getItem('estoque_geral_show_arquivadas') === 'true');
+  const [showDevolucaoCompleta, setShowDevolucaoCompleta] = useState(() => sessionStorage.getItem('estoque_geral_show_devolucao_completa') === 'true');
   const [selectedPeca, setSelectedPeca] = useState<EstoquePeca | null>(null);
   const [showLabelSelector, setShowLabelSelector] = useState(false);
   const [showLabelPreview, setShowLabelPreview] = useState(false);
@@ -51,12 +51,12 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   }, [statusFilter]);
 
   useEffect(() => {
-    sessionStorage.setItem('estoque_geral_show_arquivadas', String(showArquivadas));
-  }, [showArquivadas]);
+    sessionStorage.setItem('estoque_geral_show_devolucao_completa', String(showDevolucaoCompleta));
+  }, [showDevolucaoCompleta]);
 
   useEffect(() => {
     loadPecas();
-  }, [statusFilter, showArquivadas, selectedUnidade]);
+  }, [statusFilter, showDevolucaoCompleta, selectedUnidade]);
 
   const loadPecas = async () => {
     try {
@@ -101,8 +101,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         query = query.eq('unidade_id', unidadeFilter);
       }
 
-      if (!showArquivadas) {
-        query = query.neq('status', 'arquivada');
+      if (!showDevolucaoCompleta) {
+        query = query.not('status', 'in', '(devolucao_completa,arquivada)');
       }
 
       if (statusFilter !== 'all') {
@@ -221,8 +221,8 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           pageQuery = pageQuery.eq('unidade_id', unidadeFilter);
         }
 
-        if (!showArquivadas) {
-          pageQuery = pageQuery.neq('status', 'arquivada');
+        if (!showDevolucaoCompleta) {
+          pageQuery = pageQuery.not('status', 'in', '(devolucao_completa,arquivada)');
         }
 
         if (statusFilter !== 'all') {
@@ -692,11 +692,11 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         <label className="flex items-center gap-2 px-4 py-2 border border-gray-700 rounded-lg cursor-pointer hover:border-[#00D4FF]/50 transition whitespace-nowrap">
           <input
             type="checkbox"
-            checked={showArquivadas}
-            onChange={(e) => setShowArquivadas(e.target.checked)}
+            checked={showDevolucaoCompleta}
+            onChange={(e) => setShowDevolucaoCompleta(e.target.checked)}
             className="rounded"
           />
-          <span className="text-sm text-gray-300">Mostrar Arquivadas</span>
+          <span className="text-sm text-gray-300">Mostrar Devolu\u00e7\u00e3o Completa</span>
         </label>
 
         <button
