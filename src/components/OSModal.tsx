@@ -358,7 +358,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
 
   // Carrega markups quando a OS for carregada (para OW)
   useEffect(() => {
-    if (os?.tipo_os === 'OW' && os?.unidade_id && os?.tipo_orcamento) {
+    if ((os?.tipo_os === 'OW' || os?.tipo_os === 'LP') && os?.unidade_id && os?.tipo_orcamento) {
       loadMarkups();
     }
   }, [os?.tipo_os, os?.unidade_id, os?.tipo_orcamento]);
@@ -366,7 +366,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
   // Debounce para buscar sugestões de peças (OW)
   useEffect(() => {
     const timer = setTimeout(() => {
-      if (novaPecaCodigoOW && os?.tipo_os === 'OW') {
+      if (novaPecaCodigoOW && (os?.tipo_os === 'OW' || os?.tipo_os === 'LP')) {
         buscarSugestoesPecasOW(novaPecaCodigoOW);
       }
     }, 300);
@@ -1051,7 +1051,7 @@ export function OSModal({ osId, onClose, onReload, onMoveOS, mode = 'view', tipo
 
       // Calcula valores
       const valorGSPN = valorNum;
-      const valorComMarkup = os?.tipo_os === 'OW' ? calcularValorComMarkup(valorGSPN) : valorGSPN;
+      const valorComMarkup = (os?.tipo_os === 'OW' || os?.tipo_os === 'LP') ? calcularValorComMarkup(valorGSPN) : valorGSPN;
       const valorTotal = valorComMarkup * Math.max(peca.quantidade || 1, 1);
 
       // Atualiza a peça (corrige quantidade 0 para 1 se necessário)
@@ -3943,7 +3943,7 @@ Não haverá cobrança ao cliente.`
                 </div>
               )}
 
-              {os?.tipo_os === 'OW' && (() => {
+              {(os?.tipo_os === 'OW' || os?.tipo_os === 'LP') && (() => {
                 const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
                 const isSCACCColor = isSCACC;
                 const accentColor = isSCACC ? '#39FF14' : 'var(--text-accent)';
