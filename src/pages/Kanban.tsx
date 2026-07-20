@@ -15,7 +15,7 @@ import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
 import { useDebounce } from '../components/kanban/useDebounce';
 import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings, Wrench } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -38,6 +38,7 @@ const COLUNAS_KANBAN = [
   { id: 'rota_amarela', label: 'Rota Amarela', color: '#EAB308', icon: MapPin },
   { id: 'rota_laranja', label: 'Rota Laranja', color: '#F97316', icon: MapPin },
   { id: 'em_rota_ih', label: 'Agendado', color: '#10B981', icon: Activity },
+  { id: 'em_reparo_ih', label: 'Em Reparo IH', color: '#F97316', icon: Wrench },
   { id: 'instalacao_inicial', label: 'Instalação Inicial', color: '#7C3AED', icon: Activity },
   { id: 'service_handling', label: 'Service Handling', color: '#DB2777', icon: Activity },
   { id: 'return_handling', label: 'Return Handling', color: '#D97706', icon: Activity },
