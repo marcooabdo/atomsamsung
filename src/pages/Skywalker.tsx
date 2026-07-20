@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck, Edit2 } from 'lucide-react';
+import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck, CreditCard as Edit2 } from 'lucide-react';
 import { useSkywalker } from '../contexts/SkywalkerContext';
 import { useAuth } from '../contexts/AuthContext';
+import { usePermissions } from '../hooks/usePermissions';
 import { supabase } from '../lib/supabase';
 import { VisaoGeralTab } from '../components/skywalker/VisaoGeralTab';
 import { RegrasJogoTab } from '../components/skywalker/RegrasJogoTab';
@@ -11,20 +12,21 @@ import { ConfirmDeleteModal } from '../components/skywalker/ConfirmDeleteModal';
 
 export function Skywalker() {
   const { usuario } = useAuth();
+  const { hasPermission } = usePermissions();
   const { loading, isAdmin, myProfissional } = useSkywalker();
   const [abaAtiva, setAbaAtiva] = useState('visao-geral');
 
   const abas = [
-    { id: 'visao-geral', nome: 'Meu Painel', icone: Star, admin: false },
-    { id: 'ranking', nome: 'Ranking', icone: Trophy, admin: false },
-    { id: 'orcamentos', nome: 'Fechamentos', icone: FileCheck, admin: false },
+    { id: 'visao-geral', nome: 'Meu Painel', icone: Star, permKey: 'skywalker_visao_geral' },
+    { id: 'ranking', nome: 'Ranking', icone: Trophy, permKey: 'skywalker_visao_geral' },
+    { id: 'orcamentos', nome: 'Fechamentos', icone: FileCheck, permKey: 'skywalker_visao_geral' },
     ...(isAdmin ? [
-      { id: 'profissionais', nome: 'Profissionais', icone: Users, admin: true },
-      { id: 'regras', nome: 'Regras do Jogo', icone: BookOpen, admin: true },
-      { id: 'niveis', nome: 'Niveis e Bonus', icone: Award, admin: true },
-      { id: 'times', nome: 'Times', icone: Layers, admin: true },
+      { id: 'profissionais', nome: 'Profissionais', icone: Users, permKey: 'skywalker_times' },
+      { id: 'regras', nome: 'Regras do Jogo', icone: BookOpen, permKey: 'skywalker_regras' },
+      { id: 'niveis', nome: 'Niveis e Bonus', icone: Award, permKey: 'skywalker_niveis' },
+      { id: 'times', nome: 'Times', icone: Layers, permKey: 'skywalker_times' },
     ] : []),
-  ];
+  ].filter(aba => hasPermission(aba.permKey));
 
   if (loading) {
     return (

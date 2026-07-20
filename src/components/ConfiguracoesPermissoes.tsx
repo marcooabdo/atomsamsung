@@ -131,6 +131,7 @@ const MENU_ITEMS: MenuItem[] = [
       { id: 'config_checklists', label: 'Checklists' },
       { id: 'config_pdf_os', label: 'PDF OS' },
       { id: 'config_nf', label: 'Nota Fiscal' },
+      { id: 'config_regras_fechamento', label: 'Regras Fechamento' },
       { id: 'config_permissoes', label: 'Permissoes' }
     ]
   }

@@ -2,6 +2,7 @@ import { Activity, BarChart3, Calendar, CheckSquare, Cog, Package, Users, Zap, N
 import { Component, ReactNode } from 'react';
 import { OtimizadorProvider, useOtimizador, type OtimizadorTab } from '../contexts/OtimizadorContext';
 import { UnitFilter } from '../components/UnitFilter';
+import { usePermissions } from '../hooks/usePermissions';
 
 class OtimizadorErrorBoundary extends Component<
   { children: ReactNode },
@@ -52,23 +53,25 @@ import Analytics from '../components/otimizador/Analytics';
 import ConfiguracaoOtimizador from '../components/otimizador/ConfiguracaoOtimizador';
 import RotasRealizadas from '../components/otimizador/RotasRealizadas';
 
-const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }> = [
-  { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)' },
-  { id: 'agenda', label: 'Agenda', icon: Calendar, color: '#3B82F6' },
-  { id: 'mapa', label: 'Rastreamento', icon: Navigation, color: '#10B981' },
-  { id: 'rotas', label: 'Rotas', icon: Route, color: '#EC4899' },
-  { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00' },
-  { id: 'equipe', label: 'Equipe', icon: Users, color: '#06B6D4' },
-  { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899' },
-  { id: 'pecas', label: 'Pecas', icon: Package, color: '#F97316' },
-  { id: 'analytics', label: 'Analytics', icon: BarChart3, color: '#10B981' },
-  { id: 'historico', label: 'Rotas Realizadas', icon: FolderOpen, color: '#3B82F6' },
-  { id: 'config', label: 'Config', icon: Cog, color: '#6B7280' },
+const ALL_TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string; permKey: string }> = [
+  { id: 'dashboard', label: 'Dashboard', icon: Activity, color: 'var(--text-accent)', permKey: 'otimizador_dashboard' },
+  { id: 'agenda', label: 'Agenda', icon: Calendar, color: '#3B82F6', permKey: 'otimizador_agenda' },
+  { id: 'mapa', label: 'Rastreamento', icon: Navigation, color: '#10B981', permKey: 'otimizador_rastreamento' },
+  { id: 'rotas', label: 'Rotas', icon: Route, color: '#EC4899', permKey: 'otimizador_rotas' },
+  { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00', permKey: 'otimizador_motor' },
+  { id: 'equipe', label: 'Equipe', icon: Users, color: '#06B6D4', permKey: 'otimizador_equipe' },
+  { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899', permKey: 'otimizador_checklists' },
+  { id: 'pecas', label: 'Pecas', icon: Package, color: '#F97316', permKey: 'otimizador_pecas' },
+  { id: 'analytics', label: 'Analytics', icon: BarChart3, color: '#10B981', permKey: 'otimizador_analytics' },
+  { id: 'historico', label: 'Rotas Realizadas', icon: FolderOpen, color: '#3B82F6', permKey: 'otimizador_rotas' },
+  { id: 'config', label: 'Config', icon: Cog, color: '#6B7280', permKey: 'otimizador_config' },
 ];
 
 function OtimizadorContent() {
   const { activeTab, setActiveTab, selectedUnidade, setSelectedUnidade, unidades, isMaster } = useOtimizador();
+  const { hasPermission } = usePermissions();
   const canProceed = isMaster || selectedUnidade;
+  const tabs = ALL_TABS.filter(t => hasPermission(t.permKey));
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -110,7 +113,7 @@ function OtimizadorContent() {
         ) : (
           <>
             <div className="rounded-xl p-1.5 flex gap-1 overflow-x-auto" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
-              {TABS.map((tab) => {
+              {tabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = activeTab === tab.id;
                 return (
