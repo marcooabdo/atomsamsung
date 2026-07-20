@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Fetch ALL documents from distribution (production, last 50)
-        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&ambiente=producao&$top=50&$orderby=dh_emissao desc`;
+        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&ambiente=producao&tipo_documento=nota&$top=50`;
         resultItem.erros.push(`URL: ${distUrl}`);
 
         const distResponse = await fetch(distUrl, {
@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
         }
 
         for (const doc of documentos) {
-          const chave = doc.chave || "";
+          const chave = doc.chave_acesso || "";
           if (!chave || chave.length !== 44) continue;
 
           // Check if already exists
@@ -185,9 +185,9 @@ Deno.serve(async (req: Request) => {
 
           const insertData: any = {
             chave_acesso: chave,
-            numero_nf: nfData?.numeroNF || doc.numero_documento || "",
-            fornecedor: nfData?.fornecedor || doc.nome_emitente || "",
-            data_emissao: nfData?.dataEmissao || (doc.dh_emissao ? doc.dh_emissao.split("T")[0] : null),
+            numero_nf: nfData?.numeroNF || "",
+            fornecedor: nfData?.fornecedor || "",
+            data_emissao: nfData?.dataEmissao || null,
             valor_total: nfData?.valorTotal || doc.valor_nfe || 0,
             delivery,
             xml_conteudo: xmlContent,

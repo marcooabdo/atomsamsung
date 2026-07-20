@@ -112,7 +112,7 @@ Deno.serve(async (req: Request) => {
     // Step 3: Try distribution endpoint with ambiente=1 (production)
     for (const cnpjAtual of cnpjsToTry) {
       // Try with chave filter
-      const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpjAtual}&ambiente=producao&chave=${chave}&$top=1`;
+      const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpjAtual}&ambiente=producao&chave_acesso=${chave}&$top=1`;
       debugLog.push(`GET ${distUrl}`);
 
       try {
@@ -176,8 +176,8 @@ Deno.serve(async (req: Request) => {
           const manifestBody = {
             ambiente: "producao",
             cpf_cnpj: cnpjAtual,
-            chave: chave,
-            tipo_evento: "ciencia_operacao",
+            chave_acesso: chave,
+            tipo_evento: "210210",
           };
           debugLog.push(`  POST ${manifestUrl} body: ${JSON.stringify(manifestBody)}`);
 
@@ -200,7 +200,7 @@ Deno.serve(async (req: Request) => {
             // Wait 4 seconds and retry
             await new Promise(resolve => setTimeout(resolve, 4000));
             
-            const retryUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpjAtual}&ambiente=producao&chave=${chave}&$top=1`;
+            const retryUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpjAtual}&ambiente=producao&chave_acesso=${chave}&$top=1`;
             debugLog.push(`  Retry after manifest: GET ${retryUrl}`);
             const retryResponse = await fetch(retryUrl, {
               headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
