@@ -1,9 +1,17 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import type { Database } from '../lib/database.types';
 
-type Usuario = Database['public']['Tables']['usuarios']['Row'];
+interface Usuario {
+  id: string;
+  nome: string;
+  email: string;
+  tipo: string;
+  unidade_id: string | null;
+  ativo: boolean;
+  numero_tecnico?: string;
+  [key: string]: unknown;
+}
 
 interface Unidade {
   id: string;
@@ -21,12 +29,12 @@ interface AuthContextType {
   allUserUnits: string[];
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUsuario?: (updatedUsuario: Usuario) => void;
+  updateUsuario: (u: Usuario) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: ReactNode }) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -48,62 +56,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data) setUnidades(data);
   };
 
+  const loadUserData = async (authUser: User) => {
+    const { data } = await supabase
+      .from('usuarios')
+      .select('*')
+      .eq('id', authUser.id)
+      .maybeSingle();
+
+    setUsuario(data);
+    await loadUnidades();
+
+    const { data: extras } = await supabase
+      .from('usuario_unidades')
+      .select('unidade_id')
+      .eq('usuario_id', authUser.id);
+    setUnidadesAdicionais(extras?.map(r => r.unidade_id) || []);
+  };
+
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    let mounted = true;
 
-        if (session?.user) {
-          const { data } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
+    supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      if (!mounted) return;
+      setSession(currentSession);
+      setUser(currentSession?.user ?? null);
 
-          setUsuario(data);
-          await loadUnidades();
-
-          const { data: extras } = await supabase
-            .from('usuario_unidades')
-            .select('unidade_id')
-            .eq('usuario_id', session.user.id);
-          setUnidadesAdicionais(extras?.map(r => r.unidade_id) || []);
-        }
-
+      if (currentSession?.user) {
+        loadUserData(currentSession.user).then(() => {
+          if (mounted) setLoading(false);
+        });
+      } else {
         setLoading(false);
-      })();
+      }
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setSession(session);
-        setUser(session?.user ?? null);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      if (!mounted) return;
+      setSession(newSession);
+      setUser(newSession?.user ?? null);
 
-        if (session?.user) {
-          const { data } = await supabase
-            .from('usuarios')
-            .select('*')
-            .eq('id', session.user.id)
-            .maybeSingle();
-
-          setUsuario(data);
-          await loadUnidades();
-
-          const { data: extras } = await supabase
-            .from('usuario_unidades')
-            .select('unidade_id')
-            .eq('usuario_id', session.user.id);
-          setUnidadesAdicionais(extras?.map(r => r.unidade_id) || []);
-        } else {
-          setUsuario(null);
-          setUnidades([]);
-          setUnidadesAdicionais([]);
-        }
-      })();
+      if (newSession?.user) {
+        loadUserData(newSession.user);
+      } else {
+        setUsuario(null);
+        setUnidades([]);
+        setUnidadesAdicionais([]);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -124,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setUsuario(null);
     setUnidades([]);
+    setUnidadesAdicionais([]);
   };
 
   const updateUsuario = (updatedUsuario: Usuario) => {
