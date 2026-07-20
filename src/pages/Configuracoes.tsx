@@ -448,20 +448,15 @@ export function Configuracoes() {
             }
           }
 
-          const { data: { session } } = await supabase.auth.getSession();
+          let { data: { session: activeSession } } = await supabase.auth.getSession();
 
-          if (!session?.access_token) {
+          if (!activeSession?.access_token) {
             const { data: refreshData } = await supabase.auth.refreshSession();
-            if (!refreshData.session?.access_token) {
+            activeSession = refreshData.session;
+            if (!activeSession?.access_token) {
               alert('Sessao expirada. Faca login novamente.');
               return;
             }
-          }
-
-          const activeSession = session || (await supabase.auth.getSession()).data.session;
-          if (!activeSession?.access_token) {
-            alert('Sessao expirada. Faca login novamente.');
-            return;
           }
 
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
@@ -729,22 +724,16 @@ export function Configuracoes() {
     setShowDeleteConfirmModal(false);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      let { data: { session: activeSession } } = await supabase.auth.getSession();
 
-      if (!session?.access_token) {
+      if (!activeSession?.access_token) {
         const { data: refreshData } = await supabase.auth.refreshSession();
-        if (!refreshData.session?.access_token) {
+        activeSession = refreshData.session;
+        if (!activeSession?.access_token) {
           setDeleteMessage('Sessao expirada. Faca login novamente.');
           setShowDeleteSuccessModal(true);
           return;
         }
-      }
-
-      const activeSession = session || (await supabase.auth.getSession()).data.session;
-      if (!activeSession?.access_token) {
-        setDeleteMessage('Sessao expirada. Faca login novamente.');
-        setShowDeleteSuccessModal(true);
-        return;
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
