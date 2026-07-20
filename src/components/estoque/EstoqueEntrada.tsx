@@ -254,6 +254,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey,
         },
         body: JSON.stringify({ chaveAcesso: chave, cnpj: cnpjToSend }),
       });
@@ -279,8 +280,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       } else {
         alert('NF localizada mas o XML não está disponível.');
       }
-    } catch (err) {
-      alert('Erro ao consultar NF. Tente novamente.');
+    } catch (err: any) {
+      console.error('[Nuvem Fiscal Error]', err);
+      alert('Erro ao consultar NF. Tente novamente.\n\nDetalhe: ' + (err?.message || String(err)));
     } finally {
       setBuscandoChave(false);
     }

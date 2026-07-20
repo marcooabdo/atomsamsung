@@ -665,41 +665,51 @@ export function Kanban() {
 
       setOsData(grouped);
 
-      // Load last user comment timestamp for each OS
+      // Load last user comment timestamp for each OS (batched to avoid URL length limits)
       const allOsIds = (data || []).map(os => os.id);
       if (allOsIds.length > 0) {
-        const { data: comentariosData } = await supabase
-          .from('os_comentarios')
-          .select('os_id, created_at')
-          .in('os_id', allOsIds)
-          .or('is_system.is.null,is_system.eq.false')
-          .order('created_at', { ascending: false });
-
-        if (comentariosData) {
-          const lastCommentMap: Record<string, string> = {};
-          for (const c of comentariosData) {
-            if (c.os_id && !lastCommentMap[c.os_id]) {
-              lastCommentMap[c.os_id] = c.created_at;
-            }
-          }
-          setLastUserCommentMap(lastCommentMap);
+        const BATCH_SIZE = 50;
+        const batches: string[][] = [];
+        for (let i = 0; i < allOsIds.length; i += BATCH_SIZE) {
+          batches.push(allOsIds.slice(i, i + BATCH_SIZE));
         }
+
+        const allComentarios: any[] = [];
+        for (const batch of batches) {
+          const { data: comentariosData } = await supabase
+            .from('os_comentarios')
+            .select('os_id, created_at')
+            .in('os_id', batch)
+            .or('is_system.is.null,is_system.eq.false')
+            .order('created_at', { ascending: false });
+          if (comentariosData) allComentarios.push(...comentariosData);
+        }
+
+        const lastCommentMap: Record<string, string> = {};
+        for (const c of allComentarios) {
+          if (c.os_id && !lastCommentMap[c.os_id]) {
+            lastCommentMap[c.os_id] = c.created_at;
+          }
+        }
+        setLastUserCommentMap(lastCommentMap);
 
         // Load read timestamps for current user
         if (usuario?.id) {
-          const { data: leituraData } = await supabase
-            .from('os_comentarios_leitura')
-            .select('os_id, last_read_at')
-            .eq('usuario_id', usuario.id)
-            .in('os_id', allOsIds);
-
-          if (leituraData) {
-            const readMap: Record<string, string> = {};
-            for (const l of leituraData) {
-              if (l.os_id) readMap[l.os_id] = l.last_read_at;
-            }
-            setCommentReadMap(readMap);
+          const allLeitura: any[] = [];
+          for (const batch of batches) {
+            const { data: leituraData } = await supabase
+              .from('os_comentarios_leitura')
+              .select('os_id, last_read_at')
+              .eq('usuario_id', usuario.id)
+              .in('os_id', batch);
+            if (leituraData) allLeitura.push(...leituraData);
           }
+
+          const readMap: Record<string, string> = {};
+          for (const l of allLeitura) {
+            if (l.os_id) readMap[l.os_id] = l.last_read_at;
+          }
+          setCommentReadMap(readMap);
         }
       }
 
