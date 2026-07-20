@@ -194,12 +194,19 @@ export function Cockpit() {
         oldestInStageOSLabel = oldestInStage.numero_os_samsung || oldestInStage.numero_os_interna || oldestInStage.id.slice(0, 8);
       }
 
-      // Count OS where pecas have valor_unitario < 0.01 (missing price)
+      // Count OS where pecas have valor_unitario < 0.01 (missing price) or no pecas at all
       let semCodigoOuValor = 0;
       const osComProblema: PecaIssueOS[] = [];
       cards.forEach(os => {
         const pecas = pecasMap.get(os.id);
-        if (pecas && pecas.length > 0) {
+        if (!pecas || pecas.length === 0) {
+          semCodigoOuValor++;
+          osComProblema.push({
+            osId: os.id,
+            osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+            pecas: [],
+          });
+        } else {
           const pecasComProblema = pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01);
           if (pecasComProblema.length > 0) {
             semCodigoOuValor++;
@@ -617,7 +624,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            OS Sem Valor nas Pecas ({osList.length})
+            OS Sem Codigo/Valor ({osList.length})
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
             <X className="w-4 h-4 text-gray-400" />
@@ -628,7 +635,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
             {osList.map(os => (
               <div key={os.osId} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-900/50 border border-gray-800/40">
                 <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
-                <span className="text-xs text-gray-500">{os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} peca(s)</span>
+                <span className="text-xs text-gray-500">{os.pecas.length === 0 ? 'Sem pecas' : `${os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} sem valor`}</span>
               </div>
             ))}
           </div>
