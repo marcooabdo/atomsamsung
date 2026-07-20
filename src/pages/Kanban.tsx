@@ -318,6 +318,8 @@ export function Kanban() {
       const canSeeAllUnits = (usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id;
       if (!canSeeAllUnits && usuario.unidade_id && !selectedUnidade && unidadesAdicionais.length === 0) {
         setSelectedUnidade(usuario.unidade_id);
+      } else if (!canSeeAllUnits && unidadesAdicionais.length > 0 && selectedUnidade === usuario.unidade_id) {
+        setSelectedUnidade('');
       } else {
         loadKanbanData();
       }
