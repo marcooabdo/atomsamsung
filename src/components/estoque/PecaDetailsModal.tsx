@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw, ShieldCheck, ShieldX } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw, ShieldCheck, ShieldX, Undo2 } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
@@ -303,6 +303,29 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const STATUS_COLORS = getStatusColors(neonGreen, themeAccent);
 
   const currentStatus = (pecaDetalhada as any)?.status || peca.status;
+
+  const handleCancelarDespacho = async () => {
+    if (!confirm('Cancelar despacho desta peca?\n\nEla voltara ao status "disponivel" no estoque.')) return;
+    try {
+      const { error } = await supabase
+        .from('estoque_pecas')
+        .update({ status: 'disponivel', gi_postada_em: null, gi_numero: null })
+        .eq('id', peca.id);
+      if (error) throw error;
+
+      await supabase.from('estoque_historico').insert({
+        peca_id: peca.id,
+        status_anterior: 'devolvida_samsung',
+        status_novo: 'disponivel',
+        observacao: 'Despacho cancelado manualmente - peca retornou ao estoque disponivel',
+      });
+
+      alert('Despacho cancelado. Peca esta disponivel novamente.');
+      onClose();
+    } catch (err: any) {
+      alert('Erro ao cancelar despacho: ' + (err?.message || err));
+    }
+  };
   const statusCfg = STATUS_COLORS[currentStatus] || { label: currentStatus, color: '#6B7280' };
   const osVinculada = pecaDetalhada?.os;
   const osLabel = osVinculada
@@ -834,6 +857,20 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             >
               <RotateCcw className="w-4 h-4" />
               Emitir NF Devolucao
+            </button>
+          )}
+          {currentStatus === 'devolvida_samsung' && (
+            <button
+              onClick={handleCancelarDespacho}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors"
+              style={{
+                background: 'rgba(245,158,11,0.12)',
+                border: '1px solid rgba(245,158,11,0.4)',
+                color: '#F59E0B',
+              }}
+            >
+              <Undo2 className="w-4 h-4" />
+              Cancelar Despacho
             </button>
           )}
           <button
