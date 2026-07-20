@@ -12,6 +12,7 @@ import {
   Key, Loader2, RefreshCw, Clock, ArrowRight
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
+import { NFPendenteDetailsModal } from './NFPendenteDetailsModal';
 import { LocationSelector } from './LocationSelector';
 
 interface EstoqueEntradaProps {
@@ -129,6 +130,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [nfsPendentes, setNfsPendentes] = useState<NF[]>([]);
   const [loadingPendentes, setLoadingPendentes] = useState(false);
   const [buscandoDistribuicao, setBuscandoDistribuicao] = useState(false);
+  const [selectedPendenteNF, setSelectedPendenteNF] = useState<NF | null>(null);
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
@@ -2010,11 +2012,18 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                 {nfsPendentes.map((nf: any) => (
                   <div
                     key={nf.id}
-                    className="rounded-xl p-4 transition-all hover:scale-[1.005]"
+                    className="rounded-xl p-4 transition-all hover:scale-[1.005] cursor-pointer"
                     style={{
                       background: 'var(--bg-card)',
                       border: '1px solid rgba(245,158,11,0.2)',
                       boxShadow: 'var(--card-shadow)',
+                    }}
+                    onClick={() => {
+                      if (nf.xml_conteudo) {
+                        setSelectedPendenteNF(nf);
+                      } else {
+                        alert('XML ainda nao disponivel para esta NF. Tente buscar pela chave de acesso.');
+                      }
                     }}
                   >
                     <div className="flex items-center justify-between">
@@ -2069,7 +2078,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                           </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={() => handleDarEntradaPendente(nf)}
                           className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all"
@@ -2115,6 +2124,20 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           </div>
         )}
       </div>
+
+      {/* Modal Detalhes da NF Pendente */}
+      {selectedPendenteNF && selectedPendenteNF.xml_conteudo && createPortal(
+        <NFPendenteDetailsModal
+          nf={selectedPendenteNF}
+          parseXML={parseXML}
+          onClose={() => setSelectedPendenteNF(null)}
+          onDarEntrada={() => {
+            setSelectedPendenteNF(null);
+            handleDarEntradaPendente(selectedPendenteNF);
+          }}
+        />,
+        document.body
+      )}
     </>
   );
 }
