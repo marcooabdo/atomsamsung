@@ -31,6 +31,7 @@ interface NF {
   created_at: string;
   xml_conteudo: string | null;
   delivery?: string | null;
+  unidade_id?: string | null;
 }
 
 interface RequisicaoPendente {
@@ -174,12 +175,14 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       let countQuery = supabase
         .from('estoque_nfs')
         .select('id', { count: 'exact', head: true })
-        .eq('unidade_id', unidadeFilter);
+        .eq('unidade_id', unidadeFilter)
+        .or('pendente_entrada.is.null,pendente_entrada.eq.false');
 
       let dataQuery = supabase
         .from('estoque_nfs')
         .select('*')
         .eq('unidade_id', unidadeFilter)
+        .or('pendente_entrada.is.null,pendente_entrada.eq.false')
         .order('created_at', { ascending: false });
 
       if (dateFrom) {
@@ -281,10 +284,10 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       if (result.xml) {
         const parsed = parseXML(result.xml);
-        setParsedNF(parsed);
-        setXmlContent(result.xml);
-        setShowPreview(true);
+        parsed.xmlContent = result.xml;
+        const unidadeId = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : '';
         setChaveAcesso('');
+        await openAllNFsPreview([parsed], unidadeId);
       } else {
         alert('NF localizada mas o XML não está disponível.');
       }
@@ -502,12 +505,13 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
   };
 
-  const handleDarEntradaPendente = (nf: NF) => {
+  const handleDarEntradaPendente = async (nf: NF) => {
     if (nf.xml_conteudo) {
       const parsed = parseXML(nf.xml_conteudo);
-      setParsedNF(parsed);
-      setXmlContent(nf.xml_conteudo);
-      setShowPreview(true);
+      parsed.xmlContent = nf.xml_conteudo;
+      const unidadeId = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : (nf.unidade_id || '');
+      setSelectedPendenteNF(null);
+      await openAllNFsPreview([parsed], unidadeId);
     } else {
       alert('Esta NF não possui XML disponível para dar entrada.');
     }
@@ -908,32 +912,52 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
         // Check for duplicate NF before inserting
         const duplicateCheck = nfData.chaveAcesso
-          ? await supabase.from('estoque_nfs').select('id, numero_nf').eq('chave_acesso', nfData.chaveAcesso).maybeSingle()
-          : await supabase.from('estoque_nfs').select('id, numero_nf').eq('numero_nf', nfData.numeroNF).eq('unidade_id', unidadeId).maybeSingle();
+          ? await supabase.from('estoque_nfs').select('id, numero_nf, pendente_entrada').eq('chave_acesso', nfData.chaveAcesso).maybeSingle()
+          : await supabase.from('estoque_nfs').select('id, numero_nf, pendente_entrada').eq('numero_nf', nfData.numeroNF).eq('unidade_id', unidadeId).maybeSingle();
+
+        let nfRecord: any;
 
         if (duplicateCheck.data) {
-          throw new Error(`NF ${nfData.numeroNF} ja foi importada anteriormente (ID: ${duplicateCheck.data.id}). Importe apenas NFs novas.`);
+          if (duplicateCheck.data.pendente_entrada) {
+            // Update existing pending NF to processed
+            const { data: updated, error: updateErr } = await supabase
+              .from('estoque_nfs')
+              .update({
+                processada: true,
+                processada_em: new Date().toISOString(),
+                processada_por: usuario?.id,
+                pendente_entrada: false,
+              })
+              .eq('id', duplicateCheck.data.id)
+              .select()
+              .single();
+            if (updateErr) throw updateErr;
+            nfRecord = updated;
+          } else {
+            throw new Error(`NF ${nfData.numeroNF} ja foi importada anteriormente (ID: ${duplicateCheck.data.id}). Importe apenas NFs novas.`);
+          }
+        } else {
+          const { data: inserted, error: nfError } = await supabase
+            .from('estoque_nfs')
+            .insert({
+              numero_nf: nfData.numeroNF,
+              chave_acesso: nfData.chaveAcesso,
+              fornecedor: nfData.fornecedor,
+              data_emissao: nfData.dataEmissao,
+              valor_total: nfData.valorTotal,
+              delivery: nfData.delivery,
+              xml_conteudo: nfData.xmlContent,
+              unidade_id: unidadeId,
+              processada: true,
+              processada_em: new Date().toISOString(),
+              processada_por: usuario?.id,
+              pendente_entrada: false,
+            })
+            .select()
+            .single();
+          if (nfError) throw nfError;
+          nfRecord = inserted;
         }
-
-        const { data: nfRecord, error: nfError } = await supabase
-          .from('estoque_nfs')
-          .insert({
-            numero_nf: nfData.numeroNF,
-            chave_acesso: nfData.chaveAcesso,
-            fornecedor: nfData.fornecedor,
-            data_emissao: nfData.dataEmissao,
-            valor_total: nfData.valorTotal,
-            delivery: nfData.delivery,
-            xml_conteudo: nfData.xmlContent,
-            unidade_id: unidadeId,
-            processada: true,
-            processada_em: new Date().toISOString(),
-            processada_por: usuario?.id,
-          })
-          .select()
-          .single();
-
-        if (nfError) throw nfError;
 
         let contador = 0;
         const osParaMover = new Set<string>();
@@ -1087,6 +1111,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       }
 
       loadNFs();
+      loadNFsPendentes();
     } catch (err: any) {
       setError(`Falha na importação: ${err.message}`);
     } finally {
@@ -1686,6 +1711,22 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                   }}
                 >
                   Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    setAllPecas(prev => prev.map(p => ({ ...p, os_alocada_id: '', os_alocada_numero: '' })));
+                    setTimeout(() => handleConfirmAllImport(), 100);
+                  }}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                  style={{
+                    background: 'rgba(245,158,11,0.12)',
+                    border: '1px solid rgba(245,158,11,0.3)',
+                    color: '#F59E0B',
+                  }}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  Entrada sem Vincular
                 </button>
                 <button
                   onClick={handleConfirmAllImport}
