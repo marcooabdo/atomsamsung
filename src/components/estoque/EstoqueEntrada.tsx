@@ -9,7 +9,7 @@ import {
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
   ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
   ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin,
-  Key, Loader2, RefreshCw, Clock, ArrowRight
+  Key, Loader2, RefreshCw, Clock, ArrowRight, Layers
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 import { NFPendenteDetailsModal } from './NFPendenteDetailsModal';
@@ -126,6 +126,12 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   // Chave de acesso search
   const [chaveAcesso, setChaveAcesso] = useState('');
   const [buscandoChave, setBuscandoChave] = useState(false);
+  // Bulk import
+  const [bulkMode, setBulkMode] = useState(false);
+  const [bulkChaves, setBulkChaves] = useState('');
+  const [bulkEntradaDireta, setBulkEntradaDireta] = useState(true);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ total: number; current: number; results: { chave: string; status: 'success' | 'error' | 'duplicate'; nf?: string; error?: string }[] }>({ total: 0, current: 0, results: [] });
   // Pendentes de entrada
   const [nfsPendentes, setNfsPendentes] = useState<NF[]>([]);
   const [loadingPendentes, setLoadingPendentes] = useState(false);
@@ -288,6 +294,175 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     } finally {
       setBuscandoChave(false);
     }
+  };
+
+  const handleBulkImport = async () => {
+    const lines = bulkChaves
+      .split(/[\n,;]+/)
+      .map(l => l.replace(/[^\d]/g, ''))
+      .filter(l => l.length === 44);
+
+    if (lines.length === 0) {
+      alert('Nenhuma chave de acesso valida encontrada. Cada chave deve ter 44 digitos.');
+      return;
+    }
+
+    const uniqueChaves = [...new Set(lines)];
+    if (!confirm(`Processar ${uniqueChaves.length} chave(s) de acesso?\n\nModo: ${bulkEntradaDireta ? 'Entrada direta no estoque (sem vincular OS)' : 'Vincular com OS pendentes'}`)) return;
+
+    setBulkProcessing(true);
+    setBulkProgress({ total: uniqueChaves.length, current: 0, results: [] });
+
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    let cnpjToSend: string | null = null;
+    if (selectedUnidade && selectedUnidade !== 'todas') {
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('cnpj')
+        .eq('id', selectedUnidade)
+        .single();
+      if (unidadeData?.cnpj) cnpjToSend = unidadeData.cnpj;
+    }
+
+    const results: typeof bulkProgress.results = [];
+
+    for (let i = 0; i < uniqueChaves.length; i++) {
+      const chave = uniqueChaves[i];
+      setBulkProgress(prev => ({ ...prev, current: i + 1 }));
+
+      try {
+        // Check if already imported
+        const { data: existing } = await supabase
+          .from('estoque_nfs')
+          .select('id, numero_nf')
+          .eq('chave_acesso', chave)
+          .maybeSingle();
+
+        if (existing) {
+          results.push({ chave, status: 'duplicate', nf: existing.numero_nf });
+          setBulkProgress(prev => ({ ...prev, results: [...results] }));
+          continue;
+        }
+
+        // Fetch XML from Nuvem Fiscal
+        const response = await fetch(`${supabaseUrl}/functions/v1/consultar-nf-nuvemfiscal`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseKey}`,
+            'apikey': supabaseKey,
+          },
+          body: JSON.stringify({ chaveAcesso: chave, cnpj: cnpjToSend }),
+        });
+
+        const result = await response.json();
+
+        if (!result.success || !result.xml) {
+          results.push({ chave, status: 'error', error: result.error || 'XML nao encontrado' });
+          setBulkProgress(prev => ({ ...prev, results: [...results] }));
+          continue;
+        }
+
+        // Parse the XML
+        const parsed = parseXML(result.xml);
+
+        // Insert NF
+        const unidadeId = selectedUnidade && selectedUnidade !== 'todas' ? selectedUnidade : null;
+
+        if (bulkEntradaDireta) {
+          // Entrada direta: process NF and parts immediately as "disponivel"
+          const { data: nfInserted, error: nfErr } = await supabase
+            .from('estoque_nfs')
+            .insert({
+              numero_nf: parsed.numeroNF,
+              chave_acesso: parsed.chaveAcesso,
+              fornecedor: parsed.fornecedor,
+              data_emissao: parsed.dataEmissao || new Date().toISOString().slice(0, 10),
+              valor_total: parsed.valorTotal,
+              xml_conteudo: result.xml,
+              delivery: parsed.delivery || result.delivery || null,
+              processada: true,
+              processada_em: new Date().toISOString(),
+              processada_por: user?.id || null,
+              unidade_id: unidadeId,
+              pendente_entrada: false,
+            })
+            .select('id')
+            .single();
+
+          if (nfErr || !nfInserted) {
+            results.push({ chave, status: 'error', error: nfErr?.message || 'Erro ao inserir NF' });
+            setBulkProgress(prev => ({ ...prev, results: [...results] }));
+            continue;
+          }
+
+          // Insert pecas as disponivel
+          const pecasToInsert = parsed.produtos.map(p => ({
+            pn: p.pn,
+            descricao: p.descricao,
+            quantidade: p.quantidade,
+            valor_unitario: p.valorUnitario,
+            valor_com_impostos: p.valorComImpostos,
+            nf_id: nfInserted.id,
+            unidade_id: unidadeId,
+            data_entrada: new Date().toISOString(),
+            status: 'disponivel',
+            icms_valor: p.taxes.icms?.valor || null,
+            icms_aliquota: p.taxes.icms?.aliquota || null,
+            icms_st_valor: p.taxes.icms_st?.valor || null,
+            icms_st_aliquota: p.taxes.icms_st?.aliquota || null,
+            ipi_valor: p.taxes.ipi?.valor || null,
+            ipi_aliquota: p.taxes.ipi?.aliquota || null,
+            pis_valor: p.taxes.pis?.valor || null,
+            pis_aliquota: p.taxes.pis?.aliquota || null,
+            cofins_valor: p.taxes.cofins?.valor || null,
+            cofins_aliquota: p.taxes.cofins?.aliquota || null,
+          }));
+
+          const { error: pecasErr } = await supabase
+            .from('estoque_pecas')
+            .insert(pecasToInsert);
+
+          if (pecasErr) {
+            results.push({ chave, status: 'error', nf: parsed.numeroNF, error: 'NF salva mas erro nas pecas: ' + pecasErr.message });
+          } else {
+            results.push({ chave, status: 'success', nf: parsed.numeroNF });
+          }
+        } else {
+          // Vincular com OS: save as pendente for manual linking
+          const { error: nfErr } = await supabase
+            .from('estoque_nfs')
+            .insert({
+              numero_nf: parsed.numeroNF,
+              chave_acesso: parsed.chaveAcesso,
+              fornecedor: parsed.fornecedor,
+              data_emissao: parsed.dataEmissao || new Date().toISOString().slice(0, 10),
+              valor_total: parsed.valorTotal,
+              xml_conteudo: result.xml,
+              delivery: parsed.delivery || result.delivery || null,
+              processada: false,
+              unidade_id: unidadeId,
+              pendente_entrada: true,
+            });
+
+          if (nfErr) {
+            results.push({ chave, status: 'error', error: nfErr?.message || 'Erro ao inserir NF' });
+          } else {
+            results.push({ chave, status: 'success', nf: parsed.numeroNF });
+          }
+        }
+        setBulkProgress(prev => ({ ...prev, results: [...results] }));
+      } catch (err: any) {
+        results.push({ chave, status: 'error', error: err?.message || 'Erro desconhecido' });
+        setBulkProgress(prev => ({ ...prev, results: [...results] }));
+      }
+    }
+
+    setBulkProcessing(false);
+    loadNFs(0, '', '', '');
+    loadNFsPendentes();
   };
 
   const handleBuscarDistribuicao = async () => {
@@ -1675,51 +1850,205 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               <Key className="w-6 h-6" style={{ color: 'var(--text-accent)' }} />
             </div>
             <div className="flex-1">
-              <h4 className="font-black text-base tracking-wide mb-1" style={{ color: 'var(--text-accent)' }}>
-                CONSULTA POR CHAVE DE ACESSO
-              </h4>
-              <p className="text-sm text-gray-400 mb-4 leading-relaxed">
-                Cole a chave de acesso (44 digitos) da NF-e para buscar automaticamente via Nuvem Fiscal.
-              </p>
-              <div className="flex items-center gap-3">
-                <input
-                  type="text"
-                  value={chaveAcesso}
-                  onChange={(e) => setChaveAcesso(e.target.value.replace(/[^\d]/g, '').slice(0, 44))}
-                  placeholder="Cole a chave de acesso (44 dígitos)"
-                  maxLength={44}
-                  className="flex-1 px-4 py-2.5 rounded-lg text-sm font-mono focus:outline-none transition-all"
-                  style={{
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid rgba(var(--accent-rgb),0.25)',
-                    color: 'var(--text-primary)',
-                  }}
-                  onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.5)'; }}
-                  onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.25)'; }}
-                  disabled={buscandoChave}
-                />
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="font-black text-base tracking-wide" style={{ color: 'var(--text-accent)' }}>
+                  CONSULTA POR CHAVE DE ACESSO
+                </h4>
                 <button
-                  onClick={handleBuscarPorChave}
-                  disabled={buscandoChave || chaveAcesso.length !== 44}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  onClick={() => setBulkMode(!bulkMode)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
                   style={{
-                    background: 'rgba(var(--accent-rgb),0.12)',
-                    border: '1px solid rgba(var(--accent-rgb),0.4)',
-                    color: 'var(--text-accent)',
+                    background: bulkMode ? 'rgba(245,158,11,0.15)' : 'rgba(var(--accent-rgb),0.08)',
+                    border: bulkMode ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(var(--accent-rgb),0.2)',
+                    color: bulkMode ? '#F59E0B' : 'var(--text-secondary)',
                   }}
                 >
-                  {buscandoChave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                  {buscandoChave ? 'Buscando...' : 'Buscar NF'}
+                  <Layers className="w-3.5 h-3.5" />
+                  {bulkMode ? 'Modo Lote' : 'Importar em Lote'}
                 </button>
               </div>
-              {chaveAcesso.length > 0 && chaveAcesso.length < 44 && (
-                <p className="text-[11px] mt-2" style={{ color: 'var(--text-secondary)' }}>
-                  {chaveAcesso.length}/44 dígitos
-                </p>
+
+              {!bulkMode ? (
+                <>
+                  <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                    Cole a chave de acesso (44 digitos) da NF-e para buscar automaticamente via Nuvem Fiscal.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="text"
+                      value={chaveAcesso}
+                      onChange={(e) => setChaveAcesso(e.target.value.replace(/[^\d]/g, '').slice(0, 44))}
+                      placeholder="Cole a chave de acesso (44 dígitos)"
+                      maxLength={44}
+                      className="flex-1 px-4 py-2.5 rounded-lg text-sm font-mono focus:outline-none transition-all"
+                      style={{
+                        background: 'var(--bg-secondary)',
+                        border: '1px solid rgba(var(--accent-rgb),0.25)',
+                        color: 'var(--text-primary)',
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.5)'; }}
+                      onBlur={(e) => { e.currentTarget.style.borderColor = 'rgba(var(--accent-rgb),0.25)'; }}
+                      disabled={buscandoChave}
+                    />
+                    <button
+                      onClick={handleBuscarPorChave}
+                      disabled={buscandoChave || chaveAcesso.length !== 44}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: 'rgba(var(--accent-rgb),0.12)',
+                        border: '1px solid rgba(var(--accent-rgb),0.4)',
+                        color: 'var(--text-accent)',
+                      }}
+                    >
+                      {buscandoChave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      {buscandoChave ? 'Buscando...' : 'Buscar NF'}
+                    </button>
+                  </div>
+                  {chaveAcesso.length > 0 && chaveAcesso.length < 44 && (
+                    <p className="text-[11px] mt-2" style={{ color: 'var(--text-secondary)' }}>
+                      {chaveAcesso.length}/44 dígitos
+                    </p>
+                  )}
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-gray-400 mb-4 leading-relaxed">
+                    Cole varias chaves de acesso (uma por linha). A GIA buscara e dara entrada em todas automaticamente.
+                  </p>
+                  <textarea
+                    value={bulkChaves}
+                    onChange={(e) => setBulkChaves(e.target.value)}
+                    placeholder={"Cole as chaves de acesso aqui (uma por linha):\n35260700280273002938550040038342251705584790\n35260700280273002938550040038342261705584791\n..."}
+                    rows={6}
+                    className="w-full px-4 py-3 rounded-xl text-xs font-mono focus:outline-none transition-all resize-y"
+                    style={{
+                      background: 'var(--bg-secondary)',
+                      border: '1px solid rgba(245,158,11,0.25)',
+                      color: 'var(--text-primary)',
+                      minHeight: '120px',
+                    }}
+                    disabled={bulkProcessing}
+                  />
+                  <div className="flex items-center justify-between mt-3 gap-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-secondary)' }}>Modo de entrada:</span>
+                      <div className="flex rounded-lg overflow-hidden" style={{ border: '1px solid var(--border-primary)' }}>
+                        <button
+                          onClick={() => setBulkEntradaDireta(true)}
+                          className="px-3 py-1.5 text-xs font-bold transition-all"
+                          style={{
+                            background: bulkEntradaDireta ? 'rgba(16,185,129,0.15)' : 'transparent',
+                            color: bulkEntradaDireta ? '#10B981' : 'var(--text-secondary)',
+                            borderRight: '1px solid var(--border-primary)',
+                          }}
+                        >
+                          Entrada Direta (Estoque)
+                        </button>
+                        <button
+                          onClick={() => setBulkEntradaDireta(false)}
+                          className="px-3 py-1.5 text-xs font-bold transition-all"
+                          style={{
+                            background: !bulkEntradaDireta ? 'rgba(59,130,246,0.15)' : 'transparent',
+                            color: !bulkEntradaDireta ? '#3B82F6' : 'var(--text-secondary)',
+                          }}
+                        >
+                          Vincular com OS + GIA
+                        </button>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {bulkChaves.split(/[\n,;]+/).map(l => l.replace(/[^\d]/g, '')).filter(l => l.length === 44).length} chave(s) valida(s)
+                      </span>
+                      <button
+                        onClick={handleBulkImport}
+                        disabled={bulkProcessing || bulkChaves.split(/[\n,;]+/).map(l => l.replace(/[^\d]/g, '')).filter(l => l.length === 44).length === 0}
+                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        style={{
+                          background: bulkProcessing ? 'rgba(245,158,11,0.15)' : 'rgba(var(--accent-rgb),0.12)',
+                          border: bulkProcessing ? '1px solid rgba(245,158,11,0.4)' : '1px solid rgba(var(--accent-rgb),0.4)',
+                          color: bulkProcessing ? '#F59E0B' : 'var(--text-accent)',
+                        }}
+                      >
+                        {bulkProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+                        {bulkProcessing ? `Processando ${bulkProgress.current}/${bulkProgress.total}...` : 'Importar Tudo'}
+                      </button>
+                    </div>
+                  </div>
+                  {bulkEntradaDireta && (
+                    <p className="text-[11px] mt-2 px-1" style={{ color: '#10B981' }}>
+                      Todas as pecas serao registradas como "disponivel" no estoque sem vinculacao com OS.
+                    </p>
+                  )}
+                  {!bulkEntradaDireta && (
+                    <p className="text-[11px] mt-2 px-1" style={{ color: '#3B82F6' }}>
+                      As NFs serao salvas como pendentes para voce vincular as pecas com as OS individualmente.
+                    </p>
+                  )}
+                </>
               )}
             </div>
           </div>
         </div>
+
+        {/* Bulk Progress Results */}
+        {bulkProgress.results.length > 0 && (
+          <div className="rounded-2xl p-5" style={{ background: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+                Resultado da Importacao em Lote
+              </h4>
+              <div className="flex items-center gap-3 text-xs">
+                <span style={{ color: '#10B981' }}>{bulkProgress.results.filter(r => r.status === 'success').length} OK</span>
+                <span style={{ color: '#F59E0B' }}>{bulkProgress.results.filter(r => r.status === 'duplicate').length} Duplicadas</span>
+                <span style={{ color: '#EF4444' }}>{bulkProgress.results.filter(r => r.status === 'error').length} Erros</span>
+              </div>
+            </div>
+            {bulkProcessing && (
+              <div className="mb-3">
+                <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${(bulkProgress.current / bulkProgress.total) * 100}%`,
+                      background: 'linear-gradient(90deg, #10B981, #3B82F6)',
+                    }}
+                  />
+                </div>
+                <p className="text-[10px] mt-1" style={{ color: 'var(--text-muted)' }}>
+                  {bulkProgress.current} de {bulkProgress.total} processada(s)
+                </p>
+              </div>
+            )}
+            <div className="max-h-[200px] overflow-y-auto space-y-1">
+              {bulkProgress.results.map((r, i) => (
+                <div key={i} className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs" style={{ background: 'var(--bg-secondary)' }}>
+                  <div className="w-2 h-2 rounded-full shrink-0" style={{
+                    background: r.status === 'success' ? '#10B981' : r.status === 'duplicate' ? '#F59E0B' : '#EF4444'
+                  }} />
+                  <span className="font-mono truncate" style={{ color: 'var(--text-secondary)', maxWidth: '300px' }}>
+                    ...{r.chave.slice(-12)}
+                  </span>
+                  {r.nf && <span className="font-bold" style={{ color: 'var(--text-primary)' }}>NF {r.nf}</span>}
+                  <span className="ml-auto shrink-0" style={{
+                    color: r.status === 'success' ? '#10B981' : r.status === 'duplicate' ? '#F59E0B' : '#EF4444'
+                  }}>
+                    {r.status === 'success' ? 'Importada' : r.status === 'duplicate' ? 'Ja existe' : r.error?.slice(0, 40)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            {!bulkProcessing && (
+              <button
+                onClick={() => { setBulkProgress({ total: 0, current: 0, results: [] }); setBulkChaves(''); }}
+                className="mt-3 px-4 py-2 rounded-lg text-xs font-bold transition-all"
+                style={{ background: 'var(--bg-secondary)', color: 'var(--text-secondary)', border: '1px solid var(--border-primary)' }}
+              >
+                Limpar Resultados
+              </button>
+            )}
+          </div>
+        )}
 
         {error && (
           <div
