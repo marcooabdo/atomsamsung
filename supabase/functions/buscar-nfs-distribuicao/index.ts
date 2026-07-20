@@ -116,7 +116,7 @@ Deno.serve(async (req: Request) => {
 
       try {
         // Fetch ALL documents from distribution (production, last 50)
-        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&ambiente=1&$top=50&$orderby=dh_emissao desc`;
+        const distUrl = `${NUVEM_FISCAL_API}/distribuicao/nfe/documentos?cpf_cnpj=${cnpj}&ambiente=producao&$top=50&$orderby=dh_emissao desc`;
         resultItem.erros.push(`URL: ${distUrl}`);
 
         const distResponse = await fetch(distUrl, {
