@@ -1202,7 +1202,8 @@ export function Configuracoes() {
                       </p>
                     )}
                   </div>
-                  {/* Unidades Adicionais */}
+                  {/* Unidades Adicionais - apenas master pode configurar */}
+                  {usuarioLogado?.tipo === 'master' && (
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">
                       Unidades Adicionais
@@ -1238,6 +1239,7 @@ export function Configuracoes() {
                       </p>
                     )}
                   </div>
+                  )}
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id="ativo" checked={formUsuario.ativo} onChange={(e) => setFormUsuario({...formUsuario, ativo: e.target.checked})} className="w-4 h-4" />
                     <label htmlFor="ativo" className="text-sm text-gray-300">Usuário Ativo</label>

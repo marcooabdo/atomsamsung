@@ -46,26 +46,25 @@ Deno.serve(async (req: Request) => {
     });
 
     const token = authHeader.replace('Bearer ', '');
-    const anonKey = Deno.env.get('SUPABASE_ANON_KEY') || supabaseServiceKey;
 
-    const supabaseUser = createClient(supabaseUrl, anonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      },
-      global: {
-        headers: { Authorization: `Bearer ${token}` }
+    // Decode JWT payload to extract user ID
+    let requestingUserId: string;
+    try {
+      const payloadBase64 = token.split('.')[1];
+      const payloadJson = atob(payloadBase64.replace(/-/g, '+').replace(/_/g, '/'));
+      const payload = JSON.parse(payloadJson);
+      requestingUserId = payload.sub;
+      if (!requestingUserId) throw new Error('No sub in token');
+      // Check token expiration
+      if (payload.exp && payload.exp < Math.floor(Date.now() / 1000)) {
+        throw new Error('Token expired');
       }
-    });
-
-    const { data: { user: requestingUser }, error: authError } = await supabaseUser.auth.getUser();
-
-    if (authError || !requestingUser) {
+    } catch (e) {
       return new Response(
         JSON.stringify({
           success: false,
           error: 'Nao autenticado ou token invalido',
-          details: authError?.message
+          details: e.message
         }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -74,7 +73,7 @@ Deno.serve(async (req: Request) => {
     const { data: requestingUsuario, error: usuarioError } = await supabaseAdmin
       .from('usuarios')
       .select('tipo')
-      .eq('id', requestingUser.id)
+      .eq('id', requestingUserId)
       .single();
 
     if (usuarioError || !requestingUsuario) {
@@ -229,7 +228,7 @@ Deno.serve(async (req: Request) => {
         throw new Error('ID do usuario e obrigatorio para exclusao');
       }
 
-      if (user_id === requestingUser.id) {
+      if (user_id === requestingUserId) {
         throw new Error('Voce nao pode excluir seu proprio usuario');
       }
 
