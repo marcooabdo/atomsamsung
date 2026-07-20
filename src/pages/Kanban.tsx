@@ -105,6 +105,7 @@ const COLUNAS_IH = [
   'rota_amarela',
   'rota_laranja',
   'em_rota_ih',
+  'em_reparo_ih',
   'instalacao_inicial',
   'service_handling',
   'return_handling',
