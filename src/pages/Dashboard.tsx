@@ -102,7 +102,7 @@ const KANBAN_LABELS: Record<string, { label: string; color: string }> = {
 };
 
 export function Dashboard() {
-  const { usuario } = useAuth();
+  const { usuario, unidadesAdicionais, allUserUnits } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalOS: 0,
     totalOSLP: 0,
@@ -140,11 +140,12 @@ export function Dashboard() {
     loadUnidades();
   }, []);
 
+
   useEffect(() => {
-    if (usuario && usuario.unidade_id && !selectedUnidade) {
+    if (usuario && usuario.unidade_id && !selectedUnidade && unidadesAdicionais.length === 0) {
       setSelectedUnidade(usuario.unidade_id);
     }
-  }, [usuario]);
+  }, [usuario, unidadesAdicionais]);
 
   useEffect(() => {
     if (usuario) {
@@ -161,7 +162,8 @@ export function Dashboard() {
     try {
       setLoading(true);
       const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
-      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : usuario?.unidade_id);
+      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : (allUserUnits.length > 1 ? null : usuario?.unidade_id));
+      const multiUnits = !selectedUnidade && !canSeeAllUnits && allUserUnits.length > 1 ? allUserUnits : null;
 
       const osList = await fetchAllPages<Record<string, unknown>>((from, to) => {
         let q = supabase
@@ -170,7 +172,8 @@ export function Dashboard() {
           .gte('created_at', `${dataInicio}T00:00:00`)
           .lte('created_at', `${dataFim}T23:59:59`)
           .range(from, to);
-        if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
+        if (multiUnits) q = q.in('unidade_id', multiUnits);
+        else if (unidadeFilter) q = q.eq('unidade_id', unidadeFilter);
         return q;
       }) as any[];
 
@@ -387,7 +390,8 @@ export function Dashboard() {
   const loadPerformanceDetails = async (type: 'eficiencia' | 'aprovacao') => {
     try {
       const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
-      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : usuario?.unidade_id);
+      const unidadeFilter = selectedUnidade || (canSeeAllUnits ? null : (allUserUnits.length > 1 ? null : usuario?.unidade_id));
+      const multiUnits = !selectedUnidade && !canSeeAllUnits && allUserUnits.length > 1 ? allUserUnits : null;
 
       if (type === 'aprovacao') {
         let cotacoesQuery = supabase
@@ -398,7 +402,9 @@ export function Dashboard() {
           .eq('tipo_os', 'OW')
           .in('status', ['aprovada', 'reprovada', 'reprovada_refeita']);
 
-        if (unidadeFilter) {
+        if (multiUnits) {
+          cotacoesQuery = cotacoesQuery.in('unidade_id', multiUnits);
+        } else if (unidadeFilter) {
           cotacoesQuery = cotacoesQuery.eq('unidade_id', unidadeFilter);
         }
 
@@ -413,7 +419,9 @@ export function Dashboard() {
           .eq('tipo_os', 'OW')
           .not('orcamento_aprovado_em', 'is', null);
 
-        if (unidadeFilter) {
+        if (multiUnits) {
+          osQuery = osQuery.in('unidade_id', multiUnits);
+        } else if (unidadeFilter) {
           osQuery = osQuery.eq('unidade_id', unidadeFilter);
         }
 

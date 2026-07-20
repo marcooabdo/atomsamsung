@@ -13,7 +13,7 @@ import { EstoqueCreditoGSPN } from '../components/estoque/EstoqueCreditoGSPN';
 type Tab = 'geral' | 'entrada' | 'transferencias' | 'devolucoes' | 'mapa' | 'credito_gspn';
 
 export function Estoque() {
-  const { user } = useAuth();
+  const { user, allUserUnits } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('geral');
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
@@ -23,10 +23,10 @@ export function Estoque() {
   }, []);
 
   useEffect(() => {
-    if (user?.unidade_id) {
+    if (user?.unidade_id && allUserUnits.length <= 1) {
       setSelectedUnidade(user.unidade_id);
     }
-  }, [user]);
+  }, [user, allUserUnits]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');

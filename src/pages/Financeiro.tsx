@@ -21,7 +21,7 @@ const TABS = [
 ];
 
 export function Financeiro() {
-  const { usuario } = useAuth();
+  const { usuario, unidadesAdicionais, allUserUnits } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -38,27 +38,29 @@ export function Financeiro() {
 
   useEffect(() => {
     if (usuario) {
-      if (usuario.tipo === 'master' || usuario.tipo === 'diretoria') {
+      if ((usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id) {
         return;
       }
-      if (usuario.unidade_id) {
+      if (usuario.unidade_id && allUserUnits.length <= 1) {
         setSelectedUnidade(usuario.unidade_id);
       }
     }
-  }, [usuario]);
+  }, [usuario, allUserUnits]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
     setUnidades(data || []);
   };
 
-  const canSelectUnit = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
+  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const hasMultipleUnits = allUserUnits.length > 1;
+  const canSelectUnit = canSeeAllUnits || hasMultipleUnits;
 
   const getUnidadeIdForQuery = () => {
-    if (canSelectUnit) {
+    if (canSeeAllUnits) {
       return selectedUnidade || null;
     }
-    return usuario?.unidade_id || null;
+    return selectedUnidade || usuario?.unidade_id || null;
   };
 
   return (
@@ -81,7 +83,7 @@ export function Financeiro() {
 
           {canSelectUnit && (
             <UnitFilter
-              unidades={unidades}
+              unidades={canSeeAllUnits ? unidades : unidades.filter(u => allUserUnits.includes(u.id))}
               selectedUnidade={selectedUnidade}
               onUnidadeChange={setSelectedUnidade}
             />

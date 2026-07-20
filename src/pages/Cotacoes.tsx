@@ -13,7 +13,7 @@ type Cotacao = Database['public']['Tables']['cotacoes']['Row'] & {
 };
 
 export function Cotacoes() {
-  const { usuario, user } = useAuth();
+  const { usuario, user, allUserUnits } = useAuth();
   const [cotacoes, setCotacoes] = useState<Cotacao[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +21,7 @@ export function Cotacoes() {
   const [showModal, setShowModal] = useState(false);
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
+  const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
   const [menuAberto, setMenuAberto] = useState<string | null>(null);
   const [editandoCotacaoId, setEditandoCotacaoId] = useState<string | null>(null);
   const [showComentarioModal, setShowComentarioModal] = useState(false);
@@ -36,7 +37,7 @@ export function Cotacoes() {
 
   useEffect(() => {
     if (user) {
-      if (user.unidade_id) {
+      if (user.unidade_id && allUserUnits.length <= 1) {
         setSelectedUnidade(user.unidade_id);
       }
       loadCotacoes();
@@ -50,19 +51,22 @@ export function Cotacoes() {
 
   const loadCotacoes = async () => {
     try {
-      const unidadeFilter = selectedUnidade || (user?.unidade_id || null);
-      const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
-
       let query = supabase
         .from('cotacoes')
         .select('*')
         .in('status', ['pendente_preenchimento', 'enviada', 'reprovada'])
         .order('created_at', { ascending: false });
 
-      if (!canSeeAllUnits && unidadeFilter) {
-        query = query.eq('unidade_id', unidadeFilter);
+      if (canSeeAllUnits) {
+        if (selectedUnidade) {
+          query = query.eq('unidade_id', selectedUnidade);
+        }
       } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
+      } else if (allUserUnits.length > 1) {
+        query = query.in('unidade_id', allUserUnits);
+      } else if (usuario?.unidade_id) {
+        query = query.eq('unidade_id', usuario.unidade_id);
       }
 
       if (statusFilter !== 'all') {
@@ -1195,11 +1199,13 @@ Assistencia Tecnica Samsung`;
 
   return (
     <>
-      <UnitFilter
-        unidades={unidades}
-        selectedUnidade={selectedUnidade}
-        onUnidadeChange={setSelectedUnidade}
-      />
+      {(canSeeAllUnits || allUserUnits.length > 1) && (
+        <UnitFilter
+          unidades={canSeeAllUnits ? unidades : unidades.filter(u => allUserUnits.includes(u.id))}
+          selectedUnidade={selectedUnidade}
+          onUnidadeChange={setSelectedUnidade}
+        />
+      )}
 
       <CotacaoModal
         isOpen={showModal || showComentarioModal}

@@ -24,7 +24,7 @@ type OS = {
 const PAGE_SIZE = 50;
 
 export function OSArquivadas() {
-  const { usuario } = useAuth();
+  const { usuario, allUserUnits } = useAuth();
   const [os, setOs] = useState<OS[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -65,12 +65,14 @@ export function OSArquivadas() {
         `, { count: 'exact' })
         .eq('arquivada', true);
 
-      if (!canSeeAllUnits) {
-        if (usuario?.unidade_id) {
+      if (selectedUnidade) {
+        query = query.eq('unidade_id', selectedUnidade);
+      } else if (!canSeeAllUnits) {
+        if (allUserUnits.length > 1) {
+          query = query.in('unidade_id', allUserUnits);
+        } else if (usuario?.unidade_id) {
           query = query.eq('unidade_id', usuario.unidade_id);
         }
-      } else if (selectedUnidade) {
-        query = query.eq('unidade_id', selectedUnidade);
       }
 
       if (searchTerm.trim()) {
@@ -92,7 +94,7 @@ export function OSArquivadas() {
     } finally {
       setLoading(false);
     }
-  }, [canSeeAllUnits, selectedUnidade, searchTerm, usuario?.unidade_id]);
+  }, [canSeeAllUnits, selectedUnidade, searchTerm, usuario?.unidade_id, allUserUnits]);
 
   useEffect(() => {
     setPage(0);
@@ -151,9 +153,9 @@ export function OSArquivadas() {
         </div>
 
         <div className="flex items-center gap-3 flex-wrap">
-          {canSeeAllUnits && (
+          {(canSeeAllUnits || allUserUnits.length > 1) && (
             <UnitFilter
-              unidades={unidades}
+              unidades={canSeeAllUnits ? unidades : unidades.filter(u => allUserUnits.includes(u.id))}
               selectedUnidade={selectedUnidade}
               onUnidadeChange={setSelectedUnidade}
             />
