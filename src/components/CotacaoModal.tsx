@@ -1351,7 +1351,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
     const confirmacao = confirm(
       'ENVIAR PARA DIAGNOSTICO\n\n' +
       'Ao confirmar, todos os dados serao salvos e uma OS sera criada no Kanban na coluna DIAGNOSTICO.\n\n' +
-      'O tecnico ira analisar o aparelho e adicionar as pecas necessarias.\n\n' +
+      'O técnico irá analisar o aparelho e adicionar as peças necessárias.\n\n' +
       'Deseja continuar?'
     );
 
@@ -1488,7 +1488,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
         .eq('id', cotacaoIdFinal)
         .single();
 
-      if (!cotacao) throw new Error('Cotacao nao encontrada');
+      if (!cotacao) throw new Error('Cotação não encontrada');
 
       const valorPecas = pecas.reduce((sum, p) => sum + (p.valor_final_unitario * p.quantidade), 0);
       const valorServicos = servicosItems.reduce((sum, s) => sum + (s.valor_unitario * s.quantidade), 0);
@@ -1549,7 +1549,7 @@ export function CotacaoModal({ isOpen, onClose, onSave, cotacaoId, abrirNaAbaCom
       await supabase.from('cotacao_comentarios').insert({
         cotacao_id: cotacaoIdFinal,
         usuario_id: usuario?.id,
-        texto: `Cotacao enviada para DIAGNOSTICO no Kanban por ${usuario?.nome || 'Sistema'}`,
+        texto: `Cotação enviada para DIAGNÓSTICO no Kanban por ${usuario?.nome || 'Sistema'}`,
         is_system: true
       });
 

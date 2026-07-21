@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck, Edit2 } from 'lucide-react';
+import { Star, Trophy, Users, BookOpen, Award, Layers, Settings, UserPlus, Trash2, ChevronDown, ChevronUp, FileCheck, CreditCard as Edit2 } from 'lucide-react';
 import { useSkywalker } from '../contexts/SkywalkerContext';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -707,7 +707,7 @@ function ProfissionaisTab() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Meses Consecutivos Validos</label>
+                <label className="block text-sm font-medium mb-1" style={{ color: 'var(--text-primary)' }}>Meses Consecutivos Válidos</label>
                 <input
                   type="number"
                   min="0"

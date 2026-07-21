@@ -554,7 +554,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
     const formattedPhone = formatPhoneNumber(phone);
     if (formattedPhone.length < 10) {
-      setWhatsAppError('Numero de telefone invalido');
+      setWhatsAppError('Número de telefone inválido');
       return;
     }
 
@@ -1126,7 +1126,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
     const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
     if (isNaN(valorNum) || valorNum < 0) {
-      showAlert({ message: 'Valor invalido', type: 'warning' });
+      showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
     }
 
@@ -1167,7 +1167,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
     const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
     if (isNaN(valorNum) || valorNum < 0) {
-      showAlert({ message: 'Valor total invalido', type: 'warning' });
+      showAlert({ message: 'Valor total inválido', type: 'warning' });
       return;
     }
 
@@ -1269,7 +1269,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
     const valorGSPNNum = parseFloat(sanitizeGSPNValue(novaPecaValorGSPN));
     if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
-      showAlert({ message: 'Valor invalido', type: 'warning' });
+      showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
     }
 
@@ -2208,7 +2208,7 @@ Não haverá cobrança ao cliente.`
     }
 
     const confirmacao = confirm(
-      'CONCLUIR ANALISE TECNICA\n\n' +
+      'CONCLUIR ANÁLISE TÉCNICA\n\n' +
       'Ao confirmar, a OS será movida para a aba Cotações como "Refazer Orçamento".\n\n' +
       'A cotação ficará marcada como "Análise feita pelo técnico" para facilitar o preenchimento.\n\n' +
       'Deseja continuar?'
@@ -2253,8 +2253,8 @@ Não haverá cobrança ao cliente.`
       setTimeout(() => {
         onReload?.();
         alert(
-          'ANALISE CONCLUIDA!\n\n' +
-          'A cotacao foi atualizada e esta disponivel na aba Cotacoes.\n\n' +
+          'ANÁLISE CONCLUÍDA!\n\n' +
+          'A cotação foi atualizada e está disponível na aba Cotações.\n\n' +
           'Agora e so precificar as pecas e enviar o orcamento ao cliente.'
         );
       }, 100);
@@ -3258,7 +3258,7 @@ Não haverá cobrança ao cliente.`
               {(() => {
                 const camposFaltantes: string[] = [];
                 if (!os.defeito_relatado) camposFaltantes.push('Defeito Relatado');
-                if (!os.diagnostico_tecnico) camposFaltantes.push('Diagnostico Tecnico');
+                if (!os.diagnostico_tecnico) camposFaltantes.push('Diagnóstico Técnico');
                 if (!os.reparo_efetuado) camposFaltantes.push('Reparo Efetuado');
                 if (camposFaltantes.length === 0) return null;
                 return (
@@ -3813,7 +3813,7 @@ Não haverá cobrança ao cliente.`
                   <div>
                     <div className="flex items-center justify-between">
                       <label className={`text-xs uppercase ${os.diagnostico_tecnico ? 'text-gray-500' : 'text-amber-500/70'}`}>
-                        Diagnostico Tecnico
+                        Diagnóstico Técnico
                         {!os.diagnostico_tecnico && <span className="text-amber-500 ml-1">(pendente)</span>}
                       </label>
                       {!editandoDiagnostico && (
@@ -3842,7 +3842,7 @@ Não haverá cobrança ao cliente.`
                       </div>
                     ) : (
                       <p className={`text-sm mt-1 whitespace-pre-wrap ${os.diagnostico_tecnico ? 'text-gray-300' : 'text-gray-600 italic'}`}>
-                        {os.diagnostico_tecnico || 'Preenchido automaticamente ao concluir analise tecnica'}
+                        {os.diagnostico_tecnico || 'Preenchido automaticamente ao concluir análise técnica'}
                       </p>
                     )}
                   </div>
@@ -3951,7 +3951,7 @@ Não haverá cobrança ao cliente.`
                       onClick={() => {
                         if (pecas.length === 0) {
                           const confirma = confirm(
-                            'ATENCAO!\n\n' +
+                            'ATENÇÃO!\n\n' +
                             'Nenhuma peca foi adicionada a esta OS.\n\n' +
                             'Se realmente nao ha pecas necessarias, ESCREVA isso no relato do diagnostico que sera solicitado.\n\n' +
                             'Deseja continuar mesmo assim?'
@@ -3977,7 +3977,7 @@ Não haverá cobrança ao cliente.`
                       ) : (
                         <>
                           <Microscope className="w-4 h-4" />
-                          ANALISE CONCLUIDA
+                          ANÁLISE CONCLUÍDA
                         </>
                       )}
                     </button>
@@ -4037,7 +4037,7 @@ Não haverá cobrança ao cliente.`
                                     </span>
                                     {sugestao.valor_corrigido && (
                                       <span className="text-[10px] text-[#39FF14]">
-                                        Ultimo Pedido: R$ {sugestao.valor_corrigido.toFixed(2)}
+                                        Último Pedido: R$ {sugestao.valor_corrigido.toFixed(2)}
                                       </span>
                                     )}
                                   </div>
@@ -5590,7 +5590,7 @@ Não haverá cobrança ao cliente.`
                         {buscaServico ? 'Nenhum serviço encontrado' : `Nenhum serviço cadastrado para ${os.aparelho_linha}`}
                       </p>
                       <p className="text-gray-600 text-xs mt-2">
-                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos para esta linha em Configuracoes'}
+                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre serviços para esta linha em Configurações'}
                       </p>
                     </div>
                   );

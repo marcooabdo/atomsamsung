@@ -86,7 +86,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
       const result = await response.json();
 
       if (!response.ok) {
-        setError(result.error || 'Erro ao gerar analise');
+        setError(result.error || 'Erro ao gerar análise');
         return;
       }
 
@@ -163,7 +163,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
           }}>
             <Clock className="w-4 h-4 text-cyan-400 shrink-0" />
             <span className="text-sm text-gray-300">
-              Periodo: <span className="text-white font-medium">{new Date(periodoInicio).toLocaleDateString('pt-BR')} - {new Date(periodoFim).toLocaleDateString('pt-BR')}</span>
+              Período: <span className="text-white font-medium">{new Date(periodoInicio).toLocaleDateString('pt-BR')} - {new Date(periodoFim).toLocaleDateString('pt-BR')}</span>
             </span>
           </div>
 
@@ -176,7 +176,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
                 <Sparkles className="w-10 h-10 text-cyan-400" />
               </div>
               <p className="text-gray-300 mb-1 text-sm">Clique no botão abaixo para gerar uma análise completa</p>
-              <p className="text-gray-500 text-xs">dos dados operacionais do periodo selecionado</p>
+              <p className="text-gray-500 text-xs">dos dados operacionais do período selecionado</p>
             </div>
           )}
 
@@ -225,7 +225,7 @@ export function AIAnalysisModal({ isOpen, onClose, unidadeId, periodoInicio, per
                 className="flex items-center gap-2 text-sm text-gray-400 hover:text-gray-300 transition-colors"
               >
                 {showHistory ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                Historico ({previousAnalyses.length})
+                Histórico ({previousAnalyses.length})
               </button>
 
               {showHistory && (

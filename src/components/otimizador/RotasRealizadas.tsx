@@ -561,7 +561,7 @@ export default function RotasRealizadas() {
           </div>
           <div>
             <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Rotas Realizadas</h2>
-            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Historico completo de rotas planejadas e executadas</p>
+            <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Histórico completo de rotas planejadas e executadas</p>
           </div>
         </div>
         <button

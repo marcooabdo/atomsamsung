@@ -308,7 +308,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const text = await file.text();
         const nfData = parseXML(text);
         if (!nfData.numeroNF || nfData.produtos.length === 0) {
-          errors.push(`${file.name}: XML invalido ou sem produtos`);
+          errors.push(`${file.name}: XML inválido ou sem produtos`);
           continue;
         }
         const { data: existingNF } = await supabase

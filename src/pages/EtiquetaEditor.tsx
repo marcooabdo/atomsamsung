@@ -56,17 +56,17 @@ interface LabelData {
 }
 
 const VARIAVEIS_DISPONIVEIS = [
-  { var: '{{peca_codigo}}', label: 'Codigo da Peca', exemplo: 'GH82-12345' },
+  { var: '{{peca_codigo}}', label: 'Código da Peça', exemplo: 'GH82-12345' },
   { var: '{{peca_descricao}}', label: 'Descricao', exemplo: 'Display LCD' },
-  { var: '{{peca_id}}', label: 'ID da Peca', exemplo: '#342' },
-  { var: '{{nf_numero}}', label: 'Numero da NF', exemplo: '12345' },
+  { var: '{{peca_id}}', label: 'ID da Peça', exemplo: '#342' },
+  { var: '{{nf_numero}}', label: 'Número da NF', exemplo: '12345' },
   { var: '{{nf_delivery}}', label: 'Delivery', exemplo: 'DEL123456' },
   { var: '{{nf_data_emissao}}', label: 'Data Emissao NF', exemplo: '12/02/2026' },
   { var: '{{data_entrada}}', label: 'Data de Entrada', exemplo: '12/02/2026' },
   { var: '{{data_atual}}', label: 'Data Atual', exemplo: '12/02/2026' },
-  { var: '{{localizacao}}', label: 'Localizacao', exemplo: 'A1-B2' },
-  { var: '{{tecnico_nome}}', label: 'Tecnico', exemplo: 'Joao Silva' },
-  { var: '{{os_numero}}', label: 'Numero OS (Samsung > Interna)', exemplo: '4175123456' },
+  { var: '{{localizacao}}', label: 'Localização', exemplo: 'A1-B2' },
+  { var: '{{tecnico_nome}}', label: 'Técnico', exemplo: 'Joao Silva' },
+  { var: '{{os_numero}}', label: 'Número OS (Samsung > Interna)', exemplo: '4175123456' },
   { var: '{{os_samsung}}', label: 'OS Samsung', exemplo: '4175123456' },
   { var: '{{unidade_nome}}', label: 'Unidade', exemplo: 'Matriz' },
 ];

@@ -35,7 +35,7 @@ export default function CIProdutosTab({ pecas }: Props) {
                 </div>
               </div>
               <div className="mt-2 pt-2 flex items-center justify-between" style={{ borderTop: '1px solid var(--border-primary)' }}>
-                <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Valor Medio: {formatCurrency(peca.valorMedio)}</span>
+                <span className="text-[10px]" style={{ color: 'var(--text-secondary)' }}>Valor Médio: {formatCurrency(peca.valorMedio)}</span>
                 <div className="h-1 flex-1 mx-3 rounded-full overflow-hidden" style={{ background: 'rgba(var(--accent-rgb),0.12)' }}>
                   <div
                     className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500"

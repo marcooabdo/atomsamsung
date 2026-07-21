@@ -32,7 +32,7 @@ export const GIA_SCRIPT: ScriptStep[] = [
         items: [
           { label: 'Pipeline Operacional', value: 'Online', status: 'good' },
           { label: 'ATOM Finance', value: 'Online', status: 'good' },
-          { label: 'Nucleo de Pecas', value: 'Online', status: 'good' },
+          { label: 'Núcleo de Peças', value: 'Online', status: 'good' },
           { label: 'Samsung GSPN', value: 'Sincronizado', status: 'good' },
         ],
         delay: 500,
@@ -41,15 +41,15 @@ export const GIA_SCRIPT: ScriptStep[] = [
   },
   {
     id: 'pendencias',
-    aiText: 'Encontrei 5 pendencias criticas na unidade Sao Bernardo. Existem ordens de servico aguardando aprovacao de orcamento ha mais de 48 horas. Recomendo atencao imediata.',
+    aiText: 'Encontrei 5 pendências críticas na unidade São Bernardo. Existem ordens de serviço aguardando aprovação de orçamento há mais de 48 horas. Recomendo atenção imediata.',
     thinkingDuration: 3000,
     cards: [
       {
         id: 'pendencias-sbc',
         type: 'alert',
-        title: 'Pendencias SBC',
+        title: 'Pendências SBC',
         value: '5',
-        subtitle: 'Orcamentos aguardando > 48h',
+        subtitle: 'Orçamentos aguardando > 48h',
         color: 'red',
         delay: 200,
       },
@@ -90,7 +90,7 @@ export const GIA_SCRIPT: ScriptStep[] = [
         color: 'green',
         chartData: [
           { label: 'Campinas', value: 18400 },
-          { label: 'Sao Bernardo', value: 12300 },
+          { label: 'São Bernardo', value: 12300 },
           { label: 'Osasco', value: 8150 },
           { label: 'Santo Andre', value: 4000 },
         ],
@@ -100,13 +100,13 @@ export const GIA_SCRIPT: ScriptStep[] = [
   },
   {
     id: 'estoque',
-    aiText: 'Atencao ao estoque de pecas Samsung. Temos 12 SKUs com estoque critico, incluindo telas Galaxy S24 Ultra e baterias do A54. Sugiro fazer um pedido de reposicao ainda hoje para evitar paradas na producao.',
+    aiText: 'Atenção ao estoque de peças Samsung. Temos 12 SKUs com estoque crítico, incluindo telas Galaxy S24 Ultra e baterias do A54. Sugiro fazer um pedido de reposição ainda hoje para evitar paradas na produção.',
     thinkingDuration: 2800,
     cards: [
       {
         id: 'estoque-critico',
         type: 'alert',
-        title: 'Estoque Critico',
+        title: 'Estoque Crítico',
         value: '12',
         subtitle: 'SKUs abaixo do minimo',
         color: 'amber',

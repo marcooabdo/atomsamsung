@@ -315,7 +315,7 @@ function AdminOverview({ onSelect }: { onSelect: (prof: Profissional) => void })
     <div className="space-y-4">
       <h3 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
         <Users className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
-        Visao do Gestor
+        Visão do Gestor
       </h3>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">

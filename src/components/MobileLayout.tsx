@@ -95,7 +95,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
 
       {online && pendingOps > 0 && (
         <div className="bg-blue-500/20 border-b border-blue-500/30 px-4 py-2 flex items-center justify-between">
-          <span className="text-blue-300 text-xs font-medium">Sincronizando {pendingOps} operacao{pendingOps > 1 ? 'es' : ''}...</span>
+          <span className="text-blue-300 text-xs font-medium">Sincronizando {pendingOps} operação{pendingOps > 1 ? 'es' : ''}...</span>
           <button onClick={handleSync} className="text-blue-400 text-xs font-medium underline">Sincronizar agora</button>
         </div>
       )}
@@ -104,7 +104,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
         <div className="bg-red-500/20 border-b border-red-500/30 px-4 py-3 flex items-center gap-3">
           <MapPin className="w-5 h-5 text-red-400 flex-shrink-0" />
           <div className="flex-1">
-            <p className="text-red-400 text-sm font-medium">Localizacao obrigatoria</p>
+            <p className="text-red-400 text-sm font-medium">Localização obrigatória</p>
             <p className="text-red-400/70 text-xs">Ative o GPS para continuar usando o sistema</p>
           </div>
           <button
@@ -127,7 +127,7 @@ export function MobileLayout({ children }: MobileLayoutProps) {
           <div>
             <p className="text-white font-medium text-sm">{usuario?.nome}</p>
             <div className="flex items-center gap-1.5">
-              <p className="text-gray-400 text-xs">{usuario?.tipo === 'tecnico_ih' ? 'Tecnico IH' : 'Tecnico'}</p>
+              <p className="text-gray-400 text-xs">{usuario?.tipo === 'tecnico_ih' ? 'Técnico IH' : 'Técnico'}</p>
               {isTracking() && (
                 <span className="flex items-center gap-1 text-green-400 text-xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />

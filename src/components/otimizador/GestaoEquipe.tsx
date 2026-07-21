@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Clock, CheckCircle, Search, Award, ChevronDown, ChevronUp, Edit2, Save, X } from 'lucide-react';
+import { Users, Clock, CheckCircle, Search, Award, ChevronDown, ChevronUp, CreditCard as Edit2, Save, X } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
 
@@ -170,12 +170,12 @@ export default function GestaoEquipe() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Gestao de Equipe</h2>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Performance, disponibilidade e habilidades dos tecnicos</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Performance, disponibilidade e habilidades dos técnicos</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
-          { label: 'Total Tecnicos', value: tecnicos.length, icon: Users, color: '#06B6D4' },
+          { label: 'Total Técnicos', value: tecnicos.length, icon: Users, color: '#06B6D4' },
           { label: 'OS Concluidas', value: totalOsConcluidas, icon: CheckCircle, color: '#10B981' },
           { label: 'Em Andamento', value: totalOsEmAndamento, icon: Clock, color: '#3B82F6' },
           { label: 'Taxa Sucesso', value: `${mediaTaxa}%`, icon: Award, color: '#F59E0B' },
@@ -200,7 +200,7 @@ export default function GestaoEquipe() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: 'var(--text-tertiary)' }} />
           <input
             type="text"
-            placeholder="Buscar tecnico..."
+            placeholder="Buscar técnico..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 rounded-lg text-sm focus:outline-none transition-colors"
@@ -211,7 +211,7 @@ export default function GestaoEquipe() {
         {filteredTecnicos.length === 0 ? (
           <div className="text-center py-12">
             <Users className="w-14 h-14 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Nenhum tecnico encontrado</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum técnico encontrado</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -272,7 +272,7 @@ export default function GestaoEquipe() {
                     <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{tec.telefone || '-'}</p>
                   </div>
                   <div>
-                    <span style={{ color: 'var(--text-tertiary)' }}>Tempo Medio</span>
+                    <span style={{ color: 'var(--text-tertiary)' }}>Tempo Médio</span>
                     <p className="font-medium" style={{ color: 'var(--text-primary)' }}>
                       {tec.tempo_medio_min > 0 ? `${tec.tempo_medio_min}min` : '-'}
                     </p>

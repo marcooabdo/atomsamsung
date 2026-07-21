@@ -147,7 +147,7 @@ export default function AgendaOperacional() {
     const map = new Map<string, TecnicoDay>();
     dayAg.forEach(ag => {
       const key = ag.tecnico_agendado_id || 'sem_tecnico';
-      if (!map.has(key)) map.set(key, { tecnico_id: ag.tecnico_agendado_id, tecnico_nome: ag.tecnico?.nome || 'Sem Tecnico', agendamentos: [] });
+      if (!map.has(key)) map.set(key, { tecnico_id: ag.tecnico_agendado_id, tecnico_nome: ag.tecnico?.nome || 'Sem Técnico', agendamentos: [] });
       map.get(key)!.agendamentos.push(ag);
     });
     return Array.from(map.values());
@@ -227,7 +227,7 @@ export default function AgendaOperacional() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[
-              { label: 'Tecnico', value: filtros.tecnico_id || '', onChange: (v: string) => setFiltros({ ...filtros, tecnico_id: v || null }), options: tecnicos.map(t => ({ value: t.id, label: t.nome })) },
+              { label: 'Técnico', value: filtros.tecnico_id || '', onChange: (v: string) => setFiltros({ ...filtros, tecnico_id: v || null }), options: tecnicos.map(t => ({ value: t.id, label: t.nome })) },
               { label: 'Rota', value: filtros.rota_id || '', onChange: (v: string) => setFiltros({ ...filtros, rota_id: v || null }), options: rotas.map(r => ({ value: r.id, label: r.nome })) },
               { label: 'Status', value: filtros.status || '', onChange: (v: string) => setFiltros({ ...filtros, status: v || null }), options: [{ value: 'pendente', label: 'Pendente' }, { value: 'em_atendimento', label: 'Em Atendimento' }, { value: 'concluida', label: 'Concluida' }, { value: 'perdida', label: 'Perdida' }] },
             ].map(f => (
@@ -345,7 +345,7 @@ export default function AgendaOperacional() {
                             <p className="font-medium" style={{ color: 'var(--text-primary)' }}>{ag.cliente_nome}</p>
                             <div className="flex items-center gap-1.5" style={{ color: '#06B6D4' }}>
                               <Clock className="w-3 h-3" />
-                              <span>{ag.periodo_agendamento === 'manha' ? 'Manha' : ag.periodo_agendamento === 'tarde' ? 'Tarde' : 'Nao definido'}</span>
+                              <span>{ag.periodo_agendamento === 'manha' ? 'Manhã' : ag.periodo_agendamento === 'tarde' ? 'Tarde' : 'Não definido'}</span>
                             </div>
                             <div className="flex items-center gap-1.5" style={{ color: '#3B82F6' }}>
                               <MapPin className="w-3 h-3" />

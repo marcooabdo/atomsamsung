@@ -16,7 +16,7 @@ const TABS = [
   { id: 'dashboard', label: 'Dashboard Executivo', icon: LayoutDashboard },
   { id: 'caixa', label: 'Caixa', icon: Wallet },
   { id: 'lancamentos', label: 'Lancamentos', icon: Receipt },
-  { id: 'consumo', label: 'Consumo Pecas', icon: Package },
+  { id: 'consumo', label: 'Consumo Peças', icon: Package },
   { id: 'pendencias', label: 'Pendencias Samsung', icon: AlertTriangle },
 ];
 

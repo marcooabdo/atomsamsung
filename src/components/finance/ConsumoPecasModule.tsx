@@ -162,7 +162,7 @@ export default function ConsumoPecasModule({ unidadeId, dataInicio, dataFim }: C
 
     const ws = XLSX.utils.json_to_sheet(dadosExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Consumo Pecas');
+    XLSX.utils.book_append_sheet(wb, ws, 'Consumo Peças');
     XLSX.writeFile(wb, `consumo_pecas_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -297,7 +297,7 @@ export default function ConsumoPecasModule({ unidadeId, dataInicio, dataFim }: C
 
       <div className="premium-card p-6">
         <h3 className="text-lg font-bold text-white mb-4">
-          Pecas Consumidas - GI Postada ({pecasFiltradas.length})
+          Peças Consumidas - GI Postada ({pecasFiltradas.length})
         </h3>
 
         <div className="overflow-x-auto">

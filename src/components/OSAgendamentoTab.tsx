@@ -11,7 +11,7 @@ const TIPOS_REPARO_IH = [
   'Troca de compressor',
   'Troca de cesto',
   'Troca de serpentina',
-  'Troca de peca (simples)',
+  'Troca de peça (simples)',
   'Coleta/Entrega',
   'Coleta',
   'Visita Técnica',
@@ -190,7 +190,7 @@ export function OSAgendamentoTab({
       }
 
       if (!formData.tecnico_agendado_id) {
-        setErro('Tecnico designado e obrigatorio');
+        setErro('Técnico designado é obrigatório');
         setSalvando(false);
         return;
       }

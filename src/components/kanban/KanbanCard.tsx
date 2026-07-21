@@ -747,7 +747,7 @@ export const KanbanCard = memo(function KanbanCard({
           </div>
         )}
 
-        {/* Pecas em transito */}
+        {/* Peças em trânsito */}
         {badgeFilters.pecaTransito && (() => {
           const pecasEmTransito = (os as any).requisicoes?.filter((req: any) =>
             req.status === 'pedido_feito'
@@ -835,7 +835,7 @@ export const KanbanCard = memo(function KanbanCard({
           </div>
         )}
 
-        {/* Tecnico designado */}
+        {/* Técnico designado */}
         {badgeFilters.tecnico && os.tecnico_designado_id && (os as any).tecnico_designado?.nome && (
           <div className="mt-1.5 pt-1.5 border-t rounded-md p-1.5"
             style={{
@@ -1110,7 +1110,7 @@ export const KanbanCard = memo(function KanbanCard({
                   <div className="flex items-center gap-2 min-w-0">
                     <User className="w-3 h-3 text-[#39FF14] flex-shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[9px] text-gray-400">Tecnico:</p>
+                      <p className="text-[9px] text-gray-400">Técnico:</p>
                       <p className="text-[10px] font-bold text-[#39FF14] truncate">
                         {(os as any).tecnico_designado.nome}
                       </p>

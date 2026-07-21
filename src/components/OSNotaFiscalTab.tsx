@@ -463,8 +463,8 @@ export function OSNotaFiscalTab({
       requisitada: { label: 'Requisitada', color: '#FFBF00', bg: '#FFBF0020', icon: Clock },
       aprovada: { label: 'Aprovada', color: '#00D4FF', bg: 'rgba(var(--accent-rgb), 0.125)', icon: CheckCircle, isAccent: true },
       em_transito: { label: 'Em Transito', color: '#FFA500', bg: '#FFA50020', icon: Truck },
-      disponivel: { label: 'Disponivel', color: '#10b981', bg: '#10b98120', icon: Box },
-      vinculada_tecnico: { label: 'Com Tecnico', color: '#3b82f6', bg: '#3b82f620', icon: User },
+      disponivel: { label: 'Disponível', color: '#10b981', bg: '#10b98120', icon: Box },
+      vinculada_tecnico: { label: 'Com Técnico', color: '#3b82f6', bg: '#3b82f620', icon: User },
       em_uso: { label: 'Em Uso', color: '#00D4FF', bg: 'rgba(var(--accent-rgb), 0.125)', icon: Wrench, isAccent: true },
       usada: { label: 'Usada', color: '#39FF14', bg: '#39FF1420', icon: CheckCircle },
     };

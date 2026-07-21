@@ -73,15 +73,15 @@ const SCENARIOS: MockScenario[] = [
           title: 'Status Geral Estoque',
           color: 'cyan',
           items: [
-            { label: 'Pecas Samsung', value: '342 un.', status: 'good' },
-            { label: 'Pecas Apple', value: '89 un.', status: 'neutral' },
-            { label: 'Pecas Xiaomi', value: '12 un.', status: 'bad' },
+            { label: 'Peças Samsung', value: '342 un.', status: 'good' },
+            { label: 'Peças Apple', value: '89 un.', status: 'neutral' },
+            { label: 'Peças Xiaomi', value: '12 un.', status: 'bad' },
             { label: 'Acessorios', value: '567 un.', status: 'good' },
           ],
         },
       },
-      { type: 'TEXT', content: '**Atencao ao estoque de pecas.**\n\n' },
-      { type: 'TEXT', content: 'Temos **12 SKUs com estoque critico**, incluindo telas Galaxy S24 Ultra ' },
+      { type: 'TEXT', content: '**Atenção ao estoque de peças.**\n\n' },
+      { type: 'TEXT', content: 'Temos **12 SKUs com estoque crítico**, incluindo telas Galaxy S24 Ultra ' },
       { type: 'TEXT', content: 'e baterias do A54.\n\n' },
       {
         type: 'SHOW_CARD',
@@ -94,7 +94,7 @@ const SCENARIOS: MockScenario[] = [
           color: 'amber',
         },
       },
-      { type: 'TEXT', content: 'Sugiro fazer um **pedido de reposicao** ainda hoje para evitar paradas na producao.\n\n' },
+      { type: 'TEXT', content: 'Sugiro fazer um **pedido de reposição** ainda hoje para evitar paradas na produção.\n\n' },
       {
         type: 'SHOW_CARD',
         card: {

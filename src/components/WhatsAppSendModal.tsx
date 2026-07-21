@@ -163,7 +163,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
           await supabase.from('os_comentarios').insert({
             os_id: osData.id,
             usuario_id: usuario?.id,
-            comentario: `Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente. Valido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
+            comentario: `Link de orcamento ${forceNew ? 'REGENERADO' : 'gerado'} para o cliente. Válido por 72 horas (ate ${new Date(expiresAt).toLocaleString('pt-BR')})`,
             is_system: false
           });
         } catch (commentErr) {
@@ -311,8 +311,8 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
 
   const categoriaLabels: Record<string, string> = {
     agendamento: 'Agendamento',
-    orcamento: 'Orcamento',
-    conclusao: 'Conclusao',
+    orcamento: 'Orçamento',
+    conclusao: 'Conclusão',
     pecas: 'Pecas',
     geral: 'Geral',
   };
@@ -381,7 +381,7 @@ export function WhatsAppSendModal({ isOpen, onClose, osData, defaultTemplateSlug
                     border: '1px solid rgba(16,185,129,0.3)'
                   }}>
                     <Check className="w-4 h-4 text-green-400 flex-shrink-0" />
-                    <span className="text-xs text-green-400 font-medium">Link ativo e valido</span>
+                    <span className="text-xs text-green-400 font-medium">Link ativo e válido</span>
                   </div>
 
                   <div className="flex gap-2">

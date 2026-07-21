@@ -75,11 +75,11 @@ export default function CIPerformanceTab({ vendedores }: Props) {
                 <YAxis type="category" dataKey="nome" stroke="#94A3B8" width={100} tick={{ fontSize: 12 }} />
                 <Tooltip
                   contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid #06B6D4', borderRadius: '12px', color: 'var(--text-primary)' }}
-                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'faturamento' ? 'Faturamento' : 'Ticket Medio']}
+                  formatter={(value: number, name: string) => [formatCurrency(value), name === 'faturamento' ? 'Faturamento' : 'Ticket Médio']}
                 />
                 <Legend />
                 <Bar dataKey="faturamento" name="Faturamento" fill="#06B6D4" radius={[0, 4, 4, 0]} />
-                <Bar dataKey="ticketMedio" name="Ticket Medio" fill="#3B82F6" radius={[0, 4, 4, 0]} />
+                <Bar dataKey="ticketMedio" name="Ticket Médio" fill="#3B82F6" radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

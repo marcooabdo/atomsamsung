@@ -254,7 +254,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   value={cargo}
                   onChange={(e) => setCargo(e.target.value)}
                   className="neon-input text-sm"
-                  placeholder="Ex: Tecnico Senior"
+                  placeholder="Ex: Técnico Sênior"
                 />
               </div>
               <div>

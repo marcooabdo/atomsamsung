@@ -38,9 +38,9 @@ const PERFIS = [
   { id: 'gerente', label: 'Gerente', color: '#39FF14', desc: 'Gerencia sua unidade' },
   { id: 'administrador', label: 'Administrador', color: '#FFBF00', desc: 'Administra sua unidade' },
   { id: 'estoque', label: 'Estoque', color: '#9D4EDD', desc: 'Controle de estoque' },
-  { id: 'tecnico', label: 'Tecnico', color: '#10b981', desc: 'Execucao de OS' },
-  { id: 'tecnico_ih', label: 'Tecnico IH', color: '#06b6d4', desc: 'Tecnico In-Home' },
-  { id: 'vendedor', label: 'Vendedor', color: '#f59e0b', desc: 'Vendas e cotacoes' },
+  { id: 'tecnico', label: 'Técnico', color: '#10b981', desc: 'Execução de OS' },
+  { id: 'tecnico_ih', label: 'Técnico IH', color: '#06b6d4', desc: 'Técnico In-Home' },
+  { id: 'vendedor', label: 'Vendedor', color: '#f59e0b', desc: 'Vendas e cotações' },
   { id: 'atendente', label: 'Atendente', color: '#ec4899', desc: 'Atendimento ao cliente' }
 ];
 
@@ -60,39 +60,39 @@ const MENU_ITEMS: MenuItem[] = [
       { id: 'atom_connect_dashboard', label: 'Dashboard' },
       { id: 'atom_connect_chat', label: 'Conversas' },
       { id: 'atom_connect_kanban', label: 'Kanban' },
-      { id: 'atom_connect_automacao', label: 'Automacao' },
+      { id: 'atom_connect_automacao', label: 'Automação' },
       { id: 'atom_connect_marketing', label: 'Marketing' },
-      { id: 'atom_connect_config', label: 'Configuracoes' }
+      { id: 'atom_connect_config', label: 'Configurações' }
     ]
   },
   { id: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard },
   { id: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers },
   { id: 'menu_agendamento', label: 'Agendamento', icon: Calendar },
   {
-    id: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package,
+    id: 'menu_estoque', label: 'Núcleo de Peças', icon: Package,
     subItems: [
       { id: 'estoque_dashboard', label: 'Dashboard' },
       { id: 'estoque_geral', label: 'Estoque Geral' },
       { id: 'estoque_entrada', label: 'Entrada de NF' },
-      { id: 'estoque_devolucoes', label: 'Devolucoes' },
-      { id: 'estoque_transferencias', label: 'Transferencias' },
+      { id: 'estoque_devolucoes', label: 'Devoluções' },
+      { id: 'estoque_transferencias', label: 'Transferências' },
       { id: 'estoque_mapa', label: 'Mapa do Estoque' }
     ]
   },
-  { id: 'menu_chat', label: 'QG de Comunicacao', icon: MessageCircle },
+  { id: 'menu_chat', label: 'QG de Comunicação', icon: MessageCircle },
   {
     id: 'menu_otimizador', label: 'GIA Logistic', icon: Truck,
     subItems: [
       { id: 'otimizador_dashboard', label: 'Dashboard Executivo' },
-      { id: 'otimizador_motor', label: 'Motor de Otimizacao' },
-      { id: 'otimizador_rotas', label: 'Gestao de Rotas' },
-      { id: 'otimizador_equipe', label: 'Gestao de Equipe' },
-      { id: 'otimizador_pecas', label: 'Controle de Pecas' },
+      { id: 'otimizador_motor', label: 'Motor de Otimização' },
+      { id: 'otimizador_rotas', label: 'Gestão de Rotas' },
+      { id: 'otimizador_equipe', label: 'Gestão de Equipe' },
+      { id: 'otimizador_pecas', label: 'Controle de Peças' },
       { id: 'otimizador_checklists', label: 'Checklists' },
       { id: 'otimizador_agenda', label: 'Agenda Operacional' },
       { id: 'otimizador_rastreamento', label: 'Mapa de Rastreamento' },
       { id: 'otimizador_analytics', label: 'Analytics' },
-      { id: 'otimizador_config', label: 'Configuracao' }
+      { id: 'otimizador_config', label: 'Configuração' }
     ]
   },
   { id: 'menu_ci', label: 'Customer Intelligence', icon: Brain },
@@ -100,10 +100,10 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: 'menu_skywalker', label: 'Skywalker', icon: Rocket,
     subItems: [
-      { id: 'skywalker_visao_geral', label: 'Visao Geral' },
+      { id: 'skywalker_visao_geral', label: 'Visão Geral' },
       { id: 'skywalker_times', label: 'Times' },
       { id: 'skywalker_regras', label: 'Regras do Jogo' },
-      { id: 'skywalker_niveis', label: 'Niveis e Bonus' }
+      { id: 'skywalker_niveis', label: 'Níveis e Bônus' }
     ]
   },
   {
@@ -111,9 +111,9 @@ const MENU_ITEMS: MenuItem[] = [
     subItems: [
       { id: 'financeiro_dashboard', label: 'Dashboard' },
       { id: 'financeiro_caixa', label: 'Caixa' },
-      { id: 'financeiro_lancamentos', label: 'Lancamentos' },
-      { id: 'financeiro_consumo', label: 'Consumo de Pecas' },
-      { id: 'financeiro_pendencias', label: 'Pendencias Samsung' }
+      { id: 'financeiro_lancamentos', label: 'Lançamentos' },
+      { id: 'financeiro_consumo', label: 'Consumo de Peças' },
+      { id: 'financeiro_pendencias', label: 'Pendências Samsung' }
     ]
   },
   { id: 'menu_nf', label: 'Notas Fiscais', icon: Receipt },
@@ -123,15 +123,15 @@ const MENU_ITEMS: MenuItem[] = [
     id: 'menu_configuracoes', label: 'ATOM Core Settings', icon: Settings,
     subItems: [
       { id: 'config_unidades', label: 'Unidades' },
-      { id: 'config_usuarios', label: 'Usuarios' },
-      { id: 'config_servicos', label: 'Servicos' },
+      { id: 'config_usuarios', label: 'Usuários' },
+      { id: 'config_servicos', label: 'Serviços' },
       { id: 'config_markup', label: 'Markup' },
       { id: 'config_taxas', label: 'Taxas' },
       { id: 'config_rotas', label: 'Rotas' },
       { id: 'config_checklists', label: 'Checklists' },
       { id: 'config_pdf_os', label: 'PDF OS' },
       { id: 'config_nf', label: 'Nota Fiscal' },
-      { id: 'config_permissoes', label: 'Permissoes' }
+      { id: 'config_permissoes', label: 'Permissões' }
     ]
   }
 ];
@@ -256,7 +256,7 @@ export function ConfiguracoesPermissoes() {
           <Shield className="w-6 h-6 text-red-400" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-white">Gerenciamento de Permissoes</h2>
+          <h2 className="text-xl font-bold text-white">Gerenciamento de Permissões</h2>
           <p className="text-sm text-gray-400">Configure o acesso de cada perfil aos menus e funcionalidades</p>
         </div>
       </div>
@@ -266,7 +266,7 @@ export function ConfiguracoesPermissoes() {
         <div>
           <p className="text-sm text-amber-300 font-medium">Importante</p>
           <p className="text-xs text-amber-200/80 mt-1">
-            Usuarios com unidade cadastrada so podem ver dados da propria unidade, independente das permissoes de menu.
+            Usuários com unidade cadastrada só podem ver dados da própria unidade, independente das permissões de menu.
             Apenas Master e Diretoria sem unidade vinculada podem filtrar dados de outras unidades.
           </p>
         </div>
@@ -340,7 +340,7 @@ export function ConfiguracoesPermissoes() {
                 </div>
                 {isMaster && (
                   <div className="px-3 py-1.5 rounded-lg bg-red-500/20 border border-red-500/30">
-                    <p className="text-xs text-red-400 font-medium">Acesso Total - Nao Editavel</p>
+                    <p className="text-xs text-red-400 font-medium">Acesso Total - Não Editável</p>
                   </div>
                 )}
               </div>

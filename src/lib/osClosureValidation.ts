@@ -165,7 +165,7 @@ function checkMarkupPecas(cotacaoPecas: CotacaoPeca[]): AlertaFechamento | null 
     regra_titulo: 'Markup aplicado nas pecas',
     categoria: 'pecas',
     severidade: 'alerta',
-    mensagem: `${semMarkup.length} peca(s) sem markup na cotacao: ${semMarkup.map(p => p.pn).join(', ')}`,
+    mensagem: `${semMarkup.length} peça(s) sem markup na cotação: ${semMarkup.map(p => p.pn).join(', ')}`,
     dados_contexto: { pecas_sem_markup: semMarkup.map(p => ({ id: p.id, pn: p.pn })) },
   };
 }

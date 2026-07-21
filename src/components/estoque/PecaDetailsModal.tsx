@@ -63,9 +63,9 @@ interface HistoricoItem {
 }
 
 const getStatusColors = (neonGreen: string, themeAccent: string): Record<string, { label: string; color: string }> => ({
-  disponivel: { label: 'Disponivel', color: neonGreen },
+  disponivel: { label: 'Disponível', color: neonGreen },
   reservada: { label: 'Reservada', color: '#FFBF00' },
-  vinculada_tecnico: { label: 'Com Tecnico', color: themeAccent },
+  vinculada_tecnico: { label: 'Com Técnico', color: themeAccent },
   em_rota: { label: 'Em Rota', color: themeAccent },
   em_uso: { label: 'Em Uso', color: '#FFBF00' },
   usada: { label: 'Usada', color: '#6B7280' },
@@ -467,7 +467,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
           >
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <div>
-                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>ID Unico</p>
+                <p className="text-xs uppercase tracking-wider mb-1" style={{ color: labelColor }}>ID Único</p>
                 <p className="font-bold text-2xl font-mono" style={{ color: neonGreen }}>#{peca.id_numerico || 'N/A'}</p>
               </div>
               <div>
@@ -579,7 +579,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             >
               <div className="flex items-center gap-2 mb-4">
                 <Truck className="w-4 h-4" style={{ color: isDark ? '#60a5fa' : '#2563eb' }} />
-                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>Logistica Reversa</h3>
+                <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: isDark ? '#60a5fa' : '#2563eb' }}>Logística Reversa</h3>
               </div>
 
               <div className="space-y-4">
@@ -787,7 +787,7 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
           {/* Localizacao */}
           <div>
-            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Localizacao Fisica</p>
+            <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: textMuted }}>Localização Física</p>
             {peca.localizacao ? (
               <div
                 className="p-3 rounded-lg flex items-center justify-between"

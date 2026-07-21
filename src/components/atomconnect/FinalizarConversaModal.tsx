@@ -27,8 +27,8 @@ export interface ClosureData {
 
 const RESULTADOS = [
   { value: 'venda_realizada', label: 'Venda Realizada', icon: ShoppingCart, color: '#10b981' },
-  { value: 'orcamento_enviado', label: 'Orcamento Enviado', icon: Send, color: '#3b82f6' },
-  { value: 'orcamento_recusado', label: 'Orcamento Recusado', icon: X, color: '#ef4444' },
+  { value: 'orcamento_enviado', label: 'Orçamento Enviado', icon: Send, color: '#3b82f6' },
+  { value: 'orcamento_recusado', label: 'Orçamento Recusado', icon: X, color: '#ef4444' },
   { value: 'agendamento_marcado', label: 'Agendamento Marcado', icon: Calendar, color: '#8b5cf6' },
   { value: 'apenas_informacao', label: 'Apenas Informacao', icon: Info, color: '#6b7280' },
   { value: 'sem_interesse', label: 'Sem Interesse', icon: PhoneOff, color: '#f59e0b' },
@@ -180,7 +180,7 @@ export function FinalizarConversaModal({ accentColor, isDark, clienteNome, clien
             >
               <label className="text-xs font-semibold mb-2 flex items-center gap-1.5" style={{ color: textPrimary }}>
                 <DollarSign className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                Valor do Orcamento (R$)
+                Valor do Orçamento (R$)
               </label>
               <input
                 type="text"

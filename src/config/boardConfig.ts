@@ -13,7 +13,7 @@ export interface SectorConfig {
 
 export const BOARD_CONFIG: Record<SectorKey, SectorConfig> = {
   ESTOQUE: {
-    title: 'Estoque / Pecas',
+    title: 'Estoque / Peças',
     icon: Box,
     accentColor: '#00D4FF',
     borderColor: 'rgba(0,212,255,0.3)',

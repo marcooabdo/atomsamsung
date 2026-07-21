@@ -892,7 +892,7 @@ export function IntegratedRouteOptimizer({ unidadeId, usuarioId }: Props) {
                 </h3>
               </div>
               <p className="text-xs ml-11" style={{ color: 'var(--text-secondary)' }}>
-                Selecione a linha de produto para cada OS antes de prosseguir com a otimizacao.
+                Selecione a linha de produto para cada OS antes de prosseguir com a otimização.
               </p>
             </div>
             <div className="px-6 py-4 max-h-80 overflow-y-auto space-y-4">

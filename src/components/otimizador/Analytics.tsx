@@ -103,15 +103,15 @@ export default function Analytics() {
     <div className="space-y-6">
       <div>
         <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>Analytics e BI</h2>
-        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Analises detalhadas com tendencias e comparativos</p>
+        <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Análises detalhadas com tendências e comparativos</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {[
           { label: 'Total OSs', value: data.osPorMes.reduce((s, i) => s + i.total, 0), icon: TrendingUp, color: '#0EA5E9' },
-          { label: 'Tecnicos Ativos', value: data.osPorTecnico.length, icon: Users, color: '#06B6D4' },
+          { label: 'Técnicos Ativos', value: data.osPorTecnico.length, icon: Users, color: '#06B6D4' },
           { label: 'Receita Total', value: `R$ ${(data.receitaMensal.reduce((s, i) => s + i.receita, 0) / 1000).toFixed(0)}k`, icon: DollarSign, color: '#10B981' },
-          { label: 'Taxa Media', value: `${data.topTecnicos.length > 0 ? Math.round(data.topTecnicos.reduce((s, t) => s + t.taxa_sucesso, 0) / data.topTecnicos.length) : 0}%`, icon: Activity, color: '#F59E0B' },
+          { label: 'Taxa Média', value: `${data.topTecnicos.length > 0 ? Math.round(data.topTecnicos.reduce((s, t) => s + t.taxa_sucesso, 0) / data.topTecnicos.length) : 0}%`, icon: Activity, color: '#F59E0B' },
         ].map(c => {
           const Icon = c.icon;
           return (
@@ -197,20 +197,20 @@ export default function Analytics() {
       <div className="rounded-xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
         <div className="flex items-center gap-2 mb-5">
           <BarChart3 className="w-5 h-5" style={{ color: '#F59E0B' }} />
-          <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Top Tecnicos - Performance</h3>
+          <h3 className="font-bold" style={{ color: 'var(--text-primary)' }}>Top Técnicos - Performance</h3>
         </div>
 
         {data.topTecnicos.length === 0 ? (
           <div className="text-center py-8">
             <Users className="w-14 h-14 mx-auto mb-3 opacity-30" style={{ color: 'var(--text-tertiary)' }} />
-            <p style={{ color: 'var(--text-secondary)' }}>Nenhum dado disponivel</p>
+            <p style={{ color: 'var(--text-secondary)' }}>Nenhum dado disponível</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border-primary)' }}>
-                  {['Pos.', 'Tecnico', 'OSs Concluidas', 'Taxa'].map(h => (
+                  {['Pos.', 'Técnico', 'OSs Concluídas', 'Taxa'].map(h => (
                     <th key={h} className="text-left py-3 px-4 text-xs font-semibold" style={{ color: 'var(--text-tertiary)' }}>{h}</th>
                   ))}
                 </tr>

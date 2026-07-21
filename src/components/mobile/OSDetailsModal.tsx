@@ -42,9 +42,9 @@ interface PecaOS {
 }
 
 const PECA_STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  disponivel: { label: 'Disponivel', color: 'text-gray-400' },
+  disponivel: { label: 'Disponível', color: 'text-gray-400' },
   reservada: { label: 'Reservada', color: 'text-yellow-400' },
-  vinculada_tecnico: { label: 'Com Tecnico', color: 'text-cyan-400' },
+  vinculada_tecnico: { label: 'Com Técnico', color: 'text-cyan-400' },
   em_rota: { label: 'Em Rota', color: 'text-blue-400' },
   em_uso: { label: 'Em Uso', color: 'text-orange-400' },
   usada: { label: 'Usada', color: 'text-green-400' },

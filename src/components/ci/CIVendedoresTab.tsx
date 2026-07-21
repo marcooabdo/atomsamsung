@@ -411,7 +411,7 @@ export default function CIVendedoresTab({ usuarioUnidadeId, isGerente, selectedU
                 <tr>
                   <td colSpan={9} className="text-center py-16" style={{ color: 'var(--text-secondary)' }}>
                     <TrendingUp className="w-10 h-10 mx-auto mb-3 opacity-20" />
-                    <p>Nenhum dado encontrado para o periodo selecionado</p>
+                    <p>Nenhum dado encontrado para o período selecionado</p>
                   </td>
                 </tr>
               )}

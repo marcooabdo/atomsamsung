@@ -159,15 +159,15 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
           }
         } else {
           setWhatsappStatus('invalid');
-          setWhatsappError('Numero nao possui WhatsApp');
+          setWhatsappError('Número não possui WhatsApp');
         }
       } else {
         setWhatsappStatus('invalid');
-        setWhatsappError('Numero nao encontrado no WhatsApp');
+        setWhatsappError('Número não encontrado no WhatsApp');
       }
     } catch (error) {
       setWhatsappStatus('error');
-      setWhatsappError('Nao foi possivel verificar o numero');
+      setWhatsappError('Não foi possível verificar o número');
     }
   }, [instancia]);
 
@@ -312,7 +312,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     const formattedPhone = formatPhoneNumber(telefone);
 
     if (formattedPhone.length < 12) {
-      alert('Informe um telefone valido com DDD');
+      alert('Informe um telefone válido com DDD');
       return;
     }
     if (!selectedUnidadeId) {
@@ -320,7 +320,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
       return;
     }
     if (whatsappStatus === 'invalid') {
-      alert('Este numero nao possui WhatsApp cadastrado');
+      alert('Este número não possui WhatsApp cadastrado');
       return;
     }
     if (existingConversa) {
@@ -489,13 +489,13 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
               {whatsappStatus === 'invalid' && (
                 <p className="mt-2 text-xs text-red-400 flex items-center gap-1">
                   <XCircle className="w-3 h-3" />
-                  {whatsappError || 'Este numero nao possui WhatsApp'}
+                  {whatsappError || 'Este número não possui WhatsApp'}
                 </p>
               )}
               {whatsappStatus === 'error' && (
                 <p className="mt-2 text-xs text-yellow-400 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
-                  {whatsappError || 'Nao foi possivel verificar'}
+                  {whatsappError || 'Não foi possível verificar'}
                 </p>
               )}
               {whatsappStatus === 'checking' && (
@@ -508,7 +508,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
                 <div className="mt-3 p-3 bg-cyan-500/10 border border-cyan-500/30 rounded-lg">
                   <p className="text-xs text-cyan-300 flex items-center gap-1.5 font-medium">
                     <MessageSquare className="w-3.5 h-3.5 flex-shrink-0" />
-                    <span>Numero ja cadastrado</span>
+                    <span>Número já cadastrado</span>
                   </p>
                   <p className="text-[11px] text-white/60 mt-1.5 ml-5">
                     Este numero ja possui uma conversa ativa

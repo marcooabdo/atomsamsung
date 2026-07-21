@@ -119,7 +119,7 @@ export function OrcamentoPublico() {
 
   useEffect(() => {
     if (!token) {
-      setError('Token invalido');
+      setError('Token inválido');
       setLoading(false);
       return;
     }
@@ -151,7 +151,7 @@ export function OrcamentoPublico() {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Erro ao carregar orcamento');
+        throw new Error(errorData.error || 'Erro ao carregar orçamento');
       }
 
       const result = await response.json();
@@ -251,7 +251,7 @@ export function OrcamentoPublico() {
       setStream(mediaStream);
       setShowCamera(true);
     } catch (err) {
-      alert('Nao foi possivel acessar a camera. Por favor, permita o acesso a camera nas configuracoes do seu navegador.');
+      alert('Não foi possível acessar a câmera. Por favor, permita o acesso a camera nas configuracoes do seu navegador.');
     }
   };
 
@@ -332,7 +332,7 @@ export function OrcamentoPublico() {
 
     if (data?.os.cotacao) {
       checkPageBreak(60);
-      addText('DETALHES DO ORCAMENTO', 11, 'bold');
+      addText('DETALHES DO ORÇAMENTO', 11, 'bold');
 
       if (data.os.cotacao.cotacoes_pecas && data.os.cotacao.cotacoes_pecas.length > 0) {
         addText('Pecas:', 10, 'bold');
@@ -367,7 +367,7 @@ export function OrcamentoPublico() {
     doc.setTextColor(255, 255, 255);
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    const statusTexto = selectedAction === 'aprovado' ? 'ORCAMENTO APROVADO PELO CLIENTE' : selectedAction === 'rejeitado' ? 'ORCAMENTO REJEITADO PELO CLIENTE' : 'CLIENTE SOLICITOU NEGOCIACAO';
+    const statusTexto = selectedAction === 'aprovado' ? 'ORÇAMENTO APROVADO PELO CLIENTE' : selectedAction === 'rejeitado' ? 'ORÇAMENTO REJEITADO PELO CLIENTE' : 'CLIENTE SOLICITOU NEGOCIAÇÃO';
     doc.text(statusTexto, pageWidth / 2, yPos + 5, { align: 'center' });
     doc.setFontSize(10);
     doc.text(`Data/Hora: ${new Date().toLocaleString('pt-BR')}`, pageWidth / 2, yPos + 15, { align: 'center' });
@@ -376,7 +376,7 @@ export function OrcamentoPublico() {
 
     if (mensagem.trim()) {
       checkPageBreak(40);
-      const labelMensagem = selectedAction === 'aprovado' ? 'OBSERVACOES DO CLIENTE:' : selectedAction === 'rejeitado' ? 'MOTIVO DA REJEICAO:' : 'PROPOSTA/SOLICITACAO DO CLIENTE:';
+      const labelMensagem = selectedAction === 'aprovado' ? 'OBSERVAÇÕES DO CLIENTE:' : selectedAction === 'rejeitado' ? 'MOTIVO DA REJEIÇÃO:' : 'PROPOSTA/SOLICITAÇÃO DO CLIENTE:';
       addText(labelMensagem, 11, 'bold');
       doc.setFillColor(245, 245, 245);
       const mensagemLines = doc.splitTextToSize(mensagem.trim(), pageWidth - margin * 2 - 10);
@@ -402,7 +402,7 @@ export function OrcamentoPublico() {
     doc.setTextColor(0, 0, 0);
 
     if (localizacaoCapturada) {
-      addText('GEOLOCALIZACAO NO MOMENTO DA RESPOSTA', 12, 'bold');
+      addText('GEOLOCALIZAÇÃO NO MOMENTO DA RESPOSTA', 12, 'bold');
       yPos += 3;
       doc.setFillColor(240, 249, 255);
       doc.rect(margin, yPos - 5, pageWidth - margin * 2, 45, 'F');
@@ -417,7 +417,7 @@ export function OrcamentoPublico() {
       doc.setTextColor(0, 0, 0);
       yPos += 15;
     } else {
-      addText('GEOLOCALIZACAO: Nao disponivel', 12, 'bold');
+      addText('GEOLOCALIZAÇÃO: Não disponível', 12, 'bold');
       yPos += 10;
     }
 
@@ -436,7 +436,7 @@ export function OrcamentoPublico() {
         addText('(Erro ao carregar imagem)', 10);
       }
     } else {
-      addText('FOTO DO CLIENTE: Nao disponivel', 12, 'bold');
+      addText('FOTO DO CLIENTE: Não disponível', 12, 'bold');
       yPos += 10;
     }
 
@@ -480,7 +480,7 @@ export function OrcamentoPublico() {
           pdfUrl = publicUrl;
           const { data: linkData } = await supabase.from('orcamento_links').select('os_id').eq('token', token).maybeSingle();
           if (linkData?.os_id) {
-            const descricaoAnexo = selectedAction === 'aprovado' ? 'Comprovante de APROVACAO do orcamento pelo cliente' : selectedAction === 'rejeitado' ? 'Comprovante de REJEICAO do orcamento pelo cliente' : 'Comprovante de NEGOCIACAO do orcamento pelo cliente';
+            const descricaoAnexo = selectedAction === 'aprovado' ? 'Comprovante de APROVAÇÃO do orçamento pelo cliente' : selectedAction === 'rejeitado' ? 'Comprovante de REJEIÇÃO do orçamento pelo cliente' : 'Comprovante de NEGOCIAÇÃO do orçamento pelo cliente';
             await supabase.from('os_anexos').insert({ os_id: linkData.os_id, url: pdfUrl, tipo: 'pdf', nome_arquivo: `comprovante-${acaoNome}-${data.os.numero_os_interna}.pdf`, descricao: descricaoAnexo });
           }
         }
@@ -731,7 +731,7 @@ export function OrcamentoPublico() {
               </div>
               {os.aparelho_numero_serie && (
                 <div>
-                  <p className="text-xs text-slate-400 mb-0.5">Numero de Série</p>
+                  <p className="text-xs text-slate-400 mb-0.5">Número de Série</p>
                   <p className="text-slate-700 text-xs font-mono bg-slate-50 px-2 py-1 rounded">{os.aparelho_numero_serie}</p>
                 </div>
               )}

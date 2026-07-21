@@ -294,7 +294,7 @@ export function AtomAudit() {
       'Pecas X': o.pecas_x,
       'Pecas Pendentes': o.pecas_pending,
       'Auditada': o.auditado_status ? 'SIM' : 'NAO',
-      'Observacao': o.auditado_observacao || '',
+      'Observação': o.auditado_observacao || '',
     }));
     const ws = XLSX.utils.json_to_sheet(rows);
     const wb = XLSX.utils.book_new();

@@ -288,7 +288,7 @@ export function Cockpit() {
   }, [kpis]);
 
   function exportCSV() {
-    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Problemas Pecas\n';
+    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Problemas Peças\n';
     const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.semCodigoOuValor}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -324,7 +324,7 @@ export function Cockpit() {
           </div>
           <div>
             <h1 className="text-2xl font-bold text-white">Cockpit Executivo</h1>
-            <p className="text-xs text-gray-500">Visao gerencial em tempo real</p>
+            <p className="text-xs text-gray-500">Visão gerencial em tempo real</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -341,7 +341,7 @@ export function Cockpit() {
         <KPICard icon={Layers} label="Total OS" value={kpis.totalOS.toString()} color="#00D4FF" />
         <KPICard icon={Zap} label="OS Abertas" value={kpis.osAbertas.toString()} color="#F59E0B" />
         <KPICard icon={Target} label="OS Fechadas" value={kpis.osFechadas.toString()} color="#10B981" />
-        <KPICard icon={Clock} label="Dias Medio Aberta" value={kpis.avgDaysOpen.toFixed(1)} color="#F97316" />
+        <KPICard icon={Clock} label="Dias Médio Aberta" value={kpis.avgDaysOpen.toFixed(1)} color="#F97316" />
         <KPICard icon={DollarSign} label="Valor Total" value={formatCurrency(kpis.valorTotal)} color="#39FF14" />
       </div>
 
@@ -359,7 +359,7 @@ export function Cockpit() {
         <div className="lg:col-span-2 rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
             <TrendingUp className="w-4 h-4 text-[#00D4FF]" />
-            OS Abertas vs Fechadas (Ultimos 30 dias)
+            OS Abertas vs Fechadas (Últimos 30 dias)
           </h3>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
@@ -410,7 +410,7 @@ export function Cockpit() {
         <div className="rounded-xl border border-gray-800/60 bg-[#0D0D12]/80 backdrop-blur-sm p-5">
           <h3 className="text-sm font-semibold text-gray-300 mb-4 flex items-center gap-2">
             <BarChart2 className="w-4 h-4 text-[#10B981]" />
-            Tipo de Servico
+            Tipo de Serviço
           </h3>
           <div className="h-52">
             <ResponsiveContainer width="100%" height="100%">
@@ -444,7 +444,7 @@ export function Cockpit() {
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Mais Antiga na Etapa</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Problemas Peca</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Problemas Peça</th>
               </tr>
             </thead>
             <tbody>
@@ -496,7 +496,7 @@ export function Cockpit() {
                           {col.semCodigoOuValor}
                         </span>
                         <span className="text-[10px] text-gray-500 font-normal">
-                          {[col.totalSemPeca > 0 ? `${col.totalSemPeca} s/peca` : '', col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : '', col.totalSemValor > 0 ? `${col.totalSemValor} s/valor` : ''].filter(Boolean).join(' | ')}
+                          {[col.totalSemPeca > 0 ? `${col.totalSemPeca} s/peça` : '', col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : '', col.totalSemValor > 0 ? `${col.totalSemValor} s/valor` : ''].filter(Boolean).join(' | ')}
                         </span>
                       </button>
                     ) : (
@@ -528,7 +528,7 @@ export function Cockpit() {
                       {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
                     </span>
                     <span className="text-[10px] text-gray-500">
-                      {columnStats.reduce((s, c) => s + c.totalSemPeca, 0)} s/peca | {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
+                      {columnStats.reduce((s, c) => s + c.totalSemPeca, 0)} s/peça | {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
                     </span>
                   </div>
                 </td>
@@ -600,11 +600,11 @@ export function Cockpit() {
               <span className="text-sm font-bold text-white">{formatCurrency(kpis.valorTotal)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Valor Pecas</span>
+              <span className="text-xs text-gray-500">Valor Peças</span>
               <span className="text-sm font-bold text-[#00D4FF]">{formatCurrency(kpis.valorPecas)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Valor Servicos</span>
+              <span className="text-xs text-gray-500">Valor Serviços</span>
               <span className="text-sm font-bold text-[#39FF14]">{formatCurrency(kpis.valorServicos)}</span>
             </div>
             <div className="flex justify-between items-center">
@@ -613,13 +613,13 @@ export function Cockpit() {
             </div>
             <div className="h-px bg-gray-800 my-2" />
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Ticket Medio</span>
+              <span className="text-xs text-gray-500">Ticket Médio</span>
               <span className="text-sm font-bold text-[#00D4FF]">
                 {kpis.osFechadas > 0 ? formatCurrency(kpis.valorTotal / kpis.osFechadas) : 'R$ 0,00'}
               </span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs text-gray-500">Taxa Conversao</span>
+              <span className="text-xs text-gray-500">Taxa Conversão</span>
               <span className="text-sm font-bold text-green-400">
                 {kpis.totalOS > 0 ? ((kpis.osFechadas / kpis.totalOS) * 100).toFixed(1) : 0}%
               </span>
@@ -697,9 +697,9 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
   const handleCopy = () => {
     const text = osList.map(os => {
       const issues: string[] = [];
-      if (os.semPeca) issues.push('sem peca cadastrada');
-      if (os.semCodigo > 0) issues.push(`${os.semCodigo} sem codigo`);
-      if (os.semValor > 0) issues.push(`${os.semValor} peca com valor R$0`);
+      if (os.semPeca) issues.push('sem peça cadastrada');
+      if (os.semCodigo > 0) issues.push(`${os.semCodigo} sem código`);
+      if (os.semValor > 0) issues.push(`${os.semValor} peça com valor R$0`);
       return `${os.osLabel} - ${issues.join(', ')}`;
     }).join('\n');
     navigator.clipboard.writeText(text);
@@ -713,7 +713,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            OS com Problemas nas Pecas ({osList.length})
+            OS com Problemas nas Peças ({osList.length})
           </h3>
           <div className="flex items-center gap-2">
             <button
@@ -737,13 +737,13 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
                 </div>
                 <div className="flex items-center gap-3 mt-1">
                   {os.semPeca && (
-                    <span className="text-xs text-red-400">sem peca cadastrada</span>
+                    <span className="text-xs text-red-400">sem peça cadastrada</span>
                   )}
                   {os.semCodigo > 0 && (
-                    <span className="text-xs text-orange-400">{os.semCodigo} sem codigo</span>
+                    <span className="text-xs text-orange-400">{os.semCodigo} sem código</span>
                   )}
                   {os.semValor > 0 && (
-                    <span className="text-xs text-yellow-400">{os.semValor} peca com valor R$0</span>
+                    <span className="text-xs text-yellow-400">{os.semValor} peça com valor R$0</span>
                   )}
                 </div>
               </div>

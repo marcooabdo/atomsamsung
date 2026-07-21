@@ -24,7 +24,7 @@ interface Regra {
 }
 
 const CATEGORIA_CONFIG: Record<string, { icon: typeof Package; label: string; color: string }> = {
-  pecas: { icon: Package, label: 'Pecas', color: '#00D4FF' },
+  pecas: { icon: Package, label: 'Peças', color: '#00D4FF' },
   financeiro: { icon: DollarSign, label: 'Financeiro', color: '#39FF14' },
   fiscal: { icon: FileText, label: 'Fiscal', color: '#FFA500' },
   operacional: { icon: Wrench, label: 'Operacional', color: '#FF6B35' },
@@ -183,7 +183,7 @@ export function ConfiguracoesRegrasFechamento({ selectedUnidade }: Props) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Codigo</label>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1 block">Código</label>
               <input
                 value={formData.codigo}
                 onChange={e => setFormData(p => ({ ...p, codigo: e.target.value.toUpperCase().replace(/\s/g, '_') }))}

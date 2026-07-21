@@ -54,7 +54,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
           textColor="text-blue-400"
           hoverBorder="hover:border-blue-400/40"
           value={formatCurrency(kpis.ticketMedio)}
-          label="Ticket Medio"
+          label="Ticket Médio"
         />
         <KPICard
           icon={Star}
@@ -160,7 +160,7 @@ export default function CIDashboardTab({ kpis, clientes, vendedores, dadosMensai
                   <CartesianGrid strokeDasharray="3 3" stroke="currentColor" strokeOpacity={0.15} />
                   <XAxis dataKey="name" stroke="currentColor" strokeOpacity={0.5} tick={{ fill: 'currentColor', fillOpacity: 0.7 }} />
                   <YAxis stroke="currentColor" strokeOpacity={0.5} tickFormatter={(v) => v >= 1000 ? `R$ ${(v/1000).toFixed(0)}k` : `R$ ${v}`} tick={{ fill: 'currentColor', fillOpacity: 0.7 }} />
-                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.4)', borderRadius: '12px', color: 'var(--text-primary)' }} formatter={(value: number, name: string) => [name === 'faturamento' ? formatCurrency(value) : value, name === 'faturamento' ? 'Faturamento' : 'Orcamentos']} />
+                  <Tooltip contentStyle={{ backgroundColor: 'var(--bg-card)', border: '1px solid rgba(var(--accent-rgb),0.4)', borderRadius: '12px', color: 'var(--text-primary)' }} formatter={(value: number, name: string) => [name === 'faturamento' ? formatCurrency(value) : value, name === 'faturamento' ? 'Faturamento' : 'Orçamentos']} />
                   <Area type="monotone" dataKey="faturamento" stroke="#06B6D4" strokeWidth={2} fillOpacity={1} fill="url(#ciAreaGradient)" />
                   <Line type="monotone" dataKey="orcamentos" stroke="#F59E0B" strokeWidth={2} dot={{ fill: '#F59E0B', strokeWidth: 2 }} />
                 </AreaChart>

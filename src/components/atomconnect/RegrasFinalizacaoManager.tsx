@@ -1,8 +1,5 @@
 import { useState, useEffect } from 'react';
-import {
-  Plus, Trash2, Edit2, Save, X, Loader2, MessageSquare, List,
-  ToggleLeft, ToggleRight, Clock, GripVertical, ChevronDown, ChevronUp
-} from 'lucide-react';
+import { Plus, Trash2, CreditCard as Edit2, Save, X, Loader2, MessageSquare, List, ToggleLeft, ToggleRight, Clock, GripVertical, ChevronDown, ChevronUp } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -311,7 +308,7 @@ Digite o numero correspondente a sua avaliacao.`,
                     )}
                   </div>
                   <p className="text-xs text-gray-400 mt-0.5">
-                    {regra.opcoes.length} opcoes - {regra.tipo_interacao === 'botoes' ? 'Botoes' : 'Opcoes numeradas'}
+                    {regra.opcoes.length} opções - {regra.tipo_interacao === 'botoes' ? 'Botões' : 'Opções numeradas'}
                   </p>
                 </div>
 
@@ -361,7 +358,7 @@ Digite o numero correspondente a sua avaliacao.`,
                       </div>
 
                       <div>
-                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Opcoes de resposta:</p>
+                        <p className="text-xs text-gray-500 uppercase tracking-wider mb-2">Opções de resposta:</p>
                         <div className="space-y-2">
                           {regra.opcoes.map((opcao, i) => (
                             <div key={i} className="flex items-start gap-3 p-3 bg-black/20 rounded-lg">
@@ -458,7 +455,7 @@ Digite o numero correspondente a sua avaliacao.`,
                       onChange={(e) => setForm(prev => ({ ...prev, tipo_interacao: e.target.value as any }))}
                       className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white focus:outline-none focus:border-white/20"
                     >
-                      <option value="opcoes_numeradas" className="bg-[#1A1A2E]">Opcoes Numeradas (1, 2, 3...)</option>
+                      <option value="opcoes_numeradas" className="bg-[#1A1A2E]">Opções Numeradas (1, 2, 3...)</option>
                       <option value="botoes" className="bg-[#1A1A2E]">Botoes do WhatsApp</option>
                     </select>
                   </div>
@@ -476,14 +473,14 @@ Digite o numero correspondente a sua avaliacao.`,
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20 resize-none"
                   />
                   <p className="text-[10px] text-gray-500 mt-1">
-                    Inclua as opcoes na mensagem se estiver usando opcoes numeradas
+                    Inclua as opções na mensagem se estiver usando opções numeradas
                   </p>
                 </div>
 
                 <div>
                   <div className="flex items-center justify-between mb-3">
                     <label className="text-sm font-medium text-gray-400">
-                      Opcoes de Resposta ({form.opcoes.length})
+                      Opções de Resposta ({form.opcoes.length})
                     </label>
                     <button
                       onClick={addOpcao}

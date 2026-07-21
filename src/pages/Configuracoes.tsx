@@ -825,11 +825,11 @@ export function Configuracoes() {
 
   const allTabs = [
     { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true },
-    { id: 'usuarios' as Tab, label: 'Usuarios', icon: Users, color: 'var(--neon-green)', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
-    { id: 'permissoes' as Tab, label: 'Permissoes', icon: Shield, color: '#FF6B6B', isAccent: false, onlyFor: ['master', 'diretoria'] },
-    { id: 'servicos' as Tab, label: 'Servicos', icon: Wrench, color: '#FFBF00', isAccent: false },
+    { id: 'usuarios' as Tab, label: 'Usuários', icon: Users, color: 'var(--neon-green)', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
+    { id: 'permissoes' as Tab, label: 'Permissões', icon: Shield, color: '#FF6B6B', isAccent: false, onlyFor: ['master', 'diretoria'] },
+    { id: 'servicos' as Tab, label: 'Serviços', icon: Wrench, color: '#FFBF00', isAccent: false },
     { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064', isAccent: false },
-    { id: 'taxas' as Tab, label: 'Taxa Maquina', icon: CreditCard, color: '#9D4EDD', isAccent: false },
+    { id: 'taxas' as Tab, label: 'Taxa Máquina', icon: CreditCard, color: '#9D4EDD', isAccent: false },
     { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },

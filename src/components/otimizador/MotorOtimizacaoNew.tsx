@@ -1351,11 +1351,11 @@ export default function MotorOtimizacaoNew() {
             <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <CalendarDays className="w-4 h-4" style={{ color: '#3B82F6' }} />
-                Periodo da Rota
+                Período da Rota
               </h3>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Data Inicio</label>
+                  <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--text-secondary)' }}>Data Início</label>
                   <input
                     type="date"
                     value={dataInicio}
@@ -1395,7 +1395,7 @@ export default function MotorOtimizacaoNew() {
             <div className="rounded-2xl p-5" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <h3 className="font-semibold mb-4 flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
                 <User className="w-4 h-4" style={{ color: '#10B981' }} />
-                Tecnico e Horarios
+                Técnico e Horários
               </h3>
               <div className="space-y-4">
                 <div>
@@ -1688,11 +1688,11 @@ export default function MotorOtimizacaoNew() {
               </h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
-                  <span style={{ color: 'var(--text-secondary)' }}>Periodo</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Período</span>
                   <span style={{ color: 'var(--text-primary)' }}>{maxDias} dia(s)</span>
                 </div>
                 <div className="flex justify-between text-sm">
-                  <span style={{ color: 'var(--text-secondary)' }}>Tecnico</span>
+                  <span style={{ color: 'var(--text-secondary)' }}>Técnico</span>
                   <span style={{ color: 'var(--text-primary)' }}>{tecnicoNome || '-'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
@@ -1771,7 +1771,7 @@ export default function MotorOtimizacaoNew() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { label: 'Distancia Total', value: `${metricas.km_total} km`, icon: Navigation, color: '#3B82F6' },
+          { label: 'Distância Total', value: `${metricas.km_total} km`, icon: Navigation, color: '#3B82F6' },
           { label: 'Tempo Estimado', value: `${Math.floor(metricas.tempo_total / 60)}h${metricas.tempo_total % 60}min`, icon: Clock, color: '#10B981' },
           { label: 'Dias', value: metricas.dias, icon: Calendar, color: '#F59E0B' },
           { label: 'Atendimentos', value: metricas.atendimentos, icon: Wrench, color: '#06B6D4' },

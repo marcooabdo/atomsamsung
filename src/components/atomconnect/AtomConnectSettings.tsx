@@ -917,7 +917,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
       <div className="flex-shrink-0 px-6 py-4 border-b border-white/10">
-        <h2 className="text-xl font-bold text-white">Configuracoes</h2>
+        <h2 className="text-xl font-bold text-white">Configurações</h2>
         <p className="text-sm text-gray-400">Gerencie instancias WhatsApp e preferencias</p>
       </div>
 
@@ -1341,7 +1341,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                         onClick={() => deleteColuna(coluna)}
                         disabled={(coluna.conversas_count || 0) > 0}
                         className="p-2 rounded-lg bg-white/5 text-gray-400 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-                        title={(coluna.conversas_count || 0) > 0 ? 'Nao e possivel excluir - possui conversas' : 'Excluir coluna'}
+                        title={(coluna.conversas_count || 0) > 0 ? 'Não é possível excluir - possui conversas' : 'Excluir coluna'}
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -1872,7 +1872,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs flex-shrink-0" style={{ color: accentColor }}>2</span>
-                    Toque em Menu ou Configuracoes e selecione Aparelhos conectados
+                    Toque em Menu ou Configurações e selecione Aparelhos conectados
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="w-5 h-5 rounded-full bg-white/10 flex items-center justify-center text-xs flex-shrink-0" style={{ color: accentColor }}>3</span>

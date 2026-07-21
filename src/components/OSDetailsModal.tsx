@@ -539,7 +539,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               <div>
                 <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
                   <Phone className="w-5 h-5" style={{ color: textSecondary }} />
-                  Informacoes do Cliente
+                  Informações do Cliente
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div>
@@ -601,7 +601,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   )}
                   {osDetails.aparelho_nserie && (
                     <div>
-                      <span style={{ color: textSecondary }}>Numero de Serie:</span>
+                      <span style={{ color: textSecondary }}>Número de Série:</span>
                       <p className="font-medium" style={{ color: textPrimary }}>{osDetails.aparelho_nserie}</p>
                     </div>
                   )}
@@ -643,7 +643,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 </div>
                 {osDetails.agendamento.tecnico_nome && (
                   <div>
-                    <span style={{ color: textSecondary }}>Tecnico:</span>
+                    <span style={{ color: textSecondary }}>Técnico:</span>
                     <p className="font-medium" style={{ color: textPrimary }}>{osDetails.agendamento.tecnico_nome}</p>
                   </div>
                 )}
@@ -681,7 +681,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
             <h3 className="font-semibold mb-3 flex items-center gap-2" style={{ color: textPrimary }}>
               <DollarSign className="w-5 h-5" style={{ color: textSecondary }} />
-              Informacoes Financeiras
+              Informações Financeiras
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm mb-4">
               <div>
@@ -750,7 +750,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
           {osDetails.pecas && osDetails.pecas.length > 0 && (
             <div className="pt-6" style={{ borderTop: `1px solid ${borderColor}` }}>
-              <h3 className="font-semibold mb-3" style={{ color: textPrimary }}>Pecas Aprovadas</h3>
+              <h3 className="font-semibold mb-3" style={{ color: textPrimary }}>Peças Aprovadas</h3>
               <div className="space-y-2">
                 {osDetails.pecas.map((peca, index) => (
                   <div

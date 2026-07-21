@@ -83,7 +83,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
   const handleSalvarVendedorResponsavel = async (novoVendedorId: string | null) => {
     if (!podeEditarVendedor() && os.vendedor_responsavel_id) {
-      alert('Somente gerentes, diretoria ou master podem alterar o vendedor responsavel.');
+      alert('Somente gerentes, diretoria ou master podem alterar o vendedor responsável.');
       return;
     }
 
@@ -115,12 +115,12 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
       let comentario = '';
       if (novoVendedorId === null) {
         comentario = vendedorAnterior
-          ? `Vendedor responsavel removido (era: ${vendedorAnterior.nome})`
-          : 'Vendedor responsavel removido';
+          ? `Vendedor responsável removido (era: ${vendedorAnterior.nome})`
+          : 'Vendedor responsável removido';
       } else if (vendedorAnterior) {
-        comentario = `Vendedor responsavel alterado de ${vendedorAnterior.nome} para ${vendedorNovo?.nome || 'Desconhecido'}`;
+        comentario = `Vendedor responsável alterado de ${vendedorAnterior.nome} para ${vendedorNovo?.nome || 'Desconhecido'}`;
       } else {
-        comentario = `Vendedor responsavel definido: ${vendedorNovo?.nome || 'Desconhecido'}`;
+        comentario = `Vendedor responsável definido: ${vendedorNovo?.nome || 'Desconhecido'}`;
       }
 
       const { error: commentError } = await supabase.from('os_comentarios').insert({
@@ -223,10 +223,10 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
   const getFormaPagamentoLabel = (forma: string) => {
     const labels: Record<string, string> = {
       pix: 'PIX',
-      cartao_credito: 'Cartao de Credito',
-      cartao_debito: 'Cartao de Debito',
+      cartao_credito: 'Cartão de Crédito',
+      cartao_debito: 'Cartão de Débito',
       dinheiro: 'Dinheiro',
-      transferencia: 'Transferencia',
+      transferencia: 'Transferência',
       boleto: 'Boleto',
       outro: 'Outro'
     };
@@ -258,25 +258,25 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
     return `Prezado(a) ${nomeCliente},
 
-Segue o orcamento do seu aparelho ${os.aparelho_modelo || 'Samsung'}:
+Segue o orçamento do seu aparelho ${os.aparelho_modelo || 'Samsung'}:
 
-*PECAS/SERVICOS:*
-${itensTexto || 'Servicos tecnicos'}
+*PEÇAS/SERVIÇOS:*
+${itensTexto || 'Serviços técnicos'}
 
 *VALOR TOTAL: R$ ${valorTotal.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}*
 
 *FORMAS DE PAGAMENTO:*
 - PIX (a vista)
-- Cartao de Credito (ate 12x)
-- Cartao de Debito
+- Cartão de Crédito (até 12x)
+- Cartão de Débito
 - Dinheiro
 
-O prazo para o servico e de aproximadamente 3 a 5 dias uteis apos a aprovacao do orcamento.
+O prazo para o serviço é de aproximadamente 3 a 5 dias úteis após a aprovação do orçamento.
 
-Ficamos no aguardo da sua confirmacao!
+Ficamos no aguardo da sua confirmação!
 
 Atenciosamente,
-Assistencia Tecnica Samsung`;
+Assistência Técnica Samsung`;
   };
 
   const copiarTexto = () => {
@@ -478,7 +478,7 @@ Assistencia Tecnica Samsung`;
 
   const handleReprovarOrcamento = async () => {
     if (!motivoReprovacao.trim()) {
-      alert('Por favor, informe o motivo da reprovacao.');
+      alert('Por favor, informe o motivo da reprovação.');
       return;
     }
 
@@ -521,13 +521,13 @@ Assistencia Tecnica Samsung`;
       const valorNumerico = parseFloat(descontoValor.replace(',', '.')) || 0;
 
       if (descontoTipo === 'percentual' && valorNumerico > 100) {
-        alert('O desconto percentual nao pode ser maior que 100%');
+        alert('O desconto percentual não pode ser maior que 100%');
         return;
       }
 
       const valorBruto = calcularSubtotal();
       if (descontoTipo === 'valor' && valorNumerico > valorBruto) {
-        alert('O desconto em valor nao pode ser maior que o valor total');
+        alert('O desconto em valor não pode ser maior que o valor total');
         return;
       }
 
@@ -629,15 +629,15 @@ Assistencia Tecnica Samsung`;
             </div>
             <div className="flex-1">
               <p className="text-sm font-bold text-[#FFBF00] uppercase tracking-wide mb-1">
-                Atencao: Orcamento Desatualizado
+                Atenção: Orçamento Desatualizado
               </p>
               <p className="text-xs text-[#FFBF00]/80 leading-relaxed">
-                O custo de uma ou mais pecas foi atualizado na entrada da Nota Fiscal. O valor total da OS foi recalculado automaticamente. E necessario gerar e enviar um <strong>NOVO ORCAMENTO</strong> para o cliente.
+                O custo de uma ou mais peças foi atualizado na entrada da Nota Fiscal. O valor total da OS foi recalculado automaticamente. É necessário gerar e enviar um <strong>NOVO ORÇAMENTO</strong> para o cliente.
               </p>
             </div>
             <div className="flex items-center gap-1 text-[10px] text-[#FFBF00]/60 whitespace-nowrap">
               <RefreshCw className="w-3 h-3" />
-              Reenvio necessario
+              Reenvio necessário
             </div>
           </div>
         )}
@@ -672,7 +672,7 @@ Assistencia Tecnica Samsung`;
           </div>
         )}
 
-        {/* VENDEDOR RESPONSAVEL - Em destaque no topo */}
+        {/* VENDEDOR RESPONSÁVEL - Em destaque no topo */}
         <div className={`premium-card p-6 ${vendedorResponsavel
           ? 'bg-gradient-to-r from-[#9D4EDD]/20 to-[#00D4FF]/10 border-2 border-[#9D4EDD]'
           : 'bg-gradient-to-r from-gray-800/50 to-gray-700/30 border-2 border-dashed border-gray-600'}`}>
@@ -694,7 +694,7 @@ Assistencia Tecnica Samsung`;
                   <h3 className={`text-lg font-bold uppercase tracking-wide ${
                     vendedorResponsavel ? 'text-[#9D4EDD]' : 'text-gray-400'
                   }`}>
-                    VENDEDOR RESPONSAVEL
+                    VENDEDOR RESPONSÁVEL
                   </h3>
                   {vendedorResponsavel && !podeEditarVendedor() && (
                     <Lock className="w-4 h-4 text-gray-500" title="Somente gerentes podem alterar" />
@@ -752,7 +752,7 @@ Assistencia Tecnica Samsung`;
                 <MessageSquare className="w-5 h-5 text-[#F59E0B]" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-[#F59E0B]">NEGOCIACAO DE ORCAMENTO</h3>
+                <h3 className="text-lg font-bold text-[#F59E0B]">NEGOCIAÇÃO DE ORÇAMENTO</h3>
                 <p className="text-xs text-gray-400">Envie, aprove ou reprove o orçamento</p>
               </div>
             </div>
@@ -768,7 +768,7 @@ Assistencia Tecnica Samsung`;
             <div className="mb-4 p-3 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30">
               <p className="text-xs text-[#00D4FF]">
                 <Check className="w-3 h-3 inline mr-1" />
-                Orcamento enviado em {new Date(os.orcamento_enviado_em).toLocaleString('pt-BR')}
+                Orçamento enviado em {new Date(os.orcamento_enviado_em).toLocaleString('pt-BR')}
               </p>
             </div>
           )}
@@ -1083,7 +1083,7 @@ Assistencia Tecnica Samsung`;
         <div>
           <h4 className="text-[#00D4FF] font-bold mb-3 uppercase text-sm flex items-center gap-2">
             <DollarSign className="w-4 h-4" />
-            Historico de Pagamentos ({pagamentos.length})
+            Histórico de Pagamentos ({pagamentos.length})
           </h4>
 
           {loading ? (
@@ -1167,7 +1167,7 @@ Assistencia Tecnica Samsung`;
                     <div>
                       <p className="text-xs text-gray-400 uppercase mb-1">
                         <User className="w-3 h-3 inline mr-1" />
-                        Responsavel
+                        Responsável
                       </p>
                       <p className="text-sm text-gray-300">{pagamento.responsavel_usuario?.nome}</p>
                     </div>
@@ -1229,7 +1229,7 @@ Assistencia Tecnica Samsung`;
 
                   {pagamento.observacoes && (
                     <div className="mb-3 premium-card p-3 bg-[#00D4FF]/5">
-                      <p className="text-xs text-gray-400 uppercase mb-1">Observacoes</p>
+                      <p className="text-xs text-gray-400 uppercase mb-1">Observações</p>
                       <p className="text-sm text-gray-300">{pagamento.observacoes}</p>
                     </div>
                   )}
@@ -1302,7 +1302,7 @@ Assistencia Tecnica Samsung`;
                   <Send className="w-6 h-6 text-[#25D366]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#00D4FF]">ENVIAR ORCAMENTO</h2>
+                  <h2 className="text-xl font-bold text-[#00D4FF]">ENVIAR ORÇAMENTO</h2>
                   <p className="text-xs text-gray-400">Copie o texto e envie pelo WhatsApp</p>
                 </div>
               </div>
@@ -1366,7 +1366,7 @@ Assistencia Tecnica Samsung`;
                   <div className="flex items-center gap-2">
                     <Send className="w-4 h-4 text-[#00D4FF]" />
                     <span className="text-xs text-[#00D4FF] uppercase tracking-wider font-bold">
-                      Link de Aprovacao
+                      Link de Aprovação
                     </span>
                   </div>
                   {approvalLink && !gerandoLink && (
@@ -1426,22 +1426,22 @@ Assistencia Tecnica Samsung`;
                         <li>✓ <strong>Negociar</strong> enviando uma mensagem</li>
                       </ul>
                       <p className="text-[10px] text-blue-300 mt-2">
-                        <strong>Importante:</strong> Ao tomar qualquer acao, o sistema capturara automaticamente:
+                        <strong>Importante:</strong> Ao tomar qualquer ação, o sistema capturará automaticamente:
                       </p>
                       <ul className="text-[10px] text-blue-300 mt-1 ml-4 space-y-1">
-                        <li>• Localizacao GPS do cliente</li>
-                        <li>• Selfie do cliente (via camera)</li>
-                        <li>• Data e hora da acao</li>
+                        <li>• Localização GPS do cliente</li>
+                        <li>• Selfie do cliente (via câmera)</li>
+                        <li>• Data e hora da ação</li>
                       </ul>
                       <p className="text-[10px] text-blue-300 mt-2">
-                        Todas essas informacoes serao salvas nos <strong>Anexos da OS</strong> automaticamente.
+                        Todas essas informações serão salvas nos <strong>Anexos da OS</strong> automaticamente.
                       </p>
                     </div>
                   </>
                 ) : (
                   <div className="text-center py-6">
                     <p className="text-xs text-gray-400 mb-4">
-                      Clique no botao abaixo para gerar um link de aprovacao
+                      Clique no botão abaixo para gerar um link de aprovação
                     </p>
                     <button
                       onClick={gerarLinkAprovacao}
@@ -1458,7 +1458,7 @@ Assistencia Tecnica Samsung`;
                       GERAR LINK
                     </button>
                     <p className="text-[10px] text-gray-500 mt-3">
-                      Link tera validade de 72 horas
+                      Link terá validade de 72 horas
                     </p>
                   </div>
                 )}
@@ -1500,8 +1500,8 @@ Assistencia Tecnica Samsung`;
                   <ThumbsDown className="w-6 h-6 text-[#FF0064]" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-[#FF0064]">REPROVAR ORCAMENTO</h2>
-                  <p className="text-xs text-gray-400">Informe o motivo da reprovacao</p>
+                  <h2 className="text-xl font-bold text-[#FF0064]">REPROVAR ORÇAMENTO</h2>
+                  <p className="text-xs text-gray-400">Informe o motivo da reprovação</p>
                 </div>
               </div>
               <button
@@ -1519,7 +1519,7 @@ Assistencia Tecnica Samsung`;
               <textarea
                 value={motivoReprovacao}
                 onChange={(e) => setMotivoReprovacao(e.target.value)}
-                placeholder="Digite o motivo da reprovacao..."
+                placeholder="Digite o motivo da reprovação..."
                 className="w-full h-32 px-4 py-3 bg-black/50 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-[#FF0064] focus:outline-none resize-none"
               />
             </div>
@@ -1545,7 +1545,7 @@ Assistencia Tecnica Samsung`;
                 }}
               >
                 <ThumbsDown className="w-5 h-5" />
-                {processando ? 'PROCESSANDO...' : 'CONFIRMAR REPROVACAO'}
+                {processando ? 'PROCESSANDO...' : 'CONFIRMAR REPROVAÇÃO'}
               </button>
             </div>
           </div>
@@ -1562,7 +1562,7 @@ Assistencia Tecnica Samsung`;
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-[#9D4EDD]">SELECIONAR VENDEDOR</h2>
-                  <p className="text-xs text-gray-400">Escolha o vendedor responsavel</p>
+                  <p className="text-xs text-gray-400">Escolha o vendedor responsável</p>
                 </div>
               </div>
               <button

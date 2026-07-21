@@ -219,7 +219,7 @@ export function MuralMissoes() {
               <div className="flex items-center gap-2">
                 <Flame className="w-3.5 h-3.5 text-red-400 animate-pulse" style={{ filter: 'drop-shadow(0 0 3px rgba(239,68,68,0.8))' }} />
                 <span className="text-[10px] font-black text-red-400 tracking-wider uppercase font-mono">
-                  ALERTA: {highPriorityCount} {highPriorityCount === 1 ? 'missao critica' : 'missoes criticas'} aguardando resolucao
+                  ALERTA: {highPriorityCount} {highPriorityCount === 1 ? 'missão crítica' : 'missões críticas'} aguardando resolução
                 </span>
               </div>
               <div className="flex items-center gap-1.5">

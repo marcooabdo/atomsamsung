@@ -483,8 +483,8 @@ export function EmitirNFSeModal({
               </h3>
               <p className="text-xs text-gray-500">
                 {osId ? `OS vinculada` : 'Emissao avulsa'}
-                {form.ambiente === 2 && ' - HOMOLOGACAO'}
-                {form.ambiente === 1 && ' - PRODUCAO'}
+                {form.ambiente === 2 && ' - HOMOLOGAÇÃO'}
+                {form.ambiente === 1 && ' - PRODUÇÃO'}
               </p>
             </div>
           </div>
@@ -598,7 +598,7 @@ export function EmitirNFSeModal({
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Numero</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Número</label>
                         <input
                           type="text"
                           value={form.tomadorNumero}
@@ -696,8 +696,8 @@ export function EmitirNFSeModal({
                             onChange={(e) => setForm(prev => ({ ...prev, ambiente: parseInt(e.target.value) }))}
                             className="modal-input w-full px-3 py-2 rounded text-sm focus:outline-none focus:border-[#FFA500]"
                           >
-                            <option value={2}>Homologacao</option>
-                            <option value={1}>Producao</option>
+                            <option value={2}>Homologação</option>
+                            <option value={1}>Produção</option>
                           </select>
                         </div>
                         <div>
@@ -840,7 +840,7 @@ export function EmitirNFSeModal({
                 </div>
 
                 <div className="mt-3">
-                  <label className="block text-[10px] text-gray-500 mb-1">Observacoes</label>
+                  <label className="block text-[10px] text-gray-500 mb-1">Observações</label>
                   <textarea
                     value={form.observacoes}
                     onChange={(e) => setForm(prev => ({ ...prev, observacoes: e.target.value }))}
@@ -862,7 +862,7 @@ export function EmitirNFSeModal({
                     <span className="text-[#39FF14] font-bold text-xl">{formatCurrency(form.valorServicos)}</span>
                   </div>
                   <p className="text-xs text-gray-500 mt-1">
-                    Provedor: Nacional | Ambiente: {form.ambiente === 1 ? 'Producao' : 'Homologacao'}
+                    Provedor: Nacional | Ambiente: {form.ambiente === 1 ? 'Produção' : 'Homologação'}
                   </p>
                 </div>
 

@@ -121,7 +121,7 @@ export default function DashboardExecutivo() {
       <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
         <div className="flex items-center gap-3 mb-3">
           <Calendar className="w-5 h-5" style={{ color: 'var(--text-accent)' }} />
-          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Periodo</span>
+          <span className="font-medium" style={{ color: 'var(--text-primary)' }}>Período</span>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <input type="date" value={dataInicio} onChange={(e) => setDataInicio(e.target.value)} className="px-3 py-2 rounded-lg text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-primary)', color: 'var(--text-primary)' }} />

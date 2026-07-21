@@ -294,10 +294,10 @@ export default function GestaoRotas() {
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-1">
             <Package className="w-4 h-4" style={{ color: '#06B6D4' }} />
-            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Peca Disponivel</span>
+            <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Peça Disponível</span>
           </div>
           <p className="text-2xl font-bold" style={{ color: '#06B6D4' }}>{pecaDisponivelOS.length}</p>
-          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Aguardando alocacao</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-tertiary)' }}>Aguardando alocação</p>
         </div>
         <div className="rounded-xl p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
           <div className="flex items-center gap-2 mb-1">
@@ -358,7 +358,7 @@ export default function GestaoRotas() {
             <div className="flex items-center gap-2">
               <Package className="w-4 h-4" style={{ color: '#06B6D4' }} />
               <span className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-                Peca Disponivel ({pecaDisponivelOS.length})
+                Peça Disponível ({pecaDisponivelOS.length})
               </span>
             </div>
             <button onClick={loadData} className="p-1 rounded-md hover:bg-black/10 transition-colors">
@@ -389,7 +389,7 @@ export default function GestaoRotas() {
             ) : cityGroups.length === 0 ? (
               <div className="p-8 text-center">
                 <CheckCircle2 className="w-8 h-8 mx-auto mb-2" style={{ color: '#10B98140' }} />
-                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS em Peca Disponivel</p>
+                <p className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS em Peça Disponível</p>
               </div>
             ) : (
               <div className="p-1.5 space-y-1">
@@ -613,7 +613,7 @@ export default function GestaoRotas() {
             <div className="rounded-xl p-8 text-center" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
               <Navigation className="w-8 h-8 mx-auto mb-2 opacity-30" style={{ color: 'var(--text-secondary)' }} />
               <p className="text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>Nenhuma OS em rota</p>
-              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Mova OS da coluna "Peca Disponivel" para uma rota</p>
+              <p className="text-xs mt-1" style={{ color: 'var(--text-tertiary)' }}>Mova OS da coluna "Peça Disponível" para uma rota</p>
             </div>
           )}
         </div>

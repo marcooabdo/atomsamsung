@@ -206,7 +206,7 @@ export default function CICarteiraTab({
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <StatBlock label="Faturado" value={formatCurrency(getValorCliente(selectedCliente))} color="text-cyan-400" />
-                    <StatBlock label="Ticket Medio" value={formatCurrency(selectedCliente.ticketMedio)} color="text-blue-400" />
+                    <StatBlock label="Ticket Médio" value={formatCurrency(selectedCliente.ticketMedio)} color="text-blue-400" />
                     <StatBlock label="Total OS" value={String(selectedCliente.totalOS)} />
                     <StatBlock
                       label="Status"
@@ -220,7 +220,7 @@ export default function CICarteiraTab({
                     <div className="mt-4 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center gap-3">
                       <Award className="w-4 h-4 text-emerald-400" />
                       <div>
-                        <p className="text-xs text-emerald-400/70">Vendedor Responsavel</p>
+                        <p className="text-xs text-emerald-400/70">Vendedor Responsável</p>
                         <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>{selectedCliente.vendedorNome}</p>
                       </div>
                     </div>

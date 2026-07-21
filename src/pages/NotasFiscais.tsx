@@ -587,7 +587,7 @@ export function NotasFiscais() {
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                placeholder="Numero, chave, tomador, OS..."
+                placeholder="Número, chave, tomador, OS..."
                 className="neon-input w-full pl-10"
               />
             </div>
@@ -640,7 +640,7 @@ export function NotasFiscais() {
 
           {/* Periodo */}
           <div>
-            <label className="block text-xs text-gray-400 mb-2">Periodo</label>
+            <label className="block text-xs text-gray-400 mb-2">Período</label>
             <select
               value={periodoFiltro}
               onChange={(e) => setPeriodoFiltro(e.target.value as any)}

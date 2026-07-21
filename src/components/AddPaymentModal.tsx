@@ -152,7 +152,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
 
     const valorNum = parseFloat(valor);
     if (!valor || isNaN(valorNum) || valorNum <= 0) {
-      alert('Digite um valor valido maior que zero');
+      alert('Digite um valor válido maior que zero');
       return false;
     }
 
@@ -494,7 +494,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
               <div className="premium-card p-6 bg-gradient-to-br from-[#00D4FF]/10 to-transparent border-2 border-[#00D4FF]/30 space-y-5">
                 <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
                   <CreditCard className="w-5 h-5" />
-                  Informacoes do PIX
+                  Informações do PIX
                 </h3>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -526,7 +526,7 @@ export function AddPaymentModal({ os, onClose, onSuccess }: AddPaymentModalProps
                       className="neon-input font-mono"
                     />
                     <p className="text-xs text-gray-500 mt-2">
-                      Numero sequencial unico (se disponivel)
+                      Número sequencial único (se disponível)
                     </p>
                   </div>
                 </div>

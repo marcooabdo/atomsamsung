@@ -27,7 +27,7 @@ interface FecharOSModalProps {
 }
 
 const CATEGORIA_CONFIG: Record<string, { icon: typeof Package; label: string; color: string }> = {
-  pecas: { icon: Package, label: 'Pecas', color: '#00D4FF' },
+  pecas: { icon: Package, label: 'Peças', color: '#00D4FF' },
   financeiro: { icon: DollarSign, label: 'Financeiro', color: '#39FF14' },
   fiscal: { icon: FileText, label: 'Fiscal', color: '#FFA500' },
   operacional: { icon: Wrench, label: 'Operacional', color: '#FF6B35' },
@@ -72,7 +72,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
         alertas: [],
         bloqueios: [{
           regra_codigo: 'ERRO_VALIDACAO',
-          regra_titulo: 'Erro na validacao',
+          regra_titulo: 'Erro na validação',
           categoria: 'operacional',
           severidade: 'bloqueante',
           mensagem: 'Ocorreu um erro ao validar a OS. Tente novamente.',
@@ -327,7 +327,7 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
                     <div className="p-4 rounded-2xl" style={{ background: 'rgba(57,255,20,0.1)', border: '1px solid rgba(57,255,20,0.3)' }}>
                       <ShieldCheck className="w-10 h-10 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 12px rgba(57,255,20,0.5))' }} />
                     </div>
-                    <p className="text-base font-black text-[#39FF14]">TODAS AS VERIFICACOES APROVADAS</p>
+                    <p className="text-base font-black text-[#39FF14]">TODAS AS VERIFICAÇÕES APROVADAS</p>
                     <p className="text-xs text-gray-400 text-center max-w-xs">
                       A OS esta pronta para ser fechada. Todos os criterios de qualidade foram atendidos.
                     </p>

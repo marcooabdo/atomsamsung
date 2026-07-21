@@ -209,10 +209,10 @@ export function VendasDashboard({ vendas, unidades, canSeeAllUnits, userUnidadeI
             className="neon-input text-sm"
             style={{ minWidth: '140px' }}
           >
-            <option value="all">Todo Periodo</option>
-            <option value="semana">Ultima Semana</option>
-            <option value="mes">Este Mes</option>
-            <option value="trimestre">Ultimo Trimestre</option>
+            <option value="all">Todo Período</option>
+            <option value="semana">Última Semana</option>
+            <option value="mes">Este Mês</option>
+            <option value="trimestre">Último Trimestre</option>
           </select>
         </div>
       </header>

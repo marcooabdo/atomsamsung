@@ -60,8 +60,8 @@ interface FinalizadaConversa {
 
 const RESULTADO_MAP: Record<string, { label: string; icon: any; color: string }> = {
   venda_realizada: { label: 'Venda Realizada', icon: ShoppingCart, color: '#10b981' },
-  orcamento_enviado: { label: 'Orcamento Enviado', icon: Send, color: '#3b82f6' },
-  orcamento_recusado: { label: 'Orcamento Recusado', icon: XIcon, color: '#ef4444' },
+  orcamento_enviado: { label: 'Orçamento Enviado', icon: Send, color: '#3b82f6' },
+  orcamento_recusado: { label: 'Orçamento Recusado', icon: XIcon, color: '#ef4444' },
   agendamento_marcado: { label: 'Agendamento Marcado', icon: Calendar, color: '#8b5cf6' },
   apenas_informacao: { label: 'Apenas Informacao', icon: Info, color: '#6b7280' },
   sem_interesse: { label: 'Sem Interesse', icon: PhoneOff, color: '#f59e0b' },
@@ -404,47 +404,47 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
   const handleExportDashboard = async () => {
     const rows: Record<string, any>[] = [];
     rows.push({
-      'Metrica': 'Total de Conversas', 'Valor': stats.totalConversas
+      'Métrica': 'Total de Conversas', 'Valor': stats.totalConversas
     });
     rows.push({
-      'Metrica': 'Conversas Hoje', 'Valor': stats.conversasHoje
+      'Métrica': 'Conversas Hoje', 'Valor': stats.conversasHoje
     });
     rows.push({
-      'Metrica': 'Sem Atendente', 'Valor': stats.semAtendente
+      'Métrica': 'Sem Atendente', 'Valor': stats.semAtendente
     });
     rows.push({
-      'Metrica': 'Tempo Medio 1a Resposta', 'Valor': formatDuration(responseMetrics?.avg_first_response_seconds || 0)
+      'Métrica': 'Tempo Médio 1a Resposta', 'Valor': formatDuration(responseMetrics?.avg_first_response_seconds || 0)
     });
     rows.push({
-      'Metrica': 'Tempo Medio Entre Respostas', 'Valor': formatDuration(responseMetrics?.avg_between_response_seconds || 0)
+      'Métrica': 'Tempo Médio Entre Respostas', 'Valor': formatDuration(responseMetrics?.avg_between_response_seconds || 0)
     });
     rows.push({
-      'Metrica': 'SLA Expirado', 'Valor': responseMetrics?.sla_expired_count || 0
+      'Métrica': 'SLA Expirado', 'Valor': responseMetrics?.sla_expired_count || 0
     });
     rows.push({
-      'Metrica': 'Vendas Realizadas', 'Valor': opportunityStats.vendas
+      'Métrica': 'Vendas Realizadas', 'Valor': opportunityStats.vendas
     });
     rows.push({
-      'Metrica': 'Valor Vendas', 'Valor': opportunityStats.valorVendas
+      'Métrica': 'Valor Vendas', 'Valor': opportunityStats.valorVendas
     });
     rows.push({
-      'Metrica': 'Orcamentos Pendentes', 'Valor': opportunityStats.orcamentos
+      'Métrica': 'Orçamentos Pendentes', 'Valor': opportunityStats.orcamentos
     });
     rows.push({
-      'Metrica': 'Orcamentos Recusados', 'Valor': opportunityStats.recusados
+      'Métrica': 'Orçamentos Recusados', 'Valor': opportunityStats.recusados
     });
     rows.push({
-      'Metrica': 'Taxa de Conversao', 'Valor': `${opportunityStats.taxaConversao.toFixed(1)}%`
+      'Métrica': 'Taxa de Conversao', 'Valor': `${opportunityStats.taxaConversao.toFixed(1)}%`
     });
-    rows.push({ 'Metrica': '', 'Valor': '' });
-    rows.push({ 'Metrica': '--- Conversas por Estagio ---', 'Valor': '' });
+    rows.push({ 'Métrica': '', 'Valor': '' });
+    rows.push({ 'Métrica': '--- Conversas por Estagio ---', 'Valor': '' });
     for (const col of stats.conversasPorColuna) {
-      rows.push({ 'Metrica': col.coluna, 'Valor': col.count });
+      rows.push({ 'Métrica': col.coluna, 'Valor': col.count });
     }
-    rows.push({ 'Metrica': '', 'Valor': '' });
-    rows.push({ 'Metrica': '--- Ranking Atendentes ---', 'Valor': '' });
+    rows.push({ 'Métrica': '', 'Valor': '' });
+    rows.push({ 'Métrica': '--- Ranking Atendentes ---', 'Valor': '' });
     for (const a of stats.topAtendentes) {
-      rows.push({ 'Metrica': a.nome, 'Valor': a.atendimentos });
+      rows.push({ 'Métrica': a.nome, 'Valor': a.atendimentos });
     }
 
     const attendantRows = perAttendant
@@ -689,7 +689,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
           </div>
           <p className="text-2xl font-bold text-white">{formatDuration(avgFirstResponse)}</p>
-          <p className="text-sm text-gray-400 mt-1">Tempo Medio 1a Resposta</p>
+          <p className="text-sm text-gray-400 mt-1">Tempo Médio 1a Resposta</p>
           <p className="text-xs mt-2" style={{ color: firstResponseColor }}>
             SLA: {slaMinutes}min
           </p>
@@ -703,7 +703,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
           </div>
           <p className="text-2xl font-bold text-white">{formatDuration(avgBetween)}</p>
-          <p className="text-sm text-gray-400 mt-1">Tempo Medio Entre Respostas</p>
+          <p className="text-sm text-gray-400 mt-1">Tempo Médio Entre Respostas</p>
           <p className="text-xs text-gray-500 mt-2">Cliente enviou - voce respondeu</p>
         </div>
 
@@ -831,7 +831,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
               </div>
             </div>
             <p className="text-2xl font-bold text-blue-400">{opportunityStats.orcamentos}</p>
-            <p className="text-sm text-gray-400 mt-1">Orcamentos Pendentes</p>
+            <p className="text-sm text-gray-400 mt-1">Orçamentos Pendentes</p>
             {opportunityStats.valorOrcamentos > 0 && (
               <p className="text-xs text-blue-400/70 mt-1 font-medium">{formatCurrency(opportunityStats.valorOrcamentos)}</p>
             )}
@@ -845,7 +845,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
               </div>
             </div>
             <p className="text-2xl font-bold text-red-400">{opportunityStats.recusados}</p>
-            <p className="text-sm text-gray-400 mt-1">Orcamentos Recusados</p>
+            <p className="text-sm text-gray-400 mt-1">Orçamentos Recusados</p>
           </div>
 
           <div className="p-5 rounded-xl bg-white/5 border border-white/10 relative overflow-hidden">
@@ -857,7 +857,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
             </div>
             <p className="text-2xl font-bold" style={{ color: accentColor }}>{opportunityStats.taxaConversao.toFixed(0)}%</p>
             <p className="text-sm text-gray-400 mt-1">Taxa de Conversao</p>
-            <p className="text-xs text-gray-500 mt-1">Orcamento &rarr; Venda</p>
+            <p className="text-xs text-gray-500 mt-1">Orçamento &rarr; Venda</p>
           </div>
         </div>
       )}
@@ -865,7 +865,7 @@ export function AtomConnectDashboard({ accentColor, unidadeId }: Props) {
       {!hasData && finalizadas.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-20 text-gray-500">
           <Inbox className="w-16 h-16 mb-4 opacity-30" />
-          <p className="text-lg font-medium text-white/40">Nenhum dado disponivel</p>
+          <p className="text-lg font-medium text-white/40">Nenhum dado disponível</p>
           <p className="text-sm text-white/20 mt-1">As metricas aparecerao conforme as conversas forem criadas</p>
         </div>
       ) : (

@@ -441,7 +441,7 @@ export function GIA() {
                 <div className="flex flex-wrap gap-2 justify-center max-w-lg">
                   {[
                     'Como estao as OS hoje?',
-                    'Analise o faturamento do mes',
+                    'Analise o faturamento do mês',
                     'Quais pecas estao em falta?',
                     'Produtividade da equipe',
                   ].map((suggestion) => (

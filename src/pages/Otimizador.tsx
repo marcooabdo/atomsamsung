@@ -60,7 +60,7 @@ const TABS: Array<{ id: OtimizadorTab; label: string; icon: any; color: string }
   { id: 'motor', label: 'Otimizador', icon: Zap, color: '#FFBF00' },
   { id: 'equipe', label: 'Equipe', icon: Users, color: '#06B6D4' },
   { id: 'checklists', label: 'Checklists', icon: CheckSquare, color: '#EC4899' },
-  { id: 'pecas', label: 'Pecas', icon: Package, color: '#F97316' },
+  { id: 'pecas', label: 'Peças', icon: Package, color: '#F97316' },
   { id: 'analytics', label: 'Analytics', icon: BarChart3, color: '#10B981' },
   { id: 'historico', label: 'Rotas Realizadas', icon: FolderOpen, color: '#3B82F6' },
   { id: 'config', label: 'Config', icon: Cog, color: '#6B7280' },

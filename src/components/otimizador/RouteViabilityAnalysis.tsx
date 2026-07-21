@@ -144,17 +144,17 @@ export default function RouteViabilityAnalysis({ osFinanceiros, kmTotal, diasPer
           </div>
           <div className="text-left">
             <span className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>
-              Analise de Viabilidade da Rota
+              Análise de Viabilidade da Rota
             </span>
             <div className="flex items-center gap-3 mt-0.5">
               <span
                 className="text-xs font-bold px-2 py-0.5 rounded-full"
                 style={{ backgroundColor: badgeColor + '20', color: badgeColor }}
               >
-                {analise.viavel ? 'ROTA VIAVEL' : 'ROTA NAO VIAVEL'}
+                {analise.viavel ? 'ROTA VIÁVEL' : 'ROTA NÃO VIÁVEL'}
               </span>
               <span className="text-xs" style={{ color: 'var(--text-secondary)' }}>
-                {analise.multiplicador.toFixed(1)}x retorno ({multiplicadorMinimo}x minimo)
+                {analise.multiplicador.toFixed(1)}x retorno ({multiplicadorMinimo}x mínimo)
               </span>
             </div>
           </div>
@@ -270,10 +270,10 @@ export default function RouteViabilityAnalysis({ osFinanceiros, kmTotal, diasPer
                 <AlertTriangle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#EF4444' }} />
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#EF4444' }}>
-                    Rota nao atinge o retorno minimo de {multiplicadorMinimo}x
+                    Rota não atinge o retorno mínimo de {multiplicadorMinimo}x
                   </p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
-                    Faltam <strong style={{ color: '#EF4444' }}>{formatCurrency(analise.deficitParaViavel)}</strong> em receita para atingir o multiplicador minimo.
+                    Faltam <strong style={{ color: '#EF4444' }}>{formatCurrency(analise.deficitParaViavel)}</strong> em receita para atingir o multiplicador mínimo.
                     Considere:
                   </p>
                   <ul className="mt-2 space-y-1">
@@ -301,7 +301,7 @@ export default function RouteViabilityAnalysis({ osFinanceiros, kmTotal, diasPer
                 <CheckCircle2 className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: '#10B981' }} />
                 <div>
                   <p className="text-sm font-semibold" style={{ color: '#10B981' }}>
-                    Rota viavel! Retorno de {analise.multiplicador.toFixed(1)}x sobre o investimento
+                    Rota viável! Retorno de {analise.multiplicador.toFixed(1)}x sobre o investimento
                   </p>
                   <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)' }}>
                     A receita estimada de {formatCurrency(analise.receitaTotal)} supera o custo operacional de {formatCurrency(analise.custoTotal)} em mais de {multiplicadorMinimo}x.

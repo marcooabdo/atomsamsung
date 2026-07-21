@@ -853,7 +853,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
     const formattedPhone = formatPhoneNumber(phone);
     if (formattedPhone.length < 10) {
-      setWhatsAppError('Numero de telefone invalido');
+      setWhatsAppError('Número de telefone inválido');
       return;
     }
 
@@ -5981,7 +5981,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         {buscaServico ? 'Nenhum servico encontrado' : `Nenhum servico cadastrado para ${linhaAtual}`}
                       </p>
                       <p className="text-gray-600 text-xs mt-2">
-                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre servicos para esta linha em Configuracoes'}
+                        {buscaServico ? 'Tente outro termo de busca' : 'Cadastre serviços para esta linha em Configurações'}
                       </p>
                     </div>
                   );

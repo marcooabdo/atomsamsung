@@ -449,7 +449,7 @@ export function AtomConnectMarketing({ accentColor, unidadeId }: Props) {
                     </select>
                     {instancias.length === 0 && (
                       <p className="text-xs text-red-400 mt-1">
-                        Nenhuma instancia configurada. Vá em Configuracoes para adicionar.
+                        Nenhuma instância configurada. Vá em Configurações para adicionar.
                       </p>
                     )}
                   </div>

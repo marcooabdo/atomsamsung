@@ -260,9 +260,9 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
       }
 
       const STATUS_LABELS: Record<string, string> = {
-        disponivel: 'Disponivel',
+        disponivel: 'Disponível',
         reservada: 'Reservada',
-        vinculada_tecnico: 'Com Tecnico',
+        vinculada_tecnico: 'Com Técnico',
         em_rota: 'Em Rota',
         em_uso: 'Em Uso',
         usada: 'Usada',

@@ -386,7 +386,7 @@ export default function ControlePecas() {
                     onChange={(e) => setFiltroTecnico(e.target.value)}
                     className="px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-orange-500 transition-colors"
                   >
-                    <option value="todos">Todos Tecnicos</option>
+                    <option value="todos">Todos Técnicos</option>
                     {tecnicos.map(t => (
                       <option key={t.id} value={t.id}>{t.nome}</option>
                     ))}
@@ -581,11 +581,11 @@ export default function ControlePecas() {
                 <div className="bg-gray-800/50 border border-gray-700 rounded-xl p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <Truck className="w-5 h-5 text-cyan-400" />
-                    <h3 className="text-lg font-bold text-white">Resumo Tecnico</h3>
+                    <h3 className="text-lg font-bold text-white">Resumo Técnico</h3>
                   </div>
                   <div className="space-y-2 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-400">Total com tecnico</span>
+                      <span className="text-gray-400">Total com técnico</span>
                       <span className="text-white font-bold">{filteredRequisicoes.length}</span>
                     </div>
                     <div className="flex justify-between">

@@ -48,7 +48,7 @@ export function exportExcel(
         'Fechada em': os.fechada_em ? new Date(os.fechada_em).toLocaleDateString('pt-BR') : '',
         'Vendedor': os.vendedorNome,
         'Modelo': os.aparelho_modelo || '',
-        'Pecas': os.pecas.map(p => p.descricao).join('; ')
+        'Peças': os.pecas.map(p => p.descricao).join('; ')
       });
     });
   });
@@ -73,7 +73,7 @@ export function exportExcel(
       'Valor Total': p.valorTotal,
       'Valor Medio': p.valorMedio
     }));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pecasSheet), 'Pecas');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(pecasSheet), 'Peças');
   }
 
   XLSX.writeFile(wb, `customer_intelligence_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -132,7 +132,7 @@ export function generateHTMLReport(
     <p>Relatorio gerado em ${now}</p>
     <div class="filters">
       ${filters.tipo !== 'geral' ? `<span class="filter-tag">Tipo: ${filters.tipo}</span>` : ''}
-      <span class="filter-tag">Periodo: ${filters.periodo === 'todos' ? 'Todo Periodo' : filters.periodo}</span>
+      <span class="filter-tag">Período: ${filters.periodo === 'todos' ? 'Todo Período' : filters.periodo}</span>
       ${filters.unidade ? `<span class="filter-tag">Unidade filtrada</span>` : '<span class="filter-tag">Todas Unidades</span>'}
     </div>
   </div>
@@ -219,7 +219,7 @@ export function generateHTMLReport(
 
   ${pecas.length > 0 ? `
   <div class="section">
-    <h2>Pecas Mais Utilizadas (Top 20)</h2>
+    <h2>Peças Mais Utilizadas (Top 20)</h2>
     <table>
       <thead>
         <tr>

@@ -87,12 +87,12 @@ async function fetchAllPages<T>(
 
 const KANBAN_LABELS: Record<string, { label: string; color: string }> = {
   os_nova: { label: 'OS Nova', color: '#0EA5E9' },
-  diagnostico: { label: 'Diagnostico', color: '#8B5CF6' },
-  negociacao_em_andamento: { label: 'Negociacao', color: '#F59E0B' },
+  diagnostico: { label: 'Diagnóstico', color: '#8B5CF6' },
+  negociacao_em_andamento: { label: 'Negociação', color: '#F59E0B' },
   orcamento_aprovado: { label: 'Orc. Aprovado', color: '#10B981' },
   orcamentos_rejeitados: { label: 'Orc. Rejeitado', color: '#EF4444' },
-  aguardando_peca: { label: 'Aguardando Peca', color: '#F97316' },
-  peca_em_transito: { label: 'Peca em Transito', color: '#06B6D4' },
+  aguardando_peca: { label: 'Aguardando Peça', color: '#F97316' },
+  peca_em_transito: { label: 'Peça em Trânsito', color: '#06B6D4' },
   em_reparo: { label: 'Em Reparo', color: '#10B981' },
   em_reparo_ci: { label: 'Reparo CI', color: '#22C55E' },
   rota_azul: { label: 'Rota Azul', color: '#3B82F6' },
@@ -438,9 +438,9 @@ export function Dashboard() {
 
           return {
             id: cotacao.id,
-            numero_os: `Cotacao #${cotacao.numero_cotacao}`,
+            numero_os: `Cotação #${cotacao.numero_cotacao}`,
             tipo_os: cotacao.tipo_os,
-            cliente_nome: cotacao.cliente_nome || 'Cliente nao informado',
+            cliente_nome: cotacao.cliente_nome || 'Cliente não informado',
             created_at: cotacao.created_at,
             fechada_em: cotacao.aprovada_em || cotacao.reprovada_em,
             coluna_kanban: cotacao.status,
@@ -466,7 +466,7 @@ export function Dashboard() {
             id: os.id,
             numero_os: os.numero_os_samsung || os.numero_os_interna || 'S/N',
             tipo_os: os.tipo_os,
-            cliente_nome: os.cliente_nome || 'Cliente nao informado',
+            cliente_nome: os.cliente_nome || 'Cliente não informado',
             created_at: os.created_at,
             fechada_em: os.orcamento_aprovado_em,
             coluna_kanban: os.coluna_kanban,
@@ -505,7 +505,7 @@ export function Dashboard() {
             id: os.id,
             numero_os: os.numero_os || os.numero_os_samsung || 'S/N',
             tipo_os: os.tipo_os,
-            cliente_nome: os.cliente_nome || 'Cliente nao informado',
+            cliente_nome: os.cliente_nome || 'Cliente não informado',
             created_at: os.created_at,
             fechada_em: os.fechada_em,
             coluna_kanban: os.coluna_kanban,
@@ -538,11 +538,11 @@ export function Dashboard() {
   const statCards = [
     { title: 'Total de OS', value: stats.totalOS, icon: FileText, color: '#0EA5E9', hasGoal: false },
     { title: 'OS Abertas', value: stats.osAbertas, icon: Activity, color: '#3B82F6', hasGoal: false },
-    { title: 'Cotacoes Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
-    { title: 'Cotacoes Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
-    { title: 'Pecas Disponiveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
+    { title: 'Cotações Pendentes', value: stats.cotacoesPendentes, icon: Clock, color: '#F59E0B', hasGoal: false },
+    { title: 'Cotações Aprovadas', value: stats.cotacoesAprovadas, icon: CheckCircle, color: '#10B981', hasGoal: false },
+    { title: 'Peças Disponíveis', value: stats.pecasDisponiveis, icon: Package, color: '#06B6D4', hasGoal: false },
     { title: 'Agendamentos', value: stats.agendamentos, icon: Users, color: '#0EA5E9', hasGoal: false },
-    { title: 'Receita LP', value: stats.receitaLP, subtitle: `${stats.osLPFechadas} fechadas no periodo`, icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaLPContagem, isCount: true, onClick: () => {
+    { title: 'Receita LP', value: stats.receitaLP, subtitle: `${stats.osLPFechadas} fechadas no período`, icon: DollarSign, color: '#10B981', hasGoal: true, goal: stats.metaLPContagem, isCount: true, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -550,7 +550,7 @@ export function Dashboard() {
       }
       setShowGoalsModal(true);
     } },
-    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), subtitle: `${stats.totalOSOW} OS no periodo`, icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
+    { title: 'Receita OW', value: formatCurrency(stats.receitaOW), subtitle: `${stats.totalOSOW} OS no período`, icon: DollarSign, color: '#0EA5E9', hasGoal: true, goal: stats.metaReceitaOW, onClick: () => {
       const unidadeId = selectedUnidade || usuario?.unidade_id;
       if (!unidadeId) {
         setShowInfoModal(true);
@@ -581,7 +581,7 @@ export function Dashboard() {
       }}>
         <div className="flex items-center gap-2">
           <Filter className="w-5 h-5 text-cyan-400" />
-          <span className="text-gray-400 text-sm font-medium">Periodo:</span>
+          <span className="text-gray-400 text-sm font-medium">Período:</span>
         </div>
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2">
@@ -802,7 +802,7 @@ export function Dashboard() {
                 </span>
               </div>
             )) : (
-              <p className="text-xs text-gray-500 text-center py-4">Nenhuma OS aberta no periodo</p>
+              <p className="text-xs text-gray-500 text-center py-4">Nenhuma OS aberta no período</p>
             )}
           </div>
         </div>
@@ -875,7 +875,7 @@ export function Dashboard() {
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Taxa de Aprovacao</span>
+                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Taxa de Aprovação</span>
                 <span className="text-xs text-[#10B981] font-bold">{stats.taxaAprovacao.toFixed(1)}%</span>
               </div>
               <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
@@ -902,7 +902,7 @@ export function Dashboard() {
               }}
             >
               <div className="flex justify-between items-center mb-1.5">
-                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Eficiencia Operacional</span>
+                <span className="text-[10px] uppercase tracking-wider font-bold" style={{ color: 'var(--text-secondary)' }}>Eficiência Operacional</span>
                 <span className="text-xs text-[#0EA5E9] font-bold">{stats.eficienciaOperacional.toFixed(1)} dias</span>
               </div>
               <div className="h-1.5 bg-[var(--progress-track)] rounded-full overflow-hidden">
@@ -928,7 +928,7 @@ export function Dashboard() {
         isOpen={showPerformanceModal}
         onClose={() => setShowPerformanceModal(false)}
         metric={performanceModalType}
-        title={performanceModalType === 'eficiencia' ? 'Eficiencia Operacional' : 'Taxa de Aprovacao'}
+        title={performanceModalType === 'eficiencia' ? 'Eficiência Operacional' : 'Taxa de Aprovação'}
         osList={performanceOSList}
         targetValue={performanceModalType === 'eficiencia' ? stats.metaEficiencia : stats.metaTaxaAprovacao}
         currentValue={performanceModalType === 'eficiencia' ? stats.eficienciaOperacional : stats.taxaAprovacao}

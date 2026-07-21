@@ -200,7 +200,7 @@ export function ReactiveCards({ cards }: ReactiveCardsProps) {
             </div>
             <p className="text-sm font-medium" style={{ color: '#2d4a6e' }}>Dashboard Reativo</p>
             <p className="text-xs mt-1.5" style={{ color: '#1a2e47' }}>
-              Cards de dados aparecerao aqui conforme a GIA analisa as informacoes
+              Cards de dados aparecerao aqui conforme a GIA analisa as informações
             </p>
           </motion.div>
         )}

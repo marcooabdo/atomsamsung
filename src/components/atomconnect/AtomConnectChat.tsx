@@ -1088,7 +1088,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (error) {
-      alert('Nao foi possivel acessar o microfone. Verifique as permissoes do navegador.');
+      alert('Não foi possível acessar o microfone. Verifique as permissoes do navegador.');
     }
   };
 
@@ -2408,7 +2408,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 </div>
                 <p className="text-xs" style={{ color: textSecondary }}>{conversa.cliente_telefone}</p>
                 <p className="text-[10px] mt-1" style={{ color: textSecondary }}>
-                  Ultima resposta: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
+                  Última resposta: {formatLastSeen(conversa.ultima_resposta_cliente_at)}
                 </p>
               </div>
 
@@ -2531,7 +2531,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
               <div className="space-y-1.5">
                 {atendentes.length === 0 ? (
-                  <p className="text-xs text-gray-500 text-center py-4">Nenhum atendente disponivel</p>
+                  <p className="text-xs text-gray-500 text-center py-4">Nenhum atendente disponível</p>
                 ) : (
                   atendentes
                     .filter(a => a.id !== usuario?.id)
@@ -2604,7 +2604,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                 <div className="text-center py-6">
                   <MessageSquare className="w-12 h-12 mx-auto mb-3 text-gray-600" />
                   <p className="text-sm mb-2" style={{ color: textSecondary }}>Nenhuma regra de avaliação configurada</p>
-                  <p className="text-xs mb-4" style={{ color: textSecondary }}>Configure regras em Configuracoes &gt; Finalizacao</p>
+                  <p className="text-xs mb-4" style={{ color: textSecondary }}>Configure regras em Configurações &gt; Finalização</p>
                   <button
                     onClick={finalizarDiretamente}
                     className="px-4 py-2 rounded-lg text-xs font-medium transition-colors"

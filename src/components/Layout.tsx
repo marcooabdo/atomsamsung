@@ -46,7 +46,7 @@ const allMenuItems = [
   { id: 'cockpit', permKey: 'menu_cockpit', label: 'Cockpit', icon: Activity, path: '/cockpit' },
   { id: 'kanban', permKey: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers, path: '/kanban' },
   { id: 'os-arquivadas', permKey: 'menu_kanban', label: 'OS Arquivadas', icon: Archive, path: '/os-arquivadas' },
-  { id: 'estoque', permKey: 'menu_estoque', label: 'Nucleo de Pecas', icon: Package, path: '/estoque' },
+  { id: 'estoque', permKey: 'menu_estoque', label: 'Núcleo de Peças', icon: Package, path: '/estoque' },
   { id: 'chat', permKey: 'menu_chat', label: 'QG de Comunicacao', icon: MessageSquare, path: '/chat' },
   { id: 'otimizador', permKey: 'menu_otimizador', label: 'GIA Logistic', icon: Truck, path: '/otimizador' },
   { id: 'customer-intelligence', permKey: 'menu_ci', label: 'Customer Intelligence', icon: Users, path: '/customer-intelligence' },

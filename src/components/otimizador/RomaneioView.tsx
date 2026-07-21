@@ -190,7 +190,7 @@ export default function RomaneioView() {
             data_agendamento: os.data_agendamento || '',
             cidade: os.cliente_cidade || 'Nao informado',
             tecnico_agendado_id: os.tecnico_agendado_id || 'sem_tecnico',
-            tecnico_nome: (os as any).usuarios?.nome || 'Sem Tecnico Atribuido',
+            tecnico_nome: (os as any).usuarios?.nome || 'Sem Técnico Atribuído',
             pecas
           };
         })
@@ -223,9 +223,9 @@ export default function RomaneioView() {
     romaneios.forEach(romaneio => {
       const rows: any[] = [];
       rows.push([`ROMANEIO - ${romaneio.tecnico_nome.toUpperCase()}`]);
-      rows.push([`Periodo: ${new Date(dataInicio).toLocaleDateString('pt-BR')} a ${new Date(dataFim).toLocaleDateString('pt-BR')}`]);
+      rows.push([`Período: ${new Date(dataInicio).toLocaleDateString('pt-BR')} a ${new Date(dataFim).toLocaleDateString('pt-BR')}`]);
       rows.push([]);
-      rows.push(['Cidade', 'OS Samsung', 'OS Interna', 'Cliente', 'Aparelho', 'Endereco', 'Periodo', 'PN', 'Descricao', 'ID Peca', 'Delivery', 'Qtd', 'Status']);
+      rows.push(['Cidade', 'OS Samsung', 'OS Interna', 'Cliente', 'Aparelho', 'Endereço', 'Período', 'PN', 'Descrição', 'ID Peça', 'Delivery', 'Qtd', 'Status']);
 
       Object.entries(romaneio.cidades).forEach(([cidade, oss]) => {
         oss.forEach(os => {
@@ -258,7 +258,7 @@ export default function RomaneioView() {
       XLSX.utils.book_append_sheet(wb, ws, romaneio.tecnico_nome.slice(0, 30));
     });
 
-    const resumoRows: any[] = [['RESUMO GERAL'], [], ['Tecnico', 'Total OSs', 'Total Pecas', 'Cidades']];
+    const resumoRows: any[] = [['RESUMO GERAL'], [], ['Técnico', 'Total OSs', 'Total Peças', 'Cidades']];
     romaneios.forEach(romaneio => {
       const totalOs = Object.values(romaneio.cidades).reduce((sum, oss) => sum + oss.length, 0);
       const totalPecas = Object.values(romaneio.cidades)
@@ -284,10 +284,10 @@ export default function RomaneioView() {
       doc.setFont('helvetica', 'bold');
       doc.text('ROMANEIO DE PECAS', 14, 15);
       doc.setFontSize(11);
-      doc.text(`Tecnico: ${romaneio.tecnico_nome}`, 14, 23);
+      doc.text(`Técnico: ${romaneio.tecnico_nome}`, 14, 23);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`Periodo: ${new Date(dataInicio).toLocaleDateString('pt-BR')} a ${new Date(dataFim).toLocaleDateString('pt-BR')}`, 14, 30);
+      doc.text(`Período: ${new Date(dataInicio).toLocaleDateString('pt-BR')} a ${new Date(dataFim).toLocaleDateString('pt-BR')}`, 14, 30);
 
       let startY = 36;
 
@@ -316,7 +316,7 @@ export default function RomaneioView() {
 
         autoTable(doc, {
           startY,
-          head: [['OS', 'Cliente', 'Aparelho', 'Periodo', 'PN', 'ID Peca', 'Delivery', 'Qtd', 'Status']],
+          head: [['OS', 'Cliente', 'Aparelho', 'Período', 'PN', 'ID Peça', 'Delivery', 'Qtd', 'Status']],
           body: tableData,
           theme: 'grid',
           headStyles: { fillColor: [6, 182, 212], fontSize: 7 },
@@ -409,7 +409,7 @@ export default function RomaneioView() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="text-gray-400 text-xs mb-1.5 block">Data Inicio</label>
+            <label className="text-gray-400 text-xs mb-1.5 block">Data Início</label>
             <input
               type="date"
               value={dataInicio}
@@ -431,7 +431,7 @@ export default function RomaneioView() {
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-gradient-to-br from-orange-500/10 to-orange-600/5 border border-orange-500/20 rounded-xl p-5">
-          <p className="text-gray-400 text-xs">Tecnicos</p>
+          <p className="text-gray-400 text-xs">Técnicos</p>
           <p className="text-3xl font-bold text-orange-400 mt-1">{romaneios.length}</p>
         </div>
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-500/20 rounded-xl p-5">

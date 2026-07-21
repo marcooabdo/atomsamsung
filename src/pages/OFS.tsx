@@ -99,7 +99,7 @@ export function OFS() {
 
   const processFile = useCallback((file: File) => {
     if (!file.name.toLowerCase().endsWith('.csv')) {
-      alert('Apenas arquivos .CSV sao suportados.');
+      alert('Apenas arquivos .CSV são suportados.');
       return;
     }
     setCsvFileName(file.name);
@@ -156,8 +156,8 @@ export function OFS() {
 
   const handleCopiar = () => {
     const pedido = sortedRows.filter(r => r.qtd_final > 0);
-    if (!pedido.length) { alert('Nenhuma peca com quantidade > 0.'); return; }
-    const header = 'PN;Descricao;Qtd_Final;Valor_Unit;Subtotal';
+    if (!pedido.length) { alert('Nenhuma peça com quantidade > 0.'); return; }
+    const header = 'PN;Descrição;Qtd_Final;Valor_Unit;Subtotal';
     const lines = pedido.map(r =>
       `${r.pn};${r.descricao};${r.qtd_final};${r.valor_unitario.toFixed(2)};${(r.qtd_final * r.valor_unitario).toFixed(2)}`
     );
@@ -249,7 +249,7 @@ export function OFS() {
                 style={{ color: isDragging ? 'var(--text-accent)' : 'var(--text-secondary)' }}
               />
               <p className="font-semibold text-sm" style={{ color: isDragging ? 'var(--text-accent)' : 'var(--text-primary)' }}>
-                Arraste a planilha de sugestao diaria OFS (CSV) aqui ou clique para importar
+                Arraste a planilha de sugestão diária OFS (CSV) aqui ou clique para importar
               </p>
               <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Formato esperado: colunas PN e Qtd (separadas por ; , ou tab)</p>
             </div>
@@ -275,7 +275,7 @@ export function OFS() {
               background: 'rgba(34,197,94,0.05)',
             }}
           >
-            <p className="text-xs text-emerald-600 uppercase tracking-widest font-semibold">Credito Livre</p>
+            <p className="text-xs text-emerald-600 uppercase tracking-widest font-semibold">Crédito Livre</p>
             <p className="text-xl font-black text-emerald-600">
               {fmt(financeiro.credito_livre)}
             </p>
@@ -327,7 +327,7 @@ export function OFS() {
               style={{ color: excede ? '#ef4444' : 'var(--text-secondary)' }}
             >
               {excede ? <ShieldAlert className="w-3 h-3" /> : <Boxes className="w-3 h-3" />}
-              Credito Restante
+              Crédito Restante
             </p>
             <p
               className="text-xl font-black"
@@ -346,7 +346,7 @@ export function OFS() {
                 {excede && (
                   <p className="text-xs text-red-500 font-bold flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
-                    Alerta GIA: Pedido excede limite de seguranca!
+                    Alerta GIA: Pedido excede limite de segurança!
                   </p>
                 )}
               </>
@@ -369,8 +369,8 @@ export function OFS() {
           style={{ border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }}
         >
           <Upload className="w-12 h-12 mx-auto" style={{ color: 'var(--text-secondary)' }} />
-          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Importe a planilha CSV da Samsung para iniciar a analise</p>
-          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Os dados de estoque e giro da unidade ja estao carregados</p>
+          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Importe a planilha CSV da Samsung para iniciar a análise</p>
+          <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Os dados de estoque e giro da unidade já estão carregados</p>
         </div>
       )}
 
@@ -380,11 +380,11 @@ export function OFS() {
           style={{ border: '1px solid var(--border-primary)', background: 'var(--bg-card)' }}
         >
           <Boxes className="w-12 h-12 mx-auto" style={{ color: 'var(--text-secondary)' }} />
-          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Selecione uma unidade para comecar</p>
+          <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>Selecione uma unidade para começar</p>
         </div>
       )}
 
-      {/* BLOCO D: TABELA DE DECISAO */}
+      {/* BLOCO D: TABELA DE DECISÃO */}
       {!loading && hasData && (
         <div
           className="rounded-xl overflow-hidden"
@@ -396,7 +396,7 @@ export function OFS() {
           >
             <div className="flex items-center gap-2">
               <TrendingUp className="w-4 h-4" style={{ color: 'var(--text-accent)' }} />
-              <span className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Tabela de Decisao</span>
+              <span className="text-sm font-bold tracking-wide uppercase" style={{ color: 'var(--text-primary)' }}>Tabela de Decisão</span>
               <span
                 className="text-xs px-2 py-0.5 rounded-full"
                 style={{
@@ -430,7 +430,7 @@ export function OFS() {
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
-                    PN / Descricao <SortIcon col="pn" />
+                    PN / Descrição <SortIcon col="pn" />
                   </th>
                   <th
                     className="text-center px-3 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
@@ -439,7 +439,7 @@ export function OFS() {
                     onMouseEnter={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-accent)'}
                     onMouseLeave={e => (e.currentTarget as HTMLElement).style.color = 'var(--text-secondary)'}
                   >
-                    Estoque + Transito <SortIcon col="qtd_estoque" />
+                    Estoque + Trânsito <SortIcon col="qtd_estoque" />
                   </th>
                   <th
                     className="text-center px-3 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"
@@ -451,10 +451,10 @@ export function OFS() {
                     Giro 60d <SortIcon col="giro_60d" />
                   </th>
                   <th className="text-center px-3 py-3 uppercase tracking-wider font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                    Recomendacao
+                    Recomendação
                   </th>
                   <th className="text-center px-3 py-3 uppercase tracking-wider font-semibold whitespace-nowrap" style={{ color: 'var(--text-secondary)' }}>
-                    Decisao Final
+                    Decisão Final
                   </th>
                   <th
                     className="text-right px-4 py-3 uppercase tracking-wider font-semibold cursor-pointer whitespace-nowrap transition-colors"

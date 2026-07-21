@@ -295,7 +295,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                   <p className="text-gray-200">{selectedPeca.delivery || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-gray-500 text-xs">Localizacao</p>
+                  <p className="text-gray-500 text-xs">Localização</p>
                   <p className="text-gray-200">{selectedPeca.localizacao || 'N/A'}</p>
                 </div>
                 <div>
@@ -392,7 +392,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
                               </div>
                               <div className="flex items-center gap-1">
                                 <MapPin className="w-3 h-3" />
-                                {peca.localizacao || 'Sem localizacao'}
+                                {peca.localizacao || 'Sem localização'}
                               </div>
                               <div className="flex items-center gap-1">
                                 <Calendar className="w-3 h-3" />

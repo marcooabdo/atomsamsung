@@ -393,7 +393,7 @@ export async function gerarPDFOrdemServico(osData: OSData, pdfConfig: PDFConfig,
         { content: osData.descricao_reparo || osData.reparo_efetuado || '' }
       ],
       [
-        { content: 'Observacoes', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
+        { content: 'Observações', styles: { fillColor: COLORS.white, textColor: COLORS.samsungBlue, fontStyle: 'bold' } },
         { content: osData.observacoes_internas || '' }
       ]
     ],

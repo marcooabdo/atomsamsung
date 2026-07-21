@@ -382,13 +382,13 @@ export default function AuditarOSModal({ osId, onClose, onSaved }: AuditarOSModa
               </div>
 
               <div>
-                <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Observacao da Auditoria</label>
+                <label className="block text-xs text-gray-500 uppercase tracking-wider mb-1.5">Observação da Auditoria</label>
                 <textarea
                   value={observacao}
                   onChange={e => setObservacao(e.target.value)}
                   rows={3}
                   className="neon-input w-full resize-none"
-                  placeholder="Ex: Orcamento recusado pelo cliente, OS sem reparo, etc."
+                  placeholder="Ex: Orçamento recusado pelo cliente, OS sem reparo, etc."
                 />
               </div>
             </div>

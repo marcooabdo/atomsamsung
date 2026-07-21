@@ -1517,7 +1517,7 @@ Assistencia Tecnica Samsung`;
               <div className="mt-4 premium-card p-4 bg-[#9D4EDD]/10 border border-[#9D4EDD]/30">
                 <div className="flex items-center gap-2">
                   <Microscope className="w-5 h-5 text-[#9D4EDD]" />
-                  <span className="text-sm font-bold text-[#9D4EDD]">ANALISE CONCLUIDA PELO TECNICO</span>
+                  <span className="text-sm font-bold text-[#9D4EDD]">ANÁLISE CONCLUÍDA PELO TÉCNICO</span>
                 </div>
                 <p className="text-xs text-gray-400 mt-2">
                   Este orcamento foi analisado pelo tecnico. As pecas listadas ja foram verificadas.

@@ -360,7 +360,7 @@ export default function LancamentosModule({ unidadeId }: LancamentosModuleProps)
 
         <div className="space-y-3">
           {pagamentosFiltrados.length === 0 ? (
-            <p className="text-center text-gray-500 py-8">Nenhum pagamento encontrado no periodo</p>
+            <p className="text-center text-gray-500 py-8">Nenhum pagamento encontrado no período</p>
           ) : (
             pagamentosFiltrados.map((pagamento) => (
               <div

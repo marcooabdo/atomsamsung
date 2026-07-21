@@ -620,7 +620,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
         <div className="premium-card p-4">
           <h3 className="text-lg font-bold text-[#00D4FF] mb-4 flex items-center gap-2">
             <Receipt className="w-5 h-5" />
-            NFS-e (Nota Fiscal de Servico)
+            NFS-e (Nota Fiscal de Serviço)
           </h3>
 
           {filteredConfigs.filter(c => c.tipo === 'nfse').length === 0 ? (
@@ -811,7 +811,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                     onChange={(e) => setForm(prev => ({ ...prev, tipo: e.target.value as 'nfse' | 'nfe' }))}
                     className="w-full px-4 py-2.5 rounded-lg bg-gray-800 border border-gray-700 text-gray-200 focus:outline-none focus:border-[#00D4FF]"
                   >
-                    <option value="nfse">NFS-e (Servicos)</option>
+                    <option value="nfse">NFS-e (Serviços)</option>
                     <option value="nfe">NF-e (Produtos)</option>
                   </select>
                 </div>
@@ -841,7 +841,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Numero Inicial</label>
+                  <label className="block text-xs font-medium text-gray-400 mb-1.5">Número Inicial</label>
                   <input
                     type="number"
                     value={form.numero_inicial}
@@ -904,13 +904,13 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         </select>
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operacao</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operação</label>
                         <input
                           type="text"
                           value={form.natureza_operacao}
                           onChange={(e) => setForm(prev => ({ ...prev, natureza_operacao: e.target.value }))}
                           className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]"
-                          placeholder="Ex: Prestacao de Servicos"
+                          placeholder="Ex: Prestação de Serviços"
                         />
                       </div>
                       <div>
@@ -986,8 +986,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                             onChange={(e) => setForm(prev => ({ ...prev, nfse_tipo_ambiente: e.target.value }))}
                             className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FBB024]"
                           >
-                            <option value="2">2 - Homologacao</option>
-                            <option value="1">1 - Producao</option>
+                            <option value="2">2 - Homologação</option>
+                            <option value="1">1 - Produção</option>
                           </select>
                         </div>
                         <div>
@@ -1177,7 +1177,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Classificacao Tributaria (cClassTrib)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Classificação Tributária (cClassTrib)</label>
                         <input
                           type="text"
                           value={form.classificacao_tributaria}
@@ -1330,7 +1330,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">Classificacao Tributaria IS</label>
+                          <label className="block text-[10px] text-gray-500 mb-1">Classificação Tributária IS</label>
                           <input
                             type="text"
                             value={form.is_classificacao_tributaria}
@@ -1369,7 +1369,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   <div className="border-t border-gray-800 pt-4">
                     <h4 className="text-sm font-bold text-[#FFA500] uppercase mb-3 flex items-center gap-2">
                       <FileText className="w-4 h-4" />
-                      Configuracoes Gerais NF-e
+                      Configurações Gerais NF-e
                     </h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <div>
@@ -1390,8 +1390,8 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           onChange={(e) => setForm(prev => ({ ...prev, nfe_tipo_ambiente: e.target.value }))}
                           className="w-full px-3 py-2 rounded bg-gray-800 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#FFA500]"
                         >
-                          <option value="1">1 - Producao</option>
-                          <option value="2">2 - Homologacao</option>
+                          <option value="1">1 - Produção</option>
+                          <option value="2">2 - Homologação</option>
                         </select>
                       </div>
                       <div>
@@ -1404,7 +1404,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           <option value="1">1 - Normal</option>
                           <option value="2">2 - Complementar</option>
                           <option value="3">3 - Ajuste</option>
-                          <option value="4">4 - Devolucao</option>
+                          <option value="4">4 - Devolução</option>
                         </select>
                       </div>
                       <div>
@@ -1418,7 +1418,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div className="md:col-span-2">
-                        <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operacao</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Natureza da Operação</label>
                         <input
                           type="text"
                           value={form.natureza_operacao}
@@ -1441,7 +1441,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         </select>
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Ultima NF Emitida</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Última NF Emitida</label>
                         <input
                           type="number"
                           value={form.nfe_ultima_nf_emitida}
@@ -1847,7 +1847,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                         />
                       </div>
                       <div>
-                        <label className="block text-[10px] text-gray-500 mb-1">Classificacao Tributaria (cClassTrib)</label>
+                        <label className="block text-[10px] text-gray-500 mb-1">Classificação Tributária (cClassTrib)</label>
                         <input
                           type="text"
                           value={form.classificacao_tributaria}
@@ -2000,7 +2000,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                           />
                         </div>
                         <div>
-                          <label className="block text-[10px] text-gray-500 mb-1">Classificacao Tributaria IS</label>
+                          <label className="block text-[10px] text-gray-500 mb-1">Classificação Tributária IS</label>
                           <input
                             type="text"
                             value={form.is_classificacao_tributaria}
@@ -2053,7 +2053,7 @@ export function ConfiguracoesNF({ unidades }: ConfiguracoesNFProps) {
                   <div className="border-t border-gray-800 pt-4">
                     <div className="flex items-center justify-between mb-2">
                       <label className="block text-xs font-medium text-gray-400">
-                        Informacoes Fisco para notas desta operacao
+                        Informações Fisco para notas desta operacao
                       </label>
                       <button
                         type="button"

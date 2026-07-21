@@ -120,7 +120,7 @@ export default function PendenciasSamsungModule({ unidadeId, dataInicio, dataFim
 
     const ws = XLSX.utils.json_to_sheet(dadosExport);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Pendencias Samsung');
+    XLSX.utils.book_append_sheet(wb, ws, 'Pendências Samsung');
     XLSX.writeFile(wb, `pendencias_samsung_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -254,7 +254,7 @@ export default function PendenciasSamsungModule({ unidadeId, dataInicio, dataFim
 
       <div className="premium-card p-6">
         <h3 className="text-lg font-bold text-white mb-4">
-          Pendencias de Pagamento Samsung ({pendenciasFiltradas.length})
+          Pendências de Pagamento Samsung ({pendenciasFiltradas.length})
         </h3>
 
         <div className="space-y-3">

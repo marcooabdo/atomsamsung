@@ -7,8 +7,8 @@ export const APPROVED_STAGES = [
 
 export const KANBAN_LABELS: Record<string, string> = {
   'orcamento_aprovado': 'Orc. Aprovado',
-  'aguardando_peca': 'Aguardando Peca',
-  'peca_em_transito': 'Peca em Transito',
+  'aguardando_peca': 'Aguardando Peça',
+  'peca_em_transito': 'Peça em Trânsito',
   'em_reparo_ci': 'Em Reparo',
   'em_rota_ih': 'Agendado',
   'saw': 'SAW',

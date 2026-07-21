@@ -324,7 +324,7 @@ export default function FinanceDashboard({ unidadeId, dataInicio, dataFim }: Das
               <TrendingUp className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
-          <p className="text-xs text-gray-400 uppercase mb-1">Ticket Medio</p>
+          <p className="text-xs text-gray-400 uppercase mb-1">Ticket Médio</p>
           <p className="text-2xl font-bold text-emerald-400">
             R$ {data.ticketMedio.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
           </p>
@@ -382,7 +382,7 @@ export default function FinanceDashboard({ unidadeId, dataInicio, dataFim }: Das
               </div>
             ))}
             {data.rankingUnidades.length === 0 && (
-              <p className="text-center text-gray-500 py-8">Nenhum dado disponivel</p>
+              <p className="text-center text-gray-500 py-8">Nenhum dado disponível</p>
             )}
           </div>
         </div>
@@ -411,7 +411,7 @@ export default function FinanceDashboard({ unidadeId, dataInicio, dataFim }: Das
               </div>
             ))}
             {data.rankingFormasPagamento.length === 0 && (
-              <p className="text-center text-gray-500 py-8">Nenhum dado disponivel</p>
+              <p className="text-center text-gray-500 py-8">Nenhum dado disponível</p>
             )}
           </div>
         </div>

@@ -387,7 +387,7 @@ export default function AtomConnect() {
     { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3 },
     { id: 'marketing' as TabType, label: 'Marketing', icon: Megaphone },
     { id: 'automation' as TabType, label: 'Automacao', icon: GitBranch },
-    { id: 'settings' as TabType, label: 'Configuracoes', icon: Settings },
+    { id: 'settings' as TabType, label: 'Configurações', icon: Settings },
   ];
 
   const accentColor = '#00D4FF';
@@ -554,7 +554,7 @@ export default function AtomConnect() {
                     </div>
                     {notifications.length === 0 ? (
                       <div className="p-5 text-center text-white/20 text-xs">
-                        Nenhuma notificacao
+                        Nenhuma notificação
                       </div>
                     ) : (
                       notifications.map(n => (
