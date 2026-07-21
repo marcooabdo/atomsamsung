@@ -331,27 +331,22 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
     try {
       const consultarChave = async (chave: string): Promise<{ success: boolean; xml?: string; pdf_base64?: string; error?: string }> => {
-        const resp = await fetch('https://consultadanfe.com/api/v1/consulta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chave, format: 'json' }),
-        });
-        if (resp.status === 429) {
-          const retryAfter = resp.headers.get('Retry-After');
-          const secs = retryAfter ? parseInt(retryAfter, 10) : 60;
-          return { success: false, error: `Rate limit atingido. Tente novamente em ${secs} segundos.` };
-        }
-        if (resp.status === 202) {
-          return { success: false, error: 'NF-e em contingência. Tente novamente em alguns minutos.' };
-        }
-        if (!resp.ok) {
-          const errorCode = resp.headers.get('X-Error-Code') || '';
-          const body = await resp.text().catch(() => '');
-          return { success: false, error: errorCode || body || `Erro ${resp.status}` };
-        }
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ chaveAcesso: chave }),
+          }
+        );
         const data = await resp.json();
-        const xml = data.xml_base64 ? atob(data.xml_base64) : data.xml || '';
-        return { success: true, xml, pdf_base64: data.pdf_base64 };
+        if (!resp.ok || !data.success) {
+          return { success: false, error: data.error || `Erro ${resp.status}` };
+        }
+        return { success: true, xml: data.xml, pdf_base64: data.pdf_base64 };
       };
 
       if (linhas.length === 1) {
@@ -970,17 +965,19 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
     setDownloadingNFId(nf.id);
     try {
-      const response = await fetch('https://consultadanfe.com/api/v1/consulta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chave: nf.chave_acesso, format: 'json' }),
-      });
-      if (!response.ok) {
-        setError('Erro ao consultar DANFE. Tente novamente.');
-        return;
-      }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
+        }
+      );
       const data = await response.json();
-      if (data.pdf_base64) {
+      if (data.success && data.pdf_base64) {
         const byteCharacters = atob(data.pdf_base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -991,7 +988,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const url = URL.createObjectURL(blob);
         window.open(url, '_blank');
       } else {
-        setError('PDF não disponível para esta NF-e.');
+        setError(data.error || 'PDF não disponível para esta NF-e.');
       }
     } catch (err) {
       setError('Erro ao consultar DANFE');

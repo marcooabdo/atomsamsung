@@ -46,8 +46,8 @@ Deno.serve(async (req: Request) => {
     // Multiple keys (batch)
     if (chavesAcesso && Array.isArray(chavesAcesso)) {
       const results = [];
-      for (const chave of chavesAcesso) {
-        const clean = chave.replace(/\s/g, "");
+      for (let i = 0; i < chavesAcesso.length; i++) {
+        const clean = chavesAcesso[i].replace(/\s/g, "");
         try {
           const result = await consultarChave(clean);
           if (result.success) {
@@ -57,6 +57,9 @@ Deno.serve(async (req: Request) => {
           }
         } catch (err: any) {
           results.push({ chaveAcesso: clean, success: false, error: err.message });
+        }
+        if (i < chavesAcesso.length - 1) {
+          await new Promise(r => setTimeout(r, 1100));
         }
       }
 
@@ -78,7 +81,7 @@ Deno.serve(async (req: Request) => {
   }
 });
 
-async function consultarChave(chave: string): Promise<{
+async function consultarChave(chave: string, retryCount = 0): Promise<{
   success: boolean;
   xml?: string;
   pdf_base64?: string;
@@ -96,9 +99,14 @@ async function consultarChave(chave: string): Promise<{
 
   if (resp.status === 429) {
     const retryAfter = resp.headers.get("Retry-After") || "60";
+    const waitSecs = parseInt(retryAfter, 10);
+    if (retryCount < 1 && waitSecs <= 65) {
+      await new Promise(r => setTimeout(r, (waitSecs + 1) * 1000));
+      return consultarChave(chave, retryCount + 1);
+    }
     return {
       success: false,
-      error: `Rate limit atingido. Tente novamente em ${retryAfter} segundos.`,
+      error: `Rate limit atingido. Aguarde ${waitSecs > 120 ? Math.ceil(waitSecs / 60) + ' minutos' : waitSecs + ' segundos'} e tente novamente.`,
       httpStatus: 429,
       debug: { errorCode: "rate_limit", retryAfter },
     };
