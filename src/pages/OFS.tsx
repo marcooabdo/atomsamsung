@@ -34,7 +34,7 @@ function pct(used: number, total: number) {
 }
 
 export function OFS() {
-  const { user, allUserUnits } = useAuth();
+  const { user } = useAuth();
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [csvRows, setCsvRows] = useState<CSVRow[]>([]);
@@ -46,7 +46,7 @@ export function OFS() {
   const [copied, setCopied] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { estoqueMap, financeiro, loading, error, reload, calcQtdGIA } = useOFSData(selectedUnidade, allUserUnits);
+  const { estoqueMap, financeiro, loading, error, reload, calcQtdGIA } = useOFSData(selectedUnidade);
 
   useEffect(() => {
     supabase.from('unidades').select('id, nome').order('nome').then(({ data }) => {
@@ -55,10 +55,8 @@ export function OFS() {
   }, []);
 
   useEffect(() => {
-    if (user?.unidade_id && allUserUnits.length <= 1) {
-      setSelectedUnidade(user.unidade_id);
-    }
-  }, [user, allUserUnits]);
+    if (user?.unidade_id) setSelectedUnidade(user.unidade_id);
+  }, [user]);
 
   useEffect(() => {
     if (!estoqueMap.size && !csvRows.length) {

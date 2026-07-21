@@ -1,6 +1,6 @@
 import { createPortal } from 'react-dom';
 import { useState, useEffect } from 'react';
-import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw, ShieldCheck, ShieldX, Undo2 } from 'lucide-react';
+import { X, MapPin, Printer, Package, History, Link, Truck, AlertCircle, CheckCircle, Receipt, FileText, RotateCcw, ShieldCheck, ShieldX, XCircle } from 'lucide-react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { supabase } from '../../lib/supabase';
 import { LabelGenerator } from './LabelGenerator';
@@ -302,30 +302,67 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
   const LOGISTICA_REVERSA_STATUSES = ['devolvida_samsung', 'devolvida_nova', 'devolvida_defeito', 'devolvida_upc', 'usada_upc'];
   const STATUS_COLORS = getStatusColors(neonGreen, themeAccent);
 
-  const currentStatus = (pecaDetalhada as any)?.status || peca.status;
+  const [cancelingDespacho, setCancelingDespacho] = useState(false);
 
   const handleCancelarDespacho = async () => {
-    if (!confirm('Cancelar despacho desta peca?\n\nEla voltara ao status "disponivel" no estoque.')) return;
+    if (!confirm('Cancelar o despacho desta peça? Ela voltará a ficar DISPONÍVEL no estoque.')) return;
+
+    setCancelingDespacho(true);
     try {
-      const { error } = await supabase
+      const { data: reqData } = await supabase
+        .from('requisicoes_pecas')
+        .select('id, os_id')
+        .eq('peca_estoque_id', peca.id)
+        .in('status', ['atendida', 'gi_postada', 'pendente', 'pedido_feito', 'devolucao_pendente'])
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      await supabase
         .from('estoque_pecas')
-        .update({ status: 'disponivel', gi_postada_em: null, gi_numero: null })
+        .update({
+          status: 'disponivel',
+          os_id: null,
+          tecnico_id: null,
+          gi_postada_em: null,
+          gi_postada_por: null,
+          gi_cancelada_em: new Date().toISOString(),
+        })
         .eq('id', peca.id);
-      if (error) throw error;
+
+      if (reqData) {
+        await supabase
+          .from('requisicoes_pecas')
+          .update({ status: 'cancelada' })
+          .eq('id', reqData.id);
+
+        if (reqData.os_id) {
+          await supabase.from('os_comentarios').insert({
+            os_id: reqData.os_id,
+            comentario: `Despacho cancelado no estoque - Peça ID #${peca.id_numerico} (${peca.pn}) voltou para DISPONÍVEL.`,
+            is_system: true
+          });
+        }
+      }
 
       await supabase.from('estoque_historico').insert({
         peca_id: peca.id,
-        status_anterior: 'devolvida_samsung',
+        acao: 'despacho_cancelado',
+        status_anterior: (pecaDetalhada as any)?.status || peca.status,
         status_novo: 'disponivel',
-        observacao: 'Despacho cancelado manualmente - peca retornou ao estoque disponivel',
+        observacao: `Despacho cancelado - Peça voltou para disponível no estoque`
       });
 
-      alert('Despacho cancelado. Peca esta disponivel novamente.');
-      onClose();
-    } catch (err: any) {
-      alert('Erro ao cancelar despacho: ' + (err?.message || err));
+      alert('Despacho cancelado! Peça disponível no estoque.');
+      await loadDetalhes();
+    } catch (error: any) {
+      alert(`Erro ao cancelar despacho: ${error.message || 'Erro desconhecido'}`);
+    } finally {
+      setCancelingDespacho(false);
     }
   };
+
+  const currentStatus = (pecaDetalhada as any)?.status || peca.status;
   const statusCfg = STATUS_COLORS[currentStatus] || { label: currentStatus, color: '#6B7280' };
   const osVinculada = pecaDetalhada?.os;
   const osLabel = osVinculada
@@ -845,6 +882,21 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
 
         {/* Footer actions */}
         <div className="shrink-0 px-6 py-4 flex gap-3 flex-wrap" style={{ borderTop: `1px solid ${headerBorder}` }}>
+          {['vinculada_tecnico', 'em_rota', 'devolvida_nova', 'devolvida_defeito', 'devolvida_samsung', 'devolvida_upc', 'usada_upc', 'devolucao_pendente', 'gi_postada'].includes(currentStatus) && (
+            <button
+              onClick={handleCancelarDespacho}
+              disabled={cancelingDespacho}
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors disabled:opacity-50"
+              style={{
+                background: 'rgba(239,68,68,0.12)',
+                border: '1px solid rgba(239,68,68,0.45)',
+                color: '#EF4444',
+              }}
+            >
+              <XCircle className="w-4 h-4" />
+              {cancelingDespacho ? 'Cancelando...' : 'Cancelar Despacho'}
+            </button>
+          )}
           {['devolvida_nova', 'devolvida_defeito', 'devolvida_samsung', 'devolvida_upc', 'usada_upc'].includes(currentStatus) && (
             <button
               onClick={() => setShowEmitirNFModal(true)}
@@ -857,20 +909,6 @@ export function PecaDetailsModal({ peca, onClose, onShowLabelSelector, onShowLoc
             >
               <RotateCcw className="w-4 h-4" />
               Emitir NF Devolucao
-            </button>
-          )}
-          {currentStatus === 'devolvida_samsung' && (
-            <button
-              onClick={handleCancelarDespacho}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-bold transition-colors"
-              style={{
-                background: 'rgba(245,158,11,0.12)',
-                border: '1px solid rgba(245,158,11,0.4)',
-                color: '#F59E0B',
-              }}
-            >
-              <Undo2 className="w-4 h-4" />
-              Cancelar Despacho
             </button>
           )}
           <button

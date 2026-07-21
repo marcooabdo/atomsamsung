@@ -89,7 +89,7 @@ const getStorageUrl = (path: string | null): string | null => {
 };
 
 export function NotasFiscais() {
-  const { user, usuario, allUserUnits } = useAuth();
+  const { user, usuario } = useAuth();
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
   const [loading, setLoading] = useState(true);
   const [notasFiscais, setNotasFiscais] = useState<NotaFiscal[]>([]);
@@ -100,7 +100,7 @@ export function NotasFiscais() {
   const [tipoOsFiltro, setTipoOsFiltro] = useState<'todos' | 'LP' | 'OW'>('todos');
   const [statusFiltro, setStatusFiltro] = useState<string>('todos');
   const [selectedUnidade, setSelectedUnidade] = useState<string>(
-    !canSeeAllUnits && allUserUnits.length <= 1 && usuario?.unidade_id ? usuario.unidade_id : ''
+    !canSeeAllUnits && user?.unidade_id ? user.unidade_id : ''
   );
   const [periodoFiltro, setPeriodoFiltro] = useState<'mes' | 'trimestre' | 'ano' | 'todos'>('todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -174,14 +174,8 @@ export function NotasFiscais() {
         `)
         .order('created_at', { ascending: false });
 
-      if (!canSeeAllUnits) {
-        if (selectedUnidade) {
-          nfsQuery = nfsQuery.eq('unidade_id', selectedUnidade);
-        } else if (allUserUnits.length > 1) {
-          nfsQuery = nfsQuery.in('unidade_id', allUserUnits);
-        } else if (usuario?.unidade_id) {
-          nfsQuery = nfsQuery.eq('unidade_id', usuario.unidade_id);
-        }
+      if (!canSeeAllUnits && user?.unidade_id) {
+        nfsQuery = nfsQuery.eq('unidade_id', user.unidade_id);
       }
 
       const { data: nfsData, error } = await nfsQuery;
@@ -460,13 +454,11 @@ export function NotasFiscais() {
   return (
     <div className="min-h-screen p-6 space-y-6">
       {/* Filtro de Unidade */}
-      {(canSeeAllUnits || allUserUnits.length > 1) && (
-        <UnitFilter
-          unidades={canSeeAllUnits ? unidades : unidades.filter(u => allUserUnits.includes(u.id))}
-          selectedUnidade={selectedUnidade}
-          onUnidadeChange={setSelectedUnidade}
-        />
-      )}
+      <UnitFilter
+        unidades={unidades}
+        selectedUnidade={selectedUnidade}
+        onUnidadeChange={setSelectedUnidade}
+      />
 
       {/* Header */}
       <div className="flex items-center justify-between">

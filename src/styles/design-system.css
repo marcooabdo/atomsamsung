@@ -637,22 +637,23 @@ body {
 }
 
 .cyber-scrollbar::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 .cyber-scrollbar::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-  border-radius: 3px;
+  background: transparent;
+  border-radius: 4px;
 }
 
 .cyber-scrollbar::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.04);
 }
 
 .cyber-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: var(--scrollbar-thumb-hover);
+  background: rgba(255,255,255,0.15);
 }
 
 /* =====================================================

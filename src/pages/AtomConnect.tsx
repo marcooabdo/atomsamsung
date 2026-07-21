@@ -7,7 +7,6 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
 import { useTheme } from '../contexts/ThemeContext';
 import { ModalProvider } from '../contexts/ModalContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -57,7 +56,6 @@ interface Notification {
 
 export default function AtomConnect() {
   const { usuario, unidadeAtual, unidades } = useAuth();
-  const { hasPermission } = usePermissions();
   const { theme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
@@ -384,20 +382,13 @@ export default function AtomConnect() {
     }
   };
 
-  const allTabs = [
-    { id: 'kanban' as TabType, label: 'Pipeline', icon: Users, permKey: 'atom_connect_kanban' },
-    { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3, permKey: 'atom_connect_dashboard' },
-    { id: 'marketing' as TabType, label: 'Marketing', icon: Megaphone, permKey: 'atom_connect_marketing' },
-    { id: 'automation' as TabType, label: 'Automacao', icon: GitBranch, permKey: 'atom_connect_automacao' },
-    { id: 'settings' as TabType, label: 'Configuracoes', icon: Settings, permKey: 'atom_connect_config' },
+  const tabs = [
+    { id: 'kanban' as TabType, label: 'Pipeline', icon: Users },
+    { id: 'dashboard' as TabType, label: 'Dashboard', icon: BarChart3 },
+    { id: 'marketing' as TabType, label: 'Marketing', icon: Megaphone },
+    { id: 'automation' as TabType, label: 'Automacao', icon: GitBranch },
+    { id: 'settings' as TabType, label: 'Configuracoes', icon: Settings },
   ];
-  const tabs = allTabs.filter(t => hasPermission(t.permKey));
-
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-      setActiveTab(tabs[0].id);
-    }
-  }, [tabs.length]);
 
   const accentColor = '#00D4FF';
 

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
 import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
@@ -120,7 +119,6 @@ interface ChecklistTemplate {
 
 export function Configuracoes() {
   const { usuario: usuarioLogado } = useAuth();
-  const { hasPermission } = usePermissions();
   const [activeTab, setActiveTab] = useState<Tab>('unidades');
   const [loading, setLoading] = useState(true);
 
@@ -450,15 +448,20 @@ export function Configuracoes() {
             }
           }
 
-          let { data: { session: activeSession } } = await supabase.auth.getSession();
+          const { data: { session } } = await supabase.auth.getSession();
 
-          if (!activeSession?.access_token) {
+          if (!session?.access_token) {
             const { data: refreshData } = await supabase.auth.refreshSession();
-            activeSession = refreshData.session;
-            if (!activeSession?.access_token) {
+            if (!refreshData.session?.access_token) {
               alert('Sessao expirada. Faca login novamente.');
               return;
             }
+          }
+
+          const activeSession = session || (await supabase.auth.getSession()).data.session;
+          if (!activeSession?.access_token) {
+            alert('Sessao expirada. Faca login novamente.');
+            return;
           }
 
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
@@ -726,16 +729,22 @@ export function Configuracoes() {
     setShowDeleteConfirmModal(false);
 
     try {
-      let { data: { session: activeSession } } = await supabase.auth.getSession();
+      const { data: { session } } = await supabase.auth.getSession();
 
-      if (!activeSession?.access_token) {
+      if (!session?.access_token) {
         const { data: refreshData } = await supabase.auth.refreshSession();
-        activeSession = refreshData.session;
-        if (!activeSession?.access_token) {
+        if (!refreshData.session?.access_token) {
           setDeleteMessage('Sessao expirada. Faca login novamente.');
           setShowDeleteSuccessModal(true);
           return;
         }
+      }
+
+      const activeSession = session || (await supabase.auth.getSession()).data.session;
+      if (!activeSession?.access_token) {
+        setDeleteMessage('Sessao expirada. Faca login novamente.');
+        setShowDeleteSuccessModal(true);
+        return;
       }
 
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`;
@@ -815,26 +824,23 @@ export function Configuracoes() {
   };
 
   const allTabs = [
-    { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true, permKey: 'config_unidades' },
-    { id: 'usuarios' as Tab, label: 'Usuarios', icon: Users, color: 'var(--neon-green)', isAccent: false, permKey: 'config_usuarios' },
-    { id: 'permissoes' as Tab, label: 'Permissoes', icon: Shield, color: '#FF6B6B', isAccent: false, permKey: 'config_permissoes' },
-    { id: 'servicos' as Tab, label: 'Servicos', icon: Wrench, color: '#FFBF00', isAccent: false, permKey: 'config_servicos' },
-    { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064', isAccent: false, permKey: 'config_markup' },
-    { id: 'taxas' as Tab, label: 'Taxa Maquina', icon: CreditCard, color: '#9D4EDD', isAccent: false, permKey: 'config_taxas' },
-    { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false, permKey: 'config_rotas' },
-    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false, permKey: 'config_checklists' },
-    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false, permKey: 'config_pdf_os' },
-    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false, permKey: 'config_nf' },
-    { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, permKey: 'config_regras_fechamento' }
+    { id: 'unidades' as Tab, label: 'Unidades', icon: Building, color: 'var(--text-accent)', isAccent: true },
+    { id: 'usuarios' as Tab, label: 'Usuarios', icon: Users, color: 'var(--neon-green)', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
+    { id: 'permissoes' as Tab, label: 'Permissoes', icon: Shield, color: '#FF6B6B', isAccent: false, onlyFor: ['master', 'diretoria'] },
+    { id: 'servicos' as Tab, label: 'Servicos', icon: Wrench, color: '#FFBF00', isAccent: false },
+    { id: 'markup' as Tab, label: 'Markup', icon: DollarSign, color: '#FF0064', isAccent: false },
+    { id: 'taxas' as Tab, label: 'Taxa Maquina', icon: CreditCard, color: '#9D4EDD', isAccent: false },
+    { id: 'rotas' as Tab, label: 'Rotas', icon: MapPin, color: '#10b981', isAccent: false },
+    { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
+    { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
+    { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
+    { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] }
   ];
 
-  const tabs = allTabs.filter(tab => hasPermission(tab.permKey));
-
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-      setActiveTab(tabs[0].id);
-    }
-  }, [tabs.length]);
+  const tabs = allTabs.filter(tab => {
+    if (!tab.onlyFor) return true;
+    return usuarioLogado && tab.onlyFor.includes(usuarioLogado.tipo);
+  });
 
   return (
     <>
@@ -1207,8 +1213,7 @@ export function Configuracoes() {
                       </p>
                     )}
                   </div>
-                  {/* Unidades Adicionais - apenas master pode configurar */}
-                  {usuarioLogado?.tipo === 'master' && (
+                  {/* Unidades Adicionais */}
                   <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">
                       Unidades Adicionais
@@ -1244,7 +1249,6 @@ export function Configuracoes() {
                       </p>
                     )}
                   </div>
-                  )}
                   <div className="flex items-center gap-2">
                     <input type="checkbox" id="ativo" checked={formUsuario.ativo} onChange={(e) => setFormUsuario({...formUsuario, ativo: e.target.checked})} className="w-4 h-4" />
                     <label htmlFor="ativo" className="text-sm text-gray-300">Usuário Ativo</label>

@@ -41,7 +41,6 @@ const COLUNAS_KANBAN = [
   { id: 'peca_em_transito', label: 'Peça em Trânsito', color: '#3B82F6' },
   { id: 'em_reparo_ci', label: 'Em Reparo CI', color: '#0EA5E9' },
   { id: 'em_rota_ih', label: 'Agendado', color: '#10B981' },
-  { id: 'em_reparo_ih', label: 'Em Reparo IH', color: '#F97316' },
   { id: 'controle_qualidade', label: 'Controle de Qualidade', color: '#2563EB' },
   { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED' },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981' },
@@ -87,7 +86,7 @@ export function Cockpit() {
   const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [listModal, setListModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
-  const [clickedOS, setClickedOS] = useState<string | null>(null);
+  const [daysModal, setDaysModal] = useState<{ open: boolean; title: string; items: { label: string; days: number }[] }>({ open: false, title: '', items: [] });
   const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
@@ -177,36 +176,35 @@ export function Cockpit() {
       let oldestOSLabel = '';
       let oldestInStageDays = 0;
       let oldestInStageOSLabel = '';
-      if (cards.length > 0) {
-        const oldestOS = cards.reduce((prev, os) => {
-          return new Date(os.created_at) < new Date(prev.created_at) ? os : prev;
-        }, cards[0]);
-        oldestDays = Math.floor((now.getTime() - new Date(oldestOS.created_at).getTime()) / (1000 * 60 * 60 * 24));
-        oldestOSLabel = oldestOS.numero_os_samsung || oldestOS.numero_os_interna || oldestOS.id.slice(0, 8);
+      const allOsDays: { label: string; days: number }[] = [];
+      const allOsStageDays: { label: string; days: number }[] = [];
 
-        const oldestInStage = cards.reduce((prev, os) => {
-          const prevDate = prev.coluna_kanban_desde || prev.updated_at || prev.created_at;
-          const osDate = os.coluna_kanban_desde || os.updated_at || os.created_at;
-          return new Date(osDate) < new Date(prevDate) ? os : prev;
-        }, cards[0]);
-        const stageDate = oldestInStage.coluna_kanban_desde || oldestInStage.updated_at || oldestInStage.created_at;
-        oldestInStageDays = Math.floor((now.getTime() - new Date(stageDate).getTime()) / (1000 * 60 * 60 * 24));
-        oldestInStageOSLabel = oldestInStage.numero_os_samsung || oldestInStage.numero_os_interna || oldestInStage.id.slice(0, 8);
+      if (cards.length > 0) {
+        cards.forEach(os => {
+          const osLabel = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+          const daysOpen = Math.floor((now.getTime() - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
+          allOsDays.push({ label: osLabel, days: daysOpen });
+
+          const stageDate = os.coluna_kanban_desde || os.updated_at || os.created_at;
+          const daysInStage = Math.floor((now.getTime() - new Date(stageDate).getTime()) / (1000 * 60 * 60 * 24));
+          allOsStageDays.push({ label: osLabel, days: daysInStage });
+        });
+
+        allOsDays.sort((a, b) => b.days - a.days);
+        allOsStageDays.sort((a, b) => b.days - a.days);
+
+        oldestDays = allOsDays[0]?.days || 0;
+        oldestOSLabel = allOsDays[0]?.label || '';
+        oldestInStageDays = allOsStageDays[0]?.days || 0;
+        oldestInStageOSLabel = allOsStageDays[0]?.label || '';
       }
 
-      // Count OS where pecas have valor_unitario < 0.01 (missing price) or no pecas at all
+      // Count OS where pecas have valor_unitario < 0.01 (missing price)
       let semCodigoOuValor = 0;
       const osComProblema: PecaIssueOS[] = [];
       cards.forEach(os => {
         const pecas = pecasMap.get(os.id);
-        if (!pecas || pecas.length === 0) {
-          semCodigoOuValor++;
-          osComProblema.push({
-            osId: os.id,
-            osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
-            pecas: [],
-          });
-        } else {
+        if (pecas && pecas.length > 0) {
           const pecasComProblema = pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01);
           if (pecasComProblema.length > 0) {
             semCodigoOuValor++;
@@ -219,7 +217,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, osComProblema };
+      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, osComProblema, allOsDays, allOsStageDays };
     });
   }, [osData, pecasMap]);
 
@@ -437,10 +435,10 @@ export function Cockpit() {
                       {col.count}
                     </span>
                   </td>
-                  <td className="text-center px-4 py-3 relative">
+                  <td className="text-center px-4 py-3">
                     {col.count > 0 ? (
                       <button
-                        onClick={() => setClickedOS(prev => prev === col.id ? null : col.id)}
+                        onClick={() => setDaysModal({ open: true, title: `${col.label} - Dias Aberto`, items: col.allOsDays })}
                         className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
                       >
                         {col.oldestDays} dia{col.oldestDays !== 1 ? 's' : ''}
@@ -448,29 +446,17 @@ export function Cockpit() {
                     ) : (
                       <span className="text-xs text-gray-600">-</span>
                     )}
-                    {clickedOS === col.id && col.oldestOSLabel && (
-                      <div className="absolute z-10 top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
-                        <span className="text-xs text-gray-400">OS: </span>
-                        <span className="text-xs font-mono text-[#00D4FF] font-semibold">{col.oldestOSLabel}</span>
-                      </div>
-                    )}
                   </td>
-                  <td className="text-center px-4 py-3 relative">
+                  <td className="text-center px-4 py-3">
                     {col.count > 0 ? (
                       <button
-                        onClick={() => setClickedOS(prev => prev === `stage_${col.id}` ? null : `stage_${col.id}`)}
+                        onClick={() => setDaysModal({ open: true, title: `${col.label} - Dias na Etapa`, items: col.allOsStageDays })}
                         className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestInStageDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestInStageDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
                       >
                         {col.oldestInStageDays} dia{col.oldestInStageDays !== 1 ? 's' : ''}
                       </button>
                     ) : (
                       <span className="text-xs text-gray-600">-</span>
-                    )}
-                    {clickedOS === `stage_${col.id}` && col.oldestInStageOSLabel && (
-                      <div className="absolute z-10 top-full mt-1 left-1/2 -translate-x-1/2 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 shadow-xl whitespace-nowrap">
-                        <span className="text-xs text-gray-400">OS: </span>
-                        <span className="text-xs font-mono text-[#00D4FF] font-semibold">{col.oldestInStageOSLabel}</span>
-                      </div>
                     )}
                   </td>
                   <td className="text-center px-4 py-3">
@@ -607,6 +593,30 @@ export function Cockpit() {
       </div>
 
       {/* List OS Modal */}
+      {daysModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setDaysModal({ open: false, title: '', items: [] })}>
+          <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+              <h3 className="text-sm font-semibold text-white">{daysModal.title} ({daysModal.items.length} OS)</h3>
+              <button onClick={() => setDaysModal({ open: false, title: '', items: [] })} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+                <X className="w-4 h-4 text-gray-400" />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-1.5">
+                {daysModal.items.map((item, i) => (
+                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-900/50 border border-gray-800/40">
+                    <span className="text-sm font-mono text-[#00D4FF]">{item.label}</span>
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${item.days > 14 ? 'text-red-300 bg-red-500/10' : item.days > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}>
+                      {item.days} dia{item.days !== 1 ? 's' : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
       {listModal.open && (
         <ListOSModal
           osList={listModal.osList}
@@ -624,7 +634,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            OS Sem Codigo/Valor ({osList.length})
+            OS Sem Valor nas Pecas ({osList.length})
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
             <X className="w-4 h-4 text-gray-400" />
@@ -635,7 +645,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
             {osList.map(os => (
               <div key={os.osId} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-900/50 border border-gray-800/40">
                 <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
-                <span className="text-xs text-gray-500">{os.pecas.length === 0 ? 'Sem pecas' : `${os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} sem valor`}</span>
+                <span className="text-xs text-gray-500">{os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} peca(s)</span>
               </div>
             ))}
           </div>

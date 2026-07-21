@@ -15,7 +15,7 @@ import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
 import { useDebounce } from '../components/kanban/useDebounce';
 import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
-import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings, Wrench } from 'lucide-react';
+import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
 
@@ -38,7 +38,6 @@ const COLUNAS_KANBAN = [
   { id: 'rota_amarela', label: 'Rota Amarela', color: '#EAB308', icon: MapPin },
   { id: 'rota_laranja', label: 'Rota Laranja', color: '#F97316', icon: MapPin },
   { id: 'em_rota_ih', label: 'Agendado', color: '#10B981', icon: Activity },
-  { id: 'em_reparo_ih', label: 'Em Reparo IH', color: '#F97316', icon: Wrench },
   { id: 'instalacao_inicial', label: 'Instalação Inicial', color: '#7C3AED', icon: Activity },
   { id: 'service_handling', label: 'Service Handling', color: '#DB2777', icon: Activity },
   { id: 'return_handling', label: 'Return Handling', color: '#D97706', icon: Activity },
@@ -105,7 +104,6 @@ const COLUNAS_IH = [
   'rota_amarela',
   'rota_laranja',
   'em_rota_ih',
-  'em_reparo_ih',
   'instalacao_inicial',
   'service_handling',
   'return_handling',
@@ -319,8 +317,6 @@ export function Kanban() {
       const canSeeAllUnits = (usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id;
       if (!canSeeAllUnits && usuario.unidade_id && !selectedUnidade && unidadesAdicionais.length === 0) {
         setSelectedUnidade(usuario.unidade_id);
-      } else if (!canSeeAllUnits && unidadesAdicionais.length > 0 && selectedUnidade === usuario.unidade_id) {
-        setSelectedUnidade('');
       } else {
         loadKanbanData();
       }
@@ -669,51 +665,41 @@ export function Kanban() {
 
       setOsData(grouped);
 
-      // Load last user comment timestamp for each OS (batched to avoid URL length limits)
+      // Load last user comment timestamp for each OS
       const allOsIds = (data || []).map(os => os.id);
       if (allOsIds.length > 0) {
-        const BATCH_SIZE = 50;
-        const batches: string[][] = [];
-        for (let i = 0; i < allOsIds.length; i += BATCH_SIZE) {
-          batches.push(allOsIds.slice(i, i + BATCH_SIZE));
-        }
+        const { data: comentariosData } = await supabase
+          .from('os_comentarios')
+          .select('os_id, created_at')
+          .in('os_id', allOsIds)
+          .or('is_system.is.null,is_system.eq.false')
+          .order('created_at', { ascending: false });
 
-        const allComentarios: any[] = [];
-        for (const batch of batches) {
-          const { data: comentariosData } = await supabase
-            .from('os_comentarios')
-            .select('os_id, created_at')
-            .in('os_id', batch)
-            .or('is_system.is.null,is_system.eq.false')
-            .order('created_at', { ascending: false });
-          if (comentariosData) allComentarios.push(...comentariosData);
-        }
-
-        const lastCommentMap: Record<string, string> = {};
-        for (const c of allComentarios) {
-          if (c.os_id && !lastCommentMap[c.os_id]) {
-            lastCommentMap[c.os_id] = c.created_at;
+        if (comentariosData) {
+          const lastCommentMap: Record<string, string> = {};
+          for (const c of comentariosData) {
+            if (c.os_id && !lastCommentMap[c.os_id]) {
+              lastCommentMap[c.os_id] = c.created_at;
+            }
           }
+          setLastUserCommentMap(lastCommentMap);
         }
-        setLastUserCommentMap(lastCommentMap);
 
         // Load read timestamps for current user
         if (usuario?.id) {
-          const allLeitura: any[] = [];
-          for (const batch of batches) {
-            const { data: leituraData } = await supabase
-              .from('os_comentarios_leitura')
-              .select('os_id, last_read_at')
-              .eq('usuario_id', usuario.id)
-              .in('os_id', batch);
-            if (leituraData) allLeitura.push(...leituraData);
-          }
+          const { data: leituraData } = await supabase
+            .from('os_comentarios_leitura')
+            .select('os_id, last_read_at')
+            .eq('usuario_id', usuario.id)
+            .in('os_id', allOsIds);
 
-          const readMap: Record<string, string> = {};
-          for (const l of allLeitura) {
-            if (l.os_id) readMap[l.os_id] = l.last_read_at;
+          if (leituraData) {
+            const readMap: Record<string, string> = {};
+            for (const l of leituraData) {
+              if (l.os_id) readMap[l.os_id] = l.last_read_at;
+            }
+            setCommentReadMap(readMap);
           }
-          setCommentReadMap(readMap);
         }
       }
 
@@ -1911,32 +1897,44 @@ export function Kanban() {
         onUnidadeChange={handleUnidadeChange}
       />
 
-      <div className="premium-card p-3 flex-1 min-h-0 flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between gap-4 mb-3 flex-shrink-0">
+      <div className="premium-card p-4 flex-1 min-h-0 flex flex-col overflow-hidden" style={{
+        background: 'linear-gradient(180deg, rgba(12,12,20,0.98) 0%, rgba(8,8,16,0.99) 100%)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        boxShadow: '0 8px 40px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.03)'
+      }}>
+        <div className="flex items-center justify-between gap-4 mb-4 flex-shrink-0">
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg" style={{
-              background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.15) 0%, rgba(var(--accent-rgb),0.05) 100%)',
-              border: '1px solid rgba(var(--accent-rgb),0.3)',
-              boxShadow: '0 0 20px rgba(var(--accent-rgb),0.1)'
+            <div className="flex items-center gap-2.5 px-4 py-2 rounded-xl" style={{
+              background: 'linear-gradient(135deg, rgba(0,212,255,0.08) 0%, rgba(0,212,255,0.02) 100%)',
+              border: '1px solid rgba(0,212,255,0.2)',
+              boxShadow: '0 0 20px rgba(0,212,255,0.06), inset 0 1px 0 rgba(0,212,255,0.08)'
             }}>
-              <Activity className="w-4 h-4 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 4px var(--text-accent))' }} />
-              <h3 className="tech-heading text-sm text-[#00D4FF] tracking-widest">KANBAN</h3>
-              <span className="ml-1 px-2 py-0.5 rounded text-[10px] font-bold" style={{
-                background: 'rgba(var(--accent-rgb),0.15)',
-                color: 'var(--text-accent)',
-                border: '1px solid rgba(var(--accent-rgb),0.3)'
+              <Activity className="w-4 h-4 text-[#00D4FF]" style={{ filter: 'drop-shadow(0 0 6px rgba(0,212,255,0.5))' }} />
+              <h3 className="tech-heading text-sm text-[#00D4FF] tracking-[0.2em] font-bold">PIPELINE</h3>
+              <span className="ml-1 px-2.5 py-0.5 rounded-lg text-[10px] font-bold" style={{
+                background: 'linear-gradient(135deg, rgba(0,212,255,0.15) 0%, rgba(0,212,255,0.05) 100%)',
+                color: '#00D4FF',
+                border: '1px solid rgba(0,212,255,0.25)',
+                boxShadow: 'inset 0 1px 0 rgba(0,212,255,0.1)'
               }}>{Object.entries(osData).reduce((sum, [col, cards]) => col === 'os_fechada' ? sum : sum + cards.length, 0)}</span>
             </div>
           </div>
 
           <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#00D4FF]/50" />
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#00D4FF]/40" />
             <input
               type="text"
               placeholder="Busca Universal: OS, Cliente, Peças, Comentários, Endereço, Serial, IMEI..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="neon-input pl-10 text-xs py-2"
+              className="w-full pl-10 pr-4 text-xs py-2.5 rounded-xl transition-all duration-300 focus:ring-1 focus:ring-[#00D4FF]/30 placeholder-gray-600"
+              style={{
+                background: 'linear-gradient(135deg, rgba(255,255,255,0.03) 0%, rgba(255,255,255,0.01) 100%)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: 'rgba(255,255,255,0.9)',
+                outline: 'none',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.2)'
+              }}
               title="Busca profunda em todos os dados: número da OS, nome, telefone, email, endereço, modelo, serial, IMEI, peças, comentários e histórico"
             />
           </div>
@@ -1945,31 +1943,31 @@ export function Kanban() {
             <div className="relative" ref={actionMenuRef}>
               <button
                 onClick={() => setShowActionMenu(!showActionMenu)}
-                className="flex items-center gap-2 text-xs px-4 py-1.5 rounded-lg font-bold transition-all duration-300"
+                className="flex items-center gap-2 text-xs px-4 py-2 rounded-xl font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
-                  border: '1px solid var(--text-accent)',
-                  color: 'var(--text-accent)',
-                  boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
+                  background: 'linear-gradient(135deg, rgba(0,212,255,0.12) 0%, rgba(0,212,255,0.03) 100%)',
+                  border: '1px solid rgba(0,212,255,0.3)',
+                  color: '#00D4FF',
+                  boxShadow: '0 4px 16px rgba(0,212,255,0.1), inset 0 1px 0 rgba(0,212,255,0.1)'
                 }}
               >
                 <Settings className="w-3.5 h-3.5" />
                 AÇÃO
-                <ChevronDown className={`w-3 h-3 transition-transform ${showActionMenu ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${showActionMenu ? 'rotate-180' : ''}`} />
               </button>
 
               {showActionMenu && (
                 <div
-                  className="absolute top-full mt-2 right-0 z-50 min-w-[200px] rounded-lg p-2"
+                  className="absolute top-full mt-2 right-0 z-50 min-w-[220px] rounded-xl p-2"
                   style={{
-                    background: 'linear-gradient(135deg, rgba(0,15,30,0.98) 0%, rgba(0,20,40,0.98) 100%)',
-                    border: '1px solid rgba(var(--accent-rgb),0.3)',
-                    boxShadow: '0 10px 40px rgba(0,0,0,0.5), 0 0 20px rgba(var(--accent-rgb),0.1)'
+                    background: 'linear-gradient(180deg, rgba(15,15,25,0.99) 0%, rgba(8,8,16,0.99) 100%)',
+                    border: '1px solid rgba(0,212,255,0.2)',
+                    boxShadow: '0 20px 60px rgba(0,0,0,0.6), 0 0 30px rgba(0,212,255,0.08)'
                   }}
                 >
                   <button
                     onClick={() => { setShowBadgeFilter(true); setShowActionMenu(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#39FF14]/10"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all hover:bg-[#39FF14]/10"
                     style={{ color: 'var(--neon-green)' }}
                   >
                     <Filter className="w-4 h-4" />
@@ -1977,7 +1975,7 @@ export function Kanban() {
                   </button>
                   <button
                     onClick={() => { setShowTipoFilter(true); setShowActionMenu(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#FFBF00]/10"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all hover:bg-[#FFBF00]/10"
                     style={{ color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0) ? '#FFBF00' : '#6B7280' }}
                   >
                     <Filter className="w-4 h-4" />
@@ -1985,7 +1983,7 @@ export function Kanban() {
                   </button>
                   <button
                     onClick={() => { setShowExportModal(true); setShowActionMenu(false); }}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-xs font-medium transition-all hover:bg-[#10B981]/10"
+                    className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-medium transition-all hover:bg-[#10B981]/10"
                     style={{ color: '#10B981' }}
                   >
                     <Download className="w-4 h-4" />
@@ -2382,12 +2380,12 @@ export function Kanban() {
                 setShowBuscarOSModal(true);
               }}
               disabled={!selectedUnidade}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 text-xs px-4 py-2 rounded-xl font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
-                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.15) 0%, rgba(var(--accent-rgb),0.03) 100%)',
-                border: '1px solid var(--text-accent)',
-                color: 'var(--text-accent)',
-                boxShadow: '0 0 8px rgba(var(--accent-rgb),0.15)'
+                background: 'linear-gradient(135deg, rgba(57,255,20,0.08) 0%, rgba(57,255,20,0.02) 100%)',
+                border: '1px solid rgba(57,255,20,0.3)',
+                color: '#39FF14',
+                boxShadow: '0 4px 16px rgba(57,255,20,0.08), inset 0 1px 0 rgba(57,255,20,0.08)'
               }}
               title={!selectedUnidade ? 'Selecione uma unidade' : 'Trazer OS por número'}
             >
@@ -2403,7 +2401,7 @@ export function Kanban() {
           onDragOver={handleContainerDragOver}
           onDragLeave={handleContainerDragLeave}
         >
-          <div className="flex gap-4 h-full pb-2" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
+          <div className="flex gap-3 h-full pb-2" style={{ minWidth: 'max-content', maxHeight: '100%' }}>
             {visibleColumns.map((coluna) => {
               const ColumnIcon = coluna.icon;
               const isOver = dragOverColumn === coluna.id;
@@ -2411,16 +2409,16 @@ export function Kanban() {
               return (
                 <div
                   key={coluna.id}
-                  className={`flex-shrink-0 w-72 h-full max-h-full rounded-xl transition-all duration-300 overflow-hidden ${
+                  className={`flex-shrink-0 w-[280px] h-full max-h-full rounded-2xl transition-all duration-300 overflow-hidden ${
                     isOver ? 'scale-[1.01]' : ''
                   }`}
                   style={{
-                    background: `linear-gradient(180deg, ${coluna.color}06 0%, var(--bg-secondary) 100%)`,
-                    border: `1px solid ${isOver ? coluna.color + '60' : coluna.color + '18'}`,
+                    background: `linear-gradient(180deg, ${coluna.color}08 0%, rgba(10,10,18,0.95) 30%, rgba(8,8,16,0.98) 100%)`,
+                    border: `1px solid ${isOver ? coluna.color + '70' : 'rgba(255,255,255,0.06)'}`,
                     boxShadow: isOver
-                      ? `0 0 24px ${coluna.color}25, inset 0 0 20px ${coluna.color}08`
-                      : `0 2px 12px rgba(0,0,0,0.15)`,
-                    backdropFilter: 'blur(8px)',
+                      ? `0 0 30px ${coluna.color}30, inset 0 1px 0 ${coluna.color}20`
+                      : `0 4px 24px rgba(0,0,0,0.3), inset 0 1px 0 rgba(255,255,255,0.03)`,
+                    backdropFilter: 'blur(16px)',
                   }}
                   onDragOver={(e) => handleDragOver(e, coluna.id)}
                   onDragLeave={handleDragLeave}
@@ -2428,31 +2426,31 @@ export function Kanban() {
                 >
                   <div className="flex flex-col h-full min-h-0">
                     <div className="sticky top-0 z-10 flex-shrink-0 px-3 pt-3">
-                      <div className="flex items-center justify-between mb-2 pb-2 border-b"
+                      <div className="flex items-center justify-between mb-2 pb-2 rounded-xl px-2.5 py-2"
                         style={{
-                          borderColor: `${getTextColor(coluna.id, coluna.color)}30`,
-                          background: `linear-gradient(180deg, ${coluna.color}15 0%, ${coluna.color}08 100%)`,
+                          borderBottom: `1px solid ${getTextColor(coluna.id, coluna.color)}15`,
+                          background: `linear-gradient(135deg, ${coluna.color}12 0%, ${coluna.color}04 100%)`,
                           backdropFilter: 'blur(10px)'
                         }}
                       >
                         <div className="flex items-center gap-2">
-                          <div className="p-1 rounded-lg" style={{
-                            backgroundColor: `${coluna.color}15`,
-                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
-                            boxShadow: `0 0 10px ${coluna.color}20`
+                          <div className="p-1.5 rounded-lg" style={{
+                            background: `linear-gradient(135deg, ${coluna.color}25 0%, ${coluna.color}10 100%)`,
+                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}30`,
+                            boxShadow: `0 0 12px ${coluna.color}20, inset 0 1px 0 ${coluna.color}15`
                           }}>
                             <ColumnIcon
                               className="w-3.5 h-3.5"
                               style={{
                                 color: getTextColor(coluna.id, coluna.color),
-                                filter: `drop-shadow(0 0 6px ${getTextColor(coluna.id, coluna.color)})`
+                                filter: `drop-shadow(0 0 4px ${getTextColor(coluna.id, coluna.color)})`
                               }}
                             />
                           </div>
-                          <h4 className="font-bold text-xs uppercase tracking-wider"
+                          <h4 className="font-bold text-[10px] uppercase tracking-wider"
                             style={{
                               color: getTextColor(coluna.id, coluna.color),
-                              textShadow: `0 0 10px ${getTextColor(coluna.id, coluna.color)}60`
+                              textShadow: `0 0 8px ${getTextColor(coluna.id, coluna.color)}40`
                             }}
                           >
                             {coluna.label}
@@ -2465,11 +2463,12 @@ export function Kanban() {
                                 e.stopPropagation();
                                 setShowPecasInfoModal(true);
                               }}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all hover:scale-105 cursor-pointer"
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition-all hover:scale-105 cursor-pointer"
                               style={{
-                                background: 'linear-gradient(135deg, #10B98120 0%, #10B98110 100%)',
-                                border: '1px solid #10B98140',
-                                color: '#10B981'
+                                background: 'linear-gradient(135deg, #10B98118 0%, #10B98108 100%)',
+                                border: '1px solid #10B98130',
+                                color: '#10B981',
+                                boxShadow: '0 0 8px #10B98115'
                               }}
                               title="Clique para ver detalhes das pecas"
                             >
@@ -2482,11 +2481,12 @@ export function Kanban() {
                                 e.stopPropagation();
                                 setShowPecasInfoModal(true);
                               }}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all hover:scale-105 cursor-pointer"
+                              className="flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold transition-all hover:scale-105 cursor-pointer"
                               style={{
-                                background: 'linear-gradient(135deg, #3B82F620 0%, #3B82F610 100%)',
-                                border: '1px solid #3B82F640',
-                                color: '#3B82F6'
+                                background: 'linear-gradient(135deg, #3B82F618 0%, #3B82F608 100%)',
+                                border: '1px solid #3B82F630',
+                                color: '#3B82F6',
+                                boxShadow: '0 0 8px #3B82F615'
                               }}
                               title="Valor total das pecas em transito"
                             >
@@ -2499,10 +2499,10 @@ export function Kanban() {
                                 e.stopPropagation();
                                 setOpenSortDropdown(openSortDropdown === coluna.id ? null : coluna.id);
                               }}
-                              className="p-1 rounded-md transition-all hover:scale-110"
+                              className="p-1 rounded-lg transition-all hover:scale-110"
                               style={{
-                                background: `linear-gradient(135deg, ${coluna.color}20 0%, ${coluna.color}10 100%)`,
-                                border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`,
+                                background: `${coluna.color}10`,
+                                border: `1px solid ${getTextColor(coluna.id, coluna.color)}25`,
                                 color: getTextColor(coluna.id, coluna.color)
                               }}
                               title="Escolher ordenação"
@@ -2512,11 +2512,11 @@ export function Kanban() {
 
                             {openSortDropdown === coluna.id && (
                               <div
-                                className="absolute top-full mt-1 right-0 z-50 rounded-lg shadow-2xl min-w-[180px] overflow-hidden"
+                                className="absolute top-full mt-1 right-0 z-50 rounded-xl shadow-2xl min-w-[180px] overflow-hidden"
                                 style={{
-                                  background: 'rgba(0, 0, 0, 0.95)',
-                                  border: `1px solid ${coluna.color}60`,
-                                  boxShadow: `0 0 20px ${coluna.color}40`
+                                  background: 'linear-gradient(180deg, rgba(15,15,25,0.99) 0%, rgba(8,8,16,0.99) 100%)',
+                                  border: `1px solid ${coluna.color}40`,
+                                  boxShadow: `0 20px 50px rgba(0,0,0,0.6), 0 0 20px ${coluna.color}20`
                                 }}
                                 onClick={(e) => e.stopPropagation()}
                               >
@@ -2536,13 +2536,13 @@ export function Kanban() {
                                       }));
                                       setOpenSortDropdown(null);
                                     }}
-                                    className="w-full px-3 py-2 text-left text-xs font-medium transition-all flex items-center gap-2 hover:scale-[1.02]"
+                                    className="w-full px-3 py-2.5 text-left text-xs font-medium transition-all flex items-center gap-2.5"
                                     style={{
                                       background: columnSortOrder[coluna.id] === option.value
-                                        ? `linear-gradient(90deg, ${coluna.color}30 0%, ${coluna.color}10 100%)`
+                                        ? `linear-gradient(90deg, ${coluna.color}20 0%, transparent 100%)`
                                         : 'transparent',
-                                      color: columnSortOrder[coluna.id] === option.value ? coluna.color : '#888',
-                                      borderBottom: '1px solid rgba(255,255,255,0.05)'
+                                      color: columnSortOrder[coluna.id] === option.value ? coluna.color : 'rgba(255,255,255,0.5)',
+                                      borderBottom: '1px solid rgba(255,255,255,0.04)'
                                     }}
                                   >
                                     <span>{option.icon}</span>
@@ -2556,12 +2556,12 @@ export function Kanban() {
                             )}
                           </div>
                           <div
-                            className="px-2 py-0.5 rounded-md text-xs font-bold min-w-[28px] text-center"
+                            className="px-2.5 py-1 rounded-lg text-xs font-bold min-w-[30px] text-center"
                             style={{
-                              background: `linear-gradient(135deg, ${coluna.color}25 0%, ${coluna.color}10 100%)`,
+                              background: `linear-gradient(135deg, ${coluna.color}20 0%, ${coluna.color}08 100%)`,
                               color: getTextColor(coluna.id, coluna.color),
-                              border: `1px solid ${getTextColor(coluna.id, coluna.color)}50`,
-                              boxShadow: `0 0 15px ${coluna.color}25, inset 0 1px 1px ${coluna.color}20`
+                              border: `1px solid ${getTextColor(coluna.id, coluna.color)}35`,
+                              boxShadow: `0 0 12px ${coluna.color}15, inset 0 1px 0 ${coluna.color}15`
                             }}
                           >
                             {filteredData[coluna.id]?.length || 0}
@@ -2574,11 +2574,11 @@ export function Kanban() {
                             ...prev,
                             [coluna.id]: (prev[coluna.id] || 'asc') === 'asc' ? 'desc' : 'asc'
                           }))}
-                          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded mb-1 transition-all hover:opacity-80 active:scale-95"
+                          className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-lg mb-1 transition-all hover:opacity-80 active:scale-95"
                           style={{
-                            background: `${coluna.color}15`,
+                            background: `${coluna.color}10`,
                             color: getTextColor(coluna.id, coluna.color),
-                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}40`
+                            border: `1px solid ${getTextColor(coluna.id, coluna.color)}25`
                           }}
                           title="Clique para inverter direção"
                         >

@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
 import { UnitFilter } from '../components/UnitFilter';
 import { EstoqueGeral } from '../components/estoque/EstoqueGeral';
 import { EstoqueTransferencias } from '../components/estoque/EstoqueTransferencias';
@@ -14,8 +13,7 @@ import { EstoqueCreditoGSPN } from '../components/estoque/EstoqueCreditoGSPN';
 type Tab = 'geral' | 'entrada' | 'transferencias' | 'devolucoes' | 'mapa' | 'credito_gspn';
 
 export function Estoque() {
-  const { user, allUserUnits } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('geral');
   const [unidades, setUnidades] = useState<Array<{id: string; nome: string}>>([]);
   const [selectedUnidade, setSelectedUnidade] = useState('');
@@ -25,31 +23,24 @@ export function Estoque() {
   }, []);
 
   useEffect(() => {
-    if (user?.unidade_id && allUserUnits.length <= 1) {
+    if (user?.unidade_id) {
       setSelectedUnidade(user.unidade_id);
     }
-  }, [user, allUserUnits]);
+  }, [user]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
     setUnidades(data || []);
   };
 
-  const allTabs = [
-    { id: 'geral' as Tab, label: 'Estoque Geral', icon: Package, color: 'var(--text-accent)', isAccent: true, permKey: 'estoque_geral' },
-    { id: 'entrada' as Tab, label: 'Entrada de NF', icon: Upload, color: '#39FF14', isAccent: false, permKey: 'estoque_entrada' },
-    { id: 'transferencias' as Tab, label: 'Transferências', icon: ArrowRightLeft, color: '#FFBF00', isAccent: false, permKey: 'estoque_transferencias' },
-    { id: 'devolucoes' as Tab, label: 'Devoluções', icon: RotateCcw, color: '#FF0064', isAccent: false, permKey: 'estoque_devolucoes' },
-    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: 'var(--text-accent)', isAccent: true, permKey: 'estoque_mapa' },
-    { id: 'credito_gspn' as Tab, label: 'Crédito GSPN', icon: Zap, color: '#39FF14', isAccent: false, permKey: 'estoque_geral' },
+  const tabs = [
+    { id: 'geral' as Tab, label: 'Estoque Geral', icon: Package, color: 'var(--text-accent)', isAccent: true },
+    { id: 'entrada' as Tab, label: 'Entrada de NF', icon: Upload, color: '#39FF14', isAccent: false },
+    { id: 'transferencias' as Tab, label: 'Transferências', icon: ArrowRightLeft, color: '#FFBF00', isAccent: false },
+    { id: 'devolucoes' as Tab, label: 'Devoluções', icon: RotateCcw, color: '#FF0064', isAccent: false },
+    { id: 'mapa' as Tab, label: 'Mapa do Estoque', icon: Map, color: 'var(--text-accent)', isAccent: true },
+    { id: 'credito_gspn' as Tab, label: 'Crédito GSPN', icon: Zap, color: '#39FF14', isAccent: false },
   ];
-  const tabs = allTabs.filter(t => hasPermission(t.permKey));
-
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-      setActiveTab(tabs[0].id);
-    }
-  }, [tabs.length]);
 
   return (
     <div className="space-y-6 fade-in">

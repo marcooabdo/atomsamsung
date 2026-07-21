@@ -69,24 +69,24 @@ function getTATColor(createdAt: string, tipoOS: string, tipoAtendimento: string)
 
   if (percentual <= 70) {
     return {
-      background: 'linear-gradient(135deg, rgba(16,185,129,0.3) 0%, rgba(16,185,129,0.15) 100%)',
-      color: '#10b981',
-      border: '1px solid rgba(16,185,129,0.5)',
-      boxShadow: '0 0 8px rgba(16,185,129,0.3)'
+      background: 'linear-gradient(135deg, rgba(16,185,129,0.2) 0%, rgba(16,185,129,0.06) 100%)',
+      color: '#34D399',
+      border: '1px solid rgba(16,185,129,0.35)',
+      boxShadow: '0 0 10px rgba(16,185,129,0.15), inset 0 1px 0 rgba(16,185,129,0.1)'
     };
   } else if (percentual <= 100) {
     return {
-      background: 'linear-gradient(135deg, rgba(251,191,36,0.3) 0%, rgba(251,191,36,0.15) 100%)',
-      color: '#fbbf24',
-      border: '1px solid rgba(251,191,36,0.5)',
-      boxShadow: '0 0 8px rgba(251,191,36,0.3)'
+      background: 'linear-gradient(135deg, rgba(251,191,36,0.2) 0%, rgba(251,191,36,0.06) 100%)',
+      color: '#FBBF24',
+      border: '1px solid rgba(251,191,36,0.35)',
+      boxShadow: '0 0 10px rgba(251,191,36,0.15), inset 0 1px 0 rgba(251,191,36,0.1)'
     };
   }
   return {
-    background: 'linear-gradient(135deg, rgba(239,68,68,0.3) 0%, rgba(239,68,68,0.15) 100%)',
-    color: '#ef4444',
-    border: '1px solid rgba(239,68,68,0.5)',
-    boxShadow: '0 0 8px rgba(239,68,68,0.3)'
+    background: 'linear-gradient(135deg, rgba(239,68,68,0.2) 0%, rgba(239,68,68,0.06) 100%)',
+    color: '#F87171',
+    border: '1px solid rgba(239,68,68,0.35)',
+    boxShadow: '0 0 10px rgba(239,68,68,0.15), inset 0 1px 0 rgba(239,68,68,0.1)'
   };
 }
 
@@ -302,28 +302,35 @@ export const KanbanCard = memo(function KanbanCard({
       onClick={() => onCardClick(os)}
       className={`rounded-xl p-3 cursor-pointer group relative overflow-hidden${destaqueAlerta ? ' animate-pulse-subtle' : ''}`}
       style={{
-        background: destaqueAlerta ? 'linear-gradient(135deg, rgba(239,68,68,0.08) 0%, var(--glass-bg) 40%)' : 'var(--glass-bg)',
-        border: destaqueAlerta ? '1px solid rgba(239,68,68,0.5)' : `1px solid ${textColor}15`,
-        boxShadow: destaqueAlerta ? '0 0 12px rgba(239,68,68,0.2), var(--card-shadow)' : 'var(--card-shadow)',
-        backdropFilter: 'blur(12px)',
-        transition: 'all 0.25s ease',
+        background: destaqueAlerta
+          ? 'linear-gradient(145deg, rgba(239,68,68,0.06) 0%, rgba(12,12,20,0.95) 40%)'
+          : 'linear-gradient(145deg, rgba(255,255,255,0.03) 0%, rgba(8,8,16,0.95) 100%)',
+        border: destaqueAlerta ? '1px solid rgba(239,68,68,0.45)' : `1px solid rgba(255,255,255,0.06)`,
+        boxShadow: destaqueAlerta
+          ? '0 0 12px rgba(239,68,68,0.15), 0 4px 16px rgba(0,0,0,0.3)'
+          : '0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)',
+        backdropFilter: 'blur(16px)',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         opacity: isDragged ? 0.4 : 1
       }}
       onMouseEnter={(e) => {
-        e.currentTarget.style.borderColor = `${textColor}45`;
-        e.currentTarget.style.boxShadow = `0 6px 20px ${colunaColor}18, 0 0 16px ${colunaColor}10`;
-        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.borderColor = `${colunaColor}50`;
+        e.currentTarget.style.boxShadow = `0 8px 32px ${colunaColor}15, 0 2px 8px rgba(0,0,0,0.3), inset 0 1px 0 ${colunaColor}15`;
+        e.currentTarget.style.transform = 'translateY(-2px) scale(1.01)';
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.borderColor = `${textColor}15`;
-        e.currentTarget.style.boxShadow = 'var(--card-shadow)';
-        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = destaqueAlerta ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.06)';
+        e.currentTarget.style.boxShadow = destaqueAlerta
+          ? '0 0 12px rgba(239,68,68,0.15), 0 4px 16px rgba(0,0,0,0.3)'
+          : '0 4px 16px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.04)';
+        e.currentTarget.style.transform = 'translateY(0) scale(1)';
       }}
     >
-      <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
+      <div className="absolute top-0 left-0 right-0 h-[2px] rounded-full" style={{
         background: destaqueAlerta
           ? 'linear-gradient(90deg, #EF4444, #F97316, #EF4444)'
-          : `linear-gradient(90deg, ${colunaColor}, ${colunaColor}40, transparent)`,
+          : `linear-gradient(90deg, transparent, ${colunaColor}, ${colunaColor}60, transparent)`,
+        boxShadow: destaqueAlerta ? '0 1px 6px rgba(239,68,68,0.4)' : `0 1px 6px ${colunaColor}30`
       }}></div>
 
       {destaquePecaIncompleta && (
@@ -358,7 +365,7 @@ export const KanbanCard = memo(function KanbanCard({
       <div className="flex items-start justify-between mb-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-            <h5 className="font-bold text-xs truncate" style={{ color: 'var(--text-primary)' }}>
+            <h5 className="font-bold text-xs tracking-wide truncate" style={{ color: 'rgba(255,255,255,0.95)', letterSpacing: '0.02em' }}>
               {os.numero_os_samsung || os.numero_os_interna || 'S/N'}
             </h5>
             {searchMatchSource[os.id] === 'hidden' && (

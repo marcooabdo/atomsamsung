@@ -14,7 +14,7 @@ import { Calendar, List, Activity, AlertCircle, Users, MapPin, BarChart3 } from 
 type ViewMode = 'calendar' | 'list' | 'map';
 
 export function Agendamento() {
-  const { user, allUserUnits } = useAuth();
+  const { user } = useAuth();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [agendamentos, setAgendamentos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,13 +34,13 @@ export function Agendamento() {
 
   useEffect(() => {
     if (user) {
-      if (user.unidade_id && allUserUnits.length <= 1) {
+      if (user.unidade_id) {
         setSelectedUnidade(user.unidade_id);
       }
       loadAgendamentos();
       loadTecnicos();
     }
-  }, [user, selectedUnidade, allUserUnits]);
+  }, [user, selectedUnidade]);
 
   useEffect(() => {
     loadAgendamentos();
@@ -52,29 +52,16 @@ export function Agendamento() {
   };
 
   const loadTecnicos = async () => {
-    const canSeeAllUnits = (user?.tipo === 'master' || user?.tipo === 'diretoria') && !user?.unidade_id;
+    const unidadeFilter = selectedUnidade || user?.unidade_id;
+    if (!unidadeFilter) return;
 
-    let query = supabase
+    const { data } = await supabase
       .from('usuarios')
       .select('id, nome')
+      .eq('unidade_id', unidadeFilter)
       .in('tipo', ['tecnico', 'tecnico_ih'])
       .eq('ativo', true)
       .order('nome');
-
-    if (selectedUnidade) {
-      query = query.eq('unidade_id', selectedUnidade);
-    } else if (!canSeeAllUnits) {
-      if (allUserUnits.length > 1) {
-        query = query.in('unidade_id', allUserUnits);
-      } else if (user?.unidade_id) {
-        query = query.eq('unidade_id', user.unidade_id);
-      } else {
-        setTecnicos([]);
-        return;
-      }
-    }
-
-    const { data } = await query;
 
     setTecnicos(data || []);
   };
@@ -116,14 +103,10 @@ export function Agendamento() {
         query = query.eq('tecnico_id', user.id);
       }
 
-      if (selectedUnidade) {
+      if (!canSeeAllUnits && unidadeFilter) {
+        query = query.eq('unidade_id', unidadeFilter);
+      } else if (selectedUnidade) {
         query = query.eq('unidade_id', selectedUnidade);
-      } else if (!canSeeAllUnits) {
-        if (allUserUnits.length > 1) {
-          query = query.in('unidade_id', allUserUnits);
-        } else if (unidadeFilter) {
-          query = query.eq('unidade_id', unidadeFilter);
-        }
       }
 
       if (selectedTecnico && selectedTecnico !== 'todos') {

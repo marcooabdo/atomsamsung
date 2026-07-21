@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { usePermissions } from '../hooks/usePermissions';
 import { UnitFilter } from '../components/UnitFilter';
 import FinanceDashboard from '../components/finance/FinanceDashboard';
 import CaixaModule from '../components/finance/CaixaModule';
@@ -13,30 +12,21 @@ import {
   Filter, LayoutDashboard, Receipt, FileText, Building2
 } from 'lucide-react';
 
-const ALL_TABS = [
-  { id: 'dashboard', label: 'Dashboard Executivo', icon: LayoutDashboard, permKey: 'financeiro_dashboard' },
-  { id: 'caixa', label: 'Caixa', icon: Wallet, permKey: 'financeiro_caixa' },
-  { id: 'lancamentos', label: 'Lancamentos', icon: Receipt, permKey: 'financeiro_lancamentos' },
-  { id: 'consumo', label: 'Consumo Pecas', icon: Package, permKey: 'financeiro_consumo' },
-  { id: 'pendencias', label: 'Pendencias Samsung', icon: AlertTriangle, permKey: 'financeiro_pendencias' },
+const TABS = [
+  { id: 'dashboard', label: 'Dashboard Executivo', icon: LayoutDashboard },
+  { id: 'caixa', label: 'Caixa', icon: Wallet },
+  { id: 'lancamentos', label: 'Lancamentos', icon: Receipt },
+  { id: 'consumo', label: 'Consumo Pecas', icon: Package },
+  { id: 'pendencias', label: 'Pendencias Samsung', icon: AlertTriangle },
 ];
 
 export function Financeiro() {
-  const { usuario, unidadesAdicionais, allUserUnits } = useAuth();
-  const { hasPermission } = usePermissions();
+  const { usuario } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
   const [selectedUnidade, setSelectedUnidade] = useState('');
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
   const [dataInicio, setDataInicio] = useState('');
   const [dataFim, setDataFim] = useState('');
-
-  const tabs = ALL_TABS.filter(t => hasPermission(t.permKey));
-
-  useEffect(() => {
-    if (tabs.length > 0 && !tabs.find(t => t.id === activeTab)) {
-      setActiveTab(tabs[0].id);
-    }
-  }, [tabs.length]);
 
   useEffect(() => {
     loadUnidades();
@@ -48,29 +38,27 @@ export function Financeiro() {
 
   useEffect(() => {
     if (usuario) {
-      if ((usuario.tipo === 'master' || usuario.tipo === 'diretoria') && !usuario.unidade_id) {
+      if (usuario.tipo === 'master' || usuario.tipo === 'diretoria') {
         return;
       }
-      if (usuario.unidade_id && allUserUnits.length <= 1) {
+      if (usuario.unidade_id) {
         setSelectedUnidade(usuario.unidade_id);
       }
     }
-  }, [usuario, allUserUnits]);
+  }, [usuario]);
 
   const loadUnidades = async () => {
     const { data } = await supabase.from('unidades').select('id, nome').order('nome');
     setUnidades(data || []);
   };
 
-  const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
-  const hasMultipleUnits = allUserUnits.length > 1;
-  const canSelectUnit = canSeeAllUnits || hasMultipleUnits;
+  const canSelectUnit = usuario?.tipo === 'master' || usuario?.tipo === 'diretoria';
 
   const getUnidadeIdForQuery = () => {
-    if (canSeeAllUnits) {
+    if (canSelectUnit) {
       return selectedUnidade || null;
     }
-    return selectedUnidade || usuario?.unidade_id || null;
+    return usuario?.unidade_id || null;
   };
 
   return (
@@ -93,7 +81,7 @@ export function Financeiro() {
 
           {canSelectUnit && (
             <UnitFilter
-              unidades={canSeeAllUnits ? unidades : unidades.filter(u => allUserUnits.includes(u.id))}
+              unidades={unidades}
               selectedUnidade={selectedUnidade}
               onUnidadeChange={setSelectedUnidade}
             />
@@ -118,7 +106,7 @@ export function Financeiro() {
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-gray-700 pb-2">
-        {tabs.map((tab) => {
+        {TABS.map((tab) => {
           const Icon = tab.icon;
           return (
             <button

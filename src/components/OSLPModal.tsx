@@ -2061,10 +2061,13 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     try {
       // Se for lote e tem peças selecionadas, processar apenas as selecionadas
       if (requisicaoCancelarGI.is_lote && pecasSelecionadas && pecasSelecionadas.length > 0) {
-        // Atualizar status das peças selecionadas
+        // Atualizar status das peças selecionadas - voltar para disponivel
         await supabase
           .from('estoque_pecas')
           .update({
+            status: 'disponivel',
+            os_id: null,
+            tecnico_id: null,
             gi_postada_em: null,
             gi_postada_por: null,
             gi_cancelada_em: new Date().toISOString(),
@@ -2077,14 +2080,12 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           !pecasSelecionadas.includes(p.id) && p.gi_postada_em
         ) || [];
 
-        // Se NENHUMA peça tem GI postada, mudar status da requisição para "atendida"
-        // Se ainda existem peças com GI, manter como "gi_postada"
+        // Se NENHUMA peça tem GI postada, mudar status da requisição para "cancelada"
         if (pecasComGI.length === 0) {
-          // Todas as peças tiveram GI cancelada, atualizar requisição
           await supabase
             .from('requisicoes_pecas')
             .update({
-              status: 'atendida',
+              status: 'cancelada',
               gi_postada_em: null
             })
             .eq('id', requisicaoCancelarGI.id);
@@ -2095,61 +2096,72 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           .map(p => `#${p.id_numerico}`)
           .join(', ');
 
-        // Log com nome do usuário e motivo
         await supabase
           .from('os_comentarios')
           .insert({
             os_id: osId,
             usuario_id: usuario?.id,
-            comentario: `GI cancelada por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca}) - Lote IDs: ${idsNumericos}\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}`,
+            comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca}) - Lote IDs: ${idsNumericos}\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeças voltaram para DISPONÍVEL no estoque.`,
             is_system: true
           });
 
-        // Log no histórico das peças
         for (const pecaId of pecasSelecionadas) {
           await supabase.from('estoque_historico').insert({
             peca_id: pecaId,
             usuario_id: usuario?.id,
             acao: 'gi_cancelada',
             status_anterior: 'vinculada_tecnico',
-            status_novo: 'vinculada_tecnico',
-            observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
+            status_novo: 'disponivel',
+            observacao: `Despacho cancelado por ${usuario?.nome} - Motivo: ${motivo}`
           });
         }
       } else {
-        // Processo normal para peça única
+        // Processo normal para peça única - voltar peça para disponivel
+        if (requisicaoCancelarGI.peca_estoque_id) {
+          await supabase
+            .from('estoque_pecas')
+            .update({
+              status: 'disponivel',
+              os_id: null,
+              tecnico_id: null,
+              gi_postada_em: null,
+              gi_postada_por: null,
+              gi_cancelada_em: new Date().toISOString(),
+              gi_cancelada_por: usuario?.id
+            })
+            .eq('id', requisicaoCancelarGI.peca_estoque_id);
+        }
+
         await supabase
           .from('requisicoes_pecas')
           .update({
-            status: 'atendida',
+            status: 'cancelada',
             gi_postada_em: null
           })
           .eq('id', requisicaoCancelarGI.id);
 
-        // Log com nome do usuário e motivo
         await supabase
           .from('os_comentarios')
           .insert({
             os_id: osId,
             usuario_id: usuario?.id,
-            comentario: `GI cancelada por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca})\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}`,
+            comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca})\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeça voltou para DISPONÍVEL no estoque.`,
             is_system: true
           });
 
-        // Log no histórico da peça
         if (requisicaoCancelarGI.peca_estoque_id) {
           await supabase.from('estoque_historico').insert({
             peca_id: requisicaoCancelarGI.peca_estoque_id,
             usuario_id: usuario?.id,
             acao: 'gi_cancelada',
             status_anterior: 'vinculada_tecnico',
-            status_novo: 'vinculada_tecnico',
-            observacao: `GI cancelada por ${usuario?.nome} - Motivo: ${motivo}`
+            status_novo: 'disponivel',
+            observacao: `Despacho cancelado por ${usuario?.nome} - Motivo: ${motivo}`
           });
         }
       }
 
-      alert('GI cancelada com sucesso!');
+      alert('Despacho cancelado! Peça disponível no estoque.');
 
       await loadPecas();
       await loadRequisicoes();
@@ -2162,8 +2174,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       setMostrarModalCancelarGI(false);
       setRequisicaoCancelarGI(null);
     } catch (error) {
-      alert('Erro ao cancelar GI');
-      throw error;
+      alert(`Erro ao cancelar despacho: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
     }
   };
 
@@ -4753,7 +4764,20 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
               {abaAtiva === 'estoque' && (
                 <div className="space-y-6">
+                  {os?.coluna_kanban === 'diagnostico' && (
+                    <div className="bg-[#FFBF00]/10 border border-[#FFBF00]/30 rounded-lg p-4">
+                      <h3 className="text-sm font-bold text-[#FFBF00] uppercase tracking-wider flex items-center gap-2">
+                        <AlertTriangle className="w-4 h-4" />
+                        Requisição Bloqueada
+                      </h3>
+                      <p className="text-xs text-gray-400 mt-2">
+                        OS em DIAGNÓSTICO. Conclua a análise técnica para liberar requisição de peças.
+                      </p>
+                    </div>
+                  )}
 
+                  {os?.coluna_kanban !== 'diagnostico' && (
+                    <>
                       <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
                         <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
                           <Package className="w-4 h-4" />
@@ -5186,7 +5210,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                   </div>
 
                                   <div className="flex gap-2">
-                                    {!requisicao && !requisicaoDevolvida && (
+                                    {!requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
                                         onClick={() => {
                                           handleRequisitarPeca(peca);
@@ -5273,7 +5297,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       );
                                     })()}
 
-                                    {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && (
+                                    {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
                                       <button
                                         onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -5288,7 +5312,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       </button>
                                     )}
 
-                                    {requisicaoDevolvida?.status === 'devolvida' && !temNovaRequisicaoPendente && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
+                                    {requisicaoDevolvida?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                                       <button
                                         onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -5311,6 +5335,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </div>
                     )}
                   </div>
+                    </>
+                  )}
                 </div>
               )}
 

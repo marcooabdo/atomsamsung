@@ -49,9 +49,8 @@ export function usePermissions() {
   const hasPermission = useCallback((recurso: string): boolean => {
     if (!usuario) return false;
     if (usuario.tipo === 'master') return true;
-    if (loading) return true;
     return permissions[recurso] ?? false;
-  }, [usuario, permissions, loading]);
+  }, [usuario, permissions]);
 
   const hasMenuAccess = useCallback((menuId: string): boolean => {
     return hasPermission(`menu_${menuId}`);

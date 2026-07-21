@@ -41,55 +41,46 @@ function calcQtdGIA(giro: number, estoque: number): number {
   return Math.max(0, sugestao);
 }
 
-export function useOFSData(unidadeId: string, fallbackUnits?: string[]) {
+export function useOFSData(unidadeId: string) {
   const [estoqueMap, setEstoqueMap] = useState<Map<string, OFSPecaEstoque>>(new Map());
   const [financeiro, setFinanceiro] = useState<OFSFinanceiro>({ credito_limite: 0, credito_consumido: 0, credito_livre: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
-    const unitIds = unidadeId ? [unidadeId] : (fallbackUnits && fallbackUnits.length > 0 ? fallbackUnits : null);
-    if (!unitIds) {
+    if (!unidadeId) {
       setEstoqueMap(new Map());
       setFinanceiro({ credito_limite: 0, credito_consumido: 0, credito_livre: 0 });
       return;
     }
-    const isSingle = unitIds.length === 1;
     setLoading(true);
     setError(null);
     try {
-      const applyUnitFilter = (query: any) => isSingle ? query.eq('unidade_id', unitIds[0]) : query.in('unidade_id', unitIds);
-
       const [estRes, transitoRes, giroRes, unidadeRes] = await Promise.all([
-        applyUnitFilter(
-          supabase
-            .from('estoque_pecas')
-            .select('pn, descricao, valor_com_impostos, status')
-        ).eq('status', 'disponivel'),
+        supabase
+          .from('estoque_pecas')
+          .select('pn, descricao, valor_com_impostos, status')
+          .eq('unidade_id', unidadeId)
+          .eq('status', 'disponivel'),
 
-        applyUnitFilter(
-          supabase
-            .from('requisicoes_pecas')
-            .select('codigo_peca, descricao, quantidade_requisitada, valor_peca')
-        ).in('status', ['pendente', 'aprovada', 'pedido_feito']),
+        supabase
+          .from('requisicoes_pecas')
+          .select('codigo_peca, descricao, quantidade_requisitada, valor_peca')
+          .eq('unidade_id', unidadeId)
+          .in('status', ['pendente', 'aprovada', 'pedido_feito']),
 
-        applyUnitFilter(
-          supabase
-            .from('estoque_pecas')
-            .select('pn, descricao, valor_com_impostos')
-        ).eq('status', 'usada')
+        supabase
+          .from('estoque_pecas')
+          .select('pn, descricao, valor_com_impostos')
+          .eq('unidade_id', unidadeId)
+          .eq('status', 'usada')
           .gte('data_ultima_movimentacao', new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString()),
 
-        isSingle
-          ? supabase
-              .from('unidades')
-              .select('limite_credito_gspn')
-              .eq('id', unitIds[0])
-              .maybeSingle()
-          : supabase
-              .from('unidades')
-              .select('limite_credito_gspn')
-              .in('id', unitIds),
+        supabase
+          .from('unidades')
+          .select('limite_credito_gspn')
+          .eq('id', unidadeId)
+          .maybeSingle(),
       ]);
 
       if (estRes.error) throw estRes.error;
@@ -145,17 +136,13 @@ export function useOFSData(unidadeId: string, fallbackUnits?: string[]) {
 
       setEstoqueMap(map);
 
-      const limite = isSingle
-        ? (Number(unidadeRes.data?.limite_credito_gspn) || 0)
-        : ((unidadeRes.data as any[] || []).reduce((acc: number, u: any) => acc + (Number(u.limite_credito_gspn) || 0), 0));
+      const limite = Number(unidadeRes.data?.limite_credito_gspn) || 0;
 
-      const consumidoQuery = supabase
+      const { data: consumidoData } = await supabase
         .from('requisicoes_pecas')
         .select('valor_peca, quantidade_requisitada')
+        .eq('unidade_id', unidadeId)
         .in('status', ['pendente', 'aprovada', 'pedido_feito']);
-      const { data: consumidoData } = isSingle
-        ? await consumidoQuery.eq('unidade_id', unitIds[0])
-        : await consumidoQuery.in('unidade_id', unitIds);
 
       const consumido = (consumidoData || []).reduce((acc, r) => {
         return acc + (Number(r.valor_peca) || 0) * (Number(r.quantidade_requisitada) || 1);
@@ -171,7 +158,7 @@ export function useOFSData(unidadeId: string, fallbackUnits?: string[]) {
     } finally {
       setLoading(false);
     }
-  }, [unidadeId, JSON.stringify(fallbackUnits)]);
+  }, [unidadeId]);
 
   useEffect(() => {
     loadData();

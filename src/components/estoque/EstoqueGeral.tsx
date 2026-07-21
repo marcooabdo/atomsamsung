@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X, ArrowUpDown, ArrowUp, ArrowDown, Download, RotateCcw, Undo2 } from 'lucide-react';
+import { Search, Package, Eye, Printer, MapPin, Clock, AlertCircle, CheckSquare, Square, FileText, Truck, X, ArrowUpDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import type { Database } from '../../lib/database.types';
 import { LabelSelector } from './LabelSelector';
@@ -42,7 +42,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
   const [showEmitirNFModal, setShowEmitirNFModal] = useState(false);
   const [despachandoSamsung, setDespachandoSamsung] = useState(false);
   const [exportingReport, setExportingReport] = useState(false);
-  const [pecaNFDevolucao, setPecaNFDevolucao] = useState<EstoquePeca | null>(null);
 
   const [sortField, setSortField] = useState<SortField>('nf_date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
@@ -395,38 +394,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
     }
   };
 
-  const handleEmitirNFDevolucao = (peca: EstoquePeca) => {
-    setPecaNFDevolucao(peca);
-  };
-
-  const handleCancelarDespacho = async (peca: EstoquePeca) => {
-    if (!confirm(`Cancelar despacho da peca ${peca.pn}?\n\nEla voltara ao status "disponivel" no estoque.`)) return;
-    try {
-      const { error } = await supabase
-        .from('estoque_pecas')
-        .update({
-          status: 'disponivel',
-          gi_postada_em: null,
-          gi_numero: null,
-        })
-        .eq('id', peca.id);
-      if (error) throw error;
-
-      await supabase.from('estoque_historico').insert({
-        peca_id: peca.id,
-        status_anterior: 'devolvida_samsung',
-        status_novo: 'disponivel',
-        usuario_id: user?.id || null,
-        observacao: 'Despacho cancelado manualmente - peca retornou ao estoque disponivel',
-      });
-
-      setPecas(prev => prev.map(p => p.id === peca.id ? { ...p, status: 'disponivel' } : p));
-      alert('Despacho cancelado. Peca esta disponivel novamente.');
-    } catch (err: any) {
-      alert('Erro ao cancelar despacho: ' + (err?.message || err));
-    }
-  };
-
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { label: string; className: string }> = {
       disponivel: { label: 'Disponível', className: 'bg-green-500/20 text-green-400 border border-green-500/30' },
@@ -729,7 +696,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             onChange={(e) => setShowDevolucaoCompleta(e.target.checked)}
             className="rounded"
           />
-          <span className="text-sm text-gray-300">Mostrar Devolução Completa</span>
+          <span className="text-sm text-gray-300">Mostrar Devolu\u00e7\u00e3o Completa</span>
         </label>
 
         <button
@@ -1062,28 +1029,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                     <Eye className="w-4 h-4" />
                     Detalhes
                   </button>
-                  {peca.status === 'devolvida_samsung' && (
-                    <>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleEmitirNFDevolucao(peca); }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition text-xs font-bold"
-                        style={{ background: 'rgba(139,92,246,0.12)', color: '#A78BFA', border: '1px solid rgba(139,92,246,0.3)' }}
-                        title="Emitir NF de Devolucao"
-                      >
-                        <FileText className="w-3.5 h-3.5" />
-                        NF Dev.
-                      </button>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); handleCancelarDespacho(peca); }}
-                        className="flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg transition text-xs font-bold"
-                        style={{ background: 'rgba(245,158,11,0.12)', color: '#F59E0B', border: '1px solid rgba(245,158,11,0.3)' }}
-                        title="Cancelar despacho e voltar para disponivel"
-                      >
-                        <Undo2 className="w-3.5 h-3.5" />
-                        Cancelar
-                      </button>
-                    </>
-                  )}
                 </div>
               </div>
             );
@@ -1247,18 +1192,6 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
           onClose={() => setShowEmitirNFModal(false)}
           onSuccess={() => {
             clearSelection();
-            loadPecas();
-          }}
-        />
-      )}
-
-      {pecaNFDevolucao && (
-        <EmitirNFModal
-          pecas={[pecaNFDevolucao]}
-          unidadeId={selectedUnidade || user?.unidade_id || ''}
-          onClose={() => setPecaNFDevolucao(null)}
-          onSuccess={() => {
-            setPecaNFDevolucao(null);
             loadPecas();
           }}
         />

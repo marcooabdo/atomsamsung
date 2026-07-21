@@ -25,8 +25,7 @@ import {
   Radio,
   Layers,
   Truck,
-  ShieldCheck,
-  Activity
+  ShieldCheck
 } from 'lucide-react';
 
 interface PerfilPermissions {
@@ -67,7 +66,6 @@ const MENU_ITEMS: MenuItem[] = [
     ]
   },
   { id: 'menu_dashboard', label: 'Central ATOM', icon: LayoutDashboard },
-  { id: 'menu_cockpit', label: 'Cockpit', icon: Activity },
   { id: 'menu_kanban', label: 'Pipeline Operacional', icon: Layers },
   { id: 'menu_agendamento', label: 'Agendamento', icon: Calendar },
   {
@@ -133,7 +131,6 @@ const MENU_ITEMS: MenuItem[] = [
       { id: 'config_checklists', label: 'Checklists' },
       { id: 'config_pdf_os', label: 'PDF OS' },
       { id: 'config_nf', label: 'Nota Fiscal' },
-      { id: 'config_regras_fechamento', label: 'Regras Fechamento' },
       { id: 'config_permissoes', label: 'Permissoes' }
     ]
   }
