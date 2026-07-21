@@ -4765,20 +4765,6 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
               {abaAtiva === 'estoque' && (
                 <div className="space-y-6">
-                  {os?.coluna_kanban === 'diagnostico' && (
-                    <div className="bg-[#FFBF00]/10 border border-[#FFBF00]/30 rounded-lg p-4">
-                      <h3 className="text-sm font-bold text-[#FFBF00] uppercase tracking-wider flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4" />
-                        Requisição Bloqueada
-                      </h3>
-                      <p className="text-xs text-gray-400 mt-2">
-                        OS em DIAGNÓSTICO. Conclua a análise técnica para liberar requisição de peças.
-                      </p>
-                    </div>
-                  )}
-
-                  {os?.coluna_kanban !== 'diagnostico' && (
-                    <>
                       <div className="bg-[#00D4FF]/10 border border-[#00D4FF]/30 rounded-lg p-4">
                         <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider flex items-center gap-2">
                           <Package className="w-4 h-4" />
@@ -5211,7 +5197,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                   </div>
 
                                   <div className="flex gap-2">
-                                    {!requisicao && !requisicaoDevolvida && os?.coluna_kanban !== 'diagnostico' && (
+                                    {!requisicao && !requisicaoDevolvida && (
                                       <button
                                         onClick={() => {
                                           handleRequisitarPeca(peca);
@@ -5298,7 +5284,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       );
                                     })()}
 
-                                    {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && (
+                                    {requisicaoDevolvida?.status === 'reprovada' && !temNovaRequisicaoPendente && (
                                       <button
                                         onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -5313,7 +5299,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       </button>
                                     )}
 
-                                    {requisicaoDevolvida?.status === 'devolvida' && !temNovaRequisicaoPendente && os?.coluna_kanban !== 'diagnostico' && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
+                                    {requisicaoDevolvida?.status === 'devolvida' && !temNovaRequisicaoPendente && requisicaoDevolvida?.tipo_devolucao === 'usada' && (
                                       <button
                                         onClick={() => handleRequisitarNovamente(peca, requisicaoDevolvida)}
                                         className="neon-button flex items-center gap-2 text-xs px-4 py-2"
@@ -5336,8 +5322,6 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </div>
                     )}
                   </div>
-                    </>
-                  )}
                 </div>
               )}
 
