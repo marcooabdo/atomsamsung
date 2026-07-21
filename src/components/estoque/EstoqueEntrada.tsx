@@ -330,6 +330,13 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setError(null);
 
     try {
+      const { data: unidadeData } = await supabase
+        .from('unidades')
+        .select('cnpj')
+        .eq('id', unidadeId)
+        .maybeSingle();
+      const cnpjUnidade = unidadeData?.cnpj?.replace(/[.\-\/]/g, '') || '';
+
       const consultarChave = async (chave: string): Promise<{ success: boolean; xml?: string; pdf_base64?: string; error?: string }> => {
         const resp = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
@@ -339,7 +346,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
             },
-            body: JSON.stringify({ chaveAcesso: chave }),
+            body: JSON.stringify({ chaveAcesso: chave, cpfCnpj: cnpjUnidade }),
           }
         );
         const data = await resp.json();
@@ -965,6 +972,12 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
     setDownloadingNFId(nf.id);
     try {
+      const unidadeId = selectedUnidade || usuario?.unidade_id;
+      let cnpjUnidade = '';
+      if (unidadeId) {
+        const { data: unidadeData } = await supabase.from('unidades').select('cnpj').eq('id', unidadeId).maybeSingle();
+        cnpjUnidade = unidadeData?.cnpj?.replace(/[.\-\/]/g, '') || '';
+      }
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
         {
@@ -973,7 +986,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
+          body: JSON.stringify({ chaveAcesso: nf.chave_acesso, cpfCnpj: cnpjUnidade }),
         }
       );
       const data = await response.json();

@@ -89,6 +89,11 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
 
     setDownloadingPDF(true);
     try {
+      let cnpjUnidade = '';
+      if (nf.unidade_id) {
+        const { data: unidadeData } = await supabase.from('unidades').select('cnpj').eq('id', nf.unidade_id).maybeSingle();
+        cnpjUnidade = unidadeData?.cnpj?.replace(/[.\-\/]/g, '') || '';
+      }
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
         {
@@ -97,7 +102,7 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
+          body: JSON.stringify({ chaveAcesso: nf.chave_acesso, cpfCnpj: cnpjUnidade }),
         }
       );
 
