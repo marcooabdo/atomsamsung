@@ -31,7 +31,7 @@ async function getNuvemFiscalToken(): Promise<string> {
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`OAuth2 token error: ${response.status} - ${errorText}`);
+    throw new Error(`Token error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
@@ -42,196 +42,204 @@ async function getNuvemFiscalToken(): Promise<string> {
   return cachedToken.access_token;
 }
 
-async function fetchFromDistribuicao(chaveAcesso: string, token: string): Promise<string | null> {
-  // Try to find the document in the distribution service by chave
-  const url = `${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos?chave=${chaveAcesso}`;
-
-  try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
-    });
-
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const docs = data?.data || data?.items || data;
-
-    if (Array.isArray(docs) && docs.length > 0) {
-      const doc = docs[0];
-      const docId = doc.id;
-
-      if (docId) {
-        // Download the XML using the document ID
-        const xmlResp = await fetch(`${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos/${docId}/xml`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/xml",
-          },
-        });
-
-        if (xmlResp.ok) {
-          const xml = await xmlResp.text();
-          if (xml && xml.length > 100) return xml;
-        }
-      }
-
-      // If document has inline body/xml
-      if (doc.corpo_xml || doc.xml) {
-        return doc.corpo_xml || doc.xml;
-      }
-    }
-  } catch {
-    // Fallthrough
-  }
-
-  return null;
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchFromNfeEndpoint(chaveAcesso: string, token: string): Promise<string | null> {
-  // Try the NF-e listing endpoint filtered by chave
-  const url = `${NUVEM_FISCAL_API_BASE}/nfe?chave=${chaveAcesso}`;
+// Extract CNPJ from chave de acesso (positions 6-19)
+function extractCNPJFromChave(chave: string): string {
+  return chave.substring(6, 20);
+}
 
+// Strategy 1: Check if document already exists in distribution
+async function findInDistribuicao(chave: string, token: string): Promise<string | null> {
   try {
-    const response = await fetch(url, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        Accept: "application/json",
-      },
+    const url = `${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos?chave=${chave}`;
+    const resp = await fetch(url, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
     });
+    if (!resp.ok) return null;
 
-    if (!response.ok) return null;
-
-    const data = await response.json();
-    const docs = data?.data || data?.items || data;
-
-    if (Array.isArray(docs) && docs.length > 0) {
-      const doc = docs[0];
-      const docId = doc.id;
-
-      if (docId) {
-        const xmlResp = await fetch(`${NUVEM_FISCAL_API_BASE}/nfe/${docId}/xml`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/xml",
-          },
-        });
-
-        if (xmlResp.ok) {
-          const xml = await xmlResp.text();
-          if (xml && xml.length > 100) return xml;
+    const data = await resp.json();
+    const items = data?.data || [];
+    if (items.length > 0 && items[0].id) {
+      const xmlResp = await fetch(
+        `${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos/${items[0].id}/xml`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" } }
+      );
+      if (xmlResp.ok) {
+        const xml = await xmlResp.text();
+        if (xml && xml.length > 200 && (xml.includes("<nfeProc") || xml.includes("<NFe") || xml.includes("<infNFe"))) {
+          return xml;
         }
       }
     }
-  } catch {
-    // Fallthrough
-  }
-
+  } catch { /* fallthrough */ }
   return null;
 }
 
-async function fetchFromConsultaDanfe(chaveAcesso: string): Promise<string | null> {
+// Strategy 2: Request distribution by chave (triggers SEFAZ lookup)
+async function requestDistribuicaoByChave(chave: string, cpfCnpj: string, token: string): Promise<string | null> {
+  try {
+    // Request distribution specifying the chave
+    const resp = await fetch(`${NUVEM_FISCAL_API_BASE}/distribuicao/nfe`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({
+        cpf_cnpj: cpfCnpj,
+        ch_nfe: chave,
+      }),
+    });
+
+    if (!resp.ok) {
+      // Try alternative body format
+      const resp2 = await fetch(`${NUVEM_FISCAL_API_BASE}/distribuicao/nfe`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify({
+          cpf_cnpj: cpfCnpj,
+          chNFe: chave,
+        }),
+      });
+      if (!resp2.ok) return null;
+    }
+
+    // Poll for the document to become available (up to 60s)
+    for (let attempt = 0; attempt < 12; attempt++) {
+      await sleep(5000);
+      const xml = await findInDistribuicao(chave, token);
+      if (xml) return xml;
+    }
+  } catch { /* fallthrough */ }
+  return null;
+}
+
+// Strategy 3: Try NF-e listing (for notes emitted through Nuvem Fiscal)
+async function findInNfeListing(chave: string, token: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`${NUVEM_FISCAL_API_BASE}/nfe?chave=${chave}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    if (!resp.ok) return null;
+
+    const data = await resp.json();
+    const items = data?.data || [];
+    if (items.length > 0 && items[0].id) {
+      const xmlResp = await fetch(
+        `${NUVEM_FISCAL_API_BASE}/nfe/${items[0].id}/xml`,
+        { headers: { Authorization: `Bearer ${token}`, Accept: "application/xml" } }
+      );
+      if (xmlResp.ok) {
+        const xml = await xmlResp.text();
+        if (xml && xml.length > 200) return xml;
+      }
+    }
+  } catch { /* fallthrough */ }
+  return null;
+}
+
+// Strategy 4: Try consultadanfe.com (free service that queries SEFAZ)
+async function fetchFromConsultaDanfe(chave: string): Promise<string | null> {
+  // consultadanfe.com has an API at /api/consulta
   const urls = [
-    `https://www.consultadanfe.com.br/api/xml/${chaveAcesso}`,
-    `https://consultadanfe.com.br/api/xml/${chaveAcesso}`,
+    `https://consultadanfe.com/api/consulta/${chave}`,
+    `https://consultadanfe.com/api/v1/consulta/${chave}`,
+    `https://api.consultadanfe.com/v1/nfe/${chave}`,
+    `https://consultadanfe.com/${chave}`,
   ];
 
   for (const url of urls) {
     try {
-      const response = await fetch(url, {
+      const resp = await fetch(url, {
         headers: {
-          "Accept": "application/xml, text/xml, */*",
+          Accept: "application/json, application/xml, text/xml, */*",
           "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         },
       });
+      if (!resp.ok) continue;
 
-      if (response.ok) {
-        const text = await response.text();
-        if (text && text.length > 100 && (text.includes("<nfeProc") || text.includes("<NFe") || text.includes("<infNFe"))) {
-          return text;
-        }
+      const contentType = resp.headers.get("content-type") || "";
+      const text = await resp.text();
+
+      // Check if it's XML directly
+      if (text.includes("<nfeProc") || text.includes("<NFe") || text.includes("<infNFe")) {
+        if (text.length > 200) return text;
       }
-    } catch {
-      // Try next URL
-    }
-  }
 
+      // Check if it's JSON with xml field
+      if (contentType.includes("json")) {
+        try {
+          const json = JSON.parse(text);
+          if (json.xml && json.xml.length > 200) return json.xml;
+          if (json.xmlCode && json.xmlCode.length > 200) return json.xmlCode;
+          if (json.data?.xml && json.data.xml.length > 200) return json.data.xml;
+        } catch { /* not json */ }
+      }
+    } catch { /* try next */ }
+  }
   return null;
 }
 
-async function fetchFromSefazPortal(chaveAcesso: string): Promise<string | null> {
-  // Try nfe.fazenda.gov.br-style query (won't return XML but might confirm existence)
-  // This is a best-effort fallback using alternative free services
-  const fallbackUrls = [
-    `https://nfe-api.deno.dev/xml/${chaveAcesso}`,
-    `https://brasilapi.com.br/api/nfe/v1/${chaveAcesso}`,
-  ];
-
-  for (const url of fallbackUrls) {
-    try {
-      const response = await fetch(url, {
-        headers: {
-          "Accept": "application/xml, application/json, */*",
-          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        },
-      });
-
-      if (response.ok) {
-        const contentType = response.headers.get("content-type") || "";
-        const text = await response.text();
-
-        if (contentType.includes("xml") || text.includes("<nfeProc") || text.includes("<NFe")) {
-          if (text.length > 100) return text;
-        }
-
-        // If JSON response with XML field
-        if (contentType.includes("json")) {
-          try {
-            const json = JSON.parse(text);
-            if (json.xml && json.xml.length > 100) return json.xml;
-          } catch {}
-        }
-      }
-    } catch {
-      // Try next
+// Strategy 5: webdanfe.com.br
+async function fetchFromWebDanfe(chave: string): Promise<string | null> {
+  try {
+    const resp = await fetch(`https://www.webdanfe.com.br/api/get-xml?key=${chave}`, {
+      headers: {
+        Accept: "application/xml, text/xml, */*",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
+    if (!resp.ok) return null;
+    const text = await resp.text();
+    if (text.length > 200 && (text.includes("<nfeProc") || text.includes("<NFe") || text.includes("<infNFe"))) {
+      return text;
     }
-  }
-
+  } catch { /* fallthrough */ }
   return null;
 }
 
 interface ConsultaRequest {
   chaveAcesso?: string;
   chavesAcesso?: string[];
+  cpf_cnpj?: string;
 }
 
-interface ConsultaResult {
-  chaveAcesso: string;
-  success: boolean;
-  xml?: string;
-  error?: string;
-}
+async function consultarChave(chave: string, token: string, cpfCnpj?: string): Promise<{ xml: string | null; source?: string }> {
+  // 1. Quick check in existing distribution documents
+  let xml = await findInDistribuicao(chave, token);
+  if (xml) return { xml, source: "distribuicao-cache" };
 
-async function consultarChave(chave: string, token: string): Promise<{ xml: string | null }> {
-  // Strategy 1: Nuvem Fiscal Distribution API
-  let xml = await fetchFromDistribuicao(chave, token);
-  if (xml) return { xml };
+  // 2. Quick check in NF-e listing
+  xml = await findInNfeListing(chave, token);
+  if (xml) return { xml, source: "nfe-listing" };
 
-  // Strategy 2: Nuvem Fiscal NF-e listing
-  xml = await fetchFromNfeEndpoint(chave, token);
-  if (xml) return { xml };
-
-  // Strategy 3: consultadanfe.com.br
+  // 3. Try free fallback services (fast, no waiting)
   xml = await fetchFromConsultaDanfe(chave);
-  if (xml) return { xml };
+  if (xml) return { xml, source: "consultadanfe" };
 
-  // Strategy 4: Other fallbacks
-  xml = await fetchFromSefazPortal(chave);
-  if (xml) return { xml };
+  xml = await fetchFromWebDanfe(chave);
+  if (xml) return { xml, source: "webdanfe" };
+
+  // 4. Request distribution from SEFAZ via Nuvem Fiscal (slow, up to 60s)
+  if (cpfCnpj) {
+    xml = await requestDistribuicaoByChave(chave, cpfCnpj, token);
+    if (xml) return { xml, source: "distribuicao-sefaz" };
+  }
+
+  // 5. Try with CNPJ extracted from the chave itself (emitter's CNPJ)
+  const cnpjFromChave = extractCNPJFromChave(chave);
+  if (cnpjFromChave && cnpjFromChave !== cpfCnpj) {
+    xml = await requestDistribuicaoByChave(chave, cnpjFromChave, token);
+    if (xml) return { xml, source: "distribuicao-cnpj-chave" };
+  }
 
   return { xml: null };
 }
@@ -268,22 +276,23 @@ Deno.serve(async (req: Request) => {
     const invalidChaves = chaves.filter(c => !c || c.replace(/\s/g, "").length !== 44);
     if (invalidChaves.length > 0) {
       return new Response(
-        JSON.stringify({ error: `Chaves inválidas (devem ter 44 dígitos): ${invalidChaves.slice(0, 5).join(", ")}...` }),
+        JSON.stringify({ error: `Chaves inválidas (devem ter 44 dígitos): ${invalidChaves.slice(0, 5).join(", ")}` }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     const token = await getNuvemFiscalToken();
+    const cpfCnpj = body.cpf_cnpj;
 
     if (chaves.length === 1) {
       const chave = chaves[0].replace(/\s/g, "");
-      const result = await consultarChave(chave, token);
+      const result = await consultarChave(chave, token, cpfCnpj);
 
       if (!result.xml) {
         return new Response(
           JSON.stringify({
             success: false,
-            error: "XML não encontrado para esta chave de acesso. Verifique se a chave está correta e se a NF-e já foi autorizada na SEFAZ.",
+            error: "XML não encontrado para esta chave de acesso. Verifique se a chave está correta e se a NF-e já foi autorizada. Tente novamente em alguns segundos ou importe via arquivo XML.",
             chaveAcesso: chave
           }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -295,42 +304,35 @@ Deno.serve(async (req: Request) => {
           success: true,
           chaveAcesso: chave,
           xml: result.xml,
+          source: result.source,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Batch processing
-    const results: ConsultaResult[] = [];
-    const BATCH_SIZE = 10;
-
-    for (let i = 0; i < chaves.length; i += BATCH_SIZE) {
-      const batch = chaves.slice(i, i + BATCH_SIZE).map(c => c.replace(/\s/g, ""));
-      const batchPromises = batch.map(async (chave): Promise<ConsultaResult> => {
-        try {
-          const result = await consultarChave(chave, token);
-          if (!result.xml) {
-            return { chaveAcesso: chave, success: false, error: "XML não encontrado" };
-          }
-          return { chaveAcesso: chave, success: true, xml: result.xml };
-        } catch (err: any) {
-          return { chaveAcesso: chave, success: false, error: err.message || "Erro desconhecido" };
+    // Batch processing - process sequentially to avoid rate limits
+    const results: any[] = [];
+    for (const rawChave of chaves) {
+      const chave = rawChave.replace(/\s/g, "");
+      try {
+        const result = await consultarChave(chave, token, cpfCnpj);
+        if (result.xml) {
+          results.push({ chaveAcesso: chave, success: true, xml: result.xml, source: result.source });
+        } else {
+          results.push({ chaveAcesso: chave, success: false, error: "XML não encontrado" });
         }
-      });
-
-      const batchResults = await Promise.all(batchPromises);
-      results.push(...batchResults);
+      } catch (err: any) {
+        results.push({ chaveAcesso: chave, success: false, error: err.message || "Erro" });
+      }
     }
 
     const successCount = results.filter(r => r.success).length;
-    const errorCount = results.filter(r => !r.success).length;
-
     return new Response(
       JSON.stringify({
         success: true,
         total: chaves.length,
         encontradas: successCount,
-        nao_encontradas: errorCount,
+        nao_encontradas: chaves.length - successCount,
         results,
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }

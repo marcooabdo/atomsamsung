@@ -330,6 +330,23 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setError(null);
 
     try {
+      // Fetch unit CNPJ for distribution lookup
+      let unitCnpj: string | undefined;
+      try {
+        const unidadeFilter = selectedUnidade || usuario?.unidade_id;
+        if (unidadeFilter) {
+          const { data: unidadeData } = await supabase
+            .from('unidades')
+            .select('cnpj')
+            .eq('id', unidadeFilter)
+            .maybeSingle();
+          if (unidadeData?.cnpj) unitCnpj = unidadeData.cnpj.replace(/\D/g, '');
+        }
+      } catch {}
+
+      const requestBody: any = linhas.length === 1 ? { chaveAcesso: linhas[0] } : { chavesAcesso: linhas };
+      if (unitCnpj) requestBody.cpf_cnpj = unitCnpj;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
         {
@@ -338,7 +355,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify(linhas.length === 1 ? { chaveAcesso: linhas[0] } : { chavesAcesso: linhas }),
+          body: JSON.stringify(requestBody),
         }
       );
 
