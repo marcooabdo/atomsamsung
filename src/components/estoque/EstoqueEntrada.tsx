@@ -8,7 +8,7 @@ import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
   ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
-  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin, Key, Loader2
+  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin, Key, Loader2, Clock
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 import { LocationSelector } from './LocationSelector';
@@ -121,7 +121,12 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [buscandoChave, setBuscandoChave] = useState(false);
   const [showChaveInput, setShowChaveInput] = useState(false);
   const [exportingXmls, setExportingXmls] = useState(false);
+  const [nfPendentes, setNfPendentes] = useState<NF[]>([]);
+  const [showPendentes, setShowPendentes] = useState(true);
+  const [processandoEntrada, setProcessandoEntrada] = useState<string | null>(null);
+  const [buscaProgress, setBuscaProgress] = useState<{ current: number; total: number; found: number } | null>(null);
 
+  const [isMinimized, setIsMinimized] = useState(false);
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
   const [requisicoesDisponiveis, setRequisicoesDisponiveis] = useState<RequisicaoPendente[]>([]);
   const [allPecas, setAllPecas] = useState<PecaExpandida[]>([]);
@@ -137,6 +142,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   useEffect(() => {
     setNfPage(0);
     loadNFs(0, '', '', '');
+    loadNFsPendentes();
   }, [selectedUnidade]);
 
   const triggerSearch = (search: string, dateFrom: string, dateTo: string) => {
@@ -157,12 +163,14 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       let countQuery = supabase
         .from('estoque_nfs')
         .select('id', { count: 'exact', head: true })
-        .eq('unidade_id', unidadeFilter);
+        .eq('unidade_id', unidadeFilter)
+        .eq('processada', true);
 
       let dataQuery = supabase
         .from('estoque_nfs')
         .select('*')
         .eq('unidade_id', unidadeFilter)
+        .eq('processada', true)
         .order('created_at', { ascending: false });
 
       if (dateFrom) {
@@ -186,6 +194,21 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       const { data, error } = await dataQuery.range(from, to);
       if (error) throw error;
       setNfs(data || []);
+    } catch (err) {}
+  };
+
+  const loadNFsPendentes = async () => {
+    try {
+      const unidadeFilter = selectedUnidade || usuario?.unidade_id;
+      if (!unidadeFilter) return;
+      const { data, error } = await supabase
+        .from('estoque_nfs')
+        .select('*')
+        .eq('unidade_id', unidadeFilter)
+        .eq('processada', false)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setNfPendentes(data || []);
     } catch (err) {}
   };
 
@@ -286,9 +309,13 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   };
 
   const handleBuscarPorChave = async () => {
-    const chave = chaveAcessoInput.replace(/\s/g, '');
-    if (!chave || chave.length !== 44) {
-      alert('Chave de acesso inválida. Deve conter exatamente 44 dígitos numéricos.');
+    const linhas = chaveAcessoInput.split(/[\n,;]+/).map(l => l.replace(/\D/g, '')).filter(l => l.length === 44);
+    if (linhas.length === 0) {
+      alert('Nenhuma chave de acesso válida encontrada. Cada chave deve ter exatamente 44 dígitos.');
+      return;
+    }
+    if (linhas.length > 100) {
+      alert('Máximo de 100 chaves por vez.');
       return;
     }
 
@@ -299,6 +326,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
 
     setBuscandoChave(true);
+    setBuscaProgress({ current: 0, total: linhas.length, found: 0 });
+    setError(null);
+
     try {
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
@@ -308,37 +338,97 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             'Content-Type': 'application/json',
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
           },
-          body: JSON.stringify({ chaveAcesso: chave }),
+          body: JSON.stringify(linhas.length === 1 ? { chaveAcesso: linhas[0] } : { chavesAcesso: linhas }),
         }
       );
 
       const result = await response.json();
-      if (!response.ok || !result.success) {
-        throw new Error(result.error || 'Erro ao consultar chave de acesso');
+
+      if (linhas.length === 1) {
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Erro ao consultar chave de acesso');
+        }
+        const xml = result.xml;
+        if (!xml || xml.length < 100) {
+          throw new Error('XML não encontrado para esta chave de acesso.');
+        }
+        const nfData = parseXML(xml);
+        if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
+          throw new Error('XML inválido ou sem produtos identificados.');
+        }
+        // Save as pending NF
+        const duplicateCheck = await supabase.from('estoque_nfs').select('id').eq('chave_acesso', linhas[0]).maybeSingle();
+        if (duplicateCheck.data) {
+          throw new Error(`NF ${nfData.numeroNF} já foi importada anteriormente.`);
+        }
+        await supabase.from('estoque_nfs').insert({
+          numero_nf: nfData.numeroNF,
+          chave_acesso: nfData.chaveAcesso,
+          fornecedor: nfData.fornecedor,
+          data_emissao: nfData.dataEmissao,
+          valor_total: nfData.valorTotal,
+          delivery: nfData.delivery,
+          xml_conteudo: nfData.xmlContent,
+          unidade_id: unidadeId,
+          processada: false,
+        });
+        setBuscaProgress({ current: 1, total: 1, found: 1 });
+        setSuccessMsg(`NF ${nfData.numeroNF} importada e adicionada às NFs Pendentes de Entrada.`);
+      } else {
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || 'Erro ao consultar chaves de acesso');
+        }
+        let found = 0;
+        const errors: string[] = [];
+        for (const item of (result.results || [])) {
+          if (!item.success || !item.xml) {
+            errors.push(`${item.chaveAcesso.slice(-8)}: ${item.error || 'não encontrada'}`);
+            continue;
+          }
+          try {
+            const nfData = parseXML(item.xml);
+            if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
+              errors.push(`${item.chaveAcesso.slice(-8)}: XML sem produtos`);
+              continue;
+            }
+            const dupCheck = await supabase.from('estoque_nfs').select('id').eq('chave_acesso', item.chaveAcesso).maybeSingle();
+            if (dupCheck.data) {
+              errors.push(`${item.chaveAcesso.slice(-8)}: já importada`);
+              continue;
+            }
+            await supabase.from('estoque_nfs').insert({
+              numero_nf: nfData.numeroNF,
+              chave_acesso: nfData.chaveAcesso,
+              fornecedor: nfData.fornecedor,
+              data_emissao: nfData.dataEmissao,
+              valor_total: nfData.valorTotal,
+              delivery: nfData.delivery,
+              xml_conteudo: nfData.xmlContent,
+              unidade_id: unidadeId,
+              processada: false,
+            });
+            found++;
+          } catch (e: any) {
+            errors.push(`${item.chaveAcesso.slice(-8)}: ${e.message}`);
+          }
+          setBuscaProgress({ current: found + errors.length, total: linhas.length, found });
+        }
+        const msg = `${found} NF(s) importadas com sucesso às Pendentes de Entrada.`;
+        if (errors.length > 0) {
+          setError(`${errors.length} chave(s) com erro:\n${errors.join('\n')}`);
+        }
+        setSuccessMsg(msg);
       }
 
-      const xmlResponse = await fetch(result.xmlUrl);
-      if (!xmlResponse.ok) {
-        throw new Error('Não foi possível baixar o XML da nota fiscal. Verifique se a chave está correta.');
-      }
-
-      const xmlText = await xmlResponse.text();
-      if (!xmlText || xmlText.length < 100 || !xmlText.includes('<nfeProc') && !xmlText.includes('<NFe')) {
-        throw new Error('XML retornado é inválido ou a nota não foi encontrada na base da SEFAZ.');
-      }
-
-      const nfData = parseXML(xmlText);
-      if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
-        throw new Error('XML inválido ou sem produtos identificados.');
-      }
-
-      setNfParsed(nfData);
       setChaveAcessoInput('');
       setShowChaveInput(false);
+      loadNFs();
+      loadNFsPendentes();
     } catch (error: any) {
-      alert(error.message || 'Erro ao buscar NF pela chave de acesso');
+      setError(error.message || 'Erro ao buscar NF pela chave de acesso');
     } finally {
       setBuscandoChave(false);
+      setBuscaProgress(null);
     }
   };
 
@@ -504,6 +594,28 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
   };
 
+  const handleDarEntrada = async (nf: NF) => {
+    if (!nf.xml_conteudo) {
+      setError('Esta NF não possui XML armazenado.');
+      return;
+    }
+    const unidadeId = selectedUnidade || usuario?.unidade_id;
+    if (!unidadeId) return;
+
+    setProcessandoEntrada(nf.id);
+    try {
+      const nfData = parseXML(nf.xml_conteudo);
+      if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
+        throw new Error('XML sem produtos identificados');
+      }
+      await openAllNFsPreview([nfData], unidadeId);
+    } catch (err: any) {
+      setError(err.message || 'Erro ao processar entrada');
+    } finally {
+      setProcessandoEntrada(null);
+    }
+  };
+
   const handleAlocacaoChange = (id_temp: string, valueStr: string) => {
     const parts = valueStr.split('|');
     const os_id = parts[0] || '';
@@ -624,34 +736,50 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         const nfData = allNFs[nfIdx];
         const nfPecas = allPecas.filter(p => p.nfIndex === nfIdx);
 
-        // Check for duplicate NF before inserting
-        const duplicateCheck = nfData.chaveAcesso
-          ? await supabase.from('estoque_nfs').select('id, numero_nf').eq('chave_acesso', nfData.chaveAcesso).maybeSingle()
-          : await supabase.from('estoque_nfs').select('id, numero_nf').eq('numero_nf', nfData.numeroNF).eq('unidade_id', unidadeId).maybeSingle();
+        // Check if NF already exists (imported via chave as pending)
+        let nfRecord: any;
+        const existingNf = nfData.chaveAcesso
+          ? await supabase.from('estoque_nfs').select('*').eq('chave_acesso', nfData.chaveAcesso).maybeSingle()
+          : await supabase.from('estoque_nfs').select('*').eq('numero_nf', nfData.numeroNF).eq('unidade_id', unidadeId).maybeSingle();
 
-        if (duplicateCheck.data) {
-          throw new Error(`NF ${nfData.numeroNF} ja foi importada anteriormente (ID: ${duplicateCheck.data.id}). Importe apenas NFs novas.`);
+        if (existingNf.data) {
+          if (existingNf.data.processada) {
+            throw new Error(`NF ${nfData.numeroNF} já foi processada anteriormente.`);
+          }
+          // Update existing pending NF to processed
+          const { data: updatedNf, error: updateErr } = await supabase
+            .from('estoque_nfs')
+            .update({
+              processada: true,
+              processada_em: new Date().toISOString(),
+              processada_por: usuario?.id,
+            })
+            .eq('id', existingNf.data.id)
+            .select()
+            .single();
+          if (updateErr) throw updateErr;
+          nfRecord = updatedNf;
+        } else {
+          const { data: newNf, error: nfError } = await supabase
+            .from('estoque_nfs')
+            .insert({
+              numero_nf: nfData.numeroNF,
+              chave_acesso: nfData.chaveAcesso,
+              fornecedor: nfData.fornecedor,
+              data_emissao: nfData.dataEmissao,
+              valor_total: nfData.valorTotal,
+              delivery: nfData.delivery,
+              xml_conteudo: nfData.xmlContent,
+              unidade_id: unidadeId,
+              processada: true,
+              processada_em: new Date().toISOString(),
+              processada_por: usuario?.id,
+            })
+            .select()
+            .single();
+          if (nfError) throw nfError;
+          nfRecord = newNf;
         }
-
-        const { data: nfRecord, error: nfError } = await supabase
-          .from('estoque_nfs')
-          .insert({
-            numero_nf: nfData.numeroNF,
-            chave_acesso: nfData.chaveAcesso,
-            fornecedor: nfData.fornecedor,
-            data_emissao: nfData.dataEmissao,
-            valor_total: nfData.valorTotal,
-            delivery: nfData.delivery,
-            xml_conteudo: nfData.xmlContent,
-            unidade_id: unidadeId,
-            processada: true,
-            processada_em: new Date().toISOString(),
-            processada_por: usuario?.id,
-          })
-          .select()
-          .single();
-
-        if (nfError) throw nfError;
 
         let contador = 0;
         const osParaMover = new Set<string>();
@@ -805,6 +933,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
       }
 
       loadNFs();
+      loadNFsPendentes();
     } catch (err: any) {
       setError(`Falha na importação: ${err.message}`);
     } finally {
@@ -1406,6 +1535,22 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                   Cancelar
                 </button>
                 <button
+                  onClick={() => {
+                    setAllPecas(prev => prev.map(p => ({ ...p, os_alocada_id: '', requisicao_alocada_id: '', os_peca_id: '' })));
+                    handleConfirmAllImport();
+                  }}
+                  disabled={isSaving}
+                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                  style={{
+                    background: 'rgba(0,212,255,0.1)',
+                    border: '1px solid rgba(0,212,255,0.3)',
+                    color: '#00D4FF',
+                  }}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  Dar Entrada sem Vincular
+                </button>
+                <button
                   onClick={handleConfirmAllImport}
                   disabled={isSaving}
                   className="flex items-center gap-1.5 px-5 py-2.5 rounded-lg text-xs font-black transition-all disabled:opacity-50"
@@ -1527,32 +1672,45 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
               </div>
               {showChaveInput && (
                 <div className="mt-4 p-4 rounded-xl" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
-                  <label className="text-xs font-bold text-blue-400 mb-2 block">Chave de Acesso da NF-e (44 dígitos)</label>
-                  <div className="flex gap-2">
-                    <input
-                      type="text"
-                      value={chaveAcessoInput}
-                      onChange={(e) => setChaveAcessoInput(e.target.value.replace(/\D/g, '').slice(0, 44))}
-                      placeholder="Informe os 44 dígitos da chave de acesso..."
-                      className="flex-1 px-4 py-2.5 rounded-lg text-sm font-mono bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
-                      disabled={buscandoChave}
-                    />
+                  <label className="text-xs font-bold text-blue-400 mb-2 block">Chaves de Acesso NF-e (44 dígitos cada, uma por linha - até 100)</label>
+                  <textarea
+                    value={chaveAcessoInput}
+                    onChange={(e) => setChaveAcessoInput(e.target.value)}
+                    placeholder={"Cole uma ou mais chaves de acesso (44 dígitos cada).\nUma chave por linha, ex:\n12345678901234567890123456789012345678901234\n98765432109876543210987654321098765432109876"}
+                    className="w-full px-4 py-3 rounded-lg text-sm font-mono bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none resize-y"
+                    rows={4}
+                    disabled={buscandoChave}
+                  />
+                  <div className="flex items-center justify-between mt-3">
+                    <div className="flex items-center gap-3">
+                      <p className="text-xs text-gray-500">
+                        {(() => {
+                          const count = chaveAcessoInput.split(/[\n,;]+/).map(l => l.replace(/\D/g, '')).filter(l => l.length === 44).length;
+                          return count > 0 ? `${count} chave(s) válida(s) detectada(s)` : 'Nenhuma chave válida detectada';
+                        })()}
+                      </p>
+                      {buscaProgress && (
+                        <span className="text-xs text-blue-400 font-medium">
+                          Processando {buscaProgress.current}/{buscaProgress.total} ({buscaProgress.found} encontradas)
+                        </span>
+                      )}
+                    </div>
                     <button
                       onClick={handleBuscarPorChave}
-                      disabled={buscandoChave || chaveAcessoInput.length !== 44}
+                      disabled={buscandoChave || chaveAcessoInput.split(/[\n,;]+/).map(l => l.replace(/\D/g, '')).filter(l => l.length === 44).length === 0}
                       className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                       style={{
-                        background: chaveAcessoInput.length === 44 ? 'var(--neon-green)' : 'rgba(var(--neon-green-rgb),0.3)',
+                        background: 'var(--neon-green)',
                         color: '#000',
-                        boxShadow: chaveAcessoInput.length === 44 ? '0 0 12px rgba(var(--neon-green-rgb),0.3)' : 'none',
+                        boxShadow: '0 0 12px rgba(var(--neon-green-rgb),0.3)',
                       }}
                     >
                       {buscandoChave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
-                      {buscandoChave ? 'Buscando...' : 'Buscar XML'}
+                      {buscandoChave ? 'Buscando XMLs...' : 'Buscar XMLs'}
                     </button>
                   </div>
                   <p className="text-xs text-gray-500 mt-2">
-                    O sistema irá consultar o XML da nota na SEFAZ e importar automaticamente os produtos.
+                    O sistema consulta o XML de cada NF via Nuvem Fiscal e adiciona às NFs Pendentes de Entrada.
                   </p>
                 </div>
               )}
@@ -1589,10 +1747,84 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
           </div>
         )}
 
+        {/* NFs Pendentes de Entrada */}
+        {nfPendentes.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-xs font-black tracking-[0.2em] uppercase flex items-center gap-2" style={{ color: '#FFB800' }}>
+                <Clock className="w-4 h-4" />
+                NFs Pendentes de Entrada ({nfPendentes.length})
+              </h3>
+              <button
+                onClick={() => setShowPendentes(!showPendentes)}
+                className="text-xs text-gray-400 hover:text-white transition-colors"
+              >
+                {showPendentes ? 'Ocultar' : 'Mostrar'}
+              </button>
+            </div>
+            {showPendentes && (
+              <div className="space-y-2">
+                {nfPendentes.map(nf => (
+                  <div
+                    key={nf.id}
+                    className="flex items-center justify-between p-3 rounded-xl transition-all hover:border-yellow-500/40"
+                    style={{ background: 'rgba(255,184,0,0.04)', border: '1px solid rgba(255,184,0,0.15)' }}
+                  >
+                    <div className="flex items-center gap-4 flex-1 min-w-0">
+                      <div className="flex items-center justify-center w-9 h-9 rounded-lg" style={{ background: 'rgba(255,184,0,0.15)' }}>
+                        <FileText className="w-4 h-4 text-yellow-400" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-white">NF {nf.numero_nf || '---'}</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-yellow-500/20 text-yellow-400 border border-yellow-500/30">
+                            PENDENTE
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5">
+                          <span className="text-xs text-gray-400 truncate max-w-[200px]">{nf.fornecedor || 'Fornecedor não identificado'}</span>
+                          {nf.data_emissao && <span className="text-xs text-gray-500">{new Date(nf.data_emissao + 'T12:00:00').toLocaleDateString('pt-BR')}</span>}
+                          {nf.valor_total && <span className="text-xs text-emerald-400 font-medium">R$ {Number(nf.valor_total).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</span>}
+                          {nf.chave_acesso && <span className="text-[10px] text-gray-600 font-mono">...{nf.chave_acesso.slice(-12)}</span>}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        onClick={() => handleDarEntrada(nf)}
+                        disabled={processandoEntrada === nf.id}
+                        className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-bold text-sm text-black transition-all disabled:opacity-50"
+                        style={{ background: 'var(--neon-green)', boxShadow: '0 0 12px rgba(var(--neon-green-rgb),0.3)' }}
+                      >
+                        {processandoEntrada === nf.id ? (
+                          <><Loader2 className="w-4 h-4 animate-spin" /> Processando...</>
+                        ) : (
+                          <><Download className="w-4 h-4" /> Dar Entrada</>
+                        )}
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (!confirm(`Deseja remover a NF ${nf.numero_nf || ''} pendente?`)) return;
+                          await supabase.from('estoque_nfs').delete().eq('id', nf.id);
+                          loadNFsPendentes();
+                        }}
+                        className="p-2 rounded-lg text-gray-500 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                        title="Remover NF pendente"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         <div>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
             <h3 className="text-xs font-black tracking-[0.2em] uppercase" style={{ color: '#00D4FF' }}>
-              Notas Fiscais ({nfTotal})
+              Notas Fiscais Processadas ({nfTotal})
             </h3>
             <div className="flex items-center gap-2 flex-wrap">
               <button
