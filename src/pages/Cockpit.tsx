@@ -87,6 +87,15 @@ interface PecaIssueOS {
   semPeca?: boolean;
 }
 
+function formatDuration(days: number, hours?: number): string {
+  if (days === 0 && hours !== undefined) {
+    const h = Math.floor(hours);
+    if (h === 0) return '<1h';
+    return `${h}h`;
+  }
+  return `${days} dia${days !== 1 ? 's' : ''}`;
+}
+
 export function Cockpit() {
   const { usuario, unidades, unidadesAdicionais, allUserUnits } = useAuth();
   const [selectedUnidade, setSelectedUnidade] = useState('');
@@ -94,7 +103,7 @@ export function Cockpit() {
   const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
   const [listModal, setListModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
-  const [daysModal, setDaysModal] = useState<{ open: boolean; title: string; items: { label: string; days: number }[] }>({ open: false, title: '', items: [] });
+  const [daysModal, setDaysModal] = useState<{ open: boolean; title: string; items: { label: string; days: number; hours?: number }[] }>({ open: false, title: '', items: [] });
   const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
@@ -205,20 +214,26 @@ export function Cockpit() {
 
       let oldestDays = 0;
       let oldestOSLabel = '';
+      let oldestHours = 0;
       let oldestInStageDays = 0;
       let oldestInStageOSLabel = '';
-      const allOsDays: { label: string; days: number }[] = [];
-      const allOsStageDays: { label: string; days: number }[] = [];
+      let oldestInStageHours = 0;
+      const allOsDays: { label: string; days: number; hours?: number }[] = [];
+      const allOsStageDays: { label: string; days: number; hours?: number }[] = [];
 
       if (cards.length > 0) {
         cards.forEach(os => {
           const osLabel = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
-          const daysOpen = Math.floor((now.getTime() - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
-          allOsDays.push({ label: osLabel, days: daysOpen });
+          const msOpen = now.getTime() - new Date(os.created_at).getTime();
+          const hoursOpen = msOpen / (1000 * 60 * 60);
+          const daysOpen = Math.floor(hoursOpen / 24);
+          allOsDays.push({ label: osLabel, days: daysOpen, hours: hoursOpen });
 
           const stageDate = os.coluna_kanban_desde || os.updated_at || os.created_at;
-          const daysInStage = Math.floor((now.getTime() - new Date(stageDate).getTime()) / (1000 * 60 * 60 * 24));
-          allOsStageDays.push({ label: osLabel, days: daysInStage });
+          const msInStage = now.getTime() - new Date(stageDate).getTime();
+          const hoursInStage = msInStage / (1000 * 60 * 60);
+          const daysInStage = Math.floor(hoursInStage / 24);
+          allOsStageDays.push({ label: osLabel, days: daysInStage, hours: hoursInStage });
         });
 
         allOsDays.sort((a, b) => b.days - a.days);
@@ -226,8 +241,10 @@ export function Cockpit() {
 
         oldestDays = allOsDays[0]?.days || 0;
         oldestOSLabel = allOsDays[0]?.label || '';
+        oldestHours = allOsDays[0]?.hours || 0;
         oldestInStageDays = allOsStageDays[0]?.days || 0;
         oldestInStageOSLabel = allOsStageDays[0]?.label || '';
+        oldestInStageHours = allOsStageDays[0]?.hours || 0;
       }
 
       let semCodigoOuValor = 0;
@@ -267,7 +284,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, totalSemCodigo, totalSemValor, totalSemPeca, osComProblema, allOsDays, allOsStageDays };
+      return { ...col, count, oldestDays, oldestOSLabel, oldestHours, oldestInStageDays, oldestInStageOSLabel, oldestInStageHours, semCodigoOuValor, totalSemCodigo, totalSemValor, totalSemPeca, osComProblema, allOsDays, allOsStageDays };
     });
   }, [osData, pecasMap]);
 
@@ -491,7 +508,7 @@ export function Cockpit() {
                         onClick={() => setDaysModal({ open: true, title: `${col.label} - Dias Aberto`, items: col.allOsDays })}
                         className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
                       >
-                        {col.oldestDays} dia{col.oldestDays !== 1 ? 's' : ''}
+                        {formatDuration(col.oldestDays, col.oldestHours)}
                       </button>
                     ) : (
                       <span className="text-xs text-gray-600">-</span>
@@ -503,7 +520,7 @@ export function Cockpit() {
                         onClick={() => setDaysModal({ open: true, title: `${col.label} - Dias na Etapa`, items: col.allOsStageDays })}
                         className={`text-xs font-semibold px-2 py-0.5 rounded cursor-pointer hover:ring-1 hover:ring-gray-600 transition-all ${col.oldestInStageDays > 14 ? 'text-red-300 bg-red-500/10' : col.oldestInStageDays > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}
                       >
-                        {col.oldestInStageDays} dia{col.oldestInStageDays !== 1 ? 's' : ''}
+                        {formatDuration(col.oldestInStageDays, col.oldestInStageHours)}
                       </button>
                     ) : (
                       <span className="text-xs text-gray-600">-</span>
@@ -538,12 +555,12 @@ export function Cockpit() {
                 </td>
                 <td className="text-center px-4 py-3">
                   <span className="text-xs text-gray-400 font-medium">
-                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0)} dias
+                    Max: {formatDuration(Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestDays), 0))}
                   </span>
                 </td>
                 <td className="text-center px-4 py-3">
                   <span className="text-xs text-gray-400 font-medium">
-                    Max: {Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestInStageDays), 0)} dias
+                    Max: {formatDuration(Math.max(...columnStats.filter(c => c.count > 0).map(c => c.oldestInStageDays), 0))}
                   </span>
                 </td>
                 <td className="text-center px-4 py-3">
@@ -670,11 +687,11 @@ export function Cockpit() {
   );
 }
 
-function DaysListModal({ title, items, onClose }: { title: string; items: { label: string; days: number }[]; onClose: () => void }) {
+function DaysListModal({ title, items, onClose }: { title: string; items: { label: string; days: number; hours?: number }[]; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = () => {
-    const text = items.map(item => `${item.label} - ${item.days} dia${item.days !== 1 ? 's' : ''}`).join('\n');
+    const text = items.map(item => `${item.label} - ${formatDuration(item.days, item.hours)}`).join('\n');
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -704,7 +721,7 @@ function DaysListModal({ title, items, onClose }: { title: string; items: { labe
               <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-900/50 border border-gray-800/40">
                 <span className="text-sm font-mono text-[#00D4FF]">{item.label}</span>
                 <span className={`text-xs font-semibold px-2 py-0.5 rounded ${item.days > 14 ? 'text-red-300 bg-red-500/10' : item.days > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}>
-                  {item.days} dia{item.days !== 1 ? 's' : ''}
+                  {formatDuration(item.days, item.hours)}
                 </span>
               </div>
             ))}
