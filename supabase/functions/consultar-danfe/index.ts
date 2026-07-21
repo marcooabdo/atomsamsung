@@ -25,7 +25,7 @@ async function getNuvemFiscalToken(): Promise<string> {
       grant_type: "client_credentials",
       client_id: NUVEM_FISCAL_CLIENT_ID,
       client_secret: NUVEM_FISCAL_CLIENT_SECRET,
-      scope: "cnpj nfe",
+      scope: "cnpj nfe distribuicao-nfe",
     }),
   });
 
@@ -42,46 +42,166 @@ async function getNuvemFiscalToken(): Promise<string> {
   return cachedToken.access_token;
 }
 
-async function fetchXMLFromNuvemFiscal(chaveAcesso: string, token: string): Promise<{ xml: string; status: string } | null> {
-  const url = `${NUVEM_FISCAL_API_BASE}/nfe/consulta/${chaveAcesso}`;
+async function fetchFromDistribuicao(chaveAcesso: string, token: string): Promise<string | null> {
+  // Try to find the document in the distribution service by chave
+  const url = `${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos?chave=${chaveAcesso}`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/json",
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
 
-  if (!response.ok) {
-    if (response.status === 404) return null;
-    const errorText = await response.text();
-    throw new Error(`Nuvem Fiscal API error ${response.status}: ${errorText}`);
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const docs = data?.data || data?.items || data;
+
+    if (Array.isArray(docs) && docs.length > 0) {
+      const doc = docs[0];
+      const docId = doc.id;
+
+      if (docId) {
+        // Download the XML using the document ID
+        const xmlResp = await fetch(`${NUVEM_FISCAL_API_BASE}/distribuicao/nfe/documentos/${docId}/xml`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/xml",
+          },
+        });
+
+        if (xmlResp.ok) {
+          const xml = await xmlResp.text();
+          if (xml && xml.length > 100) return xml;
+        }
+      }
+
+      // If document has inline body/xml
+      if (doc.corpo_xml || doc.xml) {
+        return doc.corpo_xml || doc.xml;
+      }
+    }
+  } catch {
+    // Fallthrough
   }
 
-  const data = await response.json();
-  const xml = data.xml_nfe || data.xml || null;
-  const status = data.status || "unknown";
-
-  if (!xml) return null;
-  return { xml, status };
+  return null;
 }
 
-async function fetchXMLDirectFromNuvemFiscal(chaveAcesso: string, token: string): Promise<string | null> {
-  const url = `${NUVEM_FISCAL_API_BASE}/nfe/${chaveAcesso}/xml`;
+async function fetchFromNfeEndpoint(chaveAcesso: string, token: string): Promise<string | null> {
+  // Try the NF-e listing endpoint filtered by chave
+  const url = `${NUVEM_FISCAL_API_BASE}/nfe?chave=${chaveAcesso}`;
 
-  const response = await fetch(url, {
-    method: "GET",
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/xml",
-    },
-  });
+  try {
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/json",
+      },
+    });
 
-  if (!response.ok) return null;
-  const xml = await response.text();
-  if (!xml || xml.length < 100) return null;
-  return xml;
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    const docs = data?.data || data?.items || data;
+
+    if (Array.isArray(docs) && docs.length > 0) {
+      const doc = docs[0];
+      const docId = doc.id;
+
+      if (docId) {
+        const xmlResp = await fetch(`${NUVEM_FISCAL_API_BASE}/nfe/${docId}/xml`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/xml",
+          },
+        });
+
+        if (xmlResp.ok) {
+          const xml = await xmlResp.text();
+          if (xml && xml.length > 100) return xml;
+        }
+      }
+    }
+  } catch {
+    // Fallthrough
+  }
+
+  return null;
+}
+
+async function fetchFromConsultaDanfe(chaveAcesso: string): Promise<string | null> {
+  const urls = [
+    `https://www.consultadanfe.com.br/api/xml/${chaveAcesso}`,
+    `https://consultadanfe.com.br/api/xml/${chaveAcesso}`,
+  ];
+
+  for (const url of urls) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/xml, text/xml, */*",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+
+      if (response.ok) {
+        const text = await response.text();
+        if (text && text.length > 100 && (text.includes("<nfeProc") || text.includes("<NFe") || text.includes("<infNFe"))) {
+          return text;
+        }
+      }
+    } catch {
+      // Try next URL
+    }
+  }
+
+  return null;
+}
+
+async function fetchFromSefazPortal(chaveAcesso: string): Promise<string | null> {
+  // Try nfe.fazenda.gov.br-style query (won't return XML but might confirm existence)
+  // This is a best-effort fallback using alternative free services
+  const fallbackUrls = [
+    `https://nfe-api.deno.dev/xml/${chaveAcesso}`,
+    `https://brasilapi.com.br/api/nfe/v1/${chaveAcesso}`,
+  ];
+
+  for (const url of fallbackUrls) {
+    try {
+      const response = await fetch(url, {
+        headers: {
+          "Accept": "application/xml, application/json, */*",
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        },
+      });
+
+      if (response.ok) {
+        const contentType = response.headers.get("content-type") || "";
+        const text = await response.text();
+
+        if (contentType.includes("xml") || text.includes("<nfeProc") || text.includes("<NFe")) {
+          if (text.length > 100) return text;
+        }
+
+        // If JSON response with XML field
+        if (contentType.includes("json")) {
+          try {
+            const json = JSON.parse(text);
+            if (json.xml && json.xml.length > 100) return json.xml;
+          } catch {}
+        }
+      }
+    } catch {
+      // Try next
+    }
+  }
+
+  return null;
 }
 
 interface ConsultaRequest {
@@ -94,6 +214,26 @@ interface ConsultaResult {
   success: boolean;
   xml?: string;
   error?: string;
+}
+
+async function consultarChave(chave: string, token: string): Promise<{ xml: string | null }> {
+  // Strategy 1: Nuvem Fiscal Distribution API
+  let xml = await fetchFromDistribuicao(chave, token);
+  if (xml) return { xml };
+
+  // Strategy 2: Nuvem Fiscal NF-e listing
+  xml = await fetchFromNfeEndpoint(chave, token);
+  if (xml) return { xml };
+
+  // Strategy 3: consultadanfe.com.br
+  xml = await fetchFromConsultaDanfe(chave);
+  if (xml) return { xml };
+
+  // Strategy 4: Other fallbacks
+  xml = await fetchFromSefazPortal(chave);
+  if (xml) return { xml };
+
+  return { xml: null };
 }
 
 Deno.serve(async (req: Request) => {
@@ -137,31 +277,15 @@ Deno.serve(async (req: Request) => {
 
     if (chaves.length === 1) {
       const chave = chaves[0].replace(/\s/g, "");
-      let xml: string | null = null;
+      const result = await consultarChave(chave, token);
 
-      const consultaResult = await fetchXMLFromNuvemFiscal(chave, token);
-      if (consultaResult?.xml) {
-        xml = consultaResult.xml;
-      } else {
-        xml = await fetchXMLDirectFromNuvemFiscal(chave, token);
-      }
-
-      if (!xml) {
-        const fallbackXmlUrl = `https://consultadanfe.com/danfe/xml/${chave}`;
-        try {
-          const fallbackResp = await fetch(fallbackXmlUrl);
-          if (fallbackResp.ok) {
-            const fallbackXml = await fallbackResp.text();
-            if (fallbackXml && fallbackXml.length > 100 && (fallbackXml.includes("<nfeProc") || fallbackXml.includes("<NFe"))) {
-              xml = fallbackXml;
-            }
-          }
-        } catch {}
-      }
-
-      if (!xml) {
+      if (!result.xml) {
         return new Response(
-          JSON.stringify({ success: false, error: "XML não encontrado para esta chave de acesso.", chaveAcesso: chave }),
+          JSON.stringify({
+            success: false,
+            error: "XML não encontrado para esta chave de acesso. Verifique se a chave está correta e se a NF-e já foi autorizada na SEFAZ.",
+            chaveAcesso: chave
+          }),
           { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
@@ -170,14 +294,13 @@ Deno.serve(async (req: Request) => {
         JSON.stringify({
           success: true,
           chaveAcesso: chave,
-          xml,
-          xmlUrl: `${NUVEM_FISCAL_API_BASE}/nfe/${chave}/xml`,
-          pdfUrl: `https://consultadanfe.com/danfe/pdf/${chave}`,
+          xml: result.xml,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
+    // Batch processing
     const results: ConsultaResult[] = [];
     const BATCH_SIZE = 10;
 
@@ -185,31 +308,11 @@ Deno.serve(async (req: Request) => {
       const batch = chaves.slice(i, i + BATCH_SIZE).map(c => c.replace(/\s/g, ""));
       const batchPromises = batch.map(async (chave): Promise<ConsultaResult> => {
         try {
-          let xml: string | null = null;
-
-          const consultaResult = await fetchXMLFromNuvemFiscal(chave, token);
-          if (consultaResult?.xml) {
-            xml = consultaResult.xml;
-          } else {
-            xml = await fetchXMLDirectFromNuvemFiscal(chave, token);
-          }
-
-          if (!xml) {
-            try {
-              const fallbackResp = await fetch(`https://consultadanfe.com/danfe/xml/${chave}`);
-              if (fallbackResp.ok) {
-                const fallbackXml = await fallbackResp.text();
-                if (fallbackXml && fallbackXml.length > 100 && (fallbackXml.includes("<nfeProc") || fallbackXml.includes("<NFe"))) {
-                  xml = fallbackXml;
-                }
-              }
-            } catch {}
-          }
-
-          if (!xml) {
+          const result = await consultarChave(chave, token);
+          if (!result.xml) {
             return { chaveAcesso: chave, success: false, error: "XML não encontrado" };
           }
-          return { chaveAcesso: chave, success: true, xml };
+          return { chaveAcesso: chave, success: true, xml: result.xml };
         } catch (err: any) {
           return { chaveAcesso: chave, success: false, error: err.message || "Erro desconhecido" };
         }
