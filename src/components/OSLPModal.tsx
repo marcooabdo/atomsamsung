@@ -1399,7 +1399,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       if (novaPecaCodigo && novaPecaDescricao) {
         const valorPeca = parseFloat(sanitizeGSPNValue(novaPecaValor)) || 0;
         const valorComMarkup = novaPecaValorComMarkup || valorPeca;
-        const quantidade = modoSCACC ? novaPecaQuantidade : 1;
+        const quantidade = novaPecaQuantidade;
         pecasFinais = [...pecasFinais, {
           codigo: novaPecaCodigo,
           descricao: novaPecaDescricao,
@@ -3196,8 +3196,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                           </p>
                         )}
                       </div>
-                      {modoSCACC && (
-                        <div>
+                      <div>
                           <label className="text-xs text-gray-400 uppercase block mb-2">
                             Quantidade
                           </label>
@@ -3215,7 +3214,6 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                             </p>
                           )}
                         </div>
-                      )}
                     </div>
                     <div className="flex gap-2 mt-3">
                       <button
@@ -3226,7 +3224,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                           }
                           const valorPeca = parseFloat(sanitizeGSPNValue(novaPecaValor)) || 0;
                           const valorComMarkup = novaPecaValorComMarkup || valorPeca;
-                          const quantidade = modoSCACC ? novaPecaQuantidade : 1;
+                          const quantidade = novaPecaQuantidade;
                           setPecasAdicionadas([...pecasAdicionadas, {
                             codigo: novaPecaCodigo,
                             descricao: novaPecaDescricao,
@@ -3252,12 +3250,6 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       </button>
                     </div>
                   </div>
-                  {!modoSCACC && (
-                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: tipoOS === 'LP' ? '#FFA500' : 'var(--text-accent)' }}>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
-                    </div>
-                  )}
                 </div>
 
                 <div>
@@ -4906,10 +4898,6 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                           </button>
                         </div>
                       </div>
-                    </div>
-                    <div className="mt-3 flex items-center gap-2 text-xs" style={{ color: 'var(--text-accent)' }}>
-                      <AlertCircle className="w-4 h-4" />
-                      <span>Para adicionar mais de 1 peça do mesmo código, crie outra linha</span>
                     </div>
                   </div>
 
