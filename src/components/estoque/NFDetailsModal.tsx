@@ -89,24 +89,32 @@ export function NFDetailsModal({ isOpen, onClose, nfId }: NFDetailsModalProps) {
 
     setDownloadingPDF(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ chaveAcesso: nf.chave_acesso })
-        }
-      );
+      const response = await fetch('https://consultadanfe.com/api/v1/consulta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chave: nf.chave_acesso, format: 'json' }),
+      });
+
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}));
+        alert(errData.message || errData.error || `Erro HTTP ${response.status}`);
+        return;
+      }
 
       const data = await response.json();
 
-      if (data.success && data.pdfUrl) {
-        window.open(data.pdfUrl, '_blank');
+      if (data.pdf_base64) {
+        const byteCharacters = atob(data.pdf_base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
       } else {
-        alert(data.error || 'Erro ao consultar DANFE');
+        alert('PDF não disponível para esta NF-e');
       }
     } catch (error) {
       alert('Erro ao consultar DANFE');
