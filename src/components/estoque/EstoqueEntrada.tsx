@@ -330,39 +330,33 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setError(null);
 
     try {
-      // Fetch unit CNPJ for distribution lookup
-      let unitCnpj: string | undefined;
-      try {
-        const unidadeFilter = selectedUnidade || usuario?.unidade_id;
-        if (unidadeFilter) {
-          const { data: unidadeData } = await supabase
-            .from('unidades')
-            .select('cnpj')
-            .eq('id', unidadeFilter)
-            .maybeSingle();
-          if (unidadeData?.cnpj) unitCnpj = unidadeData.cnpj.replace(/\D/g, '');
-        }
-      } catch {}
-
-      const requestBody: any = linhas.length === 1 ? { chaveAcesso: linhas[0] } : { chavesAcesso: linhas };
-      if (unitCnpj) requestBody.cpf_cnpj = unitCnpj;
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
-        {
+      const consultarChave = async (chave: string): Promise<{ success: boolean; xml?: string; pdf_base64?: string; error?: string }> => {
+        const resp = await fetch('https://consultadanfe.com/api/v1/consulta', {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-          },
-          body: JSON.stringify(requestBody),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chave, format: 'json' }),
+        });
+        if (resp.status === 429) {
+          const retryAfter = resp.headers.get('Retry-After');
+          const secs = retryAfter ? parseInt(retryAfter, 10) : 60;
+          return { success: false, error: `Rate limit atingido. Tente novamente em ${secs} segundos.` };
         }
-      );
-
-      const result = await response.json();
+        if (resp.status === 202) {
+          return { success: false, error: 'NF-e em contingência. Tente novamente em alguns minutos.' };
+        }
+        if (!resp.ok) {
+          const errorCode = resp.headers.get('X-Error-Code') || '';
+          const body = await resp.text().catch(() => '');
+          return { success: false, error: errorCode || body || `Erro ${resp.status}` };
+        }
+        const data = await resp.json();
+        const xml = data.xml_base64 ? atob(data.xml_base64) : data.xml || '';
+        return { success: true, xml, pdf_base64: data.pdf_base64 };
+      };
 
       if (linhas.length === 1) {
-        if (!response.ok || !result.success) {
+        const result = await consultarChave(linhas[0]);
+        if (!result.success) {
           throw new Error(result.error || 'Erro ao consultar chave de acesso');
         }
         const xml = result.xml;
@@ -373,7 +367,6 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
           throw new Error('XML inválido ou sem produtos identificados.');
         }
-        // Save as pending NF
         const duplicateCheck = await supabase.from('estoque_nfs').select('id').eq('chave_acesso', linhas[0]).maybeSingle();
         if (duplicateCheck.data) {
           throw new Error(`NF ${nfData.numeroNF} já foi importada anteriormente.`);
@@ -392,25 +385,24 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
         setBuscaProgress({ current: 1, total: 1, found: 1 });
         setSuccessMsg(`NF ${nfData.numeroNF} importada e adicionada às NFs Pendentes de Entrada.`);
       } else {
-        if (!response.ok || !result.success) {
-          throw new Error(result.error || 'Erro ao consultar chaves de acesso');
-        }
         let found = 0;
         const errors: string[] = [];
-        for (const item of (result.results || [])) {
+        for (let i = 0; i < linhas.length; i++) {
+          setBuscaProgress({ current: i + 1, total: linhas.length, found });
+          const item = await consultarChave(linhas[i]);
           if (!item.success || !item.xml) {
-            errors.push(`${item.chaveAcesso.slice(-8)}: ${item.error || 'não encontrada'}`);
+            errors.push(`${linhas[i].slice(-8)}: ${item.error || 'não encontrada'}`);
             continue;
           }
           try {
             const nfData = parseXML(item.xml);
             if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
-              errors.push(`${item.chaveAcesso.slice(-8)}: XML sem produtos`);
+              errors.push(`${linhas[i].slice(-8)}: XML sem produtos`);
               continue;
             }
-            const dupCheck = await supabase.from('estoque_nfs').select('id').eq('chave_acesso', item.chaveAcesso).maybeSingle();
+            const dupCheck = await supabase.from('estoque_nfs').select('id').eq('chave_acesso', linhas[i]).maybeSingle();
             if (dupCheck.data) {
-              errors.push(`${item.chaveAcesso.slice(-8)}: já importada`);
+              errors.push(`${linhas[i].slice(-8)}: já importada`);
               continue;
             }
             await supabase.from('estoque_nfs').insert({
@@ -426,9 +418,11 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
             });
             found++;
           } catch (e: any) {
-            errors.push(`${item.chaveAcesso.slice(-8)}: ${e.message}`);
+            errors.push(`${linhas[i].slice(-8)}: ${e.message}`);
           }
-          setBuscaProgress({ current: found + errors.length, total: linhas.length, found });
+          setBuscaProgress({ current: i + 1, total: linhas.length, found });
+          // Small delay between requests to respect rate limit
+          if (i < linhas.length - 1) await new Promise(r => setTimeout(r, 1100));
         }
         const msg = `${found} NF(s) importadas com sucesso às Pendentes de Entrada.`;
         if (errors.length > 0) {
@@ -976,22 +970,28 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
     setDownloadingNFId(nf.id);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
-        }
-      );
+      const response = await fetch('https://consultadanfe.com/api/v1/consulta', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chave: nf.chave_acesso, format: 'json' }),
+      });
+      if (!response.ok) {
+        setError('Erro ao consultar DANFE. Tente novamente.');
+        return;
+      }
       const data = await response.json();
-      if (data.success && data.pdfUrl) {
-        window.open(data.pdfUrl, '_blank');
+      if (data.pdf_base64) {
+        const byteCharacters = atob(data.pdf_base64);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        window.open(url, '_blank');
       } else {
-        setError(data.error || 'Erro ao consultar DANFE');
+        setError('PDF não disponível para esta NF-e.');
       }
     } catch (err) {
       setError('Erro ao consultar DANFE');
