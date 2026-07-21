@@ -73,20 +73,46 @@ async function getCredentials() {
   };
 }
 
-function extractCnpjFromChave(chave: string): string {
-  return chave.substring(6, 20);
-}
-
 function formatCnpj(cnpj: string): string {
   return cnpj.replace(/[.\-\/]/g, "");
 }
 
+// Step 1: Try to find document in already-distributed cache (FREE - no event consumed)
+async function buscarDocumentoExistente(
+  token: string,
+  cpfCnpj: string,
+  chaveAcesso: string
+): Promise<{ found: boolean; documentId?: string }> {
+  const params = new URLSearchParams({
+    cpf_cnpj: cpfCnpj,
+    chave: chaveAcesso,
+    ambiente: "producao",
+    $top: "1",
+  });
+
+  const resp = await fetch(
+    `${NUVEMFISCAL_API_URL}/distribuicao/nfe/documentos?${params.toString()}`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+
+  if (!resp.ok) return { found: false };
+
+  const data = await resp.json();
+  const docs = data.data || data.items || [];
+
+  if (docs.length > 0 && docs[0].id) {
+    return { found: true, documentId: docs[0].id };
+  }
+
+  return { found: false };
+}
+
+// Step 2: Request distribution from SEFAZ (CONSUMES 1 event)
 async function distribuirPorChave(
   token: string,
   cpfCnpj: string,
   chaveAcesso: string
-): Promise<{ success: boolean; documentId?: string; xml?: string; error?: string }> {
-  // Step 1: Request distribution by access key
+): Promise<{ success: boolean; documentId?: string; error?: string }> {
   const distResp = await fetch(`${NUVEMFISCAL_API_URL}/distribuicao/nfe`, {
     method: "POST",
     headers: {
@@ -110,54 +136,39 @@ async function distribuirPorChave(
   }
 
   const distData = await distResp.json();
-
-  // The response contains the documents found
   const documentos = distData.documentos || distData.body?.documentos || [];
 
-  if (documentos.length === 0) {
-    // Check if the response has a single document inline
-    if (distData.id) {
-      return await downloadXml(token, distData.id);
-    }
-    return {
-      success: false,
-      error: distData.motivo_status || "Nenhum documento encontrado para esta chave. Verifique se a NF-e esta autorizada.",
-    };
+  if (documentos.length > 0 && documentos[0].id) {
+    return { success: true, documentId: documentos[0].id };
   }
 
-  // Get the first document with XML available
-  const doc = documentos[0];
-  const docId = doc.id;
-
-  if (!docId) {
-    return { success: false, error: "Documento encontrado mas sem ID para download." };
+  if (distData.id) {
+    return { success: true, documentId: distData.id };
   }
 
-  return await downloadXml(token, docId);
+  return {
+    success: false,
+    error: distData.motivo_status || "Nenhum documento encontrado para esta chave. Verifique se a NF-e esta autorizada.",
+  };
 }
 
+// Step 3: Download XML from document (FREE - no event consumed)
 async function downloadXml(
   token: string,
   documentId: string
-): Promise<{ success: boolean; documentId?: string; xml?: string; error?: string }> {
+): Promise<{ success: boolean; xml?: string; error?: string }> {
   const xmlResp = await fetch(
     `${NUVEMFISCAL_API_URL}/distribuicao/nfe/documentos/${documentId}/xml`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 
   if (!xmlResp.ok) {
     const errBody = await xmlResp.text();
-    return {
-      success: false,
-      documentId,
-      error: `Download XML falhou (${xmlResp.status}): ${errBody.substring(0, 200)}`,
-    };
+    return { success: false, error: `Download XML falhou (${xmlResp.status}): ${errBody.substring(0, 200)}` };
   }
 
   const xml = await xmlResp.text();
-  return { success: true, documentId, xml };
+  return { success: true, xml };
 }
 
 async function downloadPdf(
@@ -166,9 +177,7 @@ async function downloadPdf(
 ): Promise<{ success: boolean; pdf_base64?: string; error?: string }> {
   const pdfResp = await fetch(
     `${NUVEMFISCAL_API_URL}/distribuicao/nfe/documentos/${documentId}/pdf`,
-    {
-      headers: { Authorization: `Bearer ${token}` },
-    }
+    { headers: { Authorization: `Bearer ${token}` } }
   );
 
   if (!pdfResp.ok) {
@@ -184,6 +193,64 @@ async function downloadPdf(
   return { success: true, pdf_base64: btoa(binary) };
 }
 
+// Main flow: check cache first, only distribute if needed (saves events)
+async function consultarChave(
+  token: string,
+  cpfCnpj: string,
+  chaveAcesso: string
+): Promise<{ success: boolean; xml?: string; pdf_base64?: string; documentId?: string; fromCache?: boolean; error?: string }> {
+  // 1. Check if document already exists in Nuvem Fiscal (FREE)
+  const cached = await buscarDocumentoExistente(token, cpfCnpj, chaveAcesso);
+
+  let documentId: string | undefined;
+  let fromCache = false;
+
+  if (cached.found && cached.documentId) {
+    documentId = cached.documentId;
+    fromCache = true;
+  } else {
+    // 2. Not found - request distribution (CONSUMES 1 event)
+    const distResult = await distribuirPorChave(token, cpfCnpj, chaveAcesso);
+    if (!distResult.success) {
+      return { success: false, error: distResult.error };
+    }
+    documentId = distResult.documentId;
+  }
+
+  if (!documentId) {
+    return { success: false, error: "Documento sem ID para download." };
+  }
+
+  // 3. Download XML (FREE)
+  const xmlResult = await downloadXml(token, documentId);
+  if (!xmlResult.success) {
+    return { success: false, error: xmlResult.error };
+  }
+
+  // 4. Try PDF (FREE)
+  let pdf_base64: string | undefined;
+  const pdfResult = await downloadPdf(token, documentId);
+  if (pdfResult.success) {
+    pdf_base64 = pdfResult.pdf_base64;
+  }
+
+  return { success: true, xml: xmlResult.xml, pdf_base64, documentId, fromCache };
+}
+
+async function findCnpjForChave(chave: string): Promise<string> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+  const { data: unidades } = await supabase
+    .from("unidades")
+    .select("cnpj")
+    .not("cnpj", "is", null);
+
+  if (!unidades || unidades.length === 0) return "";
+  return formatCnpj(unidades[0].cnpj);
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -193,7 +260,6 @@ Deno.serve(async (req: Request) => {
     const body = await req.json();
     const { chaveAcesso, chavesAcesso, cpfCnpj } = body;
 
-    // Get credentials
     const creds = await getCredentials();
     if (!creds.clientId || !creds.clientSecret) {
       return new Response(
@@ -202,12 +268,7 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Get OAuth token
-    const token = await getNuvemFiscalToken(
-      creds.clientId,
-      creds.clientSecret,
-      creds.audience
-    );
+    const token = await getNuvemFiscalToken(creds.clientId, creds.clientSecret, creds.audience);
 
     // Single key lookup
     if (chaveAcesso && !chavesAcesso) {
@@ -220,7 +281,6 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Determine CNPJ: use provided one, or look up from unidades using CNPJ in the key
       let cnpj = cpfCnpj ? formatCnpj(cpfCnpj) : "";
       if (!cnpj) {
         cnpj = await findCnpjForChave(chave);
@@ -233,7 +293,7 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      const result = await distribuirPorChave(token, cnpj, chave);
+      const result = await consultarChave(token, cnpj, chave);
 
       if (!result.success) {
         return new Response(
@@ -242,27 +302,19 @@ Deno.serve(async (req: Request) => {
         );
       }
 
-      // Try to get PDF
-      let pdf_base64: string | undefined;
-      if (result.documentId) {
-        const pdfResult = await downloadPdf(token, result.documentId);
-        if (pdfResult.success) {
-          pdf_base64 = pdfResult.pdf_base64;
-        }
-      }
-
       return new Response(
         JSON.stringify({
           success: true,
           xml: result.xml,
-          pdf_base64,
+          pdf_base64: result.pdf_base64,
           chaveAcesso: chave,
+          fromCache: result.fromCache,
         }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Multiple keys (batch)
+    // Multiple keys (batch) - processes one at a time, each consuming max 1 event
     if (chavesAcesso && Array.isArray(chavesAcesso)) {
       const results = [];
       for (let i = 0; i < chavesAcesso.length; i++) {
@@ -278,14 +330,9 @@ Deno.serve(async (req: Request) => {
             continue;
           }
 
-          const result = await distribuirPorChave(token, cnpj, chave);
+          const result = await consultarChave(token, cnpj, chave);
           if (result.success) {
-            let pdf_base64: string | undefined;
-            if (result.documentId) {
-              const pdfResult = await downloadPdf(token, result.documentId);
-              if (pdfResult.success) pdf_base64 = pdfResult.pdf_base64;
-            }
-            results.push({ chaveAcesso: chave, success: true, xml: result.xml, pdf_base64 });
+            results.push({ chaveAcesso: chave, success: true, xml: result.xml, pdf_base64: result.pdf_base64, fromCache: result.fromCache });
           } else {
             results.push({ chaveAcesso: chave, success: false, error: result.error });
           }
@@ -314,23 +361,3 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
-
-async function findCnpjForChave(chave: string): Promise<string> {
-  // The access key contains the emitter CNPJ at positions 6-19
-  // But for distribution we need the RECIPIENT's CNPJ (our company)
-  // Try all registered companies - use the first one that has distribution enabled
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-  const { data: unidades } = await supabase
-    .from("unidades")
-    .select("cnpj")
-    .not("cnpj", "is", null);
-
-  if (!unidades || unidades.length === 0) return "";
-
-  // Return the first unidade CNPJ (cleaned)
-  // In practice the user should pass cpfCnpj for the specific unit
-  return formatCnpj(unidades[0].cnpj);
-}
