@@ -8,7 +8,7 @@ import {
   Upload, FileText, CheckCircle, AlertCircle, Package,
   Download, Eye, Trash2, Zap, X, Brain, Search, Calendar,
   ChevronDown, Cpu, ChevronRight, Code, ChevronLeft,
-  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin
+  ChevronsLeft, ChevronsRight, FileSpreadsheet, Archive, MapPin, Key, Loader2
 } from 'lucide-react';
 import { NFDetailsModal } from './NFDetailsModal';
 import { LocationSelector } from './LocationSelector';
@@ -117,6 +117,9 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
   const [nfDateFrom, setNfDateFrom] = useState('');
   const [nfDateTo, setNfDateTo] = useState('');
   const [exportingReport, setExportingReport] = useState(false);
+  const [chaveAcessoInput, setChaveAcessoInput] = useState('');
+  const [buscandoChave, setBuscandoChave] = useState(false);
+  const [showChaveInput, setShowChaveInput] = useState(false);
   const [exportingXmls, setExportingXmls] = useState(false);
 
   const [showPreviewPanel, setShowPreviewPanel] = useState(false);
@@ -280,6 +283,63 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     if (daysOpen > 10) return 'atrasada';
     if (req.os.tipo_os === 'IH') return 'IH';
     return null;
+  };
+
+  const handleBuscarPorChave = async () => {
+    const chave = chaveAcessoInput.replace(/\s/g, '');
+    if (!chave || chave.length !== 44) {
+      alert('Chave de acesso inválida. Deve conter exatamente 44 dígitos numéricos.');
+      return;
+    }
+
+    const unidadeId = selectedUnidade || usuario?.unidade_id;
+    if (!unidadeId) {
+      alert('Selecione uma unidade primeiro.');
+      return;
+    }
+
+    setBuscandoChave(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ chaveAcesso: chave }),
+        }
+      );
+
+      const result = await response.json();
+      if (!response.ok || !result.success) {
+        throw new Error(result.error || 'Erro ao consultar chave de acesso');
+      }
+
+      const xmlResponse = await fetch(result.xmlUrl);
+      if (!xmlResponse.ok) {
+        throw new Error('Não foi possível baixar o XML da nota fiscal. Verifique se a chave está correta.');
+      }
+
+      const xmlText = await xmlResponse.text();
+      if (!xmlText || xmlText.length < 100 || !xmlText.includes('<nfeProc') && !xmlText.includes('<NFe')) {
+        throw new Error('XML retornado é inválido ou a nota não foi encontrada na base da SEFAZ.');
+      }
+
+      const nfData = parseXML(xmlText);
+      if (!nfData || !nfData.produtos || nfData.produtos.length === 0) {
+        throw new Error('XML inválido ou sem produtos identificados.');
+      }
+
+      setNfParsed(nfData);
+      setChaveAcessoInput('');
+      setShowChaveInput(false);
+    } catch (error: any) {
+      alert(error.message || 'Erro ao buscar NF pela chave de acesso');
+    } finally {
+      setBuscandoChave(false);
+    }
   };
 
   const handleXMLUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1452,7 +1512,50 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
                   />
                 </label>
                 <span className="text-xs text-gray-500">Suporta multiplos arquivos simultaneos</span>
+                <button
+                  onClick={() => setShowChaveInput(!showChaveInput)}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all"
+                  style={{
+                    background: showChaveInput ? 'rgba(59,130,246,0.2)' : 'rgba(59,130,246,0.1)',
+                    border: '1px solid rgba(59,130,246,0.4)',
+                    color: '#60a5fa',
+                  }}
+                >
+                  <Key className="w-4 h-4" />
+                  Importar via Chave de Acesso
+                </button>
               </div>
+              {showChaveInput && (
+                <div className="mt-4 p-4 rounded-xl" style={{ background: 'rgba(59,130,246,0.05)', border: '1px solid rgba(59,130,246,0.2)' }}>
+                  <label className="text-xs font-bold text-blue-400 mb-2 block">Chave de Acesso da NF-e (44 dígitos)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={chaveAcessoInput}
+                      onChange={(e) => setChaveAcessoInput(e.target.value.replace(/\D/g, '').slice(0, 44))}
+                      placeholder="Informe os 44 dígitos da chave de acesso..."
+                      className="flex-1 px-4 py-2.5 rounded-lg text-sm font-mono bg-black/40 border border-white/10 text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+                      disabled={buscandoChave}
+                    />
+                    <button
+                      onClick={handleBuscarPorChave}
+                      disabled={buscandoChave || chaveAcessoInput.length !== 44}
+                      className="flex items-center gap-2 px-5 py-2.5 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                      style={{
+                        background: chaveAcessoInput.length === 44 ? 'var(--neon-green)' : 'rgba(var(--neon-green-rgb),0.3)',
+                        color: '#000',
+                        boxShadow: chaveAcessoInput.length === 44 ? '0 0 12px rgba(var(--neon-green-rgb),0.3)' : 'none',
+                      }}
+                    >
+                      {buscandoChave ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                      {buscandoChave ? 'Buscando...' : 'Buscar XML'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    O sistema irá consultar o XML da nota na SEFAZ e importar automaticamente os produtos.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
