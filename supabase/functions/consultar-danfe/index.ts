@@ -15,7 +15,22 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { chaveAcesso, chavesAcesso } = body;
+    const { chaveAcesso, chavesAcesso, xml, action } = body;
+
+    // Generate PDF from XML (uses /danfe endpoint - 500 req/min limit)
+    if (action === "gerar-pdf" && xml) {
+      const result = await gerarPDFFromXML(xml);
+      if (!result.success) {
+        return new Response(
+          JSON.stringify({ error: result.error }),
+          { status: result.httpStatus || 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+      return new Response(
+        JSON.stringify({ success: true, pdf_base64: result.pdf_base64 }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Single key
     if (chaveAcesso && !chavesAcesso) {
@@ -59,7 +74,7 @@ Deno.serve(async (req: Request) => {
           results.push({ chaveAcesso: clean, success: false, error: err.message });
         }
         if (i < chavesAcesso.length - 1) {
-          await new Promise(r => setTimeout(r, 1100));
+          await new Promise(r => setTimeout(r, 1500));
         }
       }
 
@@ -70,7 +85,7 @@ Deno.serve(async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ error: "Envie chaveAcesso (string) ou chavesAcesso (array)" }),
+      JSON.stringify({ error: "Envie chaveAcesso (string), chavesAcesso (array), ou action:'gerar-pdf' com xml" }),
       { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (err: any) {
@@ -80,6 +95,59 @@ Deno.serve(async (req: Request) => {
     );
   }
 });
+
+async function gerarPDFFromXML(xml: string): Promise<{
+  success: boolean;
+  pdf_base64?: string;
+  error?: string;
+  httpStatus?: number;
+}> {
+  const xmlBase64 = btoa(unescape(encodeURIComponent(xml)));
+
+  const resp = await fetch(`${CONSULTA_DANFE_API}/danfe`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ xml: xmlBase64 }),
+  });
+
+  if (resp.status === 429) {
+    const retryAfter = resp.headers.get("Retry-After") || "60";
+    const waitSecs = parseInt(retryAfter, 10);
+    return {
+      success: false,
+      error: `Rate limit atingido. Aguarde ${waitSecs > 120 ? Math.ceil(waitSecs / 60) + ' minutos' : waitSecs + ' segundos'} e tente novamente.`,
+      httpStatus: 429,
+    };
+  }
+
+  if (!resp.ok) {
+    let errorBody: any = {};
+    try { errorBody = await resp.json(); } catch { /* ignore */ }
+    return {
+      success: false,
+      error: errorBody.message || errorBody.error || `Erro HTTP ${resp.status}`,
+      httpStatus: resp.status,
+    };
+  }
+
+  const data = await resp.json();
+  if (data.pdf_base64) {
+    return { success: true, pdf_base64: data.pdf_base64 };
+  }
+
+  // If response is the PDF directly as binary
+  if (resp.headers.get("content-type")?.includes("application/pdf")) {
+    const arrayBuf = await resp.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuf);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return { success: true, pdf_base64: btoa(binary) };
+  }
+
+  return { success: false, error: "API nao retornou PDF" };
+}
 
 async function consultarChave(chave: string, retryCount = 0): Promise<{
   success: boolean;
@@ -143,7 +211,6 @@ async function consultarChave(chave: string, retryCount = 0): Promise<{
     };
   }
 
-  // Decode the XML from base64
   let xml: string | undefined;
   if (data.xml_base64) {
     try {

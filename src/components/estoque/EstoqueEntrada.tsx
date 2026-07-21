@@ -330,45 +330,23 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     setError(null);
 
     try {
-      const consultarChave = async (chave: string, retryCount = 0): Promise<{ success: boolean; xml?: string; pdf_base64?: string; error?: string }> => {
-        const resp = await fetch('https://consultadanfe.com/api/v1/consulta', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ chave, format: 'json' }),
-        });
-
-        if (resp.status === 429) {
-          const retryAfter = parseInt(resp.headers.get('Retry-After') || '60', 10);
-          if (retryCount < 1 && retryAfter <= 65) {
-            await new Promise(r => setTimeout(r, (retryAfter + 1) * 1000));
-            return consultarChave(chave, retryCount + 1);
+      const consultarChave = async (chave: string): Promise<{ success: boolean; xml?: string; pdf_base64?: string; error?: string }> => {
+        const resp = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+            },
+            body: JSON.stringify({ chaveAcesso: chave }),
           }
-          return { success: false, error: `Rate limit atingido. Aguarde ${retryAfter > 120 ? Math.ceil(retryAfter / 60) + ' minutos' : retryAfter + ' segundos'} e tente novamente.` };
-        }
-
-        if (!resp.ok) {
-          let errorBody: any = {};
-          try { errorBody = await resp.json(); } catch {}
-          return { success: false, error: errorBody.message || errorBody.error || `Erro HTTP ${resp.status}` };
-        }
-
+        );
         const data = await resp.json();
-        if (data.status !== 'ok' && data.status !== 'multiplas_chaves') {
-          return { success: false, error: `Status inesperado: ${data.status}` };
+        if (!resp.ok || !data.success) {
+          return { success: false, error: data.error || `Erro ${resp.status}` };
         }
-
-        let xml: string | undefined;
-        if (data.xml_base64) {
-          try { xml = atob(data.xml_base64); } catch { xml = data.xml_base64; }
-        } else if (data.xml) {
-          xml = data.xml;
-        }
-
-        if (!xml) {
-          return { success: false, error: 'API retornou sucesso mas sem XML.' };
-        }
-
-        return { success: true, xml, pdf_base64: data.pdf_base64 };
+        return { success: true, xml: data.xml, pdf_base64: data.pdf_base64 };
       };
 
       if (linhas.length === 1) {
@@ -987,18 +965,19 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
     }
     setDownloadingNFId(nf.id);
     try {
-      const response = await fetch('https://consultadanfe.com/api/v1/consulta', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chave: nf.chave_acesso, format: 'json' }),
-      });
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        setError(errData.message || errData.error || `Erro HTTP ${response.status}`);
-        return;
-      }
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/consultar-danfe`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({ chaveAcesso: nf.chave_acesso }),
+        }
+      );
       const data = await response.json();
-      if (data.pdf_base64) {
+      if (data.success && data.pdf_base64) {
         const byteCharacters = atob(data.pdf_base64);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
