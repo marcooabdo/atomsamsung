@@ -46,30 +46,69 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function downloadDocumentXml(docId: string, token: string): Promise<{ xml: string | null; method: string }> {
-  // Try /xml endpoint first (full NF-e XML)
-  const xmlResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/xml`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (xmlResp.ok) {
-    const xml = await xmlResp.text();
-    if (xml && xml.length > 100 && (xml.includes("<nfeProc") || xml.includes("<NFe") || xml.includes("<protNFe"))) {
-      return { xml, method: "xml" };
+async function downloadDocumentXml(docId: string, token: string): Promise<{ xml: string | null; method: string; debug_info?: unknown }> {
+  // Method 1: GET the document details - the body field contains the XML
+  try {
+    const docResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+    });
+    if (docResp.ok) {
+      const docData = await docResp.json();
+      // The body field contains the XML content (might be base64 or plain text)
+      if (docData.body) {
+        let xmlContent = docData.body;
+        // If body looks like base64 (no < at start), try to decode
+        if (!xmlContent.startsWith("<") && !xmlContent.startsWith("<?")) {
+          try {
+            xmlContent = atob(xmlContent);
+          } catch { /* not base64, use as-is */ }
+        }
+        if (xmlContent.length > 50) {
+          return { xml: xmlContent, method: "document-body", debug_info: { tipo_documento: docData.tipo_documento, resumo: docData.resumo, schema: docData.schema, body_length: docData.body?.length } };
+        }
+      }
+      // If no body, check if there's a xml_content or documento field
+      if (docData.xml) {
+        return { xml: docData.xml, method: "document-xml-field" };
+      }
+      if (docData.documento) {
+        return { xml: docData.documento, method: "document-documento-field" };
+      }
+      // Return debug info about what fields are available
+      return { xml: null, method: "document-no-body", debug_info: { available_fields: Object.keys(docData), tipo_documento: docData.tipo_documento, resumo: docData.resumo, schema: docData.schema, body_exists: !!docData.body, body_length: docData.body?.length || 0 } };
     }
+  } catch (e: any) {
+    // continue to fallback
   }
 
-  // Try /corpo endpoint (document body - works for resumo docs too)
-  const corpoResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/corpo`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  if (corpoResp.ok) {
-    const corpo = await corpoResp.text();
-    if (corpo && corpo.length > 100 && (corpo.includes("<nfeProc") || corpo.includes("<NFe") || corpo.includes("<resNFe") || corpo.includes("<procEventoNFe"))) {
-      return { xml: corpo, method: "corpo" };
+  // Method 2: Try /corpo endpoint
+  try {
+    const corpoResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/corpo`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (corpoResp.ok) {
+      const contentType = corpoResp.headers.get("content-type") || "";
+      const corpo = await corpoResp.text();
+      if (corpo && corpo.length > 50) {
+        return { xml: corpo, method: "corpo", debug_info: { content_type: contentType, length: corpo.length } };
+      }
     }
-  }
+  } catch { /* continue */ }
 
-  return { xml: null, method: "none" };
+  // Method 3: Try /xml endpoint  
+  try {
+    const xmlResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/xml`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (xmlResp.ok) {
+      const xml = await xmlResp.text();
+      if (xml && xml.length > 50) {
+        return { xml, method: "xml-endpoint" };
+      }
+    }
+  } catch { /* continue */ }
+
+  return { xml: null, method: "all-failed" };
 }
 
 async function consultarChave(
@@ -127,14 +166,26 @@ async function consultarChave(
   // Step 2: If already completed with documents, download XML
   if (distResult.status === "concluido" && distResult.documentos?.length > 0) {
     for (const doc of distResult.documentos) {
+      // First check if the document body is already in the response
+      if (doc.body) {
+        let xmlContent = doc.body;
+        if (!xmlContent.startsWith("<") && !xmlContent.startsWith("<?")) {
+          try { xmlContent = atob(xmlContent); } catch { /* not base64 */ }
+        }
+        if (xmlContent.length > 50) {
+          steps.push({ action: "XML from inline body", docId: doc.id, length: xmlContent.length });
+          return { xml: xmlContent, debug };
+        }
+      }
+
       if (doc.id) {
-        steps.push({ action: "trying download", docId: doc.id, resumo: doc.resumo, tipo_documento: doc.tipo_documento });
+        steps.push({ action: "trying download", docId: doc.id, resumo: doc.resumo, tipo_documento: doc.tipo_documento, has_body: !!doc.body });
         const result = await downloadDocumentXml(doc.id, token);
         if (result.xml) {
           steps.push({ action: "XML downloaded", docId: doc.id, method: result.method, source: "distribuicao-concluido" });
           return { xml: result.xml, debug };
         }
-        steps.push({ action: "download failed", docId: doc.id, method: result.method });
+        steps.push({ action: "download failed", docId: doc.id, method: result.method, detail: result.debug_info });
       }
     }
     steps.push({ note: "Documentos encontrados mas XML nao disponivel para download direto. Tentando manifestacao (ciencia da operacao)..." });
