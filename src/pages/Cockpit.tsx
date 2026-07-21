@@ -14,6 +14,8 @@ import {
   Target,
   BarChart2,
   X,
+  Copy,
+  Check,
 } from 'lucide-react';
 import {
   XAxis,
@@ -599,28 +601,11 @@ export function Cockpit() {
 
       {/* List OS Modal */}
       {daysModal.open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setDaysModal({ open: false, title: '', items: [] })}>
-          <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
-              <h3 className="text-sm font-semibold text-white">{daysModal.title} ({daysModal.items.length} OS)</h3>
-              <button onClick={() => setDaysModal({ open: false, title: '', items: [] })} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
-                <X className="w-4 h-4 text-gray-400" />
-              </button>
-            </div>
-            <div className="flex-1 overflow-y-auto p-5">
-              <div className="space-y-1.5">
-                {daysModal.items.map((item, i) => (
-                  <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-900/50 border border-gray-800/40">
-                    <span className="text-sm font-mono text-[#00D4FF]">{item.label}</span>
-                    <span className={`text-xs font-semibold px-2 py-0.5 rounded ${item.days > 14 ? 'text-red-300 bg-red-500/10' : item.days > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}>
-                      {item.days} dia{item.days !== 1 ? 's' : ''}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <DaysListModal
+          title={daysModal.title}
+          items={daysModal.items}
+          onClose={() => setDaysModal({ open: false, title: '', items: [] })}
+        />
       )}
       {listModal.open && (
         <ListOSModal
@@ -628,6 +613,51 @@ export function Cockpit() {
           onClose={() => setListModal({ open: false, osList: [] })}
         />
       )}
+    </div>
+  );
+}
+
+function DaysListModal({ title, items, onClose }: { title: string; items: { label: string; days: number }[]; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const text = items.map(item => `${item.label} - ${item.days} dia${item.days !== 1 ? 's' : ''}`).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
+      <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
+          <h3 className="text-sm font-semibold text-white">{title} ({items.length} OS)</h3>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? 'bg-green-500/20 text-green-300' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto p-5">
+          <div className="space-y-1.5">
+            {items.map((item, i) => (
+              <div key={i} className="flex items-center justify-between px-3 py-2 rounded-lg bg-gray-900/50 border border-gray-800/40">
+                <span className="text-sm font-mono text-[#00D4FF]">{item.label}</span>
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded ${item.days > 14 ? 'text-red-300 bg-red-500/10' : item.days > 7 ? 'text-yellow-300 bg-yellow-500/10' : 'text-gray-400 bg-gray-800/40'}`}>
+                  {item.days} dia{item.days !== 1 ? 's' : ''}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
