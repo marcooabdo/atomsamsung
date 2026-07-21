@@ -99,6 +99,7 @@ function formatDuration(days: number, hours?: number): string {
 export function Cockpit() {
   const { usuario, unidades, unidadesAdicionais, allUserUnits } = useAuth();
   const [selectedUnidade, setSelectedUnidade] = useState('');
+  const [filterAtendimento, setFilterAtendimento] = useState<'' | 'IH' | 'CI'>('');
   const [osData, setOsData] = useState<OSRow[]>([]);
   const [pecasMap, setPecasMap] = useState<Map<string, PecaRow[]>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -206,10 +207,15 @@ export function Cockpit() {
     }
   }
 
+  const filteredOsData = useMemo(() => {
+    if (!filterAtendimento) return osData;
+    return osData.filter(os => os.tipo_atendimento === filterAtendimento);
+  }, [osData, filterAtendimento]);
+
   const columnStats = useMemo(() => {
     const now = new Date();
     return COLUNAS_KANBAN.map(col => {
-      const cards = osData.filter(os => os.coluna_kanban === col.id);
+      const cards = filteredOsData.filter(os => os.coluna_kanban === col.id);
       const count = cards.length;
 
       let oldestDays = 0;
@@ -286,31 +292,31 @@ export function Cockpit() {
 
       return { ...col, count, oldestDays, oldestOSLabel, oldestHours, oldestInStageDays, oldestInStageOSLabel, oldestInStageHours, semCodigoOuValor, totalSemCodigo, totalSemValor, totalSemPeca, osComProblema, allOsDays, allOsStageDays };
     });
-  }, [osData, pecasMap]);
+  }, [filteredOsData, pecasMap]);
 
   const kpis = useMemo(() => {
-    const totalOS = osData.length;
-    const osAbertas = osData.filter(os => os.coluna_kanban !== 'os_fechada').length;
-    const osFechadas = osData.filter(os => os.coluna_kanban === 'os_fechada').length;
-    const lpCount = osData.filter(os => os.tipo_os === 'LP').length;
-    const owCount = osData.filter(os => os.tipo_os === 'OW').length;
-    const ihCount = osData.filter(os => os.tipo_atendimento === 'IH').length;
-    const ciCount = osData.filter(os => os.tipo_atendimento === 'CI').length;
+    const totalOS = filteredOsData.length;
+    const osAbertas = filteredOsData.filter(os => os.coluna_kanban !== 'os_fechada').length;
+    const osFechadas = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada').length;
+    const lpCount = filteredOsData.filter(os => os.tipo_os === 'LP').length;
+    const owCount = filteredOsData.filter(os => os.tipo_os === 'OW').length;
+    const ihCount = filteredOsData.filter(os => os.tipo_atendimento === 'IH').length;
+    const ciCount = filteredOsData.filter(os => os.tipo_atendimento === 'CI').length;
 
-    const valorTotal = osData.reduce((sum, os) => sum + (os.valor_total || 0), 0);
-    const valorPecas = osData.reduce((sum, os) => sum + (os.valor_pecas || 0), 0);
-    const valorServicos = osData.reduce((sum, os) => sum + (os.valor_servicos || 0), 0);
-    const valorPago = osData.reduce((sum, os) => sum + (os.valor_pago || 0), 0);
+    const valorTotal = filteredOsData.reduce((sum, os) => sum + (os.valor_total || 0), 0);
+    const valorPecas = filteredOsData.reduce((sum, os) => sum + (os.valor_pecas || 0), 0);
+    const valorServicos = filteredOsData.reduce((sum, os) => sum + (os.valor_servicos || 0), 0);
+    const valorPago = filteredOsData.reduce((sum, os) => sum + (os.valor_pago || 0), 0);
 
     const avgDaysOpen = osAbertas > 0
-      ? osData.filter(os => os.coluna_kanban !== 'os_fechada').reduce((sum, os) => {
+      ? filteredOsData.filter(os => os.coluna_kanban !== 'os_fechada').reduce((sum, os) => {
           const days = Math.floor((Date.now() - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
           return sum + days;
         }, 0) / osAbertas
       : 0;
 
     return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorPecas, valorServicos, valorPago, avgDaysOpen };
-  }, [osData]);
+  }, [filteredOsData]);
 
   const warrantyDistribution = useMemo(() => {
     return [
@@ -370,6 +376,15 @@ export function Cockpit() {
         </div>
         <div className="flex items-center gap-3">
           <UnitFilter unidades={unidades} selectedUnidade={selectedUnidade} onUnidadeChange={setSelectedUnidade} />
+          <select
+            value={filterAtendimento}
+            onChange={(e) => setFilterAtendimento(e.target.value as '' | 'IH' | 'CI')}
+            className="px-3 py-2 rounded-lg bg-gray-800/60 border border-gray-700 text-sm text-gray-200 focus:outline-none focus:border-[#00D4FF]/50"
+          >
+            <option value="">Todos (IH/CI)</option>
+            <option value="IH">Somente IH</option>
+            <option value="CI">Somente CI</option>
+          </select>
           <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/20 transition-all">
             <Download className="w-4 h-4" />
             Exportar
