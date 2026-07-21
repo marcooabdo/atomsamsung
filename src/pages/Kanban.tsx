@@ -514,6 +514,7 @@ export function Kanban() {
             pn,
             codigo,
             descricao,
+            valor_unitario,
             valor_gspn,
             quantidade,
             estoque_peca_id

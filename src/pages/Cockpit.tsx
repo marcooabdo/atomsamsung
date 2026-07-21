@@ -75,6 +75,7 @@ interface PecaRow {
   pn: string | null;
   codigo: string | null;
   valor_unitario: number | null;
+  valor_gspn?: number | null;
 }
 
 interface PecaIssueOS {
@@ -142,12 +143,35 @@ export function Cockpit() {
           const batch = openOsIds.slice(i, i + batchSize);
           const { data: pecas } = await supabase
             .from('os_pecas')
-            .select('id, os_id, pn, codigo, valor_unitario')
+            .select('id, os_id, pn, codigo, valor_unitario, valor_gspn')
             .in('os_id', batch);
           if (pecas) {
             for (const p of pecas as PecaRow[]) {
               if (!map.has(p.os_id)) map.set(p.os_id, []);
               map.get(p.os_id)!.push(p);
+            }
+          }
+        }
+        // Also load requisicoes_pecas for OS that have no os_pecas
+        const osWithoutPecas = openOsIds.filter(id => !map.has(id));
+        for (let i = 0; i < osWithoutPecas.length; i += batchSize) {
+          const batch = osWithoutPecas.slice(i, i + batchSize);
+          const { data: reqs } = await supabase
+            .from('requisicoes_pecas')
+            .select('id, os_id, codigo_peca, valor_peca')
+            .in('os_id', batch)
+            .not('status', 'in', '(cancelada,reprovada)');
+          if (reqs) {
+            for (const r of reqs as any[]) {
+              if (!map.has(r.os_id)) map.set(r.os_id, []);
+              map.get(r.os_id)!.push({
+                id: r.id,
+                os_id: r.os_id,
+                pn: r.codigo_peca,
+                codigo: r.codigo_peca,
+                valor_unitario: r.valor_peca,
+                valor_gspn: r.valor_peca,
+              });
             }
           }
         }
@@ -227,7 +251,7 @@ export function Cockpit() {
         } else {
           const hasCodigo = (p: PecaRow) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== '');
           const semCodigo = pecas.filter(p => !hasCodigo(p)).length;
-          const semValor = pecas.filter(p => hasCodigo(p) && (p.valor_unitario === null || Number(p.valor_unitario) < 0.01)).length;
+          const semValor = pecas.filter(p => hasCodigo(p) && (Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01)).length;
           if (semCodigo > 0 || semValor > 0) {
             semCodigoOuValor++;
             if (semCodigo > 0) totalSemCodigo++;

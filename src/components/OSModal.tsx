@@ -286,6 +286,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [uploadingAnexo, setUploadingAnexo] = useState(false);
 
   const isSCACC = os?.tipo_orcamento === 'samsung_contigo' || os?.tipo_orcamento === 'acessorios';
+  const isLP = os?.tipo_os === 'LP';
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1203,7 +1204,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   };
 
   const handleRemoverPecaManual = async (peca: any) => {
-    if (!peca || (peca.status !== 'manual' && !isSCACC)) return;
+    if (!peca || (peca.status !== 'manual' && !isSCACC && os?.tipo_os !== 'LP')) return;
     setRemovendoPecaId(peca.id);
     try {
       const { error } = await supabase
@@ -4178,7 +4179,7 @@ Não haverá cobrança ao cliente.`
                 <div className="space-y-3">
                   {todasPecas.map((peca) => {
                     const pecaId = peca.cotacao_peca_id || peca.id;
-                    const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual' || isSCACC || (peca as any)._isOrphanReq;
+                    const usaOsPecaId = peca.status === 'gspn' || peca.status === 'manual' || isSCACC || isLP || (peca as any)._isOrphanReq;
 
                     const requisicoesDestaPeca = requisicoes.filter(r => {
                       if ((peca as any)._isOrphanReq) {
@@ -4287,7 +4288,7 @@ Não haverá cobrança ao cliente.`
                               <p className="text-xs text-gray-500">Qtd: {peca.quantidade || 1}</p>
 
                               {/* ── VALOR GSPN (base) — para peças gspn/manual ou todas em SC/ACC ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || isLP) && !(peca as any)._isOrphanReq && (
                                 editandoValorGSPN[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-2">
                                     <span className="text-xs font-bold" style={{ color: '#9333EA' }}>GSPN R$</span>
@@ -4347,7 +4348,7 @@ Não haverá cobrança ao cliente.`
                               )}
 
                               {/* ── VALOR UNITÁRIO COM MARKUP ── */}
-                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || peca.valor_gspn > 0 || peca.valor_unitario > 0) && !(peca as any)._isOrphanReq && (
+                              {(peca.status === 'gspn' || peca.status === 'manual' || isSCACC || isLP || peca.valor_gspn > 0 || peca.valor_unitario > 0) && !(peca as any)._isOrphanReq && (
                                 editandoValorFinal[peca.id] !== undefined ? (
                                   <div className="flex items-center gap-1.5 flex-wrap">
                                     <span className="text-xs font-bold" style={{ color: 'var(--text-accent)' }}>Unit R$</span>
@@ -4406,7 +4407,7 @@ Não haverá cobrança ao cliente.`
                                 <p className="text-xs font-bold text-[#39FF14]">
                                   Total: R$ {(Number(peca.valor_unitario || 0) * Math.max(peca.quantidade || 1, 1)).toFixed(2)}
                                 </p>
-                                {(peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && !editandoValorPeca[peca.id] && (
+                                {(peca.status === 'manual' || isSCACC || isLP) && !(peca as any)._isOrphanReq && !editandoValorPeca[peca.id] && (
                                   <button
                                     onClick={() => setEditandoValorPeca(prev => ({ ...prev, [peca.id]: { unitario: String(Number(peca.valor_unitario || 0).toFixed(2)), quantidade: String(peca.quantidade || 1) } }))}
                                     className="p-1 rounded transition-all hover:opacity-80"
@@ -4419,7 +4420,7 @@ Não haverá cobrança ao cliente.`
                               </div>
 
                               {/* Edição de qtd+unitário para peças manuais / SC/ACC */}
-                              {(peca.status === 'manual' || isSCACC) && !(peca as any)._isOrphanReq && editandoValorPeca[peca.id] && (
+                              {(peca.status === 'manual' || isSCACC || isLP) && !(peca as any)._isOrphanReq && editandoValorPeca[peca.id] && (
                                 <div className="flex items-center gap-2 flex-wrap w-full mt-1">
                                   <div className="flex items-center gap-1">
                                     <span className="text-xs text-gray-500">Qtd:</span>
@@ -4790,7 +4791,7 @@ Não haverá cobrança ao cliente.`
                               onClick={async () => {
                                 if ((peca as any)._isOrphanReq) return;
                                 const novoValor = !peca.exibir_no_pdf;
-                                const tabela = peca.status === 'gspn' || peca.status === 'manual' || isSCACC ? 'os_pecas' : (peca.cotacao_peca_id ? 'cotacoes_pecas' : 'os_pecas');
+                                const tabela = peca.status === 'gspn' || peca.status === 'manual' || isSCACC || isLP ? 'os_pecas' : (peca.cotacao_peca_id ? 'cotacoes_pecas' : 'os_pecas');
                                 await supabase.from(tabela).update({ exibir_no_pdf: novoValor }).eq('id', peca.id);
                                 setPecas(prev => prev.map(p => p.id === peca.id ? { ...p, exibir_no_pdf: novoValor } : p));
                               }}

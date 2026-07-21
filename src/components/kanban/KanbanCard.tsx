@@ -274,9 +274,12 @@ export const KanbanCard = memo(function KanbanCard({
     if (osPecas.length > 0) {
       const hasCodigo = osPecas.some((p: any) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== ''));
       if (hasCodigo) {
-        const allZeroValue = osPecas
-          .filter((p: any) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== ''))
-          .every((p: any) => !p.valor_unitario || Number(p.valor_unitario) < 0.01);
+        const pecasComCodigo = osPecas.filter((p: any) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== ''));
+        const allZeroValue = pecasComCodigo.every((p: any) => {
+          const vu = Number(p.valor_unitario || 0);
+          const vg = Number(p.valor_gspn || 0);
+          return vu < 0.01 && vg < 0.01;
+        });
         if (allZeroValue) return true;
       }
     }
@@ -359,7 +362,7 @@ export const KanbanCard = memo(function KanbanCard({
         >
           <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
           <span className="text-[9px] font-bold text-[#EF4444]">
-            SEM CODIGO DE PECA
+            SEM CÓDIGO DE PEÇA
           </span>
         </div>
       )}
@@ -373,7 +376,7 @@ export const KanbanCard = memo(function KanbanCard({
         >
           <AlertTriangle className="w-3 h-3 text-[#EF4444] flex-shrink-0" />
           <span className="text-[9px] font-bold text-[#EF4444]">
-            PECA COM VALOR R$0
+            PEÇA COM VALOR R$0
           </span>
         </div>
       )}
