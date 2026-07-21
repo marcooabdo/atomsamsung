@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { UnitFilter } from '../components/UnitFilter';
@@ -107,13 +107,25 @@ export function Cockpit() {
   const [daysModal, setDaysModal] = useState<{ open: boolean; title: string; items: { label: string; days: number; hours?: number }[] }>({ open: false, title: '', items: [] });
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const hasLoadedOnce = useRef(false);
 
   useEffect(() => {
     if (usuario) loadData();
   }, [usuario, selectedUnidade, unidadesAdicionais]);
 
-  async function loadData() {
-    setLoading(true);
+  useEffect(() => {
+    if (!usuario) return;
+    const channel = supabase
+      .channel('cockpit-os-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'os' }, () => {
+        loadData(true);
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [usuario, selectedUnidade, unidadesAdicionais]);
+
+  const loadData = useCallback(async (silent = false) => {
+    if (!silent && !hasLoadedOnce.current) setLoading(true);
     try {
       let query = supabase
         .from('os')
@@ -190,8 +202,9 @@ export function Cockpit() {
       console.error('Cockpit load error:', err);
     } finally {
       setLoading(false);
+      hasLoadedOnce.current = true;
     }
-  }
+  }, [usuario, selectedUnidade, unidadesAdicionais]);
 
   const filteredOsData = useMemo(() => {
     if (!filterAtendimento) return osData;
