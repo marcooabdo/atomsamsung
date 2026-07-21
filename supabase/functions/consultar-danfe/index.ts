@@ -196,9 +196,9 @@ async function consultarChave(
         cpf_cnpj: cpfCnpj,
         ambiente: "producao",
         chave_acesso: chave,
-        tipo_evento: "ciencia_operacao",
+        tipo_evento: "210210",
       };
-      const manifestResp = await fetch(`${NUVEM_FISCAL_API}/nfe/eventos`, {
+      const manifestResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/manifestacoes`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -210,15 +210,39 @@ async function consultarChave(
       steps.push({ action: "manifestacao ciencia_operacao", status: manifestResp.status, response: manifestText.substring(0, 500) });
 
       if (manifestResp.ok || manifestResp.status === 409) {
-        // Wait a moment then retry download
-        await sleep(3000);
+        // Parse manifestation response to check status
+        let manifestData: any = null;
+        try { manifestData = JSON.parse(manifestText); } catch {}
+        steps.push({ manifestacao_data: { status: manifestData?.status, id: manifestData?.id, codigo_status: manifestData?.codigo_status } });
+
+        // Poll manifestation until registered (max 30s)
+        if (manifestData?.id && manifestData?.status === "pendente") {
+          for (let i = 0; i < 6; i++) {
+            await sleep(5000);
+            const pollResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/manifestacoes/${manifestData.id}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (pollResp.ok) {
+              const pollData = await pollResp.json();
+              steps.push({ manifest_poll: i + 1, status: pollData.status });
+              if (pollData.status === "registrado") break;
+              if (pollData.status === "erro" || pollData.status === "rejeitado") break;
+            }
+          }
+        } else {
+          // If already registered or 409 (duplicate), wait briefly
+          await sleep(3000);
+        }
+
+        // After manifestation, retry the XML download
         for (const doc of distResult.documentos) {
           if (doc.id) {
             const retryResult = await downloadDocumentXml(doc.id, token);
             if (retryResult.xml) {
-              steps.push({ action: "XML downloaded after manifestacao", docId: doc.id });
+              steps.push({ action: "XML downloaded after manifestacao", docId: doc.id, method: retryResult.method });
               return { xml: retryResult.xml, debug };
             }
+            steps.push({ action: "retry download after manifest failed", docId: doc.id, method: retryResult.method, detail: retryResult.debug_info });
           }
         }
 
@@ -238,9 +262,17 @@ async function consultarChave(
         });
         if (retryDistResp.ok) {
           const retryDist = await retryDistResp.json();
-          steps.push({ action: "retry distribution after manifest", status: retryDist.status, docs: retryDist.documentos?.length || 0 });
+          steps.push({ action: "retry distribution after manifest", status: retryDist.status, docs: retryDist.documentos?.length || 0, codigo_status: retryDist.codigo_status });
           if (retryDist.status === "concluido" && retryDist.documentos?.length > 0) {
             for (const doc of retryDist.documentos) {
+              // Check inline body first
+              if (doc.body) {
+                let xmlContent = doc.body;
+                if (!xmlContent.startsWith("<") && !xmlContent.startsWith("<?")) {
+                  try { xmlContent = atob(xmlContent); } catch {}
+                }
+                if (xmlContent.length > 50) return { xml: xmlContent, debug };
+              }
               if (doc.id) {
                 const r = await downloadDocumentXml(doc.id, token);
                 if (r.xml) return { xml: r.xml, debug };
