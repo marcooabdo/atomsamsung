@@ -46,14 +46,30 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function downloadDocumentXml(docId: string, token: string): Promise<string | null> {
-  const resp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/xml`, {
+async function downloadDocumentXml(docId: string, token: string): Promise<{ xml: string | null; method: string }> {
+  // Try /xml endpoint first (full NF-e XML)
+  const xmlResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/xml`, {
     headers: { Authorization: `Bearer ${token}` },
   });
-  if (!resp.ok) return null;
-  const xml = await resp.text();
-  if (xml && xml.length > 100) return xml;
-  return null;
+  if (xmlResp.ok) {
+    const xml = await xmlResp.text();
+    if (xml && xml.length > 100 && (xml.includes("<nfeProc") || xml.includes("<NFe") || xml.includes("<protNFe"))) {
+      return { xml, method: "xml" };
+    }
+  }
+
+  // Try /corpo endpoint (document body - works for resumo docs too)
+  const corpoResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe/documentos/${docId}/corpo`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (corpoResp.ok) {
+    const corpo = await corpoResp.text();
+    if (corpo && corpo.length > 100 && (corpo.includes("<nfeProc") || corpo.includes("<NFe") || corpo.includes("<resNFe") || corpo.includes("<procEventoNFe"))) {
+      return { xml: corpo, method: "corpo" };
+    }
+  }
+
+  return { xml: null, method: "none" };
 }
 
 async function consultarChave(
@@ -111,15 +127,80 @@ async function consultarChave(
   // Step 2: If already completed with documents, download XML
   if (distResult.status === "concluido" && distResult.documentos?.length > 0) {
     for (const doc of distResult.documentos) {
-      if (doc.id && !doc.resumo) {
-        const xml = await downloadDocumentXml(doc.id, token);
-        if (xml) {
-          steps.push({ action: "XML downloaded", docId: doc.id, source: "distribuicao-concluido" });
-          return { xml, debug };
+      if (doc.id) {
+        steps.push({ action: "trying download", docId: doc.id, resumo: doc.resumo, tipo_documento: doc.tipo_documento });
+        const result = await downloadDocumentXml(doc.id, token);
+        if (result.xml) {
+          steps.push({ action: "XML downloaded", docId: doc.id, method: result.method, source: "distribuicao-concluido" });
+          return { xml: result.xml, debug };
         }
+        steps.push({ action: "download failed", docId: doc.id, method: result.method });
       }
     }
-    steps.push({ note: "Documentos encontrados mas todos sao resumo (sem XML completo)" });
+    steps.push({ note: "Documentos encontrados mas XML nao disponivel para download direto. Tentando manifestacao (ciencia da operacao)..." });
+
+    // Step 2b: Perform manifestacao (ciencia da operacao) to unlock full XML
+    try {
+      const manifestBody = {
+        cpf_cnpj: cpfCnpj,
+        ambiente: "producao",
+        chave_acesso: chave,
+        tipo_evento: "ciencia_operacao",
+      };
+      const manifestResp = await fetch(`${NUVEM_FISCAL_API}/nfe/eventos`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(manifestBody),
+      });
+      const manifestText = await manifestResp.text();
+      steps.push({ action: "manifestacao ciencia_operacao", status: manifestResp.status, response: manifestText.substring(0, 500) });
+
+      if (manifestResp.ok || manifestResp.status === 409) {
+        // Wait a moment then retry download
+        await sleep(3000);
+        for (const doc of distResult.documentos) {
+          if (doc.id) {
+            const retryResult = await downloadDocumentXml(doc.id, token);
+            if (retryResult.xml) {
+              steps.push({ action: "XML downloaded after manifestacao", docId: doc.id });
+              return { xml: retryResult.xml, debug };
+            }
+          }
+        }
+
+        // Also try a fresh distribution request after manifestation
+        const retryDistResp = await fetch(`${NUVEM_FISCAL_API}/distribuicao/nfe`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            cpf_cnpj: cpfCnpj,
+            ambiente: "producao",
+            tipo_consulta: "cons-chave",
+            cons_chave: chave,
+          }),
+        });
+        if (retryDistResp.ok) {
+          const retryDist = await retryDistResp.json();
+          steps.push({ action: "retry distribution after manifest", status: retryDist.status, docs: retryDist.documentos?.length || 0 });
+          if (retryDist.status === "concluido" && retryDist.documentos?.length > 0) {
+            for (const doc of retryDist.documentos) {
+              if (doc.id) {
+                const r = await downloadDocumentXml(doc.id, token);
+                if (r.xml) return { xml: r.xml, debug };
+              }
+            }
+          }
+        }
+      }
+    } catch (err: any) {
+      steps.push({ action: "manifestacao error", message: err.message });
+    }
   }
 
   // Step 3: If processing, poll until done (max ~60s)
@@ -147,9 +228,9 @@ async function consultarChave(
       if (pollData.status === "concluido") {
         if (pollData.documentos?.length > 0) {
           for (const doc of pollData.documentos) {
-            if (doc.id && !doc.resumo) {
-              const xml = await downloadDocumentXml(doc.id, token);
-              if (xml) return { xml, debug };
+            if (doc.id) {
+              const result = await downloadDocumentXml(doc.id, token);
+              if (result.xml) return { xml: result.xml, debug };
             }
           }
         }
@@ -175,9 +256,9 @@ async function consultarChave(
       steps.push({ action: "search existing docs", items_count: Array.isArray(items) ? items.length : 0 });
       if (Array.isArray(items)) {
         for (const doc of items) {
-          if (doc.id && !doc.resumo) {
-            const xml = await downloadDocumentXml(doc.id, token);
-            if (xml) return { xml, debug };
+          if (doc.id) {
+            const result = await downloadDocumentXml(doc.id, token);
+            if (result.xml) return { xml: result.xml, debug };
           }
         }
       }
