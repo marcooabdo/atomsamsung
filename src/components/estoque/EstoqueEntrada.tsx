@@ -363,10 +363,7 @@ export function EstoqueEntrada({ selectedUnidade, user: userProp }: EstoqueEntra
 
       if (linhas.length === 1) {
         if (!response.ok || !result.success) {
-          const debugSteps = result.debug?.steps ? JSON.stringify(result.debug.steps) : '';
-          const debugDist = result.debug?.distribuicao ? JSON.stringify(result.debug.distribuicao) : '';
-          const debugInfo = debugSteps || debugDist ? ` [Debug: dist=${debugDist} steps=${debugSteps}]` : '';
-          throw new Error((result.error || 'Erro ao consultar chave de acesso') + debugInfo);
+          throw new Error(result.error || 'Erro ao consultar chave de acesso');
         }
         const xml = result.xml;
         if (!xml || xml.length < 100) {
