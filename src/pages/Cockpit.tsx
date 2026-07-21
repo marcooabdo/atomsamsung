@@ -679,6 +679,20 @@ function DaysListModal({ title, items, onClose }: { title: string; items: { labe
 }
 
 function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () => void }) {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    const text = osList.map(os => {
+      const issues: string[] = [];
+      if (os.semCodigo > 0) issues.push(`${os.semCodigo} sem codigo`);
+      if (os.semValor > 0) issues.push(`${os.semValor} sem valor`);
+      return `${os.osLabel} - ${issues.join(', ')}`;
+    }).join('\n');
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
       <div className="bg-[#12121a] border border-gray-800 rounded-xl w-full max-w-md max-h-[70vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
@@ -687,9 +701,18 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
             <AlertTriangle className="w-4 h-4 text-red-400" />
             OS com Problemas nas Pecas ({osList.length})
           </h3>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
-            <X className="w-4 h-4 text-gray-400" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopy}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${copied ? 'bg-green-500/20 text-green-300' : 'bg-gray-800 text-gray-300 hover:bg-gray-700 hover:text-white'}`}
+            >
+              {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copied ? 'Copiado!' : 'Copiar'}
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+              <X className="w-4 h-4 text-gray-400" />
+            </button>
+          </div>
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           <div className="space-y-2">
