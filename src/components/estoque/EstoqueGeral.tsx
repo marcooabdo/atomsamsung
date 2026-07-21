@@ -266,13 +266,13 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
         em_rota: 'Em Rota',
         em_uso: 'Em Uso',
         usada: 'Usada',
-        devolucao_pendente: 'Devolucao Pendente',
+        devolucao_pendente: 'Devolução Pendente',
         devolvida_nova: 'Devolvida Nova',
         devolvida_defeito: 'Devolvida c/ Defeito',
         devolvida_samsung: 'Devolvida Samsung',
         usada_upc: 'Devolvida UPC',
         devolvida_upc: 'Devolvida UPC',
-        devolucao_completa: 'Devolucao Completa',
+        devolucao_completa: 'Devolução Completa',
         arquivada: 'Arquivada',
       };
 
@@ -696,7 +696,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
             onChange={(e) => setShowDevolucaoCompleta(e.target.checked)}
             className="rounded"
           />
-          <span className="text-sm text-gray-300">Mostrar Devolu\u00e7\u00e3o Completa</span>
+          <span className="text-sm text-gray-300">Mostrar Devolução Completa</span>
         </label>
 
         <button
@@ -768,7 +768,7 @@ export function EstoqueGeral({ selectedUnidade, user }: EstoqueGeralProps) {
                 }}
               >
                 <FileText className="w-4 h-4" />
-                Emitir NF Devolucao ({selectedDevolvidasCount})
+                Emitir NF Devolução ({selectedDevolvidasCount})
               </button>
             )}
           </>
