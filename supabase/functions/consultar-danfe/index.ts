@@ -8,7 +8,6 @@ const corsHeaders = {
 
 const NUVEM_FISCAL_CLIENT_ID = "kfrx2HqLfTfOjM6MIkku";
 const NUVEM_FISCAL_CLIENT_SECRET = "x9mrWhVT2x4tvs5ZEbz6oC3BGTWu8maeJGNLPaDT";
-const NUVEM_FISCAL_AUDIENCE = "https://api.nuvemfiscal.com.br/";
 const NUVEM_FISCAL_TOKEN_URL = "https://auth.nuvemfiscal.com.br/oauth/token";
 const NUVEM_FISCAL_API_BASE = "https://api.nuvemfiscal.com.br";
 
@@ -26,7 +25,7 @@ async function getNuvemFiscalToken(): Promise<string> {
       grant_type: "client_credentials",
       client_id: NUVEM_FISCAL_CLIENT_ID,
       client_secret: NUVEM_FISCAL_CLIENT_SECRET,
-      audience: NUVEM_FISCAL_AUDIENCE,
+      scope: "cnpj nfe",
     }),
   });
 

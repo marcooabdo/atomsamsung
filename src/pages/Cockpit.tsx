@@ -105,7 +105,6 @@ export function Cockpit() {
   const [loading, setLoading] = useState(true);
   const [listModal, setListModal] = useState<{ open: boolean; osList: PecaIssueOS[] }>({ open: false, osList: [] });
   const [daysModal, setDaysModal] = useState<{ open: boolean; title: string; items: { label: string; days: number; hours?: number }[] }>({ open: false, title: '', items: [] });
-  const [dailyStats, setDailyStats] = useState<{ date: string; abertas: number; fechadas: number }[]>([]);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
 
@@ -187,19 +186,6 @@ export function Cockpit() {
         }
       }
       setPecasMap(map);
-
-      // Daily stats for last 30 days
-      const last30Days: { date: string; abertas: number; fechadas: number }[] = [];
-      const now = new Date();
-      for (let i = 29; i >= 0; i--) {
-        const d = new Date(now);
-        d.setDate(d.getDate() - i);
-        const dateStr = d.toISOString().split('T')[0];
-        const abertas = allOS.filter(os => os.created_at?.startsWith(dateStr)).length;
-        const fechadas = allOS.filter(os => os.coluna_kanban === 'os_fechada' && os.updated_at?.startsWith(dateStr)).length;
-        last30Days.push({ date: dateStr, abertas, fechadas });
-      }
-      setDailyStats(last30Days);
     } catch (err) {
       console.error('Cockpit load error:', err);
     } finally {
@@ -211,6 +197,20 @@ export function Cockpit() {
     if (!filterAtendimento) return osData;
     return osData.filter(os => os.tipo_atendimento === filterAtendimento);
   }, [osData, filterAtendimento]);
+
+  const dailyStats = useMemo(() => {
+    const last30Days: { date: string; abertas: number; fechadas: number }[] = [];
+    const now = new Date();
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const dateStr = d.toISOString().split('T')[0];
+      const abertas = filteredOsData.filter(os => os.created_at?.startsWith(dateStr)).length;
+      const fechadas = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada' && os.updated_at?.startsWith(dateStr)).length;
+      last30Days.push({ date: dateStr, abertas, fechadas });
+    }
+    return last30Days;
+  }, [filteredOsData]);
 
   const columnStats = useMemo(() => {
     const now = new Date();
