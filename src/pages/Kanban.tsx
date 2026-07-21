@@ -1636,8 +1636,10 @@ export function Kanban() {
         const matchesTAT = debouncedMinDiasAbertos === 0 || calcularTAT(os.created_at) >= debouncedMinDiasAbertos;
 
         const matchesRota = debouncedRotaFilters.length === 0 ||
+          (debouncedRotaFilters.includes('__sem_rota__') && !os.rota_id) ||
           debouncedRotaFilters.includes(os.rota_id) ||
           debouncedRotaFilters.some((rotaId: string) => {
+            if (rotaId === '__sem_rota__') return false;
             const rota = rotas.find(r => r.id === rotaId);
             return rota && os.coluna_kanban === rota.coluna_kanban;
           });
@@ -2287,6 +2289,28 @@ export function Kanban() {
                     <div className="pt-3 mt-3 border-t border-[#FFBF00]/30">
                       <label className="text-[10px] text-[#FFBF00] mb-1.5 block font-bold">ROTA</label>
                       <div className="flex flex-wrap gap-1.5">
+                        {(() => {
+                          const isSemRotaSelected = rotaFilters.includes('__sem_rota__');
+                          return (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setRotaFilters(prev =>
+                                  isSemRotaSelected ? prev.filter(id => id !== '__sem_rota__') : [...prev, '__sem_rota__']
+                                );
+                              }}
+                              className="px-2 py-1 rounded text-[10px] font-bold transition-all"
+                              style={{
+                                background: isSemRotaSelected ? 'rgba(239,68,68,0.15)' : 'rgba(255,191,0,0.05)',
+                                border: `1px solid ${isSemRotaSelected ? '#EF4444' : 'rgba(255,191,0,0.2)'}`,
+                                color: isSemRotaSelected ? '#EF4444' : '#9CA3AF',
+                                boxShadow: isSemRotaSelected ? '0 0 6px rgba(239,68,68,0.3)' : 'none'
+                              }}
+                            >
+                              Sem Rota
+                            </button>
+                          );
+                        })()}
                         {rotas.map(rota => {
                           const isSelected = rotaFilters.includes(rota.id);
                           return (
