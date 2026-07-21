@@ -255,23 +255,40 @@ export const KanbanCard = memo(function KanbanCard({
 
   const destaquePecaIncompleta = colunaId === 'aguardando_peca' && (() => {
     const requisicoes = (os as any).requisicoes || [];
-    if (requisicoes.length === 0) return true;
-    const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
-    const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
-    return pecasAtivas.length > 0 && pecasAtivas.every((req: any) => !req.codigo_peca);
+    const osPecas = (os as any).os_pecas || [];
+    if (requisicoes.length === 0 && osPecas.length === 0) return true;
+    if (osPecas.length > 0) {
+      const allMissingCode = osPecas.every((p: any) => (!p.pn || p.pn.trim() === '') && (!p.codigo || p.codigo.trim() === ''));
+      if (allMissingCode) return true;
+    }
+    if (requisicoes.length > 0) {
+      const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
+      const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
+      return pecasAtivas.length > 0 && pecasAtivas.every((req: any) => !req.codigo_peca);
+    }
+    return false;
   })();
 
   const destaquePecaSemValor = !destaquePecaIncompleta && colunaId === 'aguardando_peca' && (() => {
+    const osPecas = (os as any).os_pecas || [];
+    if (osPecas.length > 0) {
+      const hasCodigo = osPecas.some((p: any) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== ''));
+      if (hasCodigo) {
+        const allZeroValue = osPecas
+          .filter((p: any) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== ''))
+          .every((p: any) => !p.valor_unitario || Number(p.valor_unitario) < 0.01);
+        if (allZeroValue) return true;
+      }
+    }
     const requisicoes = (os as any).requisicoes || [];
     if (requisicoes.length === 0) return false;
     const statusTerminais = ['pedido_feito', 'gi_postada', 'devolvida', 'devolvida_samsung', 'devolvida_upc', 'devolucao_pendente', 'cancelada', 'reprovada'];
     const pecasAtivas = requisicoes.filter((req: any) => !statusTerminais.includes(req.status));
-    const osPecas = (os as any).os_pecas || [];
     return pecasAtivas.length > 0 && pecasAtivas.some((req: any) => {
       if (!req.codigo_peca) return false;
       if (req.valor_peca && Number(req.valor_peca) > 0) return false;
       const osPecaMatch = osPecas.find((p: any) => p.pn === req.codigo_peca || p.codigo === req.codigo_peca);
-      if (osPecaMatch && Number(osPecaMatch.valor_gspn) > 0) return false;
+      if (osPecaMatch && (Number(osPecaMatch.valor_unitario) > 0 || Number(osPecaMatch.valor_gspn) > 0)) return false;
       return true;
     });
   })();

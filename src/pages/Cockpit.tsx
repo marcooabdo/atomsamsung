@@ -83,6 +83,7 @@ interface PecaIssueOS {
   pecas: PecaRow[];
   semCodigo: number;
   semValor: number;
+  semPeca?: boolean;
 }
 
 export function Cockpit() {
@@ -208,10 +209,22 @@ export function Cockpit() {
       let semCodigoOuValor = 0;
       let totalSemCodigo = 0;
       let totalSemValor = 0;
+      let totalSemPeca = 0;
       const osComProblema: PecaIssueOS[] = [];
       cards.forEach(os => {
         const pecas = pecasMap.get(os.id);
-        if (pecas && pecas.length > 0) {
+        if (!pecas || pecas.length === 0) {
+          semCodigoOuValor++;
+          totalSemPeca++;
+          osComProblema.push({
+            osId: os.id,
+            osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+            pecas: [],
+            semCodigo: 0,
+            semValor: 0,
+            semPeca: true,
+          });
+        } else {
           const hasCodigo = (p: PecaRow) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== '');
           const semCodigo = pecas.filter(p => !hasCodigo(p)).length;
           const semValor = pecas.filter(p => hasCodigo(p) && (p.valor_unitario === null || Number(p.valor_unitario) < 0.01)).length;
@@ -230,7 +243,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, totalSemCodigo, totalSemValor, osComProblema, allOsDays, allOsStageDays };
+      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, totalSemCodigo, totalSemValor, totalSemPeca, osComProblema, allOsDays, allOsStageDays };
     });
   }, [osData, pecasMap]);
 
@@ -275,7 +288,7 @@ export function Cockpit() {
   }, [kpis]);
 
   function exportCSV() {
-    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Sem Codigo/Valor\n';
+    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Problemas Pecas\n';
     const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.semCodigoOuValor}`).join('\n');
     const blob = new Blob([header + rows], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
@@ -431,7 +444,7 @@ export function Cockpit() {
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Quantidade</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">OS Mais Antiga</th>
                 <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Mais Antiga na Etapa</th>
-                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Sem Cod/Valor</th>
+                <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">Problemas Peca</th>
               </tr>
             </thead>
             <tbody>
@@ -483,7 +496,7 @@ export function Cockpit() {
                           {col.semCodigoOuValor}
                         </span>
                         <span className="text-[10px] text-gray-500 font-normal">
-                          {col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : ''}{col.totalSemCodigo > 0 && col.totalSemValor > 0 ? ' | ' : ''}{col.totalSemValor > 0 ? `${col.totalSemValor} s/valor` : ''}
+                          {[col.totalSemPeca > 0 ? `${col.totalSemPeca} s/peca` : '', col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : '', col.totalSemValor > 0 ? `${col.totalSemValor} s/valor` : ''].filter(Boolean).join(' | ')}
                         </span>
                       </button>
                     ) : (
@@ -515,7 +528,7 @@ export function Cockpit() {
                       {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
                     </span>
                     <span className="text-[10px] text-gray-500">
-                      {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
+                      {columnStats.reduce((s, c) => s + c.totalSemPeca, 0)} s/peca | {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
                     </span>
                   </div>
                 </td>
@@ -684,8 +697,9 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
   const handleCopy = () => {
     const text = osList.map(os => {
       const issues: string[] = [];
+      if (os.semPeca) issues.push('sem peca cadastrada');
       if (os.semCodigo > 0) issues.push(`${os.semCodigo} sem codigo`);
-      if (os.semValor > 0) issues.push(`${os.semValor} sem valor`);
+      if (os.semValor > 0) issues.push(`${os.semValor} peca com valor R$0`);
       return `${os.osLabel} - ${issues.join(', ')}`;
     }).join('\n');
     navigator.clipboard.writeText(text);
@@ -722,11 +736,14 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
                   <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
                 </div>
                 <div className="flex items-center gap-3 mt-1">
+                  {os.semPeca && (
+                    <span className="text-xs text-red-400">sem peca cadastrada</span>
+                  )}
                   {os.semCodigo > 0 && (
                     <span className="text-xs text-orange-400">{os.semCodigo} sem codigo</span>
                   )}
                   {os.semValor > 0 && (
-                    <span className="text-xs text-red-400">{os.semValor} sem valor</span>
+                    <span className="text-xs text-yellow-400">{os.semValor} peca com valor R$0</span>
                   )}
                 </div>
               </div>
