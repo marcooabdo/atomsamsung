@@ -66,6 +66,7 @@ const COLUNAS_KANBAN = [
   { id: 'rota_amarela', label: 'Rota Amarela' },
   { id: 'rota_laranja', label: 'Rota Laranja' },
   { id: 'em_rota_ih', label: 'Agendado' },
+  { id: 'em_reparo_ih', label: 'Em Reparo IH' },
   { id: 'reparo_concluido', label: 'Reparo Concluído' },
   { id: 'aguardando_fechamento', label: 'Aguardando Fechamento' },
   { id: 'os_fechada', label: 'OS Fechada' },

@@ -41,6 +41,7 @@ const COLUNAS_KANBAN = [
   { id: 'peca_em_transito', label: 'Peça em Trânsito', color: '#3B82F6' },
   { id: 'em_reparo_ci', label: 'Em Reparo CI', color: '#0EA5E9' },
   { id: 'em_rota_ih', label: 'Agendado', color: '#10B981' },
+  { id: 'em_reparo_ih', label: 'Em Reparo IH', color: '#06B6D4' },
   { id: 'controle_qualidade', label: 'Controle de Qualidade', color: '#2563EB' },
   { id: 'qa_bt', label: 'Q&A / BT', color: '#7C3AED' },
   { id: 'reparo_concluido', label: 'Reparo Concluído', color: '#10B981' },
