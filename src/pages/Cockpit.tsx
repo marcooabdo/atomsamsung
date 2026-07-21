@@ -78,6 +78,8 @@ interface PecaIssueOS {
   osId: string;
   osLabel: string;
   pecas: PecaRow[];
+  semCodigo: number;
+  semValor: number;
 }
 
 export function Cockpit() {
@@ -200,19 +202,21 @@ export function Cockpit() {
         oldestInStageOSLabel = allOsStageDays[0]?.label || '';
       }
 
-      // Count OS where pecas have valor_unitario < 0.01 (missing price)
       let semCodigoOuValor = 0;
       const osComProblema: PecaIssueOS[] = [];
       cards.forEach(os => {
         const pecas = pecasMap.get(os.id);
         if (pecas && pecas.length > 0) {
-          const pecasComProblema = pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01);
-          if (pecasComProblema.length > 0) {
+          const semCodigo = pecas.filter(p => !p.codigo || p.codigo.trim() === '').length;
+          const semValor = pecas.filter(p => p.codigo && p.codigo.trim() !== '' && (p.valor_unitario === null || Number(p.valor_unitario) < 0.01)).length;
+          if (semCodigo > 0 || semValor > 0) {
             semCodigoOuValor++;
             osComProblema.push({
               osId: os.id,
               osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
               pecas,
+              semCodigo,
+              semValor,
             });
           }
         }
@@ -635,7 +639,7 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-800">
           <h3 className="text-sm font-semibold text-white flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-red-400" />
-            OS Sem Valor nas Pecas ({osList.length})
+            OS com Problemas nas Pecas ({osList.length})
           </h3>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-800 transition-colors">
             <X className="w-4 h-4 text-gray-400" />
@@ -644,9 +648,18 @@ function ListOSModal({ osList, onClose }: { osList: PecaIssueOS[]; onClose: () =
         <div className="flex-1 overflow-y-auto p-5">
           <div className="space-y-2">
             {osList.map(os => (
-              <div key={os.osId} className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-gray-900/50 border border-gray-800/40">
-                <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
-                <span className="text-xs text-gray-500">{os.pecas.filter(p => p.valor_unitario === null || Number(p.valor_unitario) < 0.01).length} peca(s)</span>
+              <div key={os.osId} className="px-3 py-2.5 rounded-lg bg-gray-900/50 border border-gray-800/40">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-mono text-[#00D4FF]">{os.osLabel}</span>
+                </div>
+                <div className="flex items-center gap-3 mt-1">
+                  {os.semCodigo > 0 && (
+                    <span className="text-xs text-orange-400">{os.semCodigo} sem codigo</span>
+                  )}
+                  {os.semValor > 0 && (
+                    <span className="text-xs text-red-400">{os.semValor} sem valor</span>
+                  )}
+                </div>
               </div>
             ))}
           </div>
