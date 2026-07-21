@@ -72,6 +72,7 @@ interface OSRow {
 interface PecaRow {
   id: string;
   os_id: string;
+  pn: string | null;
   codigo: string | null;
   valor_unitario: number | null;
 }
@@ -140,7 +141,7 @@ export function Cockpit() {
           const batch = openOsIds.slice(i, i + batchSize);
           const { data: pecas } = await supabase
             .from('os_pecas')
-            .select('id, os_id, codigo, valor_unitario')
+            .select('id, os_id, pn, codigo, valor_unitario')
             .in('os_id', batch);
           if (pecas) {
             for (const p of pecas as PecaRow[]) {
@@ -205,14 +206,19 @@ export function Cockpit() {
       }
 
       let semCodigoOuValor = 0;
+      let totalSemCodigo = 0;
+      let totalSemValor = 0;
       const osComProblema: PecaIssueOS[] = [];
       cards.forEach(os => {
         const pecas = pecasMap.get(os.id);
         if (pecas && pecas.length > 0) {
-          const semCodigo = pecas.filter(p => !p.codigo || p.codigo.trim() === '').length;
-          const semValor = pecas.filter(p => p.codigo && p.codigo.trim() !== '' && (p.valor_unitario === null || Number(p.valor_unitario) < 0.01)).length;
+          const hasCodigo = (p: PecaRow) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== '');
+          const semCodigo = pecas.filter(p => !hasCodigo(p)).length;
+          const semValor = pecas.filter(p => hasCodigo(p) && (p.valor_unitario === null || Number(p.valor_unitario) < 0.01)).length;
           if (semCodigo > 0 || semValor > 0) {
             semCodigoOuValor++;
+            if (semCodigo > 0) totalSemCodigo++;
+            if (semValor > 0) totalSemValor++;
             osComProblema.push({
               osId: os.id,
               osLabel: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
@@ -224,7 +230,7 @@ export function Cockpit() {
         }
       });
 
-      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, osComProblema, allOsDays, allOsStageDays };
+      return { ...col, count, oldestDays, oldestOSLabel, oldestInStageDays, oldestInStageOSLabel, semCodigoOuValor, totalSemCodigo, totalSemValor, osComProblema, allOsDays, allOsStageDays };
     });
   }, [osData, pecasMap]);
 
@@ -470,10 +476,15 @@ export function Cockpit() {
                     {col.semCodigoOuValor > 0 ? (
                       <button
                         onClick={() => setListModal({ open: true, osList: col.osComProblema })}
-                        className="inline-flex items-center gap-1 text-xs font-medium text-red-400 hover:text-red-300 hover:underline transition-colors cursor-pointer"
+                        className="inline-flex flex-col items-center gap-0.5 text-xs font-medium text-red-400 hover:text-red-300 transition-colors cursor-pointer"
                       >
-                        <AlertTriangle className="w-3 h-3" />
-                        {col.semCodigoOuValor}
+                        <span className="flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3" />
+                          {col.semCodigoOuValor}
+                        </span>
+                        <span className="text-[10px] text-gray-500 font-normal">
+                          {col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : ''}{col.totalSemCodigo > 0 && col.totalSemValor > 0 ? ' | ' : ''}{col.totalSemValor > 0 ? `${col.totalSemValor} s/valor` : ''}
+                        </span>
                       </button>
                     ) : (
                       <span className="text-xs text-green-500">{col.count > 0 ? 'OK' : '-'}</span>
@@ -499,9 +510,14 @@ export function Cockpit() {
                   </span>
                 </td>
                 <td className="text-center px-4 py-3">
-                  <span className="text-xs font-medium text-red-400">
-                    {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
-                  </span>
+                  <div className="flex flex-col items-center gap-0.5">
+                    <span className="text-xs font-medium text-red-400">
+                      {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
+                    </span>
+                    <span className="text-[10px] text-gray-500">
+                      {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
+                    </span>
+                  </div>
                 </td>
               </tr>
             </tfoot>
