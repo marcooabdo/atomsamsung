@@ -1066,7 +1066,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
 
   let queryReq = supabase
     .from("requisicoes_pecas")
-    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id, valor_unitario")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id, valor_peca")
     .eq("status", "pendente");
 
   if (unidadeId) queryReq = queryReq.eq("unidade_id", unidadeId);
@@ -1082,7 +1082,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   let pecasSemValor = 0;
 
   for (const r of pendentesList) {
-    const val = Number(r.valor_unitario) || 0;
+    const val = Number(r.valor_peca) || 0;
     const qty = Number(r.quantidade_requisitada) || 1;
     if (val > 0) {
       valorTotal += val * qty;
@@ -1116,7 +1116,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
       let uValor = 0;
       let uSemValor = 0;
       for (const r of lista) {
-        const val = Number(r.valor_unitario) || 0;
+        const val = Number(r.valor_peca) || 0;
         const qty = Number(r.quantidade_requisitada) || 1;
         if (val > 0) uValor += val * qty;
         else uSemValor++;
