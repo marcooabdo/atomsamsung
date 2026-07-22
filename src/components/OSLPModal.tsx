@@ -977,15 +977,22 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         .order('created_at', { ascending: true }),
       supabase
         .from('requisicoes_pecas')
-        .select('codigo_peca')
+        .select('codigo_peca, os_peca_id, cotacao_peca_id')
         .eq('os_id', currentOsId)
         .eq('status', 'reprovada')
     ]);
 
-    const pnsReprovados = new Set((reqReprovadasResult.data || []).map((r: any) => r.codigo_peca));
+    const reqReprovadas = reqReprovadasResult.data || [];
+    const osPecaIdsReprovados = new Set(reqReprovadas.filter((r: any) => r.os_peca_id).map((r: any) => r.os_peca_id));
+    const pnsReprovadosSemVinculo = new Set(
+      reqReprovadas.filter((r: any) => !r.os_peca_id && !r.cotacao_peca_id).map((r: any) => r.codigo_peca)
+    );
 
-
-    const osPecasFormatadas = (osPecasResult.data || []).filter((p: any) => !pnsReprovados.has(p.pn)).map(p => ({
+    const osPecasFormatadas = (osPecasResult.data || []).filter((p: any) => {
+      if (osPecaIdsReprovados.has(p.id)) return false;
+      if (pnsReprovadosSemVinculo.has(p.pn)) return false;
+      return true;
+    }).map(p => ({
       id: p.id,
       os_id: p.os_id,
       os_peca_id: p.id,
@@ -1004,7 +1011,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       exibir_no_pdf: p.exibir_no_pdf
     }));
 
-    const cotacaoPecas = (cotacaoPecasResult.data || []).filter(p => !pnsReprovados.has(p.pn)).map(p => ({
+    const cotacaoPecas = (cotacaoPecasResult.data || []).filter(p => !pnsReprovadosSemVinculo.has(p.pn)).map(p => ({
       id: p.id,
       os_id: p.os_id,
       os_peca_id: null,
