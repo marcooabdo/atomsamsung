@@ -323,6 +323,172 @@ function getTopPNs(pecas: { pn: string | null; valor_com_impostos: number | null
     .map(([pn, data]) => ({ pn, quantidade: data.qty, valor: Math.round(data.valor * 100) / 100 }));
 }
 
+async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  // OS IH in rota_ columns (FTF agendado) - check for missing date or no confirmation
+  let queryRotaOS = supabase
+    .from("os")
+    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, data_agendamento, periodo_agendamento")
+    .eq("tipo_atendimento", "IH")
+    .like("coluna_kanban", "rota_%");
+
+  if (unidadeId) queryRotaOS = queryRotaOS.eq("unidade_id", unidadeId);
+
+  const { data: osRota, error: errRota } = await queryRotaOS;
+  if (errRota) throw new Error(`Erro ao buscar OS rota: ${errRota.message}`);
+
+  // Get agendamentos for those OS
+  const osRotaIds = (osRota || []).map((o) => o.id);
+  let agendamentosRota: any[] = [];
+  if (osRotaIds.length > 0) {
+    const { data } = await supabase
+      .from("agendamentos")
+      .select("id, os_id, data_agendamento, status, confirmado_cliente, confirmado_com_cliente")
+      .in("os_id", osRotaIds)
+      .in("status", ["agendado", "confirmado", "pendente_confirmacao"]);
+    agendamentosRota = data || [];
+  }
+
+  const agendamentoMap: Record<string, typeof agendamentosRota> = {};
+  for (const a of agendamentosRota) {
+    if (!agendamentoMap[a.os_id]) agendamentoMap[a.os_id] = [];
+    agendamentoMap[a.os_id].push(a);
+  }
+
+  // FTF without date or confirmation
+  const osSemDataConfirmacao = (osRota || []).filter((o) => {
+    const ags = agendamentoMap[o.id] || [];
+    if (ags.length === 0) return true;
+    const temData = ags.some((a) => a.data_agendamento);
+    const temConfirmacao = ags.some((a) => a.confirmado_cliente || a.confirmado_com_cliente);
+    return !temData || !temConfirmacao;
+  });
+
+  // OS IH em_reparo_ih with past date
+  let queryReparoIH = supabase
+    .from("os")
+    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, data_agendamento")
+    .eq("tipo_atendimento", "IH")
+    .in("coluna_kanban", ["em_reparo_ih", "em_rota_ih"]);
+
+  if (unidadeId) queryReparoIH = queryReparoIH.eq("unidade_id", unidadeId);
+
+  const { data: osReparo, error: errReparo } = await queryReparoIH;
+  if (errReparo) throw new Error(`Erro ao buscar OS reparo IH: ${errReparo.message}`);
+
+  const osReparoIds = (osReparo || []).map((o) => o.id);
+  let agendamentosReparo: any[] = [];
+  if (osReparoIds.length > 0) {
+    const { data } = await supabase
+      .from("agendamentos")
+      .select("id, os_id, data_agendamento, status, confirmado_cliente, confirmado_com_cliente")
+      .in("os_id", osReparoIds)
+      .in("status", ["agendado", "confirmado", "pendente_confirmacao"]);
+    agendamentosReparo = data || [];
+  }
+
+  const agRepMap: Record<string, typeof agendamentosReparo> = {};
+  for (const a of agendamentosReparo) {
+    if (!agRepMap[a.os_id]) agRepMap[a.os_id] = [];
+    agRepMap[a.os_id].push(a);
+  }
+
+  const osDataErrada = (osReparo || []).filter((o) => {
+    const ags = agRepMap[o.id] || [];
+    if (ags.length === 0) return true;
+    const dataPassada = ags.some((a) => a.data_agendamento && a.data_agendamento < today);
+    const semData = !ags.some((a) => a.data_agendamento);
+    return dataPassada || semData;
+  });
+
+  // Group by unidade
+  const ftfPorUnidade: Record<string, typeof osSemDataConfirmacao> = {};
+  for (const o of osSemDataConfirmacao) {
+    const uid = o.unidade_id || "sem_unidade";
+    if (!ftfPorUnidade[uid]) ftfPorUnidade[uid] = [];
+    ftfPorUnidade[uid].push(o);
+  }
+
+  const reparoPorUnidade: Record<string, typeof osDataErrada> = {};
+  for (const o of osDataErrada) {
+    const uid = o.unidade_id || "sem_unidade";
+    if (!reparoPorUnidade[uid]) reparoPorUnidade[uid] = [];
+    reparoPorUnidade[uid].push(o);
+  }
+
+  const allUnidadeIds = new Set([
+    ...Object.keys(ftfPorUnidade),
+    ...Object.keys(reparoPorUnidade),
+  ]);
+
+  const porUnidade = Array.from(allUnidadeIds)
+    .map((uid) => ({
+      unidade: unidadeMap[uid] || uid,
+      ftf_sem_data_confirmacao: (ftfPorUnidade[uid] || []).length,
+      reparo_data_errada: (reparoPorUnidade[uid] || []).length,
+      total_problemas: (ftfPorUnidade[uid] || []).length + (reparoPorUnidade[uid] || []).length,
+      detalhes_ftf: (ftfPorUnidade[uid] || []).slice(0, 10).map((o) => ({
+        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        cliente: o.cliente_nome,
+        rota: o.coluna_kanban,
+      })),
+      detalhes_reparo: (reparoPorUnidade[uid] || []).slice(0, 10).map((o) => ({
+        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        cliente: o.cliente_nome,
+        coluna: o.coluna_kanban,
+      })),
+    }))
+    .sort((a, b) => b.total_problemas - a.total_problemas);
+
+  const resumoTexto = [
+    `AGENDAMENTOS IH - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `FTF sem data/confirmacao: ${osSemDataConfirmacao.length} OS`,
+    `Reparo IH com data errada: ${osDataErrada.length} OS`,
+    `Total problemas: ${osSemDataConfirmacao.length + osDataErrada.length}`,
+    ``,
+    `Por unidade:`,
+    ...porUnidade.map((u) =>
+      `  ${u.unidade}: ${u.ftf_sem_data_confirmacao} FTF pendentes, ${u.reparo_data_errada} com data errada`
+    ),
+  ].join("\n");
+
+  return {
+    titulo: "Agendamentos IH",
+    subtitulo: `${osSemDataConfirmacao.length} FTF sem data/confirm. + ${osDataErrada.length} reparo data errada`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    ftf_sem_data_confirmacao: {
+      total: osSemDataConfirmacao.length,
+      os_list: osSemDataConfirmacao.slice(0, 20).map((o) => ({
+        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        cliente: o.cliente_nome,
+        rota: o.coluna_kanban,
+        unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
+      })),
+    },
+    reparo_data_errada: {
+      total: osDataErrada.length,
+      os_list: osDataErrada.slice(0, 20).map((o) => ({
+        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        cliente: o.cliente_nome,
+        coluna: o.coluna_kanban,
+        unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
+      })),
+    },
+    por_unidade: porUnidade,
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
@@ -1021,9 +1187,12 @@ Deno.serve(async (req: Request) => {
       case "compliance_erros":
         resultado = await gerarComplianceErros(supabase, unidade_id);
         break;
+      case "agendamentos_ih":
+        resultado = await gerarAgendamentosIH(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
