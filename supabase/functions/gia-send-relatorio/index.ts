@@ -83,7 +83,7 @@ Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da dir
 1. SEMPRE separe por unidade: *\u{1F4CD} MOC* (Montes Claros), *\u{1F4CD} JDF* (Juiz de Fora), *\u{1F4CD} FSA* (Feira de Santana)
 2. Para OS: use SEMPRE o n\u00FAmero Samsung (ex: 4174760770). S\u00D3 use n\u00FAmero interno se n\u00E3o houver Samsung
 3. N\u00E3o mostre chaves JSON, nomes de colunas do banco, ou termos t\u00E9cnicos como "return_handling", "coluna_kanban", etc.
-4. Traduza colunas: "os_nova" = "OS Nova", "diagnostico" = "Diagn\u00F3stico", "aguardando_peca" = "Aguardando Pe\u00E7a", "peca_em_transito" = "Pe\u00E7a em Tr\u00E2nsito", "aguardando_aprovacao" = "Aguardando Aprova\u00E7\u00E3o", "em_reparo_ci" = "Em Reparo CI", "em_reparo_ih" = "Em Reparo IH", "reparo_concluido" = "Reparo Conclu\u00EDdo", "controle_qualidade" = "Controle de Qualidade", "aguardando_fechamento" = "Aguardando Fechamento", "orcamento_aprovado" = "Or\u00E7amento Aprovado", "return_handling" = "Return Handling", "instalacao_inicial" = "Instala\u00E7\u00E3o Inicial", "em_rota_ih" = "Em Rota IH", "qa_bt" = "QA/BT", "saw" = "SAW", "trade_up" = "Trade Up", "service_handling" = "Service Handling", "rota_preta" = "Rota Preta", "rota_vermelha" = "Rota Vermelha", "rota_azul" = "Rota Azul", "rota_verde" = "Rota Verde", "rota_rosa" = "Rota Rosa", "rota_amarela" = "Rota Amarela", "rota_laranja" = "Rota Laranja", "negociacao_em_andamento" = "Enviar Orcamento", "orcamentos_rejeitados" = "Orcamentos Rejeitados"
+4. Traduza colunas: "os_nova" = "OS Nova", "diagnostico" = "Diagn\u00F3stico/Triagem", "negociacao_em_andamento" = "Enviar Or\u00E7amento", "aguardando_aprovacao" = "Aguardando Aprova\u00E7\u00E3o", "orcamento_aprovado" = "Or\u00E7amento Aprovado", "aguardando_peca" = "Aguardando Pe\u00E7a", "peca_em_transito" = "Pe\u00E7a em Tr\u00E2nsito", "em_reparo_ci" = "Em Reparo CI", "rota_preta" = "Rota Preta", "rota_vermelha" = "Rota Vermelha", "rota_azul" = "Rota Azul", "rota_verde" = "Rota Verde", "rota_rosa" = "Rota Rosa", "rota_amarela" = "Rota Amarela", "rota_laranja" = "Rota Laranja", "em_rota_ih" = "Agendados (FTF)", "em_reparo_ih" = "Reparo em Progresso IH", "instalacao_inicial" = "Instala\u00E7\u00E3o Inicial", "service_handling" = "Service Handling", "return_handling" = "Return Handling", "trade_up" = "Trade Up", "saw" = "SAW", "controle_qualidade" = "Controle de Qualidade / OQC", "qa_bt" = "Q&A / BT", "reparo_concluido" = "Reparo Conclu\u00EDdo", "aguardando_fechamento" = "Aguardando Fechamento", "orcamentos_rejeitados" = "Or\u00E7amentos Rejeitados"
 5. Valores monet\u00E1rios: R$ X.XXX,XX
 6. Datas: DD/MM/YYYY | Hor\u00E1rios: HH:MM
 7. N\u00C3O invente dados - use APENAS o que foi fornecido
@@ -107,7 +107,7 @@ Exemplo de formato por unidade:
 *Aguardando Pe\u00E7a* \u2022 58 OS \u2022 Mais antiga: 13d 9h
 *Return Handling* \u2022 17 OS \u2022 Mais antiga: 11d 2h
 *Or\u00E7amento Rejeitado* \u2022 12 OS \u2022 Mais antiga: 8d 5h
-*Em Reparo IH* \u2022 4 OS \u2022 Mais antiga: 2h 40min
+*Reparo em Progresso IH* \u2022 4 OS \u2022 Mais antiga: 2h 40min
 *Diagn\u00F3stico* \u2022 3 OS \u2022 Mais antiga: 1d 5h
 *OS Nova* \u2022 2 OS \u2022 Mais antiga: 6h 20min
 
@@ -121,9 +121,15 @@ Para o Mapa de Rotas, use formato SIMPLES (sem listar OS que est\u00E3o em rota)
 
 Exemplo de formato por unidade:
 \u{1F4CD} *MOC* \u2014 Pipeline: 163 | Em rota: 111
-*Em Rota IH:* 9
+*Rota Preta:* 3
+*Rota Vermelha:* 2
+*Rota Azul:* 5
 *Rota Verde:* 1
+*Rota Rosa:* 2
 *Rota Amarela:* 1
+*Rota Laranja:* 4
+*Agendados (FTF):* 9
+*Reparo em Progresso IH:* 4
 *Rota Laranja:* 1
 
 \u{1F534} _OS IH sem rota: 21_
@@ -301,12 +307,83 @@ function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string):
   return lines.join("\n");
 }
 
+function formatarAgendamentosIHDireto(dadosPorUnidade: Record<string, any>, now: string): string {
+  const lines: string[] = [];
+
+  lines.push(`\u{1F4C5} *AGENDAMENTOS IH*`);
+  lines.push(`${now}`);
+  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+
+  let totalFTF = 0;
+  let totalReparo = 0;
+  let totalErrosFTF = 0;
+  let totalErrosReparo = 0;
+
+  for (const sigla of ["MOC", "JDF", "FSA"]) {
+    const d = dadosPorUnidade[sigla];
+    if (!d || d.erro) continue;
+    totalFTF += d.total_ftf || 0;
+    totalReparo += d.total_reparo_ih || 0;
+    totalErrosFTF += d.erros_ftf?.total || 0;
+    totalErrosReparo += d.erros_reparo_ih?.total || 0;
+  }
+
+  lines.push(`\u{1F4CA} *RESUMO EXECUTIVO:*`);
+  lines.push(`Total de OS em FTF: *${totalFTF}* | Erros FTF: *${totalErrosFTF}*`);
+  lines.push(`Total de OS em Reparo IH: *${totalReparo}* | Erros Reparo: *${totalErrosReparo}*`);
+
+  for (const sigla of ["MOC", "JDF", "FSA"]) {
+    const d = dadosPorUnidade[sigla];
+    if (!d || d.erro) {
+      lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+      lines.push(`\u{1F4CD} *${sigla}* \u2014 Erro ao gerar dados`);
+      continue;
+    }
+
+    const errosFTF = d.erros_ftf?.os_list || [];
+    const errosReparo = d.erros_reparo_ih?.os_list || [];
+    const totalErros = errosFTF.length + errosReparo.length;
+
+    lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${totalErros} erro${totalErros !== 1 ? "s" : ""}`);
+
+    lines.push(`\u{1F534} *FTF (${errosFTF.length} erro${errosFTF.length !== 1 ? "s" : ""}):*`);
+    if (errosFTF.length > 0) {
+      for (const os of errosFTF) {
+        lines.push(os);
+      }
+    } else {
+      lines.push(`_Sem erros_`);
+    }
+
+    lines.push(``);
+    lines.push(`\u26A0\uFE0F *Reparo IH (${errosReparo.length} erro${errosReparo.length !== 1 ? "s" : ""}):*`);
+    if (errosReparo.length > 0) {
+      for (const os of errosReparo) {
+        lines.push(os);
+      }
+    } else {
+      lines.push(`_Sem erros_`);
+    }
+  }
+
+  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  lines.push(`_GIA \u2022 Global Intelligence Assistance_`);
+
+  return lines.join("\n");
+}
+
 async function formatarComChatGPT(openaiKey: string, dadosPorUnidade: Record<string, any>, relInfo: typeof RELATORIOS[0]): Promise<string> {
   const now = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
   // For Pulso Operacional, format directly to guarantee ALL columns appear
   if (relInfo.tipo === "pulso_operacional") {
     return formatarPulsoDireto(dadosPorUnidade, now);
+  }
+
+  // For Agendamentos IH, format directly to avoid AI formatting errors
+  if (relInfo.tipo === "agendamentos_ih") {
+    return formatarAgendamentosIHDireto(dadosPorUnidade, now);
   }
 
   const userPrompt = `Gere o relat\u00F3rio "${relInfo.nome}" (${relInfo.emoji}).
