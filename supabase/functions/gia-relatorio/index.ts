@@ -10,31 +10,31 @@ const corsHeaders = {
 
 const COLUNA_LABELS: Record<string, string> = {
   os_nova: "OS Nova",
-  diagnostico: "Diagnóstico",
+  diagnostico: "Diagnóstico/Triagem",
+  negociacao_em_andamento: "Enviar Orçamento",
+  aguardando_aprovacao: "Aguardando Aprovação",
+  orcamento_aprovado: "Orçamento Aprovado",
   aguardando_peca: "Aguardando Peça",
   peca_em_transito: "Peça em Trânsito",
-  aguardando_aprovacao: "Aguardando Aprovação",
-  negociacao_em_andamento: "Negociação em Andamento",
-  orcamento_aprovado: "Orçamento Aprovado",
   em_reparo_ci: "Em Reparo CI",
-  em_reparo_ih: "Em Reparo IH",
-  em_rota_ih: "Agendados (FTF)",
-  controle_qualidade: "Controle de Qualidade",
-  reparo_concluido: "Reparo Concluído",
-  aguardando_fechamento: "Aguardando Fechamento",
-  rota_verde: "Rota Verde",
-  rota_azul: "Rota Azul",
-  rota_amarela: "Rota Amarela",
-  rota_vermelha: "Rota Vermelha",
-  rota_laranja: "Rota Laranja",
-  rota_rosa: "Rota Rosa",
   rota_preta: "Rota Preta",
+  rota_vermelha: "Rota Vermelha",
+  rota_azul: "Rota Azul",
+  rota_verde: "Rota Verde",
+  rota_rosa: "Rota Rosa",
+  rota_amarela: "Rota Amarela",
+  rota_laranja: "Rota Laranja",
+  em_rota_ih: "Agendados (FTF)",
+  em_reparo_ih: "Reparo em Progresso IH",
   instalacao_inicial: "Instalação Inicial",
   service_handling: "Service Handling",
   return_handling: "Return Handling",
-  saw: "SAW",
-  qa_bt: "QA/BT",
   trade_up: "Trade Up",
+  saw: "SAW",
+  controle_qualidade: "Controle de Qualidade / OQC",
+  qa_bt: "Q&A / BT",
+  reparo_concluido: "Reparo Concluído",
+  aguardando_fechamento: "Aguardando Fechamento",
   orcamentos_rejeitados: "Orçamentos Rejeitados",
   os_fechada: "OS Fechada",
 };
@@ -246,7 +246,6 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     `──────────────────────────────────────`,
     ...colunasResult
       .filter((col) => col.total > 0)
-      .sort((a, b) => b.total - a.total)
       .map((col) =>
         col.paradas > 0
           ? `${col.label} | ${col.total} | ${col.paradas} paradas | ${col.tempo_mais_antiga}`
@@ -1270,12 +1269,13 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
 
       const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban)).length;
 
-      // Route distribution sorted by count
-      const distribuicao = Object.entries(porColuna)
-        .sort((a, b) => b[1].length - a[1].length)
-        .map(([col, osCol]) => ({
+      // Route distribution in pipeline order
+      const rotaColumnsOrder = ["rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa", "rota_amarela", "rota_laranja", "em_rota_ih", "em_reparo_ih"];
+      const distribuicao = rotaColumnsOrder
+        .filter((col) => porColuna[col] && porColuna[col].length > 0)
+        .map((col) => ({
           rota: getColunaLabel(col),
-          total: osCol.length,
+          total: porColuna[col].length,
         }));
 
       // OS IH sem rota definida: IH type that has NO rota_id AND city is not mapped to any route
