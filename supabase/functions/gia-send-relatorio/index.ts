@@ -131,26 +131,35 @@ Exemplo de formato por unidade:
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: ABERTURA E FECHAMENTO \u2501\u2501\u2501
 
-Para o relat\u00F3rio de Abertura e Fechamento, siga EXATAMENTE este modelo (copie a estrutura):
+Para o relat\u00F3rio de Abertura e Fechamento, siga EXATAMENTE este modelo (copie a estrutura).
+IMPORTANTE: Coloque SEMPRE uma LINHA EM BRANCO (par\u00E1grafo) entre cada unidade e entre as se\u00E7\u00F5es de abertas/fechadas no consolidado.
 
 \u{1F4CB} *ABERTURA E FECHAMENTO*
 \u{1F555} DD/MM/AAAA \u00E0s HH:MM
 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
 \u{1F4CA} *CONSOLIDADO GERAL*
+
 \u2696\uFE0F *Saldo Total:* -47
+
 \u{1F4E5} *Abertas (37)*
 \u21B3 LP: 5 CI | 8 IH
 \u21B3 OW: 5 CI | 24 IH
+
 \u{1F4E4} *Fechadas (84)*
 \u21B3 LP: 6 CI | 16 IH
 \u21B3 OW: 3 CI | 56 IH
+
 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+
 \u{1F4CD} *MOC* | Saldo: -13
 \u{1F4E5} Abertas (6):   LP (1 CI | 2 IH) \u2022 OW (0 CI | 3 IH)
 \u{1F4E4} Fechadas (19): LP (1 CI | 1 IH) \u2022 OW (3 CI | 14 IH)
+
 \u{1F4CD} *JDF* | Saldo: -12
 \u{1F4E5} Abertas (12):  LP (0 CI | 3 IH) \u2022 OW (1 CI | 8 IH)
 \u{1F4E4} Fechadas (24): LP (1 CI | 13 IH) \u2022 OW (3 CI | 7 IH)
+
 \u{1F4CD} *FSA* | Saldo: -22
 \u{1F4E5} Abertas (19):  LP (4 CI | 3 IH) \u2022 OW (4 CI | 8 IH)
 \u{1F4E4} Fechadas (41): LP (4 CI | 2 IH) \u2022 OW (0 CI | 35 IH)
