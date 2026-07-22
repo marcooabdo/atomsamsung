@@ -247,7 +247,6 @@ _GIA \u2022 Global Intelligence Assistance_`;
 }
 
 function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string): string {
-  const SIGLAS: Record<string, string> = { MOC: "MOC", JDF: "JDF", FSA: "FSA" };
   const lines: string[] = [];
 
   // Header
@@ -260,14 +259,14 @@ function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string):
   let totalGeral = 0;
   for (const sigla of ["MOC", "JDF", "FSA"]) {
     const d = dadosPorUnidade[sigla];
-    const paradas = d?.total_os_paradas || 0;
-    totalGeral += paradas;
-    totais.push(`${paradas} ${sigla}`);
+    const total = d?.total_os || 0;
+    totalGeral += total;
+    totais.push(`${total} ${sigla}`);
   }
   lines.push(`\u{1F4CA} *RESUMO EXECUTIVO:*`);
-  lines.push(`Total de OS paradas: ${totalGeral} (${totais.join(" | ")})`);
+  lines.push(`Total de OS abertas: ${totalGeral} (${totais.join(" | ")})`);
 
-  // Per unit
+  // Per unit - show ALL columns in pipeline order with TOTAL count
   for (const sigla of ["MOC", "JDF", "FSA"]) {
     const d = dadosPorUnidade[sigla];
     if (!d || d.erro) {
@@ -275,22 +274,24 @@ function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string):
       continue;
     }
 
-    const paradas = d.total_os_paradas || 0;
+    const total = d.total_os || 0;
     lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${paradas} OS paradas`);
+    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${total} OS abertas`);
 
     const colunas = d.colunas || [];
-    // Sort by paradas desc, only show columns with paradas > 0
-    const colsComParadas = colunas
-      .filter((c: any) => c.paradas > 0)
-      .sort((a: any, b: any) => b.paradas - a.paradas);
+    // Keep pipeline order (already ordered from TODAS_COLUNAS_KANBAN), only show columns with total > 0
+    const colsComOS = colunas.filter((c: any) => c.total > 0);
 
-    for (const col of colsComParadas) {
-      lines.push(`${col.label} \u2022 ${col.paradas} OS \u2022 Mais antiga: ${col.tempo_mais_antiga}`);
+    for (const col of colsComOS) {
+      if (col.paradas > 0) {
+        lines.push(`${col.label} \u2022 ${col.total} OS \u2022 Mais antiga: ${col.tempo_mais_antiga}`);
+      } else {
+        lines.push(`${col.label} \u2022 ${col.total} OS`);
+      }
     }
 
-    if (colsComParadas.length === 0) {
-      lines.push(`_Nenhuma OS parada h\u00E1 mais de 2h_`);
+    if (colsComOS.length === 0) {
+      lines.push(`_Nenhuma OS aberta_`);
     }
   }
 
