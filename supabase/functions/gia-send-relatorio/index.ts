@@ -101,6 +101,26 @@ Exemplo de formato por unidade:
 *Return Handling* \u2022 17 \u2022 11d 2h \u2022 4176141010
 *Or\u00E7amento Rejeitado* \u2022 12 \u2022 8d 5h \u2022 4176194904
 
+\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: MAPA DE ROTAS \u2501\u2501\u2501
+
+Para o Mapa de Rotas, use formato SIMPLES (sem listar OS que est\u00E3o em rota):
+- Mostrar pipeline total e em rota no resumo executivo
+- Por unidade: mostrar pipeline total, em rota, e a contagem por rota (uma linha por rota)
+- No final de cada unidade, listar as OS IH SEM ROTA definida (apenas os n\u00FAmeros, um por linha)
+- N\u00C3O listar OS que J\u00C1 est\u00E3o em rota \u2014 apenas mostrar a contagem por rota
+
+Exemplo de formato por unidade:
+\u{1F4CD} *MOC* \u2014 Pipeline: 163 | Em rota: 111
+*Em Rota IH:* 9
+*Rota Verde:* 1
+*Rota Amarela:* 1
+*Rota Laranja:* 1
+
+\u{1F534} _OS IH sem rota: 21_
+4176279211
+4176294361
+4176199253
+
 \u2501\u2501\u2501 ESTRUTURA OBRIGAT\u00D3RIA \u2501\u2501\u2501
 
 \u{1F4CB} CABE\u00C7ALHO:
