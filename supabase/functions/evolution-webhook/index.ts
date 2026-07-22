@@ -338,25 +338,13 @@ Deno.serve(async (req: Request) => {
         });
       }
 
-      // GIA report request detection - works even without atom_connect instancia
+      // GIA report request detection - ONLY in groups
       if (isGroup && !fromMe) {
         const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
         if (textContent && isGIAReportRequest(textContent)) {
           const webhookInstanceName = typeof instance === "string"
             ? instance
             : instance?.instanceName || instance?.name || body.instanceName || "Marco";
-          handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: webhookInstanceName });
-        }
-      }
-
-      // GIA report request from private chat (DM)
-      if (!isGroup && !fromMe) {
-        const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
-        if (textContent && isGIAReportRequest(textContent)) {
-          const webhookInstanceName = typeof instance === "string"
-            ? instance
-            : instance?.instanceName || instance?.name || body.instanceName || "Marco";
-          // Send report to the private chat (use remoteJid as group_jid - sendText works for both)
           handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: webhookInstanceName });
         }
       }

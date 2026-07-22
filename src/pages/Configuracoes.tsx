@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck, Settings, BarChart3 } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
 import { ConfiguracoesPermissoes } from '../components/ConfiguracoesPermissoes';
 import { ConfiguracoesRegrasFechamento } from '../components/ConfiguracoesRegrasFechamento';
+import { ConfiguracoesAtomCore } from '../components/ConfiguracoesAtomCore';
+import { ConfiguracoesRelatorios } from '../components/ConfiguracoesRelatorios';
 
-type Tab = 'unidades' | 'usuarios' | 'permissoes' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'regras_fechamento';
+type Tab = 'unidades' | 'usuarios' | 'permissoes' | 'servicos' | 'markup' | 'taxas' | 'rotas' | 'checklists' | 'pdf_os' | 'nf' | 'regras_fechamento' | 'atom_core' | 'relatorios';
 
 interface Unidade {
   id: string;
@@ -834,7 +836,9 @@ export function Configuracoes() {
     { id: 'checklists' as Tab, label: 'Checklists', icon: FileText, color: '#3b82f6', isAccent: false },
     { id: 'pdf_os' as Tab, label: 'PDF da OS', icon: FileType, color: '#8B5CF6', isAccent: false },
     { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
-    { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] }
+    { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
+    { id: 'atom_core' as Tab, label: 'Atom Core', icon: Settings, color: '#00D4FF', isAccent: true, onlyFor: ['master', 'diretoria'] },
+    { id: 'relatorios' as Tab, label: 'Relatórios GIA', icon: BarChart3, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria'] }
   ];
 
   const tabs = allTabs.filter(tab => {
@@ -2649,6 +2653,14 @@ export function Configuracoes() {
 
                 {activeTab === 'regras_fechamento' && (
                   <ConfiguracoesRegrasFechamento selectedUnidade={selectedUnidadeRegras} />
+                )}
+
+                {activeTab === 'atom_core' && (
+                  <ConfiguracoesAtomCore />
+                )}
+
+                {activeTab === 'relatorios' && (
+                  <ConfiguracoesRelatorios />
                 )}
 
               </>

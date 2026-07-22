@@ -30,10 +30,12 @@ const DEFAULT_INSTANCE = "Marco";
 const EVOLUTION_API_URL = "https://diego-auditoria.2vhnbz.easypanel.host";
 const EVOLUTION_API_KEY = "diego";
 
-async function sendWhatsAppGroup(groupJid: string, text: string, instanceName: string) {
-  const resp = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
+async function sendWhatsAppGroup(groupJid: string, text: string, instanceName: string, apiUrl?: string, apiKey?: string) {
+  const url = apiUrl || EVOLUTION_API_URL;
+  const key = apiKey || EVOLUTION_API_KEY;
+  const resp = await fetch(`${url}/message/sendText/${instanceName}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", apikey: EVOLUTION_API_KEY },
+    headers: { "Content-Type": "application/json", apikey: key },
     body: JSON.stringify({ number: groupJid, text }),
   });
   if (!resp.ok) {
@@ -262,12 +264,28 @@ Deno.serve(async (req: Request) => {
     }
 
     const body = await req.json().catch(() => ({}));
-    const {
-      tipo,
-      todos = false,
-      group_jid = DEFAULT_GROUP_JID,
-    } = body;
-    const instance_name = body.instance_name || DEFAULT_INSTANCE;
+    const { tipo, todos = false } = body;
+
+    // Read settings from DB with fallback to hardcoded defaults
+    let group_jid = body.group_jid || DEFAULT_GROUP_JID;
+    let instance_name = body.instance_name || DEFAULT_INSTANCE;
+    let evolution_url = EVOLUTION_API_URL;
+    let evolution_key = EVOLUTION_API_KEY;
+
+    try {
+      const { data: settings } = await supabase
+        .from("atom_core_settings")
+        .select("chave, valor")
+        .in("chave", ["whatsapp_group_jid", "evolution_instance_name", "evolution_api_url", "evolution_api_key"]);
+      if (settings) {
+        for (const s of settings) {
+          if (s.chave === "whatsapp_group_jid" && s.valor) group_jid = body.group_jid || s.valor;
+          if (s.chave === "evolution_instance_name" && s.valor) instance_name = body.instance_name || s.valor;
+          if (s.chave === "evolution_api_url" && s.valor) evolution_url = s.valor;
+          if (s.chave === "evolution_api_key" && s.valor) evolution_key = s.valor;
+        }
+      }
+    } catch (_) { /* fallback to defaults */ }
 
     // If "todos" - dispatch individual calls to self to avoid timeout
     if (todos) {
@@ -337,7 +355,7 @@ Deno.serve(async (req: Request) => {
     const textoFormatado = await formatarComChatGPT(openaiKey, dadosPorUnidade, relInfo);
 
     // Send to WhatsApp
-    await sendWhatsAppGroup(group_jid, textoFormatado, instance_name);
+    await sendWhatsAppGroup(group_jid, textoFormatado, instance_name, evolution_url, evolution_key);
 
     return new Response(
       JSON.stringify({ success: true, tipo: relInfo.tipo, nome: relInfo.nome, grupo: group_jid }),
