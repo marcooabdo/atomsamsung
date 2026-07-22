@@ -129,34 +129,38 @@ Exemplo de formato por unidade:
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: ABERTURA E FECHAMENTO \u2501\u2501\u2501
 
-Para o relat\u00F3rio de Abertura e Fechamento, use formato TABELA EM LINHA:
-- PRIMEIRO: resumo executivo consolidado em UMA linha (abertas/fechadas/saldo)
-- DEPOIS: tabela por unidade onde CADA UNIDADE ocupa APENAS 2 LINHAS:
-  - Linha 1: Nome unidade + totais (abertas, fechadas, saldo)
-  - Linha 2: Distribui\u00E7\u00E3o compacta em uma \u00FAnica linha
+Para o relat\u00F3rio de Abertura e Fechamento, siga EXATAMENTE este modelo (copie a estrutura):
 
-N\u00C3O use "\u{1F539} Abertas:" e "\u{1F539} Fechadas:" em linhas separadas. Junte TUDO em formato compacto.
-
-Exemplo:
-
-\u{1F4CA} *CONSOLIDADO*
-Abertas: *37* | Fechadas: *84* | Saldo: *-47*
-_LP: 5ci 8ih | OW: 5ci 24ih_ \u2192 _LP: 6ci 16ih | OW: 3ci 56ih_
-
+\u{1F4CB} *ABERTURA E FECHAMENTO*
+\u{1F555} DD/MM/AAAA \u00E0s HH:MM
 \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+\u{1F4CA} *CONSOLIDADO GERAL*
+\u2696\uFE0F *Saldo Total:* -47
+\u{1F4E5} *Abertas (37)*
+\u21B3 LP: 5 CI | 8 IH
+\u21B3 OW: 5 CI | 24 IH
+\u{1F4E4} *Fechadas (84)*
+\u21B3 LP: 6 CI | 16 IH
+\u21B3 OW: 3 CI | 56 IH
+\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+\u{1F4CD} *MOC* | Saldo: -13
+\u{1F4E5} Abertas (6):   LP (1 CI | 2 IH) \u2022 OW (0 CI | 3 IH)
+\u{1F4E4} Fechadas (19): LP (1 CI | 1 IH) \u2022 OW (3 CI | 14 IH)
+\u{1F4CD} *JDF* | Saldo: -12
+\u{1F4E5} Abertas (12):  LP (0 CI | 3 IH) \u2022 OW (1 CI | 8 IH)
+\u{1F4E4} Fechadas (24): LP (1 CI | 13 IH) \u2022 OW (3 CI | 7 IH)
+\u{1F4CD} *FSA* | Saldo: -22
+\u{1F4E5} Abertas (19):  LP (4 CI | 3 IH) \u2022 OW (4 CI | 8 IH)
+\u{1F4E4} Fechadas (41): LP (4 CI | 2 IH) \u2022 OW (0 CI | 35 IH)
+\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
+\u{1F916} *GIA \u2022 Global Intelligence Assistance*
 
-\u{1F4CD} *MOC* \u2014 Ab: *6* | Fc: *19* | Saldo: *-13*
-_LP: 1ci 2ih | OW: 0ci 3ih_ \u2192 _LP: 1ci 1ih | OW: 3ci 14ih_
-
-\u{1F4CD} *JDF* \u2014 Ab: *12* | Fc: *24* | Saldo: *-12*
-_LP: 0ci 3ih | OW: 1ci 8ih_ \u2192 _LP: 1ci 13ih | OW: 3ci 7ih_
-
-\u{1F4CD} *FSA* \u2014 Ab: *19* | Fc: *41* | Saldo: *-22*
-_LP: 4ci 3ih | OW: 4ci 8ih_ \u2192 _LP: 4ci 2ih | OW: 0ci 35ih_
-
-O formato da segunda linha \u00E9: _[abertas por tipo]_ \u2192 _[fechadas por tipo]_
-Onde "LP: Xci Yih | OW: Xci Yih" mostra LP-CI, LP-IH, OW-CI, OW-IH de forma compacta.
-A seta (\u2192) separa abertas das fechadas.
+REGRAS:
+- Use \u21B3 (seta para baixo) como marcador de sublinha nas abertas/fechadas do consolidado
+- Cada unidade ocupa EXATAMENTE 3 linhas: nome+saldo, abertas, fechadas
+- NO consolidado, separe Abertas e Fechadas em blocos com \u{1F4E5} e \u{1F4E4}
+- Nas unidades use formato inline: LP (X CI | Y IH) \u2022 OW (X CI | Y IH)
+- SEMPRE termine com a assinatura GIA
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PROBLEMAS PE\u00C7A (COMPLIANCE) \u2501\u2501\u2501
 
