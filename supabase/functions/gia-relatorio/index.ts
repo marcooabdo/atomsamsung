@@ -323,6 +323,143 @@ function getTopPNs(pecas: { pn: string | null; valor_com_impostos: number | null
     .map(([pn, data]) => ({ pn, quantidade: data.qty, valor: Math.round(data.valor * 100) / 100 }));
 }
 
+async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  let queryAlertas = supabase
+    .from("os_alertas_fechamento")
+    .select("id, os_id, unidade_id, regra_codigo, regra_titulo, categoria, severidade, mensagem, created_at")
+    .eq("resolvido", false)
+    .eq("ignorado", false);
+
+  if (unidadeId) queryAlertas = queryAlertas.eq("unidade_id", unidadeId);
+
+  const { data: alertas, error: errAlertas } = await queryAlertas.order("created_at", { ascending: false });
+  if (errAlertas) throw new Error(`Erro ao buscar alertas: ${errAlertas.message}`);
+
+  let queryPecas = supabase
+    .from("estoque_pecas")
+    .select("id, pn, descricao, valor_com_impostos, unidade_id, status")
+    .in("status", ["disponivel", "reservada"]);
+
+  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
+
+  const { data: pecas, error: errPecas } = await queryPecas;
+  if (errPecas) throw new Error(`Erro ao buscar pecas: ${errPecas.message}`);
+
+  const alertasList = alertas || [];
+  const pecasList = pecas || [];
+
+  const semPN = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
+  const semValor = pecasList.filter((p) => !p.valor_com_impostos || Number(p.valor_com_impostos) === 0);
+
+  const alertasPorUnidade: Record<string, typeof alertasList> = {};
+  for (const a of alertasList) {
+    const uid = a.unidade_id || "sem_unidade";
+    if (!alertasPorUnidade[uid]) alertasPorUnidade[uid] = [];
+    alertasPorUnidade[uid].push(a);
+  }
+
+  const alertasPorCategoria: Record<string, { bloqueante: number; alerta: number }> = {};
+  for (const a of alertasList) {
+    const cat = a.categoria || "outros";
+    if (!alertasPorCategoria[cat]) alertasPorCategoria[cat] = { bloqueante: 0, alerta: 0 };
+    if (a.severidade === "bloqueante") alertasPorCategoria[cat].bloqueante++;
+    else alertasPorCategoria[cat].alerta++;
+  }
+
+  const semPNPorUnidade: Record<string, number> = {};
+  for (const p of semPN) {
+    const uid = p.unidade_id || "sem_unidade";
+    semPNPorUnidade[uid] = (semPNPorUnidade[uid] || 0) + 1;
+  }
+  const semValorPorUnidade: Record<string, number> = {};
+  for (const p of semValor) {
+    const uid = p.unidade_id || "sem_unidade";
+    semValorPorUnidade[uid] = (semValorPorUnidade[uid] || 0) + 1;
+  }
+
+  const bloqueantes = alertasList.filter((a) => a.severidade === "bloqueante").length;
+  const alertasCount = alertasList.filter((a) => a.severidade === "alerta").length;
+
+  const unidadesReport = Object.entries(alertasPorUnidade)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([uid, lista]) => {
+      const porCat: Record<string, number> = {};
+      for (const a of lista) {
+        const cat = a.categoria || "outros";
+        porCat[cat] = (porCat[cat] || 0) + 1;
+      }
+      return {
+        unidade: unidadeMap[uid] || uid,
+        total_alertas: lista.length,
+        bloqueantes: lista.filter((a) => a.severidade === "bloqueante").length,
+        por_categoria: porCat,
+        exemplos: lista.slice(0, 5).map((a) => ({
+          regra: a.regra_titulo || a.regra_codigo,
+          categoria: a.categoria,
+          severidade: a.severidade,
+          mensagem: a.mensagem,
+        })),
+      };
+    });
+
+  const resumoTexto = [
+    `COMPLIANCE E ERROS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `Alertas nao resolvidos: ${alertasList.length}`,
+    `  Bloqueantes: ${bloqueantes}`,
+    `  Alertas: ${alertasCount}`,
+    ``,
+    `Por categoria:`,
+    ...Object.entries(alertasPorCategoria)
+      .sort((a, b) => (b[1].bloqueante + b[1].alerta) - (a[1].bloqueante + a[1].alerta))
+      .map(([cat, data]) => `  ${cat}: ${data.bloqueante} bloqueantes, ${data.alerta} alertas`),
+    ``,
+    `Por unidade:`,
+    ...unidadesReport.map((u) => `  ${u.unidade}: ${u.total_alertas} alertas (${u.bloqueantes} bloqueantes)`),
+    ``,
+    `Problemas Pecas:`,
+    `  Sem PN: ${semPN.length}`,
+    `  Valor R$0: ${semValor.length}`,
+    ...(semPN.length > 0 ? [`  Sem PN por unidade:`, ...Object.entries(semPNPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `    ${unidadeMap[uid] || uid}: ${n}`)] : []),
+    ...(semValor.length > 0 ? [`  Valor R$0 por unidade:`, ...Object.entries(semValorPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `    ${unidadeMap[uid] || uid}: ${n}`)] : []),
+  ].join("\n");
+
+  return {
+    titulo: "Compliance e Erros",
+    subtitulo: `${alertasList.length} alertas (${bloqueantes} bloqueantes) / Pecas: ${semPN.length} sem PN, ${semValor.length} sem valor`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    alertas: {
+      total: alertasList.length,
+      bloqueantes,
+      alertas: alertasCount,
+      por_categoria: alertasPorCategoria,
+    },
+    problemas_pecas: {
+      sem_pn: semPN.length,
+      sem_valor: semValor.length,
+      sem_pn_por_unidade: Object.entries(semPNPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
+        unidade: unidadeMap[uid] || uid,
+        total,
+      })),
+      sem_valor_por_unidade: Object.entries(semValorPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
+        unidade: unidadeMap[uid] || uid,
+        total,
+      })),
+    },
+    por_unidade: unidadesReport,
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
@@ -881,9 +1018,12 @@ Deno.serve(async (req: Request) => {
       case "limite_credito_gspn":
         resultado = await gerarLimiteCreditoGSPN(supabase, unidade_id);
         break;
+      case "compliance_erros":
+        resultado = await gerarComplianceErros(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
