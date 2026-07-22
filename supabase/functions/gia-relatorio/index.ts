@@ -1212,7 +1212,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   // Fetch active OS (not archived, not closed)
   let queryOS = supabase
     .from("os")
-    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id")
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id")
     .neq("coluna_kanban", "os_fechada")
     .or("arquivada.is.null,arquivada.eq.false");
 
@@ -1228,6 +1228,25 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
 
   // IH-related columns (where IH OS should be)
   const ihColumns = [...rotaColumns, "em_reparo_ih"];
+
+  // Fetch active routes to build city-to-route mapping
+  const { data: rotasAtivas } = await supabase
+    .from("rotas")
+    .select("id, nome, cidades, unidade_id, coluna_kanban")
+    .eq("ativa", true);
+
+  // Build a map: unidade_id -> { normalizedCity -> rotaName }
+  const cidadeRotaMap: Record<string, Record<string, string>> = {};
+  for (const rota of rotasAtivas || []) {
+    const uid = rota.unidade_id;
+    if (!uid) continue;
+    if (!cidadeRotaMap[uid]) cidadeRotaMap[uid] = {};
+    const cidades = rota.cidades || [];
+    for (const cidade of cidades) {
+      const normalized = (cidade || "").trim().toLowerCase();
+      if (normalized) cidadeRotaMap[uid][normalized] = rota.nome;
+    }
+  }
 
   // Group everything by unidade
   const osPorUnidade: Record<string, typeof osList> = {};
@@ -1262,10 +1281,15 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
           total: osCol.length,
         }));
 
-      // OS IH sem rota definida: IH type that has NO rota_id assigned
+      // OS IH sem rota definida: IH type that has NO rota_id AND city is not mapped to any route
+      const unitCidadeMap = cidadeRotaMap[uid] || {};
       const osIHSemRota = lista.filter((os) => {
         const isIH = os.tipo_atendimento?.toUpperCase() === "IH";
-        return isIH && !os.rota_id;
+        if (!isIH) return false;
+        if (os.rota_id) return false;
+        const cidadeNorm = (os.cliente_cidade || "").trim().toLowerCase();
+        if (cidadeNorm && unitCidadeMap[cidadeNorm]) return false;
+        return true;
       });
 
       const osIHSemRotaNumeros = osIHSemRota.map((os) =>
