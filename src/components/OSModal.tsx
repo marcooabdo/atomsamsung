@@ -201,6 +201,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   // Route validation states
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
   const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
+  const [mostrarEditarRotaCidade, setMostrarEditarRotaCidade] = useState(false);
   const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
 
   // Estados para WhatsApp Chat
@@ -2805,6 +2806,9 @@ Não haverá cobrança ao cliente.`
   const handleRouteSelectAndMove = async (rotaColumn: string, cidadeCorrigida: string) => {
     if (!os) return;
 
+    const isEditOnly = mostrarEditarRotaCidade;
+    setMostrarEditarRotaCidade(false);
+
     const rotaColorMap: Record<string, { nome: string; cor: string }> = {
       'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
       'rota_vermelha': { nome: 'Rota Vermelha', cor: '#EF4444' },
@@ -2859,7 +2863,15 @@ Não haverá cobrança ao cliente.`
 
       setMostrarSelecionarRotaObrigatoria(false);
 
-      if (colunaDestinoAposSelecionarRota) {
+      if (isEditOnly) {
+        const extraUpdates: Record<string, any> = { rota_id: rotaIdReal };
+        if (cidadeCorrigida && cidadeCorrigida.trim() !== '' && cidadeCorrigida !== os.cliente_cidade) {
+          extraUpdates.cliente_cidade = cidadeCorrigida.trim();
+        }
+        await supabase.from('os').update(extraUpdates).eq('id', os.id);
+        setOs({ ...os, ...extraUpdates, rota_id: rotaIdReal });
+        setColunaDestinoAposSelecionarRota(null);
+      } else if (colunaDestinoAposSelecionarRota) {
         const targetCol = colunaDestinoAposSelecionarRota;
         setColunaDestinoAposSelecionarRota(null);
 
@@ -3719,8 +3731,26 @@ Não haverá cobrança ao cliente.`
                         <p className="text-sm text-gray-300">{os.cliente_bairro || '-'}</p>
                       </div>
                       <div>
-                        <p className="text-xs text-gray-500">Cidade</p>
-                        <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}</p>
+                        <p className="text-xs text-gray-500 flex items-center gap-1">
+                          Cidade
+                          <button
+                            onClick={() => {
+                              setMostrarEditarRotaCidade(true);
+                              setMostrarSelecionarRotaObrigatoria(true);
+                            }}
+                            className="ml-1 text-blue-400 hover:text-blue-300 transition-colors"
+                            title="Editar cidade e rota"
+                          >
+                            <Pencil className="w-3 h-3" />
+                          </button>
+                        </p>
+                        <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}
+                          {(() => {
+                            const rotaAtual = rotasUnidade.find(r => r.id === os.rota_id);
+                            if (rotaAtual) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${rotaAtual.cor || '#666'}25`, color: rotaAtual.cor || '#999' }}>{rotaAtual.nome}</span>;
+                            return null;
+                          })()}
+                        </p>
                       </div>
                       <div>
                         <p className="text-xs text-gray-500">Estado</p>
@@ -5740,6 +5770,7 @@ Não haverá cobrança ao cliente.`
         onSelectRoute={handleRouteSelectAndMove}
         onCancel={() => {
           setMostrarSelecionarRotaObrigatoria(false);
+          setMostrarEditarRotaCidade(false);
           setColunaDestinoAposSelecionarRota(null);
         }}
       />
