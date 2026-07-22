@@ -95,12 +95,13 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     };
   }
 
-  const osPorColuna: Record<string, OSParada[]> = {};
+  const totalOS = osParadas.length;
 
+  // Group by coluna_kanban
+  const osPorColuna: Record<string, OSParada[]> = {};
   for (const os of osParadas) {
     const minutosParada = (now.getTime() - new Date(os.coluna_kanban_desde).getTime()) / (1000 * 60);
     const coluna = os.coluna_kanban;
-
     if (!osPorColuna[coluna]) osPorColuna[coluna] = [];
     osPorColuna[coluna].push({
       id: os.id,
@@ -114,53 +115,35 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     });
   }
 
+  // Build cockpit-style data: per column -> qty, oldest time, oldest OS
   const colunasOrdenadas = Object.entries(osPorColuna)
     .sort((a, b) => b[1].length - a[1].length)
     .map(([coluna, lista]) => {
-      const osCriticas = lista.filter((os) => os.minutos_parada > 24 * 60).length;
-      const osAlerta = lista.filter((os) => os.minutos_parada > 8 * 60 && os.minutos_parada <= 24 * 60).length;
-
+      const sorted = lista.sort((a, b) => b.minutos_parada - a.minutos_parada);
+      const oldest = sorted[0];
       return {
         coluna,
         label: getColunaLabel(coluna),
         total: lista.length,
-        criticas: osCriticas,
-        alerta: osAlerta,
-        os_list: lista
-          .sort((a, b) => b.minutos_parada - a.minutos_parada)
-          .map((os) => ({
-            numero: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
-            cliente: os.cliente_nome || "Sem cliente",
-            tipo: os.tipo_os || "-",
-            tempo_parada: formatDuration(os.minutos_parada),
-            minutos_parada: Math.round(os.minutos_parada),
-            severidade: os.minutos_parada > 24 * 60 ? "critica" : os.minutos_parada > 8 * 60 ? "alerta" : "atencao",
-          })),
+        tempo_mais_antiga: formatDuration(oldest.minutos_parada),
+        minutos_mais_antiga: Math.round(oldest.minutos_parada),
+        os_mais_antiga: oldest.numero_os_samsung || oldest.numero_os_interna || oldest.id.slice(0, 8),
+        cliente_mais_antiga: oldest.cliente_nome || "Sem cliente",
+        tipo_mais_antiga: oldest.tipo_os || "-",
       };
     });
 
-  const totalCriticas = colunasOrdenadas.reduce((acc, c) => acc + c.criticas, 0);
-  const totalAlerta = colunasOrdenadas.reduce((acc, c) => acc + c.alerta, 0);
-  const totalOS = osParadas.length;
-
-  const topGargalos = colunasOrdenadas.slice(0, 3).map((c) => `${c.label} (${c.total})`).join(", ");
-
+  // Build cockpit-style resumo texto (one line per column)
   const resumoTexto = [
     `PULSO OPERACIONAL - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
     ``,
     `Total de OS paradas (+2h): ${totalOS}`,
-    `Criticas (+24h): ${totalCriticas} | Alerta (+8h): ${totalAlerta}`,
     ``,
-    `Maiores gargalos: ${topGargalos}`,
-    ``,
-    ...colunasOrdenadas.map((col) => {
-      const header = `--- ${col.label} (${col.total} OS) ---`;
-      const items = col.os_list.slice(0, 10).map(
-        (os) => `  ${os.severidade === "critica" ? "🚨" : os.severidade === "alerta" ? "⚠️" : "⏰"} ${os.numero} | ${os.cliente} | ${os.tempo_parada}`
-      );
-      if (col.os_list.length > 10) items.push(`  ... e mais ${col.os_list.length - 10} OS`);
-      return [header, ...items, ""].join("\n");
-    }),
+    `Etapa | Qtd | Tempo Mais Antiga | OS Mais Antiga`,
+    `──────────────────────────────────────`,
+    ...colunasOrdenadas.map((col) =>
+      `${col.label} | ${col.total} | ${col.tempo_mais_antiga} | ${col.os_mais_antiga}`
+    ),
   ].join("\n");
 
   return {
@@ -169,9 +152,6 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
     total_os_paradas: totalOS,
-    total_criticas: totalCriticas,
-    total_alerta: totalAlerta,
-    maiores_gargalos: topGargalos,
     colunas: colunasOrdenadas,
     resumo_texto: resumoTexto,
   };
