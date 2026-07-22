@@ -90,17 +90,22 @@ Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da dir
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PULSO OPERACIONAL \u2501\u2501\u2501
 
-Para o Pulso Operacional, use o formato COCKPIT (uma linha por etapa):
+Para o Pulso Operacional, use o formato COMPLETO com TODAS as colunas/etapas de cada unidade:
 - Cada unidade mostra o total de OS paradas
-- Depois uma lista onde cada linha mostra: *Nome da Etapa* \u2022 Qtd OS \u2022 Tempo da mais antiga \u2022 N\u00FAmero da OS mais antiga
+- Depois uma lista onde cada linha mostra: *Nome da Etapa* \u2022 X OS \u2022 Mais antiga: Xd Yh
+- N\u00C3O mostrar n\u00FAmero de OS Samsung (ex: 4176169495) - REMOVER completamente
 - Ordene por quantidade (maior primeiro)
+- Mostrar TODAS as etapas/colunas, n\u00E3o cortar nenhuma
 - Use a tradu\u00E7\u00E3o correta dos nomes de coluna
 
 Exemplo de formato por unidade:
 \u{1F4CD} *MOC* \u2014 150 OS paradas
-*Aguardando Pe\u00E7a* \u2022 58 \u2022 13d 9h \u2022 4176169495
-*Return Handling* \u2022 17 \u2022 11d 2h \u2022 4176141010
-*Or\u00E7amento Rejeitado* \u2022 12 \u2022 8d 5h \u2022 4176194904
+*Aguardando Pe\u00E7a* \u2022 58 OS \u2022 Mais antiga: 13d 9h
+*Return Handling* \u2022 17 OS \u2022 Mais antiga: 11d 2h
+*Or\u00E7amento Rejeitado* \u2022 12 OS \u2022 Mais antiga: 8d 5h
+*Em Reparo IH* \u2022 4 OS \u2022 Mais antiga: 2h 40min
+*Diagn\u00F3stico* \u2022 3 OS \u2022 Mais antiga: 1d 5h
+*OS Nova* \u2022 2 OS \u2022 Mais antiga: 6h 20min
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: MAPA DE ROTAS \u2501\u2501\u2501
 
@@ -199,13 +204,13 @@ Data/hora atual: ${now}
 Dados por unidade:
 
 *MOC (Montes Claros):*
-${JSON.stringify(dadosPorUnidade["MOC"], null, 2).slice(0, 5000)}
+${JSON.stringify(dadosPorUnidade["MOC"], null, 2).slice(0, 8000)}
 
 *JDF (Juiz de Fora):*
-${JSON.stringify(dadosPorUnidade["JDF"], null, 2).slice(0, 5000)}
+${JSON.stringify(dadosPorUnidade["JDF"], null, 2).slice(0, 8000)}
 
 *FSA (Feira de Santana):*
-${JSON.stringify(dadosPorUnidade["FSA"], null, 2).slice(0, 5000)}
+${JSON.stringify(dadosPorUnidade["FSA"], null, 2).slice(0, 8000)}
 
 IMPORTANTE: Gere APENAS o texto WhatsApp pronto para enviar. Sem explica\u00E7\u00F5es, sem coment\u00E1rios, sem bloco de c\u00F3digo.`;
 
@@ -222,7 +227,7 @@ IMPORTANTE: Gere APENAS o texto WhatsApp pronto para enviar. Sem explica\u00E7\u
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
-      max_tokens: 2800,
+      max_tokens: 4000,
     }),
   });
 
