@@ -937,7 +937,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
 
   let queryReq = supabase
     .from("requisicoes_pecas")
-    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id, valor_unitario")
     .eq("status", "pendente");
 
   if (unidadeId) queryReq = queryReq.eq("unidade_id", unidadeId);
@@ -945,29 +945,25 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const { data: pendentes, error: errPend } = await queryReq.order("created_at", { ascending: true });
   if (errPend) throw new Error(`Erro ao buscar requisicoes: ${errPend.message}`);
 
-  let queryPecas = supabase
-    .from("estoque_pecas")
-    .select("id, pn, descricao, valor_com_impostos, status, unidade_id")
-    .eq("status", "disponivel");
-
-  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
-
-  const { data: pecasDisponiveis, error: errPecas } = await queryPecas;
-  if (errPecas) throw new Error(`Erro ao buscar pecas: ${errPecas.message}`);
-
-  const pecasList = pecasDisponiveis || [];
   const pendentesList = pendentes || [];
 
-  const semPreco = pecasList.filter((p) => !p.valor_com_impostos || Number(p.valor_com_impostos) === 0);
-  const semCodigo = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
+  // Calculate values
+  let valorTotal = 0;
+  let pecasComValor = 0;
+  let pecasSemValor = 0;
 
-  const pendentesPorUnidade: Record<string, typeof pendentesList> = {};
   for (const r of pendentesList) {
-    const uid = r.unidade_id || "sem_unidade";
-    if (!pendentesPorUnidade[uid]) pendentesPorUnidade[uid] = [];
-    pendentesPorUnidade[uid].push(r);
+    const val = Number(r.valor_unitario) || 0;
+    const qty = Number(r.quantidade_requisitada) || 1;
+    if (val > 0) {
+      valorTotal += val * qty;
+      pecasComValor++;
+    } else {
+      pecasSemValor++;
+    }
   }
 
+  // Age classification
   const pendentesComIdade = pendentesList.map((r) => {
     const minutos = (now.getTime() - new Date(r.created_at).getTime()) / (1000 * 60);
     return { ...r, minutos_pendente: minutos };
@@ -977,31 +973,41 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const alerta = pendentesComIdade.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60);
   const recentes = pendentesComIdade.filter((r) => r.minutos_pendente <= 24 * 60);
 
+  // Group by unidade
+  const pendentesPorUnidade: Record<string, typeof pendentesComIdade> = {};
+  for (const r of pendentesComIdade) {
+    const uid = r.unidade_id || "sem_unidade";
+    if (!pendentesPorUnidade[uid]) pendentesPorUnidade[uid] = [];
+    pendentesPorUnidade[uid].push(r);
+  }
+
   const unidadesReport = Object.entries(pendentesPorUnidade)
     .sort((a, b) => b[1].length - a[1].length)
-    .map(([uid, lista]) => ({
-      unidade: unidadeMap[uid] || uid,
-      total_pendentes: lista.length,
-      requisicoes: lista.slice(0, 10).map((r) => ({
-        codigo: r.codigo_peca || "Sem codigo",
-        descricao: r.descricao || "-",
-        quantidade: r.quantidade_requisitada,
-        os: r.numero_os_samsung || "-",
-        tempo_pendente: formatDuration((now.getTime() - new Date(r.created_at).getTime()) / (1000 * 60)),
-      })),
-    }));
+    .map(([uid, lista]) => {
+      let uValor = 0;
+      let uSemValor = 0;
+      for (const r of lista) {
+        const val = Number(r.valor_unitario) || 0;
+        const qty = Number(r.quantidade_requisitada) || 1;
+        if (val > 0) uValor += val * qty;
+        else uSemValor++;
+      }
+      const uCriticas = lista.filter((r) => r.minutos_pendente > 48 * 60).length;
+      const uAlerta = lista.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60).length;
+      const uRecentes = lista.filter((r) => r.minutos_pendente <= 24 * 60).length;
 
-  const semPrecoPorUnidade: Record<string, number> = {};
-  for (const p of semPreco) {
-    const uid = p.unidade_id || "sem_unidade";
-    semPrecoPorUnidade[uid] = (semPrecoPorUnidade[uid] || 0) + 1;
-  }
+      return {
+        unidade: unidadeMap[uid] || uid,
+        total_pendentes: lista.length,
+        criticas: uCriticas,
+        alerta: uAlerta,
+        recentes: uRecentes,
+        valor_total: uValor,
+        sem_valor: uSemValor,
+      };
+    });
 
-  const semCodigoPorUnidade: Record<string, number> = {};
-  for (const p of semCodigo) {
-    const uid = p.unidade_id || "sem_unidade";
-    semCodigoPorUnidade[uid] = (semCodigoPorUnidade[uid] || 0) + 1;
-  }
+  const valorFormatado = valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const resumoTexto = [
     `NUCLEO DE PECAS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
@@ -1011,23 +1017,20 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     `  Alerta (+24h): ${alerta.length}`,
     `  Recentes (-24h): ${recentes.length}`,
     ``,
-    `Pecas com problemas no estoque:`,
-    `  Sem preco: ${semPreco.length}`,
-    `  Sem codigo (PN): ${semCodigo.length}`,
+    `Valor total pendente: ${valorFormatado}`,
+    `Pecas com valor: ${pecasComValor} | Sem valor cadastrado: ${pecasSemValor}`,
     ``,
-    `Requisicoes por unidade:`,
-    ...unidadesReport.map((u) => `  ${u.unidade}: ${u.total_pendentes} pendentes`),
-    ``,
-    `Sem preco por unidade:`,
-    ...Object.entries(semPrecoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `  ${unidadeMap[uid] || uid}: ${n} pecas`),
-    ``,
-    `Sem codigo por unidade:`,
-    ...Object.entries(semCodigoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `  ${unidadeMap[uid] || uid}: ${n} pecas`),
+    `Por unidade:`,
+    ...unidadesReport.map((u) => [
+      `  ${u.unidade}: ${u.total_pendentes} pendentes`,
+      `    Criticas: ${u.criticas} | Alerta: ${u.alerta} | Recentes: ${u.recentes}`,
+      `    Valor: ${u.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} | Sem valor: ${u.sem_valor}`,
+    ].join("\n")),
   ].join("\n");
 
   return {
     titulo: "Nucleo de Pecas",
-    subtitulo: `${pendentesList.length} requisicoes pendentes / ${semPreco.length} sem preco / ${semCodigo.length} sem codigo`,
+    subtitulo: `${pendentesList.length} requisicoes pendentes | ${valorFormatado} | ${pecasSemValor} sem valor`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
     requisicoes_pendentes: {
@@ -1036,19 +1039,13 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
       alerta: alerta.length,
       recentes: recentes.length,
     },
-    pecas_problemas: {
-      sem_preco: semPreco.length,
-      sem_codigo: semCodigo.length,
+    valores: {
+      valor_total: valorTotal,
+      valor_total_formatado: valorFormatado,
+      pecas_com_valor: pecasComValor,
+      pecas_sem_valor: pecasSemValor,
     },
     por_unidade: unidadesReport,
-    sem_preco_por_unidade: Object.entries(semPrecoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
-      unidade: unidadeMap[uid] || uid,
-      total,
-    })),
-    sem_codigo_por_unidade: Object.entries(semCodigoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
-      unidade: unidadeMap[uid] || uid,
-      total,
-    })),
     resumo_texto: resumoTexto,
   };
 }
