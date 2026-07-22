@@ -802,46 +802,56 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     for (const u of unidades) unidadeMap[u.id] = u.nome;
   }
 
-  // Fetch OS pecas that have issues (no PN or no value) and are active
-  let queryOSPecas = supabase
-    .from("os_pecas")
-    .select("id, pn, descricao, valor_unitario, os_id, unidade_id, status")
-    .not("status", "in", "(reprovada,devolucao_completa,devolvida_samsung)");
+  // First get active OS for the unit (os_pecas has no unidade_id column)
+  // Paginate to bypass Supabase default 1000-row limit
+  let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
+  let page = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    let osQuery = supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
+      .not("coluna_kanban", "eq", "os_fechada")
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
+    const { data: osRows, error: errOS } = await osQuery;
+    if (errOS) throw new Error(`Erro ao buscar OS: ${errOS.message}`);
+    if (!osRows || osRows.length === 0) break;
+    osDataList = osDataList.concat(osRows);
+    if (osRows.length < PAGE_SIZE) break;
+    page++;
+  }
+  const osMap: Record<string, { id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = {};
+  for (const os of osDataList) osMap[os.id] = os;
 
-  if (unidadeId) queryOSPecas = queryOSPecas.eq("unidade_id", unidadeId);
+  const osIds = osDataList.map((o) => o.id);
+  if (osIds.length === 0) {
+    return {
+      titulo: "Problemas Peca",
+      subtitulo: "0 OS com erro",
+      gerado_em: now.toISOString(),
+      horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+      totais: { os_com_erro: 0, pecas_sem_pn: 0, pecas_sem_valor: 0 },
+      por_unidade: [],
+      resumo_texto: "Sem erros de peça encontrados.",
+    };
+  }
 
-  const { data: osPecas, error: errPecas } = await queryOSPecas;
-  if (errPecas) throw new Error(`Erro ao buscar os_pecas: ${errPecas.message}`);
-
-  const pecasList = osPecas || [];
+  // Fetch os_pecas for those OS in batches
+  let pecasList: Array<{ id: string; pn: string | null; descricao: string | null; valor_unitario: number | null; os_id: string; status: string }> = [];
+  for (let i = 0; i < osIds.length; i += 200) {
+    const batch = osIds.slice(i, i + 200);
+    const { data: batchPecas } = await supabase
+      .from("os_pecas")
+      .select("id, pn, descricao, valor_unitario, os_id, status")
+      .in("os_id", batch)
+      .not("status", "in", "(reprovada,devolucao_completa,devolvida_samsung)");
+    if (batchPecas) pecasList = pecasList.concat(batchPecas);
+  }
 
   // Filter problems
   const semPN = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
   const semValor = pecasList.filter((p) => !p.valor_unitario || Number(p.valor_unitario) === 0);
-
-  // Get OS ids that have problems
-  const osIdsComProblema = new Set<string>();
-  for (const p of [...semPN, ...semValor]) {
-    if (p.os_id) osIdsComProblema.add(p.os_id);
-  }
-
-  // Fetch those OS to get coluna_kanban and numero
-  let osData: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
-  if (osIdsComProblema.size > 0) {
-    const idsArray = Array.from(osIdsComProblema);
-    // Fetch in batches of 100
-    for (let i = 0; i < idsArray.length; i += 100) {
-      const batch = idsArray.slice(i, i + 100);
-      const { data } = await supabase
-        .from("os")
-        .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
-        .in("id", batch);
-      if (data) osData = osData.concat(data);
-    }
-  }
-
-  const osMap: Record<string, typeof osData[0]> = {};
-  for (const os of osData) osMap[os.id] = os;
 
   // Build per-unit report with coluna breakdown
   type ProblemOS = { numero: string; coluna: string; sem_pn: number; sem_valor: number };
