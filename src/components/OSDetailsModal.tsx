@@ -1,4 +1,4 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
@@ -50,6 +50,7 @@ interface OSDetails {
   status_samsung_desc: string | null;
   status_samsung_reason: string | null;
   unidade_id: string;
+  rota_id: string | null;
   agendamento?: {
     data_agendamento: string;
     confirmado_com_cliente: boolean;
@@ -109,6 +110,11 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [syncingGSPN, setSyncingGSPN] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
+  const [showRotaEditor, setShowRotaEditor] = useState(false);
+  const [editCidade, setEditCidade] = useState('');
+  const [selectedRotaColumn, setSelectedRotaColumn] = useState('');
+  const [savingRota, setSavingRota] = useState(false);
+  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cidades: string[] }>>([]);
 
   const themeAccent = themeInfo.accent;
   const modalBg = isDark ? themeInfo.bg : '#ffffff';
@@ -325,9 +331,86 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       };
 
       setOsDetails(osFormatted);
+      if (osFormatted.unidade_id) loadRotas(osFormatted.unidade_id);
     } catch (error) {
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function loadRotas(unidadeId: string) {
+    const { data } = await supabase
+      .from('rotas')
+      .select('id, nome, coluna_kanban, cidades')
+      .eq('unidade_id', unidadeId)
+      .eq('ativa', true);
+    if (data) setRotas(data);
+  }
+
+  async function handleSaveRotaCidade() {
+    if (!osDetails || !selectedRotaColumn) return;
+    setSavingRota(true);
+    try {
+      const cidadeCorrigida = editCidade.trim();
+      const rotaExistente = rotas.find(r => r.coluna_kanban === selectedRotaColumn);
+
+      let rotaId = rotaExistente?.id || null;
+
+      if (rotaExistente && cidadeCorrigida) {
+        const cidadesAtuais = rotaExistente.cidades || [];
+        const cidadeNorm = cidadeCorrigida.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+        const jaExiste = cidadesAtuais.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === cidadeNorm);
+        if (!jaExiste) {
+          await supabase
+            .from('rotas')
+            .update({ cidades: [...cidadesAtuais, cidadeCorrigida] })
+            .eq('id', rotaExistente.id);
+        }
+      } else if (!rotaExistente) {
+        const rotaColorMap: Record<string, { nome: string; cor: string }> = {
+          'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
+          'rota_vermelha': { nome: 'Rota Vermelha', cor: '#EF4444' },
+          'rota_azul': { nome: 'Rota Azul', cor: '#3B82F6' },
+          'rota_verde': { nome: 'Rota Verde', cor: '#10B981' },
+          'rota_rosa': { nome: 'Rota Rosa', cor: '#EC4899' },
+          'rota_amarela': { nome: 'Rota Amarela', cor: '#EAB308' },
+          'rota_laranja': { nome: 'Rota Laranja', cor: '#F97316' },
+        };
+        const rotaInfo = rotaColorMap[selectedRotaColumn];
+        if (rotaInfo) {
+          const { data: novaRota } = await supabase
+            .from('rotas')
+            .insert({
+              nome: rotaInfo.nome,
+              cor: rotaInfo.cor,
+              coluna_kanban: selectedRotaColumn,
+              cidades: cidadeCorrigida ? [cidadeCorrigida] : [],
+              ativa: true,
+              unidade_id: osDetails.unidade_id,
+            })
+            .select()
+            .single();
+          if (novaRota) rotaId = novaRota.id;
+        }
+      }
+
+      const updateData: any = {
+        rota_id: rotaId,
+        coluna_kanban: selectedRotaColumn,
+        updated_at: new Date().toISOString(),
+      };
+      if (cidadeCorrigida && cidadeCorrigida !== osDetails.cliente_cidade) {
+        updateData.cliente_cidade = cidadeCorrigida;
+      }
+
+      await supabase.from('os').update(updateData).eq('id', osDetails.id);
+      setOsDetails({ ...osDetails, ...updateData, coluna_kanban: selectedRotaColumn, rota_id: rotaId });
+      setShowRotaEditor(false);
+      await loadRotas(osDetails.unidade_id);
+    } catch (err) {
+      console.error('Erro ao salvar rota:', err);
+    } finally {
+      setSavingRota(false);
     }
   }
 
@@ -566,7 +649,84 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   <MapPin className="w-5 h-5" style={{ color: textSecondary }} />
                   Endereco
                 </h3>
-                <p className="text-sm mb-3" style={{ color: textPrimary }}>{enderecoCompleto}</p>
+                <p className="text-sm mb-2" style={{ color: textPrimary }}>{enderecoCompleto}</p>
+
+                {/* Cidade + Rota inline editor */}
+                <div className="flex items-center gap-2 mb-3 flex-wrap">
+                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: `${textSecondary}15`, color: textSecondary }}>
+                    <Route className="w-3 h-3 inline mr-1" />
+                    {osDetails.cliente_cidade || 'Sem cidade'}
+                    {rotas.find(r => r.id === osDetails.rota_id) && (
+                      <span className="ml-1">• {rotas.find(r => r.id === osDetails.rota_id)?.nome || 'Sem rota'}</span>
+                    )}
+                  </span>
+                  <button
+                    onClick={() => {
+                      setEditCidade(osDetails.cliente_cidade || '');
+                      const rotaAtual = rotas.find(r => r.id === osDetails.rota_id);
+                      setSelectedRotaColumn(rotaAtual?.coluna_kanban || osDetails.coluna_kanban || '');
+                      setShowRotaEditor(true);
+                    }}
+                    className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                    style={{ color: textSecondary }}
+                    title="Editar cidade e rota"
+                  >
+                    <Pencil className="w-3 h-3" />
+                    Editar Rota
+                  </button>
+                </div>
+
+                {showRotaEditor && (
+                  <div className="mb-3 p-3 rounded-lg border" style={{ borderColor: `${textSecondary}30`, backgroundColor: `${textSecondary}05` }}>
+                    <div className="space-y-2">
+                      <div>
+                        <label className="text-xs font-medium block mb-1" style={{ color: textSecondary }}>Cidade</label>
+                        <input
+                          type="text"
+                          value={editCidade}
+                          onChange={(e) => setEditCidade(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          style={{ borderColor: `${textSecondary}30`, color: textPrimary, backgroundColor: 'transparent' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs font-medium block mb-1" style={{ color: textSecondary }}>Rota</label>
+                        <select
+                          value={selectedRotaColumn}
+                          onChange={(e) => setSelectedRotaColumn(e.target.value)}
+                          className="w-full px-3 py-1.5 text-sm rounded-lg border focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          style={{ borderColor: `${textSecondary}30`, color: textPrimary, backgroundColor: 'transparent' }}
+                        >
+                          <option value="">Selecionar rota...</option>
+                          <option value="rota_preta">Rota Preta</option>
+                          <option value="rota_vermelha">Rota Vermelha</option>
+                          <option value="rota_azul">Rota Azul</option>
+                          <option value="rota_verde">Rota Verde</option>
+                          <option value="rota_rosa">Rota Rosa</option>
+                          <option value="rota_amarela">Rota Amarela</option>
+                          <option value="rota_laranja">Rota Laranja</option>
+                        </select>
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          onClick={handleSaveRotaCidade}
+                          disabled={savingRota || !selectedRotaColumn}
+                          className="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                        >
+                          {savingRota ? 'Salvando...' : 'Confirmar'}
+                        </button>
+                        <button
+                          onClick={() => setShowRotaEditor(false)}
+                          className="px-3 py-1.5 text-xs font-medium rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700"
+                          style={{ color: textSecondary }}
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <button
                     onClick={() => handleOpenMaps('google')}
