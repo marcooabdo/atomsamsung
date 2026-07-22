@@ -407,6 +407,35 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         throw new Error(`Erro ao atualizar peça no estoque: ${pecaError.message}`);
       }
 
+      // Atualizar os_pecas vinculando ao estoque_peca_id
+      if (requisicao.os_peca_id) {
+        await supabase
+          .from('os_pecas')
+          .update({
+            estoque_peca_id: pecaEstoqueId,
+            status: 'vinculada_tecnico'
+          })
+          .eq('id', requisicao.os_peca_id);
+      } else if (requisicao.os_id) {
+        const { data: matchingOsPeca } = await supabase
+          .from('os_pecas')
+          .select('id')
+          .eq('os_id', requisicao.os_id)
+          .eq('pn', requisicao.codigo_peca)
+          .is('estoque_peca_id', null)
+          .limit(1)
+          .maybeSingle();
+        if (matchingOsPeca) {
+          await supabase
+            .from('os_pecas')
+            .update({
+              estoque_peca_id: pecaEstoqueId,
+              status: 'vinculada_tecnico'
+            })
+            .eq('id', matchingOsPeca.id);
+        }
+      }
+
 
       // Criar log no histórico do estoque
       const { error: histError } = await supabase.from('estoque_historico').insert({
@@ -521,6 +550,35 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
           destino: `OS ${requisicao.os?.numero_os_samsung || requisicao.os?.numero_os_interna}`,
           observacao: `ID vinculado (lote ${pecaIds.length} un.) - ${requisicao.descricao}`
         });
+      }
+
+      // Atualizar os_pecas vinculando ao primeiro estoque_peca_id
+      if (requisicao.os_peca_id) {
+        await supabase
+          .from('os_pecas')
+          .update({
+            estoque_peca_id: primeiroId,
+            status: 'vinculada_tecnico'
+          })
+          .eq('id', requisicao.os_peca_id);
+      } else if (requisicao.os_id) {
+        const { data: matchingOsPeca } = await supabase
+          .from('os_pecas')
+          .select('id')
+          .eq('os_id', requisicao.os_id)
+          .eq('pn', requisicao.codigo_peca)
+          .is('estoque_peca_id', null)
+          .limit(1)
+          .maybeSingle();
+        if (matchingOsPeca) {
+          await supabase
+            .from('os_pecas')
+            .update({
+              estoque_peca_id: primeiroId,
+              status: 'vinculada_tecnico'
+            })
+            .eq('id', matchingOsPeca.id);
+        }
       }
 
       const { data: userData } = await supabase
