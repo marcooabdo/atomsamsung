@@ -2647,7 +2647,7 @@ export function Kanban() {
                       onIniciarReparo={handleCardIniciarReparo}
                       onFecharOS={handleCardFecharOS}
                       onMoveOS={handleCardMoveToColumn}
-                      onArchive={handleArchiveOS}
+                      onArchive={usuario?.tipo === 'master' ? handleArchiveOS : undefined}
                       allColunas={COLUNAS_KANBAN.map(c => ({ id: c.id, label: c.label }))}
                       rotas={rotas}
                       ColumnIcon={coluna.icon}

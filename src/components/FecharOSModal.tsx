@@ -419,35 +419,51 @@ export function FecharOSModal({ isOpen, onClose, osId, osNumero, unidadeId, onSu
                       <CheckCircle className="w-5 h-5 text-[#39FF14]" style={{ filter: 'drop-shadow(0 0 6px rgba(57,255,20,0.6))' }} />
                       <span className="text-sm font-black text-[#39FF14]">OS fechada com sucesso!</span>
                     </div>
-                    <p className="text-xs text-gray-400 text-center">
-                      Deseja arquivar esta OS para removê-la do pipeline ativo?
-                    </p>
-                    <div className="flex items-center gap-3 mt-1">
+                    {usuario?.tipo === 'master' ? (
+                      <>
+                        <p className="text-xs text-gray-400 text-center">
+                          Deseja arquivar esta OS para removê-la do pipeline ativo?
+                        </p>
+                        <div className="flex items-center gap-3 mt-1">
+                          <button
+                            onClick={() => { onSuccess(); onClose(); }}
+                            className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-400 transition-all hover:bg-white/5"
+                            style={{ border: '1px solid rgba(255,255,255,0.1)' }}
+                          >
+                            Manter no Pipeline
+                          </button>
+                          <button
+                            onClick={handleArquivar}
+                            disabled={arquivando}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            style={{
+                              background: 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
+                              color: '#000',
+                              boxShadow: '0 0 20px rgba(0,212,255,0.35)',
+                            }}
+                          >
+                            {arquivando ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Archive className="w-4 h-4" />
+                            )}
+                            {arquivando ? 'Arquivando...' : 'ARQUIVAR'}
+                          </button>
+                        </div>
+                      </>
+                    ) : (
                       <button
                         onClick={() => { onSuccess(); onClose(); }}
-                        className="px-4 py-2.5 rounded-xl text-sm font-bold text-gray-400 transition-all hover:bg-white/5"
-                        style={{ border: '1px solid rgba(255,255,255,0.1)' }}
-                      >
-                        Manter no Pipeline
-                      </button>
-                      <button
-                        onClick={handleArquivar}
-                        disabled={arquivando}
-                        className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-black transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="px-5 py-2.5 rounded-xl text-sm font-black transition-all mt-1"
                         style={{
                           background: 'linear-gradient(135deg, #00D4FF 0%, #0EA5E9 100%)',
                           color: '#000',
                           boxShadow: '0 0 20px rgba(0,212,255,0.35)',
                         }}
                       >
-                        {arquivando ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <Archive className="w-4 h-4" />
-                        )}
-                        {arquivando ? 'Arquivando...' : 'ARQUIVAR'}
+                        FECHAR
                       </button>
-                    </div>
+                    )}
                   </div>
                 ) : (
                   <>
