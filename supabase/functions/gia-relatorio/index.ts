@@ -64,16 +64,44 @@ interface OSParada {
   minutos_parada: number;
 }
 
+const TODAS_COLUNAS_KANBAN = [
+  "os_nova",
+  "diagnostico",
+  "negociacao_em_andamento",
+  "aguardando_aprovacao",
+  "orcamento_aprovado",
+  "aguardando_peca",
+  "peca_em_transito",
+  "em_reparo_ci",
+  "rota_preta",
+  "rota_vermelha",
+  "rota_azul",
+  "rota_verde",
+  "rota_rosa",
+  "rota_amarela",
+  "rota_laranja",
+  "em_rota_ih",
+  "em_reparo_ih",
+  "instalacao_inicial",
+  "service_handling",
+  "return_handling",
+  "trade_up",
+  "saw",
+  "controle_qualidade",
+  "qa_bt",
+  "reparo_concluido",
+  "aguardando_fechamento",
+  "orcamentos_rejeitados",
+];
+
 async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
-  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
+  // Fetch ALL open OS (not just paradas) so every column appears
   let query = supabase
     .from("os")
     .select("id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, coluna_kanban_desde, tipo_os, unidade_id")
     .not("coluna_kanban", "is", null)
-    .not("coluna_kanban_desde", "is", null)
-    .lt("coluna_kanban_desde", twoHoursAgo.toISOString())
     .neq("coluna_kanban", "os_fechada")
     .or("arquivada.is.null,arquivada.eq.false");
 
@@ -81,78 +109,159 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     query = query.eq("unidade_id", unidadeId);
   }
 
-  const { data: osParadas, error } = await query.order("coluna_kanban_desde", { ascending: true });
+  const allOS: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await query.range(from, from + pageSize - 1).order("coluna_kanban_desde", { ascending: true, nullsFirst: false });
+    if (error) throw new Error(`Erro ao buscar OS: ${error.message}`);
+    if (data && data.length > 0) {
+      allOS.push(...data);
+      from += pageSize;
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
 
-  if (error) throw new Error(`Erro ao buscar OS: ${error.message}`);
-  if (!osParadas || osParadas.length === 0) {
+  if (allOS.length === 0) {
     return {
       titulo: "Pulso Operacional",
-      subtitulo: "Nenhuma OS parada ha mais de 2 horas",
+      subtitulo: "Nenhuma OS aberta no momento",
       gerado_em: now.toISOString(),
+      total_os: 0,
       total_os_paradas: 0,
       colunas: [],
-      resumo_texto: "Nenhuma OS parada ha mais de 2 horas. Operacao fluindo normalmente.",
+      resumo_texto: "Nenhuma OS aberta. Operacao sem demandas no momento.",
     };
   }
 
-  const totalOS = osParadas.length;
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
 
-  // Group by coluna_kanban
-  const osPorColuna: Record<string, OSParada[]> = {};
-  for (const os of osParadas) {
-    const minutosParada = (now.getTime() - new Date(os.coluna_kanban_desde).getTime()) / (1000 * 60);
+  // Group ALL OS by coluna_kanban
+  const osPorColuna: Record<string, typeof allOS> = {};
+  const osParadasPorColuna: Record<string, OSParada[]> = {};
+  for (const os of allOS) {
     const coluna = os.coluna_kanban;
     if (!osPorColuna[coluna]) osPorColuna[coluna] = [];
-    osPorColuna[coluna].push({
-      id: os.id,
-      numero_os_samsung: os.numero_os_samsung,
-      numero_os_interna: os.numero_os_interna,
-      cliente_nome: os.cliente_nome,
-      coluna_kanban: coluna,
-      coluna_kanban_desde: os.coluna_kanban_desde,
-      tipo_os: os.tipo_os,
-      minutos_parada: minutosParada,
-    });
+    osPorColuna[coluna].push(os);
+
+    if (os.coluna_kanban_desde && new Date(os.coluna_kanban_desde) < twoHoursAgo) {
+      const minutosParada = (now.getTime() - new Date(os.coluna_kanban_desde).getTime()) / (1000 * 60);
+      if (!osParadasPorColuna[coluna]) osParadasPorColuna[coluna] = [];
+      osParadasPorColuna[coluna].push({
+        id: os.id,
+        numero_os_samsung: os.numero_os_samsung,
+        numero_os_interna: os.numero_os_interna,
+        cliente_nome: os.cliente_nome,
+        coluna_kanban: coluna,
+        coluna_kanban_desde: os.coluna_kanban_desde,
+        tipo_os: os.tipo_os,
+        minutos_parada: minutosParada,
+      });
+    }
   }
 
-  // Build cockpit-style data: per column -> qty, oldest time, oldest OS
-  const colunasOrdenadas = Object.entries(osPorColuna)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([coluna, lista]) => {
-      const sorted = lista.sort((a, b) => b.minutos_parada - a.minutos_parada);
+  const totalOS = allOS.length;
+  const totalParadas = Object.values(osParadasPorColuna).reduce((sum, arr) => sum + arr.length, 0);
+
+  // Build data for ALL columns (even those with 0 OS)
+  const colunasResult = TODAS_COLUNAS_KANBAN.map((coluna) => {
+    const totalColuna = osPorColuna[coluna]?.length || 0;
+    const paradas = osParadasPorColuna[coluna] || [];
+    const paradasCount = paradas.length;
+
+    if (paradasCount > 0) {
+      const sorted = paradas.sort((a, b) => b.minutos_parada - a.minutos_parada);
       const oldest = sorted[0];
       return {
         coluna,
         label: getColunaLabel(coluna),
-        total: lista.length,
+        total: totalColuna,
+        paradas: paradasCount,
         tempo_mais_antiga: formatDuration(oldest.minutos_parada),
         minutos_mais_antiga: Math.round(oldest.minutos_parada),
         os_mais_antiga: oldest.numero_os_samsung || oldest.numero_os_interna || oldest.id.slice(0, 8),
         cliente_mais_antiga: oldest.cliente_nome || "Sem cliente",
         tipo_mais_antiga: oldest.tipo_os || "-",
       };
-    });
+    }
 
-  // Build cockpit-style resumo texto (one line per column)
+    return {
+      coluna,
+      label: getColunaLabel(coluna),
+      total: totalColuna,
+      paradas: 0,
+      tempo_mais_antiga: "-",
+      minutos_mais_antiga: 0,
+      os_mais_antiga: "-",
+      cliente_mais_antiga: "-",
+      tipo_mais_antiga: "-",
+    };
+  });
+
+  // Also include any extra columns found in data but not in the fixed list
+  for (const coluna of Object.keys(osPorColuna)) {
+    if (!TODAS_COLUNAS_KANBAN.includes(coluna)) {
+      const totalColuna = osPorColuna[coluna]?.length || 0;
+      const paradas = osParadasPorColuna[coluna] || [];
+      const paradasCount = paradas.length;
+      if (paradasCount > 0) {
+        const sorted = paradas.sort((a, b) => b.minutos_parada - a.minutos_parada);
+        const oldest = sorted[0];
+        colunasResult.push({
+          coluna,
+          label: getColunaLabel(coluna),
+          total: totalColuna,
+          paradas: paradasCount,
+          tempo_mais_antiga: formatDuration(oldest.minutos_parada),
+          minutos_mais_antiga: Math.round(oldest.minutos_parada),
+          os_mais_antiga: oldest.numero_os_samsung || oldest.numero_os_interna || oldest.id.slice(0, 8),
+          cliente_mais_antiga: oldest.cliente_nome || "Sem cliente",
+          tipo_mais_antiga: oldest.tipo_os || "-",
+        });
+      } else {
+        colunasResult.push({
+          coluna,
+          label: getColunaLabel(coluna),
+          total: totalColuna,
+          paradas: 0,
+          tempo_mais_antiga: "-",
+          minutos_mais_antiga: 0,
+          os_mais_antiga: "-",
+          cliente_mais_antiga: "-",
+          tipo_mais_antiga: "-",
+        });
+      }
+    }
+  }
+
   const resumoTexto = [
     `PULSO OPERACIONAL - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
     ``,
-    `Total de OS paradas (+2h): ${totalOS}`,
+    `Total de OS abertas: ${totalOS} | Paradas (+2h): ${totalParadas}`,
     ``,
-    `Etapa | Qtd | Tempo Mais Antiga | OS Mais Antiga`,
+    `Etapa | Total | Paradas (+2h) | Mais Antiga`,
     `──────────────────────────────────────`,
-    ...colunasOrdenadas.map((col) =>
-      `${col.label} | ${col.total} | ${col.tempo_mais_antiga} | ${col.os_mais_antiga}`
-    ),
+    ...colunasResult
+      .filter((col) => col.total > 0)
+      .sort((a, b) => b.total - a.total)
+      .map((col) =>
+        col.paradas > 0
+          ? `${col.label} | ${col.total} | ${col.paradas} paradas | ${col.tempo_mais_antiga}`
+          : `${col.label} | ${col.total} | sem paradas`
+      ),
   ].join("\n");
 
   return {
     titulo: "Pulso Operacional",
-    subtitulo: `${totalOS} OS paradas ha mais de 2 horas`,
+    subtitulo: `${totalOS} OS abertas | ${totalParadas} paradas ha mais de 2 horas`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
-    total_os_paradas: totalOS,
-    colunas: colunasOrdenadas,
+    total_os: totalOS,
+    total_os_paradas: totalParadas,
+    colunas: colunasResult,
     resumo_texto: resumoTexto,
   };
 }
