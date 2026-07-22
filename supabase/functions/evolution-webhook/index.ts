@@ -342,7 +342,22 @@ Deno.serve(async (req: Request) => {
       if (isGroup && !fromMe) {
         const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
         if (textContent && isGIAReportRequest(textContent)) {
-          handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: "" });
+          const webhookInstanceName = typeof instance === "string"
+            ? instance
+            : instance?.instanceName || instance?.name || body.instanceName || "Marco";
+          handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: webhookInstanceName });
+        }
+      }
+
+      // GIA report request from private chat (DM)
+      if (!isGroup && !fromMe) {
+        const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
+        if (textContent && isGIAReportRequest(textContent)) {
+          const webhookInstanceName = typeof instance === "string"
+            ? instance
+            : instance?.instanceName || instance?.name || body.instanceName || "Marco";
+          // Send report to the private chat (use remoteJid as group_jid - sendText works for both)
+          handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: webhookInstanceName });
         }
       }
 
@@ -1011,7 +1026,7 @@ const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
 function isGIAReportRequest(text: string): boolean {
   const lower = text.toLowerCase();
   if (!lower.includes("gia")) return false;
-  const hasReportWord = ["relatório", "relatorio", "report", "me dê", "me de", "me da", "me dá", "envia", "envie", "manda", "gera", "gere"].some((w) => lower.includes(w));
+  const hasReportWord = ["relatório", "relatorio", "report", "me dê", "me de", "me da", "me dá", "envia", "envie", "manda", "gera", "gere", "pulso", "abertura", "fechamento", "estoque", "compliance", "resumo"].some((w) => lower.includes(w));
   return hasReportWord;
 }
 
@@ -1045,7 +1060,7 @@ async function handleGIAReportRequest(
 
     const payload: any = {
       group_jid: groupJid,
-      instance_name: "Marco",
+      instance_name: _instancia.instance_name || "Marco",
     };
 
     if (tipo === "__todos__") {

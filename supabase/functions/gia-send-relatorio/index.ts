@@ -266,8 +266,8 @@ Deno.serve(async (req: Request) => {
       tipo,
       todos = false,
       group_jid = DEFAULT_GROUP_JID,
-      instance_name = DEFAULT_INSTANCE,
     } = body;
+    const instance_name = body.instance_name || DEFAULT_INSTANCE;
 
     // If "todos" - dispatch individual calls to self to avoid timeout
     if (todos) {
