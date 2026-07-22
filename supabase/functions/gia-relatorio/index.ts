@@ -323,6 +323,132 @@ function getTopPNs(pecas: { pn: string | null; valor_com_impostos: number | null
     .map(([pn, data]) => ({ pn, quantidade: data.qty, valor: Math.round(data.valor * 100) / 100 }));
 }
 
+async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+
+  // Fetch units with credit limits
+  let queryUnidades = supabase.from("unidades").select("id, nome, limite_credito_gspn");
+  if (unidadeId) queryUnidades = queryUnidades.eq("id", unidadeId);
+
+  const { data: unidades, error: errUni } = await queryUnidades;
+  if (errUni) throw new Error(`Erro ao buscar unidades: ${errUni.message}`);
+
+  const unidadesComLimite = (unidades || []).filter((u) => u.limite_credito_gspn && Number(u.limite_credito_gspn) > 0);
+
+  // Fetch ALL estoque_pecas (all statuses count against credit)
+  let queryPecas = supabase
+    .from("estoque_pecas")
+    .select("id, pn, valor_com_impostos, status, unidade_id, tecnico_id, os_id");
+
+  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
+
+  const { data: pecas, error: errPecas } = await queryPecas;
+  if (errPecas) throw new Error(`Erro ao buscar pecas: ${errPecas.message}`);
+
+  // Fetch active orders (pendente requisitions = pending orders consuming credit)
+  let queryPedidos = supabase
+    .from("requisicoes_pecas")
+    .select("id, valor_peca, unidade_id")
+    .eq("status", "pendente");
+
+  if (unidadeId) queryPedidos = queryPedidos.eq("unidade_id", unidadeId);
+
+  const { data: pedidos, error: errPed } = await queryPedidos;
+  if (errPed) throw new Error(`Erro ao buscar pedidos: ${errPed.message}`);
+
+  const pecasList = pecas || [];
+  const pedidosList = pedidos || [];
+
+  // Group by unidade
+  const porUnidade = unidadesComLimite.map((uni) => {
+    const limite = Number(uni.limite_credito_gspn);
+    const pecasUni = pecasList.filter((p) => p.unidade_id === uni.id);
+    const pedidosUni = pedidosList.filter((p) => p.unidade_id === uni.id);
+
+    // Categorize pecas
+    const disponivel = pecasUni.filter((p) => p.status === "disponivel" && !p.tecnico_id && !p.os_id);
+    const comTecnico = pecasUni.filter((p) => p.tecnico_id && !p.os_id && p.status !== "devolucao_completa");
+    const comDefeito = pecasUni.filter((p) => p.status === "devolvida_defeito");
+    const devolvida = pecasUni.filter((p) => p.status === "devolucao_completa");
+    const emOS = pecasUni.filter((p) => p.os_id && p.status !== "devolucao_completa");
+    const reservada = pecasUni.filter((p) => p.status === "reservada");
+
+    const valorCategoria = (lista: typeof pecasUni) =>
+      Math.round(lista.reduce((sum, p) => sum + Number(p.valor_com_impostos || 0), 0) * 100) / 100;
+
+    // Credit consumed = all pecas NOT yet returned (devolucao_completa) + active orders
+    const pecasConsumo = pecasUni.filter((p) => p.status !== "devolucao_completa");
+    const valorPecasConsumo = valorCategoria(pecasConsumo);
+    const valorPedidosAtivos = Math.round(pedidosUni.reduce((sum, p) => sum + Number(p.valor_peca || 0), 0) * 100) / 100;
+    const consumido = Math.round((valorPecasConsumo + valorPedidosAtivos) * 100) / 100;
+    const livre = Math.round((limite - consumido) * 100) / 100;
+    const percentualUso = limite > 0 ? Math.round((consumido / limite) * 10000) / 100 : 0;
+
+    return {
+      unidade: uni.nome,
+      unidade_id: uni.id,
+      limite_total: limite,
+      consumido,
+      livre,
+      percentual_uso: percentualUso,
+      alerta: percentualUso >= 80,
+      critico: percentualUso >= 95,
+      categorias: {
+        disponivel: { quantidade: disponivel.length, valor: valorCategoria(disponivel) },
+        com_tecnico: { quantidade: comTecnico.length, valor: valorCategoria(comTecnico) },
+        com_defeito: { quantidade: comDefeito.length, valor: valorCategoria(comDefeito) },
+        devolvida: { quantidade: devolvida.length, valor: valorCategoria(devolvida) },
+        em_os_aberta: { quantidade: emOS.length, valor: valorCategoria(emOS) },
+        reservada: { quantidade: reservada.length, valor: valorCategoria(reservada) },
+        pedidos_ativos: { quantidade: pedidosUni.length, valor: valorPedidosAtivos },
+      },
+    };
+  });
+
+  porUnidade.sort((a, b) => b.percentual_uso - a.percentual_uso);
+
+  const limiteGlobal = porUnidade.reduce((s, u) => s + u.limite_total, 0);
+  const consumidoGlobal = porUnidade.reduce((s, u) => s + u.consumido, 0);
+  const livreGlobal = porUnidade.reduce((s, u) => s + u.livre, 0);
+  const percentualGlobal = limiteGlobal > 0 ? Math.round((consumidoGlobal / limiteGlobal) * 10000) / 100 : 0;
+
+  const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const resumoTexto = [
+    `LIMITE DE CREDITO GSPN - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `TOTAL GERAL:`,
+    `  Limite: ${fmt(limiteGlobal)} | Consumido: ${fmt(consumidoGlobal)} | Livre: ${fmt(livreGlobal)}`,
+    `  Uso: ${percentualGlobal}%`,
+    ``,
+    ...porUnidade.map((u) => [
+      `${u.unidade}${u.critico ? " [CRITICO]" : u.alerta ? " [ALERTA]" : ""}`,
+      `  Limite: ${fmt(u.limite_total)} | Consumido: ${fmt(u.consumido)} | Livre: ${fmt(u.livre)} | ${u.percentual_uso}%`,
+      `  Disponivel: ${u.categorias.disponivel.quantidade} (${fmt(u.categorias.disponivel.valor)})`,
+      `  Com tecnico: ${u.categorias.com_tecnico.quantidade} (${fmt(u.categorias.com_tecnico.valor)})`,
+      `  Com defeito: ${u.categorias.com_defeito.quantidade} (${fmt(u.categorias.com_defeito.valor)})`,
+      `  Em OS aberta: ${u.categorias.em_os_aberta.quantidade} (${fmt(u.categorias.em_os_aberta.valor)})`,
+      `  Pedidos ativos: ${u.categorias.pedidos_ativos.quantidade} (${fmt(u.categorias.pedidos_ativos.valor)})`,
+      `  Devolvida (nao consome): ${u.categorias.devolvida.quantidade} (${fmt(u.categorias.devolvida.valor)})`,
+    ].join("\n")),
+  ].join("\n");
+
+  return {
+    titulo: "Limite de Credito GSPN",
+    subtitulo: `${percentualGlobal}% utilizado - Livre: ${fmt(livreGlobal)}`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    global: {
+      limite_total: limiteGlobal,
+      consumido: consumidoGlobal,
+      livre: livreGlobal,
+      percentual_uso: percentualGlobal,
+    },
+    por_unidade: porUnidade,
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
@@ -752,9 +878,12 @@ Deno.serve(async (req: Request) => {
       case "estoque_dia":
         resultado = await gerarEstoqueDoDia(supabase, unidade_id);
         break;
+      case "limite_credito_gspn":
+        resultado = await gerarLimiteCreditoGSPN(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
