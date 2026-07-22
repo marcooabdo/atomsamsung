@@ -672,128 +672,127 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     for (const u of unidades) unidadeMap[u.id] = u.nome;
   }
 
-  let queryAlertas = supabase
-    .from("os_alertas_fechamento")
-    .select("id, os_id, unidade_id, regra_codigo, regra_titulo, categoria, severidade, mensagem, created_at")
-    .eq("resolvido", false)
-    .eq("ignorado", false);
+  // Fetch OS pecas that have issues (no PN or no value) and are active
+  let queryOSPecas = supabase
+    .from("os_pecas")
+    .select("id, pn, descricao, valor_unitario, os_id, unidade_id, status")
+    .not("status", "in", "(reprovada,devolucao_completa,devolvida_samsung)");
 
-  if (unidadeId) queryAlertas = queryAlertas.eq("unidade_id", unidadeId);
+  if (unidadeId) queryOSPecas = queryOSPecas.eq("unidade_id", unidadeId);
 
-  const { data: alertas, error: errAlertas } = await queryAlertas.order("created_at", { ascending: false });
-  if (errAlertas) throw new Error(`Erro ao buscar alertas: ${errAlertas.message}`);
+  const { data: osPecas, error: errPecas } = await queryOSPecas;
+  if (errPecas) throw new Error(`Erro ao buscar os_pecas: ${errPecas.message}`);
 
-  let queryPecas = supabase
-    .from("estoque_pecas")
-    .select("id, pn, descricao, valor_com_impostos, unidade_id, status")
-    .in("status", ["disponivel", "reservada"]);
+  const pecasList = osPecas || [];
 
-  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
-
-  const { data: pecas, error: errPecas } = await queryPecas;
-  if (errPecas) throw new Error(`Erro ao buscar pecas: ${errPecas.message}`);
-
-  const alertasList = alertas || [];
-  const pecasList = pecas || [];
-
+  // Filter problems
   const semPN = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
-  const semValor = pecasList.filter((p) => !p.valor_com_impostos || Number(p.valor_com_impostos) === 0);
+  const semValor = pecasList.filter((p) => !p.valor_unitario || Number(p.valor_unitario) === 0);
 
-  const alertasPorUnidade: Record<string, typeof alertasList> = {};
-  for (const a of alertasList) {
-    const uid = a.unidade_id || "sem_unidade";
-    if (!alertasPorUnidade[uid]) alertasPorUnidade[uid] = [];
-    alertasPorUnidade[uid].push(a);
+  // Get OS ids that have problems
+  const osIdsComProblema = new Set<string>();
+  for (const p of [...semPN, ...semValor]) {
+    if (p.os_id) osIdsComProblema.add(p.os_id);
   }
 
-  const alertasPorCategoria: Record<string, { bloqueante: number; alerta: number }> = {};
-  for (const a of alertasList) {
-    const cat = a.categoria || "outros";
-    if (!alertasPorCategoria[cat]) alertasPorCategoria[cat] = { bloqueante: 0, alerta: 0 };
-    if (a.severidade === "bloqueante") alertasPorCategoria[cat].bloqueante++;
-    else alertasPorCategoria[cat].alerta++;
+  // Fetch those OS to get coluna_kanban and numero
+  let osData: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
+  if (osIdsComProblema.size > 0) {
+    const idsArray = Array.from(osIdsComProblema);
+    // Fetch in batches of 100
+    for (let i = 0; i < idsArray.length; i += 100) {
+      const batch = idsArray.slice(i, i + 100);
+      const { data } = await supabase
+        .from("os")
+        .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
+        .in("id", batch);
+      if (data) osData = osData.concat(data);
+    }
   }
 
-  const semPNPorUnidade: Record<string, number> = {};
+  const osMap: Record<string, typeof osData[0]> = {};
+  for (const os of osData) osMap[os.id] = os;
+
+  // Build per-unit report with coluna breakdown
+  type ProblemOS = { numero: string; coluna: string; sem_pn: number; sem_valor: number };
+
+  const problemsByUnit: Record<string, ProblemOS[]> = {};
+
+  // Aggregate problems per OS
+  const osProblems: Record<string, { sem_pn: number; sem_valor: number }> = {};
   for (const p of semPN) {
-    const uid = p.unidade_id || "sem_unidade";
-    semPNPorUnidade[uid] = (semPNPorUnidade[uid] || 0) + 1;
+    if (!p.os_id) continue;
+    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_pn: 0, sem_valor: 0 };
+    osProblems[p.os_id].sem_pn++;
   }
-  const semValorPorUnidade: Record<string, number> = {};
   for (const p of semValor) {
-    const uid = p.unidade_id || "sem_unidade";
-    semValorPorUnidade[uid] = (semValorPorUnidade[uid] || 0) + 1;
+    if (!p.os_id) continue;
+    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_pn: 0, sem_valor: 0 };
+    osProblems[p.os_id].sem_valor++;
   }
 
-  const bloqueantes = alertasList.filter((a) => a.severidade === "bloqueante").length;
-  const alertasCount = alertasList.filter((a) => a.severidade === "alerta").length;
+  for (const [osId, problems] of Object.entries(osProblems)) {
+    const os = osMap[osId];
+    if (!os) continue;
+    const uid = os.unidade_id || "sem_unidade";
+    if (!problemsByUnit[uid]) problemsByUnit[uid] = [];
+    problemsByUnit[uid].push({
+      numero: os.numero_os_samsung || os.numero_os_interna || osId.slice(0, 8),
+      coluna: getColunaLabel(os.coluna_kanban),
+      sem_pn: problems.sem_pn,
+      sem_valor: problems.sem_valor,
+    });
+  }
 
-  const unidadesReport = Object.entries(alertasPorUnidade)
+  // Sort each unit by coluna then numero
+  for (const uid of Object.keys(problemsByUnit)) {
+    problemsByUnit[uid].sort((a, b) => a.coluna.localeCompare(b.coluna) || a.numero.localeCompare(b.numero));
+  }
+
+  const totalOSComErro = Object.values(problemsByUnit).reduce((sum, list) => sum + list.length, 0);
+  const totalSemPN = semPN.length;
+  const totalSemValor = semValor.length;
+
+  // Group by coluna within each unit for summary
+  const unidadesReport = Object.entries(problemsByUnit)
     .sort((a, b) => b[1].length - a[1].length)
     .map(([uid, lista]) => {
-      const porCat: Record<string, number> = {};
-      for (const a of lista) {
-        const cat = a.categoria || "outros";
-        porCat[cat] = (porCat[cat] || 0) + 1;
+      const porColuna: Record<string, number> = {};
+      for (const os of lista) {
+        porColuna[os.coluna] = (porColuna[os.coluna] || 0) + 1;
       }
       return {
         unidade: unidadeMap[uid] || uid,
-        total_alertas: lista.length,
-        bloqueantes: lista.filter((a) => a.severidade === "bloqueante").length,
-        por_categoria: porCat,
-        exemplos: lista.slice(0, 5).map((a) => ({
-          regra: a.regra_titulo || a.regra_codigo,
-          categoria: a.categoria,
-          severidade: a.severidade,
-          mensagem: a.mensagem,
-        })),
+        total_os_com_erro: lista.length,
+        por_coluna: Object.entries(porColuna).sort((a, b) => b[1] - a[1]).map(([col, qty]) => ({ coluna: col, quantidade: qty })),
+        os_list: lista,
       };
     });
 
   const resumoTexto = [
-    `COMPLIANCE E ERROS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `PROBLEMAS PECA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
     ``,
-    `Alertas nao resolvidos: ${alertasList.length}`,
-    `  Bloqueantes: ${bloqueantes}`,
-    `  Alertas: ${alertasCount}`,
+    `OS com erro de peca: ${totalOSComErro}`,
+    `Pecas sem PN: ${totalSemPN} | Pecas sem valor: ${totalSemValor}`,
     ``,
-    `Por categoria:`,
-    ...Object.entries(alertasPorCategoria)
-      .sort((a, b) => (b[1].bloqueante + b[1].alerta) - (a[1].bloqueante + a[1].alerta))
-      .map(([cat, data]) => `  ${cat}: ${data.bloqueante} bloqueantes, ${data.alerta} alertas`),
-    ``,
-    `Por unidade:`,
-    ...unidadesReport.map((u) => `  ${u.unidade}: ${u.total_alertas} alertas (${u.bloqueantes} bloqueantes)`),
-    ``,
-    `Problemas Pecas:`,
-    `  Sem PN: ${semPN.length}`,
-    `  Valor R$0: ${semValor.length}`,
-    ...(semPN.length > 0 ? [`  Sem PN por unidade:`, ...Object.entries(semPNPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `    ${unidadeMap[uid] || uid}: ${n}`)] : []),
-    ...(semValor.length > 0 ? [`  Valor R$0 por unidade:`, ...Object.entries(semValorPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `    ${unidadeMap[uid] || uid}: ${n}`)] : []),
+    ...unidadesReport.flatMap((u) => [
+      `--- ${u.unidade} --- (${u.total_os_com_erro} OS)`,
+      ...u.por_coluna.map((c) => `  ${c.coluna}: ${c.quantidade} OS`),
+      ``,
+      ...u.os_list.map((os) => `  ${os.numero} | ${os.coluna} | sem PN: ${os.sem_pn} | sem valor: ${os.sem_valor}`),
+      ``,
+    ]),
   ].join("\n");
 
   return {
-    titulo: "Compliance e Erros",
-    subtitulo: `${alertasList.length} alertas (${bloqueantes} bloqueantes) / Pecas: ${semPN.length} sem PN, ${semValor.length} sem valor`,
+    titulo: "Problemas Peca",
+    subtitulo: `${totalOSComErro} OS com erro | ${totalSemPN} sem PN | ${totalSemValor} sem valor`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
-    alertas: {
-      total: alertasList.length,
-      bloqueantes,
-      alertas: alertasCount,
-      por_categoria: alertasPorCategoria,
-    },
-    problemas_pecas: {
-      sem_pn: semPN.length,
-      sem_valor: semValor.length,
-      sem_pn_por_unidade: Object.entries(semPNPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
-        unidade: unidadeMap[uid] || uid,
-        total,
-      })),
-      sem_valor_por_unidade: Object.entries(semValorPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
-        unidade: unidadeMap[uid] || uid,
-        total,
-      })),
+    totais: {
+      os_com_erro: totalOSComErro,
+      pecas_sem_pn: totalSemPN,
+      pecas_sem_valor: totalSemValor,
     },
     por_unidade: unidadesReport,
     resumo_texto: resumoTexto,
