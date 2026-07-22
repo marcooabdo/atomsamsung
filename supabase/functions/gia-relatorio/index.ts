@@ -177,6 +177,133 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
   };
 }
 
+async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  let queryReq = supabase
+    .from("requisicoes_pecas")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id")
+    .eq("status", "pendente");
+
+  if (unidadeId) queryReq = queryReq.eq("unidade_id", unidadeId);
+
+  const { data: pendentes, error: errPend } = await queryReq.order("created_at", { ascending: true });
+  if (errPend) throw new Error(`Erro ao buscar requisicoes: ${errPend.message}`);
+
+  let queryPecas = supabase
+    .from("estoque_pecas")
+    .select("id, pn, descricao, valor_com_impostos, status, unidade_id")
+    .eq("status", "disponivel");
+
+  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
+
+  const { data: pecasDisponiveis, error: errPecas } = await queryPecas;
+  if (errPecas) throw new Error(`Erro ao buscar pecas: ${errPecas.message}`);
+
+  const pecasList = pecasDisponiveis || [];
+  const pendentesList = pendentes || [];
+
+  const semPreco = pecasList.filter((p) => !p.valor_com_impostos || Number(p.valor_com_impostos) === 0);
+  const semCodigo = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
+
+  const pendentesPorUnidade: Record<string, typeof pendentesList> = {};
+  for (const r of pendentesList) {
+    const uid = r.unidade_id || "sem_unidade";
+    if (!pendentesPorUnidade[uid]) pendentesPorUnidade[uid] = [];
+    pendentesPorUnidade[uid].push(r);
+  }
+
+  const pendentesComIdade = pendentesList.map((r) => {
+    const minutos = (now.getTime() - new Date(r.created_at).getTime()) / (1000 * 60);
+    return { ...r, minutos_pendente: minutos };
+  });
+
+  const criticas = pendentesComIdade.filter((r) => r.minutos_pendente > 48 * 60);
+  const alerta = pendentesComIdade.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60);
+  const recentes = pendentesComIdade.filter((r) => r.minutos_pendente <= 24 * 60);
+
+  const unidadesReport = Object.entries(pendentesPorUnidade)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([uid, lista]) => ({
+      unidade: unidadeMap[uid] || uid,
+      total_pendentes: lista.length,
+      requisicoes: lista.slice(0, 10).map((r) => ({
+        codigo: r.codigo_peca || "Sem codigo",
+        descricao: r.descricao || "-",
+        quantidade: r.quantidade_requisitada,
+        os: r.numero_os_samsung || "-",
+        tempo_pendente: formatDuration((now.getTime() - new Date(r.created_at).getTime()) / (1000 * 60)),
+      })),
+    }));
+
+  const semPrecoPorUnidade: Record<string, number> = {};
+  for (const p of semPreco) {
+    const uid = p.unidade_id || "sem_unidade";
+    semPrecoPorUnidade[uid] = (semPrecoPorUnidade[uid] || 0) + 1;
+  }
+
+  const semCodigoPorUnidade: Record<string, number> = {};
+  for (const p of semCodigo) {
+    const uid = p.unidade_id || "sem_unidade";
+    semCodigoPorUnidade[uid] = (semCodigoPorUnidade[uid] || 0) + 1;
+  }
+
+  const resumoTexto = [
+    `NUCLEO DE PECAS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `Requisicoes pendentes: ${pendentesList.length}`,
+    `  Criticas (+48h): ${criticas.length}`,
+    `  Alerta (+24h): ${alerta.length}`,
+    `  Recentes (-24h): ${recentes.length}`,
+    ``,
+    `Pecas com problemas no estoque:`,
+    `  Sem preco: ${semPreco.length}`,
+    `  Sem codigo (PN): ${semCodigo.length}`,
+    ``,
+    `Requisicoes por unidade:`,
+    ...unidadesReport.map((u) => `  ${u.unidade}: ${u.total_pendentes} pendentes`),
+    ``,
+    `Sem preco por unidade:`,
+    ...Object.entries(semPrecoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `  ${unidadeMap[uid] || uid}: ${n} pecas`),
+    ``,
+    `Sem codigo por unidade:`,
+    ...Object.entries(semCodigoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, n]) => `  ${unidadeMap[uid] || uid}: ${n} pecas`),
+  ].join("\n");
+
+  return {
+    titulo: "Nucleo de Pecas",
+    subtitulo: `${pendentesList.length} requisicoes pendentes / ${semPreco.length} sem preco / ${semCodigo.length} sem codigo`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    requisicoes_pendentes: {
+      total: pendentesList.length,
+      criticas: criticas.length,
+      alerta: alerta.length,
+      recentes: recentes.length,
+    },
+    pecas_problemas: {
+      sem_preco: semPreco.length,
+      sem_codigo: semCodigo.length,
+    },
+    por_unidade: unidadesReport,
+    sem_preco_por_unidade: Object.entries(semPrecoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
+      unidade: unidadeMap[uid] || uid,
+      total,
+    })),
+    sem_codigo_por_unidade: Object.entries(semCodigoPorUnidade).sort((a, b) => b[1] - a[1]).map(([uid, total]) => ({
+      unidade: unidadeMap[uid] || uid,
+      total,
+    })),
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
@@ -473,9 +600,12 @@ Deno.serve(async (req: Request) => {
       case "mapa_rotas":
         resultado = await gerarMapaRotas(supabase, unidade_id);
         break;
+      case "nucleo_pecas":
+        resultado = await gerarNucleoPecas(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
