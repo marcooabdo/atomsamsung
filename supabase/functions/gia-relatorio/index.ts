@@ -617,11 +617,13 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     for (const u of unidades) unidadeMap[u.id] = u.nome;
   }
 
-  // ═══ FTF (em_rota_ih): must NOT have confirmed appointment. If has confirmed, date must be strictly future ═══
+  // ═══ FTF (em_rota_ih): must have confirmed appointment with FUTURE date. Error if NO confirmed future appointment. ═══
+  // Also exclude OS that are part of a grupo (grupo_os_id IS NOT NULL) - they follow the group's main OS position
   let queryFTF = supabase
     .from("os")
-    .select("id, numero_os_interna, numero_os_samsung, unidade_id")
+    .select("id, numero_os_interna, numero_os_samsung, unidade_id, grupo_os_id")
     .eq("coluna_kanban", "em_rota_ih")
+    .is("grupo_os_id", null)
     .or("arquivada.is.null,arquivada.eq.false");
 
   if (unidadeId) queryFTF = queryFTF.eq("unidade_id", unidadeId);
@@ -649,35 +651,35 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     agFTFMap[a.os_id].push(a);
   }
 
-  // FTF errors: OS that HAS confirmed appointment, or has date today or past
+  // FTF errors: OS that does NOT have a confirmed appointment with future date
   const ftfErros: Array<{ os: string; unidade_id: string | null; motivo: string }> = [];
   for (const o of osFTF || []) {
     const ags = agFTFMap[o.id] || [];
     const osLabel = o.numero_os_samsung || o.numero_os_interna || o.id.slice(0, 8);
 
     const confirmados = ags.filter((a) => a.confirmado_cliente || a.confirmado_com_cliente);
-    if (confirmados.length > 0) {
-      // Has confirmed appointment - this is wrong for FTF
-      const dataHojeOuPassada = confirmados.find((a) => a.data_agendamento && a.data_agendamento <= today);
-      if (dataHojeOuPassada) {
-        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `agendamento confirmado com data ${dataHojeOuPassada.data_agendamento}` });
-      } else {
-        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: "tem agendamento confirmado com cliente" });
-      }
+    const temConfirmadoFuturo = confirmados.some((a) => a.data_agendamento && a.data_agendamento > today);
+
+    if (temConfirmadoFuturo) {
+      // OK - has confirmed future appointment
+      continue;
+    }
+
+    if (confirmados.length === 0) {
+      ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: "sem agendamento confirmado" });
     } else {
-      // Check if any non-confirmed has date today or earlier
-      const dataErrada = ags.find((a) => a.data_agendamento && a.data_agendamento <= today);
-      if (dataErrada) {
-        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `data ${dataErrada.data_agendamento} (hoje ou passada)` });
-      }
+      const datas = confirmados.map((a) => a.data_agendamento).filter(Boolean).join(", ");
+      ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `agendamento confirmado com data ${datas} (hoje ou passada, deveria ser futura)` });
     }
   }
 
   // ═══ REPARO IH (em_reparo_ih): must have confirmed appointment with today's date ═══
+  // Also exclude OS that are part of a grupo
   let queryReparo = supabase
     .from("os")
-    .select("id, numero_os_interna, numero_os_samsung, unidade_id")
+    .select("id, numero_os_interna, numero_os_samsung, unidade_id, grupo_os_id")
     .eq("coluna_kanban", "em_reparo_ih")
+    .is("grupo_os_id", null)
     .or("arquivada.is.null,arquivada.eq.false");
 
   if (unidadeId) queryReparo = queryReparo.eq("unidade_id", unidadeId);
