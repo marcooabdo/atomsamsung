@@ -323,6 +323,200 @@ function getTopPNs(pecas: { pn: string | null; valor_com_impostos: number | null
     .map(([pn, data]) => ({ pn, quantidade: data.qty, valor: Math.round(data.valor * 100) / 100 }));
 }
 
+async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const today = now.toISOString().split("T")[0];
+  const tomorrow = new Date(now.getTime() + 86400000).toISOString().split("T")[0];
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  // OS opened today
+  let queryAbertas = supabase
+    .from("os")
+    .select("id, numero_os_interna, unidade_id, created_at")
+    .gte("created_at", `${today}T00:00:00-03:00`)
+    .lt("created_at", `${tomorrow}T00:00:00-03:00`);
+
+  if (unidadeId) queryAbertas = queryAbertas.eq("unidade_id", unidadeId);
+
+  const { data: abertasHoje } = await queryAbertas;
+
+  // OS closed today
+  let queryFechadas = supabase
+    .from("os")
+    .select("id, numero_os_interna, unidade_id, created_at, updated_at")
+    .eq("coluna_kanban", "os_fechada")
+    .gte("updated_at", `${today}T00:00:00-03:00`)
+    .lt("updated_at", `${tomorrow}T00:00:00-03:00`);
+
+  if (unidadeId) queryFechadas = queryFechadas.eq("unidade_id", unidadeId);
+
+  const { data: fechadasHoje } = await queryFechadas;
+
+  // Top 5 aging (oldest open OS)
+  let queryAging = supabase
+    .from("os")
+    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, created_at")
+    .not("coluna_kanban", "in", "(os_fechada,aguardando_fechamento)")
+    .order("created_at", { ascending: true })
+    .limit(5);
+
+  if (unidadeId) queryAging = queryAging.eq("unidade_id", unidadeId);
+
+  const { data: aging } = await queryAging;
+
+  // Average speed (days to close in last 30 days)
+  let queryVelocidade = supabase
+    .from("os")
+    .select("created_at, updated_at, unidade_id")
+    .eq("coluna_kanban", "os_fechada")
+    .gte("updated_at", new Date(now.getTime() - 30 * 86400000).toISOString());
+
+  if (unidadeId) queryVelocidade = queryVelocidade.eq("unidade_id", unidadeId);
+
+  const { data: osFechadas30d } = await queryVelocidade;
+
+  let velocidadeMedia = 0;
+  if (osFechadas30d && osFechadas30d.length > 0) {
+    const totalDias = osFechadas30d.reduce((sum, o) => {
+      const dias = (new Date(o.updated_at).getTime() - new Date(o.created_at).getTime()) / 86400000;
+      return sum + dias;
+    }, 0);
+    velocidadeMedia = Math.round((totalDias / osFechadas30d.length) * 10) / 10;
+  }
+
+  // Velocity per unit
+  const velPorUnidade: Record<string, { totalDias: number; count: number }> = {};
+  if (osFechadas30d) {
+    for (const o of osFechadas30d) {
+      const uid = o.unidade_id || "sem_unidade";
+      if (!velPorUnidade[uid]) velPorUnidade[uid] = { totalDias: 0, count: 0 };
+      velPorUnidade[uid].totalDias += (new Date(o.updated_at).getTime() - new Date(o.created_at).getTime()) / 86400000;
+      velPorUnidade[uid].count++;
+    }
+  }
+
+  // Pending for tomorrow: agendamentos + OS in critical columns
+  let queryAgAmanha = supabase
+    .from("agendamentos")
+    .select("id, os_id, tecnico_id, data_agendamento, status, confirmado_cliente, confirmado_com_cliente, unidade_id")
+    .eq("data_agendamento", tomorrow)
+    .in("status", ["agendado", "confirmado", "pendente_confirmacao"]);
+
+  if (unidadeId) queryAgAmanha = queryAgAmanha.eq("unidade_id", unidadeId);
+
+  const { data: agAmanha } = await queryAgAmanha;
+
+  // Pending approvals
+  let queryAprovacao = supabase
+    .from("os")
+    .select("id, unidade_id")
+    .eq("coluna_kanban", "aguardando_aprovacao");
+
+  if (unidadeId) queryAprovacao = queryAprovacao.eq("unidade_id", unidadeId);
+
+  const { data: osAprovacao } = await queryAprovacao;
+
+  // Pending pecas
+  let queryPecas = supabase
+    .from("os")
+    .select("id, unidade_id")
+    .eq("coluna_kanban", "aguardando_peca");
+
+  if (unidadeId) queryPecas = queryPecas.eq("unidade_id", unidadeId);
+
+  const { data: osPecas } = await queryPecas;
+
+  const abertasCount = abertasHoje?.length || 0;
+  const fechadasCount = fechadasHoje?.length || 0;
+  const saldo = fechadasCount - abertasCount;
+  const agendamentosAmanha = agAmanha?.length || 0;
+  const semConfirmacao = (agAmanha || []).filter((a) => !a.confirmado_cliente && !a.confirmado_com_cliente).length;
+
+  // Group by unidade
+  const abertasPorUni: Record<string, number> = {};
+  for (const o of (abertasHoje || [])) {
+    const uid = o.unidade_id || "sem_unidade";
+    abertasPorUni[uid] = (abertasPorUni[uid] || 0) + 1;
+  }
+  const fechadasPorUni: Record<string, number> = {};
+  for (const o of (fechadasHoje || [])) {
+    const uid = o.unidade_id || "sem_unidade";
+    fechadasPorUni[uid] = (fechadasPorUni[uid] || 0) + 1;
+  }
+
+  const allUnis = new Set([...Object.keys(abertasPorUni), ...Object.keys(fechadasPorUni), ...Object.keys(velPorUnidade)]);
+  const porUnidade = Array.from(allUnis).map((uid) => {
+    const vel = velPorUnidade[uid];
+    return {
+      unidade: unidadeMap[uid] || uid,
+      abertas: abertasPorUni[uid] || 0,
+      fechadas: fechadasPorUni[uid] || 0,
+      saldo: (fechadasPorUni[uid] || 0) - (abertasPorUni[uid] || 0),
+      velocidade_media: vel ? Math.round((vel.totalDias / vel.count) * 10) / 10 : null,
+    };
+  }).sort((a, b) => b.fechadas - a.fechadas);
+
+  const agingList = (aging || []).map((o) => {
+    const dias = Math.round((now.getTime() - new Date(o.created_at).getTime()) / 86400000);
+    return {
+      os: o.numero_os_interna || o.numero_os_samsung || o.id,
+      cliente: o.cliente_nome,
+      coluna: o.coluna_kanban,
+      unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
+      dias_aberta: dias,
+    };
+  });
+
+  const resumoTexto = [
+    `RESUMO FINAL DO DIA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `BALANCO:`,
+    `  Abertas hoje: ${abertasCount}`,
+    `  Fechadas hoje: ${fechadasCount}`,
+    `  Saldo: ${saldo >= 0 ? "+" : ""}${saldo}`,
+    `  Velocidade media (30d): ${velocidadeMedia} dias`,
+    ``,
+    `TOP 5 AGING (mais antigas):`,
+    ...agingList.map((a, i) => `  ${i + 1}. ${a.os} - ${a.cliente} (${a.dias_aberta}d) [${a.coluna}] - ${a.unidade}`),
+    ``,
+    `PENDENCIAS AMANHA:`,
+    `  Agendamentos: ${agendamentosAmanha} (${semConfirmacao} sem confirmacao)`,
+    `  Aguardando aprovacao: ${osAprovacao?.length || 0}`,
+    `  Aguardando peca: ${osPecas?.length || 0}`,
+    ``,
+    `POR UNIDADE:`,
+    ...porUnidade.map((u) => `  ${u.unidade}: +${u.abertas} / -${u.fechadas} (vel: ${u.velocidade_media ?? "N/A"}d)`),
+  ].join("\n");
+
+  return {
+    titulo: "Resumo Final do Dia",
+    subtitulo: `${fechadasCount} fechadas / ${abertasCount} abertas (saldo ${saldo >= 0 ? "+" : ""}${saldo}) | Vel: ${velocidadeMedia}d`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    balanco: {
+      abertas_hoje: abertasCount,
+      fechadas_hoje: fechadasCount,
+      saldo,
+      velocidade_media_30d: velocidadeMedia,
+      total_os_fechadas_30d: osFechadas30d?.length || 0,
+    },
+    aging_top5: agingList,
+    pendencias_amanha: {
+      agendamentos: agendamentosAmanha,
+      sem_confirmacao: semConfirmacao,
+      aguardando_aprovacao: osAprovacao?.length || 0,
+      aguardando_peca: osPecas?.length || 0,
+    },
+    por_unidade: porUnidade,
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
   const today = now.toISOString().split("T")[0];
@@ -1190,9 +1384,12 @@ Deno.serve(async (req: Request) => {
       case "agendamentos_ih":
         resultado = await gerarAgendamentosIH(supabase, unidade_id);
         break;
+      case "resumo_final":
+        resultado = await gerarResumoFinal(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
