@@ -1262,11 +1262,10 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
           total: osCol.length,
         }));
 
-      // OS IH sem rota definida (IH type but NOT in any route/reparo column)
+      // OS IH sem rota definida: IH type that has NO rota_id assigned
       const osIHSemRota = lista.filter((os) => {
         const isIH = os.tipo_atendimento?.toUpperCase() === "IH";
-        const emRotaOuReparo = ihColumns.includes(os.coluna_kanban);
-        return isIH && !emRotaOuReparo;
+        return isIH && !os.rota_id;
       });
 
       const osIHSemRotaNumeros = osIHSemRota.map((os) =>
