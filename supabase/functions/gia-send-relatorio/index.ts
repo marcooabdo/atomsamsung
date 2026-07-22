@@ -75,7 +75,7 @@ Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da dir
 5. Use caracteres de separa\u00E7\u00E3o: \u2501\u2501\u2501\u2501\u2501\u2501 ou \u2500\u2500\u2500\u2500\u2500\u2500 ou \u25AA\u25AA\u25AA
 6. N\u00E3o use markdown de links, tabelas ou c\u00F3digo
 7. Escreva SEMPRE em portugu\u00EAs brasileiro com acentos corretos
-8. M\u00E1ximo 3500 caracteres por relat\u00F3rio
+8. M\u00E1ximo 4500 caracteres por relat\u00F3rio (Pulso Operacional pode usar at\u00E9 6000 caracteres pois DEVE listar TODAS as colunas)
 9. NUNCA inclua frases como "You are trained on data up to..." ou qualquer refer\u00EAncia ao modelo de IA. Voc\u00EA \u00E9 a GIA, n\u00E3o mencione limita\u00E7\u00F5es do modelo.
 
 \u2501\u2501\u2501 REGRAS DE CONTE\u00DADO \u2501\u2501\u2501
@@ -88,16 +88,18 @@ Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da dir
 6. Datas: DD/MM/YYYY | Hor\u00E1rios: HH:MM
 7. N\u00C3O invente dados - use APENAS o que foi fornecido
 8. Se n\u00E3o houver dados para uma unidade, diga "Sem registros" de forma elegante
-9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma (EXCE\u00C7\u00C3O: Agendamentos IH deve listar TODAS as OS sem limite)
+9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma (EXCE\u00C7\u00D5ES: Agendamentos IH lista TODAS as OS; Pulso Operacional lista TODAS as colunas/etapas)
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PULSO OPERACIONAL \u2501\u2501\u2501
 
-Para o Pulso Operacional, use o formato COMPLETO com TODAS as colunas/etapas de cada unidade:
+Para o Pulso Operacional, use o formato COMPLETO com ABSOLUTAMENTE TODAS as colunas/etapas de cada unidade:
 - Cada unidade mostra o total de OS paradas
-- Depois uma lista onde cada linha mostra: *Nome da Etapa* \u2022 X OS \u2022 Mais antiga: Xd Yh
+- Depois uma lista onde CADA LINHA mostra: *Nome da Etapa* \u2022 X OS \u2022 Mais antiga: Xd Yh
 - N\u00C3O mostrar n\u00FAmero de OS Samsung (ex: 4176169495) - REMOVER completamente
 - Ordene por quantidade (maior primeiro)
-- Mostrar TODAS as etapas/colunas, n\u00E3o cortar nenhuma
+- \u26A0\uFE0F OBRIGAT\u00D3RIO: Mostrar TODAS as etapas/colunas que tenham ao menos 1 OS. N\u00C3O CORTAR, N\u00C3O RESUMIR, N\u00C3O OMITIR nenhuma coluna. Se uma unidade tem 20 colunas, mostre as 20.
+- N\u00C3O diga "e mais X colunas" ou "demais etapas" - LISTE TODAS individualmente
+- Este relat\u00F3rio pode ser mais longo que os demais (at\u00E9 6000 caracteres)
 - Use a tradu\u00E7\u00E3o correta dos nomes de coluna
 
 Exemplo de formato por unidade:
@@ -244,8 +246,67 @@ Cada unidade com seus dados formatados de forma clara
 _GIA \u2022 Global Intelligence Assistance_`;
 }
 
+function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string): string {
+  const SIGLAS: Record<string, string> = { MOC: "MOC", JDF: "JDF", FSA: "FSA" };
+  const lines: string[] = [];
+
+  // Header
+  lines.push(`\u{1F534} *PULSO OPERACIONAL*`);
+  lines.push(`${now}`);
+  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+
+  // Summary
+  const totais: string[] = [];
+  let totalGeral = 0;
+  for (const sigla of ["MOC", "JDF", "FSA"]) {
+    const d = dadosPorUnidade[sigla];
+    const paradas = d?.total_os_paradas || 0;
+    totalGeral += paradas;
+    totais.push(`${paradas} ${sigla}`);
+  }
+  lines.push(`\u{1F4CA} *RESUMO EXECUTIVO:*`);
+  lines.push(`Total de OS paradas: ${totalGeral} (${totais.join(" | ")})`);
+
+  // Per unit
+  for (const sigla of ["MOC", "JDF", "FSA"]) {
+    const d = dadosPorUnidade[sigla];
+    if (!d || d.erro) {
+      lines.push(`\u{1F4CD} *${sigla}* \u2014 Erro ao gerar dados`);
+      continue;
+    }
+
+    const paradas = d.total_os_paradas || 0;
+    lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${paradas} OS paradas`);
+
+    const colunas = d.colunas || [];
+    // Sort by paradas desc, only show columns with paradas > 0
+    const colsComParadas = colunas
+      .filter((c: any) => c.paradas > 0)
+      .sort((a: any, b: any) => b.paradas - a.paradas);
+
+    for (const col of colsComParadas) {
+      lines.push(`${col.label} \u2022 ${col.paradas} OS \u2022 Mais antiga: ${col.tempo_mais_antiga}`);
+    }
+
+    if (colsComParadas.length === 0) {
+      lines.push(`_Nenhuma OS parada h\u00E1 mais de 2h_`);
+    }
+  }
+
+  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
+  lines.push(`_GIA \u2022 Global Intelligence Assistance_`);
+
+  return lines.join("\n");
+}
+
 async function formatarComChatGPT(openaiKey: string, dadosPorUnidade: Record<string, any>, relInfo: typeof RELATORIOS[0]): Promise<string> {
   const now = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  // For Pulso Operacional, format directly to guarantee ALL columns appear
+  if (relInfo.tipo === "pulso_operacional") {
+    return formatarPulsoDireto(dadosPorUnidade, now);
+  }
 
   const userPrompt = `Gere o relat\u00F3rio "${relInfo.nome}" (${relInfo.emoji}).
 Data/hora atual: ${now}
@@ -276,7 +337,7 @@ IMPORTANTE: Gere APENAS o texto WhatsApp pronto para enviar. Sem explica\u00E7\u
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
-      max_tokens: 4000,
+      max_tokens: 6000,
     }),
   });
 
