@@ -177,6 +177,153 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
   };
 }
 
+async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+
+  // Fetch units
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  // Fetch technicians
+  const { data: tecnicos } = await supabase.from("usuarios").select("id, nome");
+  const tecnicoMap: Record<string, string> = {};
+  if (tecnicos) {
+    for (const t of tecnicos) tecnicoMap[t.id] = t.nome;
+  }
+
+  // Fetch active routes (today or recent)
+  let queryRotas = supabase
+    .from("rotas_otimizadas")
+    .select("id, nome, cor, tecnico_id, unidade_id, data_rota, status_rota, total_os, cidades")
+    .neq("status_rota", "cancelada");
+
+  if (unidadeId) queryRotas = queryRotas.eq("unidade_id", unidadeId);
+
+  const { data: rotas, error: errRotas } = await queryRotas.order("data_rota", { ascending: false }).limit(100);
+  if (errRotas) throw new Error(`Erro ao buscar rotas: ${errRotas.message}`);
+
+  // Fetch active OS (not archived, not closed) to check which are routed
+  let queryOS = supabase
+    .from("os")
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id")
+    .neq("coluna_kanban", "os_fechada")
+    .or("arquivada.is.null,arquivada.eq.false");
+
+  if (unidadeId) queryOS = queryOS.eq("unidade_id", unidadeId);
+
+  const { data: osAtivas, error: errOS } = await queryOS;
+  if (errOS) throw new Error(`Erro ao buscar OS ativas: ${errOS.message}`);
+
+  const osList = osAtivas || [];
+
+  // OS in route columns (kanban-based)
+  const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih"];
+  const osEmRotaKanban = osList.filter((os) => rotaColumns.includes(os.coluna_kanban));
+  const osComRotaId = osList.filter((os) => os.rota_id);
+  const osEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban) || os.rota_id);
+  const osSemRota = osList.filter((os) => !rotaColumns.includes(os.coluna_kanban) && !os.rota_id);
+
+  // OS IH que deveriam ter rota mas nao tem
+  const osIHSemRota = osSemRota.filter((os) => os.tipo_atendimento?.toUpperCase() === "IH");
+
+  // Group OS by route column
+  const porRotaKanban: Record<string, typeof osList> = {};
+  for (const os of osEmRotaKanban) {
+    const col = os.coluna_kanban;
+    if (!porRotaKanban[col]) porRotaKanban[col] = [];
+    porRotaKanban[col].push(os);
+  }
+
+  // Group OS sem rota by unidade
+  const semRotaPorUnidade: Record<string, typeof osList> = {};
+  for (const os of osIHSemRota) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!semRotaPorUnidade[uid]) semRotaPorUnidade[uid] = [];
+    semRotaPorUnidade[uid].push(os);
+  }
+
+  // Route distribution
+  const distribuicaoRotas = Object.entries(porRotaKanban)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([coluna, lista]) => ({
+      rota: getColunaLabel(coluna),
+      coluna,
+      total_os: lista.length,
+      tipos: {
+        LP: lista.filter((os) => os.tipo_os === "LP").length,
+        OW: lista.filter((os) => os.tipo_os === "OW").length,
+      },
+      os_list: lista.slice(0, 15).map((os) => ({
+        numero: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+        cliente: os.cliente_nome || "Sem cliente",
+        tipo: `${os.tipo_os || "-"}-${os.tipo_atendimento || "-"}`,
+      })),
+    }));
+
+  // Rotas otimizadas ativas (from rotas_otimizadas table)
+  const rotasAtivas = (rotas || []).filter((r) => r.status_rota !== "concluida").map((r) => ({
+    id: r.id,
+    nome: r.nome || "Sem nome",
+    cor: r.cor || "-",
+    tecnico: tecnicoMap[r.tecnico_id] || "-",
+    unidade: unidadeMap[r.unidade_id] || "-",
+    data_rota: r.data_rota,
+    status: r.status_rota,
+    total_os: r.total_os || 0,
+    cidades: r.cidades || [],
+  }));
+
+  // Unidades com mais OS IH sem rota
+  const semRotaResumoPorUnidade = Object.entries(semRotaPorUnidade)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([uid, lista]) => ({
+      unidade: unidadeMap[uid] || uid,
+      total: lista.length,
+      os_list: lista.slice(0, 10).map((os) => ({
+        numero: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+        cliente: os.cliente_nome || "Sem cliente",
+        tipo: os.tipo_os || "-",
+      })),
+    }));
+
+  const resumoTexto = [
+    `MAPA DE ROTAS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `OS ativas: ${osList.length}`,
+    `Em rota: ${osEmRota.length} | Sem rota: ${osSemRota.length}`,
+    `OS IH sem rota designada: ${osIHSemRota.length}`,
+    ``,
+    `Distribuicao por rota:`,
+    ...distribuicaoRotas.map((r) => `  ${r.rota}: ${r.total_os} OS (LP: ${r.tipos.LP} | OW: ${r.tipos.OW})`),
+    ``,
+    `OS IH sem rota por unidade:`,
+    ...semRotaResumoPorUnidade.map((u) => `  ${u.unidade}: ${u.total} OS`),
+    ``,
+    `Rotas planejadas ativas: ${rotasAtivas.length}`,
+    ...rotasAtivas.slice(0, 10).map((r) => `  ${r.nome} (${r.cor}) - ${r.tecnico} - ${r.total_os} OS - ${r.status}`),
+  ].join("\n");
+
+  return {
+    titulo: "Mapa de Rotas",
+    subtitulo: `${osEmRota.length} OS em rota / ${osIHSemRota.length} IH sem rota`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    totais: {
+      os_ativas: osList.length,
+      em_rota: osEmRota.length,
+      sem_rota: osSemRota.length,
+      ih_sem_rota: osIHSemRota.length,
+    },
+    distribuicao_rotas: distribuicaoRotas,
+    rotas_planejadas: rotasAtivas,
+    ih_sem_rota_por_unidade: semRotaResumoPorUnidade,
+    resumo_texto: resumoTexto,
+  };
+}
+
 async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
   const startOfDay = new Date(now);
@@ -323,9 +470,12 @@ Deno.serve(async (req: Request) => {
       case "abertura_fechamento":
         resultado = await gerarAberturaFechamento(supabase, unidade_id);
         break;
+      case "mapa_rotas":
+        resultado = await gerarMapaRotas(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
