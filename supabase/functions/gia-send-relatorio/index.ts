@@ -121,6 +121,23 @@ Exemplo de formato por unidade:
 4176294361
 4176199253
 
+\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: ABERTURA E FECHAMENTO \u2501\u2501\u2501
+
+Para o relat\u00F3rio de Abertura e Fechamento:
+- PRIMEIRO mostrar o CONSOLIDADO GERAL (soma de todas unidades) com abertas, fechadas, saldo e a distribui\u00E7\u00E3o por tipo (LP-CI, LP-IH, OW-CI, OW-IH)
+- DEPOIS mostrar por unidade com os mesmos dados
+
+Exemplo:
+\u{1F4CA} *CONSOLIDADO GERAL*
+Abertas: *16* | Fechadas: *17* | Saldo: *-1*
+\u{1F539} Abertas: LP-CI: 1 | LP-IH: 5 | OW-CI: 1 | OW-IH: 9
+\u{1F539} Fechadas: LP-CI: 1 | LP-IH: 3 | OW-CI: 2 | OW-IH: 11
+
+\u{1F4CD} *MOC*
+Abertas: *2* | Fechadas: *2* | Saldo: *0*
+\u{1F539} Abertas: LP-CI: 0 | LP-IH: 1 | OW-CI: 0 | OW-IH: 1
+\u{1F539} Fechadas: LP-CI: 0 | LP-IH: 1 | OW-CI: 0 | OW-IH: 1
+
 \u2501\u2501\u2501 ESTRUTURA OBRIGAT\u00D3RIA \u2501\u2501\u2501
 
 \u{1F4CB} CABE\u00C7ALHO:

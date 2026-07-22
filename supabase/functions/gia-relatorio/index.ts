@@ -1286,19 +1286,23 @@ async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>
   const resumoTexto = [
     `ABERTURA E FECHAMENTO - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
     ``,
-    `Resumo do dia:`,
+    `CONSOLIDADO GERAL:`,
     `  Abertas: ${totalAbertas} | Fechadas: ${totalFechadas} | Saldo: ${saldoGeral >= 0 ? "+" : ""}${saldoGeral}`,
     ``,
-    `Abertas por tipo:`,
+    `  Abertas por tipo:`,
     `  LP-CI: ${categoriasAbertas["LP-CI"]} | LP-IH: ${categoriasAbertas["LP-IH"]} | OW-CI: ${categoriasAbertas["OW-CI"]} | OW-IH: ${categoriasAbertas["OW-IH"]}`,
     ``,
-    `Fechadas por tipo:`,
+    `  Fechadas por tipo:`,
     `  LP-CI: ${categoriasFechadas["LP-CI"]} | LP-IH: ${categoriasFechadas["LP-IH"]} | OW-CI: ${categoriasFechadas["OW-CI"]} | OW-IH: ${categoriasFechadas["OW-IH"]}`,
     ``,
-    `Por unidade:`,
-    ...unidadesReport.map((u) =>
-      `  ${u.unidade_nome}: +${u.abertas.total} abertas / -${u.fechadas.total} fechadas (saldo: ${u.saldo >= 0 ? "+" : ""}${u.saldo})`
-    ),
+    `POR UNIDADE:`,
+    ...unidadesReport.flatMap((u) => [
+      `  --- ${u.unidade_nome} ---`,
+      `  Abertas: ${u.abertas.total} | Fechadas: ${u.fechadas.total} | Saldo: ${u.saldo >= 0 ? "+" : ""}${u.saldo}`,
+      `  Abertas: LP-CI: ${u.abertas.categorias["LP-CI"]} | LP-IH: ${u.abertas.categorias["LP-IH"]} | OW-CI: ${u.abertas.categorias["OW-CI"]} | OW-IH: ${u.abertas.categorias["OW-IH"]}`,
+      `  Fechadas: LP-CI: ${u.fechadas.categorias["LP-CI"]} | LP-IH: ${u.fechadas.categorias["LP-IH"]} | OW-CI: ${u.fechadas.categorias["OW-CI"]} | OW-IH: ${u.fechadas.categorias["OW-IH"]}`,
+      ``,
+    ]),
   ].join("\n");
 
   return {
