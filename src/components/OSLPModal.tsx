@@ -4986,7 +4986,23 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                       {requisicao && getStatusBadge(requisicao.status)}
                                       {!requisicao && requisicaoDevolvida && getStatusBadge(requisicaoDevolvida.status)}
                                     </div>
-                                    <p className="text-xs text-gray-500 mt-1">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                    <div className="flex items-center gap-3 mt-1">
+                                      <p className="text-xs text-gray-500">Código: {peca.codigo || peca.pn || 'N/A'}</p>
+                                      {requisicao?.peca_estoque?.id_numerico && (
+                                        <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', color: 'var(--neon-green)', border: '1px solid rgba(var(--neon-green-rgb),0.3)' }}>
+                                          ID #{requisicao.peca_estoque.id_numerico}
+                                        </span>
+                                      )}
+                                      {requisicao?.is_lote && requisicao?.pecas_lote?.length > 0 && (
+                                        <div className="flex flex-wrap gap-1">
+                                          {requisicao.pecas_lote.map((pl: any) => (
+                                            <span key={pl.id} className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: 'rgba(var(--neon-green-rgb),0.1)', color: 'var(--neon-green)', border: '1px solid rgba(var(--neon-green-rgb),0.3)' }}>
+                                              ID #{pl.id_numerico}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
                                     <div className="flex items-center gap-4 mt-2 flex-wrap">
                                       <p className="text-xs text-gray-500">Qtd: {peca.quantidade}</p>
                                       {peca.valor_gspn && (
