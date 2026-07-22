@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AlertCircle, MapPin, Pencil } from 'lucide-react';
 
 interface RouteSelectionModalProps {
@@ -32,6 +32,13 @@ export function RouteSelectionModal({
 }: RouteSelectionModalProps) {
   const [editandoCidade, setEditandoCidade] = useState(false);
   const [cidadeEditada, setCidadeEditada] = useState(cidade || '');
+
+  useEffect(() => {
+    if (isOpen) {
+      setCidadeEditada(cidade || '');
+      setEditandoCidade(false);
+    }
+  }, [isOpen, cidade]);
 
   if (!isOpen) return null;
 
