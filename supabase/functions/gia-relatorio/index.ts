@@ -10,17 +10,17 @@ const corsHeaders = {
 
 const COLUNA_LABELS: Record<string, string> = {
   os_nova: "OS Nova",
-  diagnostico: "Diagnostico",
-  aguardando_peca: "Aguardando Peca",
-  peca_em_transito: "Peca em Transito",
-  aguardando_aprovacao: "Aguardando Aprovacao",
-  negociacao_em_andamento: "Negociacao em Andamento",
-  orcamento_aprovado: "Orcamento Aprovado",
+  diagnostico: "Diagnóstico",
+  aguardando_peca: "Aguardando Peça",
+  peca_em_transito: "Peça em Trânsito",
+  aguardando_aprovacao: "Aguardando Aprovação",
+  negociacao_em_andamento: "Negociação em Andamento",
+  orcamento_aprovado: "Orçamento Aprovado",
   em_reparo_ci: "Em Reparo CI",
   em_reparo_ih: "Em Reparo IH",
   em_rota_ih: "Em Rota IH",
   controle_qualidade: "Controle de Qualidade",
-  reparo_concluido: "Reparo Concluido",
+  reparo_concluido: "Reparo Concluído",
   aguardando_fechamento: "Aguardando Fechamento",
   rota_verde: "Rota Verde",
   rota_azul: "Rota Azul",
@@ -29,13 +29,13 @@ const COLUNA_LABELS: Record<string, string> = {
   rota_laranja: "Rota Laranja",
   rota_rosa: "Rota Rosa",
   rota_preta: "Rota Preta",
-  instalacao_inicial: "Instalacao Inicial",
+  instalacao_inicial: "Instalação Inicial",
   service_handling: "Service Handling",
   return_handling: "Return Handling",
   saw: "SAW",
   qa_bt: "QA/BT",
   trade_up: "Trade Up",
-  orcamentos_rejeitados: "Orcamentos Rejeitados",
+  orcamentos_rejeitados: "Orçamentos Rejeitados",
   os_fechada: "OS Fechada",
 };
 
@@ -464,7 +464,7 @@ async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unida
   const agingList = (aging || []).map((o) => {
     const dias = Math.round((now.getTime() - new Date(o.created_at).getTime()) / 86400000);
     return {
-      os: o.numero_os_interna || o.numero_os_samsung || o.id,
+      os: o.numero_os_samsung || o.numero_os_interna || o.id,
       cliente: o.cliente_nome,
       coluna: o.coluna_kanban,
       unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
@@ -630,12 +630,12 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
       reparo_data_errada: (reparoPorUnidade[uid] || []).length,
       total_problemas: (ftfPorUnidade[uid] || []).length + (reparoPorUnidade[uid] || []).length,
       detalhes_ftf: (ftfPorUnidade[uid] || []).slice(0, 10).map((o) => ({
-        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        os: o.numero_os_samsung || o.numero_os_interna || o.id,
         cliente: o.cliente_nome,
         rota: o.coluna_kanban,
       })),
       detalhes_reparo: (reparoPorUnidade[uid] || []).slice(0, 10).map((o) => ({
-        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        os: o.numero_os_samsung || o.numero_os_interna || o.id,
         cliente: o.cliente_nome,
         coluna: o.coluna_kanban,
       })),
@@ -663,7 +663,7 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     ftf_sem_data_confirmacao: {
       total: osSemDataConfirmacao.length,
       os_list: osSemDataConfirmacao.slice(0, 20).map((o) => ({
-        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        os: o.numero_os_samsung || o.numero_os_interna || o.id,
         cliente: o.cliente_nome,
         rota: o.coluna_kanban,
         unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
@@ -672,7 +672,7 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     reparo_data_errada: {
       total: osDataErrada.length,
       os_list: osDataErrada.slice(0, 20).map((o) => ({
-        os: o.numero_os_interna || o.numero_os_samsung || o.id,
+        os: o.numero_os_samsung || o.numero_os_interna || o.id,
         cliente: o.cliente_nome,
         coluna: o.coluna_kanban,
         unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,

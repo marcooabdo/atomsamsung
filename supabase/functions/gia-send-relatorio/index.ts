@@ -8,15 +8,15 @@ const corsHeaders = {
 };
 
 const RELATORIOS = [
-  { tipo: "pulso_operacional", nome: "Pulso Operacional", emoji: "🔴", horario: "08:00" },
-  { tipo: "estoque_dia", nome: "Estoque do Dia", emoji: "📦", horario: "08:00" },
-  { tipo: "agendamentos_ih", nome: "Agendamentos IH", emoji: "📅", horario: "07:30" },
-  { tipo: "mapa_rotas", nome: "Mapa de Rotas", emoji: "🗺️", horario: "08:30" },
-  { tipo: "abertura_fechamento", nome: "Abertura e Fechamento", emoji: "📊", horario: "09:00" },
-  { tipo: "limite_credito_gspn", nome: "Limite de Credito GSPN", emoji: "💳", horario: "09:30" },
-  { tipo: "nucleo_pecas", nome: "Nucleo de Pecas", emoji: "🔧", horario: "10:00" },
-  { tipo: "compliance_erros", nome: "Compliance e Erros", emoji: "⚠️", horario: "11:00" },
-  { tipo: "resumo_final", nome: "Resumo Final", emoji: "🏁", horario: "18:00" },
+  { tipo: "pulso_operacional", nome: "Pulso Operacional", emoji: "\u{1F534}", horario: "08:00" },
+  { tipo: "estoque_dia", nome: "Estoque do Dia", emoji: "\u{1F4E6}", horario: "08:00" },
+  { tipo: "agendamentos_ih", nome: "Agendamentos IH", emoji: "\u{1F4C5}", horario: "07:30" },
+  { tipo: "mapa_rotas", nome: "Mapa de Rotas", emoji: "\u{1F5FA}\u{FE0F}", horario: "08:30" },
+  { tipo: "abertura_fechamento", nome: "Abertura e Fechamento", emoji: "\u{1F4CA}", horario: "09:00" },
+  { tipo: "limite_credito_gspn", nome: "Limite de Cr\u00E9dito GSPN", emoji: "\u{1F4B3}", horario: "09:30" },
+  { tipo: "nucleo_pecas", nome: "N\u00FAcleo de Pe\u00E7as", emoji: "\u{1F527}", horario: "10:00" },
+  { tipo: "compliance_erros", nome: "Compliance e Erros", emoji: "\u{26A0}\u{FE0F}", horario: "11:00" },
+  { tipo: "resumo_final", nome: "Resumo Final do Dia", emoji: "\u{1F3C1}", horario: "18:00" },
 ];
 
 const UNIDADES = [
@@ -54,46 +54,74 @@ async function gerarRelatorio(supabaseUrl: string, supabaseServiceKey: string, t
   });
   if (!resp.ok) {
     const err = await resp.text();
-    throw new Error(`Erro ao gerar relatorio ${tipo}: ${err}`);
+    throw new Error(`Erro ao gerar relat\u00F3rio ${tipo}: ${err}`);
   }
   return await resp.json();
 }
 
-async function formatarComChatGPT(openaiKey: string, tipo: string, dadosPorUnidade: Record<string, any>, relInfo: typeof RELATORIOS[0]): Promise<string> {
+function buildSystemPrompt(): string {
+  return `Voc\u00EA \u00E9 a *GIA* (Global Intelligence Assistance), a intelig\u00EAncia artificial da rede ATOM Smart Center Samsung.
+
+Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da diretoria e ger\u00EAncia.
+
+\u2501\u2501\u2501 REGRAS DE FORMATA\u00C7\u00C3O WHATSAPP \u2501\u2501\u2501
+
+1. *Negrito* com asteriscos para t\u00EDtulos, destaques e n\u00FAmeros importantes
+2. _It\u00E1lico_ com underline para observa\u00E7\u00F5es e notas
+3. Use emojis profissionais para separar se\u00E7\u00F5es e dar cor visual
+4. Quebras de linha generosas para respirar
+5. Use caracteres de separa\u00E7\u00E3o: \u2501\u2501\u2501\u2501\u2501\u2501 ou \u2500\u2500\u2500\u2500\u2500\u2500 ou \u25AA\u25AA\u25AA
+6. N\u00E3o use markdown de links, tabelas ou c\u00F3digo
+7. Escreva SEMPRE em portugu\u00EAs brasileiro com acentos corretos
+8. M\u00E1ximo 3500 caracteres por relat\u00F3rio
+
+\u2501\u2501\u2501 REGRAS DE CONTE\u00DADO \u2501\u2501\u2501
+
+1. SEMPRE separe por unidade: *\u{1F4CD} MOC* (Montes Claros), *\u{1F4CD} JDF* (Juiz de Fora), *\u{1F4CD} FSA* (Feira de Santana)
+2. Para OS: use SEMPRE o n\u00FAmero Samsung (ex: 4174760770). S\u00D3 use n\u00FAmero interno se n\u00E3o houver Samsung
+3. N\u00E3o mostre chaves JSON, nomes de colunas do banco, ou termos t\u00E9cnicos como "return_handling", "coluna_kanban", etc.
+4. Traduza colunas: "os_nova" = "OS Nova", "diagnostico" = "Diagn\u00F3stico", "aguardando_peca" = "Aguardando Pe\u00E7a", "peca_em_transito" = "Pe\u00E7a em Tr\u00E2nsito", "aguardando_aprovacao" = "Aguardando Aprova\u00E7\u00E3o", "em_reparo_ci" = "Em Reparo CI", "em_reparo_ih" = "Em Reparo IH", "reparo_concluido" = "Reparo Conclu\u00EDdo", "controle_qualidade" = "Controle de Qualidade", "aguardando_fechamento" = "Aguardando Fechamento", "orcamento_aprovado" = "Or\u00E7amento Aprovado"
+5. Valores monet\u00E1rios: R$ X.XXX,XX
+6. Datas: DD/MM/YYYY | Hor\u00E1rios: HH:MM
+7. N\u00C3O invente dados - use APENAS o que foi fornecido
+8. Se n\u00E3o houver dados para uma unidade, diga "Sem registros" de forma elegante
+9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma
+
+\u2501\u2501\u2501 ESTRUTURA OBRIGAT\u00D3RIA \u2501\u2501\u2501
+
+\u{1F4CB} CABE\u00C7ALHO:
+[emoji do relat\u00F3rio] *[T\u00CDTULO EM MAI\u00DASCULAS]*
+[data e hora atual no formato DD/MM/YYYY \u00E0s HH:MM]
+[linha separadora]
+
+\u{1F4CA} RESUMO EXECUTIVO:
+2-3 linhas com os n\u00FAmeros mais relevantes do consolidado
+
+\u{1F4CD} POR UNIDADE:
+Cada unidade com seus dados formatados de forma clara
+
+\u{1F3F7}\u{FE0F} RODAP\u00C9:
+_GIA \u2022 Global Intelligence Assistance_`;
+}
+
+async function formatarComChatGPT(openaiKey: string, dadosPorUnidade: Record<string, any>, relInfo: typeof RELATORIOS[0]): Promise<string> {
   const now = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
-  const systemPrompt = `Voce e a GIA (Gestao Inteligente ATOM), assistente de relatorios da rede ATOM Smart Center Samsung.
-Formata relatorios para envio via WhatsApp em um grupo de gestao com diretores e gerentes.
+  const userPrompt = `Gere o relat\u00F3rio "${relInfo.nome}" (${relInfo.emoji}).
+Data/hora atual: ${now}
 
-REGRAS ABSOLUTAS:
-- Use *negrito* para titulos e destaques importantes (WhatsApp usa asteriscos)
-- Use _italico_ com underscores quando necessario
-- Use emojis de forma profissional e moderada para destacar secoes
-- SEPARE SEMPRE por unidade: *MOC* (Montes Claros), *JDF* (Juiz de Fora), *FSA* (Feira de Santana)
-- Para OS: SEMPRE use o numero_os_samsung (ex: 4174760770). So use numero_os_interna se numero_os_samsung for null/vazio
-- Seja conciso mas completo - nao omita dados relevantes
-- Use quebras de linha e espacos para legibilidade
-- Valores monetarios: R$ X.XXX,XX
-- Horarios: HH:MM
-- NAO invente dados - use APENAS o que foi fornecido
-- NAO use links ou URLs
-- Maximo 3000 caracteres por relatorio
+Dados por unidade:
 
-ESTRUTURA:
-1. Cabecalho: emoji + *TITULO DO RELATORIO* + data/hora
-2. Linha separadora (use ━━━━━━━━━━━━━━━━ ou similar)
-3. Resumo executivo em 2-3 linhas com os numeros mais importantes
-4. Secao *📍 MOC - Montes Claros* com dados da unidade
-5. Secao *📍 JDF - Juiz de Fora* com dados da unidade
-6. Secao *📍 FSA - Feira de Santana* com dados da unidade
-7. Rodape: _GIA - Gestao Inteligente ATOM_ com horario`;
+*MOC (Montes Claros):*
+${JSON.stringify(dadosPorUnidade["MOC"], null, 2).slice(0, 5000)}
 
-  const userPrompt = `Formate o relatorio "${relInfo.nome}" (${relInfo.emoji}) gerado em ${now}.
+*JDF (Juiz de Fora):*
+${JSON.stringify(dadosPorUnidade["JDF"], null, 2).slice(0, 5000)}
 
-Dados de cada unidade (JSON):
-${JSON.stringify(dadosPorUnidade, null, 2).slice(0, 12000)}
+*FSA (Feira de Santana):*
+${JSON.stringify(dadosPorUnidade["FSA"], null, 2).slice(0, 5000)}
 
-Gere APENAS o texto formatado para WhatsApp. Nada mais. Sem explicacoes, sem markdown de codigo.`;
+IMPORTANTE: Gere APENAS o texto WhatsApp pronto para enviar. Sem explica\u00E7\u00F5es, sem coment\u00E1rios, sem bloco de c\u00F3digo.`;
 
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
@@ -104,11 +132,11 @@ Gere APENAS o texto formatado para WhatsApp. Nada mais. Sem explicacoes, sem mar
     body: JSON.stringify({
       model: "gpt-4o-mini",
       messages: [
-        { role: "system", content: systemPrompt },
+        { role: "system", content: buildSystemPrompt() },
         { role: "user", content: userPrompt },
       ],
       temperature: 0.3,
-      max_tokens: 2500,
+      max_tokens: 2800,
     }),
   });
 
@@ -118,7 +146,7 @@ Gere APENAS o texto formatado para WhatsApp. Nada mais. Sem explicacoes, sem mar
   }
 
   const data = await resp.json();
-  return data.choices?.[0]?.message?.content || "Erro ao formatar relatorio";
+  return data.choices?.[0]?.message?.content || "Erro ao formatar relat\u00F3rio";
 }
 
 Deno.serve(async (req: Request) => {
@@ -144,16 +172,14 @@ Deno.serve(async (req: Request) => {
       todos = false,
       group_jid = DEFAULT_GROUP_JID,
       instance_name = DEFAULT_INSTANCE,
-      batch_index,
     } = body;
 
-    // If "todos" - dispatch individual calls to avoid timeout
+    // If "todos" - dispatch individual calls to self to avoid timeout
     if (todos) {
       const results: any[] = [];
       for (let i = 0; i < RELATORIOS.length; i++) {
         const rel = RELATORIOS[i];
         try {
-          // Call self for each report
           const selfResp = await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
             method: "POST",
             headers: {
@@ -164,8 +190,7 @@ Deno.serve(async (req: Request) => {
           });
           const selfData = await selfResp.json();
           results.push({ tipo: rel.tipo, nome: rel.nome, sucesso: selfData.success || false, erro: selfData.error });
-          // Delay between dispatches
-          await new Promise((r) => setTimeout(r, 1500));
+          await new Promise((r) => setTimeout(r, 2000));
         } catch (err: any) {
           results.push({ tipo: rel.tipo, nome: rel.nome, sucesso: false, erro: err.message });
         }
@@ -214,7 +239,7 @@ Deno.serve(async (req: Request) => {
     await Promise.all(promises);
 
     // Format with ChatGPT
-    const textoFormatado = await formatarComChatGPT(openaiKey, relInfo.tipo, dadosPorUnidade, relInfo);
+    const textoFormatado = await formatarComChatGPT(openaiKey, dadosPorUnidade, relInfo);
 
     // Send to WhatsApp
     await sendWhatsAppGroup(group_jid, textoFormatado, instance_name);
