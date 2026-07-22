@@ -28,11 +28,11 @@ export function ModalRegistrarValorGSPN({ requisicao, onConfirm, onCancel }: Mod
     e.preventDefault();
 
     const valor = parseFloat(sanitizeGSPNValue(valorGSPN));
-    if (isNaN(valor) || valor <= 0) {
+    if (isNaN(valor) || valor < 0) {
       showAlert({
         type: 'error',
         title: 'Valor Inválido',
-        message: 'Digite um valor válido maior que zero'
+        message: 'Digite um valor válido'
       });
       return;
     }

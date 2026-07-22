@@ -1061,13 +1061,13 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
   const handleSalvarValorGSPN = async (pecaId: string) => {
     const valorEditado = editandoValorGSPN[pecaId];
-    if (!valorEditado) {
+    if (valorEditado === undefined || valorEditado === null || valorEditado === '') {
       showAlert({ message: 'Digite um valor válido', type: 'warning' });
       return;
     }
 
     const valorNum = parseFloat(sanitizeGSPNValue(valorEditado));
-    if (isNaN(valorNum) || valorNum <= 0) {
+    if (isNaN(valorNum) || valorNum < 0) {
       showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
     }
@@ -1268,13 +1268,13 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   };
 
   const handleAdicionarPecaOW = async () => {
-    if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || !novaPecaValorGSPN) {
+    if (!novaPecaCodigoOW.trim() || !novaPecaDescricaoOW.trim() || (novaPecaValorGSPN === undefined || novaPecaValorGSPN === null || novaPecaValorGSPN === '')) {
       showAlert({ message: 'Preencha todos os campos obrigatorios', type: 'warning' });
       return;
     }
 
     const valorGSPNNum = parseFloat(sanitizeGSPNValue(novaPecaValorGSPN));
-    if (isNaN(valorGSPNNum) || valorGSPNNum <= 0) {
+    if (isNaN(valorGSPNNum) || valorGSPNNum < 0) {
       showAlert({ message: 'Valor inválido', type: 'warning' });
       return;
     }

@@ -24,13 +24,13 @@ export function ModalPedirPeca({ requisicao, onConfirm, onCancel }: ModalPedirPe
       return;
     }
 
-    if (!requisicao.valor_peca) {
+    if (requisicao.valor_peca === null || requisicao.valor_peca === undefined) {
       alert('Erro: Valor GSPN não está registrado');
       return;
     }
 
     const valorNumerico = Number(requisicao.valor_peca);
-    if (isNaN(valorNumerico) || valorNumerico <= 0) {
+    if (isNaN(valorNumerico) || valorNumerico < 0) {
       alert('Erro: Valor GSPN inválido. Por favor, registre o valor correto.');
       return;
     }
