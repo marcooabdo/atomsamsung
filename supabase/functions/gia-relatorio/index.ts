@@ -177,6 +177,130 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
   };
 }
 
+async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  // Fetch all units for labeling
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  // Fetch OS opened today
+  let queryAbertas = supabase
+    .from("os")
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, unidade_id, created_at")
+    .gte("created_at", startOfDay.toISOString());
+
+  if (unidadeId) queryAbertas = queryAbertas.eq("unidade_id", unidadeId);
+
+  const { data: abertas, error: errAbertas } = await queryAbertas;
+  if (errAbertas) throw new Error(`Erro ao buscar OS abertas: ${errAbertas.message}`);
+
+  // Fetch OS closed today
+  let queryFechadas = supabase
+    .from("os")
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, unidade_id, fechada_em")
+    .gte("fechada_em", startOfDay.toISOString());
+
+  if (unidadeId) queryFechadas = queryFechadas.eq("unidade_id", unidadeId);
+
+  const { data: fechadas, error: errFechadas } = await queryFechadas;
+  if (errFechadas) throw new Error(`Erro ao buscar OS fechadas: ${errFechadas.message}`);
+
+  const categorizarOS = (lista: typeof abertas) => {
+    const categorias: Record<string, number> = { "LP-CI": 0, "LP-IH": 0, "OW-CI": 0, "OW-IH": 0, "Outros": 0 };
+    for (const os of lista || []) {
+      const tipo = os.tipo_os?.toUpperCase() || "";
+      const atend = os.tipo_atendimento?.toUpperCase() || "";
+      const key = `${tipo}-${atend}`;
+      if (key in categorias) categorias[key]++;
+      else categorias["Outros"]++;
+    }
+    return categorias;
+  };
+
+  const porUnidadeAbertas: Record<string, typeof abertas> = {};
+  const porUnidadeFechadas: Record<string, typeof fechadas> = {};
+
+  for (const os of abertas || []) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidadeAbertas[uid]) porUnidadeAbertas[uid] = [];
+    porUnidadeAbertas[uid].push(os);
+  }
+
+  for (const os of fechadas || []) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidadeFechadas[uid]) porUnidadeFechadas[uid] = [];
+    porUnidadeFechadas[uid].push(os);
+  }
+
+  const allUnidadeIds = new Set([...Object.keys(porUnidadeAbertas), ...Object.keys(porUnidadeFechadas)]);
+
+  const unidadesReport = Array.from(allUnidadeIds).map((uid) => {
+    const nome = unidadeMap[uid] || uid;
+    const abertasUnidade = porUnidadeAbertas[uid] || [];
+    const fechadasUnidade = porUnidadeFechadas[uid] || [];
+    return {
+      unidade_id: uid,
+      unidade_nome: nome,
+      abertas: {
+        total: abertasUnidade.length,
+        categorias: categorizarOS(abertasUnidade),
+      },
+      fechadas: {
+        total: fechadasUnidade.length,
+        categorias: categorizarOS(fechadasUnidade),
+      },
+      saldo: abertasUnidade.length - fechadasUnidade.length,
+    };
+  }).sort((a, b) => b.abertas.total - a.abertas.total);
+
+  const totalAbertas = (abertas || []).length;
+  const totalFechadas = (fechadas || []).length;
+  const saldoGeral = totalAbertas - totalFechadas;
+  const categoriasAbertas = categorizarOS(abertas);
+  const categoriasFechadas = categorizarOS(fechadas);
+
+  const resumoTexto = [
+    `ABERTURA E FECHAMENTO - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `Resumo do dia:`,
+    `  Abertas: ${totalAbertas} | Fechadas: ${totalFechadas} | Saldo: ${saldoGeral >= 0 ? "+" : ""}${saldoGeral}`,
+    ``,
+    `Abertas por tipo:`,
+    `  LP-CI: ${categoriasAbertas["LP-CI"]} | LP-IH: ${categoriasAbertas["LP-IH"]} | OW-CI: ${categoriasAbertas["OW-CI"]} | OW-IH: ${categoriasAbertas["OW-IH"]}`,
+    ``,
+    `Fechadas por tipo:`,
+    `  LP-CI: ${categoriasFechadas["LP-CI"]} | LP-IH: ${categoriasFechadas["LP-IH"]} | OW-CI: ${categoriasFechadas["OW-CI"]} | OW-IH: ${categoriasFechadas["OW-IH"]}`,
+    ``,
+    `Por unidade:`,
+    ...unidadesReport.map((u) =>
+      `  ${u.unidade_nome}: +${u.abertas.total} abertas / -${u.fechadas.total} fechadas (saldo: ${u.saldo >= 0 ? "+" : ""}${u.saldo})`
+    ),
+  ].join("\n");
+
+  return {
+    titulo: "Abertura e Fechamento",
+    subtitulo: `${totalAbertas} abertas / ${totalFechadas} fechadas hoje`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    periodo: "hoje",
+    totais: {
+      abertas: totalAbertas,
+      fechadas: totalFechadas,
+      saldo: saldoGeral,
+    },
+    categorias_abertas: categoriasAbertas,
+    categorias_fechadas: categoriasFechadas,
+    por_unidade: unidadesReport,
+    resumo_texto: resumoTexto,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -196,9 +320,12 @@ Deno.serve(async (req: Request) => {
       case "pulso_operacional":
         resultado = await gerarPulsoOperacional(supabase, unidade_id);
         break;
+      case "abertura_fechamento":
+        resultado = await gerarAberturaFechamento(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
