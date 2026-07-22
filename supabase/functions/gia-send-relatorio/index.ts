@@ -88,7 +88,7 @@ Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da dir
 6. Datas: DD/MM/YYYY | Hor\u00E1rios: HH:MM
 7. N\u00C3O invente dados - use APENAS o que foi fornecido
 8. Se n\u00E3o houver dados para uma unidade, diga "Sem registros" de forma elegante
-9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma
+9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma (EXCE\u00C7\u00C3O: Agendamentos IH deve listar TODAS as OS sem limite)
 
 \u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PULSO OPERACIONAL \u2501\u2501\u2501
 
@@ -183,6 +183,40 @@ Exemplo:
 4176123891 \u2022 3 pe\u00E7as sem valor
 4176152959 \u2022 1 pe\u00E7a sem PN, 1 sem valor
 4176188200 \u2022 2 pe\u00E7as sem PN
+
+\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: AGENDAMENTOS IH \u2501\u2501\u2501
+
+Para o relat\u00F3rio de Agendamentos IH:
+- Mostrar APENAS n\u00FAmeros de OS (sem nome de cliente, sem nome de rota)
+- Listar TODAS as OS com erro (sem limite)
+- Separar em duas se\u00E7\u00F5es: erros de FTF e erros de Reparo IH
+- Regra FTF: OS na coluna "Agendados (FTF)" N\u00C3O pode ter agendamento confirmado com cliente. Se tiver, a data deve ser futura. Data de hoje ou passada = ERRO.
+- Regra Reparo IH: OS na coluna "Reparo em Progresso IH" DEVE ter agendamento confirmado com cliente e data do dia atual. Sem confirma\u00E7\u00E3o ou data diferente = ERRO.
+- Por unidade, mostrar total de erros e listar TODAS as OS
+
+Exemplo:
+\u{1F4CD} *MOC* \u2014 8 erros
+\u{1F534} *FTF (5 erros):*
+4176279211
+4176294361
+4176199253
+4176287654
+4176201122
+
+\u26A0\uFE0F *Reparo IH (3 erros):*
+4176180432
+4176155611
+4176123987
+
+\u{1F4CD} *JDF* \u2014 3 erros
+\u{1F534} *FTF (2 erros):*
+4176300111
+4176312455
+
+\u26A0\uFE0F *Reparo IH (1 erro):*
+4176155987
+
+IMPORTANTE: N\u00C3O colocar motivo do erro, nome de cliente, ou qualquer outra informa\u00E7\u00E3o. APENAS o n\u00FAmero da OS.
 
 \u2501\u2501\u2501 ESTRUTURA OBRIGAT\u00D3RIA \u2501\u2501\u2501
 

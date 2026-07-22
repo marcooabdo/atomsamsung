@@ -608,7 +608,8 @@ async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unida
 
 async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
-  const today = now.toISOString().split("T")[0];
+  const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const today = `${spNow.getFullYear()}-${String(spNow.getMonth() + 1).padStart(2, "0")}-${String(spNow.getDate()).padStart(2, "0")}`;
 
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
@@ -616,66 +617,86 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     for (const u of unidades) unidadeMap[u.id] = u.nome;
   }
 
-  // OS IH in rota_ columns (FTF agendado) - check for missing date or no confirmation
-  let queryRotaOS = supabase
+  // ═══ FTF (em_rota_ih): must NOT have confirmed appointment. If has confirmed, date must be strictly future ═══
+  let queryFTF = supabase
     .from("os")
-    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, data_agendamento, periodo_agendamento")
-    .eq("tipo_atendimento", "IH")
-    .like("coluna_kanban", "rota_%");
+    .select("id, numero_os_interna, numero_os_samsung, unidade_id")
+    .eq("coluna_kanban", "em_rota_ih")
+    .or("arquivada.is.null,arquivada.eq.false");
 
-  if (unidadeId) queryRotaOS = queryRotaOS.eq("unidade_id", unidadeId);
+  if (unidadeId) queryFTF = queryFTF.eq("unidade_id", unidadeId);
 
-  const { data: osRota, error: errRota } = await queryRotaOS;
-  if (errRota) throw new Error(`Erro ao buscar OS rota: ${errRota.message}`);
+  const { data: osFTF, error: errFTF } = await queryFTF;
+  if (errFTF) throw new Error(`Erro ao buscar OS FTF: ${errFTF.message}`);
 
-  // Get agendamentos for those OS
-  const osRotaIds = (osRota || []).map((o) => o.id);
-  let agendamentosRota: any[] = [];
-  if (osRotaIds.length > 0) {
-    const { data } = await supabase
-      .from("agendamentos")
-      .select("id, os_id, data_agendamento, status, confirmado_cliente, confirmado_com_cliente")
-      .in("os_id", osRotaIds)
-      .in("status", ["agendado", "confirmado", "pendente_confirmacao"]);
-    agendamentosRota = data || [];
+  const ftfIds = (osFTF || []).map((o) => o.id);
+  let agendamentosFTF: any[] = [];
+  if (ftfIds.length > 0) {
+    const batchSize = 300;
+    for (let i = 0; i < ftfIds.length; i += batchSize) {
+      const batch = ftfIds.slice(i, i + batchSize);
+      const { data } = await supabase
+        .from("agendamentos")
+        .select("id, os_id, data_agendamento, confirmado_cliente, confirmado_com_cliente")
+        .in("os_id", batch);
+      if (data) agendamentosFTF.push(...data);
+    }
   }
 
-  const agendamentoMap: Record<string, typeof agendamentosRota> = {};
-  for (const a of agendamentosRota) {
-    if (!agendamentoMap[a.os_id]) agendamentoMap[a.os_id] = [];
-    agendamentoMap[a.os_id].push(a);
+  const agFTFMap: Record<string, typeof agendamentosFTF> = {};
+  for (const a of agendamentosFTF) {
+    if (!agFTFMap[a.os_id]) agFTFMap[a.os_id] = [];
+    agFTFMap[a.os_id].push(a);
   }
 
-  // FTF without date or confirmation
-  const osSemDataConfirmacao = (osRota || []).filter((o) => {
-    const ags = agendamentoMap[o.id] || [];
-    if (ags.length === 0) return true;
-    const temData = ags.some((a) => a.data_agendamento);
-    const temConfirmacao = ags.some((a) => a.confirmado_cliente || a.confirmado_com_cliente);
-    return !temData || !temConfirmacao;
-  });
+  // FTF errors: OS that HAS confirmed appointment, or has date today or past
+  const ftfErros: Array<{ os: string; unidade_id: string | null; motivo: string }> = [];
+  for (const o of osFTF || []) {
+    const ags = agFTFMap[o.id] || [];
+    const osLabel = o.numero_os_samsung || o.numero_os_interna || o.id.slice(0, 8);
 
-  // OS IH em_reparo_ih with past date
-  let queryReparoIH = supabase
+    const confirmados = ags.filter((a) => a.confirmado_cliente || a.confirmado_com_cliente);
+    if (confirmados.length > 0) {
+      // Has confirmed appointment - this is wrong for FTF
+      const dataHojeOuPassada = confirmados.find((a) => a.data_agendamento && a.data_agendamento <= today);
+      if (dataHojeOuPassada) {
+        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `agendamento confirmado com data ${dataHojeOuPassada.data_agendamento}` });
+      } else {
+        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: "tem agendamento confirmado com cliente" });
+      }
+    } else {
+      // Check if any non-confirmed has date today or earlier
+      const dataErrada = ags.find((a) => a.data_agendamento && a.data_agendamento <= today);
+      if (dataErrada) {
+        ftfErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `data ${dataErrada.data_agendamento} (hoje ou passada)` });
+      }
+    }
+  }
+
+  // ═══ REPARO IH (em_reparo_ih): must have confirmed appointment with today's date ═══
+  let queryReparo = supabase
     .from("os")
-    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, data_agendamento")
-    .eq("tipo_atendimento", "IH")
-    .in("coluna_kanban", ["em_reparo_ih", "em_rota_ih"]);
+    .select("id, numero_os_interna, numero_os_samsung, unidade_id")
+    .eq("coluna_kanban", "em_reparo_ih")
+    .or("arquivada.is.null,arquivada.eq.false");
 
-  if (unidadeId) queryReparoIH = queryReparoIH.eq("unidade_id", unidadeId);
+  if (unidadeId) queryReparo = queryReparo.eq("unidade_id", unidadeId);
 
-  const { data: osReparo, error: errReparo } = await queryReparoIH;
-  if (errReparo) throw new Error(`Erro ao buscar OS reparo IH: ${errReparo.message}`);
+  const { data: osReparo, error: errReparo } = await queryReparo;
+  if (errReparo) throw new Error(`Erro ao buscar OS Reparo IH: ${errReparo.message}`);
 
-  const osReparoIds = (osReparo || []).map((o) => o.id);
+  const reparoIds = (osReparo || []).map((o) => o.id);
   let agendamentosReparo: any[] = [];
-  if (osReparoIds.length > 0) {
-    const { data } = await supabase
-      .from("agendamentos")
-      .select("id, os_id, data_agendamento, status, confirmado_cliente, confirmado_com_cliente")
-      .in("os_id", osReparoIds)
-      .in("status", ["agendado", "confirmado", "pendente_confirmacao"]);
-    agendamentosReparo = data || [];
+  if (reparoIds.length > 0) {
+    const batchSize = 300;
+    for (let i = 0; i < reparoIds.length; i += batchSize) {
+      const batch = reparoIds.slice(i, i + batchSize);
+      const { data } = await supabase
+        .from("agendamentos")
+        .select("id, os_id, data_agendamento, confirmado_cliente, confirmado_com_cliente")
+        .in("os_id", batch);
+      if (data) agendamentosReparo.push(...data);
+    }
   }
 
   const agRepMap: Record<string, typeof agendamentosReparo> = {};
@@ -684,27 +705,37 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     agRepMap[a.os_id].push(a);
   }
 
-  const osDataErrada = (osReparo || []).filter((o) => {
+  // Reparo errors: OS without confirmed appointment for today
+  const reparoErros: Array<{ os: string; unidade_id: string | null; motivo: string }> = [];
+  for (const o of osReparo || []) {
     const ags = agRepMap[o.id] || [];
-    if (ags.length === 0) return true;
-    const dataPassada = ags.some((a) => a.data_agendamento && a.data_agendamento < today);
-    const semData = !ags.some((a) => a.data_agendamento);
-    return dataPassada || semData;
-  });
+    const osLabel = o.numero_os_samsung || o.numero_os_interna || o.id.slice(0, 8);
 
-  // Group by unidade
-  const ftfPorUnidade: Record<string, typeof osSemDataConfirmacao> = {};
-  for (const o of osSemDataConfirmacao) {
-    const uid = o.unidade_id || "sem_unidade";
-    if (!ftfPorUnidade[uid]) ftfPorUnidade[uid] = [];
-    ftfPorUnidade[uid].push(o);
+    const confirmados = ags.filter((a) => a.confirmado_cliente || a.confirmado_com_cliente);
+    if (confirmados.length === 0) {
+      reparoErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: "sem agendamento confirmado" });
+    } else {
+      const temHoje = confirmados.some((a) => a.data_agendamento === today);
+      if (!temHoje) {
+        const datas = confirmados.map((a) => a.data_agendamento).filter(Boolean).join(", ");
+        reparoErros.push({ os: osLabel, unidade_id: o.unidade_id, motivo: `confirmado mas data ${datas || "sem data"} (deveria ser ${today})` });
+      }
+    }
   }
 
-  const reparoPorUnidade: Record<string, typeof osDataErrada> = {};
-  for (const o of osDataErrada) {
-    const uid = o.unidade_id || "sem_unidade";
+  // Group by unidade
+  const ftfPorUnidade: Record<string, typeof ftfErros> = {};
+  for (const e of ftfErros) {
+    const uid = e.unidade_id || "sem_unidade";
+    if (!ftfPorUnidade[uid]) ftfPorUnidade[uid] = [];
+    ftfPorUnidade[uid].push(e);
+  }
+
+  const reparoPorUnidade: Record<string, typeof reparoErros> = {};
+  for (const e of reparoErros) {
+    const uid = e.unidade_id || "sem_unidade";
     if (!reparoPorUnidade[uid]) reparoPorUnidade[uid] = [];
-    reparoPorUnidade[uid].push(o);
+    reparoPorUnidade[uid].push(e);
   }
 
   const allUnidadeIds = new Set([
@@ -715,57 +746,47 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
   const porUnidade = Array.from(allUnidadeIds)
     .map((uid) => ({
       unidade: unidadeMap[uid] || uid,
-      ftf_sem_data_confirmacao: (ftfPorUnidade[uid] || []).length,
-      reparo_data_errada: (reparoPorUnidade[uid] || []).length,
-      total_problemas: (ftfPorUnidade[uid] || []).length + (reparoPorUnidade[uid] || []).length,
-      detalhes_ftf: (ftfPorUnidade[uid] || []).slice(0, 10).map((o) => ({
-        os: o.numero_os_samsung || o.numero_os_interna || o.id,
-        cliente: o.cliente_nome,
-        rota: o.coluna_kanban,
-      })),
-      detalhes_reparo: (reparoPorUnidade[uid] || []).slice(0, 10).map((o) => ({
-        os: o.numero_os_samsung || o.numero_os_interna || o.id,
-        cliente: o.cliente_nome,
-        coluna: o.coluna_kanban,
-      })),
+      erros_ftf: (ftfPorUnidade[uid] || []).length,
+      erros_reparo: (reparoPorUnidade[uid] || []).length,
+      total_erros: (ftfPorUnidade[uid] || []).length + (reparoPorUnidade[uid] || []).length,
+      detalhes_ftf: (ftfPorUnidade[uid] || []).map((e) => e.os),
+      detalhes_reparo: (reparoPorUnidade[uid] || []).map((e) => e.os),
     }))
-    .sort((a, b) => b.total_problemas - a.total_problemas);
+    .sort((a, b) => b.total_erros - a.total_erros);
 
   const resumoTexto = [
     `AGENDAMENTOS IH - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `Data referencia: ${today}`,
     ``,
-    `FTF sem data/confirmacao: ${osSemDataConfirmacao.length} OS`,
-    `Reparo IH com data errada: ${osDataErrada.length} OS`,
-    `Total problemas: ${osSemDataConfirmacao.length + osDataErrada.length}`,
+    `Total OS em FTF: ${(osFTF || []).length} | Erros FTF: ${ftfErros.length}`,
+    `Total OS em Reparo IH: ${(osReparo || []).length} | Erros Reparo: ${reparoErros.length}`,
     ``,
-    `Por unidade:`,
-    ...porUnidade.map((u) =>
-      `  ${u.unidade}: ${u.ftf_sem_data_confirmacao} FTF pendentes, ${u.reparo_data_errada} com data errada`
-    ),
+    ...porUnidade.map((u) => [
+      `${u.unidade}:`,
+      u.erros_ftf > 0 ? `  FTF erros (${u.erros_ftf}): ${u.detalhes_ftf.join(", ")}` : `  FTF: OK`,
+      u.erros_reparo > 0 ? `  Reparo erros (${u.erros_reparo}): ${u.detalhes_reparo.join(", ")}` : `  Reparo IH: OK`,
+    ].join("\n")),
   ].join("\n");
 
   return {
     titulo: "Agendamentos IH",
-    subtitulo: `${osSemDataConfirmacao.length} FTF sem data/confirm. + ${osDataErrada.length} reparo data errada`,
+    subtitulo: `${ftfErros.length} erros FTF + ${reparoErros.length} erros Reparo IH`,
     gerado_em: now.toISOString(),
+    data_referencia: today,
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
-    ftf_sem_data_confirmacao: {
-      total: osSemDataConfirmacao.length,
-      os_list: osSemDataConfirmacao.slice(0, 20).map((o) => ({
-        os: o.numero_os_samsung || o.numero_os_interna || o.id,
-        cliente: o.cliente_nome,
-        rota: o.coluna_kanban,
-        unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
-      })),
+    total_ftf: (osFTF || []).length,
+    total_reparo_ih: (osReparo || []).length,
+    erros_ftf: {
+      total: ftfErros.length,
+      regra: "FTF nao pode ter agendamento confirmado com cliente. Se tiver, a data deve ser futura (nunca hoje ou passada).",
+      os_list: ftfErros.map((e) => e.os),
+      detalhes: ftfErros,
     },
-    reparo_data_errada: {
-      total: osDataErrada.length,
-      os_list: osDataErrada.slice(0, 20).map((o) => ({
-        os: o.numero_os_samsung || o.numero_os_interna || o.id,
-        cliente: o.cliente_nome,
-        coluna: o.coluna_kanban,
-        unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
-      })),
+    erros_reparo_ih: {
+      total: reparoErros.length,
+      regra: "Reparo em Progresso IH deve ter agendamento confirmado com cliente e data do dia atual.",
+      os_list: reparoErros.map((e) => e.os),
+      detalhes: reparoErros,
     },
     por_unidade: porUnidade,
     resumo_texto: resumoTexto,
