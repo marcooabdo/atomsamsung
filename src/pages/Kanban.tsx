@@ -9,7 +9,7 @@ import { OSLPModal } from '../components/OSLPModal';
 import { AnaliseConcluidaModal } from '../components/AnaliseConcluidaModal';
 import { IniciarReparoModal } from '../components/IniciarReparoModal';
 import { ReparoEfetuadoModal } from '../components/ReparoEfetuadoModal';
-import { DiagnosticoBlockModal, ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
+import { ConfirmMoveModal, PecasAtivasBlockModal, ErrorModal, InfoModal } from '../components/kanban/KanbanModals';
 import { PecasInfoModal } from '../components/kanban/PecasInfoModal';
 import { RouteSelectionModal } from '../components/kanban/RouteSelectionModal';
 import { FecharOSModal } from '../components/FecharOSModal';
@@ -209,7 +209,6 @@ export function Kanban() {
   const [showExportModal, setShowExportModal] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
   const [routePickerOS, setRoutePickerOS] = useState<OS | null>(null);
-  const [showDiagnosticoBlock, setShowDiagnosticoBlock] = useState(false);
   const [showConfirmMove, setShowConfirmMove] = useState(false);
   const [confirmMoveData, setConfirmMoveData] = useState<{ from: string; to: string; onConfirm: () => void } | null>(null);
   const [showPecasAtivasBlock, setShowPecasAtivasBlock] = useState(false);
@@ -751,11 +750,6 @@ export function Kanban() {
   };
 
   const handleDragStart = (e: React.DragEvent, os: OS) => {
-    if (os.coluna_kanban === 'diagnostico') {
-      e.preventDefault();
-      setShowDiagnosticoBlock(true);
-      return;
-    }
     setDraggedCard(os);
     e.dataTransfer.effectAllowed = 'move';
   };
@@ -2796,11 +2790,6 @@ export function Kanban() {
           onClose={() => setShowExportModal(false)}
         />
       )}
-
-      <DiagnosticoBlockModal
-        isOpen={showDiagnosticoBlock}
-        onClose={() => setShowDiagnosticoBlock(false)}
-      />
 
       {confirmMoveData && (
         <ConfirmMoveModal
