@@ -338,6 +338,14 @@ Deno.serve(async (req: Request) => {
         });
       }
 
+      // GIA report request detection - works even without atom_connect instancia
+      if (isGroup && !fromMe) {
+        const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
+        if (textContent && isGIAReportRequest(textContent)) {
+          handleGIAReportRequest(null, textContent, rawRemoteJid, { api_url: "", api_key: "", instance_name: "" });
+        }
+      }
+
       const messageStubType = message?.messageStubType || data?.messageStubType;
       if (messageStubType) {
         return new Response(JSON.stringify({ skip: "stub_message" }), {
@@ -975,11 +983,6 @@ async function processMessage(
   if (!fromMe && tipo === "text" && conteudo && !conversa.is_interno) {
     const trimmed = conteudo.trim();
 
-    // Check if it's a GIA report request in a group
-    if (groupInfo.isGroup && isGIAReportRequest(trimmed)) {
-      await handleGIAReportRequest(supabase, trimmed, groupInfo.groupJid || rawRemoteJid, instancia);
-    }
-
     const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
     if (!handledByGIA) {
       await processRatingResponse(supabase, conversa.id, trimmed, instancia);
@@ -1023,21 +1026,26 @@ function detectReportType(text: string): string | null {
 }
 
 async function handleGIAReportRequest(
-  supabase: any,
+  _supabase: any,
   text: string,
   groupJid: string,
-  instancia: { api_url: string; api_key: string; instance_name: string }
+  _instancia: { api_url: string; api_key: string; instance_name: string }
 ) {
   try {
     const tipo = detectReportType(text);
-    if (!tipo) return;
+    if (!tipo) {
+      console.log("[GIA Report] No report type detected in:", text);
+      return;
+    }
+
+    console.log(`[GIA Report] Detected type=${tipo}, group=${groupJid}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const payload: any = {
       group_jid: groupJid,
-      instance_name: instancia.instance_name,
+      instance_name: "Marco",
     };
 
     if (tipo === "__todos__") {
@@ -1046,16 +1054,21 @@ async function handleGIAReportRequest(
       payload.tipo = tipo;
     }
 
-    await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
+    // Fire and forget - don't block the webhook response
+    fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${supabaseServiceKey}`,
       },
       body: JSON.stringify(payload),
+    }).then((resp) => {
+      console.log(`[GIA Report] gia-send-relatorio response: ${resp.status}`);
+    }).catch((err) => {
+      console.error("[GIA Report] Error calling gia-send-relatorio:", err);
     });
   } catch (err) {
-    console.error("Error handling GIA report request:", err);
+    console.error("[GIA Report] Error handling request:", err);
   }
 }
 
