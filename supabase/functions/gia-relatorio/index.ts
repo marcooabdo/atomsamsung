@@ -18,7 +18,7 @@ const COLUNA_LABELS: Record<string, string> = {
   orcamento_aprovado: "Orçamento Aprovado",
   em_reparo_ci: "Em Reparo CI",
   em_reparo_ih: "Em Reparo IH",
-  em_rota_ih: "Em Rota IH",
+  em_rota_ih: "Agendados (FTF)",
   controle_qualidade: "Controle de Qualidade",
   reparo_concluido: "Reparo Concluído",
   aguardando_fechamento: "Aguardando Fechamento",
@@ -1224,10 +1224,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const osList = osAtivas || [];
 
   // Route-related kanban columns
-  const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih"];
-
-  // IH-related columns (where IH OS should be)
-  const ihColumns = [...rotaColumns, "em_reparo_ih"];
+  const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih", "em_reparo_ih"];
 
   // Fetch active routes to build city-to-route mapping
   const { data: rotasAtivas } = await supabase
