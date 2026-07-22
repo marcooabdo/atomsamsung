@@ -177,6 +177,152 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
   };
 }
 
+async function gerarEstoqueDoDia(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  // Pecas entered today
+  let queryEntradas = supabase
+    .from("estoque_pecas")
+    .select("id, pn, descricao, valor_com_impostos, unidade_id, data_entrada")
+    .gte("data_entrada", startOfDay.toISOString());
+
+  if (unidadeId) queryEntradas = queryEntradas.eq("unidade_id", unidadeId);
+
+  const { data: entradasHoje, error: errEntradas } = await queryEntradas;
+  if (errEntradas) throw new Error(`Erro ao buscar entradas: ${errEntradas.message}`);
+
+  // Total stock by unit (all disponivel)
+  let queryEstoque = supabase
+    .from("estoque_pecas")
+    .select("id, pn, valor_com_impostos, unidade_id, status")
+    .eq("status", "disponivel");
+
+  if (unidadeId) queryEstoque = queryEstoque.eq("unidade_id", unidadeId);
+
+  const { data: estoqueTotal, error: errEstoque } = await queryEstoque;
+  if (errEstoque) throw new Error(`Erro ao buscar estoque total: ${errEstoque.message}`);
+
+  const entradas = entradasHoje || [];
+  const estoque = estoqueTotal || [];
+
+  // Entradas agrupadas por unidade
+  const entradasPorUnidade: Record<string, typeof entradas> = {};
+  for (const p of entradas) {
+    const uid = p.unidade_id || "sem_unidade";
+    if (!entradasPorUnidade[uid]) entradasPorUnidade[uid] = [];
+    entradasPorUnidade[uid].push(p);
+  }
+
+  // Estoque total agrupado por unidade
+  const estoquePorUnidade: Record<string, { quantidade: number; valor: number }> = {};
+  for (const p of estoque) {
+    const uid = p.unidade_id || "sem_unidade";
+    if (!estoquePorUnidade[uid]) estoquePorUnidade[uid] = { quantidade: 0, valor: 0 };
+    estoquePorUnidade[uid].quantidade++;
+    estoquePorUnidade[uid].valor += Number(p.valor_com_impostos || 0);
+  }
+
+  // PNs distintos nas entradas de hoje
+  const pnsHoje = new Set(entradas.map((p) => p.pn).filter(Boolean));
+  const valorEntradaHoje = entradas.reduce((sum, p) => sum + Number(p.valor_com_impostos || 0), 0);
+
+  const valorEstoqueTotal = estoque.reduce((sum, p) => sum + Number(p.valor_com_impostos || 0), 0);
+
+  const unidadesReport = Object.entries(entradasPorUnidade)
+    .sort((a, b) => b[1].length - a[1].length)
+    .map(([uid, lista]) => {
+      const pnsUnidade = new Set(lista.map((p) => p.pn).filter(Boolean));
+      const valorUnidade = lista.reduce((sum, p) => sum + Number(p.valor_com_impostos || 0), 0);
+      const estoqueUn = estoquePorUnidade[uid] || { quantidade: 0, valor: 0 };
+      return {
+        unidade: unidadeMap[uid] || uid,
+        entradas_hoje: {
+          quantidade: lista.length,
+          pns_distintos: pnsUnidade.size,
+          valor_total: Math.round(valorUnidade * 100) / 100,
+          top_pns: getTopPNs(lista, 5),
+        },
+        estoque_atual: {
+          quantidade: estoqueUn.quantidade,
+          valor_total: Math.round(estoqueUn.valor * 100) / 100,
+        },
+      };
+    });
+
+  // Unidades que nao tiveram entrada mas tem estoque
+  const unidadesSemEntrada = Object.entries(estoquePorUnidade)
+    .filter(([uid]) => !entradasPorUnidade[uid])
+    .sort((a, b) => b[1].quantidade - a[1].quantidade)
+    .map(([uid, data]) => ({
+      unidade: unidadeMap[uid] || uid,
+      entradas_hoje: { quantidade: 0, pns_distintos: 0, valor_total: 0, top_pns: [] },
+      estoque_atual: {
+        quantidade: data.quantidade,
+        valor_total: Math.round(data.valor * 100) / 100,
+      },
+    }));
+
+  const todasUnidades = [...unidadesReport, ...unidadesSemEntrada];
+
+  const resumoTexto = [
+    `ESTOQUE DO DIA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    ``,
+    `Entradas hoje:`,
+    `  Pecas: ${entradas.length} | PNs distintos: ${pnsHoje.size}`,
+    `  Valor total: R$ ${valorEntradaHoje.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    ``,
+    `Estoque disponivel total:`,
+    `  Pecas: ${estoque.length}`,
+    `  Valor: R$ ${valorEstoqueTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    ``,
+    `Por unidade:`,
+    ...todasUnidades.map((u) =>
+      `  ${u.unidade}: +${u.entradas_hoje.quantidade} hoje (${u.entradas_hoje.pns_distintos} PNs, R$ ${u.entradas_hoje.valor_total.toFixed(2)}) | Estoque: ${u.estoque_atual.quantidade} pecas (R$ ${u.estoque_atual.valor_total.toFixed(2)})`
+    ),
+  ].join("\n");
+
+  return {
+    titulo: "Estoque do Dia",
+    subtitulo: `${entradas.length} pecas entrada hoje (${pnsHoje.size} PNs) / Estoque: ${estoque.length} pecas`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    periodo: "hoje",
+    entradas_hoje: {
+      quantidade: entradas.length,
+      pns_distintos: pnsHoje.size,
+      valor_total: Math.round(valorEntradaHoje * 100) / 100,
+    },
+    estoque_total: {
+      quantidade: estoque.length,
+      valor_total: Math.round(valorEstoqueTotal * 100) / 100,
+    },
+    por_unidade: todasUnidades,
+    resumo_texto: resumoTexto,
+  };
+}
+
+function getTopPNs(pecas: { pn: string | null; valor_com_impostos: number | null }[], limit: number) {
+  const contagem: Record<string, { qty: number; valor: number }> = {};
+  for (const p of pecas) {
+    const pn = p.pn || "SEM_PN";
+    if (!contagem[pn]) contagem[pn] = { qty: 0, valor: 0 };
+    contagem[pn].qty++;
+    contagem[pn].valor += Number(p.valor_com_impostos || 0);
+  }
+  return Object.entries(contagem)
+    .sort((a, b) => b[1].qty - a[1].qty)
+    .slice(0, limit)
+    .map(([pn, data]) => ({ pn, quantidade: data.qty, valor: Math.round(data.valor * 100) / 100 }));
+}
+
 async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
@@ -603,9 +749,12 @@ Deno.serve(async (req: Request) => {
       case "nucleo_pecas":
         resultado = await gerarNucleoPecas(supabase, unidade_id);
         break;
+      case "estoque_dia":
+        resultado = await gerarEstoqueDoDia(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
