@@ -296,7 +296,10 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        if (mostrarSelecionarRotaObrigatoria) return;
+        onClose();
+      }
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);

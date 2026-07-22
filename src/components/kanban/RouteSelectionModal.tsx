@@ -44,10 +44,19 @@ export function RouteSelectionModal({
 
   const cidadeAtual = editandoCidade ? cidadeEditada : (cidade || '');
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      onCancel();
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }}>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()} onMouseDown={e => e.stopPropagation()} onKeyDown={handleKeyDown}>
       <div
         className="rounded-2xl shadow-2xl overflow-hidden"
+        onClick={e => e.stopPropagation()}
+        onMouseDown={e => e.stopPropagation()}
         style={{
           backgroundColor: 'var(--bg-card)',
           border: '2px solid #F59E0B',
