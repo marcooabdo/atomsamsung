@@ -974,6 +974,12 @@ async function processMessage(
 
   if (!fromMe && tipo === "text" && conteudo && !conversa.is_interno) {
     const trimmed = conteudo.trim();
+
+    // Check if it's a GIA report request in a group
+    if (groupInfo.isGroup && isGIAReportRequest(trimmed)) {
+      await handleGIAReportRequest(supabase, trimmed, groupInfo.groupJid || rawRemoteJid, instancia);
+    }
+
     const handledByGIA = await processGIASchedulingResponse(supabase, phoneNumber, trimmed, instancia);
     if (!handledByGIA) {
       await processRatingResponse(supabase, conversa.id, trimmed, instancia);
@@ -984,6 +990,73 @@ async function processMessage(
     status: 200,
     headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" },
   });
+}
+
+const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
+  { keywords: ["pulso", "operacional", "cockpit"], tipo: "pulso_operacional" },
+  { keywords: ["estoque", "dia"], tipo: "estoque_dia" },
+  { keywords: ["agendamento", "ih", "agenda"], tipo: "agendamentos_ih" },
+  { keywords: ["mapa", "rota", "rotas"], tipo: "mapa_rotas" },
+  { keywords: ["abertura", "fechamento"], tipo: "abertura_fechamento" },
+  { keywords: ["limite", "credito", "crédito", "gspn"], tipo: "limite_credito_gspn" },
+  { keywords: ["nucleo", "núcleo", "peça", "pecas", "peças"], tipo: "nucleo_pecas" },
+  { keywords: ["compliance", "erro", "erros", "problema"], tipo: "compliance_erros" },
+  { keywords: ["resumo", "final"], tipo: "resumo_final" },
+  { keywords: ["todos", "completo", "geral"], tipo: "__todos__" },
+];
+
+function isGIAReportRequest(text: string): boolean {
+  const lower = text.toLowerCase();
+  if (!lower.includes("gia")) return false;
+  const hasReportWord = ["relatório", "relatorio", "report", "me dê", "me de", "me da", "me dá", "envia", "envie", "manda", "gera", "gere"].some((w) => lower.includes(w));
+  return hasReportWord;
+}
+
+function detectReportType(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const entry of GIA_REPORT_KEYWORDS) {
+    if (entry.keywords.some((kw) => lower.includes(kw))) {
+      return entry.tipo;
+    }
+  }
+  return null;
+}
+
+async function handleGIAReportRequest(
+  supabase: any,
+  text: string,
+  groupJid: string,
+  instancia: { api_url: string; api_key: string; instance_name: string }
+) {
+  try {
+    const tipo = detectReportType(text);
+    if (!tipo) return;
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+    const payload: any = {
+      group_jid: groupJid,
+      instance_name: instancia.instance_name,
+    };
+
+    if (tipo === "__todos__") {
+      payload.todos = true;
+    } else {
+      payload.tipo = tipo;
+    }
+
+    await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${supabaseServiceKey}`,
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (err) {
+    console.error("Error handling GIA report request:", err);
+  }
 }
 
 async function processGIASchedulingResponse(
