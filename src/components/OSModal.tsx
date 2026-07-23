@@ -2782,6 +2782,14 @@ Não haverá cobrança ao cliente.`
       return;
     }
 
+    // Se a OS não tem rota definida e não estamos recebendo rota_id via extraUpdates, exibir modal obrigatório
+    if (!os.rota_id && !extraUpdates?.rota_id) {
+      setMostrarMoverPara(false);
+      setColunaDestinoAposSelecionarRota({ id: targetColumn, label: targetColumn });
+      setMostrarSelecionarRotaObrigatoria(true);
+      return;
+    }
+
     setMovendoOS(true);
     try {
       const { error } = await supabase

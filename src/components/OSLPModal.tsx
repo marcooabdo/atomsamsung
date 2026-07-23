@@ -2408,18 +2408,28 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     );
   };
 
-  const moverOS = async (targetColumn: string) => {
+  const moverOS = async (targetColumn: string, extraUpdates?: Record<string, any>) => {
     if (!os || movendoOS) return;
+
+    // Se a OS não tem rota definida e não estamos recebendo rota_id via extraUpdates, exibir modal obrigatório
+    if (!os.rota_id && !extraUpdates?.rota_id) {
+      setMostrarMoverPara(false);
+      setColunaDestinoAposSelecionarRota({ id: targetColumn, label: targetColumn });
+      setMostrarSelecionarRotaObrigatoria(true);
+      return;
+    }
 
     setMovendoOS(true);
     try {
+      const updateData: Record<string, any> = {
+        coluna_kanban: targetColumn,
+        bloqueio_movimentacao_automatica: true,
+        updated_at: new Date().toISOString(),
+        ...extraUpdates
+      };
       const { error } = await supabase
         .from('os')
-        .update({
-          coluna_kanban: targetColumn,
-          bloqueio_movimentacao_automatica: true,
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', os.id);
 
       if (error) throw error;
@@ -6707,6 +6717,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
               updateData.cliente_cidade = cidadeCorrigida.trim();
             }
             await supabase.from('os').update(updateData).eq('id', os.id);
+            setOS({ ...os, ...updateData });
 
             setMostrarSelecionarRotaObrigatoria(false);
             if (colunaDestinoAposSelecionarRota) {

@@ -735,15 +735,26 @@ export function Kanban() {
   };
 
   const handleModalMoveOS = (osId: string, fromColumn: string, toColumn: string) => {
+    // Find the OS card to check rota
+    const sourceCards = osData[fromColumn] || [];
+    const movedCard = sourceCards.find(c => c.id === osId);
+    if (!movedCard) return;
+
+    if (!movedCard.rota_id) {
+      setMandatoryRoutePickerOS(movedCard);
+      setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
+      return;
+    }
+
     setOsData(prevData => {
       const newData = { ...prevData };
-      const sourceCards = newData[fromColumn] || [];
-      const movedCard = sourceCards.find(c => c.id === osId);
-      if (!movedCard) return prevData;
-      newData[fromColumn] = sourceCards.filter(c => c.id !== osId);
+      const src = newData[fromColumn] || [];
+      const card = src.find(c => c.id === osId);
+      if (!card) return prevData;
+      newData[fromColumn] = src.filter(c => c.id !== osId);
       const destCards = [...(newData[toColumn] || [])];
       const lastSeq = destCards.length > 0 ? (destCards[destCards.length - 1]?.sequencia_coluna ?? 0) + 1 : 0;
-      destCards.push({ ...movedCard, coluna_kanban: toColumn, sequencia_coluna: lastSeq });
+      destCards.push({ ...card, coluna_kanban: toColumn, sequencia_coluna: lastSeq });
       newData[toColumn] = destCards;
       return newData;
     });
@@ -949,21 +960,12 @@ export function Kanban() {
 
     // Verificar se a OS tem rota definida antes de qualquer movimentação
     if (!isSameColumn) {
-      const cidadeOS = draggedCard.cliente_cidade;
-      const rotaEncontrada = findRotaByCidade(cidadeOS);
-
-      if (!draggedCard.rota_id && !rotaEncontrada) {
-        // No route defined and city not in any route - must pick one
+      if (!draggedCard.rota_id) {
+        // OS sem rota definida - obrigatório escolher rota
         setMandatoryRoutePickerOS(draggedCard);
         setPendingMandatoryMove({ targetColumn, position: finalPosition });
         setDraggedCard(null);
         return;
-      }
-
-      if (!draggedCard.rota_id && rotaEncontrada) {
-        // City has a route - auto-assign it
-        const rotaReal = rotas.find(r => r.coluna_kanban === rotaEncontrada.coluna);
-        draggedCard.rota_id = rotaReal?.id || null;
       }
     }
 
@@ -1778,11 +1780,8 @@ export function Kanban() {
       return;
     }
 
-    // Validar rota: se a OS não tem rota definida e a cidade não tem rota cadastrada, exibir modal obrigatório
-    const cidadeOS = os.cliente_cidade;
-    const rotaEncontrada = findRotaByCidade(cidadeOS);
-
-    if (!os.rota_id && !rotaEncontrada) {
+    // Validar rota: se a OS não tem rota definida, exibir modal obrigatório
+    if (!os.rota_id) {
       setMandatoryRoutePickerOS(os);
       setPendingMandatoryMove({ targetColumn, position: undefined });
       return;
@@ -1800,14 +1799,6 @@ export function Kanban() {
         updated_at: new Date().toISOString(),
       };
 
-      // Se a OS não tem rota_id, vincular a rota encontrada
-      if (!os.rota_id && rotaEncontrada) {
-        const rotaReal = rotas.find(r => r.coluna_kanban === rotaEncontrada.coluna);
-        if (rotaReal) {
-          updateData.rota_id = rotaReal.id;
-        }
-      }
-
       const { error } = await supabase
         .from('os')
         .update(updateData)
@@ -1815,7 +1806,7 @@ export function Kanban() {
 
       if (error) throw error;
 
-      const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: updateData.rota_id || os.rota_id };
+      const updatedCard = { ...os, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
 
       setOsData(prev => {
         const next = { ...prev };
