@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, MapPin, CheckCircle, Clock, Package, Camera, FileText, AlertCircle, Send, ChevronDown, ChevronUp, CreditCard as Edit3, Navigation } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
@@ -96,6 +96,8 @@ type Step = 'checkin' | 'checklist' | 'pecas' | 'evidencias' | 'encerramento' | 
 
 export function ExecucaoOS() {
   const { agendamentoId: osId } = useParams();
+  const [searchParams] = useSearchParams();
+  const visitaId = searchParams.get('visita');
   const navigate = useNavigate();
   const { usuario } = useAuth();
 
@@ -174,8 +176,12 @@ export function ExecucaoOS() {
 
     let agendamentoData = null;
     if (agendamentosData && agendamentosData.length > 0) {
-      const agendamentoPendente = agendamentosData.find(a => !a.checkout_realizado);
-      agendamentoData = agendamentoPendente || agendamentosData[0];
+      if (visitaId) {
+        agendamentoData = agendamentosData.find(a => a.id === visitaId) || agendamentosData[0];
+      } else {
+        const agendamentoPendente = agendamentosData.find(a => !a.checkout_realizado);
+        agendamentoData = agendamentoPendente || agendamentosData[0];
+      }
     }
 
     const { data, error } = await supabase

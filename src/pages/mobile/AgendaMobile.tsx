@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapPin, Clock, Phone, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon, Package, Navigation } from 'lucide-react';
+import { MapPin, Clock, Phone, RefreshCw, CheckCircle, PlayCircle, Calendar as CalendarIcon, Package, Navigation, Eye, Download } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import { OSDetailsModal } from '../../components/mobile/OSDetailsModal';
@@ -161,6 +161,80 @@ export function AgendaMobile() {
     return periodos[periodo?.toLowerCase()] || periodo || 'Não especificado';
   };
 
+  const handleDownloadPDF = async (os: AgendamentoOS) => {
+    try {
+      const { data: agData } = await supabase
+        .from('agendamentos')
+        .select('*')
+        .eq('id', os.agendamento_id)
+        .maybeSingle();
+
+      if (!agData) return;
+
+      const { data: osData } = await supabase
+        .from('os')
+        .select('numero_os_samsung, numero_os_interna, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, aparelho_marca, aparelho_modelo, defeito_relatado, diagnostico_tecnico, reparo_efetuado, tipo_atendimento, tipo_reparo')
+        .eq('id', os.id)
+        .maybeSingle();
+
+      const { jsPDF } = await import('jspdf');
+      const doc = new jsPDF();
+
+      const osNum = osData?.numero_os_samsung || osData?.numero_os_interna || 'S/N';
+      doc.setFontSize(16);
+      doc.text(`Relatório de Visita - OS ${osNum}`, 14, 20);
+      
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      const statusBadge = getStatusBadge(os);
+      doc.text(`Status: ${statusBadge.label}`, 14, 28);
+      doc.text(`Data: ${agData.data_agendamento ? new Date(agData.data_agendamento + 'T12:00:00').toLocaleDateString('pt-BR') : 'N/A'}`, 14, 34);
+
+      let y = 44;
+      doc.setTextColor(0);
+      doc.setFontSize(12);
+      doc.text('Dados do Cliente', 14, y); y += 8;
+      doc.setFontSize(10);
+      doc.text(`Cliente: ${osData?.cliente_nome || 'N/A'}`, 14, y); y += 6;
+      doc.text(`Telefone: ${osData?.cliente_telefone || 'N/A'}`, 14, y); y += 6;
+      doc.text(`Endereço: ${osData?.cliente_endereco || ''}, ${osData?.cliente_bairro || ''} - ${osData?.cliente_cidade || ''}`, 14, y); y += 6;
+      doc.text(`Aparelho: ${osData?.aparelho_marca || ''} ${osData?.aparelho_modelo || ''}`, 14, y); y += 10;
+
+      doc.setFontSize(12);
+      doc.text('Informações da Visita', 14, y); y += 8;
+      doc.setFontSize(10);
+      if (agData.checkin_hora) {
+        doc.text(`Check-in: ${new Date(agData.checkin_hora).toLocaleString('pt-BR')}`, 14, y); y += 6;
+      }
+      if (agData.checkout_hora) {
+        doc.text(`Check-out: ${new Date(agData.checkout_hora).toLocaleString('pt-BR')}`, 14, y); y += 6;
+      }
+      if (agData.checkin_hora && agData.checkout_hora) {
+        const duracao = Math.round((new Date(agData.checkout_hora).getTime() - new Date(agData.checkin_hora).getTime()) / 60000);
+        doc.text(`Duração: ${duracao} minutos`, 14, y); y += 6;
+      }
+      y += 4;
+
+      doc.setFontSize(12);
+      doc.text('Diagnóstico e Reparo', 14, y); y += 8;
+      doc.setFontSize(10);
+      doc.text(`Defeito Relatado: ${osData?.defeito_relatado || 'N/A'}`, 14, y, { maxWidth: 180 }); y += 10;
+      doc.text(`Diagnóstico: ${osData?.diagnostico_tecnico || 'N/A'}`, 14, y, { maxWidth: 180 }); y += 10;
+      doc.text(`Reparo Efetuado: ${osData?.reparo_efetuado || 'N/A'}`, 14, y, { maxWidth: 180 }); y += 10;
+
+      if (agData.checkout_observacoes) {
+        doc.setFontSize(12);
+        doc.text('Observações do Checkout', 14, y); y += 8;
+        doc.setFontSize(10);
+        doc.text(agData.checkout_observacoes, 14, y, { maxWidth: 180 });
+      }
+
+      doc.save(`visita_${osNum}_${agData.data_agendamento || 'sem-data'}.pdf`);
+    } catch (err) {
+      console.error('Erro ao gerar PDF:', err);
+    }
+  };
+
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
@@ -267,9 +341,21 @@ export function AgendaMobile() {
 
                 <div className="flex gap-2 pt-2">
                   {os.checkin_realizado && os.checkout_realizado ? (
-                    <div className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-700/50 text-gray-400 font-medium rounded-xl">
-                      <CheckCircle className="w-5 h-5" />
-                      Visita Concluída
+                    <div className="flex-1 flex gap-2">
+                      <button
+                        onClick={() => navigate(`/mobile/execucao/${os.id}?visita=${os.agendamento_id}`)}
+                        className="flex-1 flex items-center justify-center gap-2 px-3 py-3 bg-gray-700/80 text-gray-200 font-medium rounded-xl hover:bg-gray-600/80 transition-all border border-gray-600/50"
+                      >
+                        <Eye className="w-4 h-4" />
+                        Ver Detalhes
+                      </button>
+                      <button
+                        onClick={() => handleDownloadPDF(os)}
+                        className="flex items-center justify-center gap-2 px-4 py-3 bg-gray-700/80 text-gray-200 font-medium rounded-xl hover:bg-gray-600/80 transition-all border border-gray-600/50"
+                      >
+                        <Download className="w-4 h-4" />
+                        PDF
+                      </button>
                     </div>
                   ) : (
                     <button
