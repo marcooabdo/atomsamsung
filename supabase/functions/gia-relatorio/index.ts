@@ -798,8 +798,14 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     return nome.slice(0, 3).toUpperCase();
   }
 
-  // Fetch all active OS that are NOT in a route (rota_id IS NULL) and not closed/archived
-  // These are OS without routes defined
+  // Columns that represent a route/color assigned - OS in these columns already have a route
+  const colunasComRota = [
+    "rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa",
+    "rota_amarela", "rota_laranja", "em_rota_ih",
+  ];
+
+  // Fetch all active OS that have NO route color defined
+  // Exclude: closed, archived, and OS already in a route column
   let allOS: any[] = [];
   let from = 0;
   const pageSize = 1000;
@@ -809,6 +815,7 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
       .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, coluna_kanban, rota_id, unidade_id")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
+      .not("coluna_kanban", "in", `(${colunasComRota.join(",")})`)
       .is("rota_id", null)
       .range(from, from + pageSize - 1);
     if (unidadeId) q = q.eq("unidade_id", unidadeId);
@@ -820,12 +827,11 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     from += pageSize;
   }
 
-  // Columns to include in the report (pipeline columns that matter)
+  // Columns to include in the report (only non-route pipeline columns)
   const colunasOrdem = [
     "os_nova", "diagnostico", "negociacao_em_andamento", "aguardando_aprovacao",
     "orcamento_aprovado", "aguardando_peca", "peca_em_transito", "em_reparo_ci",
-    "rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa",
-    "rota_amarela", "rota_laranja", "em_rota_ih", "em_reparo_ih",
+    "em_reparo_ih",
     "instalacao_inicial", "service_handling", "return_handling", "trade_up",
     "saw", "controle_qualidade", "qa_bt", "reparo_concluido",
     "aguardando_fechamento", "orcamentos_rejeitados",
