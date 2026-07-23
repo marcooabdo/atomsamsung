@@ -58,6 +58,31 @@ async function sendWhatsAppGroup(groupJid: string, message: string) {
   return await response.json();
 }
 
+async function sendWhatsAppImage(groupJid: string, imageUrl: string, caption?: string) {
+  const config = await getGIAEvolutionConfig();
+
+  const response = await fetch(`${config.api_url}/message/sendMedia/${config.instance_name}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": config.api_key,
+    },
+    body: JSON.stringify({
+      number: groupJid,
+      mediatype: "image",
+      media: imageUrl,
+      caption: caption || "",
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Evolution API sendMedia error (${config.instance_name}): ${response.status} - ${errText}`);
+  }
+
+  return await response.json();
+}
+
 async function generateMotivacionalOperacional(): Promise<string> {
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) throw new Error("OPENAI_API_KEY não configurada");
@@ -146,6 +171,50 @@ async function generateReport(tipo: string): Promise<string> {
   return text;
 }
 
+async function generateAndSendPulsoImages(targetGroup: string): Promise<string[]> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio-image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({}),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`gia-relatorio-image erro (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  const results: string[] = [];
+
+  if (data.images && data.images.length > 0) {
+    for (let i = 0; i < data.images.length; i++) {
+      const img = data.images[i];
+      const unit = data.units?.[i];
+      const caption = i === 0
+        ? `🔴 PULSO OPERACIONAL — ${data.horario}\n${data.total_os} OS abertas no total`
+        : "";
+      
+      try {
+        await sendWhatsAppImage(targetGroup, img.url, caption);
+        results.push(`Imagem ${img.sigla}: OK`);
+        if (i < data.images.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+      } catch (e) {
+        results.push(`Imagem ${img.sigla}: ERRO - ${e.message}`);
+      }
+    }
+  }
+
+  return results;
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -168,8 +237,21 @@ Deno.serve(async (req: Request) => {
 
       for (const config of allConfigs || []) {
         try {
+          // Para pulso_operacional, usar envio visual com imagens
+          if (config.tipo === "pulso_operacional") {
+            const sendGroup = config.grupo_destino || targetGroup;
+            const imageResults = await generateAndSendPulsoImages(sendGroup);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            const message = await generateReport(config.tipo);
+            await sendWhatsAppGroup(sendGroup, message);
+            results.push(`${config.nome}: OK (${imageResults.length} imagens + texto)`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            continue;
+          }
+          
+          const sendGroup = config.grupo_destino || targetGroup;
           const message = await generateReport(config.tipo);
-          await sendWhatsAppGroup(targetGroup, message);
+          await sendWhatsAppGroup(sendGroup, message);
           results.push(`${config.nome}: OK`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (e) {
@@ -207,7 +289,43 @@ Deno.serve(async (req: Request) => {
     // Prioridade: group_jid do request (on-demand) > grupo_destino da config > grupo padrão
     const targetGroup = group_jid || config.grupo_destino || DEFAULT_GROUP;
 
-    // Gerar o relatório
+    // Para pulso_operacional, enviar imagens visuais por unidade
+    if (tipo === "pulso_operacional") {
+      try {
+        const imageResults = await generateAndSendPulsoImages(targetGroup);
+        
+        // Enviar também um texto resumo breve após as imagens
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const message = await generateReport(tipo);
+        await sendWhatsAppGroup(targetGroup, message);
+        
+        await supabase.from("gia_relatorio_logs").insert({
+          tipo,
+          nome: config.nome,
+          status: "sucesso",
+          etapa: "envio_completo",
+          mensagem: `Pulso visual enviado (${imageResults.length} imagens + texto) para ${targetGroup}`,
+          grupo_jid: targetGroup,
+          instancia: "Marco",
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            tipo, 
+            grupo_destino: targetGroup,
+            images: imageResults,
+            message: `Pulso visual enviado com ${imageResults.length} imagens` 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (imageErr) {
+        console.error("Erro ao gerar imagens do pulso, enviando texto:", imageErr.message);
+        // Fallback: enviar como texto normal
+      }
+    }
+
+    // Gerar o relatório (texto)
     const message = await generateReport(tipo);
 
     // Enviar para o grupo correto usando instância Marco (ATOM CORE)
