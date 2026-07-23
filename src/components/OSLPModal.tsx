@@ -6746,6 +6746,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
               setMostrarConfirmacaoMover(true);
             }
             setMostrarEditarRotaCidade(false);
+            if (onReload) onReload();
           } catch (error: any) {
             alert(`Erro ao definir rota: ${error.message}`);
           }

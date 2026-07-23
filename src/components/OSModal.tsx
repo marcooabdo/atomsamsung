@@ -2882,6 +2882,7 @@ Não haverá cobrança ao cliente.`
         await supabase.from('os').update(extraUpdates).eq('id', os.id);
         setOS({ ...os, ...extraUpdates, rota_id: rotaIdReal });
         setColunaDestinoAposSelecionarRota(null);
+        if (onReload) onReload();
       } else if (colunaDestinoAposSelecionarRota) {
         const targetCol = colunaDestinoAposSelecionarRota;
         setColunaDestinoAposSelecionarRota(null);
@@ -2924,6 +2925,7 @@ Não haverá cobrança ao cliente.`
         setOS({ ...os, ...updates });
         setMostrarSelecionarRotaObrigatoria(false);
         setMostrarEditarRotaCidade(false);
+        if (onReload) onReload();
       } catch (error: any) {
         alert(`Erro ao salvar cidade: ${error.message}`);
       }
