@@ -1481,24 +1481,21 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   // Route-related kanban columns
   const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih", "em_reparo_ih"];
 
-  // Fetch active routes to build city-to-route mapping
-  const { data: rotasAtivas } = await supabase
-    .from("rotas")
-    .select("id, nome, cidades, unidade_id, coluna_kanban")
-    .eq("ativa", true);
+  // Fetch agendamentos to validate IH and FTF
+  const { data: agendamentos } = await supabase
+    .from("agendamentos")
+    .select("id, os_id, data_agendamento, status")
+    .in("status", ["agendado", "confirmado", "pendente_confirmacao", "em_andamento"]);
 
-  // Build a map: unidade_id -> { normalizedCity -> rotaName }
-  const cidadeRotaMap: Record<string, Record<string, string>> = {};
-  for (const rota of rotasAtivas || []) {
-    const uid = rota.unidade_id;
-    if (!uid) continue;
-    if (!cidadeRotaMap[uid]) cidadeRotaMap[uid] = {};
-    const cidades = rota.cidades || [];
-    for (const cidade of cidades) {
-      const normalized = (cidade || "").trim().toLowerCase();
-      if (normalized) cidadeRotaMap[uid][normalized] = rota.nome;
-    }
+  const agendamentoPorOS: Record<string, { data_agendamento: string | null }[]> = {};
+  for (const ag of agendamentos || []) {
+    if (!ag.os_id) continue;
+    if (!agendamentoPorOS[ag.os_id]) agendamentoPorOS[ag.os_id] = [];
+    agendamentoPorOS[ag.os_id].push({ data_agendamento: ag.data_agendamento });
   }
+
+  // Today's date string for comparison (only future dates are valid for FTF)
+  const todayStr = now.toISOString().split("T")[0];
 
   // Group everything by unidade
   const osPorUnidade: Record<string, typeof osList> = {};
@@ -1534,18 +1531,28 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
           total: porColuna[col].length,
         }));
 
-      // OS IH sem rota definida: IH type that has NO rota_id AND city is not mapped to any route
-      const unitCidadeMap = cidadeRotaMap[uid] || {};
-      const osIHSemRota = lista.filter((os) => {
-        const isIH = os.tipo_atendimento?.toUpperCase() === "IH";
-        if (!isIH) return false;
-        if (os.rota_id) return false;
-        const cidadeNorm = (os.cliente_cidade || "").trim().toLowerCase();
-        if (cidadeNorm && unitCidadeMap[cidadeNorm]) return false;
-        return true;
+      // OS IH sem rota: OS in "em_reparo_ih" that have NO active agendamento
+      const osEmReparoIH = lista.filter((os) => os.coluna_kanban === "em_reparo_ih");
+      const osIHSemRota = osEmReparoIH.filter((os) => {
+        const ags = agendamentoPorOS[os.id];
+        return !ags || ags.length === 0;
       });
 
       const osIHSemRotaNumeros = osIHSemRota.map((os) =>
+        os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
+      );
+
+      // Erros FTF: OS in "em_rota_ih" with past date or no agendamento
+      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih");
+      const osErrosFTF = osEmFTF.filter((os) => {
+        const ags = agendamentoPorOS[os.id];
+        if (!ags || ags.length === 0) return true; // no agendamento at all
+        // Check if ALL agendamentos have past or current date
+        const hasFutureDate = ags.some((ag) => ag.data_agendamento && ag.data_agendamento > todayStr);
+        return !hasFutureDate;
+      });
+
+      const osErrosFTFNumeros = osErrosFTF.map((os) =>
         os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
       );
 
@@ -1558,6 +1565,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
         distribuicao,
         ih_sem_rota_total: osIHSemRota.length,
         ih_sem_rota_lista: osIHSemRotaNumeros,
+        ftf_erros_total: osErrosFTF.length,
+        ftf_erros_lista: osErrosFTFNumeros,
       };
     });
 
@@ -1565,6 +1574,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const totalPipeline = osList.length;
   const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban)).length;
   const totalIHSemRota = unidadesData.reduce((acc, u) => acc + u.ih_sem_rota_total, 0);
+  const totalFTFErros = unidadesData.reduce((acc, u) => acc + u.ftf_erros_total, 0);
 
   // Build resumo texto in cockpit style
   const spTime = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -1578,7 +1588,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     ``,
     `📊 RESUMO EXECUTIVO:`,
     `Total de OS no pipeline: ${totalPipeline.toLocaleString("pt-BR")}`,
-    `Em rota: ${totalEmRota} | IH sem rota: ${totalIHSemRota}`,
+    `Em rota: ${totalEmRota} | IH sem rota: ${totalIHSemRota} | Erros FTF: ${totalFTFErros}`,
   ];
 
   for (const unidade of unidadesData) {
@@ -1593,6 +1603,14 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     linhasResumo.push(`🔴 OS IH sem rota: ${unidade.ih_sem_rota_total}`);
     if (unidade.ih_sem_rota_lista.length > 0) {
       for (const num of unidade.ih_sem_rota_lista) {
+        linhasResumo.push(num);
+      }
+    }
+
+    if (unidade.ftf_erros_total > 0) {
+      linhasResumo.push(``);
+      linhasResumo.push(`⚠️ Erros FTF: ${unidade.ftf_erros_total}`);
+      for (const num of unidade.ftf_erros_lista) {
         linhasResumo.push(num);
       }
     }
