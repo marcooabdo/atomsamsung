@@ -2872,7 +2872,7 @@ Não haverá cobrança ao cliente.`
           extraUpdates.cliente_cidade = cidadeCorrigida.trim();
         }
         await supabase.from('os').update(extraUpdates).eq('id', os.id);
-        setOs({ ...os, ...extraUpdates, rota_id: rotaIdReal });
+        setOS({ ...os, ...extraUpdates, rota_id: rotaIdReal });
         setColunaDestinoAposSelecionarRota(null);
       } else if (colunaDestinoAposSelecionarRota) {
         const targetCol = colunaDestinoAposSelecionarRota;
@@ -2913,7 +2913,7 @@ Não haverá cobrança ao cliente.`
           updates.rota_id = null;
         }
         await supabase.from('os').update(updates).eq('id', os.id);
-        setOs({ ...os, ...updates });
+        setOS({ ...os, ...updates });
         setMostrarSelecionarRotaObrigatoria(false);
         setMostrarEditarRotaCidade(false);
       } catch (error: any) {
