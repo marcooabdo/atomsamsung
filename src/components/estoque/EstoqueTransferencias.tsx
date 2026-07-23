@@ -42,6 +42,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
   const [modalVerPedido, setModalVerPedido] = useState<any>(null);
   const [historicoMinimizado, setHistoricoMinimizado] = useState(true);
   const [buscaHistorico, setBuscaHistorico] = useState('');
+  const [buscaGeral, setBuscaGeral] = useState('');
 
   useEffect(() => {
     loadData();
@@ -940,6 +941,36 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
     g.requisicoes.some(r => r.status === 'pendente' || r.status === 'pedido_feito')
   );
 
+  const requisicoesComPendentesFiltradas = requisicoesComPendentes.filter(grupo => {
+    if (!buscaGeral.trim()) return true;
+    const termo = buscaGeral.toLowerCase().trim();
+    const osNum = (grupo.numero_os_samsung || grupo.numero_os_interna || '').toLowerCase();
+    if (osNum.includes(termo)) return true;
+    for (const r of grupo.requisicoes) {
+      if ((r.codigo_peca || '').toLowerCase().includes(termo)) return true;
+      if ((r.descricao || '').toLowerCase().includes(termo)) return true;
+      if ((r.numero_pedido_samsung || '').toLowerCase().includes(termo)) return true;
+    }
+    const deliveries = grupo.requisicoes.map(r => (r as any).delivery || '').filter(Boolean);
+    if (deliveries.some(d => d.toLowerCase().includes(termo))) return true;
+    const ids = grupo.requisicoes.map(r => (r as any).id_unico || '').filter(Boolean);
+    if (ids.some(d => d.toLowerCase().includes(termo))) return true;
+    return false;
+  });
+
+  const pedidosAtivosFiltrados = pedidosAtivos.filter(grupo => {
+    if (!buscaGeral.trim()) return true;
+    const termo = buscaGeral.toLowerCase().trim();
+    const osNum = (grupo.numero_os_samsung || grupo.numero_os_interna || '').toLowerCase();
+    if (osNum.includes(termo)) return true;
+    for (const r of grupo.requisicoes) {
+      if ((r.codigo_peca || '').toLowerCase().includes(termo)) return true;
+      if ((r.descricao || '').toLowerCase().includes(termo)) return true;
+      if ((r.numero_pedido_samsung || '').toLowerCase().includes(termo)) return true;
+    }
+    return false;
+  });
+
   const calcularEstatisticas = () => {
     const todasRequisicoesPendentes = requisicoesComPendentes.flatMap(g =>
       g.requisicoes.filter(r => r.status === 'pendente')
@@ -1099,12 +1130,34 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
         </div>
       </div>
 
+      {/* BUSCA GERAL */}
+      <div className="relative mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Buscar por OS, peça, ID, delivery ou nº pedido..."
+          value={buscaGeral}
+          onChange={(e) => setBuscaGeral(e.target.value)}
+          className="w-full pl-10 pr-10 py-2.5 rounded-lg bg-[#1a1a2e] border border-gray-700 text-sm text-white placeholder-gray-500 focus:outline-none focus:border-[#FFBF00]/50 transition-colors"
+        />
+        {buscaGeral && (
+          <button onClick={() => setBuscaGeral('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white">
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+      {buscaGeral && (
+        <p className="text-xs text-gray-400 mb-3">
+          Mostrando {pedidosAtivosFiltrados.flatMap(g => g.requisicoes).length + requisicoesComPendentesFiltradas.length} resultados para "{buscaGeral}"
+        </p>
+      )}
+
       {/* PEDIDOS ATIVOS - SEMPRE VISÍVEIS */}
-      {pedidosAtivos.length > 0 && (
+      {pedidosAtivosFiltrados.length > 0 && (
         <div>
           <h3 className="text-lg font-bold text-[#FF0064] mb-4 flex items-center gap-2">
             <Package className="w-5 h-5" />
-            PEDIDOS ATIVOS ({pedidosAtivos.length} OSs - {pedidosAtivos.flatMap(g => g.requisicoes).length} peças)
+            PEDIDOS ATIVOS ({pedidosAtivosFiltrados.length} OSs - {pedidosAtivosFiltrados.flatMap(g => g.requisicoes).length} peças)
           </h3>
           <div className="bg-[#FF0064]/10 border border-[#FF0064]/30 rounded-lg p-4 mb-4">
             <div className="flex items-start gap-2">
@@ -1121,7 +1174,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
             </div>
           </div>
           <div className="space-y-3">
-            {pedidosAtivos.map((grupo) => {
+            {pedidosAtivosFiltrados.map((grupo) => {
               return (
                 <div key={grupo.os_id} className="premium-card border-[#FF0064]/30">
                   <div
@@ -1271,14 +1324,14 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
       )}
 
       {/* REQUISIÇÕES PENDENTES */}
-      {requisicoesComPendentes.length > 0 && (
+      {requisicoesComPendentesFiltradas.length > 0 && (
         <div>
           <h3 className="text-lg font-bold text-[#FFBF00] mb-4 flex items-center gap-2">
             <Clock className="w-5 h-5" />
-            REQUISIÇÕES PENDENTES ({requisicoesComPendentes.length} OSs)
+            REQUISIÇÕES PENDENTES ({requisicoesComPendentesFiltradas.length} OSs)
           </h3>
           <div className="space-y-3">
-            {requisicoesComPendentes.map((grupo) => (
+            {requisicoesComPendentesFiltradas.map((grupo) => (
               <div key={grupo.os_id} className="premium-card">
                 <div
                   className="p-4 cursor-pointer hover:bg-white/5 transition-colors"
