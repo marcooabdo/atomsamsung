@@ -947,19 +947,21 @@ export function Kanban() {
 
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
 
-    // Verificar se a cidade tem uma cor de rota cadastrada antes de qualquer movimentação
+    // Verificar se a OS tem rota definida antes de qualquer movimentação
     if (!isSameColumn) {
       const cidadeOS = draggedCard.cliente_cidade;
       const rotaEncontrada = findRotaByCidade(cidadeOS);
 
-      if (!rotaEncontrada) {
+      if (!draggedCard.rota_id && !rotaEncontrada) {
+        // No route defined and city not in any route - must pick one
         setMandatoryRoutePickerOS(draggedCard);
         setPendingMandatoryMove({ targetColumn, position: finalPosition });
         setDraggedCard(null);
         return;
       }
 
-      if (!draggedCard.rota_id) {
+      if (!draggedCard.rota_id && rotaEncontrada) {
+        // City has a route - auto-assign it
         const rotaReal = rotas.find(r => r.coluna_kanban === rotaEncontrada.coluna);
         draggedCard.rota_id = rotaReal?.id || null;
       }
@@ -1776,11 +1778,11 @@ export function Kanban() {
       return;
     }
 
-    // Validar rota: se a cidade não tem rota cadastrada, exibir modal obrigatório
+    // Validar rota: se a OS não tem rota definida e a cidade não tem rota cadastrada, exibir modal obrigatório
     const cidadeOS = os.cliente_cidade;
     const rotaEncontrada = findRotaByCidade(cidadeOS);
 
-    if (!rotaEncontrada) {
+    if (!os.rota_id && !rotaEncontrada) {
       setMandatoryRoutePickerOS(os);
       setPendingMandatoryMove({ targetColumn, position: undefined });
       return;
