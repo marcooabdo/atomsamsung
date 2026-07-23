@@ -1425,7 +1425,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   while (true) {
     let q = supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id, grupo_os_id")
+      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id, grupo_os_id, created_at")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
       .range(from, from + pageSize - 1);
@@ -1457,6 +1457,25 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   // Today's date string for comparison (only future dates are valid for FTF)
   const todayStr = now.toISOString().split("T")[0];
 
+  // For grouped OS, find the principal (oldest) in each group so we can hide non-principal ones
+  const grupoOS: Record<string, typeof osList> = {};
+  for (const os of osList) {
+    if (os.grupo_os_id) {
+      if (!grupoOS[os.grupo_os_id]) grupoOS[os.grupo_os_id] = [];
+      grupoOS[os.grupo_os_id].push(os);
+    }
+  }
+  // Sort each group by created_at ascending — first one is the principal
+  const principalOSIds = new Set<string>();
+  const linkedOSIds = new Set<string>();
+  for (const members of Object.values(grupoOS)) {
+    members.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
+    principalOSIds.add(members[0].id);
+    for (let i = 1; i < members.length; i++) {
+      linkedOSIds.add(members[i].id);
+    }
+  }
+
   // Group everything by unidade
   const osPorUnidade: Record<string, typeof osList> = {};
   for (const os of osList) {
@@ -1475,7 +1494,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       const porColuna: Record<string, typeof osList> = {};
       for (const os of lista) {
         if (rotaColumns.includes(os.coluna_kanban)) {
-          if (os.coluna_kanban === "em_rota_ih" && os.grupo_os_id) continue;
+          if (linkedOSIds.has(os.id)) continue;
           if (!porColuna[os.coluna_kanban]) porColuna[os.coluna_kanban] = [];
           porColuna[os.coluna_kanban].push(os);
         }
@@ -1495,6 +1514,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       // OS IH sem rota: OS in "em_reparo_ih" that have NO active agendamento
       const osEmReparoIH = lista.filter((os) => os.coluna_kanban === "em_reparo_ih");
       const osIHSemRota = osEmReparoIH.filter((os) => {
+        if (linkedOSIds.has(os.id)) return false;
         const ags = agendamentoPorOS[os.id];
         return !ags || ags.length === 0;
       });
@@ -1504,8 +1524,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       );
 
       // Erros FTF: OS in "em_rota_ih" with past date or no agendamento
-      // Exclude OS that are linked (grupo_os_id) - they are managed by the parent OS
-      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && !os.grupo_os_id);
+      // Exclude linked OS (non-principal) — they are managed by the principal OS
+      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && !linkedOSIds.has(os.id));
       const osErrosFTF = osEmFTF.filter((os) => {
         const ags = agendamentoPorOS[os.id];
         if (!ags || ags.length === 0) return true; // no agendamento at all
@@ -1533,8 +1553,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     });
 
   // Totals
-  const totalPipeline = osList.length;
-  const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban)).length;
+  const totalPipeline = osList.filter((os) => !linkedOSIds.has(os.id)).length;
+  const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban) && !linkedOSIds.has(os.id)).length;
   const totalIHSemRota = unidadesData.reduce((acc, u) => acc + u.ih_sem_rota_total, 0);
   const totalFTFErros = unidadesData.reduce((acc, u) => acc + u.ftf_erros_total, 0);
 
