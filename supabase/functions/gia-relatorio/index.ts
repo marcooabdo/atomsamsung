@@ -1512,16 +1512,17 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     .map(([uid, lista]) => {
       const totalPipeline = lista.length;
 
-      // Group by coluna_kanban for route columns
+      // Group by coluna_kanban for route columns (exclude linked OS from em_rota_ih count)
       const porColuna: Record<string, typeof osList> = {};
       for (const os of lista) {
         if (rotaColumns.includes(os.coluna_kanban)) {
+          if (os.coluna_kanban === "em_rota_ih" && os.grupo_os_id) continue;
           if (!porColuna[os.coluna_kanban]) porColuna[os.coluna_kanban] = [];
           porColuna[os.coluna_kanban].push(os);
         }
       }
 
-      const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban)).length;
+      const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban) && !(os.coluna_kanban === "em_rota_ih" && os.grupo_os_id)).length;
 
       // Route distribution in pipeline order
       const rotaColumnsOrder = ["rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa", "rota_amarela", "rota_laranja", "em_rota_ih", "em_reparo_ih"];
