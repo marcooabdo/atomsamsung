@@ -2890,6 +2890,38 @@ Não haverá cobrança ao cliente.`
     }
   };
 
+  const handleConfirmCityEdit = async (cidadeEditada: string) => {
+    if (!os) return;
+
+    const cidadeNorm = normalizeCidadeLocal(cidadeEditada);
+    let rotaEncontrada: typeof rotasUnidade[0] | null = null;
+
+    for (const rota of rotasUnidade) {
+      const cidadesNorm = rota.cidades.map(c => normalizeCidadeLocal(c));
+      if (cidadesNorm.includes(cidadeNorm)) {
+        rotaEncontrada = rota;
+        break;
+      }
+    }
+
+    if (rotaEncontrada) {
+      await handleRouteSelectAndMove(rotaEncontrada.coluna_kanban, cidadeEditada);
+    } else {
+      try {
+        const updates: Record<string, any> = { cliente_cidade: cidadeEditada.trim() };
+        if (os.rota_id) {
+          updates.rota_id = null;
+        }
+        await supabase.from('os').update(updates).eq('id', os.id);
+        setOs({ ...os, ...updates });
+        setMostrarSelecionarRotaObrigatoria(false);
+        setMostrarEditarRotaCidade(false);
+      } catch (error: any) {
+        alert(`Erro ao salvar cidade: ${error.message}`);
+      }
+    }
+  };
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
@@ -5771,6 +5803,7 @@ Não haverá cobrança ao cliente.`
         osNumero={os?.numero_os_samsung || os?.numero_os_interna || 'S/N'}
         clienteBairro={os?.cliente_bairro}
         onSelectRoute={handleRouteSelectAndMove}
+        onConfirmCity={handleConfirmCityEdit}
         onCancel={() => {
           setMostrarSelecionarRotaObrigatoria(false);
           setMostrarEditarRotaCidade(false);

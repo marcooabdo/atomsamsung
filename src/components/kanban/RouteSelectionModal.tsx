@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { AlertCircle, MapPin, Pencil } from 'lucide-react';
+import { AlertCircle, MapPin, Pencil, Check } from 'lucide-react';
 
 interface RouteSelectionModalProps {
   isOpen: boolean;
@@ -8,6 +8,7 @@ interface RouteSelectionModalProps {
   osNumero?: string;
   clienteBairro?: string;
   onSelectRoute: (rotaColumn: string, cidadeCorrigida: string) => void;
+  onConfirmCity?: (cidadeEditada: string) => void;
   onCancel: () => void;
 }
 
@@ -28,6 +29,7 @@ export function RouteSelectionModal({
   osNumero,
   clienteBairro,
   onSelectRoute,
+  onConfirmCity,
   onCancel,
 }: RouteSelectionModalProps) {
   const [editandoCidade, setEditandoCidade] = useState(false);
@@ -173,7 +175,14 @@ export function RouteSelectionModal({
                     Cancelar
                   </button>
                   <button
-                    onClick={() => setEditandoCidade(false)}
+                    onClick={() => {
+                      const trimmed = cidadeEditada.trim();
+                      if (onConfirmCity && trimmed) {
+                        onConfirmCity(trimmed);
+                      } else {
+                        setEditandoCidade(false);
+                      }
+                    }}
                     className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={{
                       backgroundColor: 'rgba(16,185,129,0.1)',
@@ -181,7 +190,10 @@ export function RouteSelectionModal({
                       color: '#10B981'
                     }}
                   >
-                    Confirmar
+                    <span className="flex items-center justify-center gap-1">
+                      <Check className="w-3 h-3" />
+                      Confirmar
+                    </span>
                   </button>
                 </div>
               </div>
