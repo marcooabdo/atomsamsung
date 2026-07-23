@@ -1797,8 +1797,14 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
 
 async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
+
+  // Calculate start of day in São Paulo timezone (UTC-3)
+  const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const startOfDaySP = new Date(spNow);
+  startOfDaySP.setHours(0, 0, 0, 0);
+  // Convert back to UTC for the query
+  const offsetMs = now.getTime() - spNow.getTime();
+  const startOfDayUTC = new Date(startOfDaySP.getTime() + offsetMs);
 
   // Fetch all units for labeling
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
@@ -1807,22 +1813,23 @@ async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>
     for (const u of unidades) unidadeMap[u.id] = u.nome;
   }
 
-  // Fetch OS opened today
+  // Fetch OS opened today (created_at >= start of day SP)
   let queryAbertas = supabase
     .from("os")
     .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, unidade_id, created_at")
-    .gte("created_at", startOfDay.toISOString());
+    .gte("created_at", startOfDayUTC.toISOString());
 
   if (unidadeId) queryAbertas = queryAbertas.eq("unidade_id", unidadeId);
 
   const { data: abertas, error: errAbertas } = await queryAbertas;
   if (errAbertas) throw new Error(`Erro ao buscar OS abertas: ${errAbertas.message}`);
 
-  // Fetch OS closed today
+  // Fetch OS moved to os_fechada today (coluna_kanban_desde >= start of day SP)
   let queryFechadas = supabase
     .from("os")
-    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, unidade_id, fechada_em")
-    .gte("fechada_em", startOfDay.toISOString());
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, tipo_os, tipo_atendimento, unidade_id, coluna_kanban_desde")
+    .eq("coluna_kanban", "os_fechada")
+    .gte("coluna_kanban_desde", startOfDayUTC.toISOString());
 
   if (unidadeId) queryFechadas = queryFechadas.eq("unidade_id", unidadeId);
 
