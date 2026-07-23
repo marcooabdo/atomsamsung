@@ -180,7 +180,7 @@ export function ExecucaoOS() {
 
     const { data, error } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_relatado, coluna_kanban, tecnico_agendado_id, tipo_os')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, tipo_atendimento, tipo_reparo, defeito_relatado, diagnostico_tecnico, reparo_efetuado, coluna_kanban, tecnico_agendado_id, tipo_os')
       .eq('id', osId)
       .maybeSingle();
 
@@ -299,10 +299,17 @@ export function ExecucaoOS() {
   };
 
   const loadComentarios = async (osId: string) => {
-    // Campos sempre começam vazios para o técnico preencher
-    setDefeitoEncontrado('');
-    setDiagnostico('');
-    setAcaoRealizada('');
+    const { data } = await supabase
+      .from('os')
+      .select('diagnostico_tecnico, reparo_efetuado, defeito_relatado')
+      .eq('id', osId)
+      .maybeSingle();
+
+    if (data) {
+      setDefeitoEncontrado(data.defeito_relatado || '');
+      setDiagnostico(data.diagnostico_tecnico || '');
+      setAcaoRealizada(data.reparo_efetuado || '');
+    }
   };
 
   useEffect(() => {
@@ -398,6 +405,15 @@ export function ExecucaoOS() {
     comentario += `DEFEITO ENCONTRADO:\n${defeitoEncontrado || 'Não informado'}\n\nDIAGNÓSTICO:\n${diagnostico || 'Não informado'}\n\nAÇÃO REALIZADA:\n${acaoRealizada || 'Não informado'}`;
 
     await supabase
+      .from('os')
+      .update({
+        defeito_relatado: defeitoEncontrado || null,
+        diagnostico_tecnico: diagnostico || null,
+        reparo_efetuado: acaoRealizada || null
+      })
+      .eq('id', agendamento.os_id);
+
+    await supabase
       .from('os_comentarios')
       .insert({
         os_id: agendamento.os_id,
@@ -456,7 +472,7 @@ export function ExecucaoOS() {
         await supabase
           .from('requisicoes_pecas')
           .update({
-            status: 'gi_postado',
+            status: 'gi_postada',
             tipo_devolucao: 'usada',
             motivo_devolucao: 'Peça consumida durante o reparo'
           })

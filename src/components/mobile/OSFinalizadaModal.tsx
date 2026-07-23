@@ -153,7 +153,7 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
         )
       `)
       .eq('os_id', osId)
-      .in('status', ['gi_postado', 'devolvida', 'em_uso']);
+      .in('status', ['gi_postada', 'devolvida', 'em_uso']);
 
     if (pecasData) {
       setPecas(pecasData as any);
@@ -384,11 +384,11 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
                             <p className="text-gray-400 text-sm">{descricao}</p>
                           </div>
                           <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            peca.status === 'gi_postado' ? 'bg-green-500/20 text-green-400' :
+                            peca.status === 'gi_postada' ? 'bg-green-500/20 text-green-400' :
                             peca.status === 'devolvida' ? 'bg-blue-500/20 text-blue-400' :
                             'bg-gray-500/20 text-gray-400'
                           }`}>
-                            {peca.status === 'gi_postado' ? 'GI Postado' :
+                            {peca.status === 'gi_postada' ? 'GI Postado' :
                              peca.status === 'devolvida' ? 'Devolvida' : peca.status}
                           </span>
                         </div>

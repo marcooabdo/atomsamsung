@@ -63,8 +63,8 @@ export function DesempenhoMobile() {
     const { data: pecasData } = await supabase
       .from('requisicoes_pecas')
       .select('id, updated_at')
-      .eq('solicitante_id', usuario.id)
-      .eq('status', 'gi_postado')
+      .eq('tecnico_id', usuario.id)
+      .eq('status', 'gi_postada')
       .gte('updated_at', inicioMes);
 
     if (agendamentosMes) {
