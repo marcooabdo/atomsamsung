@@ -892,15 +892,20 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       .from("os")
       .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
       .not("coluna_kanban", "in", `(${COLUNAS_EXCLUIDAS.join(",")})`)
+      .or("arquivada.is.null,arquivada.eq.false")
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
     const { data: osRows, error: errOS } = await osQuery;
-    if (errOS) throw new Error(`Erro ao buscar OS: ${errOS.message}`);
+    if (errOS) {
+      console.error("[Compliance] Erro ao buscar OS page", page, errOS.message);
+      break;
+    }
     if (!osRows || osRows.length === 0) break;
     osDataList = osDataList.concat(osRows);
     if (osRows.length < PAGE_SIZE) break;
     page++;
   }
+  console.log(`[Compliance] Total OS carregadas (pré-filtro SMA): ${osDataList.length}`);
 
   // Exclude SMA unit
   osDataList = osDataList.filter((os) => !os.unidade_id || !smaIds.includes(os.unidade_id));
@@ -921,19 +926,24 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     };
   }
 
-  let pecasList: Array<{ id: string; pn: string | null; descricao: string | null; valor_unitario: number | null; os_id: string; status: string }> = [];
+  let pecasList: Array<{ id: string; pn: string | null; codigo: string | null; descricao: string | null; valor_unitario: number | null; valor_gspn: number | null; os_id: string; status: string }> = [];
   for (let i = 0; i < osIds.length; i += 200) {
     const batch = osIds.slice(i, i + 200);
     const { data: batchPecas } = await supabase
       .from("os_pecas")
-      .select("id, pn, descricao, valor_unitario, os_id, status")
+      .select("id, pn, codigo, descricao, valor_unitario, valor_gspn, os_id, status")
       .in("os_id", batch)
       .not("status", "in", "(reprovada,devolucao_completa,devolvida_samsung)");
     if (batchPecas) pecasList = pecasList.concat(batchPecas);
   }
+  console.log(`[Compliance] Total peças carregadas: ${pecasList.length}`);
 
-  const semCodigo = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
-  const semValor = pecasList.filter((p) => !p.valor_unitario || Number(p.valor_unitario) === 0);
+  const hasCodigo = (p: { pn: string | null; codigo: string | null }) =>
+    (p.pn && p.pn.trim() !== "") || (p.codigo && p.codigo.trim() !== "");
+
+  const semCodigo = pecasList.filter((p) => !hasCodigo(p));
+  const semValor = pecasList.filter((p) => hasCodigo(p) && Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01);
+  console.log(`[Compliance] Sem código: ${semCodigo.length}, Sem valor: ${semValor.length}`);
 
   type ProblemOS = { numero: string; coluna: string; coluna_key: string; sem_codigo: number; sem_valor: number };
   const problemsByUnit: Record<string, ProblemOS[]> = {};
