@@ -831,11 +831,12 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
   while (true) {
     let q = supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, coluna_kanban, rota_id, unidade_id")
+      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, coluna_kanban, rota_id, unidade_id, tipo_atendimento")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
       .not("coluna_kanban", "in", `(${colunasComRota.join(",")})`)
       .is("rota_id", null)
+      .eq("tipo_atendimento", "IH")
       .range(from, from + pageSize - 1);
     if (unidadeId) q = q.eq("unidade_id", unidadeId);
     const { data, error } = await q;
