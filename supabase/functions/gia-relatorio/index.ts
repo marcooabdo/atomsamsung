@@ -1263,39 +1263,99 @@ async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>,
 
 async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+  const todayISO = todayStart.toISOString();
 
+  // === SETUP: Fetch unidades ===
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
+  const unidadeSigla: Record<string, string> = {};
   if (unidades) {
-    for (const u of unidades) unidadeMap[u.id] = u.nome;
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeSigla[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeSigla[u.id] = "JDF";
+      else if (nome.includes("feira")) unidadeSigla[u.id] = "FSA";
+      else unidadeSigla[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
   }
 
+  // === SECTION 1: Estoque Real (snapshot) ===
+  let queryEstoque = supabase
+    .from("estoque_pecas")
+    .select("id, unidade_id, status, valor_com_impostos");
+  if (unidadeId) queryEstoque = queryEstoque.eq("unidade_id", unidadeId);
+  const { data: allPecas } = await queryEstoque;
+  const pecasList = allPecas || [];
+
+  const estoqueByUnidade: Record<string, { disponiveis: number; valorDisp: number; reservadas: number; comTecnico: number; defeito: number; valorDefeito: number }> = {};
+  for (const p of pecasList) {
+    const uid = p.unidade_id || "sem_unidade";
+    if (!estoqueByUnidade[uid]) estoqueByUnidade[uid] = { disponiveis: 0, valorDisp: 0, reservadas: 0, comTecnico: 0, defeito: 0, valorDefeito: 0 };
+    const val = Number(p.valor_com_impostos) || 0;
+    if (p.status === "disponivel") { estoqueByUnidade[uid].disponiveis++; estoqueByUnidade[uid].valorDisp += val; }
+    else if (p.status === "reservada") { estoqueByUnidade[uid].reservadas++; }
+    else if (p.status === "vinculada_tecnico") { estoqueByUnidade[uid].comTecnico++; }
+    else if (p.status === "devolvida_defeito") { estoqueByUnidade[uid].defeito++; estoqueByUnidade[uid].valorDefeito += val; }
+  }
+
+  const totalDisponiveis = pecasList.filter(p => p.status === "disponivel").length;
+  const totalValorEstoque = pecasList.filter(p => p.status === "disponivel").reduce((s, p) => s + (Number(p.valor_com_impostos) || 0), 0);
+  const totalDefeito = pecasList.filter(p => p.status === "devolvida_defeito").length;
+  const totalValorDefeito = pecasList.filter(p => p.status === "devolvida_defeito").reduce((s, p) => s + (Number(p.valor_com_impostos) || 0), 0);
+
+  // === SECTION 2: Movimentacao do dia ===
+  let queryEntradasHoje = supabase
+    .from("estoque_pecas")
+    .select("id, unidade_id, valor_com_impostos")
+    .gte("data_entrada", todayISO);
+  if (unidadeId) queryEntradasHoje = queryEntradasHoje.eq("unidade_id", unidadeId);
+  const { data: entradasHoje } = await queryEntradasHoje;
+  const entradasList = entradasHoje || [];
+  const totalEntradasHoje = entradasList.length;
+  const valorEntradasHoje = entradasList.reduce((s, p) => s + (Number(p.valor_com_impostos) || 0), 0);
+
+  // NFs recebidas hoje
+  let queryNFsHoje = supabase
+    .from("estoque_nfs")
+    .select("id, unidade_id, valor_total, processada, pendente_entrada")
+    .gte("created_at", todayISO);
+  if (unidadeId) queryNFsHoje = queryNFsHoje.eq("unidade_id", unidadeId);
+  const { data: nfsHoje } = await queryNFsHoje;
+  const nfsHojeList = nfsHoje || [];
+  const totalNFsHoje = nfsHojeList.length;
+  const valorNFsHoje = nfsHojeList.reduce((s, n) => s + (Number(n.valor_total) || 0), 0);
+
+  // NFs pendentes de entrada (total, nao apenas hoje)
+  let queryNFsPend = supabase
+    .from("estoque_nfs")
+    .select("id, unidade_id, valor_total, created_at")
+    .eq("pendente_entrada", true);
+  if (unidadeId) queryNFsPend = queryNFsPend.eq("unidade_id", unidadeId);
+  const { data: nfsPend } = await queryNFsPend;
+  const nfsPendList = nfsPend || [];
+  const totalNFsPendentes = nfsPendList.length;
+  const valorNFsPendentes = nfsPendList.reduce((s, n) => s + (Number(n.valor_total) || 0), 0);
+  const nfsPendMais24h = nfsPendList.filter(n => (now.getTime() - new Date(n.created_at).getTime()) > 24 * 60 * 60 * 1000).length;
+
+  // === SECTION 3: Requisicoes Pendentes ===
   let queryReq = supabase
     .from("requisicoes_pecas")
-    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, os_id, valor_peca")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, status, unidade_id, created_at, numero_os_samsung, valor_peca, numero_pedido_samsung, previsao_entrega")
     .eq("status", "pendente");
-
   if (unidadeId) queryReq = queryReq.eq("unidade_id", unidadeId);
-
-  const { data: pendentes, error: errPend } = await queryReq.order("created_at", { ascending: true });
-  if (errPend) throw new Error(`Erro ao buscar requisicoes: ${errPend.message}`);
-
+  const { data: pendentes } = await queryReq.order("created_at", { ascending: true });
   const pendentesList = pendentes || [];
 
-  // Calculate values
-  let valorTotal = 0;
+  let valorTotalPendente = 0;
   let pecasComValor = 0;
   let pecasSemValor = 0;
-
   for (const r of pendentesList) {
     const val = Number(r.valor_peca) || 0;
     const qty = Number(r.quantidade_requisitada) || 1;
-    if (val > 0) {
-      valorTotal += val * qty;
-      pecasComValor++;
-    } else {
-      pecasSemValor++;
-    }
+    if (val > 0) { valorTotalPendente += val * qty; pecasComValor++; } else { pecasSemValor++; }
   }
 
   // Age classification
@@ -1303,98 +1363,205 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     const minutos = (now.getTime() - new Date(r.created_at).getTime()) / (1000 * 60);
     return { ...r, minutos_pendente: minutos };
   });
-
   const criticas = pendentesComIdade.filter((r) => r.minutos_pendente > 48 * 60);
   const alerta = pendentesComIdade.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60);
   const recentes = pendentesComIdade.filter((r) => r.minutos_pendente <= 24 * 60);
 
+  // Top 5 pecas mais requisitadas
+  const pecaCount: Record<string, { codigo: string; descricao: string; qtd: number }> = {};
+  for (const r of pendentesList) {
+    const key = r.codigo_peca || "SEM_CODIGO";
+    if (!pecaCount[key]) pecaCount[key] = { codigo: key, descricao: r.descricao || "", qtd: 0 };
+    pecaCount[key].qtd += Number(r.quantidade_requisitada) || 1;
+  }
+  const topPecas = Object.values(pecaCount).sort((a, b) => b.qtd - a.qtd).slice(0, 5);
+
   // Group by unidade
-  const pendentesPorUnidade: Record<string, typeof pendentesComIdade> = {};
+  const reqPorUnidade: Record<string, typeof pendentesComIdade> = {};
   for (const r of pendentesComIdade) {
     const uid = r.unidade_id || "sem_unidade";
-    if (!pendentesPorUnidade[uid]) pendentesPorUnidade[uid] = [];
-    pendentesPorUnidade[uid].push(r);
+    if (!reqPorUnidade[uid]) reqPorUnidade[uid] = [];
+    reqPorUnidade[uid].push(r);
   }
 
-  const unidadesReport = Object.entries(pendentesPorUnidade)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([uid, lista]) => {
-      let uValor = 0;
-      let uSemValor = 0;
-      for (const r of lista) {
-        const val = Number(r.valor_peca) || 0;
-        const qty = Number(r.quantidade_requisitada) || 1;
-        if (val > 0) uValor += val * qty;
-        else uSemValor++;
-      }
-      const uCriticas = lista.filter((r) => r.minutos_pendente > 48 * 60).length;
-      const uAlerta = lista.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60).length;
-      const uRecentes = lista.filter((r) => r.minutos_pendente <= 24 * 60).length;
+  // === SECTION 4: Pedidos em Transito (pedido_feito) ===
+  let queryPedidos = supabase
+    .from("requisicoes_pecas")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, unidade_id, numero_pedido_samsung, previsao_entrega, valor_peca")
+    .eq("status", "pedido_feito");
+  if (unidadeId) queryPedidos = queryPedidos.eq("unidade_id", unidadeId);
+  const { data: pedidosFeitos } = await queryPedidos;
+  const pedidosFeitosList = pedidosFeitos || [];
+  const totalPedidosTransito = pedidosFeitosList.length;
+  const valorPedidosTransito = pedidosFeitosList.reduce((s, p) => s + ((Number(p.valor_peca) || 0) * (Number(p.quantidade_requisitada) || 1)), 0);
 
-      return {
-        unidade: unidadeMap[uid] || uid,
-        total_pendentes: lista.length,
-        criticas: uCriticas,
-        alerta: uAlerta,
-        recentes: uRecentes,
-        valor_total: uValor,
-        sem_valor: uSemValor,
-      };
-    });
+  // === BUILD TEXT REPORT ===
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const horaRelatorio = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
-  function getSigla(nome: string): string {
-    const lower = nome.toLowerCase();
-    if (lower.includes("montes claros")) return "MOC";
-    if (lower.includes("juiz de fora")) return "JDF";
-    if (lower.includes("feira")) return "FSA";
-    return nome.slice(0, 3).toUpperCase();
+  const lines: string[] = [
+    `📦 *NUCLEO DE PECAS*`,
+    `${horaRelatorio}`,
+    `━━━━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `🏪 *ESTOQUE DISPONIVEL:*`,
+    `Pecas disponiveis: ${totalDisponiveis}`,
+    `Valor total em estoque: ${fmt(totalValorEstoque)}`,
+  ];
+
+  // Estoque por unidade
+  const estoqueEntries = Object.entries(estoqueByUnidade).filter(([, v]) => v.disponiveis > 0).sort((a, b) => b[1].disponiveis - a[1].disponiveis);
+  for (const [uid, data] of estoqueEntries) {
+    const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
+    lines.push(`  📍 ${sigla}: ${data.disponiveis} pcs | ${fmt(data.valorDisp)}`);
   }
 
-  const valorFormatado = valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  lines.push(``);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📊 *MOVIMENTACAO DO DIA:*`);
+  lines.push(`Entradas hoje: ${totalEntradasHoje} pcs | ${fmt(valorEntradasHoje)}`);
+  lines.push(`NFs recebidas hoje: ${totalNFsHoje} | ${fmt(valorNFsHoje)}`);
+  if (totalNFsPendentes > 0) {
+    lines.push(`⚠️ NFs pendentes de entrada: ${totalNFsPendentes} | ${fmt(valorNFsPendentes)}`);
+    if (nfsPendMais24h > 0) {
+      lines.push(`  🔴 ${nfsPendMais24h} NFs ha mais de 24h sem entrada`);
+    }
+  }
 
-  const resumoTexto = [
-    `📦 NUCLEO DE PEÇAS`,
-    `${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-    `──────────────────`,
-    `📊 RESUMO EXECUTIVO:`,
-    `Requisições pendentes: ${pendentesList.length}`,
-    `  🔴 Críticas (+48h): ${criticas.length}`,
-    `  🟡 Alerta (+24h): ${alerta.length}`,
-    `  🟢 Recentes (-24h): ${recentes.length}`,
-    `Valor total pendente: ${valorFormatado}`,
-    `Peças com valor: ${pecasComValor} | Sem valor cadastrado: ${pecasSemValor}`,
-    `──────────────────`,
-    ...unidadesReport.map((u) => {
-      const sigla = getSigla(u.unidade);
-      const uValorFmt = u.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-      return [
-        `📍 ${sigla} — ${u.total_pendentes} pendentes`,
-        `  Críticas: ${u.criticas} | Alerta: ${u.alerta} | Recentes: ${u.recentes}`,
-        `  Valor: ${uValorFmt} | Sem valor: ${u.sem_valor}`,
-      ].join("\n");
-    }),
-    `──────────────────`,
-    `GIA • Global Intelligence Assistance`,
-  ].join("\n");
+  lines.push(``);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📋 *REQUISICOES PENDENTES: ${pendentesList.length}*`);
+  lines.push(`Valor total pendente: ${fmt(valorTotalPendente)}`);
+  lines.push(`  🔴 Criticas (+48h): ${criticas.length}`);
+  lines.push(`  🟡 Alerta (+24h): ${alerta.length}`);
+  lines.push(`  🟢 Recentes (-24h): ${recentes.length}`);
+  if (pecasSemValor > 0) {
+    const pctSemValor = Math.round((pecasSemValor / pendentesList.length) * 100);
+    lines.push(`  ⚠️ Sem valor cadastrado: ${pecasSemValor} (${pctSemValor}%)`);
+  }
+
+  // Per-unit breakdown
+  const reqEntries = Object.entries(reqPorUnidade).sort((a, b) => b[1].length - a[1].length);
+  lines.push(``);
+  for (const [uid, lista] of reqEntries) {
+    const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
+    const uCriticas = lista.filter(r => r.minutos_pendente > 48 * 60).length;
+    const uAlerta = lista.filter(r => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60).length;
+    const uRecentes = lista.filter(r => r.minutos_pendente <= 24 * 60).length;
+    const uValor = lista.reduce((s, r) => s + ((Number(r.valor_peca) || 0) * (Number(r.quantidade_requisitada) || 1)), 0);
+    lines.push(`📍 ${sigla} — ${lista.length} pendentes | ${fmt(uValor)}`);
+    lines.push(`  🔴${uCriticas} 🟡${uAlerta} 🟢${uRecentes}`);
+  }
+
+  // Top 5 pecas
+  if (topPecas.length > 0) {
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`🔥 *TOP 5 PECAS MAIS PEDIDAS:*`);
+    for (let i = 0; i < topPecas.length; i++) {
+      const p = topPecas[i];
+      const desc = p.descricao.length > 30 ? p.descricao.slice(0, 30) + "..." : p.descricao;
+      lines.push(`${i + 1}. ${p.codigo} (${p.qtd}x)`);
+      lines.push(`   ${desc}`);
+    }
+  }
+
+  // Pedidos em transito
+  if (totalPedidosTransito > 0) {
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`🚚 *PEDIDOS EM TRANSITO: ${totalPedidosTransito}*`);
+    lines.push(`Valor estimado: ${fmt(valorPedidosTransito)}`);
+  }
+
+  // Devolucoes
+  if (totalDefeito > 0) {
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`🔄 *DEVOLUCOES PENDENTES:*`);
+    lines.push(`Pecas com defeito aguardando: ${totalDefeito}`);
+    lines.push(`Valor retido: ${fmt(totalValorDefeito)}`);
+    const defeitoEntries = Object.entries(estoqueByUnidade).filter(([, v]) => v.defeito > 0);
+    for (const [uid, data] of defeitoEntries) {
+      const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
+      lines.push(`  📍 ${sigla}: ${data.defeito} pcs | ${fmt(data.valorDefeito)}`);
+    }
+  }
+
+  // Alertas
+  const alertas: string[] = [];
+  for (const [uid, lista] of reqEntries) {
+    const uCriticas = lista.filter(r => r.minutos_pendente > 48 * 60).length;
+    if (uCriticas >= 10) {
+      const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
+      alertas.push(`🚨 ${sigla}: ${uCriticas} requisicoes criticas (+48h)`);
+    }
+  }
+  if (pecasSemValor > 0 && (pecasSemValor / pendentesList.length) > 0.3) {
+    alertas.push(`⚠️ ${Math.round((pecasSemValor / pendentesList.length) * 100)}% das requisicoes sem valor cadastrado`);
+  }
+  if (nfsPendMais24h >= 3) {
+    alertas.push(`📦 ${nfsPendMais24h} NFs aguardando entrada ha mais de 24h`);
+  }
+
+  if (alertas.length > 0) {
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`🚨 *ALERTAS:*`);
+    for (const a of alertas) lines.push(a);
+  }
+
+  lines.push(``);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(`GIA • Nucleo de Pecas`);
+
+  const resumoTexto = lines.join("\n");
 
   return {
     titulo: "Nucleo de Pecas",
-    subtitulo: `${pendentesList.length} requisicoes pendentes | ${valorFormatado} | ${pecasSemValor} sem valor`,
+    subtitulo: `${pendentesList.length} req. pendentes | Estoque: ${totalDisponiveis} pcs (${fmt(totalValorEstoque)}) | Defeito: ${totalDefeito}`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    estoque: {
+      total_disponiveis: totalDisponiveis,
+      valor_total_estoque: totalValorEstoque,
+      total_defeito: totalDefeito,
+      valor_total_defeito: totalValorDefeito,
+      por_unidade: estoqueByUnidade,
+    },
+    movimentacao_dia: {
+      entradas_hoje: totalEntradasHoje,
+      valor_entradas_hoje: valorEntradasHoje,
+      nfs_hoje: totalNFsHoje,
+      valor_nfs_hoje: valorNFsHoje,
+      nfs_pendentes: totalNFsPendentes,
+      valor_nfs_pendentes: valorNFsPendentes,
+      nfs_pend_mais_24h: nfsPendMais24h,
+    },
     requisicoes_pendentes: {
       total: pendentesList.length,
       criticas: criticas.length,
       alerta: alerta.length,
       recentes: recentes.length,
-    },
-    valores: {
-      valor_total: valorTotal,
-      valor_total_formatado: valorFormatado,
+      valor_total: valorTotalPendente,
       pecas_com_valor: pecasComValor,
       pecas_sem_valor: pecasSemValor,
     },
-    por_unidade: unidadesReport,
+    pedidos_transito: {
+      total: totalPedidosTransito,
+      valor: valorPedidosTransito,
+    },
+    top_pecas: topPecas,
+    alertas,
+    por_unidade: reqEntries.map(([uid, lista]) => ({
+      unidade: unidadeMap[uid] || uid,
+      sigla: unidadeSigla[uid] || "???",
+      total_pendentes: lista.length,
+      criticas: lista.filter(r => r.minutos_pendente > 48 * 60).length,
+      alerta: lista.filter(r => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60).length,
+      recentes: lista.filter(r => r.minutos_pendente <= 24 * 60).length,
+      valor_total: lista.reduce((s, r) => s + ((Number(r.valor_peca) || 0) * (Number(r.quantidade_requisitada) || 1)), 0),
+    })),
     resumo_texto: resumoTexto,
   };
 }
