@@ -884,15 +884,13 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     }
   }
 
-  let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
+  let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null; arquivada: boolean | null }> = [];
   let page = 0;
   const PAGE_SIZE = 1000;
   while (true) {
     let osQuery = supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
-      .not("coluna_kanban", "in", `(${COLUNAS_EXCLUIDAS.join(",")})`)
-      .or("arquivada.is.null,arquivada.eq.false")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, arquivada")
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
     const { data: osRows, error: errOS } = await osQuery;
@@ -905,12 +903,20 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     if (osRows.length < PAGE_SIZE) break;
     page++;
   }
-  console.log(`[Compliance] Total OS carregadas (pré-filtro SMA): ${osDataList.length}`);
+  console.log(`[Compliance] Total OS carregadas (raw): ${osDataList.length}`);
+
+  // Filter in JS to avoid PostgREST .not() + .or() combination issues
+  osDataList = osDataList.filter((os) => {
+    if (COLUNAS_EXCLUIDAS.includes(os.coluna_kanban)) return false;
+    if (os.arquivada === true) return false;
+    return true;
+  });
+  console.log(`[Compliance] Após filtro coluna/arquivada: ${osDataList.length}`);
 
   // Exclude SMA unit
   osDataList = osDataList.filter((os) => !os.unidade_id || !smaIds.includes(os.unidade_id));
 
-  const osMap: Record<string, { id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = {};
+  const osMap: Record<string, { id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null; arquivada: boolean | null }> = {};
   for (const os of osDataList) osMap[os.id] = os;
 
   const osIds = osDataList.map((o) => o.id);
