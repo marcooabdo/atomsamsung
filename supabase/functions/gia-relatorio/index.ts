@@ -420,21 +420,49 @@ async function gerarEstoqueDoDia(supabase: ReturnType<typeof createClient>, unid
 
   const todasUnidades = [...unidadesReport, ...unidadesSemEntrada];
 
+  function getSiglaEstoque(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const totalEstoqueQtd = todasUnidades.reduce((s, u) => s + u.estoque_atual.quantidade, 0);
+  const totalEstoqueVal = todasUnidades.reduce((s, u) => s + u.estoque_atual.valor_total, 0);
+  const totalEstoqueValFmt = totalEstoqueVal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
   const resumoTexto = [
-    `ESTOQUE DO DIA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `📦 ESTOQUE DO DIA`,
+    `${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `Entradas hoje:`,
-    `  Pecas: ${entradas.length} | PNs distintos: ${pnsHoje.size}`,
-    `  Valor total: R$ ${valorEntradaHoje.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de entradas hoje: ${entradas.length} peças | ${pnsHoje.size} PNs distintos`,
+    `Estoque disponível total: ${totalEstoqueQtd} peças | Valor: ${totalEstoqueValFmt}`,
     ``,
-    `Estoque disponivel total:`,
-    `  Pecas: ${estoque.length}`,
-    `  Valor: R$ ${valorEstoqueTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    ``,
-    `Por unidade:`,
-    ...todasUnidades.map((u) =>
-      `  ${u.unidade}: +${u.entradas_hoje.quantidade} hoje (${u.entradas_hoje.pns_distintos} PNs, R$ ${u.entradas_hoje.valor_total.toFixed(2)}) | Estoque: ${u.estoque_atual.quantidade} pecas (R$ ${u.estoque_atual.valor_total.toFixed(2)})`
-    ),
+    ...todasUnidades.map((u) => {
+      const sigla = getSiglaEstoque(u.unidade);
+      const valFmt = u.entradas_hoje.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      const pecaStr = u.estoque_atual.quantidade === 1 ? "peça" : "peças";
+      const lines = [
+        `📍 ${sigla} — ${u.entradas_hoje.quantidade} peças entrada hoje (${u.entradas_hoje.pns_distintos} PNs) / Estoque: ${u.estoque_atual.quantidade} ${pecaStr}`,
+        `Entradas hoje: ${u.entradas_hoje.quantidade} peças | Valor total: ${valFmt}`,
+      ];
+      if (u.entradas_hoje.top_pns && u.entradas_hoje.top_pns.length > 0) {
+        lines.push(`Top PNs:`);
+        for (const pn of u.entradas_hoje.top_pns.slice(0, 5)) {
+          const pnVal = pn.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+          lines.push(`- ${pn.pn} • ${pn.quantidade} unidades • ${pnVal}`);
+        }
+      }
+      lines.push(``);
+      return lines.join("\n");
+    }),
+    `──────────────────`,
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -1083,19 +1111,39 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       };
     });
 
+  function getSiglaCE(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
   const resumoTexto = [
-    `PROBLEMAS PECA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `⚠️ PROBLEMAS PEÇA (COMPLIANCE)`,
+    `${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `OS com erro de peca: ${totalOSComErro}`,
-    `Pecas sem PN: ${totalSemPN} | Pecas sem valor: ${totalSemValor}`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de OS com erro: ${totalOSComErro}`,
+    `${totalSemPN} sem PN | ${totalSemValor} sem valor`,
     ``,
-    ...unidadesReport.flatMap((u) => [
-      `--- ${u.unidade} --- (${u.total_os_com_erro} OS)`,
-      ...u.por_coluna.map((c) => `  ${c.coluna}: ${c.quantidade} OS`),
-      ``,
-      ...u.os_list.map((os) => `  ${os.numero} | ${os.coluna} | sem PN: ${os.sem_pn} | sem valor: ${os.sem_valor}`),
-      ``,
-    ]),
+    ...unidadesReport.map((u) => {
+      const sigla = getSiglaCE(u.unidade);
+      const lines = [
+        `📍 ${sigla} — ${u.total_os_com_erro} OS com erro`,
+      ];
+      for (const c of u.por_coluna) {
+        lines.push(`${c.coluna} • ${c.quantidade} OS`);
+      }
+      lines.push(``);
+      return lines.join("\n");
+    }),
+    `──────────────────`,
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -1204,23 +1252,44 @@ async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>,
 
   const fmt = (v: number) => `R$ ${v.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+  function getSiglaLC(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
   const resumoTexto = [
-    `LIMITE DE CREDITO GSPN - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `💳 LIMITE DE CRÉDITO GSPN`,
+    `${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `TOTAL GERAL:`,
-    `  Limite: ${fmt(limiteGlobal)} | Consumido: ${fmt(consumidoGlobal)} | Livre: ${fmt(livreGlobal)}`,
-    `  Uso: ${percentualGlobal}%`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total Geral:`,
+    `- Limite: ${fmt(limiteGlobal)}`,
+    `- Consumido: ${fmt(consumidoGlobal)}`,
+    `- Livre: ${fmt(livreGlobal)}`,
+    `- Uso: ${percentualGlobal}%`,
     ``,
-    ...porUnidade.map((u) => [
-      `${u.unidade}${u.critico ? " [CRITICO]" : u.alerta ? " [ALERTA]" : ""}`,
-      `  Limite: ${fmt(u.limite_total)} | Consumido: ${fmt(u.consumido)} | Livre: ${fmt(u.livre)} | ${u.percentual_uso}%`,
-      `  Disponivel: ${u.categorias.disponivel.quantidade} (${fmt(u.categorias.disponivel.valor)})`,
-      `  Com tecnico: ${u.categorias.com_tecnico.quantidade} (${fmt(u.categorias.com_tecnico.valor)})`,
-      `  Com defeito: ${u.categorias.com_defeito.quantidade} (${fmt(u.categorias.com_defeito.valor)})`,
-      `  Em OS aberta: ${u.categorias.em_os_aberta.quantidade} (${fmt(u.categorias.em_os_aberta.valor)})`,
-      `  Pedidos ativos: ${u.categorias.pedidos_ativos.quantidade} (${fmt(u.categorias.pedidos_ativos.valor)})`,
-      `  Devolvida (nao consome): ${u.categorias.devolvida.quantidade} (${fmt(u.categorias.devolvida.valor)})`,
-    ].join("\n")),
+    ...porUnidade.map((u) => {
+      const sigla = getSiglaLC(u.unidade);
+      return [
+        `📍 ${sigla} — ${u.percentual_uso}% utilizado`,
+        `Limite: ${fmt(u.limite_total)} | Consumido: ${fmt(u.consumido)} | Livre: ${fmt(u.livre)}`,
+        `Disponível: ${u.categorias.disponivel.quantidade} (${fmt(u.categorias.disponivel.valor)})`,
+        `Com técnico: ${u.categorias.com_tecnico.quantidade} (${fmt(u.categorias.com_tecnico.valor)})`,
+        `Com defeito: ${u.categorias.com_defeito.quantidade} (${fmt(u.categorias.com_defeito.valor)})`,
+        `Em OS aberta: ${u.categorias.em_os_aberta.quantidade} (${fmt(u.categorias.em_os_aberta.valor)})`,
+        `Pedidos ativos: ${u.categorias.pedidos_ativos.quantidade} (${fmt(u.categorias.pedidos_ativos.valor)})`,
+        `Devolvida (não consome): ${u.categorias.devolvida.quantidade} (${fmt(u.categorias.devolvida.valor)})`,
+        ``,
+      ].join("\n");
+    }),
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -1635,26 +1704,53 @@ async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>
   const categoriasAbertas = categorizarOS(abertas);
   const categoriasFechadas = categorizarOS(fechadas);
 
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const saldoStr = saldoGeral >= 0 ? `+${saldoGeral}` : `${saldoGeral}`;
+
   const resumoTexto = [
-    `ABERTURA E FECHAMENTO - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `📋 ABERTURA E FECHAMENTO`,
+    `🕕 ${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `CONSOLIDADO GERAL:`,
-    `  Abertas: ${totalAbertas} | Fechadas: ${totalFechadas} | Saldo: ${saldoGeral >= 0 ? "+" : ""}${saldoGeral}`,
+    `📊 CONSOLIDADO GERAL`,
     ``,
-    `  Abertas por tipo:`,
-    `  LP-CI: ${categoriasAbertas["LP-CI"]} | LP-IH: ${categoriasAbertas["LP-IH"]} | OW-CI: ${categoriasAbertas["OW-CI"]} | OW-IH: ${categoriasAbertas["OW-IH"]}`,
+    `⚖️ Saldo Total: ${saldoStr}`,
     ``,
-    `  Fechadas por tipo:`,
-    `  LP-CI: ${categoriasFechadas["LP-CI"]} | LP-IH: ${categoriasFechadas["LP-IH"]} | OW-CI: ${categoriasFechadas["OW-CI"]} | OW-IH: ${categoriasFechadas["OW-IH"]}`,
+    `📥 Abertas (${totalAbertas})`,
+    `↳ LP: ${categoriasAbertas["LP-CI"]} CI | ${categoriasAbertas["LP-IH"]} IH`,
+    `↳ OW: ${categoriasAbertas["OW-CI"]} CI | ${categoriasAbertas["OW-IH"]} IH`,
     ``,
-    `POR UNIDADE:`,
-    ...unidadesReport.flatMap((u) => [
-      `  --- ${u.unidade_nome} ---`,
-      `  Abertas: ${u.abertas.total} | Fechadas: ${u.fechadas.total} | Saldo: ${u.saldo >= 0 ? "+" : ""}${u.saldo}`,
-      `  Abertas: LP-CI: ${u.abertas.categorias["LP-CI"]} | LP-IH: ${u.abertas.categorias["LP-IH"]} | OW-CI: ${u.abertas.categorias["OW-CI"]} | OW-IH: ${u.abertas.categorias["OW-IH"]}`,
-      `  Fechadas: LP-CI: ${u.fechadas.categorias["LP-CI"]} | LP-IH: ${u.fechadas.categorias["LP-IH"]} | OW-CI: ${u.fechadas.categorias["OW-CI"]} | OW-IH: ${u.fechadas.categorias["OW-IH"]}`,
-      ``,
-    ]),
+    `📤 Fechadas (${totalFechadas})`,
+    `↳ LP: ${categoriasFechadas["LP-CI"]} CI | ${categoriasFechadas["LP-IH"]} IH`,
+    `↳ OW: ${categoriasFechadas["OW-CI"]} CI | ${categoriasFechadas["OW-IH"]} IH`,
+    ``,
+    `──────────────────`,
+    ``,
+    ...unidadesReport.map((u) => {
+      const sigla = getSigla(u.unidade_nome);
+      const sU = u.saldo >= 0 ? `+${u.saldo}` : `${u.saldo}`;
+      const aLP = `LP (${u.abertas.categorias["LP-CI"]} CI | ${u.abertas.categorias["LP-IH"]} IH)`;
+      const aOW = `OW (${u.abertas.categorias["OW-CI"]} CI | ${u.abertas.categorias["OW-IH"]} IH)`;
+      const fLP = `LP (${u.fechadas.categorias["LP-CI"]} CI | ${u.fechadas.categorias["LP-IH"]} IH)`;
+      const fOW = `OW (${u.fechadas.categorias["OW-CI"]} CI | ${u.fechadas.categorias["OW-IH"]} IH)`;
+      return [
+        `📍 ${sigla} | Saldo: ${sU}`,
+        `📥 Abertas (${u.abertas.total}):  ${aLP} • ${aOW}`,
+        `📤 Fechadas (${u.fechadas.total}): ${fLP} • ${fOW}`,
+        ``,
+      ].join("\n");
+    }),
+    `──────────────────`,
+    `🤖 GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
