@@ -62,21 +62,18 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
 
 ⏰ Relatório gerado: {horario}`,
 
-  agendamentos_ih: `📅 *AGENDAMENTOS IH*
+  agendamentos_ih: `🚨📋 *RELATÓRIO ROTAS*
 ━━━━━━━━━━━━━━━━━━━━━
 
-📋 *AGENDA DO DIA:*
-{lista_agendamentos}
+📅 {data}
+⏰ {horario}
 
-📊 *RESUMO:*
-• Total agendados: {total}
-• Manhã: {manha}
-• Tarde: {tarde}
+⚠️ *{total} OS sem rota definida*
 
-🗺️ *ROTAS:*
-{rotas_dia}
+{detalhes_unidades}
 
-⏰ Relatório gerado: {horario}`,
+━━━━━━━━━━━━━━━━━━━━━
+🤖 _GIA • Global Intelligence Assistance_`,
 
   compliance_erros: `⚠️ *COMPLIANCE E ERROS*
 ━━━━━━━━━━━━━━━━━━━━━
