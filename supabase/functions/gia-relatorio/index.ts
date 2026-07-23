@@ -1611,7 +1611,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const resumoTexto = lines.join("\n");
 
   return {
-    titulo: "Nucleo de Pecas",
+    titulo: "Nucleo de Peças",
     subtitulo: `${pendentesList.length} req. pendentes | Estoque: ${totalDisponiveis} pcs (${fmt(totalValorEstoque)}) | Defeito: ${totalDefeito}`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
