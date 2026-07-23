@@ -1698,8 +1698,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     from += pageSize;
   }
 
-  // Route-related kanban columns
-  const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih", "em_reparo_ih"];
+  // Route-related kanban columns (only IH routes)
+  const rotaColumns = ["em_rota_ih", "em_reparo_ih"];
 
   // Fetch agendamentos to validate IH and FTF
   const { data: agendamentos } = await supabase
@@ -1762,8 +1762,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
 
       const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban) && !(os.coluna_kanban === "em_rota_ih" && os.grupo_os_id)).length;
 
-      // Route distribution in pipeline order
-      const rotaColumnsOrder = ["rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa", "rota_amarela", "rota_laranja", "em_rota_ih", "em_reparo_ih"];
+      // Route distribution in pipeline order (only IH)
+      const rotaColumnsOrder = ["em_rota_ih", "em_reparo_ih"];
       const distribuicao = rotaColumnsOrder
         .filter((col) => porColuna[col] && porColuna[col].length > 0)
         .map((col) => ({
