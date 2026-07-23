@@ -232,7 +232,7 @@ export function ExecucaoOS() {
 
     await loadPecas(data.id);
     await loadChecklist(agendamentoData?.id || '');
-    await loadComentarios(data.id);
+    await loadComentarios(data.id, !checkinRealizado);
 
     setLoading(false);
   };
@@ -298,7 +298,15 @@ export function ExecucaoOS() {
     }
   };
 
-  const loadComentarios = async (osId: string) => {
+  const loadComentarios = async (osId: string, isNewVisit: boolean) => {
+    // For a new visit (not yet checked-in), start with blank fields
+    if (isNewVisit) {
+      setDefeitoEncontrado('');
+      setDiagnostico('');
+      setAcaoRealizada('');
+      return;
+    }
+
     const { data } = await supabase
       .from('os')
       .select('diagnostico_tecnico, reparo_efetuado, defeito_relatado')
