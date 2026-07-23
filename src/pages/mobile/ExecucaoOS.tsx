@@ -773,7 +773,7 @@ export function ExecucaoOS() {
 
         let novoStatus: string;
         if (resultado === 'sucesso') {
-          novoStatus = 'reparo_concluido';
+          novoStatus = isIH ? 'aguardando_fechamento' : 'reparo_concluido';
         } else {
           novoStatus = 'aguardando_peca';
         }
