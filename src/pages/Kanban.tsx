@@ -3100,6 +3100,7 @@ export function Kanban() {
         clienteNome={mandatoryRoutePickerOS?.cliente_nome}
         osNumero={mandatoryRoutePickerOS?.numero_os_samsung || mandatoryRoutePickerOS?.numero_os_interna || 'S/N'}
         clienteBairro={mandatoryRoutePickerOS?.cliente_bairro}
+        rotas={rotas}
         onSelectRoute={(rotaColumn, cidadeCorrigida) => handleMandatoryRouteSelect(rotaColumn, cidadeCorrigida)}
         onCancel={() => {
           setMandatoryRoutePickerOS(null);

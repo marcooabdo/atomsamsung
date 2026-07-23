@@ -6658,6 +6658,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         clienteNome={os?.cliente_nome}
         osNumero={os?.numero_os_samsung || os?.numero_os_interna || 'S/N'}
         clienteBairro={os?.cliente_bairro}
+        rotas={rotasUnidade}
         onSelectRoute={async (rotaColumn, cidadeCorrigida) => {
           if (!os) return;
           const rotaColorMap: Record<string, { nome: string; cor: string }> = {

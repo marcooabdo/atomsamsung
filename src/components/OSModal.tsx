@@ -5810,6 +5810,7 @@ Não haverá cobrança ao cliente.`
         clienteNome={os?.cliente_nome}
         osNumero={os?.numero_os_samsung || os?.numero_os_interna || 'S/N'}
         clienteBairro={os?.cliente_bairro}
+        rotas={rotasUnidade}
         onSelectRoute={handleRouteSelectAndMove}
         onConfirmCity={handleConfirmCityEdit}
         onCancel={() => {

@@ -1,5 +1,14 @@
 import { useState, useEffect } from 'react';
 import { AlertCircle, MapPin, Pencil, Check } from 'lucide-react';
+import { normalizarCidade } from '../../lib/cidadeNormalize';
+
+interface RotaInfo {
+  id: string;
+  nome: string;
+  cor?: string | null;
+  cidades: string[];
+  coluna_kanban: string;
+}
 
 interface RouteSelectionModalProps {
   isOpen: boolean;
@@ -7,6 +16,7 @@ interface RouteSelectionModalProps {
   clienteNome?: string;
   osNumero?: string;
   clienteBairro?: string;
+  rotas?: RotaInfo[];
   onSelectRoute: (rotaColumn: string, cidadeCorrigida: string) => void;
   onConfirmCity?: (cidadeEditada: string) => void;
   onCancel: () => void;
@@ -28,6 +38,7 @@ export function RouteSelectionModal({
   clienteNome,
   osNumero,
   clienteBairro,
+  rotas,
   onSelectRoute,
   onConfirmCity,
   onCancel,
@@ -44,7 +55,28 @@ export function RouteSelectionModal({
 
   if (!isOpen) return null;
 
-  const cidadeAtual = editandoCidade ? cidadeEditada : (cidade || '');
+  const handleConfirmCity = () => {
+    const trimmed = cidadeEditada.trim();
+    if (!trimmed) return;
+
+    // Check if the corrected city already has a route defined
+    if (rotas && rotas.length > 0) {
+      const cidadeNorm = normalizarCidade(trimmed);
+      for (const rota of rotas) {
+        const cidadesNorm = rota.cidades.map(c => normalizarCidade(c));
+        if (cidadesNorm.includes(cidadeNorm)) {
+          onSelectRoute(rota.coluna_kanban, trimmed);
+          return;
+        }
+      }
+    }
+
+    if (onConfirmCity) {
+      onConfirmCity(trimmed);
+    }
+
+    setEditandoCidade(false);
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Escape') {
@@ -152,6 +184,7 @@ export function RouteSelectionModal({
                   type="text"
                   value={cidadeEditada}
                   onChange={(e) => setCidadeEditada(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleConfirmCity(); }}
                   placeholder="Digite o nome correto da cidade"
                   className="w-full px-3 py-2.5 rounded-lg text-sm font-medium"
                   style={{
@@ -175,14 +208,7 @@ export function RouteSelectionModal({
                     Cancelar
                   </button>
                   <button
-                    onClick={() => {
-                      const trimmed = cidadeEditada.trim();
-                      if (onConfirmCity && trimmed) {
-                        onConfirmCity(trimmed);
-                      } else {
-                        setEditandoCidade(false);
-                      }
-                    }}
+                    onClick={handleConfirmCity}
                     className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-all"
                     style={{
                       backgroundColor: 'rgba(16,185,129,0.1)',
