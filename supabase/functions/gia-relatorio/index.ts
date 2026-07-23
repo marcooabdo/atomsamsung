@@ -1438,7 +1438,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const horaRelatorio = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
 
   const lines: string[] = [
-    `📦 *NUCLEO DE PECAS*`,
+    `📦 *NÚCLEO DE PEÇAS*`,
     `${horaRelatorio}`,
     `━━━━━━━━━━━━━━━━━━━━━`,
     ``,
