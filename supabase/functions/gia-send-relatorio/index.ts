@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "npm:@supabase/supabase-js@2.57.4";
+import { createClient } from "npm:@supabase/supabase-js@2.49.1";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,425 +7,230 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Client-Info, Apikey",
 };
 
-const RELATORIOS = [
-  { tipo: "pulso_operacional", nome: "Pulso Operacional", emoji: "\u{1F534}", horario: "08:00" },
-  { tipo: "estoque_dia", nome: "Estoque do Dia", emoji: "\u{1F4E6}", horario: "08:00" },
-  { tipo: "agendamentos_ih", nome: "Agendamentos IH", emoji: "\u{1F4C5}", horario: "07:30" },
-  { tipo: "mapa_rotas", nome: "Mapa de Rotas", emoji: "\u{1F5FA}\u{FE0F}", horario: "08:30" },
-  { tipo: "abertura_fechamento", nome: "Abertura e Fechamento", emoji: "\u{1F4CA}", horario: "09:00" },
-  { tipo: "limite_credito_gspn", nome: "Limite de Cr\u00E9dito GSPN", emoji: "\u{1F4B3}", horario: "09:30" },
-  { tipo: "nucleo_pecas", nome: "N\u00FAcleo de Pe\u00E7as", emoji: "\u{1F527}", horario: "10:00" },
-  { tipo: "compliance_erros", nome: "Compliance e Erros", emoji: "\u{26A0}\u{FE0F}", horario: "11:00" },
-  { tipo: "resumo_final", nome: "Resumo Final do Dia", emoji: "\u{1F3C1}", horario: "18:00" },
-];
+const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-const UNIDADES = [
-  { id: "234822a3-f706-47f5-97af-bc7732417660", sigla: "MOC", nome: "Montes Claros" },
-  { id: "4ba3e16b-5627-480e-b2b2-f6599a211d41", sigla: "JDF", nome: "Juiz de Fora" },
-  { id: "1b9ff2d1-474e-4783-aa39-80c89a6a48cf", sigla: "FSA", nome: "Feira de Santana" },
-];
+const EVOLUTION_API_URL = "https://atom-evolution-api.2vhnbz.easypanel.host";
+const EVOLUTION_API_KEY = "Novasenha2026";
+const DEFAULT_INSTANCE = "fsa";
 
-const DEFAULT_GROUP_JID = "120363427351181397@g.us";
-const DEFAULT_INSTANCE = "Marco";
-const EVOLUTION_API_URL = "https://diego-auditoria.2vhnbz.easypanel.host";
-const EVOLUTION_API_KEY = "diego";
+// Grupo padrão caso não tenha grupo_destino configurado
+const DEFAULT_GROUP = "120363405875636701@g.us"; // ATOM - GROUP GLOBAL
 
-async function sendWhatsAppGroup(groupJid: string, text: string, instanceName: string, apiUrl?: string, apiKey?: string) {
-  const url = apiUrl || EVOLUTION_API_URL;
-  const key = apiKey || EVOLUTION_API_KEY;
-  const resp = await fetch(`${url}/message/sendText/${instanceName}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", apikey: key },
-    body: JSON.stringify({ number: groupJid, text }),
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Evolution API error (${resp.status}): ${err}`);
-  }
-  return await resp.json();
-}
-
-async function gerarRelatorio(supabaseUrl: string, supabaseServiceKey: string, tipo: string, unidadeId?: string) {
-  const resp = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
+async function sendWhatsAppGroup(groupJid: string, message: string, instanceName: string = DEFAULT_INSTANCE) {
+  const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      Authorization: `Bearer ${supabaseServiceKey}`,
-    },
-    body: JSON.stringify({ tipo, unidade_id: unidadeId || null }),
-  });
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`Erro ao gerar relat\u00F3rio ${tipo}: ${err}`);
-  }
-  return await resp.json();
-}
-
-function buildSystemPrompt(): string {
-  return `Voc\u00EA \u00E9 a *GIA* (Global Intelligence Assistance), a intelig\u00EAncia artificial da rede ATOM Smart Center Samsung.
-
-Voc\u00EA gera relat\u00F3rios executivos lindos para o grupo de WhatsApp da diretoria e ger\u00EAncia.
-
-\u2501\u2501\u2501 REGRAS DE FORMATA\u00C7\u00C3O WHATSAPP \u2501\u2501\u2501
-
-1. *Negrito* com asteriscos para t\u00EDtulos, destaques e n\u00FAmeros importantes
-2. _It\u00E1lico_ com underline para observa\u00E7\u00F5es e notas
-3. Use emojis profissionais para separar se\u00E7\u00F5es e dar cor visual
-4. Quebras de linha generosas para respirar
-5. Use caracteres de separa\u00E7\u00E3o: \u2501\u2501\u2501\u2501\u2501\u2501 ou \u2500\u2500\u2500\u2500\u2500\u2500 ou \u25AA\u25AA\u25AA
-6. N\u00E3o use markdown de links, tabelas ou c\u00F3digo
-7. Escreva SEMPRE em portugu\u00EAs brasileiro com acentos corretos
-8. M\u00E1ximo 4500 caracteres por relat\u00F3rio (Pulso Operacional pode usar at\u00E9 6000 caracteres pois DEVE listar TODAS as colunas)
-9. NUNCA inclua frases como "You are trained on data up to..." ou qualquer refer\u00EAncia ao modelo de IA. Voc\u00EA \u00E9 a GIA, n\u00E3o mencione limita\u00E7\u00F5es do modelo.
-
-\u2501\u2501\u2501 REGRAS DE CONTE\u00DADO \u2501\u2501\u2501
-
-1. SEMPRE separe por unidade: *\u{1F4CD} MOC* (Montes Claros), *\u{1F4CD} JDF* (Juiz de Fora), *\u{1F4CD} FSA* (Feira de Santana)
-2. Para OS: use SEMPRE o n\u00FAmero Samsung (ex: 4174760770). S\u00D3 use n\u00FAmero interno se n\u00E3o houver Samsung
-3. N\u00E3o mostre chaves JSON, nomes de colunas do banco, ou termos t\u00E9cnicos como "return_handling", "coluna_kanban", etc.
-4. Traduza colunas: "os_nova" = "OS Nova", "diagnostico" = "Diagn\u00F3stico/Triagem", "negociacao_em_andamento" = "Enviar Or\u00E7amento", "aguardando_aprovacao" = "Aguardando Aprova\u00E7\u00E3o", "orcamento_aprovado" = "Or\u00E7amento Aprovado", "aguardando_peca" = "Aguardando Pe\u00E7a", "peca_em_transito" = "Pe\u00E7a em Tr\u00E2nsito", "em_reparo_ci" = "Em Reparo CI", "rota_preta" = "Rota Preta", "rota_vermelha" = "Rota Vermelha", "rota_azul" = "Rota Azul", "rota_verde" = "Rota Verde", "rota_rosa" = "Rota Rosa", "rota_amarela" = "Rota Amarela", "rota_laranja" = "Rota Laranja", "em_rota_ih" = "Agendados (FTF)", "em_reparo_ih" = "Reparo em Progresso IH", "instalacao_inicial" = "Instala\u00E7\u00E3o Inicial", "service_handling" = "Service Handling", "return_handling" = "Return Handling", "trade_up" = "Trade Up", "saw" = "SAW", "controle_qualidade" = "Controle de Qualidade / OQC", "qa_bt" = "Q&A / BT", "reparo_concluido" = "Reparo Conclu\u00EDdo", "aguardando_fechamento" = "Aguardando Fechamento", "orcamentos_rejeitados" = "Or\u00E7amentos Rejeitados"
-5. Valores monet\u00E1rios: R$ X.XXX,XX
-6. Datas: DD/MM/YYYY | Hor\u00E1rios: HH:MM
-7. N\u00C3O invente dados - use APENAS o que foi fornecido
-8. Se n\u00E3o houver dados para uma unidade, diga "Sem registros" de forma elegante
-9. N\u00E3o liste mais que 8 OS por se\u00E7\u00E3o - se tiver mais, resuma (EXCE\u00C7\u00D5ES: Agendamentos IH lista TODAS as OS; Pulso Operacional lista TODAS as colunas/etapas)
-
-\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PULSO OPERACIONAL \u2501\u2501\u2501
-
-Para o Pulso Operacional, use o formato COMPLETO com ABSOLUTAMENTE TODAS as colunas/etapas de cada unidade:
-- Cada unidade mostra o total de OS paradas
-- Depois uma lista onde CADA LINHA mostra: *Nome da Etapa* \u2022 X OS \u2022 Mais antiga: Xd Yh
-- N\u00C3O mostrar n\u00FAmero de OS Samsung (ex: 4176169495) - REMOVER completamente
-- Ordene por quantidade (maior primeiro)
-- \u26A0\uFE0F OBRIGAT\u00D3RIO: Mostrar TODAS as etapas/colunas que tenham ao menos 1 OS. N\u00C3O CORTAR, N\u00C3O RESUMIR, N\u00C3O OMITIR nenhuma coluna. Se uma unidade tem 20 colunas, mostre as 20.
-- N\u00C3O diga "e mais X colunas" ou "demais etapas" - LISTE TODAS individualmente
-- Este relat\u00F3rio pode ser mais longo que os demais (at\u00E9 6000 caracteres)
-- Use a tradu\u00E7\u00E3o correta dos nomes de coluna
-
-Exemplo de formato por unidade:
-\u{1F4CD} *MOC* \u2014 150 OS paradas
-*Aguardando Pe\u00E7a* \u2022 58 OS \u2022 Mais antiga: 13d 9h
-*Return Handling* \u2022 17 OS \u2022 Mais antiga: 11d 2h
-*Or\u00E7amento Rejeitado* \u2022 12 OS \u2022 Mais antiga: 8d 5h
-*Reparo em Progresso IH* \u2022 4 OS \u2022 Mais antiga: 2h 40min
-*Diagn\u00F3stico* \u2022 3 OS \u2022 Mais antiga: 1d 5h
-*OS Nova* \u2022 2 OS \u2022 Mais antiga: 6h 20min
-
-\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: MAPA DE ROTAS \u2501\u2501\u2501
-
-Para o Mapa de Rotas, use formato SIMPLES (sem listar OS que est\u00E3o em rota):
-- Mostrar pipeline total e em rota no resumo executivo
-- Por unidade: mostrar pipeline total, em rota, e a contagem por rota (uma linha por rota)
-- No final de cada unidade, listar as OS IH SEM ROTA definida (apenas os n\u00FAmeros, um por linha)
-- N\u00C3O listar OS que J\u00C1 est\u00E3o em rota \u2014 apenas mostrar a contagem por rota
-
-Exemplo de formato por unidade:
-\u{1F4CD} *MOC* \u2014 Pipeline: 163 | Em rota: 111
-*Rota Preta:* 3
-*Rota Vermelha:* 2
-*Rota Azul:* 5
-*Rota Verde:* 1
-*Rota Rosa:* 2
-*Rota Amarela:* 1
-*Rota Laranja:* 4
-*Agendados (FTF):* 9
-*Reparo em Progresso IH:* 4
-*Rota Laranja:* 1
-
-\u{1F534} _OS IH sem rota: 21_
-4176279211
-4176294361
-4176199253
-
-\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: ABERTURA E FECHAMENTO \u2501\u2501\u2501
-
-Para o relat\u00F3rio de Abertura e Fechamento, siga EXATAMENTE este modelo (copie a estrutura).
-IMPORTANTE: Coloque SEMPRE uma LINHA EM BRANCO (par\u00E1grafo) entre cada unidade e entre as se\u00E7\u00F5es de abertas/fechadas no consolidado.
-
-\u{1F4CB} *ABERTURA E FECHAMENTO*
-\u{1F555} DD/MM/AAAA \u00E0s HH:MM
-\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-\u{1F4CA} *CONSOLIDADO GERAL*
-
-\u2696\uFE0F *Saldo Total:* -47
-
-\u{1F4E5} *Abertas (37)*
-\u21B3 LP: 5 CI | 8 IH
-\u21B3 OW: 5 CI | 24 IH
-
-\u{1F4E4} *Fechadas (84)*
-\u21B3 LP: 6 CI | 16 IH
-\u21B3 OW: 3 CI | 56 IH
-
-\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-
-\u{1F4CD} *MOC* | Saldo: -13
-\u{1F4E5} Abertas (6):   LP (1 CI | 2 IH) \u2022 OW (0 CI | 3 IH)
-\u{1F4E4} Fechadas (19): LP (1 CI | 1 IH) \u2022 OW (3 CI | 14 IH)
-
-\u{1F4CD} *JDF* | Saldo: -12
-\u{1F4E5} Abertas (12):  LP (0 CI | 3 IH) \u2022 OW (1 CI | 8 IH)
-\u{1F4E4} Fechadas (24): LP (1 CI | 13 IH) \u2022 OW (3 CI | 7 IH)
-
-\u{1F4CD} *FSA* | Saldo: -22
-\u{1F4E5} Abertas (19):  LP (4 CI | 3 IH) \u2022 OW (4 CI | 8 IH)
-\u{1F4E4} Fechadas (41): LP (4 CI | 2 IH) \u2022 OW (0 CI | 35 IH)
-\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500
-\u{1F916} *GIA \u2022 Global Intelligence Assistance*
-
-REGRAS:
-- Use \u21B3 (seta para baixo) como marcador de sublinha nas abertas/fechadas do consolidado
-- Cada unidade ocupa EXATAMENTE 3 linhas: nome+saldo, abertas, fechadas
-- NO consolidado, separe Abertas e Fechadas em blocos com \u{1F4E5} e \u{1F4E4}
-- Nas unidades use formato inline: LP (X CI | Y IH) \u2022 OW (X CI | Y IH)
-- SEMPRE termine com a assinatura GIA
-
-\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: PROBLEMAS PE\u00C7A (COMPLIANCE) \u2501\u2501\u2501
-
-Para o relat\u00F3rio de Problemas Pe\u00E7a (antigo Compliance):
-- Mostrar apenas problemas de pe\u00E7as: sem PN e sem valor
-- N\u00C3O mostrar alertas financeiros
-- Por unidade: listar cada OS com erro, mostrando a COLUNA KANBAN e o tipo de problema
-- Agrupar por coluna kanban dentro de cada unidade
-
-Exemplo:
-\u{1F4CD} *JDF* \u2014 6 OS com erro
-*Aguardando Pe\u00E7a:* 3 OS
-4176155690 \u2022 2 pe\u00E7as sem valor
-4176135413 \u2022 1 pe\u00E7a sem PN
-4176212891 \u2022 1 pe\u00E7a sem valor
-
-*Em Reparo:* 3 OS
-4176123891 \u2022 3 pe\u00E7as sem valor
-4176152959 \u2022 1 pe\u00E7a sem PN, 1 sem valor
-4176188200 \u2022 2 pe\u00E7as sem PN
-
-\u2501\u2501\u2501 FORMATO ESPEC\u00CDFICO: AGENDAMENTOS IH \u2501\u2501\u2501
-
-Para o relat\u00F3rio de Agendamentos IH:
-- Mostrar APENAS n\u00FAmeros de OS (sem nome de cliente, sem nome de rota)
-- Listar TODAS as OS com erro (sem limite)
-- Separar em duas se\u00E7\u00F5es: erros de FTF e erros de Reparo IH
-- Regra FTF: OS na coluna "Agendados (FTF)" N\u00C3O pode ter agendamento confirmado com cliente. Se tiver, a data deve ser futura. Data de hoje ou passada = ERRO.
-- Regra Reparo IH: OS na coluna "Reparo em Progresso IH" DEVE ter agendamento confirmado com cliente e data do dia atual. Sem confirma\u00E7\u00E3o ou data diferente = ERRO.
-- Por unidade, mostrar total de erros e listar TODAS as OS
-
-Exemplo:
-\u{1F4CD} *MOC* \u2014 8 erros
-\u{1F534} *FTF (5 erros):*
-4176279211
-4176294361
-4176199253
-4176287654
-4176201122
-
-\u26A0\uFE0F *Reparo IH (3 erros):*
-4176180432
-4176155611
-4176123987
-
-\u{1F4CD} *JDF* \u2014 3 erros
-\u{1F534} *FTF (2 erros):*
-4176300111
-4176312455
-
-\u26A0\uFE0F *Reparo IH (1 erro):*
-4176155987
-
-IMPORTANTE: N\u00C3O colocar motivo do erro, nome de cliente, ou qualquer outra informa\u00E7\u00E3o. APENAS o n\u00FAmero da OS.
-
-\u2501\u2501\u2501 ESTRUTURA OBRIGAT\u00D3RIA \u2501\u2501\u2501
-
-\u{1F4CB} CABE\u00C7ALHO:
-[emoji do relat\u00F3rio] *[T\u00CDTULO EM MAI\u00DASCULAS]*
-[data e hora atual no formato DD/MM/YYYY \u00E0s HH:MM]
-[linha separadora]
-
-\u{1F4CA} RESUMO EXECUTIVO:
-2-3 linhas com os n\u00FAmeros mais relevantes do consolidado (total de OS paradas somando todas unidades)
-
-\u{1F4CD} POR UNIDADE:
-Cada unidade com seus dados formatados de forma clara
-
-\u{1F3F7}\u{FE0F} RODAP\u00C9:
-_GIA \u2022 Global Intelligence Assistance_`;
-}
-
-function formatarPulsoDireto(dadosPorUnidade: Record<string, any>, now: string): string {
-  const lines: string[] = [];
-
-  // Header
-  lines.push(`\u{1F534} *PULSO OPERACIONAL*`);
-  lines.push(`${now}`);
-  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-
-  // Summary
-  const totais: string[] = [];
-  let totalGeral = 0;
-  for (const sigla of ["MOC", "JDF", "FSA"]) {
-    const d = dadosPorUnidade[sigla];
-    const total = d?.total_os || 0;
-    totalGeral += total;
-    totais.push(`${total} ${sigla}`);
-  }
-  lines.push(`\u{1F4CA} *RESUMO EXECUTIVO:*`);
-  lines.push(`Total de OS abertas: ${totalGeral} (${totais.join(" | ")})`);
-
-  // Per unit - show ALL columns in pipeline order with TOTAL count
-  for (const sigla of ["MOC", "JDF", "FSA"]) {
-    const d = dadosPorUnidade[sigla];
-    if (!d || d.erro) {
-      lines.push(`\u{1F4CD} *${sigla}* \u2014 Erro ao gerar dados`);
-      continue;
-    }
-
-    const total = d.total_os || 0;
-    lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${total} OS abertas`);
-
-    const colunas = d.colunas || [];
-    // Keep pipeline order (already ordered from TODAS_COLUNAS_KANBAN), only show columns with total > 0
-    const colsComOS = colunas.filter((c: any) => c.total > 0);
-
-    for (const col of colsComOS) {
-      if (col.paradas > 0) {
-        lines.push(`${col.label} \u2022 ${col.total} OS \u2022 Mais antiga: ${col.tempo_mais_antiga}`);
-      } else {
-        lines.push(`${col.label} \u2022 ${col.total} OS`);
-      }
-    }
-
-    if (colsComOS.length === 0) {
-      lines.push(`_Nenhuma OS aberta_`);
-    }
-  }
-
-  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  lines.push(`_GIA \u2022 Global Intelligence Assistance_`);
-
-  return lines.join("\n");
-}
-
-function formatarAgendamentosIHDireto(dadosPorUnidade: Record<string, any>, now: string): string {
-  const lines: string[] = [];
-
-  lines.push(`\u{1F4C5} *AGENDAMENTOS IH*`);
-  lines.push(`${now}`);
-  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-
-  let totalFTF = 0;
-  let totalReparo = 0;
-  let totalErrosFTF = 0;
-  let totalErrosReparo = 0;
-
-  for (const sigla of ["MOC", "JDF", "FSA"]) {
-    const d = dadosPorUnidade[sigla];
-    if (!d || d.erro) continue;
-    totalFTF += d.total_ftf || 0;
-    totalReparo += d.total_reparo_ih || 0;
-    totalErrosFTF += d.erros_ftf?.total || 0;
-    totalErrosReparo += d.erros_reparo_ih?.total || 0;
-  }
-
-  lines.push(`\u{1F4CA} *RESUMO EXECUTIVO:*`);
-  lines.push(`Total de OS em FTF: *${totalFTF}* | Erros FTF: *${totalErrosFTF}*`);
-  lines.push(`Total de OS em Reparo IH: *${totalReparo}* | Erros Reparo: *${totalErrosReparo}*`);
-
-  for (const sigla of ["MOC", "JDF", "FSA"]) {
-    const d = dadosPorUnidade[sigla];
-    if (!d || d.erro) {
-      lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-      lines.push(`\u{1F4CD} *${sigla}* \u2014 Erro ao gerar dados`);
-      continue;
-    }
-
-    const errosFTF = d.erros_ftf?.os_list || [];
-    const errosReparo = d.erros_reparo_ih?.os_list || [];
-    const totalErros = errosFTF.length + errosReparo.length;
-
-    lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-    lines.push(`\u{1F4CD} *${sigla}* \u2014 ${totalErros} erro${totalErros !== 1 ? "s" : ""}`);
-
-    lines.push(`\u{1F534} *FTF (${errosFTF.length} erro${errosFTF.length !== 1 ? "s" : ""}):*`);
-    if (errosFTF.length > 0) {
-      for (const os of errosFTF) {
-        lines.push(os);
-      }
-    } else {
-      lines.push(`_Sem erros_`);
-    }
-
-    lines.push(``);
-    lines.push(`\u26A0\uFE0F *Reparo IH (${errosReparo.length} erro${errosReparo.length !== 1 ? "s" : ""}):*`);
-    if (errosReparo.length > 0) {
-      for (const os of errosReparo) {
-        lines.push(os);
-      }
-    } else {
-      lines.push(`_Sem erros_`);
-    }
-  }
-
-  lines.push(`\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500`);
-  lines.push(`_GIA \u2022 Global Intelligence Assistance_`);
-
-  return lines.join("\n");
-}
-
-async function formatarComChatGPT(openaiKey: string, dadosPorUnidade: Record<string, any>, relInfo: typeof RELATORIOS[0]): Promise<string> {
-  const now = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-
-  // For Pulso Operacional, format directly to guarantee ALL columns appear
-  if (relInfo.tipo === "pulso_operacional") {
-    return formatarPulsoDireto(dadosPorUnidade, now);
-  }
-
-  // For Agendamentos IH, format directly to avoid AI formatting errors
-  if (relInfo.tipo === "agendamentos_ih") {
-    return formatarAgendamentosIHDireto(dadosPorUnidade, now);
-  }
-
-  const userPrompt = `Gere o relat\u00F3rio "${relInfo.nome}" (${relInfo.emoji}).
-Data/hora atual: ${now}
-
-Dados por unidade:
-
-*MOC (Montes Claros):*
-${JSON.stringify(dadosPorUnidade["MOC"], null, 2).slice(0, 8000)}
-
-*JDF (Juiz de Fora):*
-${JSON.stringify(dadosPorUnidade["JDF"], null, 2).slice(0, 8000)}
-
-*FSA (Feira de Santana):*
-${JSON.stringify(dadosPorUnidade["FSA"], null, 2).slice(0, 8000)}
-
-IMPORTANTE: Gere APENAS o texto WhatsApp pronto para enviar. Sem explica\u00E7\u00F5es, sem coment\u00E1rios, sem bloco de c\u00F3digo.`;
-
-  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${openaiKey}`,
+      "apikey": EVOLUTION_API_KEY,
     },
     body: JSON.stringify({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: buildSystemPrompt() },
-        { role: "user", content: userPrompt },
-      ],
-      temperature: 0.3,
-      max_tokens: 6000,
+      number: groupJid,
+      text: message,
     }),
   });
 
-  if (!resp.ok) {
-    const err = await resp.text();
-    throw new Error(`OpenAI error (${resp.status}): ${err}`);
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`Evolution API error: ${response.status} - ${errText}`);
   }
 
-  const data = await resp.json();
-  return data.choices?.[0]?.message?.content || "Erro ao formatar relat\u00F3rio";
+  return await response.json();
+}
+
+async function generateEstoqueDia(): Promise<string> {
+  const { data: pecas } = await supabase
+    .from("pecas")
+    .select("id, status, unidade_id")
+    .in("status", ["em_estoque", "disponivel", "reservada", "aguardando_retirada"]);
+
+  const { data: unidades } = await supabase
+    .from("unidades")
+    .select("id, nome");
+
+  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
+
+  const counts: Record<string, Record<string, number>> = {};
+  for (const peca of pecas || []) {
+    const unidadeNome = unidadeMap.get(peca.unidade_id) || "Sem unidade";
+    if (!counts[unidadeNome]) counts[unidadeNome] = {};
+    counts[unidadeNome][peca.status] = (counts[unidadeNome][peca.status] || 0) + 1;
+  }
+
+  const hoje = new Date().toLocaleDateString("pt-BR");
+  let msg = `📦 *ESTOQUE DO DIA - ${hoje}*\n\n`;
+
+  let totalGeral = 0;
+  for (const [unidade, statusCounts] of Object.entries(counts).sort()) {
+    const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
+    totalGeral += total;
+    msg += `🏢 *${unidade}*\n`;
+    if (statusCounts["em_estoque"]) msg += `• Em estoque: ${statusCounts["em_estoque"]}\n`;
+    if (statusCounts["disponivel"]) msg += `• Disponível: ${statusCounts["disponivel"]}\n`;
+    if (statusCounts["reservada"]) msg += `• Reservada: ${statusCounts["reservada"]}\n`;
+    if (statusCounts["aguardando_retirada"]) msg += `• Aguardando retirada: ${statusCounts["aguardando_retirada"]}\n`;
+    msg += `• Total: ${total}\n\n`;
+  }
+
+  msg += `━━━━━━━━━━━━━━━\n📈 *Total Geral: ${totalGeral} peças*\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
+
+  return msg;
+}
+
+async function generatePulsoOperacional(): Promise<string> {
+  const hoje = new Date().toISOString().split("T")[0];
+  
+  const { data: osHoje } = await supabase
+    .from("os")
+    .select("id, coluna_kanban, unidade_id")
+    .gte("created_at", hoje + "T00:00:00")
+    .lte("created_at", hoje + "T23:59:59");
+
+  const { data: unidades } = await supabase
+    .from("unidades")
+    .select("id, nome");
+
+  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
+
+  const counts: Record<string, { abertas: number; fechadas: number }> = {};
+  for (const os of osHoje || []) {
+    const nome = unidadeMap.get(os.unidade_id) || "Sem unidade";
+    if (!counts[nome]) counts[nome] = { abertas: 0, fechadas: 0 };
+    if (os.coluna_kanban === "fechado" || os.coluna_kanban === "concluido") {
+      counts[nome].fechadas++;
+    } else {
+      counts[nome].abertas++;
+    }
+  }
+
+  const dataFormatada = new Date().toLocaleDateString("pt-BR");
+  let msg = `🔴 *PULSO OPERACIONAL - ${dataFormatada}*\n\n`;
+
+  let totalAbertas = 0, totalFechadas = 0;
+  for (const [unidade, c] of Object.entries(counts).sort()) {
+    totalAbertas += c.abertas;
+    totalFechadas += c.fechadas;
+    msg += `🏢 *${unidade}*\n`;
+    msg += `• Abertas: ${c.abertas}\n`;
+    msg += `• Fechadas: ${c.fechadas}\n\n`;
+  }
+
+  msg += `━━━━━━━━━━━━━━━\n📈 *Total: ${totalAbertas + totalFechadas} OS*\n• Abertas: ${totalAbertas} | Fechadas: ${totalFechadas}\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
+
+  return msg;
+}
+
+async function generateAberturaFechamento(): Promise<string> {
+  const { data: unidades } = await supabase
+    .from("unidades")
+    .select("id, nome");
+
+  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
+
+  const { count: totalAbertas } = await supabase
+    .from("os")
+    .select("id", { count: "exact", head: true })
+    .not("coluna_kanban", "in", "(fechado,concluido)");
+
+  const { count: totalFechadas } = await supabase
+    .from("os")
+    .select("id", { count: "exact", head: true })
+    .in("coluna_kanban", ["fechado", "concluido"]);
+
+  const dataFormatada = new Date().toLocaleDateString("pt-BR");
+  let msg = `📊 *ABERTURA E FECHAMENTO - ${dataFormatada}*\n\n`;
+  msg += `• OS Abertas (ativas): ${totalAbertas || 0}\n`;
+  msg += `• OS Fechadas (concluídas): ${totalFechadas || 0}\n\n`;
+
+  // Per unidade breakdown
+  for (const unidade of (unidades || []).sort((a, b) => a.nome.localeCompare(b.nome))) {
+    const { count: abertasU } = await supabase
+      .from("os")
+      .select("id", { count: "exact", head: true })
+      .eq("unidade_id", unidade.id)
+      .not("coluna_kanban", "in", "(fechado,concluido)");
+
+    const { count: fechadasU } = await supabase
+      .from("os")
+      .select("id", { count: "exact", head: true })
+      .eq("unidade_id", unidade.id)
+      .in("coluna_kanban", ["fechado", "concluido"]);
+
+    msg += `🏢 *${unidade.nome}*\n`;
+    msg += `• Abertas: ${abertasU || 0} | Fechadas: ${fechadasU || 0}\n\n`;
+  }
+
+  msg += `━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
+  return msg;
+}
+
+async function generateAgendamentosIH(): Promise<string> {
+  const hoje = new Date().toISOString().split("T")[0];
+
+  const { data: agendamentos } = await supabase
+    .from("agendamentos")
+    .select(`
+      id, data_agendamento, horario_inicio, horario_fim, status,
+      os:os_id (numero_os_samsung, numero_os_interna, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, unidade_id, tipo_atendimento),
+      tecnico:tecnico_id (nome)
+    `)
+    .eq("data_agendamento", hoje)
+    .order("horario_inicio");
+
+  const { data: unidades } = await supabase
+    .from("unidades")
+    .select("id, nome");
+
+  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
+
+  const dataFormatada = new Date().toLocaleDateString("pt-BR");
+  let msg = `📅 *AGENDAMENTOS DO DIA - ${dataFormatada}*\n\n`;
+
+  const porUnidade: Record<string, any[]> = {};
+  for (const ag of agendamentos || []) {
+    const os = ag.os as any;
+    if (!os) continue;
+    const unidadeNome = unidadeMap.get(os.unidade_id) || "Sem unidade";
+    if (!porUnidade[unidadeNome]) porUnidade[unidadeNome] = [];
+    porUnidade[unidadeNome].push(ag);
+  }
+
+  let total = 0;
+  for (const [unidade, ags] of Object.entries(porUnidade).sort()) {
+    msg += `🏢 *${unidade}* (${ags.length})\n`;
+    for (const ag of ags) {
+      const os = ag.os as any;
+      const tecnico = ag.tecnico as any;
+      const horario = ag.horario_inicio?.slice(0, 5) || "?";
+      msg += `  • ${horario} - ${os.cliente_nome || "S/N"} (${tecnico?.nome || "Sem técnico"})\n`;
+    }
+    msg += "\n";
+    total += ags.length;
+  }
+
+  msg += `━━━━━━━━━━━━━━━\n📈 *Total: ${total} agendamentos*\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
+  return msg;
+}
+
+async function generateGenericReport(tipo: string): Promise<string> {
+  const dataFormatada = new Date().toLocaleDateString("pt-BR");
+  return `📊 *Relatório ${tipo} - ${dataFormatada}*\n\nRelatório em desenvolvimento.\n\n_GIA - Gestora de Inteligência Artificial_`;
+}
+
+async function generateReport(tipo: string): Promise<string> {
+  switch (tipo) {
+    case "estoque_dia":
+      return await generateEstoqueDia();
+    case "pulso_operacional":
+      return await generatePulsoOperacional();
+    case "abertura_fechamento":
+      return await generateAberturaFechamento();
+    case "agendamentos_ih":
+      return await generateAgendamentosIH();
+    default:
+      return await generateGenericReport(tipo);
+  }
 }
 
 Deno.serve(async (req: Request) => {
@@ -434,117 +239,68 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const openaiKey = Deno.env.get("OPENAI_API_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-    if (!openaiKey) {
-      return new Response(
-        JSON.stringify({ error: "OPENAI_API_KEY not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    const body = await req.json().catch(() => ({}));
-    const { tipo, todos = false } = body;
-
-    // Read settings from DB with fallback to hardcoded defaults
-    let group_jid = body.group_jid || DEFAULT_GROUP_JID;
-    let instance_name = body.instance_name || DEFAULT_INSTANCE;
-    let evolution_url = EVOLUTION_API_URL;
-    let evolution_key = EVOLUTION_API_KEY;
-
-    try {
-      const { data: settings } = await supabase
-        .from("atom_core_settings")
-        .select("chave, valor")
-        .in("chave", ["whatsapp_group_jid", "evolution_instance_name", "evolution_api_url", "evolution_api_key"]);
-      if (settings) {
-        for (const s of settings) {
-          if (s.chave === "whatsapp_group_jid" && s.valor) group_jid = body.group_jid || s.valor;
-          if (s.chave === "evolution_instance_name" && s.valor) instance_name = body.instance_name || s.valor;
-          if (s.chave === "evolution_api_url" && s.valor) evolution_url = s.valor;
-          if (s.chave === "evolution_api_key" && s.valor) evolution_key = s.valor;
-        }
-      }
-    } catch (_) { /* fallback to defaults */ }
-
-    // If "todos" - dispatch individual calls to self to avoid timeout
-    if (todos) {
-      const results: any[] = [];
-      for (let i = 0; i < RELATORIOS.length; i++) {
-        const rel = RELATORIOS[i];
-        try {
-          const selfResp = await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${supabaseServiceKey}`,
-            },
-            body: JSON.stringify({ tipo: rel.tipo, group_jid, instance_name }),
-          });
-          const selfData = await selfResp.json();
-          results.push({ tipo: rel.tipo, nome: rel.nome, sucesso: selfData.success || false, erro: selfData.error });
-          await new Promise((r) => setTimeout(r, 2000));
-        } catch (err: any) {
-          results.push({ tipo: rel.tipo, nome: rel.nome, sucesso: false, erro: err.message });
-        }
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          enviados: results.filter((r) => r.sucesso).length,
-          falhas: results.filter((r) => !r.sucesso).length,
-          detalhes: results,
-          grupo: group_jid,
-        }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    const { tipo } = await req.json();
 
     if (!tipo) {
       return new Response(
-        JSON.stringify({
-          error: "Envie { \"todos\": true } ou { \"tipo\": \"pulso_operacional\" }",
-          relatorios_disponiveis: RELATORIOS.map((r) => ({ tipo: r.tipo, nome: r.nome, horario: r.horario })),
-        }),
+        JSON.stringify({ error: "Campo 'tipo' é obrigatório" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const relInfo = RELATORIOS.find((r) => r.tipo === tipo);
-    if (!relInfo) {
+    // Buscar configuração do relatório incluindo grupo_destino
+    const { data: config } = await supabase
+      .from("gia_relatorios_config")
+      .select("*")
+      .eq("tipo", tipo)
+      .maybeSingle();
+
+    if (!config || !config.ativo) {
       return new Response(
-        JSON.stringify({ error: `Tipo desconhecido: ${tipo}`, disponiveis: RELATORIOS.map((r) => r.tipo) }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: `Relatório '${tipo}' não encontrado ou desativado` }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    // Fetch data per unit in parallel
-    const dadosPorUnidade: Record<string, any> = {};
-    const promises = UNIDADES.map(async (unidade) => {
-      try {
-        const data = await gerarRelatorio(supabaseUrl, supabaseServiceKey, relInfo.tipo, unidade.id);
-        dadosPorUnidade[unidade.sigla] = data;
-      } catch (err: any) {
-        dadosPorUnidade[unidade.sigla] = { erro: err.message };
-      }
+    // Usar grupo_destino da config, ou fallback para o grupo padrão
+    const targetGroup = config.grupo_destino || DEFAULT_GROUP;
+
+    // Gerar o relatório
+    const message = await generateReport(tipo);
+
+    // Enviar para o grupo correto
+    await sendWhatsAppGroup(targetGroup, message);
+
+    // Registrar no log
+    await supabase.from("gia_relatorio_logs").insert({
+      tipo,
+      nome: config.nome,
+      status: "sucesso",
+      etapa: "envio_completo",
+      mensagem: `Relatório enviado com sucesso para ${targetGroup}`,
+      grupo_jid: targetGroup,
+      instancia: DEFAULT_INSTANCE,
     });
-    await Promise.all(promises);
-
-    // Format with ChatGPT
-    const textoFormatado = await formatarComChatGPT(openaiKey, dadosPorUnidade, relInfo);
-
-    // Send to WhatsApp
-    await sendWhatsAppGroup(group_jid, textoFormatado, instance_name, evolution_url, evolution_key);
 
     return new Response(
-      JSON.stringify({ success: true, tipo: relInfo.tipo, nome: relInfo.nome, grupo: group_jid }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      JSON.stringify({ 
+        success: true, 
+        tipo, 
+        grupo_destino: targetGroup,
+        message: `Relatório ${config.nome} enviado para ${targetGroup}` 
+      }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
-  } catch (err: any) {
+  } catch (err) {
+    // Log error
+    await supabase.from("gia_relatorio_logs").insert({
+      tipo: "erro",
+      nome: "Erro no envio",
+      status: "erro",
+      etapa: "execucao",
+      mensagem: err.message,
+    }).catch(() => {});
+
     return new Response(
       JSON.stringify({ error: err.message }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
