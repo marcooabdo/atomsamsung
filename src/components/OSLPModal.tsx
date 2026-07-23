@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
@@ -156,6 +156,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
   // Estados para validação de rota IH
   const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
   const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
+  const [mostrarEditarRotaCidade, setMostrarEditarRotaCidade] = useState(false);
   const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
 
   // Estados para criação de nova OS
@@ -768,7 +769,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     try {
       const { data } = await supabase
         .from('rotas')
-        .select('id, nome, cidades, coluna_kanban')
+        .select('id, nome, cidades, coluna_kanban, cor')
         .eq('unidade_id', unidadeIdParam)
         .eq('ativa', true);
 
@@ -4667,8 +4668,26 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                             <p className="text-sm text-gray-300">{os.cliente_bairro || '-'}</p>
                           </div>
                           <div>
-                            <p className="text-xs text-gray-500">Cidade</p>
-                            <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}</p>
+                            <p className="text-xs text-gray-500 flex items-center gap-1">
+                              Cidade
+                              <button
+                                onClick={() => {
+                                  setMostrarEditarRotaCidade(true);
+                                  setMostrarSelecionarRotaObrigatoria(true);
+                                }}
+                                className="ml-1 text-blue-400 hover:text-blue-300 transition-colors"
+                                title="Editar cidade e rota"
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </button>
+                            </p>
+                            <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}
+                              {(() => {
+                                const rotaAtual = rotasUnidade.find(r => r.id === os.rota_id);
+                                if (rotaAtual) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${(rotaAtual as any).cor || '#666'}25`, color: (rotaAtual as any).cor || '#999' }}>{rotaAtual.nome}</span>;
+                                return null;
+                              })()}
+                            </p>
                           </div>
                           <div>
                             <p className="text-xs text-gray-500">Estado</p>
@@ -6721,17 +6740,19 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             setOS({ ...os, ...updateData });
 
             setMostrarSelecionarRotaObrigatoria(false);
-            if (colunaDestinoAposSelecionarRota) {
+            if (!mostrarEditarRotaCidade && colunaDestinoAposSelecionarRota) {
               setColunaDestino(colunaDestinoAposSelecionarRota);
               setColunaDestinoAposSelecionarRota(null);
               setMostrarConfirmacaoMover(true);
             }
+            setMostrarEditarRotaCidade(false);
           } catch (error: any) {
             alert(`Erro ao definir rota: ${error.message}`);
           }
         }}
         onCancel={() => {
           setMostrarSelecionarRotaObrigatoria(false);
+          setMostrarEditarRotaCidade(false);
           setColunaDestinoAposSelecionarRota(null);
         }}
       />
