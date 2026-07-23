@@ -10,59 +10,39 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseKey);
-const DEFAULT_INSTANCE = "fsa";
-
 // Grupo padrão caso não tenha grupo_destino configurado
 const DEFAULT_GROUP = "120363405875636701@g.us"; // ATOM - GROUP GLOBAL
 
-async function getEvolutionInstance(preferredInstanceName?: string): Promise<{ api_url: string; api_key: string; instance_name: string }> {
-  // Tentar a instância preferida primeiro
-  if (preferredInstanceName) {
-    const { data: preferred } = await supabase
-      .from("atom_connect_instancias")
-      .select("api_url, api_key, instance_name, status")
-      .eq("instance_name", preferredInstanceName)
-      .maybeSingle();
+async function getGIAEvolutionConfig(): Promise<{ api_url: string; api_key: string; instance_name: string }> {
+  const { data: secrets } = await supabase
+    .from("system_secrets")
+    .select("key, value")
+    .in("key", ["EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE_NAME"]);
 
-    if (preferred && preferred.status === "connected") {
-      return { api_url: preferred.api_url, api_key: preferred.api_key, instance_name: preferred.instance_name };
-    }
+  const secretMap: Record<string, string> = {};
+  for (const s of secrets || []) {
+    secretMap[s.key] = s.value;
   }
 
-  // Fallback: buscar qualquer instância conectada
-  const { data: connected } = await supabase
-    .from("atom_connect_instancias")
-    .select("api_url, api_key, instance_name")
-    .eq("status", "connected")
-    .limit(1)
-    .maybeSingle();
+  const api_url = secretMap["EVOLUTION_API_URL"];
+  const api_key = secretMap["EVOLUTION_API_KEY"];
+  const instance_name = secretMap["EVOLUTION_INSTANCE_NAME"];
 
-  if (connected) {
-    return { api_url: connected.api_url, api_key: connected.api_key, instance_name: connected.instance_name };
+  if (!api_url || !api_key || !instance_name) {
+    throw new Error("Configuração Evolution API incompleta em system_secrets (ATOM CORE)");
   }
 
-  // Último fallback: pegar a primeira instância disponível (mesmo desconectada)
-  const { data: any_instance } = await supabase
-    .from("atom_connect_instancias")
-    .select("api_url, api_key, instance_name")
-    .limit(1)
-    .maybeSingle();
-
-  if (any_instance) {
-    return { api_url: any_instance.api_url, api_key: any_instance.api_key, instance_name: any_instance.instance_name };
-  }
-
-  throw new Error("Nenhuma instância Evolution API encontrada");
+  return { api_url, api_key, instance_name };
 }
 
-async function sendWhatsAppGroup(groupJid: string, message: string, preferredInstance?: string) {
-  const instance = await getEvolutionInstance(preferredInstance);
+async function sendWhatsAppGroup(groupJid: string, message: string) {
+  const config = await getGIAEvolutionConfig();
   
-  const response = await fetch(`${instance.api_url}/message/sendText/${instance.instance_name}`, {
+  const response = await fetch(`${config.api_url}/message/sendText/${config.instance_name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": instance.api_key,
+      "apikey": config.api_key,
     },
     body: JSON.stringify({
       number: groupJid,
@@ -72,7 +52,7 @@ async function sendWhatsAppGroup(groupJid: string, message: string, preferredIns
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Evolution API error (${instance.instance_name}): ${response.status} - ${errText}`);
+    throw new Error(`Evolution API error (${config.instance_name}): ${response.status} - ${errText}`);
   }
 
   return await response.json();
@@ -335,10 +315,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { tipo, group_jid, instance_name, todos } = body;
-
-    // Determinar instância preferida para envio
-    const preferredInstance = instance_name || undefined;
+    const { tipo, group_jid, todos } = body;
 
     // Se "todos" flag, enviar todos os relatórios ativos
     if (todos) {
@@ -354,7 +331,7 @@ Deno.serve(async (req: Request) => {
       for (const config of allConfigs || []) {
         try {
           const message = await generateReport(config.tipo);
-          await sendWhatsAppGroup(targetGroup, message, preferredInstance);
+          await sendWhatsAppGroup(targetGroup, message);
           results.push(`${config.nome}: OK`);
           await new Promise(resolve => setTimeout(resolve, 2000));
         } catch (e) {
@@ -395,8 +372,8 @@ Deno.serve(async (req: Request) => {
     // Gerar o relatório
     const message = await generateReport(tipo);
 
-    // Enviar para o grupo correto usando instância conectada
-    await sendWhatsAppGroup(targetGroup, message, preferredInstance);
+    // Enviar para o grupo correto usando instância Marco (ATOM CORE)
+    await sendWhatsAppGroup(targetGroup, message);
 
     // Registrar no log
     await supabase.from("gia_relatorio_logs").insert({
@@ -406,7 +383,7 @@ Deno.serve(async (req: Request) => {
       etapa: "envio_completo",
       mensagem: `Relatório enviado com sucesso para ${targetGroup}`,
       grupo_jid: targetGroup,
-      instancia: instance_name || "auto",
+      instancia: "Marco",
     });
 
     return new Response(
