@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, Link2, Unlink, Layers, Loader2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../contexts/AuthContext';
 
 interface VincularOSModalProps {
   isOpen: boolean;
@@ -10,6 +11,7 @@ interface VincularOSModalProps {
 }
 
 export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: VincularOSModalProps) {
+  const { usuario } = useAuth();
   const [searchTerm, setSearchTerm] = useState('');
   const [results, setResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -143,6 +145,26 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
 
       setResults(prev => prev.filter(os => os.id !== targetOS.id));
       await loadLinkedOS();
+
+      const nomeUsuario = usuario?.nome || 'Sistema';
+      const osPrincipalLabel = currentOS.numero_os_samsung || currentOS.numero_os_interna || currentOS.id.slice(0, 8);
+      const osVinculadaLabel = targetOS.numero_os_samsung || targetOS.numero_os_interna || targetOS.id.slice(0, 8);
+
+      await supabase.from('os_comentarios').insert([
+        {
+          os_id: currentOS.id,
+          usuario_id: usuario?.id || null,
+          comentario: `OS vinculada ao grupo por ${nomeUsuario}.\nOS adicionada: ${osVinculadaLabel}`,
+          is_system: true
+        },
+        {
+          os_id: targetOS.id,
+          usuario_id: usuario?.id || null,
+          comentario: `OS vinculada ao grupo por ${nomeUsuario}.\nOS principal: ${osPrincipalLabel}`,
+          is_system: true
+        }
+      ]);
+
       onVinculado();
     } finally {
       setActionLoading(null);
@@ -173,6 +195,26 @@ export function VincularOSModal({ isOpen, onClose, currentOS, onVinculado }: Vin
       }
 
       await loadLinkedOS();
+
+      const nomeUsuario = usuario?.nome || 'Sistema';
+      const osPrincipalLabel = currentOS.numero_os_samsung || currentOS.numero_os_interna || currentOS.id.slice(0, 8);
+      const osDesvinculadaLabel = targetOS.numero_os_samsung || targetOS.numero_os_interna || targetOS.id.slice(0, 8);
+
+      await supabase.from('os_comentarios').insert([
+        {
+          os_id: currentOS.id,
+          usuario_id: usuario?.id || null,
+          comentario: `OS desvinculada do grupo por ${nomeUsuario}.\nOS removida: ${osDesvinculadaLabel}`,
+          is_system: true
+        },
+        {
+          os_id: targetOS.id,
+          usuario_id: usuario?.id || null,
+          comentario: `OS desvinculada do grupo por ${nomeUsuario}.\nOS principal era: ${osPrincipalLabel}`,
+          is_system: true
+        }
+      ]);
+
       onVinculado();
     } finally {
       setActionLoading(null);
