@@ -1944,14 +1944,27 @@ export function Kanban() {
             <div className="relative" ref={actionMenuRef}>
               <button
                 onClick={() => setShowActionMenu(!showActionMenu)}
-                className="flex items-center gap-2 text-xs px-4 py-2 rounded-xl font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
+                className="relative flex items-center gap-2 text-xs px-4 py-2 rounded-xl font-bold transition-all duration-300 hover:scale-[1.02] active:scale-[0.98]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.12) 0%, rgba(0,212,255,0.03) 100%)',
-                  border: '1px solid rgba(0,212,255,0.3)',
-                  color: '#00D4FF',
-                  boxShadow: '0 4px 16px rgba(0,212,255,0.1), inset 0 1px 0 rgba(0,212,255,0.1)'
+                  background: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0)
+                    ? 'linear-gradient(135deg, rgba(255,191,0,0.18) 0%, rgba(255,191,0,0.05) 100%)'
+                    : 'linear-gradient(135deg, rgba(0,212,255,0.12) 0%, rgba(0,212,255,0.03) 100%)',
+                  border: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0)
+                    ? '1px solid rgba(255,191,0,0.5)'
+                    : '1px solid rgba(0,212,255,0.3)',
+                  color: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0)
+                    ? '#FFBF00'
+                    : '#00D4FF',
+                  boxShadow: (tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0)
+                    ? '0 4px 16px rgba(255,191,0,0.15), inset 0 1px 0 rgba(255,191,0,0.1)'
+                    : '0 4px 16px rgba(0,212,255,0.1), inset 0 1px 0 rgba(0,212,255,0.1)'
                 }}
               >
+                {(tipoOSFilters.length > 0 || tipoAtendimentoFilters.length > 0 || tecnicoFilters.length > 0 || minDiasAbertos > 0 || rotaFilters.length > 0) && (
+                  <span className="absolute -top-1.5 -right-1.5 flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold text-black bg-[#FFBF00] shadow-lg shadow-[#FFBF00]/30 animate-pulse">
+                    {tipoOSFilters.length + tipoAtendimentoFilters.length + tecnicoFilters.length + rotaFilters.length + (minDiasAbertos > 0 ? 1 : 0)}
+                  </span>
+                )}
                 <Settings className="w-3.5 h-3.5" />
                 AÇÃO
                 <ChevronDown className={`w-3 h-3 transition-transform duration-300 ${showActionMenu ? 'rotate-180' : ''}`} />
