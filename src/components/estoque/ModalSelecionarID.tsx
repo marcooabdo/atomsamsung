@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { X, QrCode, Package, MapPin, Calendar, DollarSign, CheckCircle, Layers } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
@@ -149,19 +150,20 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
   const isPecaSelected = (peca: PecaEstoque) => selectedPecas.some(p => p.id === peca.id);
 
   if (loading) {
-    return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+    return createPortal(
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[9999]">
         <div className="premium-card p-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#00D4FF] mx-auto"></div>
           <p className="text-gray-400 mt-4">Carregando peças disponíveis...</p>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="premium-card max-w-4xl w-full max-h-[90vh] overflow-y-auto cyber-scrollbar relative z-[51]">
+  return createPortal(
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[9999] p-4">
+      <div className="premium-card max-w-4xl w-full max-h-[90vh] overflow-y-auto cyber-scrollbar relative">
         <div className="sticky top-0 bg-[#0A0F1E] border-b border-[#00D4FF]/20 p-6 flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold text-[#00D4FF] flex items-center gap-2">
@@ -472,6 +474,7 @@ export function ModalSelecionarID({ requisicao, onConfirm, onConfirmMultiple, on
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
