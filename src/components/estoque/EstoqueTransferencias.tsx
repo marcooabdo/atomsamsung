@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { supabase } from '../../lib/supabase';
 import { ArrowRightLeft, QrCode, Check, Package, ChevronDown, ChevronRight, DollarSign, Clock, AlertCircle, X, CheckCircle, XCircle, AlertTriangle, Search, Minimize2, Maximize2, Copy } from 'lucide-react';
 import { useModal } from '../../contexts/ModalContext';
+import { useAuth } from '../../contexts/AuthContext';
 import { ModalSelecionarID } from './ModalSelecionarID';
 import { ModalPedirPeca } from './ModalPedirPeca';
 import { ModalRegistrarValorGSPN } from './ModalRegistrarValorGSPN';
@@ -29,6 +30,7 @@ interface RequisicaoAgrupada {
 
 export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransferenciasProps) {
   const { showAlert, showConfirm } = useModal();
+  const { usuario, unidadesAdicionais } = useAuth();
   const [requisicoesAgrupadas, setRequisicoesAgrupadas] = useState<RequisicaoAgrupada[]>([]);
   const [pedidosAtivos, setPedidosAtivos] = useState<RequisicaoAgrupada[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,7 +48,7 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
   useEffect(() => {
     loadData();
-  }, [selectedUnidade]);
+  }, [selectedUnidade, usuario?.unidade_id]);
 
 
   const loadData = async () => {
@@ -74,6 +76,9 @@ export function EstoqueTransferencias({ selectedUnidade, user }: EstoqueTransfer
 
       if (selectedUnidade && selectedUnidade !== 'todas') {
         query = query.eq('unidade_id', selectedUnidade);
+      } else if (usuario?.unidade_id && usuario?.tipo !== 'master' && usuario?.tipo !== 'diretoria') {
+        const accessibleUnits = [usuario.unidade_id, ...(unidadesAdicionais || [])];
+        query = query.in('unidade_id', accessibleUnits);
       }
 
       const { data, error } = await query;
