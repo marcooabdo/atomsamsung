@@ -97,7 +97,7 @@ const TODAS_COLUNAS_KANBAN = [
 async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
-  // Fetch unidades for grouping by unit
+  // Fetch unidades for grouping
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
   const unidadeShort: Record<string, string> = {};
@@ -112,16 +112,16 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     }
   }
 
-  // Fetch ALL open OS (not just paradas) so every column appears
-  let query = supabase
+  // Fetch ALL open OS
+  let baseQuery = supabase
     .from("os")
-    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, coluna_kanban, coluna_kanban_desde, tipo_os, unidade_id")
+    .select("id, coluna_kanban, coluna_kanban_desde, created_at, unidade_id")
     .not("coluna_kanban", "is", null)
     .neq("coluna_kanban", "os_fechada")
     .or("arquivada.is.null,arquivada.eq.false");
 
   if (unidadeId) {
-    query = query.eq("unidade_id", unidadeId);
+    baseQuery = baseQuery.eq("unidade_id", unidadeId);
   }
 
   const allOS: any[] = [];
@@ -129,7 +129,7 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
   const pageSize = 1000;
   let hasMore = true;
   while (hasMore) {
-    const { data, error } = await query.range(from, from + pageSize - 1).order("coluna_kanban_desde", { ascending: true, nullsFirst: false });
+    const { data, error } = await baseQuery.range(from, from + pageSize - 1);
     if (error) throw new Error(`Erro ao buscar OS: ${error.message}`);
     if (data && data.length > 0) {
       allOS.push(...data);
@@ -142,117 +142,17 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
 
   if (allOS.length === 0) {
     return {
-      titulo: "Pulso Operacional",
+      titulo: "Pipeline Completo",
       subtitulo: "Nenhuma OS aberta no momento",
       gerado_em: now.toISOString(),
       total_os: 0,
-      total_os_paradas: 0,
-      colunas: [],
-      resumo_texto: "Nenhuma OS aberta. Operacao sem demandas no momento.",
+      resumo_texto: "Nenhuma OS aberta. Operação sem demandas no momento.",
     };
-  }
-
-  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
-
-  // Group ALL OS by coluna_kanban
-  const osPorColuna: Record<string, typeof allOS> = {};
-  const osParadasPorColuna: Record<string, OSParada[]> = {};
-  for (const os of allOS) {
-    const coluna = os.coluna_kanban;
-    if (!osPorColuna[coluna]) osPorColuna[coluna] = [];
-    osPorColuna[coluna].push(os);
-
-    if (os.coluna_kanban_desde && new Date(os.coluna_kanban_desde) < twoHoursAgo) {
-      const minutosParada = (now.getTime() - new Date(os.coluna_kanban_desde).getTime()) / (1000 * 60);
-      if (!osParadasPorColuna[coluna]) osParadasPorColuna[coluna] = [];
-      osParadasPorColuna[coluna].push({
-        id: os.id,
-        numero_os_samsung: os.numero_os_samsung,
-        numero_os_interna: os.numero_os_interna,
-        cliente_nome: os.cliente_nome,
-        coluna_kanban: coluna,
-        coluna_kanban_desde: os.coluna_kanban_desde,
-        tipo_os: os.tipo_os,
-        minutos_parada: minutosParada,
-      });
-    }
   }
 
   const totalOS = allOS.length;
-  const totalParadas = Object.values(osParadasPorColuna).reduce((sum, arr) => sum + arr.length, 0);
 
-  // Build data for ALL columns (even those with 0 OS)
-  const colunasResult = TODAS_COLUNAS_KANBAN.map((coluna) => {
-    const totalColuna = osPorColuna[coluna]?.length || 0;
-    const paradas = osParadasPorColuna[coluna] || [];
-    const paradasCount = paradas.length;
-
-    if (paradasCount > 0) {
-      const sorted = paradas.sort((a, b) => b.minutos_parada - a.minutos_parada);
-      const oldest = sorted[0];
-      return {
-        coluna,
-        label: getColunaLabel(coluna),
-        total: totalColuna,
-        paradas: paradasCount,
-        tempo_mais_antiga: formatDuration(oldest.minutos_parada),
-        minutos_mais_antiga: Math.round(oldest.minutos_parada),
-        os_mais_antiga: oldest.numero_os_samsung || oldest.numero_os_interna || oldest.id.slice(0, 8),
-        cliente_mais_antiga: oldest.cliente_nome || "Sem cliente",
-        tipo_mais_antiga: oldest.tipo_os || "-",
-      };
-    }
-
-    return {
-      coluna,
-      label: getColunaLabel(coluna),
-      total: totalColuna,
-      paradas: 0,
-      tempo_mais_antiga: "-",
-      minutos_mais_antiga: 0,
-      os_mais_antiga: "-",
-      cliente_mais_antiga: "-",
-      tipo_mais_antiga: "-",
-    };
-  });
-
-  // Also include any extra columns found in data but not in the fixed list
-  for (const coluna of Object.keys(osPorColuna)) {
-    if (!TODAS_COLUNAS_KANBAN.includes(coluna)) {
-      const totalColuna = osPorColuna[coluna]?.length || 0;
-      const paradas = osParadasPorColuna[coluna] || [];
-      const paradasCount = paradas.length;
-      if (paradasCount > 0) {
-        const sorted = paradas.sort((a, b) => b.minutos_parada - a.minutos_parada);
-        const oldest = sorted[0];
-        colunasResult.push({
-          coluna,
-          label: getColunaLabel(coluna),
-          total: totalColuna,
-          paradas: paradasCount,
-          tempo_mais_antiga: formatDuration(oldest.minutos_parada),
-          minutos_mais_antiga: Math.round(oldest.minutos_parada),
-          os_mais_antiga: oldest.numero_os_samsung || oldest.numero_os_interna || oldest.id.slice(0, 8),
-          cliente_mais_antiga: oldest.cliente_nome || "Sem cliente",
-          tipo_mais_antiga: oldest.tipo_os || "-",
-        });
-      } else {
-        colunasResult.push({
-          coluna,
-          label: getColunaLabel(coluna),
-          total: totalColuna,
-          paradas: 0,
-          tempo_mais_antiga: "-",
-          minutos_mais_antiga: 0,
-          os_mais_antiga: "-",
-          cliente_mais_antiga: "-",
-          tipo_mais_antiga: "-",
-        });
-      }
-    }
-  }
-
-  // Group OS by unidade for the text report
+  // Group OS by unidade
   const osPorUnidade: Record<string, typeof allOS> = {};
   for (const os of allOS) {
     const uid = os.unidade_id || "sem_unidade";
@@ -260,67 +160,84 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     osPorUnidade[uid].push(os);
   }
 
-  // Build per-unit breakdown string for RESUMO EXECUTIVO
-  const unidadeTotals = Object.entries(osPorUnidade)
-    .map(([uid, osList]) => `${osList.length} ${unidadeShort[uid] || "???"}`)
-    .join(" | ");
+  function formatHoursToDays(hours: number): string {
+    if (hours < 24) return hours < 1 ? "<1h" : `${Math.floor(hours)}h`;
+    const d = Math.floor(hours / 24);
+    const h = Math.floor(hours % 24);
+    return h > 0 ? `${d}d ${h}h` : `${d}d`;
+  }
 
-  // Build per-unit sections
+  // Build per-unit pipeline table text
   const unidadeSections: string[] = [];
-  for (const [uid, osList] of Object.entries(osPorUnidade)) {
+  const sortedUnits = Object.entries(osPorUnidade)
+    .filter(([uid]) => uid !== "sem_unidade")
+    .sort((a, b) => b[1].length - a[1].length);
+
+  for (const [uid, osList] of sortedUnits) {
     const sigla = unidadeShort[uid] || "???";
     const totalUnit = osList.length;
 
-    // Group by coluna within this unidade
-    const osPorColunaUnidade: Record<string, typeof allOS> = {};
+    const osPorColuna: Record<string, typeof allOS> = {};
     for (const os of osList) {
       const col = os.coluna_kanban || "sem_coluna";
-      if (!osPorColunaUnidade[col]) osPorColunaUnidade[col] = [];
-      osPorColunaUnidade[col].push(os);
+      if (!osPorColuna[col]) osPorColuna[col] = [];
+      osPorColuna[col].push(os);
     }
 
     const linhas: string[] = [];
-    for (const [coluna, osCol] of Object.entries(osPorColunaUnidade)) {
-      if (osCol.length === 0) continue;
+    const allCols = [...TODAS_COLUNAS_KANBAN];
+    for (const col of Object.keys(osPorColuna)) {
+      if (!allCols.includes(col)) allCols.push(col);
+    }
+
+    for (const coluna of allCols) {
+      const osCol = osPorColuna[coluna];
+      if (!osCol || osCol.length === 0) continue;
       const label = getColunaLabel(coluna);
-      // Find oldest OS in this column for this unit
-      let oldestMinutes = 0;
+
+      let oldestOpenH = 0;
+      let oldestStageH = 0;
       for (const os of osCol) {
-        if (os.coluna_kanban_desde) {
-          const desde = new Date(os.coluna_kanban_desde);
-          const diffMin = (now.getTime() - desde.getTime()) / 60000;
-          if (diffMin > oldestMinutes) oldestMinutes = diffMin;
+        if (os.created_at) {
+          const h = (now.getTime() - new Date(os.created_at).getTime()) / 3600000;
+          if (h > oldestOpenH) oldestOpenH = h;
+        }
+        const sd = os.coluna_kanban_desde || os.created_at;
+        if (sd) {
+          const h = (now.getTime() - new Date(sd).getTime()) / 3600000;
+          if (h > oldestStageH) oldestStageH = h;
         }
       }
-      const maisAntiga = oldestMinutes > 0 ? ` • Mais antiga: ${formatDuration(oldestMinutes)}` : "";
-      linhas.push(`${label} • ${osCol.length} OS${maisAntiga}`);
+
+      const openStr = oldestOpenH > 0 ? formatHoursToDays(oldestOpenH) : "—";
+      const stageStr = oldestStageH > 0 ? formatHoursToDays(oldestStageH) : "—";
+      linhas.push(`  ${label} • *${osCol.length}* OS • Antiga: ${openStr} • Etapa: ${stageStr}`);
     }
 
     unidadeSections.push(
-      [`📍 ${sigla} — ${totalUnit} OS abertas`, ...linhas].join("\n")
+      [`📍 *${sigla}* — ${totalUnit} OS abertas`, ...linhas].join("\n")
     );
   }
 
+  const unidadeTotals = sortedUnits.map(([uid, osList]) => `${osList.length} ${unidadeShort[uid] || "???"}`).join(" | ");
+
   const resumoTexto = [
-    `🔴 PULSO OPERACIONAL`,
+    `📊 *PIPELINE COMPLETO — CENTRAL ATOM*`,
     now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
-    `──────────────────`,
-    `📊 RESUMO EXECUTIVO:`,
-    `Total de OS abertas: ${totalOS} (${unidadeTotals})`,
-    `──────────────────`,
-    unidadeSections.join("\n──────────────────\n"),
-    `──────────────────`,
+    `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
+    `Total: *${totalOS}* OS abertas (${unidadeTotals})`,
+    `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
+    unidadeSections.join("\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"),
+    `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
     `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
-    titulo: "Pulso Operacional",
-    subtitulo: `${totalOS} OS abertas | ${totalParadas} paradas ha mais de 2 horas`,
+    titulo: "Pipeline Completo",
+    subtitulo: `${totalOS} OS abertas`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
     total_os: totalOS,
-    total_os_paradas: totalParadas,
-    colunas: colunasResult,
     resumo_texto: resumoTexto,
   };
 }
