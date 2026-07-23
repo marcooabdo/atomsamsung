@@ -31,6 +31,7 @@ interface AgendamentoOS {
   longitude: number | null;
   agendamento_status: string;
   checkin_realizado: boolean;
+  checkout_realizado: boolean;
 }
 
 export function AgendaMobile() {
@@ -83,9 +84,7 @@ export function AgendaMobile() {
       .order('horario_inicio', { ascending: true });
 
     if (!error && data) {
-      // Filter out visits that are fully completed (both check-in and checkout done)
-      const activeVisits = data.filter(item => !(item.checkin_realizado && item.checkout_realizado));
-      const mappedData = activeVisits.map(item => ({
+      const mappedData = data.map(item => ({
         id: item.os_id,
         agendamento_id: item.id,
         numero_os_interna: item.os?.numero_os_interna,
@@ -110,7 +109,8 @@ export function AgendaMobile() {
         latitude: null,
         longitude: null,
         agendamento_status: item.status,
-        checkin_realizado: item.checkin_realizado
+        checkin_realizado: item.checkin_realizado,
+        checkout_realizado: item.checkout_realizado
       }));
       setAgendamentos(mappedData as any[]);
     }
@@ -122,13 +122,30 @@ export function AgendaMobile() {
   }, [usuario, dataFiltro]);
 
   const getStatusBadge = (os: AgendamentoOS) => {
+    // Visit fully completed - show OS kanban status (what the tech chose)
+    if (os.checkin_realizado && os.checkout_realizado) {
+      const kanbanMap: Record<string, { label: string; color: string }> = {
+        'aguardando_peca': { label: 'Voltar com Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
+        'reparo_concluido': { label: 'Reparo Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+        'aguardando_fechamento': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+        'os_fechada': { label: 'OS Fechada', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+        'em_reparo_ci': { label: 'Em Reparo (CI)', color: 'bg-purple-500/20 text-purple-400 border-purple-500/50' },
+        'aguardando_aprovacao': { label: 'Aguardando Aprovação', color: 'bg-amber-500/20 text-amber-400 border-amber-500/50' },
+      };
+      return kanbanMap[os.coluna_kanban] || { label: 'Finalizado', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+    }
+    // Visit in progress (check-in done, no checkout yet)
     if (os.checkin_realizado) {
       return { label: 'Em Atendimento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' };
     }
+    // Visit not started yet - always show as available
     return { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
   };
 
   const getCardBorderColor = (os: AgendamentoOS) => {
+    if (os.checkin_realizado && os.checkout_realizado) {
+      return 'border-green-500/30';
+    }
     if (os.checkin_realizado) {
       return 'border-yellow-500/50';
     }
@@ -249,25 +266,32 @@ export function AgendaMobile() {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  <button
-                    onClick={() => {
-                      setSelectedOS(os);
-                      setShowDetailsModal(true);
-                    }}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
-                  >
-                    {os.checkin_realizado ? (
-                      <>
-                        <CheckCircle className="w-5 h-5" />
-                        Continuar
-                      </>
-                    ) : (
-                      <>
-                        <PlayCircle className="w-5 h-5" />
-                        Iniciar Atendimento
-                      </>
-                    )}
-                  </button>
+                  {os.checkin_realizado && os.checkout_realizado ? (
+                    <div className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gray-700/50 text-gray-400 font-medium rounded-xl">
+                      <CheckCircle className="w-5 h-5" />
+                      Visita Concluída
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => {
+                        setSelectedOS(os);
+                        setShowDetailsModal(true);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
+                    >
+                      {os.checkin_realizado ? (
+                        <>
+                          <CheckCircle className="w-5 h-5" />
+                          Continuar
+                        </>
+                      ) : (
+                        <>
+                          <PlayCircle className="w-5 h-5" />
+                          Iniciar Atendimento
+                        </>
+                      )}
+                    </button>
+                  )}
                 </div>
               </div>
             );

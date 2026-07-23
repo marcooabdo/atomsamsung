@@ -136,8 +136,14 @@ export function DesempenhoMobile() {
           const checkout = new Date(a.checkout_hora!);
           const tempoMinutos = (checkout.getTime() - checkin.getTime()) / (1000 * 60);
 
-          const isSuccess = a.os?.coluna_kanban === 'reparo_concluido' ||
-                           a.os?.coluna_kanban === 'finalizado';
+          const resultado = (() => {
+            const kanban = a.os?.coluna_kanban;
+            if (kanban === 'reparo_concluido' || kanban === 'aguardando_fechamento' || kanban === 'os_fechada') return 'Concluído';
+            if (kanban === 'aguardando_peca') return 'Voltar com Peça';
+            if (kanban === 'aguardando_aprovacao') return 'Aguardando Aprovação';
+            if (kanban === 'em_reparo_ci') return 'Em Reparo (CI)';
+            return kanban?.replace(/_/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase()) || 'Finalizado';
+          })();
 
           return {
             id: a.id,
@@ -146,7 +152,7 @@ export function DesempenhoMobile() {
             cliente_nome: a.os?.cliente_nome || '',
             data_conclusao: checkout.toLocaleDateString('pt-BR') + ' ' + checkout.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
             tempo_atendimento: Math.round(tempoMinutos),
-            resultado: isSuccess ? 'Sucesso' : 'Pendente'
+            resultado
           };
         });
 
@@ -286,9 +292,13 @@ export function DesempenhoMobile() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-white font-bold">OS #{item.numero_os}</span>
                       <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                        item.resultado === 'Sucesso'
+                        item.resultado === 'Concluído'
                           ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                          : 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/50'
+                          : item.resultado === 'Voltar com Peça'
+                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
+                          : item.resultado === 'Aguardando Aprovação'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
+                          : 'bg-gray-500/20 text-gray-400 border border-gray-500/50'
                       }`}>
                         {item.resultado}
                       </span>
