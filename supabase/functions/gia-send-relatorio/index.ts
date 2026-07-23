@@ -192,6 +192,27 @@ async function generateLimiteCreditoImage(): Promise<{ success: boolean; image_u
   return await response.json();
 }
 
+async function generateAberturaFechamentoImage(): Promise<{ success: boolean; image_url?: string; horario?: string; totais?: { abertas: number; fechadas: number; saldo: number } }> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio-image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({ tipo: "abertura_fechamento" }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`gia-relatorio-image (abertura_fechamento) erro (${response.status}): ${errText}`);
+  }
+
+  return await response.json();
+}
+
 async function generateAndSendPulsoImages(targetGroup: string): Promise<string[]> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -357,6 +378,21 @@ Deno.serve(async (req: Request) => {
         }
       } catch (imgErr) {
         console.error("Erro ao gerar imagem limite crédito, enviando apenas texto:", imgErr.message);
+      }
+    }
+
+    // Para abertura_fechamento, enviar imagem + texto
+    if (tipo === "abertura_fechamento") {
+      try {
+        const imgResult = await generateAberturaFechamentoImage();
+        if (imgResult.success && imgResult.image_url) {
+          const saldoStr = (imgResult.totais?.saldo ?? 0) >= 0 ? `+${imgResult.totais?.saldo}` : `${imgResult.totais?.saldo}`;
+          const caption = `📋 ABERTURA & FECHAMENTO — ${imgResult.horario}\nSaldo: ${saldoStr} | ${imgResult.totais?.abertas || 0} abertas • ${imgResult.totais?.fechadas || 0} fechadas`;
+          await sendWhatsAppImage(targetGroup, imgResult.image_url, caption);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (imgErr) {
+        console.error("Erro ao gerar imagem abertura/fechamento, enviando apenas texto:", imgErr.message);
       }
     }
 

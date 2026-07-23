@@ -465,6 +465,319 @@ async function handleLimiteCreditoImage(supabase: ReturnType<typeof createClient
   };
 }
 
+// ==================== ABERTURA E FECHAMENTO IMAGE ====================
+
+interface AberturaFechamentoData {
+  totalAbertas: number;
+  totalFechadas: number;
+  saldo: number;
+  categoriasAbertas: Record<string, number>;
+  categoriasFechadas: Record<string, number>;
+  unidades: Array<{
+    sigla: string;
+    nome: string;
+    abertas: number;
+    fechadas: number;
+    saldo: number;
+    catAbertas: Record<string, number>;
+    catFechadas: Record<string, number>;
+  }>;
+  horario: string;
+  data: string;
+}
+
+function generateAberturaFechamentoSVG(d: AberturaFechamentoData): string {
+  const width = 900;
+  const headerHeight = 100;
+  const summaryHeight = 180;
+  const unitCardHeight = 72;
+  const unitGap = 8;
+  const unitsHeaderHeight = 40;
+  const footerHeight = 50;
+  const unitsCount = d.unidades.length;
+  const unitsAreaHeight = unitsHeaderHeight + unitsCount * (unitCardHeight + unitGap);
+  const totalHeight = headerHeight + summaryHeight + 20 + unitsAreaHeight + footerHeight;
+
+  const saldoColor = d.saldo <= 0 ? "#10b981" : "#ef4444";
+  const saldoStr = d.saldo >= 0 ? `+${d.saldo}` : `${d.saldo}`;
+  const saldoIcon = d.saldo <= 0 ? "▼" : "▲";
+
+  const maxBar = Math.max(d.totalAbertas, d.totalFechadas, 1);
+  const abertasBarW = (d.totalAbertas / maxBar) * 220;
+  const fechadasBarW = (d.totalFechadas / maxBar) * 220;
+
+  function catLine(cat: Record<string, number>): string {
+    return `LP: ${cat["LP-CI"] || 0}CI ${cat["LP-IH"] || 0}IH  |  OW: ${cat["OW-CI"] || 0}CI ${cat["OW-IH"] || 0}IH`;
+  }
+
+  // Summary cards SVG
+  const cardY = headerHeight + 20;
+  const cardH = summaryHeight - 40;
+
+  const summarySvg = `
+    <!-- Saldo Card -->
+    <rect x="40" y="${cardY}" width="200" height="${cardH}" rx="12" fill="#111827" stroke="${saldoColor}" stroke-width="2"/>
+    <text x="140" y="${cardY + 28}" font-family="Arial, sans-serif" font-size="10" fill="#94a3b8" text-anchor="middle" letter-spacing="1.5">SALDO DO DIA</text>
+    <text x="140" y="${cardY + 72}" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="${saldoColor}" text-anchor="middle">${saldoStr}</text>
+    <text x="140" y="${cardY + 100}" font-family="Arial, sans-serif" font-size="13" fill="${saldoColor}" text-anchor="middle">${saldoIcon} ${d.saldo <= 0 ? "Reduzindo backlog" : "Acumulando OS"}</text>
+    <text x="140" y="${cardY + 125}" font-family="Arial, sans-serif" font-size="10" fill="#64748b" text-anchor="middle">${d.totalAbertas + d.totalFechadas} movimentações</text>
+
+    <!-- Abertas Card -->
+    <rect x="270" y="${cardY}" width="290" height="${cardH}" rx="12" fill="#111827" stroke="#334155" stroke-width="1"/>
+    <circle cx="292" cy="${cardY + 26}" r="5" fill="#f59e0b"/>
+    <text x="304" y="${cardY + 30}" font-family="Arial, sans-serif" font-size="11" fill="#f59e0b" letter-spacing="1">ABERTAS HOJE</text>
+    <text x="540" y="${cardY + 30}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="end">${d.totalAbertas}</text>
+    
+    <rect x="290" y="${cardY + 44}" width="250" height="10" rx="5" fill="#1e293b"/>
+    <rect x="290" y="${cardY + 44}" width="${Math.max(abertasBarW, 4)}" height="10" rx="5" fill="#f59e0b"/>
+    
+    <text x="290" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">LP-CI</text>
+    <text x="340" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasAbertas["LP-CI"] || 0}</text>
+    <text x="380" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">LP-IH</text>
+    <text x="430" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasAbertas["LP-IH"] || 0}</text>
+    
+    <text x="290" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">OW-CI</text>
+    <text x="340" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasAbertas["OW-CI"] || 0}</text>
+    <text x="380" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">OW-IH</text>
+    <text x="430" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasAbertas["OW-IH"] || 0}</text>
+
+    <text x="290" y="${cardY + 130}" font-family="Arial, sans-serif" font-size="11" fill="#64748b">Outros: ${d.categoriasAbertas["Outros"] || 0}</text>
+
+    <!-- Fechadas Card -->
+    <rect x="590" y="${cardY}" width="270" height="${cardH}" rx="12" fill="#111827" stroke="#334155" stroke-width="1"/>
+    <circle cx="612" cy="${cardY + 26}" r="5" fill="#10b981"/>
+    <text x="624" y="${cardY + 30}" font-family="Arial, sans-serif" font-size="11" fill="#10b981" letter-spacing="1">FECHADAS HOJE</text>
+    <text x="840" y="${cardY + 30}" font-family="Arial, sans-serif" font-size="22" font-weight="bold" fill="#ffffff" text-anchor="end">${d.totalFechadas}</text>
+    
+    <rect x="610" y="${cardY + 44}" width="230" height="10" rx="5" fill="#1e293b"/>
+    <rect x="610" y="${cardY + 44}" width="${Math.max(fechadasBarW, 4)}" height="10" rx="5" fill="#10b981"/>
+    
+    <text x="610" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">LP-CI</text>
+    <text x="660" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasFechadas["LP-CI"] || 0}</text>
+    <text x="700" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">LP-IH</text>
+    <text x="750" y="${cardY + 80}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasFechadas["LP-IH"] || 0}</text>
+    
+    <text x="610" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">OW-CI</text>
+    <text x="660" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasFechadas["OW-CI"] || 0}</text>
+    <text x="700" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8">OW-IH</text>
+    <text x="750" y="${cardY + 105}" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="#ffffff">${d.categoriasFechadas["OW-IH"] || 0}</text>
+
+    <text x="610" y="${cardY + 130}" font-family="Arial, sans-serif" font-size="11" fill="#64748b">Outros: ${d.categoriasFechadas["Outros"] || 0}</text>
+  `;
+
+  // Units breakdown
+  const unitsStartY = headerHeight + summaryHeight + 20;
+  let unitsSvg = `
+    <text x="50" y="${unitsStartY + 24}" font-family="Arial, sans-serif" font-size="11" fill="#64748b" letter-spacing="2">POR UNIDADE</text>
+    <line x1="145" y1="${unitsStartY + 20}" x2="${width - 50}" y2="${unitsStartY + 20}" stroke="#1e293b" stroke-width="1"/>
+  `;
+
+  d.unidades.forEach((u, i) => {
+    const y = unitsStartY + unitsHeaderHeight + i * (unitCardHeight + unitGap);
+    const uSaldoColor = u.saldo <= 0 ? "#10b981" : "#ef4444";
+    const uSaldoStr = u.saldo >= 0 ? `+${u.saldo}` : `${u.saldo}`;
+    const uMaxBar = Math.max(u.abertas, u.fechadas, 1);
+    const uAbertasBarW = (u.abertas / uMaxBar) * 120;
+    const uFechadasBarW = (u.fechadas / uMaxBar) * 120;
+
+    unitsSvg += `
+      <rect x="40" y="${y}" width="${width - 80}" height="${unitCardHeight}" rx="8" fill="#0d1117" stroke="#1e293b" stroke-width="1"/>
+      
+      <!-- Sigla + Name -->
+      <rect x="56" y="${y + 12}" width="50" height="48" rx="6" fill="${uSaldoColor}20" stroke="${uSaldoColor}" stroke-width="1"/>
+      <text x="81" y="${y + 35}" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="${uSaldoColor}" text-anchor="middle">${escapeXml(u.sigla)}</text>
+      <text x="81" y="${y + 52}" font-family="Arial, sans-serif" font-size="10" fill="${uSaldoColor}" text-anchor="middle">${uSaldoStr}</text>
+      
+      <!-- Abertas -->
+      <text x="130" y="${y + 22}" font-family="Arial, sans-serif" font-size="9" fill="#f59e0b">ABERTAS</text>
+      <text x="200" y="${y + 22}" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff">${u.abertas}</text>
+      <rect x="130" y="${y + 28}" width="140" height="6" rx="3" fill="#1e293b"/>
+      <rect x="130" y="${y + 28}" width="${Math.max(uAbertasBarW, 2)}" height="6" rx="3" fill="#f59e0b"/>
+      <text x="130" y="${y + 48}" font-family="Arial, sans-serif" font-size="9" fill="#64748b">${catLine(u.catAbertas)}</text>
+
+      <!-- Fechadas -->
+      <text x="360" y="${y + 22}" font-family="Arial, sans-serif" font-size="9" fill="#10b981">FECHADAS</text>
+      <text x="435" y="${y + 22}" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff">${u.fechadas}</text>
+      <rect x="360" y="${y + 28}" width="140" height="6" rx="3" fill="#1e293b"/>
+      <rect x="360" y="${y + 28}" width="${Math.max(uFechadasBarW, 2)}" height="6" rx="3" fill="#10b981"/>
+      <text x="360" y="${y + 48}" font-family="Arial, sans-serif" font-size="9" fill="#64748b">${catLine(u.catFechadas)}</text>
+
+      <!-- Saldo badge -->
+      <rect x="${width - 140}" y="${y + 18}" width="60" height="36" rx="8" fill="${uSaldoColor}15" stroke="${uSaldoColor}50" stroke-width="1"/>
+      <text x="${width - 110}" y="${y + 42}" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="${uSaldoColor}" text-anchor="middle">${uSaldoStr}</text>
+    `;
+  });
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#060a13"/>
+      <stop offset="50%" style="stop-color:#0a1628"/>
+      <stop offset="100%" style="stop-color:#060a13"/>
+    </linearGradient>
+    <linearGradient id="headerGradAF" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#0a1628"/>
+      <stop offset="50%" style="stop-color:#122040"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+    <linearGradient id="accentLine" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10b981;stop-opacity:0"/>
+      <stop offset="50%" style="stop-color:#10b981;stop-opacity:1"/>
+      <stop offset="100%" style="stop-color:#10b981;stop-opacity:0"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="${width}" height="${totalHeight}" fill="url(#bgGrad)" rx="16"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="${width}" height="${headerHeight}" fill="url(#headerGradAF)" rx="16"/>
+  <rect x="0" y="${headerHeight - 16}" width="${width}" height="16" fill="url(#headerGradAF)"/>
+  <line x1="40" y1="${headerHeight - 1}" x2="${width - 40}" y2="${headerHeight - 1}" stroke="url(#accentLine)" stroke-width="1"/>
+
+  <!-- Logo area -->
+  <rect x="${width - 110}" y="20" width="70" height="60" rx="10" fill="#111827" stroke="#1e3a5f" stroke-width="1"/>
+  <text x="${width - 75}" y="46" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="#60a5fa" text-anchor="middle">ATOM</text>
+  <text x="${width - 75}" y="62" font-family="Arial, sans-serif" font-size="9" fill="#64748b" text-anchor="middle">CORE</text>
+
+  <!-- Title -->
+  <text x="50" y="36" font-family="Arial, sans-serif" font-size="9" fill="#64748b" letter-spacing="3">RELATÓRIO DIÁRIO</text>
+  <text x="50" y="62" font-family="Arial, sans-serif" font-size="24" font-weight="bold" fill="#ffffff">ABERTURA &amp; FECHAMENTO</text>
+  <text x="50" y="86" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8">${escapeXml(d.data)} • ${escapeXml(d.horario)}</text>
+
+  <!-- Summary cards -->
+  ${summarySvg}
+
+  <!-- Units breakdown -->
+  ${unitsSvg}
+
+  <!-- Footer -->
+  <line x1="40" y1="${totalHeight - footerHeight}" x2="${width - 40}" y2="${totalHeight - footerHeight}" stroke="#1e293b" stroke-width="1"/>
+  <text x="${width / 2}" y="${totalHeight - 20}" font-family="Arial, sans-serif" font-size="11" fill="#475569" text-anchor="middle">GIA • Global Intelligence Assistance</text>
+</svg>`;
+}
+
+async function handleAberturaFechamentoImage(supabase: ReturnType<typeof createClient>) {
+  const now = new Date();
+  const horario = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const data = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const startOfDaySP = new Date(spNow);
+  startOfDaySP.setHours(0, 0, 0, 0);
+  const offsetMs = now.getTime() - spNow.getTime();
+  const startOfDayUTC = new Date(startOfDaySP.getTime() + offsetMs);
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) unidadeMap[u.id] = u.nome;
+  }
+
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    if (lower.includes("uberlândia") || lower.includes("uberlandia")) return "UDI";
+    if (lower.includes("governador")) return "GVD";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const { data: abertas } = await supabase
+    .from("os")
+    .select("id, tipo_os, tipo_atendimento, unidade_id")
+    .gte("created_at", startOfDayUTC.toISOString());
+
+  const { data: fechadas } = await supabase
+    .from("os")
+    .select("id, tipo_os, tipo_atendimento, unidade_id")
+    .eq("coluna_kanban", "os_fechada")
+    .gte("coluna_kanban_desde", startOfDayUTC.toISOString());
+
+  function categorizar(lista: any[]): Record<string, number> {
+    const cat: Record<string, number> = { "LP-CI": 0, "LP-IH": 0, "OW-CI": 0, "OW-IH": 0, "Outros": 0 };
+    for (const os of lista) {
+      const tipo = (os.tipo_os || "").toUpperCase();
+      const atend = (os.tipo_atendimento || "").toUpperCase();
+      const key = `${tipo}-${atend}`;
+      if (key in cat) cat[key]++;
+      else cat["Outros"]++;
+    }
+    return cat;
+  }
+
+  const abertasList = abertas || [];
+  const fechadasList = fechadas || [];
+
+  const porUnidadeAbertas: Record<string, any[]> = {};
+  const porUnidadeFechadas: Record<string, any[]> = {};
+  for (const os of abertasList) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidadeAbertas[uid]) porUnidadeAbertas[uid] = [];
+    porUnidadeAbertas[uid].push(os);
+  }
+  for (const os of fechadasList) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidadeFechadas[uid]) porUnidadeFechadas[uid] = [];
+    porUnidadeFechadas[uid].push(os);
+  }
+
+  const allUids = new Set([...Object.keys(porUnidadeAbertas), ...Object.keys(porUnidadeFechadas)]);
+  const unidadesData = Array.from(allUids)
+    .filter(uid => uid !== "sem_unidade" && unidadeMap[uid])
+    .map(uid => {
+      const a = porUnidadeAbertas[uid] || [];
+      const f = porUnidadeFechadas[uid] || [];
+      return {
+        sigla: getSigla(unidadeMap[uid]),
+        nome: unidadeMap[uid],
+        abertas: a.length,
+        fechadas: f.length,
+        saldo: a.length - f.length,
+        catAbertas: categorizar(a),
+        catFechadas: categorizar(f),
+      };
+    })
+    .sort((a, b) => b.abertas - a.abertas);
+
+  const imgData: AberturaFechamentoData = {
+    totalAbertas: abertasList.length,
+    totalFechadas: fechadasList.length,
+    saldo: abertasList.length - fechadasList.length,
+    categoriasAbertas: categorizar(abertasList),
+    categoriasFechadas: categorizar(fechadasList),
+    unidades: unidadesData,
+    horario,
+    data,
+  };
+
+  const svg = generateAberturaFechamentoSVG(imgData);
+  const pngBuffer = await svgToPng(svg);
+
+  const fileName = `abertura_fechamento_${now.toISOString().slice(0, 10)}_${horario.replace(":", "")}.png`;
+  const storagePath = `relatorios/abertura-fechamento/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("os-anexos")
+    .upload(storagePath, pngBuffer, { contentType: "image/png", upsert: true });
+
+  if (uploadError) {
+    throw new Error(`Erro upload imagem abertura/fechamento: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from("os-anexos").getPublicUrl(storagePath);
+
+  return {
+    success: true,
+    horario,
+    image_url: urlData.publicUrl,
+    totais: { abertas: imgData.totalAbertas, fechadas: imgData.totalFechadas, saldo: imgData.saldo },
+    unidades: unidadesData.map(u => ({ sigla: u.sigla, saldo: u.saldo })),
+  };
+}
+
 // ==================== MAIN HANDLER ====================
 
 Deno.serve(async (req: Request) => {
@@ -486,6 +799,13 @@ Deno.serve(async (req: Request) => {
 
     if (tipo === "limite_credito_gspn") {
       const result = await handleLimiteCreditoImage(supabase);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (tipo === "abertura_fechamento") {
+      const result = await handleAberturaFechamentoImage(supabase);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
