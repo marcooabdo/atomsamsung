@@ -1001,8 +1001,8 @@ async function processMessage(
 const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
   { keywords: ["pulso", "operacional", "cockpit"], tipo: "pulso_operacional" },
   { keywords: ["estoque", "dia"], tipo: "estoque_dia" },
-  { keywords: ["sem rota", "relatório rota", "relatorio rota", "os sem rota"], tipo: "agendamentos_ih" },
-  { keywords: ["mapa", "rota", "rotas", "relatório rotas", "relatorio rotas"], tipo: "mapa_rotas" },
+  { keywords: ["sem rota", "os sem rota", "relatório rota", "relatorio rota", "relatório agenda", "relatorio agenda", "agenda", "agendamento"], tipo: "agendamentos_ih" },
+  { keywords: ["mapa rota", "mapa rotas", "relatório rotas", "relatorio rotas", "mapa de rota"], tipo: "mapa_rotas" },
   { keywords: ["abertura", "fechamento"], tipo: "abertura_fechamento" },
   { keywords: ["limite", "credito", "crédito", "gspn"], tipo: "limite_credito_gspn" },
   { keywords: ["nucleo", "núcleo", "peça", "pecas", "peças"], tipo: "nucleo_pecas" },
@@ -1014,7 +1014,7 @@ const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
 function isGIAReportRequest(text: string): boolean {
   const lower = text.toLowerCase();
   if (!lower.includes("gia")) return false;
-  const hasReportWord = ["relatório", "relatorio", "report", "me dê", "me de", "me da", "me dá", "envia", "envie", "manda", "gera", "gere", "pulso", "abertura", "fechamento", "estoque", "compliance", "resumo"].some((w) => lower.includes(w));
+  const hasReportWord = ["relatório", "relatorio", "report", "me dê", "me de", "me da", "me dá", "envia", "envie", "manda", "gera", "gere", "pulso", "abertura", "fechamento", "estoque", "compliance", "resumo", "agenda", "agendamento"].some((w) => lower.includes(w));
   return hasReportWord;
 }
 
