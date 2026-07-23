@@ -58,180 +58,6 @@ async function sendWhatsAppGroup(groupJid: string, message: string) {
   return await response.json();
 }
 
-async function generateEstoqueDia(): Promise<string> {
-  const { data: pecas } = await supabase
-    .from("pecas")
-    .select("id, status, unidade_id")
-    .in("status", ["em_estoque", "disponivel", "reservada", "aguardando_retirada"]);
-
-  const { data: unidades } = await supabase
-    .from("unidades")
-    .select("id, nome");
-
-  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
-
-  const counts: Record<string, Record<string, number>> = {};
-  for (const peca of pecas || []) {
-    const unidadeNome = unidadeMap.get(peca.unidade_id) || "Sem unidade";
-    if (!counts[unidadeNome]) counts[unidadeNome] = {};
-    counts[unidadeNome][peca.status] = (counts[unidadeNome][peca.status] || 0) + 1;
-  }
-
-  const hoje = new Date().toLocaleDateString("pt-BR");
-  let msg = `📦 *ESTOQUE DO DIA - ${hoje}*\n\n`;
-
-  let totalGeral = 0;
-  for (const [unidade, statusCounts] of Object.entries(counts).sort()) {
-    const total = Object.values(statusCounts).reduce((a, b) => a + b, 0);
-    totalGeral += total;
-    msg += `🏢 *${unidade}*\n`;
-    if (statusCounts["em_estoque"]) msg += `• Em estoque: ${statusCounts["em_estoque"]}\n`;
-    if (statusCounts["disponivel"]) msg += `• Disponível: ${statusCounts["disponivel"]}\n`;
-    if (statusCounts["reservada"]) msg += `• Reservada: ${statusCounts["reservada"]}\n`;
-    if (statusCounts["aguardando_retirada"]) msg += `• Aguardando retirada: ${statusCounts["aguardando_retirada"]}\n`;
-    msg += `• Total: ${total}\n\n`;
-  }
-
-  msg += `━━━━━━━━━━━━━━━\n📈 *Total Geral: ${totalGeral} peças*\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
-
-  return msg;
-}
-
-async function generatePulsoOperacional(): Promise<string> {
-  const hoje = new Date().toISOString().split("T")[0];
-  
-  const { data: osHoje } = await supabase
-    .from("os")
-    .select("id, coluna_kanban, unidade_id")
-    .gte("created_at", hoje + "T00:00:00")
-    .lte("created_at", hoje + "T23:59:59");
-
-  const { data: unidades } = await supabase
-    .from("unidades")
-    .select("id, nome");
-
-  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
-
-  const counts: Record<string, { abertas: number; fechadas: number }> = {};
-  for (const os of osHoje || []) {
-    const nome = unidadeMap.get(os.unidade_id) || "Sem unidade";
-    if (!counts[nome]) counts[nome] = { abertas: 0, fechadas: 0 };
-    if (os.coluna_kanban === "fechado" || os.coluna_kanban === "concluido") {
-      counts[nome].fechadas++;
-    } else {
-      counts[nome].abertas++;
-    }
-  }
-
-  const dataFormatada = new Date().toLocaleDateString("pt-BR");
-  let msg = `🔴 *PULSO OPERACIONAL - ${dataFormatada}*\n\n`;
-
-  let totalAbertas = 0, totalFechadas = 0;
-  for (const [unidade, c] of Object.entries(counts).sort()) {
-    totalAbertas += c.abertas;
-    totalFechadas += c.fechadas;
-    msg += `🏢 *${unidade}*\n`;
-    msg += `• Abertas: ${c.abertas}\n`;
-    msg += `• Fechadas: ${c.fechadas}\n\n`;
-  }
-
-  msg += `━━━━━━━━━━━━━━━\n📈 *Total: ${totalAbertas + totalFechadas} OS*\n• Abertas: ${totalAbertas} | Fechadas: ${totalFechadas}\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
-
-  return msg;
-}
-
-async function generateAberturaFechamento(): Promise<string> {
-  const { data: unidades } = await supabase
-    .from("unidades")
-    .select("id, nome");
-
-  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
-
-  const { count: totalAbertas } = await supabase
-    .from("os")
-    .select("id", { count: "exact", head: true })
-    .not("coluna_kanban", "in", "(fechado,concluido)");
-
-  const { count: totalFechadas } = await supabase
-    .from("os")
-    .select("id", { count: "exact", head: true })
-    .in("coluna_kanban", ["fechado", "concluido"]);
-
-  const dataFormatada = new Date().toLocaleDateString("pt-BR");
-  let msg = `📊 *ABERTURA E FECHAMENTO - ${dataFormatada}*\n\n`;
-  msg += `• OS Abertas (ativas): ${totalAbertas || 0}\n`;
-  msg += `• OS Fechadas (concluídas): ${totalFechadas || 0}\n\n`;
-
-  // Per unidade breakdown
-  for (const unidade of (unidades || []).sort((a, b) => a.nome.localeCompare(b.nome))) {
-    const { count: abertasU } = await supabase
-      .from("os")
-      .select("id", { count: "exact", head: true })
-      .eq("unidade_id", unidade.id)
-      .not("coluna_kanban", "in", "(fechado,concluido)");
-
-    const { count: fechadasU } = await supabase
-      .from("os")
-      .select("id", { count: "exact", head: true })
-      .eq("unidade_id", unidade.id)
-      .in("coluna_kanban", ["fechado", "concluido"]);
-
-    msg += `🏢 *${unidade.nome}*\n`;
-    msg += `• Abertas: ${abertasU || 0} | Fechadas: ${fechadasU || 0}\n\n`;
-  }
-
-  msg += `━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
-  return msg;
-}
-
-async function generateAgendamentosIH(): Promise<string> {
-  const hoje = new Date().toISOString().split("T")[0];
-
-  const { data: agendamentos } = await supabase
-    .from("agendamentos")
-    .select(`
-      id, data_agendamento, horario_inicio, horario_fim, status,
-      os:os_id (numero_os_samsung, numero_os_interna, cliente_nome, cliente_endereco, cliente_bairro, cliente_cidade, unidade_id, tipo_atendimento),
-      tecnico:tecnico_id (nome)
-    `)
-    .eq("data_agendamento", hoje)
-    .order("horario_inicio");
-
-  const { data: unidades } = await supabase
-    .from("unidades")
-    .select("id, nome");
-
-  const unidadeMap = new Map(unidades?.map(u => [u.id, u.nome]) || []);
-
-  const dataFormatada = new Date().toLocaleDateString("pt-BR");
-  let msg = `📅 *AGENDAMENTOS DO DIA - ${dataFormatada}*\n\n`;
-
-  const porUnidade: Record<string, any[]> = {};
-  for (const ag of agendamentos || []) {
-    const os = ag.os as any;
-    if (!os) continue;
-    const unidadeNome = unidadeMap.get(os.unidade_id) || "Sem unidade";
-    if (!porUnidade[unidadeNome]) porUnidade[unidadeNome] = [];
-    porUnidade[unidadeNome].push(ag);
-  }
-
-  let total = 0;
-  for (const [unidade, ags] of Object.entries(porUnidade).sort()) {
-    msg += `🏢 *${unidade}* (${ags.length})\n`;
-    for (const ag of ags) {
-      const os = ag.os as any;
-      const tecnico = ag.tecnico as any;
-      const horario = ag.horario_inicio?.slice(0, 5) || "?";
-      msg += `  • ${horario} - ${os.cliente_nome || "S/N"} (${tecnico?.nome || "Sem técnico"})\n`;
-    }
-    msg += "\n";
-    total += ags.length;
-  }
-
-  msg += `━━━━━━━━━━━━━━━\n📈 *Total: ${total} agendamentos*\n━━━━━━━━━━━━━━━\n\n_GIA - Gestora de Inteligência Artificial_`;
-  return msg;
-}
-
 async function generateMotivacionalOperacional(): Promise<string> {
   const openaiKey = Deno.env.get("OPENAI_API_KEY");
   if (!openaiKey) throw new Error("OPENAI_API_KEY não configurada");
@@ -286,26 +112,38 @@ IMPORTANTE: Gere APENAS o texto da mensagem, sem markdown extra, sem explicaçõ
   return result.choices[0]?.message?.content || "Bom dia, equipe! Vamos com tudo hoje! 🚀\n\nGIA • Diretoria Group Global";
 }
 
-async function generateGenericReport(tipo: string): Promise<string> {
-  const dataFormatada = new Date().toLocaleDateString("pt-BR");
-  return `📊 *Relatório ${tipo} - ${dataFormatada}*\n\nRelatório em desenvolvimento.\n\n_GIA - Gestora de Inteligência Artificial_`;
-}
-
 async function generateReport(tipo: string): Promise<string> {
-  switch (tipo) {
-    case "estoque_dia":
-      return await generateEstoqueDia();
-    case "pulso_operacional":
-      return await generatePulsoOperacional();
-    case "abertura_fechamento":
-      return await generateAberturaFechamento();
-    case "agendamentos_ih":
-      return await generateAgendamentosIH();
-    case "motivacional_operacional":
-      return await generateMotivacionalOperacional();
-    default:
-      return await generateGenericReport(tipo);
+  // Motivacional usa OpenAI diretamente (não existe em gia-relatorio)
+  if (tipo === "motivacional_operacional") {
+    return await generateMotivacionalOperacional();
   }
+
+  // Todos os outros tipos: chamar gia-relatorio que tem a lógica completa
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({ tipo }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`gia-relatorio retornou erro (${response.status}): ${errText}`);
+  }
+
+  const data = await response.json();
+  
+  // gia-relatorio retorna { resumo_texto, titulo, ... } - usar resumo_texto como mensagem
+  if (data.resumo_texto) return data.resumo_texto;
+  if (data.mensagem) return data.mensagem;
+  if (data.message) return data.message;
+  
+  throw new Error(`Resposta de gia-relatorio sem conteúdo de texto para tipo: ${tipo}`);
 }
 
 Deno.serve(async (req: Request) => {
