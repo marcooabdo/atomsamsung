@@ -213,6 +213,60 @@ async function generateAgendamentosIH(): Promise<string> {
   return msg;
 }
 
+async function generateMotivacionalOperacional(): Promise<string> {
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) throw new Error("OPENAI_API_KEY não configurada");
+
+  const hoje = new Date();
+  const diasSemana = ["domingo", "segunda-feira", "terça-feira", "quarta-feira", "quinta-feira", "sexta-feira", "sábado"];
+  const diaSemana = diasSemana[hoje.getDay()];
+  const dataFormatada = hoje.toLocaleDateString("pt-BR");
+  const seed = `${hoje.getFullYear()}-${hoje.getMonth()}-${hoje.getDate()}`;
+
+  const systemPrompt = `Você é um Líder Inspirador e Estrategista de Operações.
+Sua missão é gerar uma mensagem motivacional longa, profunda e DIFERENTE a cada dia para ser enviada para a equipe Operacional e Administrativa (Centralização ATOM) de uma assistência técnica autorizada Samsung (Group Global).
+
+Contexto da Equipe:
+Esta equipe é responsável pelo "coração" da empresa: atendimento ao cliente, triagem de defeitos, roteirização de técnicos (logística), tratativas com a fábrica, laboratório e fechamento de Ordens de Serviço (OS). Os dias são intensos, cheios de imprevistos, clientes exigentes e SLAs (prazos) curtos. A empresa tem unidades em Feira de Santana, Juiz de Fora e Montes Claros.
+
+Diretrizes:
+- Tom: Empático, enérgico, encorajador e realista. Não use positividade tóxica; reconheça que o trabalho é duro e desafiador, mas reforce que o esforço está construindo um futuro melhor e mais organizado.
+- Foco: Importância da organização, comunicação entre áreas (engrenagem perfeita), foco na solução e não no problema. Mostre que o trabalho impacta diretamente a vida dos clientes e o sucesso da empresa.
+- Variedade: Use uma abordagem DIFERENTE a cada dia. Pode ser metáfora sobre esportes/competição, construção de uma máquina perfeita, reflexão filosófica sobre resiliência, analogia com música/orquestra, F1, aviação, exploração espacial, etc. NUNCA repita a mesma metáfora em dias seguidos.
+- Formatação: WhatsApp. Parágrafos curtos, espaçamento adequado, emojis de forma estratégica (sem exagerar), negrito com *asteriscos*.
+- Fechamento: Termine com uma frase de impacto desejando um dia produtivo e excelente, e assine como "GIA • Diretoria Group Global".
+- Comprimento: Entre 800 e 1200 caracteres. Nem curto demais, nem longo demais para WhatsApp.
+
+IMPORTANTE: Gere APENAS o texto da mensagem, sem markdown extra, sem explicações. O texto será enviado diretamente no WhatsApp.`;
+
+  const userPrompt = `Hoje é ${diaSemana}, ${dataFormatada}. Seed para variação: ${seed}. Gere a mensagem motivacional de hoje para a equipe.`;
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openaiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      temperature: 0.9,
+      max_tokens: 1000,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`OpenAI API error: ${response.status} - ${errText}`);
+  }
+
+  const result = await response.json();
+  return result.choices[0]?.message?.content || "Bom dia, equipe! Vamos com tudo hoje! 🚀\n\nGIA • Diretoria Group Global";
+}
+
 async function generateGenericReport(tipo: string): Promise<string> {
   const dataFormatada = new Date().toLocaleDateString("pt-BR");
   return `📊 *Relatório ${tipo} - ${dataFormatada}*\n\nRelatório em desenvolvimento.\n\n_GIA - Gestora de Inteligência Artificial_`;
@@ -228,6 +282,8 @@ async function generateReport(tipo: string): Promise<string> {
       return await generateAberturaFechamento();
     case "agendamentos_ih":
       return await generateAgendamentosIH();
+    case "motivacional_operacional":
+      return await generateMotivacionalOperacional();
     default:
       return await generateGenericReport(tipo);
   }
