@@ -11,7 +11,7 @@ const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 // Grupo padrão caso não tenha grupo_destino configurado
-const DEFAULT_GROUP = "120363405875636701@g.us"; // ATOM - GROUP GLOBAL
+const DEFAULT_GROUP = "120363427351181397@g.us"; // 🚀 Task Force ATOM | GG
 
 async function getGIAEvolutionConfig(): Promise<{ api_url: string; api_key: string; instance_name: string }> {
   const { data: secrets } = await supabase
