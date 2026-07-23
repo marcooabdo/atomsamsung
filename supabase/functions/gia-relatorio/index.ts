@@ -1042,7 +1042,12 @@ async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>,
   const { data: unidades, error: errUni } = await queryUnidades;
   if (errUni) throw new Error(`Erro ao buscar unidades: ${errUni.message}`);
 
-  const unidadesComLimite = (unidades || []).filter((u) => u.limite_credito_gspn && Number(u.limite_credito_gspn) > 0);
+  const unidadesComLimite = (unidades || []).filter((u) => {
+    if (!u.limite_credito_gspn || Number(u.limite_credito_gspn) <= 0) return false;
+    const lower = u.nome.toLowerCase();
+    if (lower.includes("são bernardo") || lower.includes("sao bernardo") || lower.includes("sbc")) return false;
+    return true;
+  });
 
   // Fetch ALL estoque_pecas (all statuses count against credit)
   let queryPecas = supabase
@@ -1131,36 +1136,59 @@ async function gerarLimiteCreditoGSPN(supabase: ReturnType<typeof createClient>,
     return nome.slice(0, 3).toUpperCase();
   }
 
+  function getAlertEmoji(pct: number): string {
+    if (pct >= 95) return "🔴";
+    if (pct >= 80) return "🟡";
+    return "🟢";
+  }
+
+  function buildBar(pct: number): string {
+    const filled = Math.round(pct / 10);
+    return "█".repeat(Math.min(filled, 10)) + "░".repeat(Math.max(10 - filled, 0));
+  }
+
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
+  const globalEmoji = getAlertEmoji(percentualGlobal);
+
   const resumoTexto = [
-    `💳 LIMITE DE CRÉDITO GSPN`,
-    `${spDate} às ${spHour}`,
-    `──────────────────`,
+    `*💳 LIMITE DE CRÉDITO GSPN*`,
+    `${spDate} • ${spHour}`,
     ``,
-    `📊 RESUMO EXECUTIVO:`,
-    `Total Geral:`,
-    `- Limite: ${fmt(limiteGlobal)}`,
-    `- Consumido: ${fmt(consumidoGlobal)}`,
-    `- Livre: ${fmt(livreGlobal)}`,
-    `- Uso: ${percentualGlobal}%`,
+    `━━━━━━━━━━━━━━━━━━`,
+    ``,
+    `${globalEmoji} *CONSOLIDADO*`,
+    ``,
+    `   Limite:     *${fmt(limiteGlobal)}*`,
+    `   Consumido:  *${fmt(consumidoGlobal)}*`,
+    `   Disponível: *${fmt(livreGlobal)}*`,
+    `   Uso:        ${buildBar(percentualGlobal)} *${percentualGlobal}%*`,
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
     ``,
     ...porUnidade.map((u) => {
       const sigla = getSiglaLC(u.unidade);
+      const emoji = getAlertEmoji(u.percentual_uso);
       return [
-        `📍 ${sigla} — ${u.percentual_uso}% utilizado`,
-        `Limite: ${fmt(u.limite_total)} | Consumido: ${fmt(u.consumido)} | Livre: ${fmt(u.livre)}`,
-        `Disponível: ${u.categorias.disponivel.quantidade} (${fmt(u.categorias.disponivel.valor)})`,
-        `Com técnico: ${u.categorias.com_tecnico.quantidade} (${fmt(u.categorias.com_tecnico.valor)})`,
-        `Com defeito: ${u.categorias.com_defeito.quantidade} (${fmt(u.categorias.com_defeito.valor)})`,
-        `Em OS aberta: ${u.categorias.em_os_aberta.quantidade} (${fmt(u.categorias.em_os_aberta.valor)})`,
-        `Pedidos ativos: ${u.categorias.pedidos_ativos.quantidade} (${fmt(u.categorias.pedidos_ativos.valor)})`,
-        `Devolvida (não consome): ${u.categorias.devolvida.quantidade} (${fmt(u.categorias.devolvida.valor)})`,
+        `${emoji} *${sigla}* — ${buildBar(u.percentual_uso)} *${u.percentual_uso}%*`,
+        ``,
+        `   Limite: ${fmt(u.limite_total)}`,
+        `   Consumido: ${fmt(u.consumido)}`,
+        `   Disponível: ${fmt(u.livre)}`,
+        ``,
+        `   📦 Estoque: ${u.categorias.disponivel.quantidade} pçs (${fmt(u.categorias.disponivel.valor)})`,
+        `   👨‍🔧 C/ técnico: ${u.categorias.com_tecnico.quantidade} pçs (${fmt(u.categorias.com_tecnico.valor)})`,
+        `   ⚠️ C/ defeito: ${u.categorias.com_defeito.quantidade} pçs (${fmt(u.categorias.com_defeito.valor)})`,
+        `   🔧 Em OS: ${u.categorias.em_os_aberta.quantidade} pçs (${fmt(u.categorias.em_os_aberta.valor)})`,
+        `   🛒 Pedidos: ${u.categorias.pedidos_ativos.quantidade} pçs (${fmt(u.categorias.pedidos_ativos.valor)})`,
+        `   ✅ Devolvidas: ${u.categorias.devolvida.quantidade} pçs (${fmt(u.categorias.devolvida.valor)})`,
+        ``,
+        `━━━━━━━━━━━━━━━━━━`,
         ``,
       ].join("\n");
     }),
-    `GIA • Global Intelligence Assistance`,
+    `🤖 _GIA • Global Intelligence Assistance_`,
   ].join("\n");
 
   return {
