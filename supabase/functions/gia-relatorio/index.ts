@@ -1467,9 +1467,10 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   // Fetch active OS (not archived, not closed)
   let queryOS = supabase
     .from("os")
-    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id")
+    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id, grupo_os_id")
     .neq("coluna_kanban", "os_fechada")
-    .or("arquivada.is.null,arquivada.eq.false");
+    .or("arquivada.is.null,arquivada.eq.false")
+    .limit(5000);
 
   if (unidadeId) queryOS = queryOS.eq("unidade_id", unidadeId);
 
@@ -1543,7 +1544,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       );
 
       // Erros FTF: OS in "em_rota_ih" with past date or no agendamento
-      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih");
+      // Exclude OS that are linked (grupo_os_id) - they are managed by the parent OS
+      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && !os.grupo_os_id);
       const osErrosFTF = osEmFTF.filter((os) => {
         const ags = agendamentoPorOS[os.id];
         if (!ags || ags.length === 0) return true; // no agendamento at all
