@@ -1750,17 +1750,17 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     .map(([uid, lista]) => {
       const totalPipeline = lista.length;
 
-      // Group by coluna_kanban for route columns (exclude linked OS from em_rota_ih count)
+      // Group by coluna_kanban for route columns (only IH, exclude linked OS)
       const porColuna: Record<string, typeof osList> = {};
       for (const os of lista) {
-        if (rotaColumns.includes(os.coluna_kanban)) {
+        if (rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH') {
           if (linkedOSIds.has(os.id)) continue;
           if (!porColuna[os.coluna_kanban]) porColuna[os.coluna_kanban] = [];
           porColuna[os.coluna_kanban].push(os);
         }
       }
 
-      const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban) && !(os.coluna_kanban === "em_rota_ih" && os.grupo_os_id)).length;
+      const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH' && !(os.coluna_kanban === "em_rota_ih" && os.grupo_os_id)).length;
 
       // Route distribution in pipeline order (only IH)
       const rotaColumnsOrder = ["em_rota_ih", "em_reparo_ih"];
@@ -1771,21 +1771,22 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
           total: porColuna[col].length,
         }));
 
-      // OS IH sem rota: OS in "em_reparo_ih" that have NO active agendamento
-      const osEmReparoIH = lista.filter((os) => os.coluna_kanban === "em_reparo_ih");
-      const osIHSemRota = osEmReparoIH.filter((os) => {
+      // OS IH sem rota: IH OS that have no rota_id assigned and are not yet in em_rota_ih
+      const osIHSemRota = lista.filter((os) => {
+        if (os.tipo_atendimento !== 'IH') return false;
         if (linkedOSIds.has(os.id)) return false;
-        const ags = agendamentoPorOS[os.id];
-        return !ags || ags.length === 0;
+        if (os.coluna_kanban === 'em_rota_ih') return false;
+        if (os.rota_id) return false;
+        return true;
       });
 
       const osIHSemRotaNumeros = osIHSemRota.map((os) =>
         os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
       );
 
-      // Erros FTF: OS in "em_rota_ih" with past date or no agendamento
+      // Erros FTF: OS in "em_rota_ih" with past date or no agendamento (only IH)
       // Exclude linked OS (non-principal) — they are managed by the principal OS
-      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && !linkedOSIds.has(os.id));
+      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id));
       const osErrosFTF = osEmFTF.filter((os) => {
         const ags = agendamentoPorOS[os.id];
         if (!ags || ags.length === 0) return true; // no agendamento at all
@@ -1814,7 +1815,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
 
   // Totals
   const totalPipeline = osList.filter((os) => !linkedOSIds.has(os.id)).length;
-  const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban) && !linkedOSIds.has(os.id)).length;
+  const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
   const totalIHSemRota = unidadesData.reduce((acc, u) => acc + u.ih_sem_rota_total, 0);
   const totalFTFErros = unidadesData.reduce((acc, u) => acc + u.ftf_erros_total, 0);
 
