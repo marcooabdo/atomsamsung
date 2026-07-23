@@ -1466,6 +1466,37 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     }
   }
 
+  // Movimentação por unidade
+  const movPorUnidade: Record<string, { entradas: number; valorEntradas: number; nfs: number; valorNfs: number; nfsPend: number }> = {};
+  for (const e of entradasList) {
+    const uid = e.unidade_id || "sem";
+    if (!movPorUnidade[uid]) movPorUnidade[uid] = { entradas: 0, valorEntradas: 0, nfs: 0, valorNfs: 0, nfsPend: 0 };
+    movPorUnidade[uid].entradas++;
+    movPorUnidade[uid].valorEntradas += Number(e.valor_com_impostos) || 0;
+  }
+  for (const n of nfsHojeList) {
+    const uid = n.unidade_id || "sem";
+    if (!movPorUnidade[uid]) movPorUnidade[uid] = { entradas: 0, valorEntradas: 0, nfs: 0, valorNfs: 0, nfsPend: 0 };
+    movPorUnidade[uid].nfs++;
+    movPorUnidade[uid].valorNfs += Number(n.valor_total) || 0;
+  }
+  for (const n of nfsPendList) {
+    const uid = n.unidade_id || "sem";
+    if (!movPorUnidade[uid]) movPorUnidade[uid] = { entradas: 0, valorEntradas: 0, nfs: 0, valorNfs: 0, nfsPend: 0 };
+    movPorUnidade[uid].nfsPend++;
+  }
+  const movEntries = Object.entries(movPorUnidade).filter(([, v]) => v.entradas > 0 || v.nfs > 0 || v.nfsPend > 0);
+  if (movEntries.length > 1 || (movEntries.length === 1 && !unidadeId)) {
+    lines.push(``);
+    lines.push(`📍 *Por unidade:*`);
+    for (const [uid, data] of movEntries.sort((a, b) => b[1].entradas - a[1].entradas)) {
+      const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
+      let detail = `${data.entradas} entradas | ${data.nfs} NFs`;
+      if (data.nfsPend > 0) detail += ` | ${data.nfsPend} pend`;
+      lines.push(`  ${sigla}: ${detail}`);
+    }
+  }
+
   lines.push(``);
   lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
   lines.push(`📋 *REQUISICOES PENDENTES: ${pendentesList.length}*`);
@@ -1575,7 +1606,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
 
   lines.push(``);
   lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
-  lines.push(`GIA • Nucleo de Pecas`);
+  lines.push(`GIA • Global Intelligence Assistance`);
 
   const resumoTexto = lines.join("\n");
 
