@@ -171,6 +171,27 @@ async function generateReport(tipo: string): Promise<string> {
   return text;
 }
 
+async function generateLimiteCreditoImage(): Promise<{ success: boolean; image_url?: string; horario?: string; global?: { percentual: number } }> {
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+
+  const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio-image`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${supabaseServiceKey}`,
+    },
+    body: JSON.stringify({ tipo: "limite_credito_gspn" }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    throw new Error(`gia-relatorio-image (limite_credito) erro (${response.status}): ${errText}`);
+  }
+
+  return await response.json();
+}
+
 async function generateAndSendPulsoImages(targetGroup: string): Promise<string[]> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -322,6 +343,20 @@ Deno.serve(async (req: Request) => {
       } catch (imageErr) {
         console.error("Erro ao gerar imagens do pulso, enviando texto:", imageErr.message);
         // Fallback: enviar como texto normal
+      }
+    }
+
+    // Para limite_credito_gspn, enviar imagem + texto
+    if (tipo === "limite_credito_gspn") {
+      try {
+        const imgResult = await generateLimiteCreditoImage();
+        if (imgResult.success && imgResult.image_url) {
+          const caption = `💳 LIMITE DE CRÉDITO GSPN — ${imgResult.horario}\nUso global: ${imgResult.global?.percentual}%`;
+          await sendWhatsAppImage(targetGroup, imgResult.image_url, caption);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+      } catch (imgErr) {
+        console.error("Erro ao gerar imagem limite crédito, enviando apenas texto:", imgErr.message);
       }
     }
 

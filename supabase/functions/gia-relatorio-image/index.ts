@@ -175,6 +175,298 @@ function generatePipelineSVG(unit: UnitData, horario: string): string {
 </svg>`;
 }
 
+// ==================== LIMITE CREDITO GSPN IMAGE ====================
+
+interface LimiteCreditoUnit {
+  sigla: string;
+  nome: string;
+  limite: number;
+  consumido: number;
+  livre: number;
+  percentual: number;
+  categorias: {
+    disponivel: { qtd: number; valor: number };
+    com_tecnico: { qtd: number; valor: number };
+    com_defeito: { qtd: number; valor: number };
+    em_os: { qtd: number; valor: number };
+    pedidos: { qtd: number; valor: number };
+    devolvidas: { qtd: number; valor: number };
+  };
+}
+
+function fmtBRL(v: number): string {
+  const abs = Math.abs(v);
+  const formatted = abs.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  return v < 0 ? `R$ -${formatted}` : `R$ ${formatted}`;
+}
+
+function getStatusColor(pct: number): string {
+  if (pct >= 95) return "#ef4444";
+  if (pct >= 80) return "#f59e0b";
+  return "#10b981";
+}
+
+function generateLimiteCreditoSVG(
+  units: LimiteCreditoUnit[],
+  globalLimite: number,
+  globalConsumido: number,
+  globalLivre: number,
+  globalPct: number,
+  horario: string,
+  data: string
+): string {
+  const width = 1200;
+  const headerHeight = 120;
+  const consolidadoHeight = 200;
+  const cardHeight = 320;
+  const footerHeight = 50;
+  const gapY = 20;
+
+  const cardsPerRow = Math.min(units.length, 3);
+  const cardRows = Math.ceil(units.length / 3);
+  const cardsAreaHeight = cardRows * (cardHeight + gapY);
+  const totalHeight = headerHeight + consolidadoHeight + gapY + cardsAreaHeight + footerHeight;
+
+  const globalColor = getStatusColor(globalPct);
+
+  const globalBarWidth = 400;
+  const globalBarFill = Math.min(globalPct / 100, 1) * globalBarWidth;
+
+  let consolidadoSvg = `
+    <rect x="40" y="${headerHeight}" width="${width - 80}" height="${consolidadoHeight}" rx="12" fill="#1a2332" stroke="#334155" stroke-width="1"/>
+    <circle cx="520" cy="${headerHeight + 30}" r="6" fill="${globalColor}"/>
+    <text x="535" y="${headerHeight + 36}" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff">CONSOLIDADO</text>
+
+    <rect x="80" y="${headerHeight + 55}" width="320" height="70" rx="8" fill="#0f1729" stroke="#475569" stroke-width="0.5"/>
+    <text x="240" y="${headerHeight + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">Limite:</text>
+    <text x="240" y="${headerHeight + 108}" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">${escapeXml(fmtBRL(globalLimite))}</text>
+
+    <rect x="440" y="${headerHeight + 55}" width="320" height="70" rx="8" fill="#0f1729" stroke="#475569" stroke-width="0.5"/>
+    <text x="600" y="${headerHeight + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">Consumido:</text>
+    <text x="600" y="${headerHeight + 108}" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff" text-anchor="middle">${escapeXml(fmtBRL(globalConsumido))}</text>
+
+    <rect x="800" y="${headerHeight + 55}" width="320" height="70" rx="8" fill="#0f1729" stroke="#475569" stroke-width="0.5"/>
+    <text x="960" y="${headerHeight + 80}" font-family="Arial, sans-serif" font-size="11" fill="#94a3b8" text-anchor="middle">Disponível:</text>
+    <text x="960" y="${headerHeight + 108}" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="${globalLivre < 0 ? "#ef4444" : "#ffffff"}" text-anchor="middle">${escapeXml(fmtBRL(globalLivre))}</text>
+
+    <rect x="400" y="${headerHeight + 145}" width="${globalBarWidth}" height="16" rx="8" fill="#1e293b"/>
+    <rect x="400" y="${headerHeight + 145}" width="${Math.max(globalBarFill, 0)}" height="16" rx="8" fill="${globalColor}"/>
+    <text x="${400 + globalBarWidth + 20}" y="${headerHeight + 158}" font-family="Arial, sans-serif" font-size="13" fill="#e2e8f0">Uso: ${globalPct.toFixed(2)}%</text>
+  `;
+
+  let cardsSvg = "";
+  const cardWidth = (width - 80 - (cardsPerRow - 1) * 20) / cardsPerRow;
+  const cardsStartY = headerHeight + consolidadoHeight + gapY;
+
+  units.forEach((unit, i) => {
+    const row = Math.floor(i / 3);
+    const col = i % 3;
+    const x = 40 + col * (cardWidth + 20);
+    const y = cardsStartY + row * (cardHeight + gapY);
+
+    const borderColor = unit.percentual >= 80 ? "#ef4444" : "#10b981";
+    const barColor = getStatusColor(unit.percentual);
+    const unitBarWidth = cardWidth - 40;
+    const unitBarFill = Math.min(unit.percentual / 100, 1) * unitBarWidth;
+
+    const catY = y + 170;
+    const lineH = 24;
+
+    cardsSvg += `
+      <rect x="${x}" y="${y}" width="${cardWidth}" height="${cardHeight}" rx="12" fill="#111827" stroke="${borderColor}" stroke-width="2"/>
+
+      <circle cx="${x + 20}" cy="${y + 28}" r="6" fill="${barColor}"/>
+      <text x="${x + 35}" y="${y + 34}" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#ffffff">${escapeXml(unit.sigla)}</text>
+      <text x="${x + cardWidth - 20}" y="${y + 34}" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="${barColor}" text-anchor="end">${unit.percentual.toFixed(2)}%</text>
+
+      <rect x="${x + 20}" y="${y + 50}" width="${unitBarWidth}" height="12" rx="6" fill="#1e293b"/>
+      <rect x="${x + 20}" y="${y + 50}" width="${Math.max(Math.min(unitBarFill, unitBarWidth), 0)}" height="12" rx="6" fill="${barColor}"/>
+
+      <text x="${x + 20}" y="${y + 90}" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8">Limite:</text>
+      <text x="${x + cardWidth - 20}" y="${y + 90}" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end">${escapeXml(fmtBRL(unit.limite))}</text>
+
+      <text x="${x + 20}" y="${y + 112}" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8">Consumido:</text>
+      <text x="${x + cardWidth - 20}" y="${y + 112}" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="#ffffff" text-anchor="end">${escapeXml(fmtBRL(unit.consumido))}</text>
+
+      <text x="${x + 20}" y="${y + 134}" font-family="Arial, sans-serif" font-size="12" fill="#94a3b8">Disponível:</text>
+      <text x="${x + cardWidth - 20}" y="${y + 134}" font-family="Arial, sans-serif" font-size="13" font-weight="bold" fill="${unit.livre < 0 ? "#ef4444" : "#ffffff"}" text-anchor="end">${escapeXml(fmtBRL(unit.livre))}</text>
+
+      <line x1="${x + 20}" y1="${y + 150}" x2="${x + cardWidth - 20}" y2="${y + 150}" stroke="#334155" stroke-width="0.5"/>
+
+      <text x="${x + 20}" y="${catY}" font-family="Arial, sans-serif" font-size="11" fill="#fbbf24">📦</text>
+      <text x="${x + 40}" y="${catY}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">Estoque:</text>
+      <text x="${x + cardWidth - 20}" y="${catY}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.disponivel.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.disponivel.valor))})</text>
+
+      <text x="${x + 20}" y="${catY + lineH}" font-family="Arial, sans-serif" font-size="11" fill="#60a5fa">👨‍🔧</text>
+      <text x="${x + 40}" y="${catY + lineH}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">C/ técnico:</text>
+      <text x="${x + cardWidth - 20}" y="${catY + lineH}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.com_tecnico.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.com_tecnico.valor))})</text>
+
+      <text x="${x + 20}" y="${catY + lineH * 2}" font-family="Arial, sans-serif" font-size="11" fill="#f59e0b">⚠️</text>
+      <text x="${x + 40}" y="${catY + lineH * 2}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">C/ defeito:</text>
+      <text x="${x + cardWidth - 20}" y="${catY + lineH * 2}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.com_defeito.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.com_defeito.valor))})</text>
+
+      <text x="${x + 20}" y="${catY + lineH * 3}" font-family="Arial, sans-serif" font-size="11" fill="#a78bfa">🔧</text>
+      <text x="${x + 40}" y="${catY + lineH * 3}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">Em OS:</text>
+      <text x="${x + cardWidth - 20}" y="${catY + lineH * 3}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.em_os.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.em_os.valor))})</text>
+
+      <text x="${x + 20}" y="${catY + lineH * 4}" font-family="Arial, sans-serif" font-size="11" fill="#f472b6">🛒</text>
+      <text x="${x + 40}" y="${catY + lineH * 4}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">Pedidos:</text>
+      <text x="${x + cardWidth - 20}" y="${catY + lineH * 4}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.pedidos.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.pedidos.valor))})</text>
+
+      <text x="${x + 20}" y="${catY + lineH * 5}" font-family="Arial, sans-serif" font-size="11" fill="#4ade80">✅</text>
+      <text x="${x + 40}" y="${catY + lineH * 5}" font-family="Arial, sans-serif" font-size="11" fill="#cbd5e1">Devolvidas:</text>
+      <text x="${x + cardWidth - 20}" y="${catY + lineH * 5}" font-family="Arial, sans-serif" font-size="11" fill="#e2e8f0" text-anchor="end">${unit.categorias.devolvidas.qtd} pcs (${escapeXml(fmtBRL(unit.categorias.devolvidas.valor))})</text>
+    `;
+  });
+
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${totalHeight}" viewBox="0 0 ${width} ${totalHeight}">
+  <defs>
+    <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0a1628"/>
+      <stop offset="50%" style="stop-color:#0f2035"/>
+      <stop offset="100%" style="stop-color:#0a1628"/>
+    </linearGradient>
+  </defs>
+  <rect width="${width}" height="${totalHeight}" fill="#0a1020" rx="16"/>
+
+  <!-- Header -->
+  <rect x="0" y="0" width="${width}" height="${headerHeight}" fill="url(#headerGrad)" rx="16"/>
+  <rect x="0" y="${headerHeight - 16}" width="${width}" height="16" fill="url(#headerGrad)"/>
+  <text x="80" y="50" font-family="Arial, sans-serif" font-size="9" fill="#64748b" letter-spacing="3">RELATÓRIO FINANCEIRO</text>
+  <text x="80" y="80" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#ffffff">💳 LIMITE DE CRÉDITO GSPN</text>
+  <text x="80" y="105" font-family="Arial, sans-serif" font-size="13" fill="#94a3b8">${escapeXml(data)} • ${escapeXml(horario)}</text>
+
+  <!-- Logo placeholder top-right -->
+  <rect x="${width - 100}" y="30" width="60" height="60" rx="10" fill="#1e293b" stroke="#334155" stroke-width="1"/>
+  <text x="${width - 70}" y="55" font-family="Arial, sans-serif" font-size="9" fill="#64748b" text-anchor="middle">ATOM</text>
+  <text x="${width - 70}" y="72" font-family="Arial, sans-serif" font-size="9" fill="#64748b" text-anchor="middle">CORE</text>
+
+  <!-- Consolidado -->
+  ${consolidadoSvg}
+
+  <!-- Unit Cards -->
+  ${cardsSvg}
+
+  <!-- Footer -->
+  <text x="${width / 2}" y="${totalHeight - 18}" font-family="Arial, sans-serif" font-size="11" fill="#475569" text-anchor="middle">🤖 GIA • Global Intelligence Assistance</text>
+</svg>`;
+}
+
+async function handleLimiteCreditoImage(supabase: ReturnType<typeof createClient>) {
+  const now = new Date();
+  const horario = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const data = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome, limite_credito_gspn");
+
+  const unidadesComLimite = (unidades || []).filter((u: any) => {
+    if (!u.limite_credito_gspn || Number(u.limite_credito_gspn) <= 0) return false;
+    const lower = u.nome.toLowerCase();
+    if (lower.includes("bernardo") || lower.includes("sbc")) return false;
+    return true;
+  });
+
+  if (unidadesComLimite.length === 0) {
+    return { success: false, error: "Nenhuma unidade com limite de crédito configurado" };
+  }
+
+  // Fetch estoque_pecas
+  const { data: pecas } = await supabase
+    .from("estoque_pecas")
+    .select("id, unidade_id, status, valor_com_impostos, tecnico_id, os_id");
+
+  // Fetch pending requisitions
+  const { data: pedidos } = await supabase
+    .from("requisicoes_pecas")
+    .select("id, valor_peca, unidade_id")
+    .eq("status", "pendente");
+
+  const pecasList = pecas || [];
+  const pedidosList = pedidos || [];
+
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    if (lower.includes("uberlândia") || lower.includes("uberlandia")) return "UDI";
+    if (lower.includes("governador")) return "GVD";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
+  const unitResults: LimiteCreditoUnit[] = unidadesComLimite.map((uni: any) => {
+    const limite = Number(uni.limite_credito_gspn);
+    const pecasUni = pecasList.filter((p: any) => p.unidade_id === uni.id);
+    const pedidosUni = pedidosList.filter((p: any) => p.unidade_id === uni.id);
+
+    const disponivel = pecasUni.filter((p: any) => p.status === "disponivel" && !p.tecnico_id && !p.os_id);
+    const comTecnico = pecasUni.filter((p: any) => p.tecnico_id && !p.os_id && p.status !== "devolucao_completa");
+    const comDefeito = pecasUni.filter((p: any) => p.status === "devolvida_defeito");
+    const devolvida = pecasUni.filter((p: any) => p.status === "devolucao_completa");
+    const emOS = pecasUni.filter((p: any) => p.os_id && p.status !== "devolucao_completa");
+
+    const valCat = (lista: any[]) => Math.round(lista.reduce((s: number, p: any) => s + Number(p.valor_com_impostos || 0), 0) * 100) / 100;
+
+    const pecasConsumo = pecasUni.filter((p: any) => p.status !== "devolucao_completa");
+    const valorPecasConsumo = valCat(pecasConsumo);
+    const valorPedidos = Math.round(pedidosUni.reduce((s: number, p: any) => s + Number(p.valor_peca || 0), 0) * 100) / 100;
+    const consumido = Math.round((valorPecasConsumo + valorPedidos) * 100) / 100;
+    const livre = Math.round((limite - consumido) * 100) / 100;
+    const percentual = limite > 0 ? Math.round((consumido / limite) * 10000) / 100 : 0;
+
+    return {
+      sigla: getSigla(uni.nome),
+      nome: uni.nome,
+      limite,
+      consumido,
+      livre,
+      percentual,
+      categorias: {
+        disponivel: { qtd: disponivel.length, valor: valCat(disponivel) },
+        com_tecnico: { qtd: comTecnico.length, valor: valCat(comTecnico) },
+        com_defeito: { qtd: comDefeito.length, valor: valCat(comDefeito) },
+        em_os: { qtd: emOS.length, valor: valCat(emOS) },
+        pedidos: { qtd: pedidosUni.length, valor: valorPedidos },
+        devolvidas: { qtd: devolvida.length, valor: valCat(devolvida) },
+      },
+    };
+  });
+
+  unitResults.sort((a, b) => b.percentual - a.percentual);
+
+  const globalLimite = unitResults.reduce((s, u) => s + u.limite, 0);
+  const globalConsumido = unitResults.reduce((s, u) => s + u.consumido, 0);
+  const globalLivre = unitResults.reduce((s, u) => s + u.livre, 0);
+  const globalPct = globalLimite > 0 ? Math.round((globalConsumido / globalLimite) * 10000) / 100 : 0;
+
+  const svg = generateLimiteCreditoSVG(unitResults, globalLimite, globalConsumido, globalLivre, globalPct, horario, data);
+  const pngBuffer = await svgToPng(svg);
+
+  const fileName = `limite_credito_${now.toISOString().slice(0, 10)}_${horario.replace(":", "")}.png`;
+  const storagePath = `relatorios/limite-credito/${fileName}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("os-anexos")
+    .upload(storagePath, pngBuffer, { contentType: "image/png", upsert: true });
+
+  if (uploadError) {
+    throw new Error(`Erro upload imagem limite crédito: ${uploadError.message}`);
+  }
+
+  const { data: urlData } = supabase.storage.from("os-anexos").getPublicUrl(storagePath);
+
+  return {
+    success: true,
+    horario,
+    image_url: urlData.publicUrl,
+    global: { limite: globalLimite, consumido: globalConsumido, livre: globalLivre, percentual: globalPct },
+    units: unitResults.map(u => ({ sigla: u.sigla, percentual: u.percentual })),
+  };
+}
+
+// ==================== MAIN HANDLER ====================
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -185,6 +477,21 @@ Deno.serve(async (req: Request) => {
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Parse request body for tipo
+    let tipo = "pulso_operacional";
+    try {
+      const body = await req.json();
+      if (body.tipo) tipo = body.tipo;
+    } catch { /* default to pulso */ }
+
+    if (tipo === "limite_credito_gspn") {
+      const result = await handleLimiteCreditoImage(supabase);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Default: Pulso Operacional (existing behavior)
     const now = new Date();
     const horario = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
