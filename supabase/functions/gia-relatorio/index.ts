@@ -1465,19 +1465,25 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   }
 
   // Fetch active OS (not archived, not closed)
-  let queryOS = supabase
-    .from("os")
-    .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id, grupo_os_id")
-    .neq("coluna_kanban", "os_fechada")
-    .or("arquivada.is.null,arquivada.eq.false")
-    .limit(5000);
-
-  if (unidadeId) queryOS = queryOS.eq("unidade_id", unidadeId);
-
-  const { data: osAtivas, error: errOS } = await queryOS;
-  if (errOS) throw new Error(`Erro ao buscar OS ativas: ${errOS.message}`);
-
-  const osList = osAtivas || [];
+  // Fetch all active OS using pagination to avoid PostgREST 1000-row default limit
+  let osList: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    let q = supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, tipo_os, tipo_atendimento, coluna_kanban, rota_id, unidade_id, grupo_os_id")
+      .neq("coluna_kanban", "os_fechada")
+      .or("arquivada.is.null,arquivada.eq.false")
+      .range(from, from + pageSize - 1);
+    if (unidadeId) q = q.eq("unidade_id", unidadeId);
+    const { data, error: errOS } = await q;
+    if (errOS) throw new Error(`Erro ao buscar OS ativas: ${errOS.message}`);
+    if (!data || data.length === 0) break;
+    osList = osList.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
 
   // Route-related kanban columns
   const rotaColumns = ["rota_verde", "rota_azul", "rota_amarela", "rota_vermelha", "rota_laranja", "rota_rosa", "rota_preta", "em_rota_ih", "em_reparo_ih"];
