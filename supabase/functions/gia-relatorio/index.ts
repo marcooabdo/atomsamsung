@@ -1313,11 +1313,13 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const alerta = pendentesComIdade.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60);
   const recentes = pendentesComIdade.filter((r) => r.minutos_pendente <= 24 * 60);
 
-  // Top 10 pecas mais pedidas (all requisicoes, not just pendentes)
+  // Top 10 pecas mais pedidas (últimos 60 dias)
+  const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000).toISOString();
   let queryAllReq = supabase
     .from("requisicoes_pecas")
     .select("id, codigo_peca, descricao, quantidade_requisitada, unidade_id")
-    .in("status", ["pendente", "pedido_feito", "atendida"]);
+    .in("status", ["pendente", "pedido_feito", "atendida"])
+    .gte("created_at", sixtyDaysAgo);
   if (unidadeId) queryAllReq = queryAllReq.eq("unidade_id", unidadeId);
   const { data: allReqs } = await queryAllReq;
   const allReqsList = allReqs || [];
@@ -1473,7 +1475,7 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   if (unidadeIdsForTop.length > 0) {
     lines.push(``);
     lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
-    lines.push(`🔥 *TOP 10 PEÇAS MAIS PEDIDAS POR UNIDADE:*`);
+    lines.push(`🔥 *TOP 10 PEÇAS MAIS PEDIDAS (60 DIAS):*`);
     for (const uid of unidadeIdsForTop) {
       const sigla = unidadeSigla[uid] || unidadeMap[uid] || uid;
       const unitPecas = topPecasPorUnidade[uid];
