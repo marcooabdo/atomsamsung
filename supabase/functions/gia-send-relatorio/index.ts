@@ -112,6 +112,56 @@ IMPORTANTE: Gere APENAS o texto da mensagem, sem markdown extra, sem explicaçõ
   return result.choices[0]?.message?.content || "Bom dia, equipe! Vamos com tudo hoje! 🚀\n\nGIA • Diretoria Group Global";
 }
 
+async function formatReportWithAI(rawData: string, tipo: string): Promise<string> {
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!openaiKey) {
+    // Se não tem OpenAI, retorna o texto cru
+    return rawData;
+  }
+
+  const systemPrompt = `Você é a GIA (Gestora de Inteligência ATOM), assistente de uma rede de assistências técnicas autorizadas Samsung (Group Global).
+Sua tarefa é formatar relatórios operacionais para envio via WhatsApp.
+
+Diretrizes de formatação:
+- Use emojis estratégicos e relevantes para cada seção (📊📦🔴🟡🟢🏢💰⚠️✅❌📈📉🔧⏰🎯 etc.)
+- Use negrito com *asteriscos* para títulos e destaques
+- Separe seções com linhas (━━━━━━━━━━━━━━━)
+- Parágrafos curtos, espaçamento adequado para leitura no celular
+- Destaque números importantes em negrito
+- Use indicadores visuais: 🔴 para crítico, 🟡 para alerta, 🟢 para ok
+- Mantenha TODOS os dados e números exatamente como recebidos, não invente dados
+- Assine como "_GIA • Diretoria Group Global_"
+- Não adicione análises ou recomendações que não estejam nos dados
+- Apenas reformate visualmente os dados recebidos de forma clara e bonita para WhatsApp
+
+IMPORTANTE: Retorne APENAS o texto formatado para WhatsApp, sem markdown extra, sem explicações.`;
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${openaiKey}`,
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Formate o seguinte relatório do tipo "${tipo}" para envio no WhatsApp:\n\n${rawData}` },
+      ],
+      temperature: 0.3,
+      max_tokens: 2000,
+    }),
+  });
+
+  if (!response.ok) {
+    // Se OpenAI falhar, retorna texto cru
+    return rawData;
+  }
+
+  const result = await response.json();
+  return result.choices[0]?.message?.content || rawData;
+}
+
 async function generateReport(tipo: string): Promise<string> {
   // Motivacional usa OpenAI diretamente (não existe em gia-relatorio)
   if (tipo === "motivacional_operacional") {
@@ -138,12 +188,14 @@ async function generateReport(tipo: string): Promise<string> {
 
   const data = await response.json();
   
-  // gia-relatorio retorna { resumo_texto, titulo, ... } - usar resumo_texto como mensagem
-  if (data.resumo_texto) return data.resumo_texto;
-  if (data.mensagem) return data.mensagem;
-  if (data.message) return data.message;
-  
-  throw new Error(`Resposta de gia-relatorio sem conteúdo de texto para tipo: ${tipo}`);
+  // gia-relatorio retorna { resumo_texto, titulo, ... } - usar resumo_texto como base
+  const rawText = data.resumo_texto || data.mensagem || data.message;
+  if (!rawText) {
+    throw new Error(`Resposta de gia-relatorio sem conteúdo de texto para tipo: ${tipo}`);
+  }
+
+  // Formatar com ChatGPT para ficar bonito no WhatsApp
+  return await formatReportWithAI(rawText, tipo);
 }
 
 Deno.serve(async (req: Request) => {
