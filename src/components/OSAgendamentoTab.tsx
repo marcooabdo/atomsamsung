@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle, AlertTriangle } from 'lucide-react';
+import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
@@ -70,8 +70,7 @@ export function OSAgendamentoTab({
   const [mostrarNovoTipo, setMostrarNovoTipo] = useState(false);
   const [tiposCustom, setTiposCustom] = useState<string[]>([]);
 
-  const primeiraVisitaTemCheckin = todosAgendamentos.length > 0 &&
-    todosAgendamentos[todosAgendamentos.length - 1]?.checkin_realizado === true;
+
 
   useEffect(() => {
     loadTecnicos();
@@ -181,10 +180,6 @@ export function OSAgendamentoTab({
   };
 
   const handleSave = async () => {
-    if (primeiraVisitaTemCheckin) {
-      setErro('Não é possível alterar a visita após o check-in ter sido realizado.');
-      return;
-    }
     setErro('');
     setSucesso('');
     setSalvando(true);
@@ -345,14 +340,6 @@ export function OSAgendamentoTab({
   return (
     <div className="space-y-6">
       <div className="space-y-4">
-        {primeiraVisitaTemCheckin && (
-          <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-yellow-500 flex-shrink-0" />
-            <span className="text-yellow-400 text-sm font-medium">
-              Check-in ja realizado. Nao e possivel alterar os dados desta visita. Para um novo agendamento, clique em "Agendar Nova Visita".
-            </span>
-          </div>
-        )}
         <div>
           <label className="block text-sm font-semibold text-[#00D4FF] mb-2">
             <Calendar className="w-4 h-4 inline mr-2" />
@@ -364,7 +351,6 @@ export function OSAgendamentoTab({
             onChange={(e) => setFormData({ ...formData, data_agendamento: e.target.value })}
             className="neon-input w-full"
             min={new Date().toISOString().split('T')[0]}
-            disabled={primeiraVisitaTemCheckin}
           />
         </div>
 
@@ -376,26 +362,24 @@ export function OSAgendamentoTab({
           <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => !primeiraVisitaTemCheckin && setFormData({ ...formData, periodo_agendamento: 'manha' })}
-              disabled={primeiraVisitaTemCheckin}
+              onClick={() => setFormData({ ...formData, periodo_agendamento: 'manha' })}
               className={`p-3 rounded-lg border-2 transition-all ${
                 formData.periodo_agendamento === 'manha'
                   ? 'border-[#00D4FF] bg-[#00D4FF20] text-[#00D4FF]'
                   : 'border-gray-600 bg-gray-700/30 text-gray-400 hover:border-gray-500'
-              } ${primeiraVisitaTemCheckin ? 'opacity-50 cursor-not-allowed' : ''}`}
+              }`}
             >
               <Sun className="w-5 h-5 mx-auto mb-1" />
               <span className="text-sm font-semibold">Manhã</span>
             </button>
             <button
               type="button"
-              onClick={() => !primeiraVisitaTemCheckin && setFormData({ ...formData, periodo_agendamento: 'tarde' })}
-              disabled={primeiraVisitaTemCheckin}
+              onClick={() => setFormData({ ...formData, periodo_agendamento: 'tarde' })}
               className={`p-3 rounded-lg border-2 transition-all ${
                 formData.periodo_agendamento === 'tarde'
                   ? 'border-[#00D4FF] bg-[#00D4FF20] text-[#00D4FF]'
                   : 'border-gray-600 bg-gray-700/30 text-gray-400 hover:border-gray-500'
-              } ${primeiraVisitaTemCheckin ? 'opacity-50 cursor-not-allowed' : ''}`}
+              }`}
             >
               <Moon className="w-5 h-5 mx-auto mb-1" />
               <span className="text-sm font-semibold">Tarde</span>
@@ -413,7 +397,6 @@ export function OSAgendamentoTab({
               value={formData.tipo_reparo}
               onChange={(e) => setFormData({ ...formData, tipo_reparo: e.target.value })}
               className="neon-input w-full"
-              disabled={primeiraVisitaTemCheckin}
             >
               <option value="">Selecione o tipo de reparo</option>
               {[...TIPOS_REPARO_IH, ...tiposCustom].map((tipo) => (
@@ -489,7 +472,6 @@ export function OSAgendamentoTab({
             value={formData.tecnico_agendado_id}
             onChange={(e) => setFormData({ ...formData, tecnico_agendado_id: e.target.value })}
             className="neon-input w-full"
-            disabled={primeiraVisitaTemCheckin}
           >
             <option value="">Selecione um tecnico</option>
             {tecnicos.map((tecnico) => (
@@ -507,7 +489,6 @@ export function OSAgendamentoTab({
               checked={formData.confirmado_com_cliente}
               onChange={(e) => setFormData({ ...formData, confirmado_com_cliente: e.target.checked })}
               className="w-5 h-5 rounded border-[#00D4FF] bg-transparent checked:bg-[#00D4FF]"
-              disabled={primeiraVisitaTemCheckin}
             />
             <span className="text-sm font-semibold text-[#00D4FF]">
               <CheckCircle className="w-4 h-4 inline mr-2" />
@@ -577,9 +558,8 @@ export function OSAgendamentoTab({
         <div className="flex gap-3 pt-4">
           <button
             onClick={handleSave}
-            disabled={salvando || primeiraVisitaTemCheckin}
-            className={`neon-button flex-1 flex items-center justify-center gap-2 ${primeiraVisitaTemCheckin ? 'opacity-50 cursor-not-allowed' : ''}`}
-            title={primeiraVisitaTemCheckin ? 'Não é possível alterar após check-in' : ''}
+            disabled={salvando}
+            className="neon-button flex-1 flex items-center justify-center gap-2"
           >
             {salvando ? (
               <>
