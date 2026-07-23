@@ -804,9 +804,28 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     "rota_amarela", "rota_laranja", "em_rota_ih",
   ];
 
-  // Fetch all active OS that have NO route color defined
-  // Exclude: closed, archived, and OS already in a route column
-  let allOS: any[] = [];
+  // Fetch all active routes to build a set of cities that already have a color per unit
+  const { data: rotasAtivas } = await supabase
+    .from("rotas")
+    .select("cidades, unidade_id")
+    .eq("ativa", true);
+
+  // Build a map: unidade_id -> Set of normalized city names with a route
+  const cidadesComRotaPorUnidade: Record<string, Set<string>> = {};
+  if (rotasAtivas) {
+    for (const rota of rotasAtivas) {
+      if (!rota.cidades || !rota.unidade_id) continue;
+      if (!cidadesComRotaPorUnidade[rota.unidade_id]) {
+        cidadesComRotaPorUnidade[rota.unidade_id] = new Set();
+      }
+      for (const cidade of rota.cidades) {
+        cidadesComRotaPorUnidade[rota.unidade_id].add(cidade.toLowerCase().trim());
+      }
+    }
+  }
+
+  // Fetch all active OS that are not closed/archived and not already in a route column
+  let allOSRaw: any[] = [];
   let from = 0;
   const pageSize = 1000;
   while (true) {
@@ -822,10 +841,18 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     const { data, error } = await q;
     if (error) throw new Error(`Erro ao buscar OS sem rota: ${error.message}`);
     if (!data || data.length === 0) break;
-    allOS = allOS.concat(data);
+    allOSRaw = allOSRaw.concat(data);
     if (data.length < pageSize) break;
     from += pageSize;
   }
+
+  // Filter out OS whose city already has a route color in the same unit
+  const allOS = allOSRaw.filter((os) => {
+    if (!os.cliente_cidade || !os.unidade_id) return true;
+    const cidadesSet = cidadesComRotaPorUnidade[os.unidade_id];
+    if (!cidadesSet) return true;
+    return !cidadesSet.has(os.cliente_cidade.toLowerCase().trim());
+  });
 
   // Columns to include in the report (only non-route pipeline columns)
   const colunasOrdem = [
