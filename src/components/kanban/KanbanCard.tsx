@@ -1,7 +1,7 @@
 import { memo, useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { formatTipoAtendimentoShort } from '../../lib/supabase';
-import { normalizarCidade } from '../../lib/cidadeNormalize';
+import { normalizarCidade, removeAccents } from '../../lib/cidadeNormalize';
 import {
   Search, AlertCircle, Clock, Package, Calendar, CheckCircle,
   DollarSign, Copy, User, ArrowRightLeft, MessageCircle,
@@ -630,9 +630,9 @@ export const KanbanCard = memo(function KanbanCard({
         {/* City badge */}
         {os.cliente_cidade && (() => {
           const cidadeDisplay = normalizarCidade(os.cliente_cidade);
-          const cidadeNorm = os.cliente_cidade.trim().toLowerCase();
+          const cidadeNorm = removeAccents(os.cliente_cidade.trim().toLowerCase());
           const rotaMatch = rotas.find(r =>
-            r.cidades?.some(c => c.trim().toLowerCase() === cidadeNorm)
+            r.cidades?.some(c => removeAccents(c.trim().toLowerCase()) === cidadeNorm)
           );
           const cor = rotaMatch?.cor || null;
           if (cor) {
