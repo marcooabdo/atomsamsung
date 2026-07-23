@@ -97,6 +97,21 @@ const TODAS_COLUNAS_KANBAN = [
 async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
+  // Fetch unidades for grouping by unit
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  const unidadeShort: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeShort[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeShort[u.id] = "JDF";
+      else if (nome.includes("feira de santana") || nome.includes("feira")) unidadeShort[u.id] = "FSA";
+      else unidadeShort[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
+  }
+
   // Fetch ALL open OS (not just paradas) so every column appears
   let query = supabase
     .from("os")
@@ -237,20 +252,65 @@ async function gerarPulsoOperacional(supabase: ReturnType<typeof createClient>, 
     }
   }
 
+  // Group OS by unidade for the text report
+  const osPorUnidade: Record<string, typeof allOS> = {};
+  for (const os of allOS) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!osPorUnidade[uid]) osPorUnidade[uid] = [];
+    osPorUnidade[uid].push(os);
+  }
+
+  // Build per-unit breakdown string for RESUMO EXECUTIVO
+  const unidadeTotals = Object.entries(osPorUnidade)
+    .map(([uid, osList]) => `${osList.length} ${unidadeShort[uid] || "???"}`)
+    .join(" | ");
+
+  // Build per-unit sections
+  const unidadeSections: string[] = [];
+  for (const [uid, osList] of Object.entries(osPorUnidade)) {
+    const sigla = unidadeShort[uid] || "???";
+    const totalUnit = osList.length;
+
+    // Group by coluna within this unidade
+    const osPorColunaUnidade: Record<string, typeof allOS> = {};
+    for (const os of osList) {
+      const col = os.coluna_kanban || "sem_coluna";
+      if (!osPorColunaUnidade[col]) osPorColunaUnidade[col] = [];
+      osPorColunaUnidade[col].push(os);
+    }
+
+    const linhas: string[] = [];
+    for (const [coluna, osCol] of Object.entries(osPorColunaUnidade)) {
+      if (osCol.length === 0) continue;
+      const label = getColunaLabel(coluna);
+      // Find oldest OS in this column for this unit
+      let oldestMinutes = 0;
+      for (const os of osCol) {
+        if (os.coluna_kanban_desde) {
+          const desde = new Date(os.coluna_kanban_desde);
+          const diffMin = (now.getTime() - desde.getTime()) / 60000;
+          if (diffMin > oldestMinutes) oldestMinutes = diffMin;
+        }
+      }
+      const maisAntiga = oldestMinutes > 0 ? ` • Mais antiga: ${formatDuration(oldestMinutes)}` : "";
+      linhas.push(`${label} • ${osCol.length} OS${maisAntiga}`);
+    }
+
+    unidadeSections.push(
+      [`📍 ${sigla} — ${totalUnit} OS abertas`, ...linhas].join("\n")
+    );
+  }
+
   const resumoTexto = [
-    `PULSO OPERACIONAL - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-    ``,
-    `Total de OS abertas: ${totalOS} | Paradas (+2h): ${totalParadas}`,
-    ``,
-    `Etapa | Total | Paradas (+2h) | Mais Antiga`,
-    `──────────────────────────────────────`,
-    ...colunasResult
-      .filter((col) => col.total > 0)
-      .map((col) =>
-        col.paradas > 0
-          ? `${col.label} | ${col.total} | ${col.paradas} paradas | ${col.tempo_mais_antiga}`
-          : `${col.label} | ${col.total} | sem paradas`
-      ),
+    `🔴 PULSO OPERACIONAL`,
+    now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+    `──────────────────`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de OS abertas: ${totalOS} (${unidadeTotals})`,
+    `──────────────────`,
+    unidadeSections.join("\n──────────────────\n"),
+    `──────────────────`,
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -445,17 +505,26 @@ async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unida
 
   const { data: fechadasHoje } = await queryFechadas;
 
-  // Top 5 aging (oldest open OS)
+  // Top 5 aging per unit (oldest open OS - only CI and IH LP)
   let queryAging = supabase
     .from("os")
-    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, created_at")
+    .select("id, numero_os_interna, numero_os_samsung, cliente_nome, coluna_kanban, unidade_id, created_at, tipo_os, tipo_atendimento")
     .not("coluna_kanban", "in", "(os_fechada,aguardando_fechamento)")
+    .in("tipo_atendimento", ["CI", "IH"])
     .order("created_at", { ascending: true })
-    .limit(5);
+    .limit(500);
 
   if (unidadeId) queryAging = queryAging.eq("unidade_id", unidadeId);
 
   const { data: aging } = await queryAging;
+
+  // Filter IH to only LP
+  const agingFiltered = (aging || []).filter((o) => {
+    if (o.tipo_atendimento === "CI") return true;
+    // IH only if LP (tipo_os or tipo_orcamento)
+    const tipoOs = (o.tipo_os || "").toLowerCase();
+    return tipoOs.includes("lp") || tipoOs === "lp";
+  });
 
   // Average speed (days to close in last 30 days)
   let queryVelocidade = supabase
@@ -549,37 +618,110 @@ async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unida
     };
   }).sort((a, b) => b.fechadas - a.fechadas);
 
-  const agingList = (aging || []).map((o) => {
-    const dias = Math.round((now.getTime() - new Date(o.created_at).getTime()) / 86400000);
-    return {
-      os: o.numero_os_samsung || o.numero_os_interna || o.id,
-      cliente: o.cliente_nome,
-      coluna: o.coluna_kanban,
-      unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
-      dias_aberta: dias,
-    };
-  });
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
 
-  const resumoTexto = [
-    `RESUMO FINAL DO DIA - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+  // Group aging by unidade - top 5 per unit
+  const agingPorUnidade: Record<string, typeof agingFiltered> = {};
+  for (const o of agingFiltered) {
+    const uid = o.unidade_id || "sem_unidade";
+    if (!agingPorUnidade[uid]) agingPorUnidade[uid] = [];
+    if (agingPorUnidade[uid].length < 5) agingPorUnidade[uid].push(o);
+  }
+
+  // Group pendencias by unidade
+  const aprovacaoPorUni: Record<string, number> = {};
+  for (const o of (osAprovacao || [])) {
+    const uid = o.unidade_id || "sem_unidade";
+    aprovacaoPorUni[uid] = (aprovacaoPorUni[uid] || 0) + 1;
+  }
+  const pecasPorUni: Record<string, number> = {};
+  for (const o of (osPecas || [])) {
+    const uid = o.unidade_id || "sem_unidade";
+    pecasPorUni[uid] = (pecasPorUni[uid] || 0) + 1;
+  }
+  const agPorUni: Record<string, number> = {};
+  for (const a of (agAmanha || [])) {
+    const uid = a.unidade_id || "sem_unidade";
+    agPorUni[uid] = (agPorUni[uid] || 0) + 1;
+  }
+
+  const getColunaLabel = (col: string) => {
+    const labels: Record<string, string> = {
+      os_nova: "OS Nova", diagnostico_triagem: "Diagnóstico/Triagem",
+      enviar_orcamento: "Enviar Orçamento", aguardando_aprovacao: "Aguardando Aprovação",
+      orcamento_aprovado: "Orçamento Aprovado", aguardando_peca: "Aguardando Peça",
+      peca_em_transito: "Peça em Trânsito", reparo_em_progresso_ih: "Reparo em Progresso IH",
+      return_handling: "Return Handling", instalacao_inicial: "Instalação Inicial",
+      trade_up: "Trade Up", service_handling: "Service Handling",
+    };
+    return labels[col] || col.split("_").map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(" ");
+  };
+
+  const spTime = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spDate = spTime.split(",")[0]?.trim() || spTime;
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+  const totalAb = abertasCount;
+  const totalFe = fechadasCount;
+  const saldoSign = saldo >= 0 ? "+" : "";
+
+  const lines: string[] = [
+    `🏁 RESUMO FINAL DO DIA`,
+    `${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `BALANCO:`,
-    `  Abertas hoje: ${abertasCount}`,
-    `  Fechadas hoje: ${fechadasCount}`,
-    `  Saldo: ${saldo >= 0 ? "+" : ""}${saldo}`,
-    `  Velocidade media (30d): ${velocidadeMedia} dias`,
-    ``,
-    `TOP 5 AGING (mais antigas):`,
-    ...agingList.map((a, i) => `  ${i + 1}. ${a.os} - ${a.cliente} (${a.dias_aberta}d) [${a.coluna}] - ${a.unidade}`),
-    ``,
-    `PENDENCIAS AMANHA:`,
-    `  Agendamentos: ${agendamentosAmanha} (${semConfirmacao} sem confirmacao)`,
-    `  Aguardando aprovacao: ${osAprovacao?.length || 0}`,
-    `  Aguardando peca: ${osPecas?.length || 0}`,
-    ``,
-    `POR UNIDADE:`,
-    ...porUnidade.map((u) => `  ${u.unidade}: +${u.abertas} / -${u.fechadas} (vel: ${u.velocidade_media ?? "N/A"}d)`),
-  ].join("\n");
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de OS: ${totalAb} abertas | ${totalFe} fechadas | Saldo: ${saldoSign}${saldo}`,
+  ];
+
+  // Per unit sections
+  const sortedUnis = porUnidade.sort((a, b) => a.unidade.localeCompare(b.unidade));
+  for (const u of sortedUnis) {
+    const uid = Object.entries(unidadeMap).find(([, v]) => v === u.unidade)?.[0] || "";
+    const sigla = getSigla(u.unidade);
+    const vel = u.velocidade_media !== null ? `${u.velocidade_media}d` : "N/A";
+    const saldoU = u.saldo >= 0 ? `+${u.saldo}` : `${u.saldo}`;
+
+    lines.push(``);
+    lines.push(`📍 ${sigla} — ${u.abertas} abertas | ${u.fechadas} fechadas | Saldo: ${saldoU} | Velocidade: ${vel}`);
+    lines.push(`🔹 Abertas hoje: ${u.abertas}`);
+    lines.push(`🔹 Fechadas hoje: ${u.fechadas}`);
+    lines.push(`🔹 Saldo: ${saldoU}`);
+    lines.push(`🔹 Velocidade média (30d): ${vel}`);
+    lines.push(``);
+
+    // Top 5 aging for this unit
+    const unitAging = agingPorUnidade[uid] || [];
+    if (unitAging.length > 0) {
+      lines.push(`TOP 5 AGING:`);
+      unitAging.forEach((o, i) => {
+        const dias = Math.round((now.getTime() - new Date(o.created_at).getTime()) / 86400000);
+        const osNum = o.numero_os_samsung || o.numero_os_interna || o.id;
+        const cliente = o.cliente_nome || "S/N";
+        const colLabel = getColunaLabel(o.coluna_kanban);
+        lines.push(`${i + 1}. ${osNum} - ${cliente} (${dias}d) [${colLabel}]`);
+      });
+      lines.push(``);
+    }
+
+    // Pendencias for this unit
+    lines.push(`PENDÊNCIAS AMANHÃ:`);
+    lines.push(`🔸 Agendamentos: ${agPorUni[uid] || 0}`);
+    lines.push(`🔸 Aguardando Aprovação: ${aprovacaoPorUni[uid] || 0}`);
+    lines.push(`🔸 Aguardando Peça: ${pecasPorUni[uid] || 0}`);
+    lines.push(``);
+    lines.push(`──────────────────`);
+  }
+
+  lines.push(`GIA • Global Intelligence Assistance`);
+
+  const resumoTexto = lines.join("\n");
 
   return {
     titulo: "Resumo Final do Dia",
@@ -593,7 +735,13 @@ async function gerarResumoFinal(supabase: ReturnType<typeof createClient>, unida
       velocidade_media_30d: velocidadeMedia,
       total_os_fechadas_30d: osFechadas30d?.length || 0,
     },
-    aging_top5: agingList,
+    aging_top5: Object.entries(agingPorUnidade).flatMap(([, list]) => list.map((o) => ({
+      os: o.numero_os_samsung || o.numero_os_interna || o.id,
+      cliente: o.cliente_nome,
+      coluna: o.coluna_kanban,
+      unidade: unidadeMap[o.unidade_id || ""] || o.unidade_id,
+      dias_aberta: Math.round((now.getTime() - new Date(o.created_at).getTime()) / 86400000),
+    }))),
     pendencias_amanha: {
       agendamentos: agendamentosAmanha,
       sem_confirmacao: semConfirmacao,
@@ -755,18 +903,43 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     }))
     .sort((a, b) => b.total_erros - a.total_erros);
 
+  function getUnidadeSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
   const resumoTexto = [
-    `AGENDAMENTOS IH - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-    `Data referencia: ${today}`,
-    ``,
-    `Total OS em FTF: ${(osFTF || []).length} | Erros FTF: ${ftfErros.length}`,
-    `Total OS em Reparo IH: ${(osReparo || []).length} | Erros Reparo: ${reparoErros.length}`,
-    ``,
-    ...porUnidade.map((u) => [
-      `${u.unidade}:`,
-      u.erros_ftf > 0 ? `  FTF erros (${u.erros_ftf}): ${u.detalhes_ftf.join(", ")}` : `  FTF: OK`,
-      u.erros_reparo > 0 ? `  Reparo erros (${u.erros_reparo}): ${u.detalhes_reparo.join(", ")}` : `  Reparo IH: OK`,
-    ].join("\n")),
+    `📅 AGENDAMENTOS IH`,
+    `${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `──────────────────`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de OS em FTF: ${(osFTF || []).length} | Erros FTF: ${ftfErros.length}`,
+    `Total de OS em Reparo IH: ${(osReparo || []).length} | Erros Reparo: ${reparoErros.length}`,
+    `──────────────────`,
+    ...porUnidade.map((u) => {
+      const sigla = getUnidadeSigla(u.unidade);
+      const lines: string[] = [];
+      lines.push(`📍 ${sigla} — ${u.total_erros} erro${u.total_erros !== 1 ? "s" : ""}`);
+      lines.push(`🔴 FTF (${u.erros_ftf} erro${u.erros_ftf !== 1 ? "s" : ""}):`);
+      if (u.erros_ftf > 0) {
+        for (const os of u.detalhes_ftf) lines.push(os);
+      } else {
+        lines.push(`Sem erros`);
+      }
+      lines.push(``);
+      lines.push(`⚠️ Reparo IH (${u.erros_reparo} erro${u.erros_reparo !== 1 ? "s" : ""}):`);
+      if (u.erros_reparo > 0) {
+        for (const os of u.detalhes_reparo) lines.push(os);
+      } else {
+        lines.push(`Sem erros`);
+      }
+      lines.push(`──────────────────`);
+      return lines.join("\n");
+    }),
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -1147,25 +1320,39 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
       };
     });
 
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira")) return "FSA";
+    return nome.slice(0, 3).toUpperCase();
+  }
+
   const valorFormatado = valorTotal.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   const resumoTexto = [
-    `NUCLEO DE PECAS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-    ``,
-    `Requisicoes pendentes: ${pendentesList.length}`,
-    `  Criticas (+48h): ${criticas.length}`,
-    `  Alerta (+24h): ${alerta.length}`,
-    `  Recentes (-24h): ${recentes.length}`,
-    ``,
+    `📦 NUCLEO DE PEÇAS`,
+    `${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `──────────────────`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Requisições pendentes: ${pendentesList.length}`,
+    `  🔴 Críticas (+48h): ${criticas.length}`,
+    `  🟡 Alerta (+24h): ${alerta.length}`,
+    `  🟢 Recentes (-24h): ${recentes.length}`,
     `Valor total pendente: ${valorFormatado}`,
-    `Pecas com valor: ${pecasComValor} | Sem valor cadastrado: ${pecasSemValor}`,
-    ``,
-    `Por unidade:`,
-    ...unidadesReport.map((u) => [
-      `  ${u.unidade}: ${u.total_pendentes} pendentes`,
-      `    Criticas: ${u.criticas} | Alerta: ${u.alerta} | Recentes: ${u.recentes}`,
-      `    Valor: ${u.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })} | Sem valor: ${u.sem_valor}`,
-    ].join("\n")),
+    `Peças com valor: ${pecasComValor} | Sem valor cadastrado: ${pecasSemValor}`,
+    `──────────────────`,
+    ...unidadesReport.map((u) => {
+      const sigla = getSigla(u.unidade);
+      const uValorFmt = u.valor_total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+      return [
+        `📍 ${sigla} — ${u.total_pendentes} pendentes`,
+        `  Críticas: ${u.criticas} | Alerta: ${u.alerta} | Recentes: ${u.recentes}`,
+        `  Valor: ${uValorFmt} | Sem valor: ${u.sem_valor}`,
+      ].join("\n");
+    }),
+    `──────────────────`,
+    `GIA • Global Intelligence Assistance`,
   ].join("\n");
 
   return {
@@ -1311,32 +1498,39 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const totalIHSemRota = unidadesData.reduce((acc, u) => acc + u.ih_sem_rota_total, 0);
 
   // Build resumo texto in cockpit style
+  const spTime = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spDate = spTime.split(",")[0]?.trim() || spTime;
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
   const linhasResumo: string[] = [
-    `MAPA DE ROTAS - ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `🗺️ MAPA DE ROTAS`,
+    `${spDate} às ${spHour}`,
+    `──────────────────`,
     ``,
-    `Pipeline total: ${totalPipeline} OS`,
+    `📊 RESUMO EXECUTIVO:`,
+    `Total de OS no pipeline: ${totalPipeline.toLocaleString("pt-BR")}`,
     `Em rota: ${totalEmRota} | IH sem rota: ${totalIHSemRota}`,
-    ``,
   ];
 
   for (const unidade of unidadesData) {
-    linhasResumo.push(`--- ${unidade.unidade_sigla} (${unidade.unidade_nome}) ---`);
-    linhasResumo.push(`Pipeline: ${unidade.total_pipeline} | Em rota: ${unidade.em_rota}`);
     linhasResumo.push(``);
+    linhasResumo.push(`📍 ${unidade.unidade_sigla} — Pipeline: ${unidade.total_pipeline} | Em rota: ${unidade.em_rota}`);
 
     for (const rota of unidade.distribuicao) {
       linhasResumo.push(`${rota.rota}: ${rota.total}`);
     }
 
     linhasResumo.push(``);
-    linhasResumo.push(`OS IH sem rota definida: ${unidade.ih_sem_rota_total}`);
+    linhasResumo.push(`🔴 OS IH sem rota: ${unidade.ih_sem_rota_total}`);
     if (unidade.ih_sem_rota_lista.length > 0) {
       for (const num of unidade.ih_sem_rota_lista) {
         linhasResumo.push(num);
       }
     }
-    linhasResumo.push(``);
+    linhasResumo.push(`──────────────────`);
   }
+
+  linhasResumo.push(`GIA • Global Intelligence Assistance`);
 
   return {
     titulo: "Mapa de Rotas",
