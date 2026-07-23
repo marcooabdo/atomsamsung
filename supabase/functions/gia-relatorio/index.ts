@@ -1367,14 +1367,41 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const alerta = pendentesComIdade.filter((r) => r.minutos_pendente > 24 * 60 && r.minutos_pendente <= 48 * 60);
   const recentes = pendentesComIdade.filter((r) => r.minutos_pendente <= 24 * 60);
 
-  // Top 5 pecas mais requisitadas
+  // Top 10 pecas mais pedidas (all requisicoes, not just pendentes)
+  let queryAllReq = supabase
+    .from("requisicoes_pecas")
+    .select("id, codigo_peca, descricao, quantidade_requisitada, unidade_id")
+    .in("status", ["pendente", "pedido_feito", "atendida"]);
+  if (unidadeId) queryAllReq = queryAllReq.eq("unidade_id", unidadeId);
+  const { data: allReqs } = await queryAllReq;
+  const allReqsList = allReqs || [];
+
+  // Top 10 per unit
+  const topPecasPorUnidade: Record<string, Array<{ codigo: string; descricao: string; qtd: number }>> = {};
+  for (const r of allReqsList) {
+    const uid = r.unidade_id || "sem_unidade";
+    if (!topPecasPorUnidade[uid]) topPecasPorUnidade[uid] = [];
+    const key = r.codigo_peca || "SEM_CODIGO";
+    let existing = topPecasPorUnidade[uid].find(p => p.codigo === key);
+    if (!existing) {
+      existing = { codigo: key, descricao: r.descricao || "", qtd: 0 };
+      topPecasPorUnidade[uid].push(existing);
+    }
+    existing.qtd += Number(r.quantidade_requisitada) || 1;
+  }
+  for (const uid of Object.keys(topPecasPorUnidade)) {
+    topPecasPorUnidade[uid].sort((a, b) => b.qtd - a.qtd);
+    topPecasPorUnidade[uid] = topPecasPorUnidade[uid].slice(0, 10);
+  }
+
+  // Global top 10
   const pecaCount: Record<string, { codigo: string; descricao: string; qtd: number }> = {};
-  for (const r of pendentesList) {
+  for (const r of allReqsList) {
     const key = r.codigo_peca || "SEM_CODIGO";
     if (!pecaCount[key]) pecaCount[key] = { codigo: key, descricao: r.descricao || "", qtd: 0 };
     pecaCount[key].qtd += Number(r.quantidade_requisitada) || 1;
   }
-  const topPecas = Object.values(pecaCount).sort((a, b) => b.qtd - a.qtd).slice(0, 5);
+  const topPecas = Object.values(pecaCount).sort((a, b) => b.qtd - a.qtd).slice(0, 10);
 
   // Group by unidade
   const reqPorUnidade: Record<string, typeof pendentesComIdade> = {};
@@ -1394,6 +1421,17 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   const pedidosFeitosList = pedidosFeitos || [];
   const totalPedidosTransito = pedidosFeitosList.length;
   const valorPedidosTransito = pedidosFeitosList.reduce((s, p) => s + ((Number(p.valor_peca) || 0) * (Number(p.quantidade_requisitada) || 1)), 0);
+
+  // === SECTION 5: Top 10 IDs mais antigos em estoque ===
+  let queryAntigos = supabase
+    .from("estoque_pecas")
+    .select("id, id_numerico, pn, descricao, unidade_id, created_at")
+    .eq("status", "disponivel")
+    .order("created_at", { ascending: true })
+    .limit(10);
+  if (unidadeId) queryAntigos = queryAntigos.eq("unidade_id", unidadeId);
+  const { data: pecasAntigas } = await queryAntigos;
+  const pecasAntigasList = pecasAntigas || [];
 
   // === BUILD TEXT REPORT ===
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -1453,16 +1491,23 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     lines.push(`  🔴${uCriticas} 🟡${uAlerta} 🟢${uRecentes}`);
   }
 
-  // Top 5 pecas
-  if (topPecas.length > 0) {
+  // Top 10 pecas POR UNIDADE
+  const unidadeIdsForTop = Object.keys(topPecasPorUnidade);
+  if (unidadeIdsForTop.length > 0) {
     lines.push(``);
     lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
-    lines.push(`🔥 *TOP 5 PECAS MAIS PEDIDAS:*`);
-    for (let i = 0; i < topPecas.length; i++) {
-      const p = topPecas[i];
-      const desc = p.descricao.length > 30 ? p.descricao.slice(0, 30) + "..." : p.descricao;
-      lines.push(`${i + 1}. ${p.codigo} (${p.qtd}x)`);
-      lines.push(`   ${desc}`);
+    lines.push(`🔥 *TOP 10 PEÇAS MAIS PEDIDAS POR UNIDADE:*`);
+    for (const uid of unidadeIdsForTop) {
+      const sigla = unidadeSigla[uid] || unidadeMap[uid] || uid;
+      const unitPecas = topPecasPorUnidade[uid];
+      if (unitPecas.length === 0) continue;
+      lines.push(``);
+      lines.push(`📍 *${sigla}:*`);
+      for (let i = 0; i < unitPecas.length; i++) {
+        const p = unitPecas[i];
+        const desc = p.descricao.length > 25 ? p.descricao.slice(0, 25) + "..." : p.descricao;
+        lines.push(`${i + 1}. ${p.codigo} (${p.qtd}x) - ${desc}`);
+      }
     }
   }
 
@@ -1485,6 +1530,23 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     for (const [uid, data] of defeitoEntries) {
       const sigla = unidadeSigla[uid] || uid.slice(0, 3).toUpperCase();
       lines.push(`  📍 ${sigla}: ${data.defeito} pcs | ${fmt(data.valorDefeito)}`);
+    }
+  }
+
+  // Top 10 IDs mais antigos em estoque
+  if (pecasAntigasList.length > 0) {
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`⏳ *TOP 10 IDs MAIS ANTIGOS EM ESTOQUE:*`);
+    for (let i = 0; i < pecasAntigasList.length; i++) {
+      const peca = pecasAntigasList[i];
+      const dataEntrada = new Date(peca.created_at);
+      const diasEstoque = Math.floor((now.getTime() - dataEntrada.getTime()) / (1000 * 60 * 60 * 24));
+      const dataFormatada = dataEntrada.toLocaleDateString("pt-BR");
+      const sigla = unidadeSigla[peca.unidade_id] || "???";
+      const desc = (peca.descricao || peca.pn || "").length > 20 ? (peca.descricao || peca.pn || "").slice(0, 20) + "..." : (peca.descricao || peca.pn || "");
+      lines.push(`${i + 1}. #${peca.id_numerico || "?"} | ${desc} | ${sigla}`);
+      lines.push(`   📅 ${dataFormatada} — *${diasEstoque} dias*`);
     }
   }
 
