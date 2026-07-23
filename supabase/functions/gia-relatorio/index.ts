@@ -1511,7 +1511,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
   const linhasResumo: string[] = [
-    `🗺️ RELATÓRIO ROTAS`,
+    `🗺️ RELATÓRIO AGENDA`,
     `${spDate} às ${spHour}`,
     `──────────────────`,
     ``,
