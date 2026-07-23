@@ -120,7 +120,7 @@ interface ChecklistTemplate {
 }
 
 export function Configuracoes() {
-  const { usuario: usuarioLogado } = useAuth();
+  const { usuario: usuarioLogado, unidadesAdicionais: myUnidadesAdicionais } = useAuth();
   const [activeTab, setActiveTab] = useState<Tab>('unidades');
   const [loading, setLoading] = useState(true);
 
@@ -2396,6 +2396,16 @@ export function Configuracoes() {
                         >
                           <option value="">Selecione uma unidade</option>
                           {unidades.map(u => (
+                            <option key={u.id} value={u.id}>{u.nome}</option>
+                          ))}
+                        </select>
+                      ) : myUnidadesAdicionais.length > 0 ? (
+                        <select
+                          value={selectedUnidadeRota}
+                          onChange={(e) => setSelectedUnidadeRota(e.target.value)}
+                          className="neon-input"
+                        >
+                          {unidades.filter(u => u.id === userUnitId || myUnidadesAdicionais.includes(u.id)).map(u => (
                             <option key={u.id} value={u.id}>{u.nome}</option>
                           ))}
                         </select>
