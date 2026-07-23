@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle } from 'lucide-react';
+import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle, Pencil, Trash2 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
@@ -60,8 +60,6 @@ export function OSAgendamentoTab({
   const [todosAgendamentos, setTodosAgendamentos] = useState<any[]>([]);
   const [dadosSalvos, setDadosSalvos] = useState<any>(null);
   const [tipoOS, setTipoOS] = useState<string>('');
-  const [mostrarNovaVisita, setMostrarNovaVisita] = useState(false);
-  const [salvandoNovaVisita, setSalvandoNovaVisita] = useState(false);
   const [visitaChecklistAberta, setVisitaChecklistAberta] = useState<string | null>(null);
   const [cancelamentoModal, setCancelamentoModal] = useState<{ aberto: boolean; agendamentoId: string | null }>({ aberto: false, agendamentoId: null });
   const [motivoCancelamento, setMotivoCancelamento] = useState('');
@@ -203,6 +201,11 @@ export function OSAgendamentoTab({
         return;
       }
 
+      // Check if there's an existing visit without check-in that we can update
+      const visitaSemCheckin = todosAgendamentos.find(a => !a.checkin_realizado && a.status !== 'cancelado');
+      const todasTemCheckin = todosAgendamentos.length > 0 && !visitaSemCheckin;
+
+      // Update OS data
       const updateData = {
         data_agendamento: formData.data_agendamento,
         tecnico_agendado_id: formData.tecnico_agendado_id,
@@ -212,26 +215,78 @@ export function OSAgendamentoTab({
         updated_at: new Date().toISOString()
       };
 
-      const { data: updatedData, error } = await supabase
+      const { error: osError } = await supabase
         .from('os')
         .update(updateData)
-        .eq('id', osId)
-        .select('data_agendamento, tecnico_agendado_id, confirmado_com_cliente, periodo_agendamento, tipo_reparo')
-        .single();
+        .eq('id', osId);
 
-      if (error) throw error;
+      if (osError) throw osError;
 
-      const tecnicoSelecionado = tecnicos.find(t => t.id === updatedData.tecnico_agendado_id);
+      const horarioInicio = formData.periodo_agendamento === 'manha' ? '08:00:00' : '13:00:00';
+      const horarioFim = formData.periodo_agendamento === 'manha' ? '12:00:00' : '18:00:00';
 
+      if (todasTemCheckin) {
+        // All visits have check-in - create a NEW visit
+        const { error: insertError } = await supabase
+          .from('agendamentos')
+          .insert({
+            os_id: osId,
+            tecnico_id: formData.tecnico_agendado_id,
+            data_agendamento: formData.data_agendamento,
+            horario_inicio: horarioInicio,
+            horario_fim: horarioFim,
+            status: 'confirmado',
+            confirmado_com_cliente: formData.confirmado_com_cliente,
+            observacao: 'Nova visita agendada',
+            agendado_por: usuario?.id,
+            unidade_id: unidadeId
+          });
+
+        if (insertError) throw insertError;
+        setSucesso('Nova visita agendada com sucesso!');
+      } else if (visitaSemCheckin) {
+        // Update the existing visit without check-in
+        const { error: updateAgendError } = await supabase
+          .from('agendamentos')
+          .update({
+            tecnico_id: formData.tecnico_agendado_id,
+            data_agendamento: formData.data_agendamento,
+            horario_inicio: horarioInicio,
+            horario_fim: horarioFim,
+            confirmado_com_cliente: formData.confirmado_com_cliente,
+          })
+          .eq('id', visitaSemCheckin.id);
+
+        if (updateAgendError) throw updateAgendError;
+        setSucesso('Agendamento atualizado com sucesso!');
+      } else {
+        // No visits yet - create first one
+        const { error: insertError } = await supabase
+          .from('agendamentos')
+          .insert({
+            os_id: osId,
+            tecnico_id: formData.tecnico_agendado_id,
+            data_agendamento: formData.data_agendamento,
+            horario_inicio: horarioInicio,
+            horario_fim: horarioFim,
+            status: 'confirmado',
+            confirmado_com_cliente: formData.confirmado_com_cliente,
+            agendado_por: usuario?.id,
+            unidade_id: unidadeId
+          });
+
+        if (insertError) throw insertError;
+        setSucesso('Agendamento salvo com sucesso!');
+      }
+
+      const tecnicoSelecionado = tecnicos.find(t => t.id === formData.tecnico_agendado_id);
       setDadosSalvos({
-        data: updatedData.data_agendamento,
+        data: formData.data_agendamento,
         tecnico: tecnicoSelecionado?.nome || 'N/A',
-        periodo: updatedData.periodo_agendamento || 'Não especificado',
-        confirmado: updatedData.confirmado_com_cliente,
-        tipo_reparo: tipoAtendimento === 'IH' ? (updatedData.tipo_reparo || 'N/A') : null
+        periodo: formData.periodo_agendamento || 'Não especificado',
+        confirmado: formData.confirmado_com_cliente,
+        tipo_reparo: tipoAtendimento === 'IH' ? (formData.tipo_reparo || 'N/A') : null
       });
-
-      setSucesso('Agendamento salvo com sucesso!');
 
       setTimeout(() => {
         setSucesso('');
@@ -246,50 +301,29 @@ export function OSAgendamentoTab({
     }
   };
 
-  const handleAgendarNovaVisita = async () => {
-    if (!formData.data_agendamento || !formData.tecnico_agendado_id) {
-      setErro('Preencha data e técnico para agendar nova visita');
-      return;
-    }
+  const handleEditarVisita = (agend: any) => {
+    setFormData({
+      ...formData,
+      data_agendamento: agend.data_agendamento,
+      tecnico_agendado_id: agend.tecnico_id || '',
+      confirmado_com_cliente: agend.confirmado_com_cliente || false,
+      periodo_agendamento: agend.horario_inicio?.startsWith('08') ? 'manha' : 'tarde',
+    });
+  };
 
-    setSalvandoNovaVisita(true);
-    setErro('');
-
+  const handleExcluirVisita = async (agendamentoId: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta visita?')) return;
     try {
-      const horarioInicio = formData.periodo_agendamento === 'manha' ? '08:00:00' : '13:00:00';
-      const horarioFim = formData.periodo_agendamento === 'manha' ? '12:00:00' : '18:00:00';
-
-      const { data: novoAgendamento, error } = await supabase
+      const { error } = await supabase
         .from('agendamentos')
-        .insert({
-          os_id: osId,
-          tecnico_id: formData.tecnico_agendado_id,
-          data_agendamento: formData.data_agendamento,
-          horario_inicio: horarioInicio,
-          horario_fim: horarioFim,
-          status: 'confirmado',
-          confirmado_com_cliente: formData.confirmado_com_cliente,
-          observacao: 'Nova visita agendada',
-          agendado_por: usuario?.id,
-          unidade_id: unidadeId
-        })
-        .select()
-        .single();
-
+        .delete()
+        .eq('id', agendamentoId);
       if (error) throw error;
-
-      setSucesso('Nova visita agendada com sucesso! O técnico verá no mobile.');
-
+      setSucesso('Visita excluída com sucesso!');
       await loadAgendamento();
-      setMostrarNovaVisita(false);
-
-      setTimeout(() => {
-        setSucesso('');
-      }, 5000);
+      setTimeout(() => setSucesso(''), 5000);
     } catch (error: any) {
-      setErro(error.message || 'Erro ao agendar nova visita');
-    } finally {
-      setSalvandoNovaVisita(false);
+      setErro(error.message || 'Erro ao excluir visita');
     }
   };
 
@@ -578,50 +612,10 @@ export function OSAgendamentoTab({
 
       {todosAgendamentos.length > 0 && (
         <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-[#00D4FF] font-bold text-lg">Histórico de Visitas</h3>
-            <button
-              onClick={() => setMostrarNovaVisita(!mostrarNovaVisita)}
-              className="px-4 py-2 bg-[#00D4FF20] border border-[#00D4FF] rounded-lg text-[#00D4FF] hover:bg-[#00D4FF30] transition-all flex items-center gap-2 text-sm font-semibold"
-            >
-              <Plus className="w-4 h-4" />
-              Agendar Nova Visita
-            </button>
-          </div>
-
-          {mostrarNovaVisita && (
-            <div className="premium-card p-4 bg-[#FFBF0010] border border-[#FFBF0030]">
-              <h4 className="text-[#FFBF00] font-bold mb-3 flex items-center gap-2">
-                <Plus className="w-5 h-5" />
-                Agendar Nova Visita Técnica
-              </h4>
-              <p className="text-sm text-gray-400 mb-4">
-                Preencha os dados acima (data, período e técnico) e clique no botão abaixo para criar uma nova visita.
-              </p>
-              <button
-                onClick={handleAgendarNovaVisita}
-                disabled={salvandoNovaVisita || !formData.data_agendamento || !formData.tecnico_agendado_id}
-                className="neon-button w-full flex items-center justify-center gap-2"
-              >
-                {salvandoNovaVisita ? (
-                  <>
-                    <Clock className="w-4 h-4 animate-spin" />
-                    Agendando...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle className="w-4 h-4" />
-                    Confirmar Nova Visita
-                  </>
-                )}
-              </button>
-            </div>
-          )}
+          <h3 className="text-[#00D4FF] font-bold text-lg">Histórico de Visitas</h3>
 
           <div className="space-y-3">
             {todosAgendamentos.map((agend, index) => {
-              const isPrimeiraVisita = index === todosAgendamentos.length - 1;
-
               return (
                 <div key={agend.id} className="premium-card p-4 bg-gray-800/50">
                   <div className="flex items-start justify-between mb-3">
@@ -631,22 +625,43 @@ export function OSAgendamentoTab({
                       </div>
                       <div>
                         <p className="text-white font-semibold">
-                          Visita {todosAgendamentos.length - index} {isPrimeiraVisita && <span className="text-[#00D4FF] text-xs">(Inicial)</span>}
+                          Visita {todosAgendamentos.length - index}
                         </p>
                         <p className="text-xs text-gray-400">
                           {new Date(agend.data_agendamento + 'T00:00:00').toLocaleDateString('pt-BR')}
                         </p>
                       </div>
                     </div>
-                    <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                      agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :
-                      agend.status === 'em_andamento' ? 'bg-[#FFBF0020] text-[#FFBF00]' :
-                      agend.status === 'concluido' ? 'bg-[#39FF1420] text-[#39FF14]' :
-                      'bg-gray-700 text-gray-400'
-                    }`}>
-                      {agend.status === 'confirmado' ? 'Agendado' :
-                       agend.status === 'em_andamento' ? 'Em Andamento' :
-                       agend.status === 'concluido' ? 'Concluído' : agend.status}
+                    <div className="flex items-center gap-2">
+                      {!agend.checkin_realizado && agend.status !== 'concluido' && agend.status !== 'cancelado' && (
+                        <>
+                          <button
+                            onClick={() => handleEditarVisita(agend)}
+                            className="p-1.5 rounded-lg bg-[#FFBF0020] border border-[#FFBF0040] text-[#FFBF00] hover:bg-[#FFBF0030] transition-all"
+                            title="Editar visita"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                          <button
+                            onClick={() => handleExcluirVisita(agend.id)}
+                            className="p-1.5 rounded-lg bg-[#FF006420] border border-[#FF006440] text-[#FF0064] hover:bg-[#FF006430] transition-all"
+                            title="Excluir visita"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </>
+                      )}
+                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                        agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :
+                        agend.status === 'em_andamento' ? 'bg-[#FFBF0020] text-[#FFBF00]' :
+                        agend.status === 'concluido' ? 'bg-[#39FF1420] text-[#39FF14]' :
+                        'bg-gray-700 text-gray-400'
+                      }`}>
+                        {agend.status === 'confirmado' ? 'Agendado' :
+                         agend.status === 'em_andamento' ? 'Em Andamento' :
+                         agend.status === 'concluido' ? 'Concluído' :
+                         agend.status === 'cancelado' ? 'Cancelado' : agend.status}
+                      </div>
                     </div>
                   </div>
 
@@ -661,7 +676,7 @@ export function OSAgendamentoTab({
                       </div>
                     </div>
                     <div>
-                      <span className="text-gray-400 block mb-1">Status:</span>
+                      <span className="text-gray-400 block mb-1">Confirmação:</span>
                       <p className="text-white font-semibold capitalize">
                         {agend.confirmado_com_cliente ? 'Confirmado' : 'Pendente confirmação'}
                       </p>
@@ -676,90 +691,72 @@ export function OSAgendamentoTab({
                       <ClipboardList className="w-4 h-4" />
                       Checklist Técnico
                     </button>
-
-                    {!agend.checkin_realizado && agend.status !== 'concluido' && agend.status !== 'cancelado' && (
-                      <button
-                        onClick={() => setCancelamentoModal({ aberto: true, agendamentoId: agend.id })}
-                        className="w-full px-4 py-2 bg-[#FF006410] border border-[#FF006430] rounded-lg text-[#FF0064] hover:bg-[#FF006420] transition-all flex items-center justify-center gap-2 text-sm font-semibold"
-                      >
-                        <XCircle className="w-4 h-4" />
-                        Cancelar Agendamento
-                      </button>
-                    )}
                   </div>
 
-                  {isPrimeiraVisita && agend.checkin_realizado && (
-                  <div className="mt-3 p-3 bg-[#39FF1410] border border-[#39FF1430] rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-4 h-4 text-[#39FF14]" />
-                      <span className="text-[#39FF14] font-semibold text-sm">Check-in Realizado</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-400 block">Horário:</span>
-                        <p className="text-white font-semibold">
-                          {new Date(agend.checkin_hora).toLocaleString('pt-BR')}
-                        </p>
+                  {agend.checkin_realizado && (
+                    <div className="mt-3 p-3 bg-[#39FF1410] border border-[#39FF1430] rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-[#39FF14]" />
+                        <span className="text-[#39FF14] font-semibold text-sm">Check-in Realizado</span>
                       </div>
-                      {agend.checkin_latitude && agend.checkin_longitude && (
+                      <div className="grid grid-cols-2 gap-2 text-xs">
                         <div>
-                          <span className="text-gray-400 block">Localização:</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-[#39FF14]" />
-                            <p className="text-white font-mono text-[10px]">
-                              {parseFloat(agend.checkin_latitude).toFixed(4)}, {parseFloat(agend.checkin_longitude).toFixed(4)}
-                            </p>
-                          </div>
+                          <span className="text-gray-400 block">Horário:</span>
+                          <p className="text-white font-semibold">
+                            {new Date(agend.checkin_hora).toLocaleString('pt-BR')}
+                          </p>
                         </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {isPrimeiraVisita && agend.checkout_realizado && (
-                  <div className="mt-3 p-3 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg">
-                    <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="w-4 h-4 text-[#00D4FF]" />
-                      <span className="text-[#00D4FF] font-semibold text-sm">Check-out Realizado</span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="text-gray-400 block">Horário:</span>
-                        <p className="text-white font-semibold">
-                          {new Date(agend.checkout_hora).toLocaleString('pt-BR')}
-                        </p>
+                        {agend.checkin_latitude && agend.checkin_longitude && (
+                          <div>
+                            <span className="text-gray-400 block">Localização:</span>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-[#39FF14]" />
+                              <p className="text-white font-mono text-[10px]">
+                                {parseFloat(agend.checkin_latitude).toFixed(4)}, {parseFloat(agend.checkin_longitude).toFixed(4)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
                       </div>
-                      {agend.checkout_latitude && agend.checkout_longitude && (
-                        <div>
-                          <span className="text-gray-400 block">Localização:</span>
-                          <div className="flex items-center gap-1">
-                            <MapPin className="w-3 h-3 text-[#00D4FF]" />
-                            <p className="text-white font-mono text-[10px]">
-                              {parseFloat(agend.checkout_latitude).toFixed(4)}, {parseFloat(agend.checkout_longitude).toFixed(4)}
-                            </p>
-                          </div>
-                        </div>
-                      )}
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {isPrimeiraVisita && !agend.checkin_realizado && !agend.checkout_realizado && (
-                  <div className="mt-3 p-3 bg-gray-700/30 border border-gray-600 rounded-lg">
-                    <p className="text-gray-400 text-xs text-center">
-                      Aguardando check-in do técnico
-                    </p>
-                  </div>
-                )}
+                  {agend.checkout_realizado && (
+                    <div className="mt-3 p-3 bg-[#00D4FF10] border border-[#00D4FF30] rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <CheckCircle className="w-4 h-4 text-[#00D4FF]" />
+                        <span className="text-[#00D4FF] font-semibold text-sm">Check-out Realizado</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div>
+                          <span className="text-gray-400 block">Horário:</span>
+                          <p className="text-white font-semibold">
+                            {new Date(agend.checkout_hora).toLocaleString('pt-BR')}
+                          </p>
+                        </div>
+                        {agend.checkout_latitude && agend.checkout_longitude && (
+                          <div>
+                            <span className="text-gray-400 block">Localização:</span>
+                            <div className="flex items-center gap-1">
+                              <MapPin className="w-3 h-3 text-[#00D4FF]" />
+                              <p className="text-white font-mono text-[10px]">
+                                {parseFloat(agend.checkout_latitude).toFixed(4)}, {parseFloat(agend.checkout_longitude).toFixed(4)}
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
-                {!isPrimeiraVisita && (
-                  <div className="mt-3 p-3 bg-gray-700/20 border border-gray-600/30 rounded-lg">
-                    <p className="text-gray-400 text-xs text-center">
-                      Visita adicional agendada
-                    </p>
-                  </div>
-                )}
-              </div>
+                  {!agend.checkin_realizado && !agend.checkout_realizado && agend.status !== 'cancelado' && (
+                    <div className="mt-3 p-3 bg-gray-700/30 border border-gray-600 rounded-lg">
+                      <p className="text-gray-400 text-xs text-center">
+                        Aguardando check-in do técnico
+                      </p>
+                    </div>
+                  )}
+                </div>
               );
             })}
           </div>
@@ -771,7 +768,7 @@ export function OSAgendamentoTab({
         <ul className="space-y-2 text-xs text-gray-400">
           <li className="flex items-start gap-2">
             <span className="text-[#00D4FF] mt-0.5">•</span>
-            <span>Ao salvar, um agendamento será criado automaticamente no sistema</span>
+            <span>Ao salvar, a visita pendente será atualizada ou uma nova será criada automaticamente</span>
           </li>
           <li className="flex items-start gap-2">
             <span className="text-[#00D4FF] mt-0.5">•</span>
