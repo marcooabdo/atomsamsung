@@ -869,14 +869,21 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
 async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
 
+  const COLUNAS_EXCLUIDAS = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "trade_up", "os_fechada"];
+
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
+  const smaIds: string[] = [];
   if (unidades) {
-    for (const u of unidades) unidadeMap[u.id] = u.nome;
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const lower = u.nome.toLowerCase();
+      if (lower.includes("bernardo") || lower.includes("sma") || lower.includes("sbc")) {
+        smaIds.push(u.id);
+      }
+    }
   }
 
-  // First get active OS for the unit (os_pecas has no unidade_id column)
-  // Paginate to bypass Supabase default 1000-row limit
   let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
   let page = 0;
   const PAGE_SIZE = 1000;
@@ -884,7 +891,7 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     let osQuery = supabase
       .from("os")
       .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id")
-      .not("coluna_kanban", "eq", "os_fechada")
+      .not("coluna_kanban", "in", `(${COLUNAS_EXCLUIDAS.join(",")})`)
       .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
     if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
     const { data: osRows, error: errOS } = await osQuery;
@@ -894,23 +901,26 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     if (osRows.length < PAGE_SIZE) break;
     page++;
   }
+
+  // Exclude SMA unit
+  osDataList = osDataList.filter((os) => !os.unidade_id || !smaIds.includes(os.unidade_id));
+
   const osMap: Record<string, { id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = {};
   for (const os of osDataList) osMap[os.id] = os;
 
   const osIds = osDataList.map((o) => o.id);
   if (osIds.length === 0) {
     return {
-      titulo: "Problemas Peca",
-      subtitulo: "0 OS com erro",
+      titulo: "Compliance — Problemas Peça",
+      subtitulo: "Nenhum erro encontrado",
       gerado_em: now.toISOString(),
       horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
-      totais: { os_com_erro: 0, pecas_sem_pn: 0, pecas_sem_valor: 0 },
+      totais: { os_com_erro: 0, pecas_sem_codigo: 0, pecas_sem_valor: 0 },
       por_unidade: [],
-      resumo_texto: "Sem erros de peça encontrados.",
+      resumo_texto: "Nenhum erro de peça encontrado. Tudo em conformidade.",
     };
   }
 
-  // Fetch os_pecas for those OS in batches
   let pecasList: Array<{ id: string; pn: string | null; descricao: string | null; valor_unitario: number | null; os_id: string; status: string }> = [];
   for (let i = 0; i < osIds.length; i += 200) {
     const batch = osIds.slice(i, i + 200);
@@ -922,25 +932,21 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     if (batchPecas) pecasList = pecasList.concat(batchPecas);
   }
 
-  // Filter problems
-  const semPN = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
+  const semCodigo = pecasList.filter((p) => !p.pn || p.pn.trim() === "");
   const semValor = pecasList.filter((p) => !p.valor_unitario || Number(p.valor_unitario) === 0);
 
-  // Build per-unit report with coluna breakdown
-  type ProblemOS = { numero: string; coluna: string; sem_pn: number; sem_valor: number };
-
+  type ProblemOS = { numero: string; coluna: string; coluna_key: string; sem_codigo: number; sem_valor: number };
   const problemsByUnit: Record<string, ProblemOS[]> = {};
 
-  // Aggregate problems per OS
-  const osProblems: Record<string, { sem_pn: number; sem_valor: number }> = {};
-  for (const p of semPN) {
+  const osProblems: Record<string, { sem_codigo: number; sem_valor: number }> = {};
+  for (const p of semCodigo) {
     if (!p.os_id) continue;
-    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_pn: 0, sem_valor: 0 };
-    osProblems[p.os_id].sem_pn++;
+    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_codigo: 0, sem_valor: 0 };
+    osProblems[p.os_id].sem_codigo++;
   }
   for (const p of semValor) {
     if (!p.os_id) continue;
-    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_pn: 0, sem_valor: 0 };
+    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_codigo: 0, sem_valor: 0 };
     osProblems[p.os_id].sem_valor++;
   }
 
@@ -952,79 +958,103 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     problemsByUnit[uid].push({
       numero: os.numero_os_samsung || os.numero_os_interna || osId.slice(0, 8),
       coluna: getColunaLabel(os.coluna_kanban),
-      sem_pn: problems.sem_pn,
+      coluna_key: os.coluna_kanban,
+      sem_codigo: problems.sem_codigo,
       sem_valor: problems.sem_valor,
     });
   }
 
-  // Sort each unit by coluna then numero
   for (const uid of Object.keys(problemsByUnit)) {
     problemsByUnit[uid].sort((a, b) => a.coluna.localeCompare(b.coluna) || a.numero.localeCompare(b.numero));
   }
 
   const totalOSComErro = Object.values(problemsByUnit).reduce((sum, list) => sum + list.length, 0);
-  const totalSemPN = semPN.length;
+  const totalSemCodigo = semCodigo.length;
   const totalSemValor = semValor.length;
 
-  // Group by coluna within each unit for summary
-  const unidadesReport = Object.entries(problemsByUnit)
-    .sort((a, b) => b[1].length - a[1].length)
-    .map(([uid, lista]) => {
-      const porColuna: Record<string, number> = {};
-      for (const os of lista) {
-        porColuna[os.coluna] = (porColuna[os.coluna] || 0) + 1;
-      }
-      return {
-        unidade: unidadeMap[uid] || uid,
-        total_os_com_erro: lista.length,
-        por_coluna: Object.entries(porColuna).sort((a, b) => b[1] - a[1]).map(([col, qty]) => ({ coluna: col, quantidade: qty })),
-        os_list: lista,
-      };
-    });
-
-  function getSiglaCE(nome: string): string {
+  function getSiglaCompliance(nome: string): string {
     const lower = nome.toLowerCase();
     if (lower.includes("montes claros")) return "MOC";
     if (lower.includes("juiz de fora")) return "JDF";
     if (lower.includes("feira")) return "FSA";
+    if (lower.includes("uberlândia") || lower.includes("uberlandia")) return "UDI";
+    if (lower.includes("governador valadares")) return "GVD";
     return nome.slice(0, 3).toUpperCase();
   }
+
+  const unidadesReport = Object.entries(problemsByUnit)
+    .sort((a, b) => {
+      const nomeA = unidadeMap[a[0]] || a[0];
+      const nomeB = unidadeMap[b[0]] || b[0];
+      return nomeA.localeCompare(nomeB);
+    })
+    .map(([uid, lista]) => {
+      const porColuna: Record<string, ProblemOS[]> = {};
+      for (const os of lista) {
+        if (!porColuna[os.coluna]) porColuna[os.coluna] = [];
+        porColuna[os.coluna].push(os);
+      }
+      return {
+        unidade: unidadeMap[uid] || uid,
+        sigla: getSiglaCompliance(unidadeMap[uid] || uid),
+        total_os_com_erro: lista.length,
+        colunas: Object.entries(porColuna)
+          .sort((a, b) => b[1].length - a[1].length)
+          .map(([col, osList]) => ({ coluna: col, os_list: osList })),
+      };
+    });
 
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
-  const resumoTexto = [
-    `⚠️ PROBLEMAS PEÇA (COMPLIANCE)`,
-    `${spDate} às ${spHour}`,
-    `──────────────────`,
-    ``,
-    `📊 RESUMO EXECUTIVO:`,
-    `Total de OS com erro: ${totalOSComErro}`,
-    `${totalSemPN} sem PN | ${totalSemValor} sem valor`,
-    ``,
-    ...unidadesReport.map((u) => {
-      const sigla = getSiglaCE(u.unidade);
-      const lines = [
-        `📍 ${sigla} — ${u.total_os_com_erro} OS com erro`,
-      ];
-      for (const c of u.por_coluna) {
-        lines.push(`${c.coluna} • ${c.quantidade} OS`);
-      }
+  const lines: string[] = [];
+  lines.push(`📋 *COMPLIANCE — PROBLEMAS PEÇA*`);
+  lines.push(`${spDate} • ${spHour}`);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━`);
+  lines.push(``);
+  lines.push(`📊 *RESUMO GERAL*`);
+  lines.push(`▸ OS com erro: *${totalOSComErro}*`);
+  lines.push(`▸ Peças sem código: *${totalSemCodigo}*`);
+  lines.push(`▸ Peças sem valor (R$0): *${totalSemValor}*`);
+  lines.push(``);
+  lines.push(`━━━━━━━━━━━━━━━━━━━━━━`);
+
+  for (const u of unidadesReport) {
+    lines.push(``);
+    lines.push(`🏢 *${u.sigla} — ${u.unidade}*`);
+    lines.push(`⚠️ ${u.total_os_com_erro} OS com pendência`);
+    lines.push(`─────────────────`);
+
+    for (const col of u.colunas) {
       lines.push(``);
-      return lines.join("\n");
-    }),
-    `──────────────────`,
-    `GIA • Global Intelligence Assistance`,
-  ].join("\n");
+      lines.push(`  📂 *${col.coluna}* (${col.os_list.length})`);
+
+      for (const os of col.os_list) {
+        const erros: string[] = [];
+        if (os.sem_codigo > 0) erros.push(`${os.sem_codigo} sem código`);
+        if (os.sem_valor > 0) erros.push(`${os.sem_valor} sem valor`);
+        lines.push(`     • ${os.numero} → ${erros.join(" | ")}`);
+      }
+    }
+
+    lines.push(``);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━━`);
+  }
+
+  lines.push(``);
+  lines.push(`_Corrigir antes do fechamento da OS._`);
+  lines.push(`GIA • Compliance Report`);
+
+  const resumoTexto = lines.join("\n");
 
   return {
-    titulo: "Problemas Peca",
-    subtitulo: `${totalOSComErro} OS com erro | ${totalSemPN} sem PN | ${totalSemValor} sem valor`,
+    titulo: "Compliance — Problemas Peça",
+    subtitulo: `${totalOSComErro} OS | ${totalSemCodigo} sem código | ${totalSemValor} sem valor`,
     gerado_em: now.toISOString(),
-    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    horario_disparo: spHour,
     totais: {
       os_com_erro: totalOSComErro,
-      pecas_sem_pn: totalSemPN,
+      pecas_sem_codigo: totalSemCodigo,
       pecas_sem_valor: totalSemValor,
     },
     por_unidade: unidadesReport,
