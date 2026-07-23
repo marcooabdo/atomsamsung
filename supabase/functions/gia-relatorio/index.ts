@@ -1591,7 +1591,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
   const linhasResumo: string[] = [
-    `🗺️ MAPA DE ROTAS`,
+    `🗺️ RELATÓRIO ROTAS`,
     `${spDate} às ${spHour}`,
     `──────────────────`,
     ``,
@@ -1629,7 +1629,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   linhasResumo.push(`GIA • Global Intelligence Assistance`);
 
   return {
-    titulo: "Mapa de Rotas",
+    titulo: "Relatório Rotas",
     subtitulo: `${totalEmRota} OS em rota / ${totalIHSemRota} IH sem rota`,
     gerado_em: now.toISOString(),
     horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),

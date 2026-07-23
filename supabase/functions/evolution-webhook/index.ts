@@ -1002,7 +1002,7 @@ const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
   { keywords: ["pulso", "operacional", "cockpit"], tipo: "pulso_operacional" },
   { keywords: ["estoque", "dia"], tipo: "estoque_dia" },
   { keywords: ["agendamento", "ih", "agenda"], tipo: "agendamentos_ih" },
-  { keywords: ["mapa", "rota", "rotas"], tipo: "mapa_rotas" },
+  { keywords: ["mapa", "rota", "rotas", "relatório rotas", "relatorio rotas"], tipo: "mapa_rotas" },
   { keywords: ["abertura", "fechamento"], tipo: "abertura_fechamento" },
   { keywords: ["limite", "credito", "crédito", "gspn"], tipo: "limite_credito_gspn" },
   { keywords: ["nucleo", "núcleo", "peça", "pecas", "peças"], tipo: "nucleo_pecas" },

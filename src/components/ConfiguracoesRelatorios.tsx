@@ -111,7 +111,7 @@ const DEFAULT_TEMPLATES: Record<string, string> = {
 
 ⏰ Relatório gerado: {horario}`,
 
-  mapa_rotas: `🗺️ *MAPA DE ROTAS*
+  mapa_rotas: `🗺️ *RELATÓRIO ROTAS*
 ━━━━━━━━━━━━━━━━━━━━━
 
 📋 *ROTAS DO DIA:*
