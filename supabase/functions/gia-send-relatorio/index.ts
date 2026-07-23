@@ -10,20 +10,59 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const supabase = createClient(supabaseUrl, supabaseKey);
-
-const EVOLUTION_API_URL = "https://atom-evolution-api.2vhnbz.easypanel.host";
-const EVOLUTION_API_KEY = "Novasenha2026";
 const DEFAULT_INSTANCE = "fsa";
 
 // Grupo padrão caso não tenha grupo_destino configurado
 const DEFAULT_GROUP = "120363405875636701@g.us"; // ATOM - GROUP GLOBAL
 
-async function sendWhatsAppGroup(groupJid: string, message: string, instanceName: string = DEFAULT_INSTANCE) {
-  const response = await fetch(`${EVOLUTION_API_URL}/message/sendText/${instanceName}`, {
+async function getEvolutionInstance(preferredInstanceName?: string): Promise<{ api_url: string; api_key: string; instance_name: string }> {
+  // Tentar a instância preferida primeiro
+  if (preferredInstanceName) {
+    const { data: preferred } = await supabase
+      .from("atom_connect_instancias")
+      .select("api_url, api_key, instance_name, status")
+      .eq("instance_name", preferredInstanceName)
+      .maybeSingle();
+
+    if (preferred && preferred.status === "connected") {
+      return { api_url: preferred.api_url, api_key: preferred.api_key, instance_name: preferred.instance_name };
+    }
+  }
+
+  // Fallback: buscar qualquer instância conectada
+  const { data: connected } = await supabase
+    .from("atom_connect_instancias")
+    .select("api_url, api_key, instance_name")
+    .eq("status", "connected")
+    .limit(1)
+    .maybeSingle();
+
+  if (connected) {
+    return { api_url: connected.api_url, api_key: connected.api_key, instance_name: connected.instance_name };
+  }
+
+  // Último fallback: pegar a primeira instância disponível (mesmo desconectada)
+  const { data: any_instance } = await supabase
+    .from("atom_connect_instancias")
+    .select("api_url, api_key, instance_name")
+    .limit(1)
+    .maybeSingle();
+
+  if (any_instance) {
+    return { api_url: any_instance.api_url, api_key: any_instance.api_key, instance_name: any_instance.instance_name };
+  }
+
+  throw new Error("Nenhuma instância Evolution API encontrada");
+}
+
+async function sendWhatsAppGroup(groupJid: string, message: string, preferredInstance?: string) {
+  const instance = await getEvolutionInstance(preferredInstance);
+  
+  const response = await fetch(`${instance.api_url}/message/sendText/${instance.instance_name}`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "apikey": EVOLUTION_API_KEY,
+      "apikey": instance.api_key,
     },
     body: JSON.stringify({
       number: groupJid,
@@ -33,7 +72,7 @@ async function sendWhatsAppGroup(groupJid: string, message: string, instanceName
 
   if (!response.ok) {
     const errText = await response.text();
-    throw new Error(`Evolution API error: ${response.status} - ${errText}`);
+    throw new Error(`Evolution API error (${instance.instance_name}): ${response.status} - ${errText}`);
   }
 
   return await response.json();
@@ -295,7 +334,39 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { tipo } = await req.json();
+    const body = await req.json();
+    const { tipo, group_jid, instance_name, todos } = body;
+
+    // Determinar instância preferida para envio
+    const preferredInstance = instance_name || undefined;
+
+    // Se "todos" flag, enviar todos os relatórios ativos
+    if (todos) {
+      const { data: allConfigs } = await supabase
+        .from("gia_relatorios_config")
+        .select("*")
+        .eq("ativo", true)
+        .not("tipo", "eq", "motivacional_operacional");
+
+      const targetGroup = group_jid || DEFAULT_GROUP;
+      const results: string[] = [];
+
+      for (const config of allConfigs || []) {
+        try {
+          const message = await generateReport(config.tipo);
+          await sendWhatsAppGroup(targetGroup, message, preferredInstance);
+          results.push(`${config.nome}: OK`);
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        } catch (e) {
+          results.push(`${config.nome}: ERRO - ${e.message}`);
+        }
+      }
+
+      return new Response(
+        JSON.stringify({ success: true, results }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!tipo) {
       return new Response(
@@ -318,14 +389,14 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    // Usar grupo_destino da config, ou fallback para o grupo padrão
-    const targetGroup = config.grupo_destino || DEFAULT_GROUP;
+    // Prioridade: group_jid do request (on-demand) > grupo_destino da config > grupo padrão
+    const targetGroup = group_jid || config.grupo_destino || DEFAULT_GROUP;
 
     // Gerar o relatório
     const message = await generateReport(tipo);
 
-    // Enviar para o grupo correto
-    await sendWhatsAppGroup(targetGroup, message);
+    // Enviar para o grupo correto usando instância conectada
+    await sendWhatsAppGroup(targetGroup, message, preferredInstance);
 
     // Registrar no log
     await supabase.from("gia_relatorio_logs").insert({
@@ -335,7 +406,7 @@ Deno.serve(async (req: Request) => {
       etapa: "envio_completo",
       mensagem: `Relatório enviado com sucesso para ${targetGroup}`,
       grupo_jid: targetGroup,
-      instancia: DEFAULT_INSTANCE,
+      instancia: instance_name || "auto",
     });
 
     return new Response(
