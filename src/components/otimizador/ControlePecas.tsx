@@ -282,7 +282,7 @@ export default function ControlePecas() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-amber-500 to-yellow-600">
-            Nucleo de Pecas
+            Núcleo de Peças
           </h2>
           <p className="text-gray-400 mt-1">Requisicoes IH, status, gestao de GI e romaneio</p>
         </div>
