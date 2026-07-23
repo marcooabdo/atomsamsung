@@ -30,6 +30,7 @@ interface AgendamentoOS {
   latitude: number | null;
   longitude: number | null;
   agendamento_status: string;
+  checkin_realizado: boolean;
 }
 
 export function AgendaMobile() {
@@ -55,6 +56,8 @@ export function AgendaMobile() {
         horario_fim,
         confirmado_com_cliente,
         status,
+        checkin_realizado,
+        checkout_realizado,
         os:os_id (
           numero_os_interna,
           numero_os_samsung,
@@ -76,11 +79,13 @@ export function AgendaMobile() {
       `)
       .eq('tecnico_id', usuario.id)
       .eq('data_agendamento', dataFiltro)
-      .in('status', ['confirmado', 'em_andamento', 'pendente_confirmacao'])
+      .not('status', 'in', '(cancelado)')
       .order('horario_inicio', { ascending: true });
 
     if (!error && data) {
-      const mappedData = data.map(item => ({
+      // Filter out visits that are fully completed (both check-in and checkout done)
+      const activeVisits = data.filter(item => !(item.checkin_realizado && item.checkout_realizado));
+      const mappedData = activeVisits.map(item => ({
         id: item.os_id,
         agendamento_id: item.id,
         numero_os_interna: item.os?.numero_os_interna,
@@ -104,7 +109,8 @@ export function AgendaMobile() {
         observacoes: item.os?.observacoes_internas,
         latitude: null,
         longitude: null,
-        agendamento_status: item.status
+        agendamento_status: item.status,
+        checkin_realizado: item.checkin_realizado
       }));
       setAgendamentos(mappedData as any[]);
     }
@@ -116,29 +122,14 @@ export function AgendaMobile() {
   }, [usuario, dataFiltro]);
 
   const getStatusBadge = (os: AgendamentoOS) => {
-    const statusMap: Record<string, { label: string; color: string }> = {
-      'os_fechada': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-      'reparo_concluido': { label: 'Reparo Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-      'em_reparo_ci': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'em_rota_ih': { label: 'Em Andamento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' },
-      'rota_preta': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_vermelha': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_azul': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_verde': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_rosa': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_amarela': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'rota_laranja': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' },
-      'aguardando_peca': { label: 'Aguardando Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
-      'os_nova': { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' }
-    };
-    return statusMap[os.coluna_kanban] || { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
+    if (os.checkin_realizado) {
+      return { label: 'Em Atendimento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' };
+    }
+    return { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
   };
 
   const getCardBorderColor = (os: AgendamentoOS) => {
-    if (os.coluna_kanban === 'os_fechada' || os.coluna_kanban === 'reparo_concluido') {
-      return 'border-green-500/50';
-    }
-    if (os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih') {
+    if (os.checkin_realizado) {
       return 'border-yellow-500/50';
     }
     return 'border-blue-500/50';
@@ -258,28 +249,25 @@ export function AgendaMobile() {
                 </div>
 
                 <div className="flex gap-2 pt-2">
-                  {os.coluna_kanban !== 'os_fechada' && os.coluna_kanban !== 'reparo_concluido' && (
-                    <button
-                      onClick={() => {
-                        setSelectedOS(os);
-                        setShowDetailsModal(true);
-                      }}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
-                    >
-                      {os.coluna_kanban === 'em_reparo_ci' || os.coluna_kanban === 'em_rota_ih' ? (
-                        <>
-                          <CheckCircle className="w-5 h-5" />
-                          Continuar
-                        </>
-                      ) : (
-                        <>
-                          <PlayCircle className="w-5 h-5" />
-                          Ver Detalhes
-                        </>
-                      )}
-                    </button>
-                  )}
-
+                  <button
+                    onClick={() => {
+                      setSelectedOS(os);
+                      setShowDetailsModal(true);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-medium rounded-xl hover:from-cyan-600 hover:to-blue-600 transition-all"
+                  >
+                    {os.checkin_realizado ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Continuar
+                      </>
+                    ) : (
+                      <>
+                        <PlayCircle className="w-5 h-5" />
+                        Iniciar Atendimento
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             );
