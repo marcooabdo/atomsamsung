@@ -355,8 +355,7 @@ export function ExecucaoOS() {
           checkin_latitude: latitude,
           checkin_longitude: longitude
         })
-        .eq('os_id', agendamento.os_id)
-        .eq('tecnico_id', usuario?.id);
+        .eq('id', agendamento.id);
 
       await supabase
         .from('os_comentarios')
@@ -765,8 +764,7 @@ export function ExecucaoOS() {
             checkout_latitude: latitude,
             checkout_longitude: longitude
           })
-          .eq('os_id', agendamento.os_id)
-          .eq('tecnico_id', usuario?.id);
+          .eq('id', agendamento.id);
 
         await supabase
           .from('os_comentarios')
