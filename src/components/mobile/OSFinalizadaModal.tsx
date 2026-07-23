@@ -54,16 +54,6 @@ interface Anexo {
   created_at: string;
 }
 
-interface Comentario {
-  id: string;
-  comentario: string;
-  created_at: string;
-  is_system: boolean;
-  usuario: {
-    nome: string;
-  } | null;
-}
-
 interface OSData {
   numero_os_samsung: string | null;
   numero_os_interna: string | null;
@@ -83,7 +73,7 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
   const [checklists, setChecklists] = useState<ChecklistVinculado[]>([]);
   const [pecas, setPecas] = useState<Peca[]>([]);
   const [anexos, setAnexos] = useState<Anexo[]>([]);
-  const [comentarios, setComentarios] = useState<Comentario[]>([]);
+
 
   useEffect(() => {
     loadOSData();
@@ -168,23 +158,6 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
 
     if (anexosData) {
       setAnexos(anexosData);
-    }
-
-    // Carregar comentários
-    const { data: comentariosData } = await supabase
-      .from('os_comentarios')
-      .select(`
-        id,
-        comentario,
-        created_at,
-        is_system,
-        usuario:usuarios(nome)
-      `)
-      .eq('os_id', osId)
-      .order('created_at', { ascending: true });
-
-    if (comentariosData) {
-      setComentarios(comentariosData as any);
     }
 
     setLoading(false);
@@ -538,42 +511,6 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
               </div>
             )}
 
-            {/* Comentários */}
-            {comentarios.length > 0 && (
-              <div className="bg-gray-800 rounded-xl p-4 space-y-3">
-                <h3 className="text-white font-bold flex items-center gap-2">
-                  <FileText className="w-5 h-5 text-cyan-400" />
-                  Histórico de Atividades
-                </h3>
-                <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {comentarios.map((comentario) => (
-                    <div
-                      key={comentario.id}
-                      className={`p-3 rounded-lg ${
-                        comentario.is_system
-                          ? 'bg-cyan-500/10 border border-cyan-500/30'
-                          : 'bg-gray-700/50'
-                      }`}
-                    >
-                      <div className="flex items-start justify-between mb-1">
-                        <p className="text-cyan-400 text-xs font-medium">
-                          {comentario.usuario?.nome || 'Sistema'}
-                        </p>
-                        <p className="text-gray-500 text-xs">
-                          {new Date(comentario.created_at).toLocaleString('pt-BR', {
-                            day: '2-digit',
-                            month: '2-digit',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </p>
-                      </div>
-                      <p className="text-white text-sm whitespace-pre-line">{comentario.comentario}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
           {/* Footer */}

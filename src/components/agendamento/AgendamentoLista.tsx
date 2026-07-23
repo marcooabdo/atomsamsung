@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Calendar, MapPin, User, Phone, Package, DollarSign, Clock, CheckCircle, AlertCircle, FileText } from 'lucide-react';
+import { Calendar, MapPin, User, Phone, Package, DollarSign, Clock, CheckCircle, AlertCircle, FileText, Zap } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import type { Database } from '../../lib/database.types';
 import { AgendamentoPDF } from './AgendamentoPDF';
@@ -51,11 +51,16 @@ export function AgendamentoLista({
     checkinData: any;
     checkoutData: any;
     checklistRespostas: any[];
+    anexos: any[];
+    unidadeInfo: any;
+    logoUrl: string | null;
+    osData: any;
+    resultadoVisita: string | null;
   } | null>(null);
 
   const handlePrint = useReactToPrint({
     contentRef: pdfRef,
-    documentTitle: `Agendamento_${pdfData?.agendamento?.os?.numero_os_samsung || 'SN'}`,
+    documentTitle: `VisitaTecnica_${pdfData?.agendamento?.os?.numero_os_samsung || pdfData?.agendamento?.os?.numero_os_interna || 'SN'}`,
   });
 
   const loadPdfData = async (agendamento: Agendamento) => {
@@ -75,16 +80,67 @@ export function AgendamentoLista({
         .eq('agendamento_id', agendamento.id)
         .order('item_ordem', { ascending: true });
 
+      const { data: anexosData } = await supabase
+        .from('os_anexos')
+        .select('id, tipo, nome_arquivo, url, descricao')
+        .eq('os_id', agendamento.os_id)
+        .order('created_at', { ascending: true });
+
+      const { data: osData } = await supabase
+        .from('os')
+        .select('numero_os_samsung, numero_os_interna, cliente_nome, cliente_telefone, cliente_endereco, cliente_bairro, cliente_cidade, cliente_estado, cliente_cep, tipo_atendimento, tipo_reparo, defeito_relatado, diagnostico_tecnico, reparo_efetuado, modelo, imei, numero_serie, coluna_kanban')
+        .eq('id', agendamento.os_id)
+        .maybeSingle();
+
+      let unidadeInfo = null;
+      let logoUrl: string | null = null;
+      if (agendamento.unidade_id) {
+        const { data: unidadeData } = await supabase
+          .from('unidades')
+          .select('nome, razao_social, cnpj, telefone, endereco, cidade, estado, email')
+          .eq('id', agendamento.unidade_id)
+          .maybeSingle();
+        unidadeInfo = unidadeData;
+
+        const { data: configData } = await supabase
+          .from('configuracoes_pdf_os')
+          .select('logo_url')
+          .eq('unidade_id', agendamento.unidade_id)
+          .maybeSingle();
+        logoUrl = configData?.logo_url || null;
+      }
+
+      let resultadoVisita: string | null = null;
+      const { data: checkoutComentario } = await supabase
+        .from('os_comentarios')
+        .select('comentario')
+        .eq('os_id', agendamento.os_id)
+        .eq('is_system', true)
+        .ilike('comentario', '%CHECK-OUT REALIZADO%')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (checkoutComentario?.comentario) {
+        const match = checkoutComentario.comentario.match(/Resultado: (.+)/);
+        if (match) resultadoVisita = match[1].split('\n')[0].trim();
+      }
+
       setPdfData({
         agendamento,
         checkinData,
         checkoutData,
-        checklistRespostas: checklistRespostas || []
+        checklistRespostas: checklistRespostas || [],
+        anexos: anexosData || [],
+        unidadeInfo,
+        logoUrl,
+        osData,
+        resultadoVisita
       });
 
       setTimeout(() => {
         handlePrint();
-      }, 100);
+      }, 300);
     } catch (error) {
       alert('Erro ao gerar PDF');
     }
@@ -318,6 +374,25 @@ export function AgendamentoLista({
                           {agendamento.os.tipo_atendimento}
                         </span>
                       )}
+                      {agendamento.tem_checkout && agendamento.status === 'concluido' && (
+                        <span
+                          className="px-2 py-0.5 rounded font-bold flex items-center gap-1"
+                          style={{
+                            backgroundColor: agendamento.os.coluna_kanban === 'reparo_concluido' || agendamento.os.coluna_kanban === 'aguardando_fechamento'
+                              ? '#10b98130' : agendamento.os.coluna_kanban === 'aguardando_peca' ? '#f59e0b30' : '#6b728030',
+                            color: agendamento.os.coluna_kanban === 'reparo_concluido' || agendamento.os.coluna_kanban === 'aguardando_fechamento'
+                              ? '#10b981' : agendamento.os.coluna_kanban === 'aguardando_peca' ? '#f59e0b' : '#6b7280',
+                            border: `1px solid ${agendamento.os.coluna_kanban === 'reparo_concluido' || agendamento.os.coluna_kanban === 'aguardando_fechamento'
+                              ? '#10b981' : agendamento.os.coluna_kanban === 'aguardando_peca' ? '#f59e0b' : '#6b7280'}60`
+                          }}
+                        >
+                          <Zap className="w-3 h-3" />
+                          {agendamento.os.coluna_kanban === 'reparo_concluido' ? 'Reparo Concluído' :
+                           agendamento.os.coluna_kanban === 'aguardando_fechamento' ? 'Aguardando Fechamento' :
+                           agendamento.os.coluna_kanban === 'aguardando_peca' ? 'Aguardando Peça' :
+                           getRotaLabel(agendamento.os.coluna_kanban)}
+                        </span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       {!agendamento.tem_checkin && agendamento.status !== 'cancelado' && (
@@ -381,6 +456,11 @@ export function AgendamentoLista({
             checkinData={pdfData.checkinData}
             checkoutData={pdfData.checkoutData}
             checklistRespostas={pdfData.checklistRespostas}
+            anexos={pdfData.anexos}
+            unidadeInfo={pdfData.unidadeInfo}
+            logoUrl={pdfData.logoUrl}
+            osData={pdfData.osData}
+            resultadoVisita={pdfData.resultadoVisita}
           />
         </div>
       )}
