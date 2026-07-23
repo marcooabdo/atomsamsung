@@ -231,7 +231,7 @@ export function Cockpit() {
       d.setDate(d.getDate() - i);
       const dateStr = d.toISOString().split('T')[0];
       const abertas = filteredOsData.filter(os => os.created_at?.startsWith(dateStr)).length;
-      const fechadas = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada' && os.updated_at?.startsWith(dateStr)).length;
+      const fechadas = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada' && (os.coluna_kanban_desde || os.updated_at)?.startsWith(dateStr)).length;
       last30Days.push({ date: dateStr, abertas, fechadas });
     }
     return last30Days;
@@ -323,6 +323,8 @@ export function Cockpit() {
     const totalOS = filteredOsData.length;
     const osAbertas = filteredOsData.filter(os => os.coluna_kanban !== 'os_fechada').length;
     const osFechadas = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada').length;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const osFechadasHoje = filteredOsData.filter(os => os.coluna_kanban === 'os_fechada' && (os.coluna_kanban_desde || os.updated_at)?.startsWith(todayStr)).length;
     const lpCount = filteredOsData.filter(os => os.tipo_os === 'LP').length;
     const owCount = filteredOsData.filter(os => os.tipo_os === 'OW').length;
     const ihCount = filteredOsData.filter(os => os.tipo_atendimento === 'IH').length;
@@ -340,7 +342,7 @@ export function Cockpit() {
         }, 0) / osAbertas
       : 0;
 
-    return { totalOS, osAbertas, osFechadas, lpCount, owCount, ihCount, ciCount, valorTotal, valorPecas, valorServicos, valorPago, avgDaysOpen };
+    return { totalOS, osAbertas, osFechadas, osFechadasHoje, lpCount, owCount, ihCount, ciCount, valorTotal, valorPecas, valorServicos, valorPago, avgDaysOpen };
   }, [filteredOsData]);
 
   const warrantyDistribution = useMemo(() => {
@@ -421,7 +423,7 @@ export function Cockpit() {
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
         <KPICard icon={Layers} label="Total OS" value={kpis.totalOS.toString()} color="#00D4FF" />
         <KPICard icon={Zap} label="OS Abertas" value={kpis.osAbertas.toString()} color="#F59E0B" />
-        <KPICard icon={Target} label="OS Fechadas" value={kpis.osFechadas.toString()} color="#10B981" />
+        <KPICard icon={Target} label="Fechadas Hoje" value={kpis.osFechadasHoje.toString()} color="#10B981" />
         <KPICard icon={Clock} label="Dias Médio Aberta" value={kpis.avgDaysOpen.toFixed(1)} color="#F97316" />
         <KPICard icon={DollarSign} label="Valor Total" value={formatCurrency(kpis.valorTotal)} color="#39FF14" />
       </div>

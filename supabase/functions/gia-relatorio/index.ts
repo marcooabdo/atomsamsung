@@ -1901,42 +1901,39 @@ async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
   const saldoStr = saldoGeral >= 0 ? `+${saldoGeral}` : `${saldoGeral}`;
+  const saldoEmoji = saldoGeral <= 0 ? "🟢" : "🔴";
 
   const resumoTexto = [
-    `📋 ABERTURA E FECHAMENTO`,
-    `🕕 ${spDate} às ${spHour}`,
-    `──────────────────`,
+    `*📋 ABERTURA & FECHAMENTO*`,
+    `${spDate} • ${spHour}`,
     ``,
-    `📊 CONSOLIDADO GERAL`,
+    `━━━━━━━━━━━━━━━━━━`,
     ``,
-    `⚖️ Saldo Total: ${saldoStr}`,
+    `${saldoEmoji} *Saldo: ${saldoStr}*`,
     ``,
-    `📥 Abertas (${totalAbertas})`,
-    `↳ LP: ${categoriasAbertas["LP-CI"]} CI | ${categoriasAbertas["LP-IH"]} IH`,
-    `↳ OW: ${categoriasAbertas["OW-CI"]} CI | ${categoriasAbertas["OW-IH"]} IH`,
+    `   📥 *${totalAbertas}* abertas`,
+    `        LP → ${categoriasAbertas["LP-CI"]} CI • ${categoriasAbertas["LP-IH"]} IH`,
+    `        OW → ${categoriasAbertas["OW-CI"]} CI • ${categoriasAbertas["OW-IH"]} IH`,
     ``,
-    `📤 Fechadas (${totalFechadas})`,
-    `↳ LP: ${categoriasFechadas["LP-CI"]} CI | ${categoriasFechadas["LP-IH"]} IH`,
-    `↳ OW: ${categoriasFechadas["OW-CI"]} CI | ${categoriasFechadas["OW-IH"]} IH`,
+    `   📤 *${totalFechadas}* fechadas`,
+    `        LP → ${categoriasFechadas["LP-CI"]} CI • ${categoriasFechadas["LP-IH"]} IH`,
+    `        OW → ${categoriasFechadas["OW-CI"]} CI • ${categoriasFechadas["OW-IH"]} IH`,
     ``,
-    `──────────────────`,
+    `━━━━━━━━━━━━━━━━━━`,
     ``,
     ...unidadesReport.map((u) => {
       const sigla = getSigla(u.unidade_nome);
       const sU = u.saldo >= 0 ? `+${u.saldo}` : `${u.saldo}`;
-      const aLP = `LP (${u.abertas.categorias["LP-CI"]} CI | ${u.abertas.categorias["LP-IH"]} IH)`;
-      const aOW = `OW (${u.abertas.categorias["OW-CI"]} CI | ${u.abertas.categorias["OW-IH"]} IH)`;
-      const fLP = `LP (${u.fechadas.categorias["LP-CI"]} CI | ${u.fechadas.categorias["LP-IH"]} IH)`;
-      const fOW = `OW (${u.fechadas.categorias["OW-CI"]} CI | ${u.fechadas.categorias["OW-IH"]} IH)`;
+      const sUEmoji = u.saldo <= 0 ? "🟢" : "🔴";
       return [
-        `📍 ${sigla} | Saldo: ${sU}`,
-        `📥 Abertas (${u.abertas.total}):  ${aLP} • ${aOW}`,
-        `📤 Fechadas (${u.fechadas.total}): ${fLP} • ${fOW}`,
+        `${sUEmoji} *${sigla}*  (${sU})`,
+        `     📥 ${u.abertas.total} abertas — LP: ${u.abertas.categorias["LP-CI"]}CI ${u.abertas.categorias["LP-IH"]}IH • OW: ${u.abertas.categorias["OW-CI"]}CI ${u.abertas.categorias["OW-IH"]}IH`,
+        `     📤 ${u.fechadas.total} fechadas — LP: ${u.fechadas.categorias["LP-CI"]}CI ${u.fechadas.categorias["LP-IH"]}IH • OW: ${u.fechadas.categorias["OW-CI"]}CI ${u.fechadas.categorias["OW-IH"]}IH`,
         ``,
       ].join("\n");
     }),
-    `──────────────────`,
-    `🤖 GIA • Global Intelligence Assistance`,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🤖 _GIA • Global Intelligence Assistance_`,
   ].join("\n");
 
   return {
