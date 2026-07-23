@@ -868,9 +868,59 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
 
 async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
-  const COLUNAS_EXCLUIDAS = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "trade_up", "os_fechada"];
+  // Columns where having pecas is expected (skip "sem peça" check for early-stage columns)
+  const COLUNAS_EXCLUIDAS_PECA_CHECK = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "trade_up", "os_fechada"];
 
+  // Use raw SQL to avoid any PostgREST filter issues
+  let sqlOS = `
+    SELECT id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id
+    FROM os
+    WHERE (arquivada IS NULL OR arquivada = false)
+    AND coluna_kanban NOT IN ('os_fechada')
+  `;
+  if (unidadeId) sqlOS += ` AND unidade_id = '${unidadeId}'`;
+
+  const { data: osResult, error: osErr } = await supabase.rpc("exec_sql", { query: sqlOS });
+
+  // Fallback if RPC doesn't exist: use standard queries
+  let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
+
+  if (osErr || !osResult) {
+    console.log("[Compliance] RPC not available, using standard queries...");
+    // Standard approach - fetch all OS
+    let page = 0;
+    const PAGE_SIZE = 1000;
+    while (true) {
+      let osQuery = supabase
+        .from("os")
+        .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, arquivada")
+        .neq("coluna_kanban", "os_fechada")
+        .order("created_at", { ascending: false })
+        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+      if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
+      const { data: osRows, error: errOS } = await osQuery;
+      if (errOS) {
+        console.error("[Compliance] Erro page", page, errOS.message);
+        break;
+      }
+      if (!osRows || osRows.length === 0) break;
+      for (const row of osRows) {
+        if (row.arquivada === true) continue;
+        osDataList.push(row);
+      }
+      if (osRows.length < PAGE_SIZE) break;
+      page++;
+    }
+  } else {
+    osDataList = osResult as any;
+  }
+
+  console.log(`[Compliance] OS carregadas: ${osDataList.length}`);
+
+  // Filter out SMA unit
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
   const smaIds: string[] = [];
@@ -883,101 +933,118 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       }
     }
   }
-
-  let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null; arquivada: boolean | null }> = [];
-  let page = 0;
-  const PAGE_SIZE = 1000;
-  while (true) {
-    let osQuery = supabase
-      .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, arquivada")
-      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-    if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
-    const { data: osRows, error: errOS } = await osQuery;
-    if (errOS) {
-      console.error("[Compliance] Erro ao buscar OS page", page, errOS.message);
-      break;
-    }
-    if (!osRows || osRows.length === 0) break;
-    osDataList = osDataList.concat(osRows);
-    if (osRows.length < PAGE_SIZE) break;
-    page++;
-  }
-  console.log(`[Compliance] Total OS carregadas (raw): ${osDataList.length}`);
-
-  // Filter in JS to avoid PostgREST .not() + .or() combination issues
-  osDataList = osDataList.filter((os) => {
-    if (COLUNAS_EXCLUIDAS.includes(os.coluna_kanban)) return false;
-    if (os.arquivada === true) return false;
-    return true;
-  });
-  console.log(`[Compliance] Após filtro coluna/arquivada: ${osDataList.length}`);
-
-  // Exclude SMA unit
   osDataList = osDataList.filter((os) => !os.unidade_id || !smaIds.includes(os.unidade_id));
 
-  const osMap: Record<string, { id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null; arquivada: boolean | null }> = {};
+  const osMap: Record<string, typeof osDataList[0]> = {};
   for (const os of osDataList) osMap[os.id] = os;
 
   const osIds = osDataList.map((o) => o.id);
+  console.log(`[Compliance] OS IDs após filtro: ${osIds.length}`);
+
   if (osIds.length === 0) {
     return {
       titulo: "Compliance — Problemas Peça",
       subtitulo: "Nenhum erro encontrado",
       gerado_em: now.toISOString(),
-      horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
-      totais: { os_com_erro: 0, pecas_sem_codigo: 0, pecas_sem_valor: 0 },
+      horario_disparo: spHour,
+      totais: { os_com_erro: 0, pecas_sem_codigo: 0, pecas_sem_valor: 0, os_sem_peca: 0 },
       por_unidade: [],
       resumo_texto: "Nenhum erro de peça encontrado. Tudo em conformidade.",
     };
   }
 
-  let pecasList: Array<{ id: string; pn: string | null; codigo: string | null; descricao: string | null; valor_unitario: number | null; valor_gspn: number | null; os_id: string; status: string }> = [];
+  // Fetch os_pecas for all OS - matching Cockpit logic exactly
+  const pecasPerOS: Map<string, Array<{ id: string; pn: string | null; codigo: string | null; valor_unitario: number | null; valor_gspn: number | null; os_id: string }>> = new Map();
   for (let i = 0; i < osIds.length; i += 200) {
     const batch = osIds.slice(i, i + 200);
     const { data: batchPecas } = await supabase
       .from("os_pecas")
-      .select("id, pn, codigo, descricao, valor_unitario, valor_gspn, os_id, status")
-      .in("os_id", batch)
-      .not("status", "in", "(reprovada,devolucao_completa,devolvida_samsung)");
-    if (batchPecas) pecasList = pecasList.concat(batchPecas);
+      .select("id, pn, codigo, valor_unitario, valor_gspn, os_id")
+      .in("os_id", batch);
+    if (batchPecas) {
+      for (const p of batchPecas) {
+        if (!pecasPerOS.has(p.os_id)) pecasPerOS.set(p.os_id, []);
+        pecasPerOS.get(p.os_id)!.push(p);
+      }
+    }
   }
-  console.log(`[Compliance] Total peças carregadas: ${pecasList.length}`);
 
+  // Also check requisicoes_pecas for OS without os_pecas (like Cockpit does)
+  const osWithoutPecas = osIds.filter(id => !pecasPerOS.has(id));
+  for (let i = 0; i < osWithoutPecas.length; i += 200) {
+    const batch = osWithoutPecas.slice(i, i + 200);
+    const { data: reqs } = await supabase
+      .from("requisicoes_pecas")
+      .select("id, os_id, codigo_peca, valor_peca")
+      .in("os_id", batch)
+      .not("status", "in", "(cancelada,reprovada)");
+    if (reqs) {
+      for (const r of reqs as any[]) {
+        if (!pecasPerOS.has(r.os_id)) pecasPerOS.set(r.os_id, []);
+        pecasPerOS.get(r.os_id)!.push({
+          id: r.id,
+          os_id: r.os_id,
+          pn: r.codigo_peca,
+          codigo: r.codigo_peca,
+          valor_unitario: r.valor_peca,
+          valor_gspn: r.valor_peca,
+        });
+      }
+    }
+  }
+
+  console.log(`[Compliance] OS com peças mapeadas: ${pecasPerOS.size}`);
+
+  // Check for problems - matching Cockpit logic exactly
   const hasCodigo = (p: { pn: string | null; codigo: string | null }) =>
     (p.pn && p.pn.trim() !== "") || (p.codigo && p.codigo.trim() !== "");
 
-  const semCodigo = pecasList.filter((p) => !hasCodigo(p));
-  const semValor = pecasList.filter((p) => hasCodigo(p) && Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01);
-  console.log(`[Compliance] Sem código: ${semCodigo.length}, Sem valor: ${semValor.length}`);
-
-  type ProblemOS = { numero: string; coluna: string; coluna_key: string; sem_codigo: number; sem_valor: number };
+  type ProblemOS = { numero: string; coluna: string; coluna_key: string; sem_codigo: number; sem_valor: number; sem_peca: boolean };
   const problemsByUnit: Record<string, ProblemOS[]> = {};
 
-  const osProblems: Record<string, { sem_codigo: number; sem_valor: number }> = {};
-  for (const p of semCodigo) {
-    if (!p.os_id) continue;
-    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_codigo: 0, sem_valor: 0 };
-    osProblems[p.os_id].sem_codigo++;
-  }
-  for (const p of semValor) {
-    if (!p.os_id) continue;
-    if (!osProblems[p.os_id]) osProblems[p.os_id] = { sem_codigo: 0, sem_valor: 0 };
-    osProblems[p.os_id].sem_valor++;
-  }
+  let totalSemPeca = 0;
+  let totalSemCodigo = 0;
+  let totalSemValor = 0;
 
-  for (const [osId, problems] of Object.entries(osProblems)) {
-    const os = osMap[osId];
-    if (!os) continue;
-    const uid = os.unidade_id || "sem_unidade";
-    if (!problemsByUnit[uid]) problemsByUnit[uid] = [];
-    problemsByUnit[uid].push({
-      numero: os.numero_os_samsung || os.numero_os_interna || osId.slice(0, 8),
-      coluna: getColunaLabel(os.coluna_kanban),
-      coluna_key: os.coluna_kanban,
-      sem_codigo: problems.sem_codigo,
-      sem_valor: problems.sem_valor,
-    });
+  for (const os of osDataList) {
+    const pecas = pecasPerOS.get(os.id);
+
+    // Check: OS has no peças at all (skip for early-stage columns)
+    if (!pecas || pecas.length === 0) {
+      if (!COLUNAS_EXCLUIDAS_PECA_CHECK.includes(os.coluna_kanban)) {
+        totalSemPeca++;
+        const uid = os.unidade_id || "sem_unidade";
+        if (!problemsByUnit[uid]) problemsByUnit[uid] = [];
+        problemsByUnit[uid].push({
+          numero: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+          coluna: getColunaLabel(os.coluna_kanban),
+          coluna_key: os.coluna_kanban,
+          sem_codigo: 0,
+          sem_valor: 0,
+          sem_peca: true,
+        });
+      }
+      continue;
+    }
+
+    // Check: peças sem código or sem valor
+    const semCodigo = pecas.filter(p => !hasCodigo(p)).length;
+    const semValor = pecas.filter(p => hasCodigo(p) && Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01).length;
+
+    if (semCodigo > 0 || semValor > 0) {
+      if (semCodigo > 0) totalSemCodigo += semCodigo;
+      if (semValor > 0) totalSemValor += semValor;
+      const uid = os.unidade_id || "sem_unidade";
+      if (!problemsByUnit[uid]) problemsByUnit[uid] = [];
+      problemsByUnit[uid].push({
+        numero: os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8),
+        coluna: getColunaLabel(os.coluna_kanban),
+        coluna_key: os.coluna_kanban,
+        sem_codigo: semCodigo,
+        sem_valor: semValor,
+        sem_peca: false,
+      });
+    }
   }
 
   for (const uid of Object.keys(problemsByUnit)) {
@@ -985,8 +1052,6 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   }
 
   const totalOSComErro = Object.values(problemsByUnit).reduce((sum, list) => sum + list.length, 0);
-  const totalSemCodigo = semCodigo.length;
-  const totalSemValor = semValor.length;
 
   function getSiglaCompliance(nome: string): string {
     const lower = nome.toLowerCase();
@@ -996,6 +1061,18 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     if (lower.includes("uberlândia") || lower.includes("uberlandia")) return "UDI";
     if (lower.includes("governador valadares")) return "GVD";
     return nome.slice(0, 3).toUpperCase();
+  }
+
+  if (totalOSComErro === 0) {
+    return {
+      titulo: "Compliance — Problemas Peça",
+      subtitulo: "Nenhum erro encontrado",
+      gerado_em: now.toISOString(),
+      horario_disparo: spHour,
+      totais: { os_com_erro: 0, pecas_sem_codigo: 0, pecas_sem_valor: 0, os_sem_peca: 0 },
+      por_unidade: [],
+      resumo_texto: `📋 *COMPLIANCE — PROBLEMAS PEÇA*\n${spDate} • ${spHour}\n━━━━━━━━━━━━━━━━━━━━━━\n\n✅ *Nenhum erro de peça encontrado.*\nTodas as OS com peça registrada possuem código e valor.\n\nGIA • Compliance Report`,
+    };
   }
 
   const unidadesReport = Object.entries(problemsByUnit)
@@ -1020,9 +1097,6 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       };
     });
 
-  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-
   const lines: string[] = [];
   lines.push(`📋 *COMPLIANCE — PROBLEMAS PEÇA*`);
   lines.push(`${spDate} • ${spHour}`);
@@ -1030,8 +1104,9 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   lines.push(``);
   lines.push(`📊 *RESUMO GERAL*`);
   lines.push(`▸ OS com erro: *${totalOSComErro}*`);
-  lines.push(`▸ Peças sem código: *${totalSemCodigo}*`);
-  lines.push(`▸ Peças sem valor (R$0): *${totalSemValor}*`);
+  if (totalSemPeca > 0) lines.push(`▸ OS sem peça registrada: *${totalSemPeca}*`);
+  if (totalSemCodigo > 0) lines.push(`▸ Peças sem código: *${totalSemCodigo}*`);
+  if (totalSemValor > 0) lines.push(`▸ Peças sem valor (R$0): *${totalSemValor}*`);
   lines.push(``);
   lines.push(`━━━━━━━━━━━━━━━━━━━━━━`);
 
@@ -1045,11 +1120,15 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       lines.push(``);
       lines.push(`  📂 *${col.coluna}* (${col.os_list.length})`);
 
-      for (const os of col.os_list) {
+      for (const os of col.os_list.slice(0, 20)) {
         const erros: string[] = [];
+        if (os.sem_peca) erros.push("sem peça");
         if (os.sem_codigo > 0) erros.push(`${os.sem_codigo} sem código`);
         if (os.sem_valor > 0) erros.push(`${os.sem_valor} sem valor`);
         lines.push(`     • ${os.numero} → ${erros.join(" | ")}`);
+      }
+      if (col.os_list.length > 20) {
+        lines.push(`     ... e mais ${col.os_list.length - 20} OS`);
       }
     }
 
@@ -1065,13 +1144,14 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
 
   return {
     titulo: "Compliance — Problemas Peça",
-    subtitulo: `${totalOSComErro} OS | ${totalSemCodigo} sem código | ${totalSemValor} sem valor`,
+    subtitulo: `${totalOSComErro} OS | ${totalSemCodigo} sem código | ${totalSemValor} sem valor | ${totalSemPeca} sem peça`,
     gerado_em: now.toISOString(),
     horario_disparo: spHour,
     totais: {
       os_com_erro: totalOSComErro,
       pecas_sem_codigo: totalSemCodigo,
       pecas_sem_valor: totalSemValor,
+      os_sem_peca: totalSemPeca,
     },
     por_unidade: unidadesReport,
     resumo_texto: resumoTexto,
