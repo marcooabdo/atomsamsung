@@ -1343,9 +1343,9 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
   // === SECTION 5: Top 10 IDs mais antigos em estoque ===
   let queryAntigos = supabase
     .from("estoque_pecas")
-    .select("id, id_numerico, pn, descricao, unidade_id, created_at")
+    .select("id, id_numerico, pn, descricao, unidade_id, created_at, nf_id, data_entrada, estoque_nfs(data_emissao)")
     .eq("status", "disponivel")
-    .order("created_at", { ascending: true })
+    .order("data_entrada", { ascending: true })
     .limit(10);
   if (unidadeId) queryAntigos = queryAntigos.eq("unidade_id", unidadeId);
   const { data: pecasAntigas } = await queryAntigos;
@@ -1488,10 +1488,11 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
     lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
     lines.push(`⏳ *TOP 10 IDs MAIS ANTIGOS EM ESTOQUE:*`);
     for (let i = 0; i < pecasAntigasList.length; i++) {
-      const peca = pecasAntigasList[i];
-      const dataEntrada = new Date(peca.created_at);
-      const diasEstoque = Math.floor((now.getTime() - dataEntrada.getTime()) / (1000 * 60 * 60 * 24));
-      const dataFormatada = dataEntrada.toLocaleDateString("pt-BR");
+      const peca = pecasAntigasList[i] as any;
+      const nfEmissao = peca.estoque_nfs?.data_emissao;
+      const dataRef = nfEmissao ? new Date(nfEmissao + "T00:00:00Z") : (peca.data_entrada ? new Date(peca.data_entrada) : new Date(peca.created_at));
+      const diasEstoque = Math.floor((now.getTime() - dataRef.getTime()) / (1000 * 60 * 60 * 24));
+      const dataFormatada = dataRef.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
       const sigla = unidadeSigla[peca.unidade_id] || "???";
       const desc = (peca.descricao || peca.pn || "").length > 20 ? (peca.descricao || peca.pn || "").slice(0, 20) + "..." : (peca.descricao || peca.pn || "");
       lines.push(`${i + 1}. #${peca.id_numerico || "?"} | ${desc} | ${sigla}`);
