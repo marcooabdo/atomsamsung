@@ -610,10 +610,10 @@ export function Cockpit() {
                 <td className="text-center px-4 py-3">
                   <div className="flex flex-col items-center gap-0.5">
                     <span className="text-xs font-medium text-red-400">
-                      {columnStats.reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
+                      {columnStats.filter(c => !['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'].includes(c.id)).reduce((s, c) => s + c.semCodigoOuValor, 0)} OS
                     </span>
                     <span className="text-[10px] text-gray-500">
-                      {columnStats.reduce((s, c) => s + c.totalSemPeca, 0)} s/peça | {columnStats.reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.reduce((s, c) => s + c.totalSemValor, 0)} s/valor
+                      {columnStats.filter(c => !['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'].includes(c.id)).reduce((s, c) => s + c.totalSemPeca, 0)} s/peça | {columnStats.filter(c => !['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'].includes(c.id)).reduce((s, c) => s + c.totalSemCodigo, 0)} s/cod | {columnStats.filter(c => !['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'].includes(c.id)).reduce((s, c) => s + c.totalSemValor, 0)} s/valor
                     </span>
                   </div>
                 </td>
