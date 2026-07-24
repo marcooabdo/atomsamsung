@@ -2001,6 +2001,20 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     setMostrarModalDevolucao(true);
   };
 
+  const handleExcluirPeca = async (peca: any, tipo: string) => {
+    if (!confirm('Tem certeza que deseja excluir esta peça?')) return;
+    try {
+      if (tipo === 'os_peca') {
+        await supabase.from('os_pecas').delete().eq('id', peca.id);
+      } else if (tipo === 'cotacao') {
+        await supabase.from('cotacoes_pecas').delete().eq('id', peca.id);
+      }
+      await loadPecas();
+    } catch {
+      alert('Erro ao excluir peça');
+    }
+  };
+
   const handleConfirmarDevolucao = async (motivo: string, tipo: 'nova' | 'nova_com_defeito' | 'usada', pecasSelecionadas?: string[]) => {
     if (!requisicaoSelecionada) return;
 
@@ -5238,6 +5252,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
 
                                   <div className="flex gap-2">
                                     {!requisicao && !requisicaoDevolvida && (
+                                      <>
                                       <button
                                         onClick={() => {
                                           handleRequisitarPeca(peca);
@@ -5247,6 +5262,19 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                         <Send className="w-3 h-3" />
                                         REQUISITAR
                                       </button>
+                                      <button
+                                        onClick={() => handleExcluirPeca(peca, tipo)}
+                                        className="neon-button flex items-center gap-2 text-xs px-4 py-2"
+                                        style={{
+                                          backgroundColor: '#FF006410',
+                                          borderColor: '#FF0064',
+                                          color: '#FF0064'
+                                        }}
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                        EXCLUIR
+                                      </button>
+                                      </>
                                     )}
 
                                     {requisicao?.status === 'pendente' && (
