@@ -1792,32 +1792,17 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     agendamentoPorOS[ag.os_id].push({ data_agendamento: ag.data_agendamento, status: ag.status });
   }
 
-  // For grouped OS, find ALL members (including closed) to correctly identify linked (non-principal) OS
+  // For grouped OS, exclude any OS that belongs to a group where another member
+  // is further ahead in the pipeline. If an OS is grouped, it means it's being
+  // handled together with another OS — we exclude ALL grouped OS from error analysis
+  // to avoid false positives (e.g., old OS stuck in FTF while the newer linked OS is in SAW/Fechada).
   const grupoIds = [...new Set(osList.filter((os) => os.grupo_os_id).map((os) => os.grupo_os_id))];
   const linkedOSIds = new Set<string>();
   if (grupoIds.length > 0) {
-    // Fetch all OS in these groups (including closed ones) to determine the true principal
-    const batchSize = 50;
-    const allGroupMembers: any[] = [];
-    for (let i = 0; i < grupoIds.length; i += batchSize) {
-      const batch = grupoIds.slice(i, i + batchSize);
-      const { data: members } = await supabase
-        .from("os")
-        .select("id, grupo_os_id, created_at, coluna_kanban")
-        .in("grupo_os_id", batch);
-      if (members) allGroupMembers.push(...members);
-    }
-    // Group by grupo_os_id and find principal (oldest by created_at)
-    const grupoOS: Record<string, typeof allGroupMembers> = {};
-    for (const os of allGroupMembers) {
-      if (!grupoOS[os.grupo_os_id]) grupoOS[os.grupo_os_id] = [];
-      grupoOS[os.grupo_os_id].push(os);
-    }
-    for (const members of Object.values(grupoOS)) {
-      members.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
-      // All except the first (principal) are linked
-      for (let i = 1; i < members.length; i++) {
-        linkedOSIds.add(members[i].id);
+    // Any OS that has a grupo_os_id is excluded from error analysis
+    for (const os of osList) {
+      if (os.grupo_os_id) {
+        linkedOSIds.add(os.id);
       }
     }
   }
