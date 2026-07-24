@@ -871,56 +871,38 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
-  // Columns where having pecas is expected (skip "sem peça" check for early-stage columns)
+  // Columns where "sem peça" is not an error (early-stage, already closed)
   const COLUNAS_EXCLUIDAS_PECA_CHECK = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "trade_up", "os_fechada"];
 
-  // Use raw SQL to avoid any PostgREST filter issues
-  let sqlOS = `
-    SELECT id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id
-    FROM os
-    WHERE (arquivada IS NULL OR arquivada = false)
-    AND coluna_kanban NOT IN ('os_fechada')
-  `;
-  if (unidadeId) sqlOS += ` AND unidade_id = '${unidadeId}'`;
-
-  const { data: osResult, error: osErr } = await supabase.rpc("exec_sql", { query: sqlOS });
-
-  // Fallback if RPC doesn't exist: use standard queries
+  // Fetch all open OS using paginated standard queries
   let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
-
-  if (osErr || !osResult) {
-    console.log("[Compliance] RPC not available, using standard queries...");
-    // Standard approach - fetch all OS
-    let page = 0;
-    const PAGE_SIZE = 1000;
-    while (true) {
-      let osQuery = supabase
-        .from("os")
-        .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, arquivada")
-        .neq("coluna_kanban", "os_fechada")
-        .order("created_at", { ascending: false })
-        .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
-      if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
-      const { data: osRows, error: errOS } = await osQuery;
-      if (errOS) {
-        console.error("[Compliance] Erro page", page, errOS.message);
-        break;
-      }
-      if (!osRows || osRows.length === 0) break;
-      for (const row of osRows) {
-        if (row.arquivada === true) continue;
-        osDataList.push(row);
-      }
-      if (osRows.length < PAGE_SIZE) break;
-      page++;
+  let page = 0;
+  const PAGE_SIZE = 1000;
+  while (true) {
+    let osQuery = supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, arquivada")
+      .neq("coluna_kanban", "os_fechada")
+      .order("created_at", { ascending: false })
+      .range(page * PAGE_SIZE, (page + 1) * PAGE_SIZE - 1);
+    if (unidadeId) osQuery = osQuery.eq("unidade_id", unidadeId);
+    const { data: osRows, error: errOS } = await osQuery;
+    if (errOS) {
+      console.error("[Compliance] Erro page", page, errOS.message);
+      break;
     }
-  } else {
-    osDataList = osResult as any;
+    if (!osRows || osRows.length === 0) break;
+    for (const row of osRows) {
+      if (row.arquivada === true) continue;
+      osDataList.push(row);
+    }
+    if (osRows.length < PAGE_SIZE) break;
+    page++;
   }
 
   console.log(`[Compliance] OS carregadas: ${osDataList.length}`);
 
-  // Filter out SMA unit
+  // Filter out São Bernardo unit (inactive)
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
   const unidadeMap: Record<string, string> = {};
   const smaIds: string[] = [];
@@ -928,7 +910,7 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
     for (const u of unidades) {
       unidadeMap[u.id] = u.nome;
       const lower = u.nome.toLowerCase();
-      if (lower.includes("bernardo") || lower.includes("sma") || lower.includes("sbc")) {
+      if (lower.includes("são bernardo") || lower.includes("sao bernardo") || lower.includes("s.b.c") || lower === "sbc") {
         smaIds.push(u.id);
       }
     }
