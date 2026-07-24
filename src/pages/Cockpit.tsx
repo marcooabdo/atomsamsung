@@ -361,14 +361,130 @@ export function Cockpit() {
     ].filter(t => t.value > 0);
   }, [kpis]);
 
-  function exportCSV() {
-    const header = 'Coluna,Quantidade,Card Mais Antigo (dias),Problemas Peças\n';
-    const rows = columnStats.map(c => `"${c.label}",${c.count},${c.oldestDays},${c.semCodigoOuValor}`).join('\n');
-    const blob = new Blob([header + rows], { type: 'text/csv' });
+  async function exportExcel() {
+    const XLSX = await import('xlsx');
+    const wb = XLSX.utils.book_new();
+    const EXCLUDED = ['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'];
+    const unidadeNameMap = new Map(unidades.map((u: any) => [u.id, u.nome]));
+
+    // --- Sheet 1: Dashboard ---
+    const dashData = [
+      ['COCKPIT EXECUTIVO - RESUMO', ''],
+      ['Data', new Date().toLocaleDateString('pt-BR')],
+      ['', ''],
+      ['INDICADORES GERAIS', ''],
+      ['Total OS', kpis.totalOS],
+      ['OS Abertas', kpis.osAbertas],
+      ['OS Fechadas', kpis.osFechadas],
+      ['Fechadas Hoje', kpis.osFechadasHoje],
+      ['Dias Médio Aberta', Number(kpis.avgDaysOpen.toFixed(1))],
+      ['', ''],
+      ['TIPO DE GARANTIA', 'Quantidade', '% do Total'],
+      ['LP', kpis.lpCount, kpis.totalOS > 0 ? `${((kpis.lpCount / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['OW', kpis.owCount, kpis.totalOS > 0 ? `${((kpis.owCount / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['Outros', kpis.totalOS - kpis.lpCount - kpis.owCount, kpis.totalOS > 0 ? `${(((kpis.totalOS - kpis.lpCount - kpis.owCount) / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['', ''],
+      ['TIPO DE SERVIÇO', 'Quantidade', '% do Total'],
+      ['IH', kpis.ihCount, kpis.totalOS > 0 ? `${((kpis.ihCount / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['CI', kpis.ciCount, kpis.totalOS > 0 ? `${((kpis.ciCount / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['Outros', kpis.totalOS - kpis.ihCount - kpis.ciCount, kpis.totalOS > 0 ? `${(((kpis.totalOS - kpis.ihCount - kpis.ciCount) / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+      ['', ''],
+      ['RESUMO FINANCEIRO', ''],
+      ['Valor Total OS', kpis.valorTotal],
+      ['Valor Peças', kpis.valorPecas],
+      ['Valor Serviços', kpis.valorServicos],
+      ['Valor Pago', kpis.valorPago],
+      ['Ticket Médio', kpis.osFechadas > 0 ? kpis.valorTotal / kpis.osFechadas : 0],
+      ['Taxa Conversão', kpis.totalOS > 0 ? `${((kpis.osFechadas / kpis.totalOS) * 100).toFixed(1)}%` : '0%'],
+    ];
+    const ws1 = XLSX.utils.aoa_to_sheet(dashData);
+    ws1['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws1, 'Dashboard');
+
+    // --- Sheet 2: Abertura OS (daily + pie breakdown) ---
+    const openingHeader = [['Data', 'OS Abertas', 'OS Fechadas']];
+    const openingRows = dailyStats.map(d => [d.date, d.abertas, d.fechadas]);
+    const openingData = [...openingHeader, ...openingRows];
+    const ws2 = XLSX.utils.aoa_to_sheet(openingData);
+    ws2['!cols'] = [{ wch: 12 }, { wch: 12 }, { wch: 12 }];
+    XLSX.utils.book_append_sheet(wb, ws2, 'Abertura OS');
+
+    // --- Sheet 3: Pipeline Completo ---
+    const pipeHeader = [['Etapa', 'Tipo Serviço', 'Unidade', 'Quantidade', 'OS Mais Antiga (dias)', 'Mais Antiga na Etapa (dias)', 'Problemas Peça']];
+    const pipeRows = columnStats.map(col => {
+      const problemLabel = EXCLUDED.includes(col.id) ? '-' :
+        col.semCodigoOuValor > 0 ? `${col.semCodigoOuValor} (${[col.totalSemPeca > 0 ? `${col.totalSemPeca} s/peça` : '', col.totalSemCodigo > 0 ? `${col.totalSemCodigo} s/cod` : '', col.totalSemValor > 0 ? `${col.totalSemValor} s/val` : ''].filter(Boolean).join(', ')})` : 'OK';
+      return [col.label, '', '', col.count, col.oldestDays, col.oldestInStageDays, problemLabel];
+    });
+    // Add individual OS rows per column
+    const allOsRows: any[][] = [];
+    for (const col of columnStats) {
+      const colCards = filteredOsData.filter(os => os.coluna_kanban === col.id);
+      for (const os of colCards) {
+        const osLabel = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+        const tipoServico = os.tipo_atendimento || '-';
+        const unidadeNome = os.unidade_id ? (unidadeNameMap.get(os.unidade_id) || os.unidade_id.slice(0, 8)) : '-';
+        const now = Date.now();
+        const daysOpen = Math.floor((now - new Date(os.created_at).getTime()) / (1000 * 60 * 60 * 24));
+        const stageDate = os.coluna_kanban_desde || os.updated_at || os.created_at;
+        const daysInStage = Math.floor((now - new Date(stageDate).getTime()) / (1000 * 60 * 60 * 24));
+        let pecaProblem = '-';
+        if (!EXCLUDED.includes(col.id)) {
+          const pecas = pecasMap.get(os.id);
+          if (!pecas || pecas.length === 0) {
+            pecaProblem = 'Sem peça cadastrada';
+          } else {
+            const hasCodigo = (p: PecaRow) => (p.pn && p.pn.trim() !== '') || (p.codigo && p.codigo.trim() !== '');
+            const semCod = pecas.filter(p => !hasCodigo(p)).length;
+            const semVal = pecas.filter(p => hasCodigo(p) && (Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01)).length;
+            if (semCod > 0 || semVal > 0) {
+              pecaProblem = [semCod > 0 ? `${semCod} s/código` : '', semVal > 0 ? `${semVal} s/valor` : ''].filter(Boolean).join(', ');
+            } else {
+              pecaProblem = 'OK';
+            }
+          }
+        }
+        allOsRows.push([col.label, tipoServico, unidadeNome, osLabel, daysOpen, daysInStage, pecaProblem]);
+      }
+    }
+    const pipeOsHeader = [['', ''], ['TODAS AS OS DETALHADAS', ''], ['Etapa', 'Tipo Serviço', 'Unidade', 'OS', 'Dias Aberto', 'Dias na Etapa', 'Problema Peça']];
+    // Gargalos
+    const gargalosHeader = [['', ''], ['GARGALOS (TOP 5 MAIOR TEMPO)', ''], ['Etapa', 'Dias Mais Antiga']];
+    const gargalosRows = columnStats
+      .filter(c => c.count > 0 && c.id !== 'os_fechada')
+      .sort((a, b) => b.oldestDays - a.oldestDays)
+      .slice(0, 5)
+      .map(c => [c.label, c.oldestDays]);
+    // Volume
+    const volumeHeader = [['', ''], ['VOLUME POR ETAPA', ''], ['Etapa', 'Quantidade']];
+    const volumeRows = columnStats.filter(c => c.count > 0).map(c => [c.label, c.count]);
+    // Financial
+    const finHeader = [['', ''], ['RESUMO FINANCEIRO', ''], ['', 'Valor']];
+    const finRows = [
+      ['Valor Total OS', kpis.valorTotal],
+      ['Valor Peças', kpis.valorPecas],
+      ['Valor Serviços', kpis.valorServicos],
+      ['Valor Pago', kpis.valorPago],
+      ['Ticket Médio', kpis.osFechadas > 0 ? kpis.valorTotal / kpis.osFechadas : 0],
+    ];
+
+    const pipeAll = [
+      ...pipeHeader, ...pipeRows,
+      ...gargalosHeader, ...gargalosRows,
+      ...volumeHeader, ...volumeRows,
+      ...finHeader, ...finRows,
+      ...pipeOsHeader, ...allOsRows,
+    ];
+    const ws3 = XLSX.utils.aoa_to_sheet(pipeAll);
+    ws3['!cols'] = [{ wch: 26 }, { wch: 14 }, { wch: 20 }, { wch: 18 }, { wch: 18 }, { wch: 20 }, { wch: 28 }];
+    XLSX.utils.book_append_sheet(wb, ws3, 'Pipeline Completo');
+
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `cockpit_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `cockpit_executivo_${new Date().toISOString().split('T')[0]}.xlsx`;
     a.click();
     URL.revokeObjectURL(url);
   }
@@ -412,7 +528,7 @@ export function Cockpit() {
             <option value="IH">Somente IH</option>
             <option value="CI">Somente CI</option>
           </select>
-          <button onClick={exportCSV} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/20 transition-all">
+          <button onClick={exportExcel} className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] text-sm hover:bg-[#00D4FF]/20 transition-all">
             <Download className="w-4 h-4" />
             Exportar
           </button>
