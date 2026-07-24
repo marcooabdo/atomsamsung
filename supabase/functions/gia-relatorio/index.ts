@@ -1736,6 +1736,8 @@ async function gerarNucleoPecas(supabase: ReturnType<typeof createClient>, unida
 
 async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
+  const spNow = new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" }));
+  const todayStr = spNow.toISOString().split("T")[0];
 
   // Fetch units
   const { data: unidades } = await supabase.from("unidades").select("id, nome");
@@ -1752,8 +1754,7 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     }
   }
 
-  // Fetch active OS (not archived, not closed)
-  // Fetch all active OS using pagination to avoid PostgREST 1000-row default limit
+  // Fetch all active OS using pagination
   let osList: any[] = [];
   let from = 0;
   const pageSize = 1000;
@@ -1773,26 +1774,25 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     from += pageSize;
   }
 
-  // Route-related kanban columns (only IH routes)
-  const rotaColumns = ["em_rota_ih", "em_reparo_ih"];
+  // Columns relevant to this report
+  const colunasFTF = "em_rota_ih";
+  const colunasReparoIH = "em_reparo_ih";
+  const colunasRota = ["rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa", "rota_amarela", "rota_laranja"];
 
-  // Fetch agendamentos to validate IH and FTF
+  // Fetch agendamentos with status info
   const { data: agendamentos } = await supabase
     .from("agendamentos")
     .select("id, os_id, data_agendamento, status")
     .in("status", ["agendado", "confirmado", "pendente_confirmacao", "em_andamento"]);
 
-  const agendamentoPorOS: Record<string, { data_agendamento: string | null }[]> = {};
+  const agendamentoPorOS: Record<string, { data_agendamento: string | null; status: string }[]> = {};
   for (const ag of agendamentos || []) {
     if (!ag.os_id) continue;
     if (!agendamentoPorOS[ag.os_id]) agendamentoPorOS[ag.os_id] = [];
-    agendamentoPorOS[ag.os_id].push({ data_agendamento: ag.data_agendamento });
+    agendamentoPorOS[ag.os_id].push({ data_agendamento: ag.data_agendamento, status: ag.status });
   }
 
-  // Today's date string for comparison (only future dates are valid for FTF)
-  const todayStr = now.toISOString().split("T")[0];
-
-  // For grouped OS, find the principal (oldest) in each group so we can hide non-principal ones
+  // For grouped OS, find the principal (oldest) in each group
   const grupoOS: Record<string, typeof osList> = {};
   for (const os of osList) {
     if (os.grupo_os_id) {
@@ -1800,18 +1800,15 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       grupoOS[os.grupo_os_id].push(os);
     }
   }
-  // Sort each group by created_at ascending — first one is the principal
-  const principalOSIds = new Set<string>();
   const linkedOSIds = new Set<string>();
   for (const members of Object.values(grupoOS)) {
     members.sort((a, b) => (a.created_at || "").localeCompare(b.created_at || ""));
-    principalOSIds.add(members[0].id);
     for (let i = 1; i < members.length; i++) {
       linkedOSIds.add(members[i].id);
     }
   }
 
-  // Group everything by unidade
+  // Group by unidade
   const osPorUnidade: Record<string, typeof osList> = {};
   for (const os of osList) {
     const uid = os.unidade_id || "sem_unidade";
@@ -1825,127 +1822,168 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     .map(([uid, lista]) => {
       const totalPipeline = lista.length;
 
-      // Group by coluna_kanban for route columns (only IH, exclude linked OS)
-      const porColuna: Record<string, typeof osList> = {};
-      for (const os of lista) {
-        if (rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH') {
-          if (linkedOSIds.has(os.id)) continue;
-          if (!porColuna[os.coluna_kanban]) porColuna[os.coluna_kanban] = [];
-          porColuna[os.coluna_kanban].push(os);
-        }
-      }
+      // Count FTF and Reparo IH (exclude linked OS)
+      const totalFTF = lista.filter((os) => os.coluna_kanban === colunasFTF && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
+      const totalReparoIH = lista.filter((os) => os.coluna_kanban === colunasReparoIH && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
 
-      const emRotaTotal = lista.filter((os) => rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH' && !(os.coluna_kanban === "em_rota_ih" && os.grupo_os_id)).length;
-
-      // Route distribution in pipeline order (only IH)
-      const rotaColumnsOrder = ["em_rota_ih", "em_reparo_ih"];
-      const distribuicao = rotaColumnsOrder
-        .filter((col) => porColuna[col] && porColuna[col].length > 0)
-        .map((col) => ({
-          rota: getColunaLabel(col),
-          total: porColuna[col].length,
-        }));
-
-      // OS IH sem rota: IH OS that have no rota_id assigned and are not yet in em_rota_ih
-      const osIHSemRota = lista.filter((os) => {
-        if (os.tipo_atendimento !== 'IH') return false;
-        if (linkedOSIds.has(os.id)) return false;
-        if (os.coluna_kanban === 'em_rota_ih') return false;
-        if (os.rota_id) return false;
-        return true;
-      });
-
-      const osIHSemRotaNumeros = osIHSemRota.map((os) =>
-        os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
-      );
-
-      // Erros FTF: OS in "em_rota_ih" with past date or no agendamento (only IH)
-      // Exclude linked OS (non-principal) — they are managed by the principal OS
-      const osEmFTF = lista.filter((os) => os.coluna_kanban === "em_rota_ih" && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id));
+      // --- ERROS FTF ---
+      // FTF is VALID only if has CONFIRMED scheduling for a FUTURE date
+      // ERROR if: no scheduling, scheduling for today, scheduling for past, or future but not confirmed
+      const osEmFTF = lista.filter((os) => os.coluna_kanban === colunasFTF && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id));
       const osErrosFTF = osEmFTF.filter((os) => {
         const ags = agendamentoPorOS[os.id];
-        if (!ags || ags.length === 0) return true; // no agendamento at all
-        // Check if ALL agendamentos have past or current date
-        const hasFutureDate = ags.some((ag) => ag.data_agendamento && ag.data_agendamento > todayStr);
-        return !hasFutureDate;
+        if (!ags || ags.length === 0) return true;
+        const hasConfirmedFuture = ags.some((ag) =>
+          ag.status === "confirmado" && ag.data_agendamento && ag.data_agendamento > todayStr
+        );
+        return !hasConfirmedFuture;
       });
-
       const osErrosFTFNumeros = osErrosFTF.map((os) =>
         os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
       );
+
+      // --- ERROS REPARO EM PROGRESSO IH ---
+      // Reparo IH is VALID only if has CONFIRMED scheduling for TODAY
+      // ERROR if: no scheduling, scheduling for future, scheduling for past, or today but not confirmed
+      const osEmReparoIH = lista.filter((os) => os.coluna_kanban === colunasReparoIH && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id));
+      const osErrosReparoIH = osEmReparoIH.filter((os) => {
+        const ags = agendamentoPorOS[os.id];
+        if (!ags || ags.length === 0) return true;
+        const hasConfirmedToday = ags.some((ag) =>
+          ag.status === "confirmado" && ag.data_agendamento === todayStr
+        );
+        return !hasConfirmedToday;
+      });
+      const osErrosReparoIHNumeros = osErrosReparoIH.map((os) =>
+        os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8)
+      );
+
+      // --- ERROS COLUNAS DE ROTA ---
+      // Route columns should NOT have OS with CONFIRMED scheduling for today or future
+      // ERROR if: has confirmed scheduling for today or future date
+      const osEmRotas = lista.filter((os) => colunasRota.includes(os.coluna_kanban) && !linkedOSIds.has(os.id));
+      const osErrosRota = osEmRotas.filter((os) => {
+        const ags = agendamentoPorOS[os.id];
+        if (!ags || ags.length === 0) return false;
+        const hasConfirmedTodayOrFuture = ags.some((ag) =>
+          ag.status === "confirmado" && ag.data_agendamento && ag.data_agendamento >= todayStr
+        );
+        return hasConfirmedTodayOrFuture;
+      });
+      const osErrosRotaNumeros = osErrosRota.map((os) => {
+        const num = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+        const col = getColunaLabel(os.coluna_kanban);
+        return `${num} _(${col})_`;
+      });
 
       return {
         unidade_id: uid,
         unidade_nome: unidadeMap[uid] || uid,
         unidade_sigla: unidadeShort[uid] || "???",
         total_pipeline: totalPipeline,
-        em_rota: emRotaTotal,
-        distribuicao,
-        ih_sem_rota_total: osIHSemRota.length,
-        ih_sem_rota_lista: osIHSemRotaNumeros,
+        total_ftf: totalFTF,
+        total_reparo_ih: totalReparoIH,
         ftf_erros_total: osErrosFTF.length,
         ftf_erros_lista: osErrosFTFNumeros,
+        reparo_ih_erros_total: osErrosReparoIH.length,
+        reparo_ih_erros_lista: osErrosReparoIHNumeros,
+        rota_erros_total: osErrosRota.length,
+        rota_erros_lista: osErrosRotaNumeros,
       };
     });
 
   // Totals
   const totalPipeline = osList.filter((os) => !linkedOSIds.has(os.id)).length;
-  const totalEmRota = osList.filter((os) => rotaColumns.includes(os.coluna_kanban) && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
-  const totalIHSemRota = unidadesData.reduce((acc, u) => acc + u.ih_sem_rota_total, 0);
+  const totalFTF = osList.filter((os) => os.coluna_kanban === colunasFTF && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
+  const totalReparoIH = osList.filter((os) => os.coluna_kanban === colunasReparoIH && os.tipo_atendimento === 'IH' && !linkedOSIds.has(os.id)).length;
   const totalFTFErros = unidadesData.reduce((acc, u) => acc + u.ftf_erros_total, 0);
+  const totalReparoIHErros = unidadesData.reduce((acc, u) => acc + u.reparo_ih_erros_total, 0);
+  const totalRotaErros = unidadesData.reduce((acc, u) => acc + u.rota_erros_total, 0);
+  const totalErros = totalFTFErros + totalReparoIHErros + totalRotaErros;
 
-  // Build resumo texto in cockpit style
-  const spTime = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  const spDate = spTime.split(",")[0]?.trim() || spTime;
+  // Build formatted WhatsApp text
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
   const linhasResumo: string[] = [
-    `🗺️ RELATÓRIO AGENDA`,
-    `${spDate} às ${spHour}`,
-    `──────────────────`,
+    `*📋 RELATÓRIO AGENDA IH*`,
+    `━━━━━━━━━━━━━━━━━━━━━`,
+    `📅 ${spDate}`,
+    `⏰ ${spHour}`,
     ``,
-    `📊 RESUMO EXECUTIVO:`,
-    `Total de OS no pipeline: ${totalPipeline.toLocaleString("pt-BR")}`,
-    `Em rota: ${totalEmRota} | IH sem rota: ${totalIHSemRota} | Erros FTF: ${totalFTFErros}`,
+    `*📊 RESUMO EXECUTIVO*`,
+    `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
+    `Pipeline: *${totalPipeline.toLocaleString("pt-BR")}* OS`,
+    `FTF: *${totalFTF}* | Reparo IH: *${totalReparoIH}*`,
+    ``,
+    `*⚠️ ${totalErros} ERROS ENCONTRADOS:*`,
+    `• Erros FTF: ${totalFTFErros}`,
+    `• Erros Reparo IH: ${totalReparoIHErros}`,
+    `• Erros Rota: ${totalRotaErros}`,
   ];
 
   for (const unidade of unidadesData) {
-    linhasResumo.push(``);
-    linhasResumo.push(`📍 ${unidade.unidade_sigla} — Pipeline: ${unidade.total_pipeline} | Em rota: ${unidade.em_rota}`);
-
-    for (const rota of unidade.distribuicao) {
-      linhasResumo.push(`${rota.rota}: ${rota.total}`);
-    }
+    const hasErrors = unidade.ftf_erros_total > 0 || unidade.reparo_ih_erros_total > 0 || unidade.rota_erros_total > 0;
+    if (!hasErrors) continue;
 
     linhasResumo.push(``);
-    linhasResumo.push(`🔴 OS IH sem rota: ${unidade.ih_sem_rota_total}`);
-    if (unidade.ih_sem_rota_lista.length > 0) {
-      for (const num of unidade.ih_sem_rota_lista) {
-        linhasResumo.push(num);
-      }
-    }
+    linhasResumo.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    linhasResumo.push(`*🏢 ${unidade.unidade_sigla}* — FTF: ${unidade.total_ftf} | Reparo IH: ${unidade.total_reparo_ih}`);
+    linhasResumo.push(`━━━━━━━━━━━━━━━━━━━━━`);
 
     if (unidade.ftf_erros_total > 0) {
       linhasResumo.push(``);
-      linhasResumo.push(`⚠️ Erros FTF: ${unidade.ftf_erros_total}`);
+      linhasResumo.push(`*🔴 Erros FTF (${unidade.ftf_erros_total}):*`);
+      linhasResumo.push(`_Sem agendamento confirmado futuro_`);
       for (const num of unidade.ftf_erros_lista) {
-        linhasResumo.push(num);
+        linhasResumo.push(`  • ${num}`);
       }
     }
-    linhasResumo.push(`──────────────────`);
+
+    if (unidade.reparo_ih_erros_total > 0) {
+      linhasResumo.push(``);
+      linhasResumo.push(`*🟠 Erros Reparo IH (${unidade.reparo_ih_erros_total}):*`);
+      linhasResumo.push(`_Sem agendamento confirmado para hoje_`);
+      for (const num of unidade.reparo_ih_erros_lista) {
+        linhasResumo.push(`  • ${num}`);
+      }
+    }
+
+    if (unidade.rota_erros_total > 0) {
+      linhasResumo.push(``);
+      linhasResumo.push(`*🟡 Erros Rota (${unidade.rota_erros_total}):*`);
+      linhasResumo.push(`_Agendamento confirmado indevido (hoje/futuro)_`);
+      for (const num of unidade.rota_erros_lista) {
+        linhasResumo.push(`  • ${num}`);
+      }
+    }
   }
 
-  linhasResumo.push(`GIA • Global Intelligence Assistance`);
+  // Check if no errors at all
+  if (totalErros === 0) {
+    linhasResumo.push(``);
+    linhasResumo.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    linhasResumo.push(`✅ *Nenhum erro encontrado!*`);
+    linhasResumo.push(`Todos os agendamentos estão corretos.`);
+  }
+
+  linhasResumo.push(``);
+  linhasResumo.push(`━━━━━━━━━━━━━━━━━━━━━`);
+  linhasResumo.push(`🤖 _GIA • Global Intelligence Assistance_`);
 
   return {
-    titulo: "Relatório Rotas",
-    subtitulo: `${totalEmRota} OS em rota / ${totalIHSemRota} IH sem rota`,
+    titulo: "Relatório Agenda IH",
+    subtitulo: `${totalErros} erros de agendamento encontrados`,
     gerado_em: now.toISOString(),
-    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    horario_disparo: spHour,
     totais: {
       pipeline: totalPipeline,
-      em_rota: totalEmRota,
-      ih_sem_rota: totalIHSemRota,
+      ftf: totalFTF,
+      reparo_ih: totalReparoIH,
+      erros_ftf: totalFTFErros,
+      erros_reparo_ih: totalReparoIHErros,
+      erros_rota: totalRotaErros,
+      erros_total: totalErros,
     },
     unidades: unidadesData,
     resumo_texto: linhasResumo.join("\n"),
