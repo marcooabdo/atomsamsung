@@ -1857,6 +1857,18 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
         return `${num} _(${col})_`;
       });
 
+      // --- ERROS CI EM COLUNAS IH ---
+      // OS with tipo_atendimento = 'CI' should NOT be in FTF, Reparo IH, or route columns
+      const colunasIHOnly = [colunasFTF, colunasReparoIH, ...colunasRota];
+      const osCIEmColunasIH = lista.filter((os) =>
+        os.tipo_atendimento === 'CI' && colunasIHOnly.includes(os.coluna_kanban) && !linkedOSIds.has(os.id)
+      );
+      const osCIErrosNumeros = osCIEmColunasIH.map((os) => {
+        const num = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+        const col = getColunaLabel(os.coluna_kanban);
+        return `${num} _(${col})_`;
+      });
+
       return {
         unidade_id: uid,
         unidade_nome: unidadeMap[uid] || uid,
@@ -1870,6 +1882,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
         reparo_ih_erros_lista: osErrosReparoIHNumeros,
         rota_erros_total: osErrosRota.length,
         rota_erros_lista: osErrosRotaNumeros,
+        ci_erros_total: osCIEmColunasIH.length,
+        ci_erros_lista: osCIErrosNumeros,
       };
     });
 
@@ -1880,7 +1894,8 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
   const totalFTFErros = unidadesData.reduce((acc, u) => acc + u.ftf_erros_total, 0);
   const totalReparoIHErros = unidadesData.reduce((acc, u) => acc + u.reparo_ih_erros_total, 0);
   const totalRotaErros = unidadesData.reduce((acc, u) => acc + u.rota_erros_total, 0);
-  const totalErros = totalFTFErros + totalReparoIHErros + totalRotaErros;
+  const totalCIErros = unidadesData.reduce((acc, u) => acc + u.ci_erros_total, 0);
+  const totalErros = totalFTFErros + totalReparoIHErros + totalRotaErros + totalCIErros;
 
   // Build formatted WhatsApp text
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
@@ -1901,10 +1916,11 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
     `• Erros FTF: ${totalFTFErros}`,
     `• Erros Reparo IH: ${totalReparoIHErros}`,
     `• Erros Rota: ${totalRotaErros}`,
+    `• OS CI em colunas IH: ${totalCIErros}`,
   ];
 
   for (const unidade of unidadesData) {
-    const hasErrors = unidade.ftf_erros_total > 0 || unidade.reparo_ih_erros_total > 0 || unidade.rota_erros_total > 0;
+    const hasErrors = unidade.ftf_erros_total > 0 || unidade.reparo_ih_erros_total > 0 || unidade.rota_erros_total > 0 || unidade.ci_erros_total > 0;
     if (!hasErrors) continue;
 
     linhasResumo.push(``);
@@ -1935,6 +1951,15 @@ async function gerarMapaRotas(supabase: ReturnType<typeof createClient>, unidade
       linhasResumo.push(`*🟡 Erros Rota (${unidade.rota_erros_total}):*`);
       linhasResumo.push(`_Agendamento confirmado indevido (hoje/futuro)_`);
       for (const num of unidade.rota_erros_lista) {
+        linhasResumo.push(`  • ${num}`);
+      }
+    }
+
+    if (unidade.ci_erros_total > 0) {
+      linhasResumo.push(``);
+      linhasResumo.push(`*🟣 OS CI em colunas IH (${unidade.ci_erros_total}):*`);
+      linhasResumo.push(`_OS Carry-In não pode estar em FTF/Reparo IH/Rota_`);
+      for (const num of unidade.ci_erros_lista) {
         linhasResumo.push(`  • ${num}`);
       }
     }
