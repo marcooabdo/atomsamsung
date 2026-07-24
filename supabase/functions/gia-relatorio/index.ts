@@ -872,7 +872,17 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
 
   // Columns where "sem peça" is not an error (early-stage, already closed)
-  const COLUNAS_EXCLUIDAS_PECA_CHECK = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "trade_up", "os_fechada"];
+  const COLUNAS_EXCLUIDAS_PECA_CHECK = ["os_nova", "diagnostico", "instalacao_inicial", "service_handling", "return_handling", "trade_up", "os_fechada"];
+
+  // Column order matching Cockpit
+  const COLUNA_ORDER = [
+    "negociacao_em_andamento", "aguardando_aprovacao", "orcamento_aprovado",
+    "aguardando_peca", "peca_em_transito", "em_reparo_ci",
+    "rota_preta", "rota_vermelha", "rota_azul", "rota_verde", "rota_rosa", "rota_amarela", "rota_laranja",
+    "em_rota_ih", "em_reparo_ih",
+    "saw", "controle_qualidade", "qa_bt",
+    "reparo_concluido", "aguardando_fechamento", "orcamentos_rejeitados",
+  ];
 
   // Fetch all open OS using paginated standard queries
   let osDataList: Array<{ id: string; numero_os_samsung: string | null; numero_os_interna: string | null; coluna_kanban: string; unidade_id: string | null }> = [];
@@ -1009,7 +1019,9 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
       continue;
     }
 
-    // Check: peças sem código or sem valor
+    // Check: peças sem código or sem valor (also skip excluded columns)
+    if (COLUNAS_EXCLUIDAS_PECA_CHECK.includes(os.coluna_kanban)) continue;
+
     const semCodigo = pecas.filter(p => !hasCodigo(p)).length;
     const semValor = pecas.filter(p => hasCodigo(p) && Number(p.valor_unitario || 0) < 0.01 && Number(p.valor_gspn || 0) < 0.01).length;
 
@@ -1030,7 +1042,14 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   }
 
   for (const uid of Object.keys(problemsByUnit)) {
-    problemsByUnit[uid].sort((a, b) => a.coluna.localeCompare(b.coluna) || a.numero.localeCompare(b.numero));
+    problemsByUnit[uid].sort((a, b) => {
+      const idxA = COLUNA_ORDER.indexOf(a.coluna_key);
+      const idxB = COLUNA_ORDER.indexOf(b.coluna_key);
+      const orderA = idxA >= 0 ? idxA : 999;
+      const orderB = idxB >= 0 ? idxB : 999;
+      if (orderA !== orderB) return orderA - orderB;
+      return a.numero.localeCompare(b.numero);
+    });
   }
 
   const totalOSComErro = Object.values(problemsByUnit).reduce((sum, list) => sum + list.length, 0);
@@ -1074,7 +1093,13 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
         sigla: getSiglaCompliance(unidadeMap[uid] || uid),
         total_os_com_erro: lista.length,
         colunas: Object.entries(porColuna)
-          .sort((a, b) => b[1].length - a[1].length)
+          .sort((a, b) => {
+            const keyA = a[1][0]?.coluna_key || "";
+            const keyB = b[1][0]?.coluna_key || "";
+            const idxA = COLUNA_ORDER.indexOf(keyA);
+            const idxB = COLUNA_ORDER.indexOf(keyB);
+            return (idxA >= 0 ? idxA : 999) - (idxB >= 0 ? idxB : 999);
+          })
           .map(([col, osList]) => ({ coluna: col, os_list: osList })),
       };
     });

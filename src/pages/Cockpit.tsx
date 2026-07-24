@@ -569,7 +569,9 @@ export function Cockpit() {
                     )}
                   </td>
                   <td className="text-center px-4 py-3">
-                    {col.semCodigoOuValor > 0 ? (
+                    {['os_nova', 'diagnostico', 'instalacao_inicial', 'service_handling', 'return_handling', 'trade_up', 'os_fechada'].includes(col.id) ? (
+                      <span className="text-xs text-gray-600">-</span>
+                    ) : col.semCodigoOuValor > 0 ? (
                       <button
                         onClick={() => setListModal({ open: true, osList: col.osComProblema })}
                         className="inline-flex flex-col items-center gap-0.5 text-xs font-medium text-red-400 hover:text-red-300 transition-colors cursor-pointer"
