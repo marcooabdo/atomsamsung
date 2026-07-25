@@ -18,6 +18,7 @@ import { SkywalkerProvider } from './contexts/SkywalkerContext';
 import { NotasFiscais } from './pages/NotasFiscais';
 import { GIA } from './pages/GIA';
 import { OSPrintView } from './pages/OSPrintView';
+import { VisitaPrintView } from './pages/VisitaPrintView';
 import EtiquetaEditor from './pages/EtiquetaEditor';
 import { AgendaMobile } from './pages/mobile/AgendaMobile';
 import { ExecucaoOS } from './pages/mobile/ExecucaoOS';
@@ -100,6 +101,15 @@ function AppContent() {
           element={
             <ProtectedRoute>
               <OSPrintView />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/visita/print"
+          element={
+            <ProtectedRoute>
+              <VisitaPrintView />
             </ProtectedRoute>
           }
         />
