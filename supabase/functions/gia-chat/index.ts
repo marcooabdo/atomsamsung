@@ -285,6 +285,10 @@ EXEMPLOS PRATICOS:
 "Performance geral da operacao..."
 [CARD_RADAR: KPIs de Performance | Score 0-100 | green | Qualidade:92 | Velocidade:85 | Satisfacao:94 | Eficiencia:78 | Custo:88 | Inovacao:82]
 
+ACOES DE RELATORIO WHATSAPP:
+Quando o usuario pedir para enviar um relatorio no WhatsApp/grupo, o sistema intercepta e executa AUTOMATICAMENTE. Voce recebera um "[SYSTEM ACTION RESULT: ...]" informando se foi enviado com sucesso ou se deu erro. Apenas confirme ao usuario de forma natural.
+Relatorios disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo.
+
 REGRAS CRITICAS:
 1. SEMPRE inclua 2-4 cards quando responder com dados
 2. Use o tipo de grafico mais adequado para o tipo de dado
@@ -304,15 +308,51 @@ REGRAS CRITICAS:
 
     chatMessages.push({ role: "user", content: message });
 
-    // Detect command: send LP report via WhatsApp
+    // Detect command: send report via WhatsApp
     const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-    const isLPReportRequest = (
-      (msgLower.includes("relatorio") || msgLower.includes("controle")) &&
-      (msgLower.includes("lp") || msgLower.includes("prazo")) &&
-      (msgLower.includes("enviar") || msgLower.includes("envia") || msgLower.includes("manda") || msgLower.includes("mandar") || msgLower.includes("dispara") || msgLower.includes("disparar") || msgLower.includes("whatsapp") || msgLower.includes("grupo"))
+    
+    const REPORT_TRIGGERS: { keywords: string[]; tipo: string }[] = [
+      { keywords: ["lp", "prazo lp", "controle lp"], tipo: "controle_lp_prazo" },
+      { keywords: ["pulso", "pulso operacional"], tipo: "pulso_operacional" },
+      { keywords: ["abertura", "fechamento", "abertura e fechamento"], tipo: "abertura_fechamento" },
+      { keywords: ["rota", "mapa de rota", "mapa rotas"], tipo: "mapa_rotas" },
+      { keywords: ["peca", "nucleo peca", "nucleo de peca"], tipo: "nucleo_pecas" },
+      { keywords: ["estoque dia", "estoque do dia"], tipo: "estoque_dia" },
+      { keywords: ["credito", "limite credito", "limite de credito", "gspn credito"], tipo: "limite_credito_gspn" },
+      { keywords: ["compliance", "erros compliance"], tipo: "compliance_erros" },
+      { keywords: ["agenda", "agendamento", "agendamentos ih"], tipo: "agendamentos_ih" },
+      { keywords: ["resumo final", "resumo do dia"], tipo: "resumo_final" },
+    ];
+
+    const isSendRequest = (
+      msgLower.includes("enviar") || msgLower.includes("envia") || 
+      msgLower.includes("manda") || msgLower.includes("mandar") || 
+      msgLower.includes("dispara") || msgLower.includes("disparar") || 
+      msgLower.includes("whatsapp") || msgLower.includes("grupo") ||
+      msgLower.includes("manda no") || msgLower.includes("envia no")
+    ) && (
+      msgLower.includes("relatorio") || msgLower.includes("controle") || msgLower.includes("report")
     );
 
-    if (isLPReportRequest) {
+    // Also detect simpler patterns like "envia o LP", "manda o pulso", "envia a agenda"
+    const isSimpleSendRequest = (
+      msgLower.includes("enviar") || msgLower.includes("envia") || 
+      msgLower.includes("manda") || msgLower.includes("mandar") || 
+      msgLower.includes("dispara") || msgLower.includes("disparar")
+    );
+
+    let detectedReportTipo: string | null = null;
+
+    if (isSendRequest || isSimpleSendRequest) {
+      for (const trigger of REPORT_TRIGGERS) {
+        if (trigger.keywords.some(kw => msgLower.includes(kw))) {
+          detectedReportTipo = trigger.tipo;
+          break;
+        }
+      }
+    }
+
+    if (detectedReportTipo) {
       try {
         const sendResponse = await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
           method: "POST",
@@ -320,13 +360,13 @@ REGRAS CRITICAS:
             "Content-Type": "application/json",
             "Authorization": `Bearer ${supabaseServiceKey}`,
           },
-          body: JSON.stringify({ tipo: "controle_lp_prazo" }),
+          body: JSON.stringify({ tipo: detectedReportTipo }),
         });
 
         const sendResult = await sendResponse.json();
         const actionResult = sendResponse.ok
-          ? "RELATORIO LP ENVIADO COM SUCESSO no grupo WhatsApp."
-          : `ERRO ao enviar relatorio LP: ${sendResult.error || "falha desconhecida"}`;
+          ? `RELATORIO "${detectedReportTipo}" ENVIADO COM SUCESSO no grupo WhatsApp.`
+          : `ERRO ao enviar relatorio "${detectedReportTipo}": ${sendResult.error || "falha desconhecida"}`;
 
         chatMessages[chatMessages.length - 1] = {
           role: "user",
@@ -335,7 +375,7 @@ REGRAS CRITICAS:
       } catch (sendErr) {
         chatMessages[chatMessages.length - 1] = {
           role: "user",
-          content: `${message}\n\n[SYSTEM ACTION RESULT: ERRO ao enviar relatorio LP - ${String(sendErr)}]`,
+          content: `${message}\n\n[SYSTEM ACTION RESULT: ERRO ao enviar relatorio "${detectedReportTipo}" - ${String(sendErr)}]`,
         };
       }
     }
