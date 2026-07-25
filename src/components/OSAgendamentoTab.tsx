@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle, Pencil, Trash2 } from 'lucide-react';
+import { Calendar, User, CheckCircle, Clock, Sun, Moon, Wrench, MapPin, Plus, ClipboardList, X, XCircle, Pencil, Trash2, FileText } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
@@ -327,6 +327,102 @@ export function OSAgendamentoTab({
     }
   };
 
+  const handleVisitaPDF = async (agend: any) => {
+    const { jsPDF } = await import('jspdf');
+    const { data: osData } = await supabase
+      .from('os')
+      .select('numero_os_samsung, numero_os_interna, cliente_nome, endereco, bairro, cidade')
+      .eq('id', osId)
+      .maybeSingle();
+
+    const doc = new jsPDF();
+    const pageW = doc.internal.pageSize.getWidth();
+    let y = 20;
+
+    doc.setFontSize(16);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Relatório da Visita', pageW / 2, y, { align: 'center' });
+    y += 12;
+
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const osLabel = osData?.numero_os_samsung || osData?.numero_os_interna || osId.slice(0, 8);
+    doc.text(`OS: ${osLabel}`, 14, y);
+    y += 6;
+    doc.text(`Cliente: ${osData?.cliente_nome || '-'}`, 14, y);
+    y += 6;
+    doc.text(`Endereço: ${osData?.endereco || ''} ${osData?.bairro || ''} - ${osData?.cidade || ''}`, 14, y);
+    y += 6;
+
+    const tecNome = agend.tecnico_id ? (tecnicos.find((t) => t.id === agend.tecnico_id)?.nome || agend.tecnico_id.slice(0, 8)) : '-';
+    doc.text(`Técnico: ${tecNome}`, 14, y);
+    y += 6;
+    doc.text(`Data Agendamento: ${agend.data_agendamento ? new Date(agend.data_agendamento + 'T12:00:00').toLocaleDateString('pt-BR') : '-'}`, 14, y);
+    y += 6;
+
+    if (agend.checkin_hora) {
+      doc.text(`Check-in: ${new Date(agend.checkin_hora).toLocaleString('pt-BR')}`, 14, y);
+      y += 6;
+    }
+    if (agend.checkout_hora) {
+      doc.text(`Check-out: ${new Date(agend.checkout_hora).toLocaleString('pt-BR')}`, 14, y);
+      y += 6;
+    }
+
+    const resultadoLabel = agend.resultado_visita === 'reparo_sucesso' ? 'Reparo com Sucesso' :
+      agend.resultado_visita === 'peca_defeito' ? 'Peça com Defeito' :
+      agend.resultado_visita === 'improdutiva_revisita' ? 'Improdutiva / Revisita' :
+      agend.resultado_visita || '-';
+    doc.text(`Resultado: ${resultadoLabel}`, 14, y);
+    y += 10;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Defeito Encontrado:', 14, y);
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const defeitoText = agend.defeito_encontrado || '-';
+    const defeitoLines = doc.splitTextToSize(defeitoText, pageW - 28);
+    doc.text(defeitoLines, 14, y);
+    y += defeitoLines.length * 5 + 6;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Diagnóstico Técnico:', 14, y);
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const diagText = agend.diagnostico_tecnico || '-';
+    const diagLines = doc.splitTextToSize(diagText, pageW - 28);
+    doc.text(diagLines, 14, y);
+    y += diagLines.length * 5 + 6;
+
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Ação Realizada:', 14, y);
+    y += 6;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const acaoText = agend.acao_realizada || '-';
+    const acaoLines = doc.splitTextToSize(acaoText, pageW - 28);
+    doc.text(acaoLines, 14, y);
+    y += acaoLines.length * 5 + 6;
+
+    if (agend.checkout_observacoes) {
+      doc.setFontSize(12);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Observações do Checkout:', 14, y);
+      y += 6;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const obsLines = doc.splitTextToSize(agend.checkout_observacoes, pageW - 28);
+      doc.text(obsLines, 14, y);
+    }
+
+    doc.save(`visita_${osLabel}_${agend.data_agendamento || 'sem_data'}.pdf`);
+  };
+
   const handleCancelarAgendamento = async () => {
     if (!cancelamentoModal.agendamentoId || !motivoCancelamento.trim()) {
       setErro('Motivo do cancelamento é obrigatório');
@@ -650,6 +746,28 @@ export function OSAgendamentoTab({
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </>
+                      )}
+                      {agend.checkout_realizado && (
+                        <button
+                          onClick={() => handleVisitaPDF(agend)}
+                          className="p-1.5 rounded-lg bg-[#00D4FF20] border border-[#00D4FF40] text-[#00D4FF] hover:bg-[#00D4FF30] transition-all"
+                          title="PDF da visita"
+                        >
+                          <FileText className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      {agend.resultado_visita && (
+                        <div className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide ${
+                          agend.resultado_visita === 'reparo_sucesso' ? 'bg-[#39FF1420] text-[#39FF14] border border-[#39FF1440]' :
+                          agend.resultado_visita === 'peca_defeito' ? 'bg-[#FF006420] text-[#FF0064] border border-[#FF006440]' :
+                          agend.resultado_visita === 'improdutiva_revisita' ? 'bg-[#FFBF0020] text-[#FFBF00] border border-[#FFBF0040]' :
+                          'bg-gray-700 text-gray-400 border border-gray-600'
+                        }`}>
+                          {agend.resultado_visita === 'reparo_sucesso' ? 'Reparo com Sucesso' :
+                           agend.resultado_visita === 'peca_defeito' ? 'Peça com Defeito' :
+                           agend.resultado_visita === 'improdutiva_revisita' ? 'Improdutiva / Revisita' :
+                           agend.resultado_visita}
+                        </div>
                       )}
                       <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
                         agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :

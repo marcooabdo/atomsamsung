@@ -166,7 +166,7 @@ export function ExecucaoOS() {
 
     const { data: agendamentosData, error: agendamentoError } = await supabase
       .from('agendamentos')
-      .select('id, tecnico_id, checkin_realizado, checkout_realizado, checkin_hora, checkout_hora, checkin_latitude, checkin_longitude, created_at')
+      .select('id, tecnico_id, checkin_realizado, checkout_realizado, checkin_hora, checkout_hora, checkin_latitude, checkin_longitude, created_at, resultado_visita')
       .eq('os_id', osId)
       .eq('tecnico_id', usuario.id)
       .order('created_at', { ascending: false });
@@ -231,6 +231,13 @@ export function ExecucaoOS() {
     };
 
     setAgendamento(agendamentoObj as unknown as AgendamentoDetalhes);
+
+    if (agendamentoData?.resultado_visita) {
+      const rv = agendamentoData.resultado_visita;
+      if (rv === 'reparo_sucesso') setResultado('sucesso');
+      else if (rv === 'peca_defeito') setResultado('peca_defeito');
+      else if (rv === 'improdutiva_revisita') setResultado('improdutiva');
+    }
 
     if (checkinRealizado) {
       setCurrentStep('checklist');
@@ -777,6 +784,8 @@ export function ExecucaoOS() {
           // ignored
         }
 
+        const resultadoVisitaLabel = resultado === 'sucesso' ? 'reparo_sucesso' : resultado === 'peca_defeito' ? 'peca_defeito' : 'improdutiva_revisita';
+
         await supabase
           .from('agendamentos')
           .update({
@@ -786,7 +795,8 @@ export function ExecucaoOS() {
             checkout_longitude: longitude,
             defeito_encontrado: defeitoEncontrado || null,
             diagnostico_tecnico: diagnostico || null,
-            acao_realizada: acaoRealizada || null
+            acao_realizada: acaoRealizada || null,
+            resultado_visita: resultadoVisitaLabel
           })
           .eq('id', agendamento.id);
 
