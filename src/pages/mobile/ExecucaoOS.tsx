@@ -238,7 +238,7 @@ export function ExecucaoOS() {
 
     await loadPecas(data.id);
     await loadChecklist(agendamentoData?.id || '');
-    await loadComentarios(data.id, !checkinRealizado);
+    await loadComentarios(data.id, agendamentoData?.id || '', !checkinRealizado);
 
     setLoading(false);
   };
@@ -304,8 +304,7 @@ export function ExecucaoOS() {
     }
   };
 
-  const loadComentarios = async (osId: string, isNewVisit: boolean) => {
-    // For a new visit (not yet checked-in), start with blank fields
+  const loadComentarios = async (osId: string, agendamentoId: string, isNewVisit: boolean) => {
     if (isNewVisit) {
       setDefeitoEncontrado('');
       setDiagnostico('');
@@ -313,17 +312,24 @@ export function ExecucaoOS() {
       return;
     }
 
-    const { data } = await supabase
-      .from('os')
-      .select('diagnostico_tecnico, reparo_efetuado, defeito_relatado')
-      .eq('id', osId)
-      .maybeSingle();
+    if (agendamentoId) {
+      const { data: agData } = await supabase
+        .from('agendamentos')
+        .select('defeito_encontrado, diagnostico_tecnico, acao_realizada')
+        .eq('id', agendamentoId)
+        .maybeSingle();
 
-    if (data) {
-      setDefeitoEncontrado(data.defeito_relatado || '');
-      setDiagnostico(data.diagnostico_tecnico || '');
-      setAcaoRealizada(data.reparo_efetuado || '');
+      if (agData && (agData.defeito_encontrado || agData.diagnostico_tecnico || agData.acao_realizada)) {
+        setDefeitoEncontrado(agData.defeito_encontrado || '');
+        setDiagnostico(agData.diagnostico_tecnico || '');
+        setAcaoRealizada(agData.acao_realizada || '');
+        return;
+      }
     }
+
+    setDefeitoEncontrado('');
+    setDiagnostico('');
+    setAcaoRealizada('');
   };
 
   useEffect(() => {
@@ -425,6 +431,15 @@ export function ExecucaoOS() {
         reparo_efetuado: acaoRealizada || null
       })
       .eq('id', agendamento.os_id);
+
+    await supabase
+      .from('agendamentos')
+      .update({
+        defeito_encontrado: defeitoEncontrado || null,
+        diagnostico_tecnico: diagnostico || null,
+        acao_realizada: acaoRealizada || null
+      })
+      .eq('id', agendamento.id);
 
     await supabase
       .from('os_comentarios')
@@ -768,7 +783,10 @@ export function ExecucaoOS() {
             checkout_realizado: true,
             checkout_hora: checkoutTime.toISOString(),
             checkout_latitude: latitude,
-            checkout_longitude: longitude
+            checkout_longitude: longitude,
+            defeito_encontrado: defeitoEncontrado || null,
+            diagnostico_tecnico: diagnostico || null,
+            acao_realizada: acaoRealizada || null
           })
           .eq('id', agendamento.id);
 
