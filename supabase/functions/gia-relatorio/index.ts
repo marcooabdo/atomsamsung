@@ -2180,6 +2180,210 @@ async function gerarAberturaFechamento(supabase: ReturnType<typeof createClient>
   };
 }
 
+async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+
+  const COLUNAS_EXCLUIDAS = [
+    "reparo_concluido",
+    "service_handling",
+    "return_handling",
+    "trade_up",
+    "instalacao_inicial",
+    "os_fechada",
+  ];
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  const unidadeShort: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeShort[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeShort[u.id] = "JDF";
+      else if (nome.includes("feira de santana") || nome.includes("feira")) unidadeShort[u.id] = "FSA";
+      else unidadeShort[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
+  }
+
+  let query = supabase
+    .from("os")
+    .select("id, numero_os_samsung, numero_os_interna, aparelho_modelo, tipo_atendimento, tipo_os, coluna_kanban, coluna_kanban_desde, created_at, unidade_id")
+    .eq("tipo_os", "LP")
+    .not("coluna_kanban", "is", null)
+    .not("coluna_kanban", "in", `(${COLUNAS_EXCLUIDAS.join(",")})`)
+    .or("arquivada.is.null,arquivada.eq.false");
+
+  if (unidadeId) {
+    query = query.eq("unidade_id", unidadeId);
+  }
+
+  const allOS: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  let hasMore = true;
+  while (hasMore) {
+    const { data, error } = await query.range(from, from + pageSize - 1);
+    if (error) throw new Error(`Erro ao buscar OS LP: ${error.message}`);
+    if (data && data.length > 0) {
+      allOS.push(...data);
+      from += pageSize;
+      hasMore = data.length === pageSize;
+    } else {
+      hasMore = false;
+    }
+  }
+
+  if (allOS.length === 0) {
+    const resumoTexto = [
+      `📋 *CONTROLE LP — PRAZO*`,
+      now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+      `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
+      `✅ Nenhuma OS LP aberta no momento.`,
+      `┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`,
+      `🤖 _GIA • Global Intelligence Assistance_`,
+    ].join("\n");
+    return { titulo: "Controle LP Prazo", resumo_texto: resumoTexto };
+  }
+
+  function getPrazo(os: any): { dias: number; label: string } {
+    const tipo = (os.tipo_atendimento || "").toUpperCase();
+    if (tipo === "CI") return { dias: 3, label: "CI 3d" };
+    const modelo = (os.aparelho_modelo || "").toUpperCase();
+    if (modelo.startsWith("QN") || modelo.startsWith("UN") || modelo.startsWith("W")) {
+      return { dias: 7, label: "IH 7d" };
+    }
+    return { dias: 5, label: "IH 5d" };
+  }
+
+  function diasCorridos(dateStr: string): number {
+    if (!dateStr) return 0;
+    return Math.floor((now.getTime() - new Date(dateStr).getTime()) / 86400000);
+  }
+
+  const osPorUnidade: Record<string, any[]> = {};
+  for (const os of allOS) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!osPorUnidade[uid]) osPorUnidade[uid] = [];
+    osPorUnidade[uid].push(os);
+  }
+
+  let totalAtrasadas = 0;
+  let totalNoPrazo = 0;
+  let atrasadasCI = 0;
+  let atrasadasIH5 = 0;
+  let atrasadasIH7 = 0;
+
+  const unidadeSections: string[] = [];
+  const sortedUnits = Object.entries(osPorUnidade)
+    .filter(([uid]) => uid !== "sem_unidade")
+    .sort((a, b) => (unidadeShort[a[0]] || "").localeCompare(unidadeShort[b[0]] || ""));
+
+  for (const [uid, osList] of sortedUnits) {
+    const sigla = unidadeShort[uid] || "???";
+
+    const ci: any[] = [];
+    const ih5: any[] = [];
+    const ih7: any[] = [];
+
+    for (const os of osList) {
+      const prazoInfo = getPrazo(os);
+      if (prazoInfo.label === "CI 3d") ci.push(os);
+      else if (prazoInfo.label === "IH 5d") ih5.push(os);
+      else ih7.push(os);
+    }
+
+    function formatOSLine(os: any, prazoDias: number): string {
+      const numero = os.numero_os_samsung || os.numero_os_interna || "S/N";
+      const modelo = os.aparelho_modelo || "—";
+      const etapa = getColunaLabel(os.coluna_kanban || "");
+      const diasAberta = diasCorridos(os.created_at);
+      const diasEtapa = diasCorridos(os.coluna_kanban_desde || os.created_at);
+      const atrasada = diasAberta > prazoDias;
+
+      if (atrasada) {
+        totalAtrasadas++;
+        if (prazoDias === 3) atrasadasCI++;
+        else if (prazoDias === 5) atrasadasIH5++;
+        else atrasadasIH7++;
+      } else {
+        totalNoPrazo++;
+      }
+
+      const statusIcon = atrasada ? "🔴" : diasAberta === prazoDias ? "🟡" : "🟢";
+      return `   ${statusIcon} ${numero} • ${modelo}\n      📍 ${etapa} • *${diasAberta}d* aberta • ${diasEtapa}d etapa`;
+    }
+
+    function sortByDias(a: any, b: any): number {
+      return diasCorridos(a.created_at) - diasCorridos(b.created_at);
+    }
+
+    ci.sort(sortByDias).reverse();
+    ih5.sort(sortByDias).reverse();
+    ih7.sort(sortByDias).reverse();
+
+    const lines: string[] = [];
+    lines.push(`📍 *${sigla}* — ${osList.length} OS LP`);
+
+    if (ci.length > 0) {
+      const atrasadasCIUnit = ci.filter(os => diasCorridos(os.created_at) > 3).length;
+      lines.push(`\n  ⚡ *CI — Prazo 3 dias* (${ci.length} OS${atrasadasCIUnit > 0 ? ` • 🔴 ${atrasadasCIUnit} atrasadas` : ""})`);
+      for (const os of ci) {
+        lines.push(formatOSLine(os, 3));
+      }
+    }
+
+    if (ih5.length > 0) {
+      const atrasadasIH5Unit = ih5.filter(os => diasCorridos(os.created_at) > 5).length;
+      lines.push(`\n  🏠 *IH 5 dias* — REF, AC, RT, etc (${ih5.length} OS${atrasadasIH5Unit > 0 ? ` • 🔴 ${atrasadasIH5Unit} atrasadas` : ""})`);
+      for (const os of ih5) {
+        lines.push(formatOSLine(os, 5));
+      }
+    }
+
+    if (ih7.length > 0) {
+      const atrasadasIH7Unit = ih7.filter(os => diasCorridos(os.created_at) > 7).length;
+      lines.push(`\n  📺 *IH 7 dias* — TV (QN, UN, W) (${ih7.length} OS${atrasadasIH7Unit > 0 ? ` • 🔴 ${atrasadasIH7Unit} atrasadas` : ""})`);
+      for (const os of ih7) {
+        lines.push(formatOSLine(os, 7));
+      }
+    }
+
+    unidadeSections.push(lines.join("\n"));
+  }
+
+  const totalOS = allOS.length;
+  const percAtrasadas = totalOS > 0 ? Math.round((totalAtrasadas / totalOS) * 100) : 0;
+
+  const resumoTexto = [
+    `📋 *CONTROLE LP — PRAZO*`,
+    now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+    `━━━━━━━━━━━━━━━━━━`,
+    `📊 *${totalOS}* OS LP abertas`,
+    `🟢 ${totalNoPrazo} no prazo • 🔴 ${totalAtrasadas} atrasadas (${percAtrasadas}%)`,
+    ``,
+    `   CI 3d: 🔴 ${atrasadasCI} atrasadas`,
+    `   IH 5d: 🔴 ${atrasadasIH5} atrasadas`,
+    `   IH 7d: 🔴 ${atrasadasIH7} atrasadas`,
+    `━━━━━━━━━━━━━━━━━━`,
+    ``,
+    unidadeSections.join("\n┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄\n"),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🤖 _GIA • Global Intelligence Assistance_`,
+  ].join("\n");
+
+  return {
+    titulo: "Controle LP Prazo",
+    subtitulo: `${totalOS} OS LP • ${totalAtrasadas} atrasadas`,
+    gerado_em: now.toISOString(),
+    horario_disparo: now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" }),
+    total_os: totalOS,
+    total_atrasadas: totalAtrasadas,
+    resumo_texto: resumoTexto,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -2223,9 +2427,12 @@ Deno.serve(async (req: Request) => {
       case "resumo_final":
         resultado = await gerarResumoFinal(supabase, unidade_id);
         break;
+      case "controle_lp_prazo":
+        resultado = await gerarControleLPPrazo(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
