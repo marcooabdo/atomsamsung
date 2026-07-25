@@ -769,17 +769,16 @@ export function OSAgendamentoTab({
                            agend.resultado_visita}
                         </div>
                       )}
-                      <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                        agend.status === 'confirmado' ? 'bg-[#00D4FF20] text-[#00D4FF]' :
-                        agend.status === 'em_andamento' ? 'bg-[#FFBF0020] text-[#FFBF00]' :
-                        agend.status === 'concluido' ? 'bg-[#39FF1420] text-[#39FF14]' :
-                        'bg-gray-700 text-gray-400'
-                      }`}>
-                        {agend.status === 'confirmado' ? 'Agendado' :
-                         agend.status === 'em_andamento' ? 'Em Andamento' :
-                         agend.status === 'concluido' ? 'Concluído' :
-                         agend.status === 'cancelado' ? 'Cancelado' : agend.status}
-                      </div>
+                      {!agend.resultado_visita && (
+                        <div className={`px-3 py-1 rounded-full text-xs font-semibold ${
+                          agend.checkin_realizado && !agend.checkout_realizado ? 'bg-[#FFBF0020] text-[#FFBF00]' :
+                          agend.status === 'cancelado' ? 'bg-gray-700 text-gray-400' :
+                          'bg-[#00D4FF20] text-[#00D4FF]'
+                        }`}>
+                          {agend.checkin_realizado && !agend.checkout_realizado ? 'Em Andamento' :
+                           agend.status === 'cancelado' ? 'Cancelado' : 'Agendado'}
+                        </div>
+                      )}
                     </div>
                   </div>
 

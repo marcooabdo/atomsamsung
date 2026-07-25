@@ -673,7 +673,8 @@ export function ExecucaoOS() {
         tipo: tipo,
         nome_arquivo: novoNome,
         url: evidencia.url || '',
-        tamanho_bytes: evidencia.size
+        tamanho_bytes: evidencia.size,
+        agendamento_id: agendamento.id
       });
 
     if (insertError) {
@@ -768,7 +769,8 @@ export function ExecucaoOS() {
             tipo: 'assinatura_tecnico',
             nome_arquivo: 'Assinatura Técnico',
             url: tecnicoUrl,
-            tamanho_bytes: tecnicoBlob.size
+            tamanho_bytes: tecnicoBlob.size,
+            agendamento_id: agendamento.id
           },
           {
             os_id: agendamento.os_id,
@@ -776,7 +778,8 @@ export function ExecucaoOS() {
             tipo: 'assinatura_cliente',
             nome_arquivo: 'Assinatura Cliente',
             url: clienteUrl,
-            tamanho_bytes: clienteBlob.size
+            tamanho_bytes: clienteBlob.size,
+            agendamento_id: agendamento.id
           }
         ]);
 

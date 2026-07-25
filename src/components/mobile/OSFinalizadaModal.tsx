@@ -149,15 +149,32 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
       setPecas(pecasData as any);
     }
 
-    // Carregar anexos
-    const { data: anexosData } = await supabase
+    // Carregar anexos (filter by agendamento if available, fallback to os_id)
+    const anexosQuery = supabase
       .from('os_anexos')
       .select('id, tipo, nome_arquivo, url, tamanho_bytes, descricao, created_at')
-      .eq('os_id', osId)
+      .eq('agendamento_id', agendamentoId)
       .order('created_at', { ascending: true });
 
-    if (anexosData) {
+    const { data: anexosData } = await anexosQuery;
+
+    if (anexosData && anexosData.length > 0) {
       setAnexos(anexosData);
+    } else {
+      // Fallback: for older visits without agendamento_id, filter by time window
+      if (agendamentoData?.checkin_hora) {
+        const { data: fallbackAnexos } = await supabase
+          .from('os_anexos')
+          .select('id, tipo, nome_arquivo, url, tamanho_bytes, descricao, created_at')
+          .eq('os_id', osId)
+          .gte('created_at', agendamentoData.checkin_hora)
+          .lte('created_at', agendamentoData.checkout_hora || new Date().toISOString())
+          .order('created_at', { ascending: true });
+
+        if (fallbackAnexos) {
+          setAnexos(fallbackAnexos);
+        }
+      }
     }
 
     setLoading(false);
@@ -282,10 +299,37 @@ export function OSFinalizadaModal({ osId, agendamentoId, onClose }: OSFinalizada
                     {os.tipo_atendimento === 'IH' ? `IH - ${os.tipo_reparo || ''}` : os.tipo_atendimento}
                   </p>
                 </div>
-                {os.defeito_relatado && (
+                {(agendamento?.defeito_encontrado || os.defeito_relatado) && (
                   <div>
-                    <p className="text-gray-400">Defeito Relatado</p>
-                    <p className="text-white">{os.defeito_relatado}</p>
+                    <p className="text-gray-400">Defeito Encontrado</p>
+                    <p className="text-white">{agendamento?.defeito_encontrado || os.defeito_relatado}</p>
+                  </div>
+                )}
+                {agendamento?.diagnostico_tecnico && (
+                  <div>
+                    <p className="text-gray-400">Diagnóstico Técnico</p>
+                    <p className="text-white">{agendamento.diagnostico_tecnico}</p>
+                  </div>
+                )}
+                {agendamento?.acao_realizada && (
+                  <div>
+                    <p className="text-gray-400">Ação Realizada</p>
+                    <p className="text-white">{agendamento.acao_realizada}</p>
+                  </div>
+                )}
+                {agendamento?.resultado_visita && (
+                  <div>
+                    <p className="text-gray-400">Resultado da Visita</p>
+                    <p className={`font-semibold ${
+                      agendamento.resultado_visita === 'reparo_sucesso' ? 'text-green-400' :
+                      agendamento.resultado_visita === 'peca_defeito' ? 'text-red-400' :
+                      'text-amber-400'
+                    }`}>
+                      {agendamento.resultado_visita === 'reparo_sucesso' ? 'Reparo com Sucesso' :
+                       agendamento.resultado_visita === 'peca_defeito' ? 'Peça com Defeito' :
+                       agendamento.resultado_visita === 'improdutiva_revisita' ? 'Improdutiva / Revisita' :
+                       agendamento.resultado_visita}
+                    </p>
                   </div>
                 )}
               </div>

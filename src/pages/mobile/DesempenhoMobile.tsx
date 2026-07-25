@@ -45,7 +45,7 @@ export function DesempenhoMobile() {
 
     const { data: agendamentosMes } = await supabase
       .from('agendamentos')
-      .select('id, checkin_hora, checkout_hora, os:os_id(coluna_kanban)')
+      .select('id, checkin_hora, checkout_hora, resultado_visita')
       .eq('tecnico_id', usuario.id)
       .eq('checkout_realizado', true)
       .not('checkout_hora', 'is', null)
@@ -82,8 +82,7 @@ export function DesempenhoMobile() {
 
       const totalConcluidasMes = agendamentosMes.length;
       const osComSucesso = agendamentosMes.filter(a =>
-        a.os?.coluna_kanban === 'reparo_concluido' ||
-        a.os?.coluna_kanban === 'finalizado'
+        a.resultado_visita === 'reparo_sucesso'
       ).length;
       const taxaSucesso = totalConcluidasMes > 0 ? (osComSucesso / totalConcluidasMes) * 100 : 0;
 
@@ -113,12 +112,13 @@ export function DesempenhoMobile() {
         os_id,
         checkin_hora,
         checkout_hora,
+        resultado_visita,
+        defeito_encontrado,
         os:os_id (
           id,
           numero_os_samsung,
           numero_os_interna,
-          cliente_nome,
-          coluna_kanban
+          cliente_nome
         )
       `)
       .eq('tecnico_id', usuario.id)
@@ -137,12 +137,11 @@ export function DesempenhoMobile() {
           const tempoMinutos = (checkout.getTime() - checkin.getTime()) / (1000 * 60);
 
           const resultado = (() => {
-            const kanban = a.os?.coluna_kanban;
-            if (kanban === 'reparo_concluido' || kanban === 'aguardando_fechamento' || kanban === 'os_fechada') return 'Concluído';
-            if (kanban === 'aguardando_peca') return 'Voltar com Peça';
-            if (kanban === 'aguardando_aprovacao') return 'Aguardando Aprovação';
-            if (kanban === 'em_reparo_ci') return 'Em Reparo (CI)';
-            return kanban?.replace(/_/g, ' ')?.replace(/\b\w/g, c => c.toUpperCase()) || 'Finalizado';
+            const rv = a.resultado_visita;
+            if (rv === 'reparo_sucesso') return 'Reparo com Sucesso';
+            if (rv === 'peca_defeito') return 'Peça com Defeito';
+            if (rv === 'improdutiva_revisita') return 'Improdutiva / Revisita';
+            return rv || 'Finalizado';
           })();
 
           return {
@@ -292,11 +291,11 @@ export function DesempenhoMobile() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-white font-bold">OS #{item.numero_os}</span>
                       <span className={`px-2 py-1 rounded-lg text-xs font-medium ${
-                        item.resultado === 'Concluído'
+                        item.resultado === 'Reparo com Sucesso'
                           ? 'bg-green-500/20 text-green-400 border border-green-500/50'
-                          : item.resultado === 'Voltar com Peça'
-                          ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50'
-                          : item.resultado === 'Aguardando Aprovação'
+                          : item.resultado === 'Peça com Defeito'
+                          ? 'bg-red-500/20 text-red-400 border border-red-500/50'
+                          : item.resultado === 'Improdutiva / Revisita'
                           ? 'bg-amber-500/20 text-amber-400 border border-amber-500/50'
                           : 'bg-gray-500/20 text-gray-400 border border-gray-500/50'
                       }`}>

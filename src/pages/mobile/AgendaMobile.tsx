@@ -32,6 +32,7 @@ interface AgendamentoOS {
   agendamento_status: string;
   checkin_realizado: boolean;
   checkout_realizado: boolean;
+  resultado_visita: string | null;
 }
 
 export function AgendaMobile() {
@@ -59,6 +60,7 @@ export function AgendaMobile() {
         status,
         checkin_realizado,
         checkout_realizado,
+        resultado_visita,
         os:os_id (
           numero_os_interna,
           numero_os_samsung,
@@ -110,7 +112,8 @@ export function AgendaMobile() {
         longitude: null,
         agendamento_status: item.status,
         checkin_realizado: item.checkin_realizado,
-        checkout_realizado: item.checkout_realizado
+        checkout_realizado: item.checkout_realizado,
+        resultado_visita: (item as any).resultado_visita || null
       }));
       setAgendamentos(mappedData as any[]);
     }
@@ -122,23 +125,20 @@ export function AgendaMobile() {
   }, [usuario, dataFiltro]);
 
   const getStatusBadge = (os: AgendamentoOS) => {
-    // Visit fully completed - show OS kanban status (what the tech chose)
     if (os.checkin_realizado && os.checkout_realizado) {
-      const kanbanMap: Record<string, { label: string; color: string }> = {
-        'aguardando_peca': { label: 'Voltar com Peça', color: 'bg-orange-500/20 text-orange-400 border-orange-500/50' },
-        'reparo_concluido': { label: 'Reparo Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-        'aguardando_fechamento': { label: 'Concluído', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-        'os_fechada': { label: 'OS Fechada', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
-        'em_reparo_ci': { label: 'Em Reparo (CI)', color: 'bg-purple-500/20 text-purple-400 border-purple-500/50' },
-        'aguardando_aprovacao': { label: 'Aguardando Aprovação', color: 'bg-amber-500/20 text-amber-400 border-amber-500/50' },
-      };
-      return kanbanMap[os.coluna_kanban] || { label: 'Finalizado', color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+      if (os.resultado_visita) {
+        const resultadoMap: Record<string, { label: string; color: string }> = {
+          'reparo_sucesso': { label: 'Reparo com Sucesso', color: 'bg-green-500/20 text-green-400 border-green-500/50' },
+          'peca_defeito': { label: 'Peça com Defeito', color: 'bg-red-500/20 text-red-400 border-red-500/50' },
+          'improdutiva_revisita': { label: 'Improdutiva / Revisita', color: 'bg-amber-500/20 text-amber-400 border-amber-500/50' },
+        };
+        return resultadoMap[os.resultado_visita] || { label: os.resultado_visita, color: 'bg-gray-500/20 text-gray-400 border-gray-500/50' };
+      }
+      return { label: 'Finalizado', color: 'bg-green-500/20 text-green-400 border-green-500/50' };
     }
-    // Visit in progress (check-in done, no checkout yet)
     if (os.checkin_realizado) {
       return { label: 'Em Atendimento', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/50' };
     }
-    // Visit not started yet - always show as available
     return { label: 'Disponível', color: 'bg-blue-500/20 text-blue-400 border-blue-500/50' };
   };
 
