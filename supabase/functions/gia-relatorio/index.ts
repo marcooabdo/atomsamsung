@@ -2250,7 +2250,7 @@ async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, u
     const tipo = (os.tipo_atendimento || "").toUpperCase();
     if (tipo === "CI") return { dias: 3, label: "CI 3d" };
     const modelo = (os.aparelho_modelo || "").toUpperCase();
-    if (modelo.startsWith("QN") || modelo.startsWith("UN") || modelo.startsWith("W")) {
+    if (modelo.startsWith("QN") || modelo.startsWith("UN") || modelo.startsWith("W") || modelo.startsWith("LH") || modelo.startsWith("LS")) {
       return { dias: 7, label: "IH 7d" };
     }
     return { dias: 5, label: "IH 5d" };

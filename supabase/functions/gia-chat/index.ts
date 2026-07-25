@@ -312,38 +312,34 @@ REGRAS CRITICAS:
     const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     const REPORT_TRIGGERS: { keywords: string[]; tipo: string }[] = [
-      { keywords: ["lp", "prazo lp", "controle lp"], tipo: "controle_lp_prazo" },
-      { keywords: ["pulso", "pulso operacional"], tipo: "pulso_operacional" },
-      { keywords: ["abertura", "fechamento", "abertura e fechamento"], tipo: "abertura_fechamento" },
-      { keywords: ["rota", "mapa de rota", "mapa rotas"], tipo: "mapa_rotas" },
-      { keywords: ["peca", "nucleo peca", "nucleo de peca"], tipo: "nucleo_pecas" },
+      { keywords: ["controle lp", "relatorio lp", "relatorio de lp", " lp"], tipo: "controle_lp_prazo" },
+      { keywords: ["pulso operacional", "pulso"], tipo: "pulso_operacional" },
+      { keywords: ["abertura e fechamento", "abertura", "fechamento"], tipo: "abertura_fechamento" },
+      { keywords: ["rotas", "mapa de rota", "mapa rotas", "relatorio rota"], tipo: "mapa_rotas" },
+      { keywords: ["nucleo de peca", "nucleo peca", "relatorio peca"], tipo: "nucleo_pecas" },
       { keywords: ["estoque dia", "estoque do dia"], tipo: "estoque_dia" },
-      { keywords: ["credito", "limite credito", "limite de credito", "gspn credito"], tipo: "limite_credito_gspn" },
+      { keywords: ["limite de credito", "limite credito", "credito gspn"], tipo: "limite_credito_gspn" },
       { keywords: ["compliance", "erros compliance"], tipo: "compliance_erros" },
       { keywords: ["agenda", "agendamento", "agendamentos ih"], tipo: "agendamentos_ih" },
       { keywords: ["resumo final", "resumo do dia"], tipo: "resumo_final" },
     ];
 
-    const isSendRequest = (
+    const hasActionVerb = (
       msgLower.includes("enviar") || msgLower.includes("envia") || 
       msgLower.includes("manda") || msgLower.includes("mandar") || 
-      msgLower.includes("dispara") || msgLower.includes("disparar") || 
-      msgLower.includes("whatsapp") || msgLower.includes("grupo") ||
-      msgLower.includes("manda no") || msgLower.includes("envia no")
-    ) && (
-      msgLower.includes("relatorio") || msgLower.includes("controle") || msgLower.includes("report")
+      msgLower.includes("dispara") || msgLower.includes("disparar") ||
+      msgLower.includes("gera") || msgLower.includes("gerar")
     );
 
-    // Also detect simpler patterns like "envia o LP", "manda o pulso", "envia a agenda"
-    const isSimpleSendRequest = (
-      msgLower.includes("enviar") || msgLower.includes("envia") || 
-      msgLower.includes("manda") || msgLower.includes("mandar") || 
-      msgLower.includes("dispara") || msgLower.includes("disparar")
+    const hasReportWord = (
+      msgLower.includes("relatorio") || msgLower.includes("controle") || 
+      msgLower.includes("report") || msgLower.includes("pulso") || 
+      msgLower.includes("nucleo") || msgLower.includes("limite")
     );
 
     let detectedReportTipo: string | null = null;
 
-    if (isSendRequest || isSimpleSendRequest) {
+    if (hasActionVerb && (hasReportWord || msgLower.includes("whatsapp") || msgLower.includes("grupo"))) {
       for (const trigger of REPORT_TRIGGERS) {
         if (trigger.keywords.some(kw => msgLower.includes(kw))) {
           detectedReportTipo = trigger.tipo;
