@@ -2373,6 +2373,19 @@ async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, u
     `🤖 _GIA • Global Intelligence Assistance_`,
   ].join("\n");
 
+  const mensagensPorUnidade: string[] = [];
+  for (const section of unidadeSections) {
+    const msg = [
+      `📋 *CONTROLE LP — PRAZO*`,
+      now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+      `━━━━━━━━━━━━━━━━━━`,
+      section,
+      `━━━━━━━━━━━━━━━━━━`,
+      `🤖 _GIA • Global Intelligence Assistance_`,
+    ].join("\n");
+    mensagensPorUnidade.push(msg);
+  }
+
   return {
     titulo: "Controle LP Prazo",
     subtitulo: `${totalOS} OS LP • ${totalAtrasadas} atrasadas`,
@@ -2381,6 +2394,7 @@ async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, u
     total_os: totalOS,
     total_atrasadas: totalAtrasadas,
     resumo_texto: resumoTexto,
+    mensagens_por_unidade: mensagensPorUnidade,
   };
 }
 

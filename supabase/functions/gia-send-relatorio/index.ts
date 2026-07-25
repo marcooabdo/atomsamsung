@@ -331,6 +331,64 @@ Deno.serve(async (req: Request) => {
     // Prioridade: group_jid do request (on-demand) > grupo_destino da config > grupo padrão
     const targetGroup = group_jid || config.grupo_destino || DEFAULT_GROUP;
 
+    // Para controle_lp_prazo, enviar uma mensagem separada por unidade
+    if (tipo === "controle_lp_prazo") {
+      try {
+        const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseKey}`,
+          },
+          body: JSON.stringify({ tipo }),
+        });
+
+        if (!response.ok) {
+          const errText = await response.text();
+          throw new Error(`gia-relatorio LP erro (${response.status}): ${errText}`);
+        }
+
+        const data = await response.json();
+        const mensagens: string[] = data.mensagens_por_unidade || [];
+
+        if (mensagens.length === 0) {
+          const fallbackMsg = data.resumo_texto || data.mensagem || "Nenhuma OS LP encontrada.";
+          await sendWhatsAppGroup(targetGroup, fallbackMsg);
+        } else {
+          for (let i = 0; i < mensagens.length; i++) {
+            await sendWhatsAppGroup(targetGroup, mensagens[i]);
+            if (i < mensagens.length - 1) {
+              await new Promise(resolve => setTimeout(resolve, 1500));
+            }
+          }
+        }
+
+        await supabase.from("gia_relatorio_logs").insert({
+          tipo,
+          nome: config.nome,
+          status: "sucesso",
+          etapa: "envio_completo",
+          mensagem: `LP enviado em ${mensagens.length} mensagens separadas para ${targetGroup}`,
+          grupo_jid: targetGroup,
+          instancia: "Marco",
+        });
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            tipo, 
+            grupo_destino: targetGroup,
+            mensagens_enviadas: mensagens.length,
+            message: `LP enviado em ${mensagens.length} mensagens (1 por unidade)` 
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (lpErr) {
+        console.error("Erro LP separado, tentando texto único:", lpErr.message);
+        // Fallback: enviar como texto normal (cai no fluxo padrão abaixo)
+      }
+    }
+
     // Para pulso_operacional, enviar imagens visuais por unidade
     if (tipo === "pulso_operacional") {
       try {
