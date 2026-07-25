@@ -304,6 +304,42 @@ REGRAS CRITICAS:
 
     chatMessages.push({ role: "user", content: message });
 
+    // Detect command: send LP report via WhatsApp
+    const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const isLPReportRequest = (
+      (msgLower.includes("relatorio") || msgLower.includes("controle")) &&
+      (msgLower.includes("lp") || msgLower.includes("prazo")) &&
+      (msgLower.includes("enviar") || msgLower.includes("envia") || msgLower.includes("manda") || msgLower.includes("mandar") || msgLower.includes("dispara") || msgLower.includes("disparar") || msgLower.includes("whatsapp") || msgLower.includes("grupo"))
+    );
+
+    if (isLPReportRequest) {
+      try {
+        const sendResponse = await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${supabaseServiceKey}`,
+          },
+          body: JSON.stringify({ tipo: "controle_lp_prazo" }),
+        });
+
+        const sendResult = await sendResponse.json();
+        const actionResult = sendResponse.ok
+          ? "RELATORIO LP ENVIADO COM SUCESSO no grupo WhatsApp."
+          : `ERRO ao enviar relatorio LP: ${sendResult.error || "falha desconhecida"}`;
+
+        chatMessages[chatMessages.length - 1] = {
+          role: "user",
+          content: `${message}\n\n[SYSTEM ACTION RESULT: ${actionResult}]`,
+        };
+      } catch (sendErr) {
+        chatMessages[chatMessages.length - 1] = {
+          role: "user",
+          content: `${message}\n\n[SYSTEM ACTION RESULT: ERRO ao enviar relatorio LP - ${String(sendErr)}]`,
+        };
+      }
+    }
+
     const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
