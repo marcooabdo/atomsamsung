@@ -2786,8 +2786,10 @@ Não haverá cobrança ao cliente.`
       return;
     }
 
-    // Se a OS não tem rota definida e não estamos recebendo rota_id via extraUpdates, exibir modal obrigatório
-    if (!os.rota_id && !extraUpdates?.rota_id) {
+    // Se a OS não tem rota definida (cidade não está em nenhuma rota) e não estamos recebendo rota_id via extraUpdates, exibir modal obrigatório
+    const cidadeNormCheck = normalizeCidadeLocal(os.cliente_cidade);
+    const temRotaPorCidade = cidadeNormCheck ? rotasUnidade.some(r => r.cidades?.some(c => normalizeCidadeLocal(c) === cidadeNormCheck)) : false;
+    if (!temRotaPorCidade && !extraUpdates?.rota_id) {
       setMostrarMoverPara(false);
       setColunaDestinoAposSelecionarRota({ id: targetColumn, label: targetColumn });
       setMostrarSelecionarRotaObrigatoria(true);
