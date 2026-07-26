@@ -2427,11 +2427,13 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     unidadeMap[u.id] = u.nome?.replace('Smart Center Samsung ', '').replace('SC Samsung ', '') || u.cidade || 'Unidade';
   }
 
+  const normCity = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
   const { data: kmRef } = await supabase.from('rotas_cidades_km').select('unidade_id, cidade, distancia_km_ida_volta, receita_por_os');
   const receitaMap: Record<string, number> = {};
   const kmDefinedSet = new Set<string>();
   for (const r of kmRef || []) {
-    const key = `${r.unidade_id}|${r.cidade?.toLowerCase()}`;
+    const key = `${r.unidade_id}|${normCity(r.cidade || '')}`;
     receitaMap[key] = r.receita_por_os || 0;
     if (r.distancia_km_ida_volta && r.distancia_km_ida_volta > 0) kmDefinedSet.add(key);
   }
@@ -2441,14 +2443,14 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   const cidadesEmRotaSet = new Set<string>();
   for (const rota of rotasData || []) {
     for (const cidade of (rota.cidades || [])) {
-      cidadesEmRotaSet.add(`${rota.unidade_id}|${cidade.trim().toLowerCase()}`);
+      cidadesEmRotaSet.add(`${rota.unidade_id}|${normCity(cidade)}`);
     }
   }
 
   // Build unit city set (these get excluded entirely, R$ 0)
   const cidadesUnidadeSet = new Set<string>();
   for (const u of unidades || []) {
-    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${u.cidade.toLowerCase()}`);
+    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${normCity(u.cidade)}`);
   }
 
   // Pipeline order for IH (matching Kanban board)
@@ -2511,7 +2513,7 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     if (!os.unidade_id) continue;
     const uid = os.unidade_id;
     const cidade = os.cliente_cidade?.trim() || 'Sem cidade';
-    const key = `${uid}|${cidade.toLowerCase()}`;
+    const key = `${uid}|${normCity(cidade)}`;
 
     totalOSByUnit[uid] = (totalOSByUnit[uid] || 0) + 1;
 

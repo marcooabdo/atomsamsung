@@ -203,12 +203,13 @@ export function AtomAudit() {
   const filteredOS = useMemo(() => {
     let list = [...osList];
     if (searchTerm) {
-      const term = searchTerm.toLowerCase();
+      const term = searchTerm.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const normS = (s: string | null | undefined) => (s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
       list = list.filter(o =>
-        o.numero_os_interna?.toLowerCase().includes(term) ||
-        o.numero_os_samsung?.toLowerCase().includes(term) ||
-        o.cliente_cidade?.toLowerCase().includes(term) ||
-        o.aparelho_modelo?.toLowerCase().includes(term)
+        normS(o.numero_os_interna).includes(term) ||
+        normS(o.numero_os_samsung).includes(term) ||
+        normS(o.cliente_cidade).includes(term) ||
+        normS(o.aparelho_modelo).includes(term)
       );
     }
     if (filtroCidade) list = list.filter(o => normalizarCidade(o.cliente_cidade) === filtroCidade);

@@ -263,7 +263,7 @@ export default function MotorOtimizacaoNew() {
   useEffect(() => {
     let filtered = [...osList];
     if (filterCidade) {
-      filtered = filtered.filter(os => os.cliente_cidade.toLowerCase().includes(filterCidade.toLowerCase()));
+      filtered = filtered.filter(os => os.cliente_cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(filterCidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')));
     }
     if (filterProduto) {
       filtered = filtered.filter(os => os.aparelho_linha?.toLowerCase().includes(filterProduto.toLowerCase()));

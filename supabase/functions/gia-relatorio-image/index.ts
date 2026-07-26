@@ -829,11 +829,12 @@ async function handleDinheiroNaMesaImage(supabase: ReturnType<typeof createClien
     .neq('coluna_kanban', 'os_fechada')
     .eq('arquivada', false);
 
+  const normCity = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
   const { data: kmRef } = await supabase.from('rotas_cidades_km').select('unidade_id, cidade, distancia_km_ida_volta, receita_por_os');
   const receitaMap: Record<string, number> = {};
   const kmDefinedSet = new Set<string>();
   for (const r of kmRef || []) {
-    const key = `${r.unidade_id}|${(r.cidade || '').toLowerCase()}`;
+    const key = `${r.unidade_id}|${normCity(r.cidade || '')}`;
     receitaMap[key] = r.receita_por_os || 0;
     if (r.distancia_km_ida_volta && Number(r.distancia_km_ida_volta) > 0) kmDefinedSet.add(key);
   }
@@ -842,13 +843,13 @@ async function handleDinheiroNaMesaImage(supabase: ReturnType<typeof createClien
   const cidadesEmRotaSet = new Set<string>();
   for (const rota of rotasData || []) {
     for (const cidade of (rota.cidades || [])) {
-      cidadesEmRotaSet.add(`${rota.unidade_id}|${cidade.trim().toLowerCase()}`);
+      cidadesEmRotaSet.add(`${rota.unidade_id}|${normCity(cidade)}`);
     }
   }
 
   const cidadesUnidadeSet = new Set<string>();
   for (const u of targetUnits) {
-    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${u.cidade.toLowerCase()}`);
+    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${normCity(u.cidade)}`);
   }
 
   const now = new Date();
@@ -867,7 +868,7 @@ async function handleDinheiroNaMesaImage(supabase: ReturnType<typeof createClien
     for (const os of unitOS) {
       const cidade = (os.cliente_cidade || '').trim();
       if (!cidade) { errorCount++; continue; }
-      const key = `${unit.id}|${cidade.toLowerCase()}`;
+      const key = `${unit.id}|${normCity(cidade)}`;
       if (cidadesUnidadeSet.has(key)) continue;
       
       const isInRoute = cidadesEmRotaSet.has(key);

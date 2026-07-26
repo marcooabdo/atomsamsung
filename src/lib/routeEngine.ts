@@ -181,7 +181,7 @@ export function otimizarRota(
   const comCoord = osList.filter(os => os.lat && os.lng);
 
   comCoord.forEach(os => {
-    const cidade = (os.cliente_cidade || '').trim().toLowerCase();
+    const cidade = (os.cliente_cidade || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (cidade && !rotasCidades.has(cidade) && !cidadesSemRota.includes(cidade)) {
       cidadesSemRota.push(cidade);
     }

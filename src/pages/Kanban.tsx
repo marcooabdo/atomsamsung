@@ -3266,8 +3266,8 @@ function ExportModal({ osData, rotas, onClose }: ExportModalProps) {
           row['Cliente Cidade'] = normalizarCidade(os.cliente_cidade);
           row['Rota'] = (() => {
             if (!os.cliente_cidade) return '';
-            const cidadeNorm = normalizarCidade(os.cliente_cidade).toLowerCase().trim();
-            const rota = rotas.find(r => r.cidades.some(c => normalizarCidade(c).toLowerCase().trim() === cidadeNorm));
+            const cidadeNorm = normalizarCidade(os.cliente_cidade).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+            const rota = rotas.find(r => r.cidades.some(c => normalizarCidade(c).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() === cidadeNorm));
             return rota?.nome || '';
           })();
           row['Cliente Estado'] = os.cliente_estado || '';

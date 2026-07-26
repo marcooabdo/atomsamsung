@@ -657,10 +657,12 @@ export function Configuracoes() {
       .from('rotas_cidades_km')
       .select('cidade, distancia_km_ida_volta')
       .eq('unidade_id', unidadeId);
+    const normC = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const map: Record<string, string> = {};
-    for (const row of data || []) {
-      if (row.distancia_km_ida_volta) {
-        map[row.cidade] = String(row.distancia_km_ida_volta);
+    for (const cidade of cidades) {
+      const match = (data || []).find(row => normC(row.cidade) === normC(cidade));
+      if (match?.distancia_km_ida_volta) {
+        map[cidade] = String(match.distancia_km_ida_volta);
       }
     }
     setCidadesKM(map);
@@ -671,12 +673,12 @@ export function Configuracoes() {
     if (!km || km <= 0 || !formRota.unidade_id) return;
     const receita = km * 1.38;
 
-    const { data: existing } = await supabase
+    const normC = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const { data: allKm } = await supabase
       .from('rotas_cidades_km')
-      .select('id')
-      .eq('unidade_id', formRota.unidade_id)
-      .ilike('cidade', cidade)
-      .maybeSingle();
+      .select('id, cidade')
+      .eq('unidade_id', formRota.unidade_id);
+    const existing = (allKm || []).find(row => normC(row.cidade) === normC(cidade)) || null;
 
     if (existing) {
       await supabase.from('rotas_cidades_km').update({

@@ -259,13 +259,13 @@ export default function GestaoRotas() {
 
   const getFilteredOS = () => {
     if (!search.trim()) return pecaDisponivelOS;
-    const s = search.toLowerCase();
+    const s = search.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     return pecaDisponivelOS.filter(os =>
       (os.numero_os_interna || '').toLowerCase().includes(s) ||
       (os.numero_os_samsung || '').toLowerCase().includes(s) ||
-      (os.cliente_nome || '').toLowerCase().includes(s) ||
-      (os.cliente_cidade || '').toLowerCase().includes(s) ||
-      (os.cliente_bairro || '').toLowerCase().includes(s)
+      (os.cliente_nome || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(s) ||
+      (os.cliente_cidade || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(s) ||
+      (os.cliente_bairro || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(s)
     );
   };
 

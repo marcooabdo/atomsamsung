@@ -69,10 +69,11 @@ Deno.serve(async (req: Request) => {
       unidadeMap[u.id] = { nome: u.nome, cidade: u.cidade || "" };
     }
 
+    const normalizeCity = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
     const existingSet = new Set(
       (existingKm || [])
         .filter((e: any) => e.distancia_km_ida_volta && Number(e.distancia_km_ida_volta) > 0)
-        .map((e: any) => `${e.unidade_id}|${e.cidade.toLowerCase().trim()}`)
+        .map((e: any) => `${e.unidade_id}|${normalizeCity(e.cidade)}`)
     );
 
     // Build list of cities needing calculation
@@ -86,13 +87,13 @@ Deno.serve(async (req: Request) => {
       for (const cidade of cidades) {
         const cidadeTrim = cidade.trim();
         if (!cidadeTrim) continue;
-        if (cidadeTrim.toLowerCase() === unit.cidade.toLowerCase()) continue;
+        if (normalizeCity(cidadeTrim) === normalizeCity(unit.cidade)) continue;
         
-        const key = `${rota.unidade_id}|${cidadeTrim.toLowerCase()}`;
+        const key = `${rota.unidade_id}|${normalizeCity(cidadeTrim)}`;
         if (existingSet.has(key)) continue;
         
         // Avoid duplicates in needsCalc
-        if (!needsCalc.find(n => n.unidade_id === rota.unidade_id && n.cidade.toLowerCase() === cidadeTrim.toLowerCase())) {
+        if (!needsCalc.find(n => n.unidade_id === rota.unidade_id && normalizeCity(n.cidade) === normalizeCity(cidadeTrim))) {
           needsCalc.push({
             unidade_id: rota.unidade_id,
             cidade: cidadeTrim,
@@ -116,13 +117,12 @@ Deno.serve(async (req: Request) => {
         const kmIdaVolta = Math.round(kmOneWay * 2 * 10) / 10;
         const receita = Math.round(kmIdaVolta * RATE_PER_KM * 100) / 100;
 
-        // Check if already exists (case-insensitive)
-        const { data: existing } = await supabase
+        // Check if already exists (accent + case insensitive)
+        const { data: allExisting } = await supabase
           .from("rotas_cidades_km")
-          .select("id")
-          .eq("unidade_id", item.unidade_id)
-          .ilike("cidade", item.cidade)
-          .maybeSingle();
+          .select("id, cidade")
+          .eq("unidade_id", item.unidade_id);
+        const existing = (allExisting || []).find((r: any) => normalizeCity(r.cidade) === normalizeCity(item.cidade)) || null;
 
         let error;
         if (existing) {
