@@ -190,6 +190,7 @@ export function Configuracoes() {
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
   const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
+  const [cidadesKM, setCidadesKM] = useState<Record<string, string>>({});
   const [formChecklist, setFormChecklist] = useState({ nome: '', descricao: '', tipo_servico: 'geral' as const, tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM' as const, unidade_id: '', itens: [] as ChecklistItem[], ativo: true });
   const [novaCidade, setNovaCidade] = useState('');
   const [novoItem, setNovoItem] = useState({ texto: '', tipo_resposta: 'checkbox' as const });
@@ -328,7 +329,10 @@ export function Configuracoes() {
           break;
         case 'rotas':
           const rota = rotas.find(r => r.id === id);
-          if (rota) setFormRota({ nome: rota.nome, cor: rota.cor, cidades: rota.cidades || [], unidade_id: rota.unidade_id || '', ativa: rota.ativa });
+          if (rota) {
+            setFormRota({ nome: rota.nome, cor: rota.cor, cidades: rota.cidades || [], unidade_id: rota.unidade_id || '', ativa: rota.ativa });
+            loadCidadesKM(rota.unidade_id, rota.cidades || []);
+          }
           break;
         case 'checklists':
           const checklist = checklists.find(c => c.id === id);
@@ -370,6 +374,7 @@ export function Configuracoes() {
       setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: defaultUnitForForm, ativo: true });
       setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: defaultUnitForForm, tipo_orcamento: 'normal', ativo: true });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota || defaultUnitForForm, ativa: true });
+      setCidadesKM({});
       setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist || defaultUnitForForm, itens: [], ativo: true });
     }
     setShowModal(true);
@@ -640,6 +645,55 @@ export function Configuracoes() {
       loadData();
     } catch (error: any) {
       alert(`Erro ao salvar: ${error.message || 'Erro desconhecido'}`);
+    }
+  };
+
+  const loadCidadesKM = async (unidadeId: string | null, cidades: string[]) => {
+    if (!unidadeId || cidades.length === 0) {
+      setCidadesKM({});
+      return;
+    }
+    const { data } = await supabase
+      .from('rotas_cidades_km')
+      .select('cidade, distancia_km_ida_volta')
+      .eq('unidade_id', unidadeId);
+    const map: Record<string, string> = {};
+    for (const row of data || []) {
+      if (row.distancia_km_ida_volta) {
+        map[row.cidade] = String(row.distancia_km_ida_volta);
+      }
+    }
+    setCidadesKM(map);
+  };
+
+  const handleSaveCidadeKM = async (cidade: string) => {
+    const km = parseFloat(cidadesKM[cidade] || '0');
+    if (!km || km <= 0 || !formRota.unidade_id) return;
+    const receita = km * 1.38;
+
+    const { data: existing } = await supabase
+      .from('rotas_cidades_km')
+      .select('id')
+      .eq('unidade_id', formRota.unidade_id)
+      .ilike('cidade', cidade)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase.from('rotas_cidades_km').update({
+        distancia_km: km / 2,
+        distancia_km_ida_volta: km,
+        receita_por_os: receita,
+        updated_at: new Date().toISOString(),
+      }).eq('id', existing.id);
+    } else {
+      await supabase.from('rotas_cidades_km').insert({
+        unidade_id: formRota.unidade_id,
+        cidade,
+        distancia_km: km / 2,
+        distancia_km_ida_volta: km,
+        receita_por_os: receita,
+        calculado_at: new Date().toISOString(),
+      });
     }
   };
 
@@ -1533,8 +1587,21 @@ export function Configuracoes() {
                     {formRota.cidades.length > 0 ? (
                       <div className="space-y-2">
                         {formRota.cidades.map((cidade, index) => (
-                          <div key={index} className="flex items-center justify-between bg-[#0A0F1E] p-2 rounded border border-[#00D4FF]/20">
-                            <span className="text-sm text-gray-300">{cidade}</span>
+                          <div key={index} className="flex items-center gap-2 bg-[#0A0F1E] p-2 rounded border border-[#00D4FF]/20">
+                            <span className="text-sm text-gray-300 flex-1 min-w-0 truncate">{cidade}</span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <input
+                                type="number"
+                                placeholder="KM i/v"
+                                value={cidadesKM[cidade] || ''}
+                                onChange={(e) => setCidadesKM(prev => ({ ...prev, [cidade]: e.target.value }))}
+                                onBlur={() => handleSaveCidadeKM(cidade)}
+                                className="w-20 px-2 py-1 text-xs bg-gray-700/50 border border-gray-600 rounded text-white text-center focus:outline-none focus:border-cyan-500"
+                                min="0"
+                                step="0.1"
+                              />
+                              <span className="text-[10px] text-gray-500">km</span>
+                            </div>
                             <button
                               type="button"
                               onClick={() => {
@@ -1543,7 +1610,7 @@ export function Configuracoes() {
                                   cidades: formRota.cidades.filter((_, i) => i !== index)
                                 });
                               }}
-                              className="p-1 hover:bg-red-500/20 rounded transition-colors"
+                              className="p-1 hover:bg-red-500/20 rounded transition-colors shrink-0"
                             >
                               <X className="w-4 h-4 text-red-400" />
                             </button>

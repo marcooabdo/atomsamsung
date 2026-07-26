@@ -2400,12 +2400,10 @@ async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, u
 
 async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
-  const TARIFA_KM = 1.38;
 
-  // Get all active LP+OW IH OS (not archived, not closed)
   let osQuery = supabase
     .from('os')
-    .select('id, cliente_cidade, cliente_estado, unidade_id, coluna_kanban, tipo_os, tipo_atendimento')
+    .select('id, cliente_cidade, unidade_id, coluna_kanban, tipo_os')
     .in('tipo_os', ['LP', 'OW'])
     .eq('tipo_atendimento', 'IH')
     .neq('coluna_kanban', 'os_fechada')
@@ -2417,195 +2415,147 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
 
   const { data: osList, error: osError } = await osQuery;
   if (osError) {
-    console.error("[RelatorioKM] Query error:", JSON.stringify(osError));
-    return {
-      titulo: "Relatório KM",
-      subtitulo: "Erro na consulta",
-      gerado_em: now.toISOString(),
-      resumo_texto: `Erro ao consultar OS: ${osError.message}`,
-      mensagens_por_unidade: [],
-    };
+    return { titulo: "Relatório KM", subtitulo: "Erro", gerado_em: now.toISOString(), resumo_texto: `Erro: ${osError.message}`, mensagens_por_unidade: [] };
   }
   if (!osList || osList.length === 0) {
-    return {
-      titulo: "Relatório KM",
-      subtitulo: "Nenhuma OS IH ativa",
-      gerado_em: now.toISOString(),
-      resumo_texto: "Nenhuma OS IH ativa encontrada para cálculo de KM.",
-      mensagens_por_unidade: [],
-    };
+    return { titulo: "Relatório KM", subtitulo: "Vazio", gerado_em: now.toISOString(), resumo_texto: "Nenhuma OS IH ativa encontrada.", mensagens_por_unidade: [] };
   }
 
-  // Get all units
   const { data: unidades } = await supabase.from('unidades').select('id, nome, cidade');
   const unidadeMap: Record<string, string> = {};
   for (const u of unidades || []) {
     unidadeMap[u.id] = u.nome?.replace('Smart Center Samsung ', '').replace('SC Samsung ', '') || u.cidade || 'Unidade';
   }
 
-  // Get KM reference for all cities
   const { data: kmRef } = await supabase.from('rotas_cidades_km').select('unidade_id, cidade, distancia_km_ida_volta, receita_por_os');
-  const kmMap: Record<string, { km: number; receita: number }> = {};
+  const receitaMap: Record<string, number> = {};
+  const kmDefinedSet = new Set<string>();
   for (const r of kmRef || []) {
-    kmMap[`${r.unidade_id}|${r.cidade?.toLowerCase()}`] = { km: r.distancia_km_ida_volta, receita: r.receita_por_os };
+    const key = `${r.unidade_id}|${r.cidade?.toLowerCase()}`;
+    receitaMap[key] = r.receita_por_os || 0;
+    if (r.distancia_km_ida_volta && r.distancia_km_ida_volta > 0) kmDefinedSet.add(key);
   }
 
-  // Group by unit, then by city
-  const byUnit: Record<string, Record<string, { colunas: Record<string, number>; km: number; receita: number; tipoOS: Record<string, number> }>> = {};
-  
+  const colunaLabels: Record<string, string> = {
+    'os_nova': 'OS Nova', 'aguardando_peca': 'Aguard. Peça', 'peca_em_transito': 'Peça Trânsito',
+    'em_rota_ih': 'Em Rota IH', 'em_reparo_ih': 'Em Reparo IH', 'aguardando_fechamento': 'Aguard. Fechamento',
+    'aguardando_aprovacao': 'Aguard. Aprovação', 'return_handling': 'Return Handling', 'service_handling': 'Service Handling',
+    'saw': 'SAW', 'qa_bt': 'QA/BT', 'rota_preta': 'Rota Preta', 'rota_vermelha': 'Rota Vermelha',
+    'rota_azul': 'Rota Azul', 'rota_verde': 'Rota Verde', 'rota_rosa': 'Rota Rosa',
+    'rota_amarela': 'Rota Amarela', 'rota_laranja': 'Rota Laranja',
+  };
+  const colunaEmojis: Record<string, string> = {
+    'os_nova': '🆕', 'aguardando_peca': '⏳', 'peca_em_transito': '🚚', 'em_rota_ih': '🛣️',
+    'em_reparo_ih': '🔧', 'aguardando_fechamento': '📋', 'aguardando_aprovacao': '✋',
+    'return_handling': '↩️', 'service_handling': '⚙️', 'saw': '📦', 'qa_bt': '🔍',
+  };
+
+  type CityData = { count: number; receita: number };
+  type ColData = Record<string, CityData>;
+  const mappedByUnit: Record<string, Record<string, ColData>> = {};
+  const unmappedByUnit: Record<string, Record<string, number>> = {};
+
   for (const os of osList) {
-    if (!os.unidade_id || !os.cliente_cidade) continue;
-    if (!byUnit[os.unidade_id]) byUnit[os.unidade_id] = {};
-    
-    const cidade = os.cliente_cidade.trim();
-    const cidadeKey = cidade.toLowerCase();
-    
-    if (!byUnit[os.unidade_id][cidade]) {
-      const ref = kmMap[`${os.unidade_id}|${cidadeKey}`];
-      byUnit[os.unidade_id][cidade] = {
-        colunas: {},
-        km: ref?.km || 0,
-        receita: ref?.receita || 0,
-        tipoOS: {},
-      };
+    if (!os.unidade_id) continue;
+    const uid = os.unidade_id;
+    const cidade = os.cliente_cidade?.trim() || 'Sem cidade';
+    const key = `${uid}|${cidade.toLowerCase()}`;
+
+    if (kmDefinedSet.has(key)) {
+      const col = os.coluna_kanban || 'os_nova';
+      if (!mappedByUnit[uid]) mappedByUnit[uid] = {};
+      if (!mappedByUnit[uid][col]) mappedByUnit[uid][col] = {};
+      if (!mappedByUnit[uid][col][cidade]) mappedByUnit[uid][col][cidade] = { count: 0, receita: receitaMap[key] || 0 };
+      mappedByUnit[uid][col][cidade].count++;
+    } else {
+      if (!unmappedByUnit[uid]) unmappedByUnit[uid] = {};
+      unmappedByUnit[uid][cidade] = (unmappedByUnit[uid][cidade] || 0) + 1;
     }
-    
-    const col = os.coluna_kanban || 'os_nova';
-    byUnit[os.unidade_id][cidade].colunas[col] = (byUnit[os.unidade_id][cidade].colunas[col] || 0) + 1;
-    byUnit[os.unidade_id][cidade].tipoOS[os.tipo_os] = (byUnit[os.unidade_id][cidade].tipoOS[os.tipo_os] || 0) + 1;
   }
 
-  // Visual bar helper
-  function makeBar(value: number, max: number, width: number = 8): string {
-    const filled = max > 0 ? Math.round((value / max) * width) : 0;
-    return '▓'.repeat(filled) + '░'.repeat(width - filled);
-  }
-
-  // Medal for ranking
-  function getMedal(index: number): string {
-    if (index === 0) return '🥇';
-    if (index === 1) return '🥈';
-    if (index === 2) return '🥉';
-    return '▪️';
-  }
-
-  // Generate messages per unit
   const mensagensPorUnidade: string[] = [];
   let totalGeralOS = 0;
   let totalGeralReceita = 0;
 
-  const unitIds = Object.keys(byUnit).sort((a, b) => (unidadeMap[a] || '').localeCompare(unidadeMap[b] || ''));
+  const allUnitIds = [...new Set([...Object.keys(mappedByUnit), ...Object.keys(unmappedByUnit)])].sort((a, b) => (unidadeMap[a] || '').localeCompare(unidadeMap[b] || ''));
 
-  for (const uid of unitIds) {
-    const cidades = byUnit[uid];
+  for (const uid of allUnitIds) {
+    const colunas = mappedByUnit[uid] || {};
+    const unmapped = unmappedByUnit[uid] || {};
     const nomeUnidade = unidadeMap[uid] || 'Unidade';
-    
-    // Sort cities by total revenue descending
-    const cidadesSorted = Object.entries(cidades).sort((a, b) => {
-      const totalA = Object.values(a[1].colunas).reduce((s, n) => s + n, 0) * a[1].receita;
-      const totalB = Object.values(b[1].colunas).reduce((s, n) => s + n, 0) * b[1].receita;
-      return totalB - totalA;
-    });
 
-    let unitOS = 0;
-    let unitReceita = 0;
-    const lines: string[] = [];
-
-    // Find max revenue for bar scaling
-    const maxCidadeReceita = cidadesSorted.reduce((max, [, data]) => {
-      const t = Object.values(data.colunas).reduce((s, n) => s + n, 0) * data.receita;
-      return t > max ? t : max;
-    }, 0);
-
-    for (let i = 0; i < cidadesSorted.length; i++) {
-      const [cidade, data] = cidadesSorted[i];
-      const totalOS = Object.values(data.colunas).reduce((s, n) => s + n, 0);
-      const valorCidade = totalOS * data.receita;
-      unitOS += totalOS;
-      unitReceita += valorCidade;
-
-      const tipoBreak = Object.entries(data.tipoOS).map(([t, n]) => `${n} ${t}`).join(' + ');
-      const medal = getMedal(i);
-      const bar = makeBar(valorCidade, maxCidadeReceita);
-
-      if (data.km > 0) {
-        lines.push(`${medal} *${cidade}*`);
-        lines.push(`     ${bar}  R$ ${valorCidade.toFixed(2)}`);
-        lines.push(`     ${totalOS} OS (${tipoBreak}) • ${data.km}km i/v`);
-      } else {
-        lines.push(`${medal} *${cidade}* ⚠️`);
-        lines.push(`     ${totalOS} OS (${tipoBreak}) • _KM pendente_`);
-      }
+    const colTotals: { col: string; os: number; receita: number; cidades: ColData }[] = [];
+    for (const [col, cidadesData] of Object.entries(colunas)) {
+      let colOS = 0; let colReceita = 0;
+      for (const c of Object.values(cidadesData)) { colOS += c.count; colReceita += c.count * c.receita; }
+      colTotals.push({ col, os: colOS, receita: colReceita, cidades: cidadesData });
     }
+    colTotals.sort((a, b) => b.receita - a.receita);
 
+    const unitOS = colTotals.reduce((s, c) => s + c.os, 0);
+    const unitReceita = colTotals.reduce((s, c) => s + c.receita, 0);
     totalGeralOS += unitOS;
     totalGeralReceita += unitReceita;
 
+    const lines: string[] = [];
+    for (const { col, os: colOS, receita: colReceita, cidades: cidadesData } of colTotals) {
+      const emoji = colunaEmojis[col] || '▪️';
+      const label = colunaLabels[col] || col;
+      lines.push(`${emoji} *${label}* — ${colOS} OS • R$ ${colReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
+      const cidadesSorted = Object.entries(cidadesData).sort((a, b) => (b[1].count * b[1].receita) - (a[1].count * a[1].receita));
+      for (const [cidade, data] of cidadesSorted) {
+        lines.push(`    ${data.count}x ${cidade} → R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
+      }
+      lines.push('');
+    }
+
+    const unmappedEntries = Object.entries(unmapped).sort((a, b) => b[1] - a[1]);
+    const totalUnmapped = unmappedEntries.reduce((s, [, n]) => s + n, 0);
     const hora = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", hour: '2-digit', minute: '2-digit' });
 
-    const msg = [
-      `╔══════════════════════════════╗`,
-      `   💰 *DINHEIRO NA MESA*`,
-      `   📍 ${nomeUnidade}`,
-      `╚══════════════════════════════╝`,
+    const msgParts = [
+      `💰 *DINHEIRO NA MESA — ${nomeUnidade}*`,
+      `${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${hora}`,
       ``,
-      `🕐 ${hora} • ${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
-      ``,
-      `┌─────────────────────────────┐`,
-      `  📊 *${unitOS}* OS IH ativas`,
-      `  💵 *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}* receita potencial`,
-      `  🚗 Tarifa: R$ ${TARIFA_KM}/km`,
-      `└─────────────────────────────┘`,
-      ``,
-      `🏙️ *RANKING CIDADES:*`,
+      `📊 ${unitOS} OS mapeadas • *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
       ``,
       ...lines,
-      ``,
-      `═══════════════════════════════`,
-      `💰 *TOTAL: R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
-      `📈 ${cidadesSorted.length} cidades • ${unitOS} OS`,
-      `═══════════════════════════════`,
-      `🤖 _GIA • Global Intelligence Assistance_`,
-    ].join("\n");
+      `━━━━━━━━━━━━━━━━━━━━━`,
+      `💰 *Total: R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
+    ];
 
-    mensagensPorUnidade.push(msg);
+    if (unmappedEntries.length > 0) {
+      msgParts.push('');
+      msgParts.push(`⚠️ *${totalUnmapped} OS sem KM definido:*`);
+      for (const [cidade, qty] of unmappedEntries) {
+        msgParts.push(`    ${qty}x ${cidade}`);
+      }
+    }
+    msgParts.push('');
+    msgParts.push(`_GIA • Global Intelligence Assistance_`);
+    mensagensPorUnidade.push(msgParts.join("\n"));
   }
 
-  // Summary text (consolidated)
-  const unitSummaries = unitIds.map((uid, idx) => {
-    const cidades = byUnit[uid];
-    const nomeU = unidadeMap[uid] || 'Unidade';
-    const osCount = Object.values(cidades).reduce((s, c) => s + Object.values(c.colunas).reduce((ss, n) => ss + n, 0), 0);
-    const receita = Object.values(cidades).reduce((s, c) => s + Object.values(c.colunas).reduce((ss, n) => ss + n, 0) * c.receita, 0);
-    const bar = makeBar(receita, totalGeralReceita);
-    return `  ${getMedal(idx)} *${nomeU}*\n     ${bar}  R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} (${osCount} OS)`;
-  });
-
   const resumoTexto = [
-    `╔══════════════════════════════╗`,
-    `   💰 *DINHEIRO NA MESA*`,
-    `   📊 Consolidado Geral`,
-    `╚══════════════════════════════╝`,
+    `💰 *DINHEIRO NA MESA — Consolidado*`,
+    now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     ``,
-    `🕐 ${now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })}`,
+    `📊 ${totalGeralOS} OS mapeadas • *R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
     ``,
-    `┌─────────────────────────────┐`,
-    `  📊 *${totalGeralOS}* OS IH ativas`,
-    `  💵 *R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
-    `  🏢 ${Object.keys(byUnit).length} unidades`,
-    `└─────────────────────────────┘`,
+    ...allUnitIds.map(uid => {
+      const colunas = mappedByUnit[uid] || {};
+      const nomeU = unidadeMap[uid] || 'Unidade';
+      const osCount = Object.values(colunas).reduce((s, c) => s + Object.values(c).reduce((ss, d) => ss + d.count, 0), 0);
+      const receita = Object.values(colunas).reduce((s, c) => s + Object.values(c).reduce((ss, d) => ss + d.count * d.receita, 0), 0);
+      return `🏢 *${nomeU}*: ${osCount} OS • R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+    }),
     ``,
-    `🏆 *RANKING UNIDADES:*`,
-    ``,
-    ...unitSummaries,
-    ``,
-    `═══════════════════════════════`,
-    `🤖 _GIA • Global Intelligence Assistance_`,
+    `_GIA • Global Intelligence Assistance_`,
   ].join("\n");
 
   return {
     titulo: "Relatório KM",
-    subtitulo: `${totalGeralOS} OS IH • R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} na mesa`,
+    subtitulo: `${totalGeralOS} OS • R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`,
     gerado_em: now.toISOString(),
     total_os: totalGeralOS,
     total_receita: totalGeralReceita,
