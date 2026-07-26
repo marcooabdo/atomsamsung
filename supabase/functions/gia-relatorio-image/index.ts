@@ -824,7 +824,7 @@ async function handleDinheiroNaMesaImage(supabase: ReturnType<typeof createClien
   const { data: osList } = await supabase
     .from('os')
     .select('id, coluna_kanban, cliente_cidade, unidade_id, tipo_os, tipo_atendimento')
-    .in('tipo_os', ['LP', 'OW'])
+    .eq('tipo_os', 'LP')
     .eq('tipo_atendimento', 'IH')
     .neq('coluna_kanban', 'os_fechada')
     .eq('arquivada', false);

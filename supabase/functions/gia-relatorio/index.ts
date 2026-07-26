@@ -2404,7 +2404,7 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   let osQuery = supabase
     .from('os')
     .select('id, cliente_cidade, unidade_id, coluna_kanban, tipo_os')
-    .in('tipo_os', ['LP', 'OW'])
+    .eq('tipo_os', 'LP')
     .eq('tipo_atendimento', 'IH')
     .neq('coluna_kanban', 'os_fechada')
     .eq('arquivada', false);
@@ -2574,7 +2574,9 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       const cidadeLines = cidadesSorted.map(([cidade, data]) =>
         `${data.count}x ${cidade} (R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`
       );
-      lines.push(`      _${cidadeLines.join(' • ')}_`);
+      for (const cl of cidadeLines) {
+        lines.push(`      _${cl}_`);
+      }
       lines.push('');
     }
 
