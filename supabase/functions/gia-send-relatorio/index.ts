@@ -331,8 +331,8 @@ Deno.serve(async (req: Request) => {
     // Prioridade: group_jid do request (on-demand) > grupo_destino da config > grupo padrão
     const targetGroup = group_jid || config.grupo_destino || DEFAULT_GROUP;
 
-    // Para controle_lp_prazo, enviar uma mensagem separada por unidade
-    if (tipo === "controle_lp_prazo") {
+    // Para controle_lp_prazo e relatorio_km, enviar uma mensagem separada por unidade
+    if (tipo === "controle_lp_prazo" || tipo === "relatorio_km") {
       try {
         const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
           method: "POST",

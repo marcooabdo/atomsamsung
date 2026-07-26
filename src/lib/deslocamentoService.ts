@@ -150,4 +150,65 @@ export async function salvarReceitaManual(
     .eq('os_id', osId);
 }
 
+export async function calcularESalvarKmCidade(
+  unidadeId: string,
+  cidadeDestino: string,
+  estadoDestino: string
+): Promise<{ distancia_km_ida_volta: number; receita_por_os: number } | null> {
+  const { data: existing } = await supabase
+    .from('rotas_cidades_km')
+    .select('distancia_km_ida_volta, receita_por_os')
+    .eq('unidade_id', unidadeId)
+    .ilike('cidade', cidadeDestino.trim())
+    .maybeSingle();
+
+  if (existing) return existing;
+
+  const { data: unidade } = await supabase
+    .from('unidades')
+    .select('cidade, estado')
+    .eq('id', unidadeId)
+    .maybeSingle();
+
+  if (!unidade?.cidade) return null;
+
+  const result = await calcularDistanciaViaProxy(
+    unidade.cidade, unidade.estado || '',
+    cidadeDestino.trim(), estadoDestino || ''
+  );
+
+  if (result.erro || result.distancia_km === 0) return null;
+
+  const idaVolta = Math.round(result.distancia_km * 2 * 10) / 10;
+  const receita = Math.round(idaVolta * TARIFA_POR_KM * 100) / 100;
+
+  await supabase
+    .from('rotas_cidades_km')
+    .insert({
+      unidade_id: unidadeId,
+      cidade: cidadeDestino.trim(),
+      estado: estadoDestino || null,
+      distancia_km: result.distancia_km,
+      distancia_km_ida_volta: idaVolta,
+      receita_por_os: receita,
+      calculado_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+  return { distancia_km_ida_volta: idaVolta, receita_por_os: receita };
+}
+
+export async function getKmCidade(
+  unidadeId: string,
+  cidade: string
+): Promise<{ distancia_km_ida_volta: number; receita_por_os: number } | null> {
+  const { data } = await supabase
+    .from('rotas_cidades_km')
+    .select('distancia_km_ida_volta, receita_por_os')
+    .eq('unidade_id', unidadeId)
+    .ilike('cidade', cidade.trim())
+    .maybeSingle();
+  return data;
+}
+
 export { TARIFA_POR_KM };

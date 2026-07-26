@@ -2398,6 +2398,188 @@ async function gerarControleLPPrazo(supabase: ReturnType<typeof createClient>, u
   };
 }
 
+async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const TARIFA_KM = 1.38;
+
+  // Get all active LP IH OS (not archived, not closed)
+  let osQuery = supabase
+    .from('os')
+    .select('id, numero_os, cliente_cidade, cliente_estado, unidade_id, coluna_kanban, tipo_os, tipo_atendimento')
+    .eq('tipo_os', 'LP')
+    .eq('tipo_atendimento', 'IH')
+    .neq('coluna_kanban', 'os_fechada')
+    .or('arquivada.is.null,arquivada.eq.false');
+
+  if (unidadeId) {
+    osQuery = osQuery.eq('unidade_id', unidadeId);
+  }
+
+  const { data: osList } = await osQuery;
+  if (!osList || osList.length === 0) {
+    return {
+      titulo: "Relatório KM",
+      subtitulo: "Nenhuma OS LP IH ativa",
+      gerado_em: now.toISOString(),
+      resumo_texto: "Nenhuma OS LP IH ativa encontrada.",
+      mensagens_por_unidade: [],
+    };
+  }
+
+  // Get all units
+  const { data: unidades } = await supabase.from('unidades').select('id, nome, cidade');
+  const unidadeMap: Record<string, string> = {};
+  for (const u of unidades || []) {
+    unidadeMap[u.id] = u.nome?.replace('Smart Center Samsung ', '') || u.cidade || 'Unidade';
+  }
+
+  // Get KM reference for all cities
+  const { data: kmRef } = await supabase.from('rotas_cidades_km').select('unidade_id, cidade, distancia_km_ida_volta, receita_por_os');
+  const kmMap: Record<string, { km: number; receita: number }> = {};
+  for (const r of kmRef || []) {
+    kmMap[`${r.unidade_id}|${r.cidade?.toLowerCase()}`] = { km: r.distancia_km_ida_volta, receita: r.receita_por_os };
+  }
+
+  // Column labels
+  const colunaLabels: Record<string, string> = {
+    'os_nova': 'OS Nova',
+    'aguardando_peca': 'Aguard. Peça',
+    'peca_em_transito': 'Peça Trânsito',
+    'em_rota_ih': 'Em Rota IH',
+    'em_reparo_ih': 'Em Reparo IH',
+    'aguardando_fechamento': 'Aguard. Fech.',
+    'aguardando_aprovacao': 'Aguard. Aprov.',
+    'return_handling': 'Return Handling',
+    'service_handling': 'Service Handling',
+    'saw': 'SAW',
+    'qa_bt': 'QA/BT',
+    'rota_preta': 'Rota Preta',
+    'rota_vermelha': 'Rota Vermelha',
+    'rota_azul': 'Rota Azul',
+    'rota_verde': 'Rota Verde',
+    'rota_rosa': 'Rota Rosa',
+    'rota_amarela': 'Rota Amarela',
+    'rota_laranja': 'Rota Laranja',
+  };
+
+  // Group by unit, then by city
+  const byUnit: Record<string, Record<string, { colunas: Record<string, number>; km: number; receita: number }>> = {};
+  
+  for (const os of osList) {
+    if (!os.unidade_id || !os.cliente_cidade) continue;
+    if (!byUnit[os.unidade_id]) byUnit[os.unidade_id] = {};
+    
+    const cidade = os.cliente_cidade.trim();
+    const cidadeKey = cidade.toLowerCase();
+    
+    if (!byUnit[os.unidade_id][cidade]) {
+      const ref = kmMap[`${os.unidade_id}|${cidadeKey}`];
+      byUnit[os.unidade_id][cidade] = {
+        colunas: {},
+        km: ref?.km || 0,
+        receita: ref?.receita || 0,
+      };
+    }
+    
+    const col = os.coluna_kanban || 'os_nova';
+    byUnit[os.unidade_id][cidade].colunas[col] = (byUnit[os.unidade_id][cidade].colunas[col] || 0) + 1;
+  }
+
+  // Generate messages per unit
+  const mensagensPorUnidade: string[] = [];
+  let totalGeralOS = 0;
+  let totalGeralReceita = 0;
+
+  const unitIds = Object.keys(byUnit).sort((a, b) => (unidadeMap[a] || '').localeCompare(unidadeMap[b] || ''));
+
+  for (const uid of unitIds) {
+    const cidades = byUnit[uid];
+    const nomeUnidade = unidadeMap[uid] || 'Unidade';
+    
+    // Sort cities by total revenue descending
+    const cidadesSorted = Object.entries(cidades).sort((a, b) => {
+      const totalA = Object.values(a[1].colunas).reduce((s, n) => s + n, 0) * a[1].receita;
+      const totalB = Object.values(b[1].colunas).reduce((s, n) => s + n, 0) * b[1].receita;
+      return totalB - totalA;
+    });
+
+    let unitOS = 0;
+    let unitReceita = 0;
+    const lines: string[] = [];
+
+    for (const [cidade, data] of cidadesSorted) {
+      const totalOS = Object.values(data.colunas).reduce((s, n) => s + n, 0);
+      const valorCidade = totalOS * data.receita;
+      unitOS += totalOS;
+      unitReceita += valorCidade;
+
+      const colEntries = Object.entries(data.colunas)
+        .sort((a, b) => b[1] - a[1])
+        .map(([col, qty]) => `${qty}x ${colunaLabels[col] || col}`)
+        .join(', ');
+
+      if (data.km > 0) {
+        lines.push(`📍 *${cidade}* — ${data.km} km i/v`);
+        lines.push(`   ${totalOS} OS → R${valorCidade.toFixed(2)}`);
+        lines.push(`   _${colEntries}_`);
+      } else {
+        lines.push(`📍 *${cidade}* — ⚠️ KM não calculado`);
+        lines.push(`   ${totalOS} OS`);
+        lines.push(`   _${colEntries}_`);
+      }
+    }
+
+    totalGeralOS += unitOS;
+    totalGeralReceita += unitReceita;
+
+    const msg = [
+      `💰 *RELATÓRIO KM — ${nomeUnidade.toUpperCase()}*`,
+      now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+      `━━━━━━━━━━━━━━━━━━`,
+      `📊 *${unitOS} OS LP IH* • R${unitReceita.toFixed(2)} na mesa`,
+      `💵 Tarifa: R${TARIFA_KM}/km`,
+      ``,
+      ...lines,
+      ``,
+      `━━━━━━━━━━━━━━━━━━`,
+      `💰 *Total ${nomeUnidade}: R${unitReceita.toFixed(2)}*`,
+      `🤖 _GIA • Global Intelligence Assistance_`,
+    ].join("\n");
+
+    mensagensPorUnidade.push(msg);
+  }
+
+  // Summary text (consolidated)
+  const resumoTexto = [
+    `💰 *RELATÓRIO KM — CONSOLIDADO*`,
+    now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }),
+    `━━━━━━━━━━━━━━━━━━`,
+    `📊 *${totalGeralOS} OS LP IH* distribuídas em ${Object.keys(byUnit).length} unidades`,
+    `💵 *Dinheiro na mesa: R${totalGeralReceita.toFixed(2)}*`,
+    ``,
+    ...unitIds.map(uid => {
+      const cidades = byUnit[uid];
+      const nomeU = unidadeMap[uid] || 'Unidade';
+      const osCount = Object.values(cidades).reduce((s, c) => s + Object.values(c.colunas).reduce((ss, n) => ss + n, 0), 0);
+      const receita = Object.values(cidades).reduce((s, c) => s + Object.values(c.colunas).reduce((ss, n) => ss + n, 0) * c.receita, 0);
+      return `   🏢 ${nomeU}: ${osCount} OS • R${receita.toFixed(2)}`;
+    }),
+    ``,
+    `━━━━━━━━━━━━━━━━━━`,
+    `🤖 _GIA • Global Intelligence Assistance_`,
+  ].join("\n");
+
+  return {
+    titulo: "Relatório KM",
+    subtitulo: `${totalGeralOS} OS LP IH • R${totalGeralReceita.toFixed(2)} na mesa`,
+    gerado_em: now.toISOString(),
+    total_os: totalGeralOS,
+    total_receita: totalGeralReceita,
+    resumo_texto: resumoTexto,
+    mensagens_por_unidade: mensagensPorUnidade,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -2444,9 +2626,12 @@ Deno.serve(async (req: Request) => {
       case "controle_lp_prazo":
         resultado = await gerarControleLPPrazo(supabase, unidade_id);
         break;
+      case "relatorio_km":
+        resultado = await gerarRelatorioKM(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

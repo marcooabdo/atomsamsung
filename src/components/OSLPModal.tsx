@@ -4,6 +4,7 @@ import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, Che
 import { supabase } from '../lib/supabase';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
+import { getKmCidade, calcularESalvarKmCidade } from '../lib/deslocamentoService';
 
 function sanitizeGSPNValue(raw: string): string {
   let cleaned = raw.replace(/[^\d.,]/g, '');
@@ -158,6 +159,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
   const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
   const [mostrarEditarRotaCidade, setMostrarEditarRotaCidade] = useState(false);
   const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
+  const [cidadeKmLP, setCidadeKmLP] = useState<{ distancia_km_ida_volta: number; receita_por_os: number } | null>(null);
 
   // Estados para criação de nova OS
   const [unidades, setUnidades] = useState<Array<{ id: string; nome: string }>>([]);
@@ -293,6 +295,12 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onClose]);
+
+  useEffect(() => {
+    if (os?.cliente_cidade && os?.unidade_id) {
+      getKmCidade(os.unidade_id, os.cliente_cidade).then(setCidadeKmLP);
+    }
+  }, [os?.cliente_cidade, os?.unidade_id]);
 
   // Load user preference for system comments visibility
   const prefLoaded = useRef(false);
@@ -4701,6 +4709,11 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                 if (rotaAtual) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${(rotaAtual as any).cor || '#666'}25`, color: (rotaAtual as any).cor || '#999' }}>{rotaAtual.nome}</span>;
                                 return null;
                               })()}
+                              {cidadeKmLP && (
+                                <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium">
+                                  {cidadeKmLP.distancia_km_ida_volta} km i/v • R${cidadeKmLP.receita_por_os.toFixed(2)}
+                                </span>
+                              )}
                             </p>
                           </div>
                           <div>
@@ -6775,6 +6788,12 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             }
             setMostrarEditarRotaCidade(false);
             if (onReload) onReload();
+
+            if (cidadeOS && os.unidade_id) {
+              calcularESalvarKmCidade(os.unidade_id, cidadeOS, os.cliente_estado || '').then(km => {
+                if (km) setCidadeKmLP(km);
+              });
+            }
           } catch (error: any) {
             alert(`Erro ao definir rota: ${error.message}`);
           }

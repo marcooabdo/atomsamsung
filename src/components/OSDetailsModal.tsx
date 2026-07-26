@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { WhatsAppSendModal } from './WhatsAppSendModal';
+import { calcularESalvarKmCidade, getKmCidade } from '../lib/deslocamentoService';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 import { useTheme } from '../contexts/ThemeContext';
 
@@ -114,6 +115,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [editCidade, setEditCidade] = useState('');
   const [selectedRotaColumn, setSelectedRotaColumn] = useState('');
   const [savingRota, setSavingRota] = useState(false);
+  const [cidadeKm, setCidadeKm] = useState<{ distancia_km_ida_volta: number; receita_por_os: number } | null>(null);
   const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cidades: string[] }>>([]);
 
   const themeAccent = themeInfo.accent;
@@ -128,6 +130,12 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     loadOSDetails();
     loadCurrentJob();
   }, [osId]);
+
+  useEffect(() => {
+    if (osDetails?.cliente_cidade && osDetails?.unidade_id && (osDetails?.tipo_os === 'LP' || osDetails?.tipo_os === 'OW')) {
+      getKmCidade(osDetails.unidade_id, osDetails.cliente_cidade).then(setCidadeKm);
+    }
+  }, [osDetails?.cliente_cidade, osDetails?.unidade_id]);
 
   useEffect(() => {
     if (!osDetails?.unidade_id) return;
@@ -407,6 +415,10 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       setOsDetails({ ...osDetails, ...updateData, coluna_kanban: selectedRotaColumn, rota_id: rotaId });
       setShowRotaEditor(false);
       await loadRotas(osDetails.unidade_id);
+
+      if (cidadeCorrigida && osDetails.unidade_id) {
+        calcularESalvarKmCidade(osDetails.unidade_id, cidadeCorrigida, osDetails.cliente_estado || '');
+      }
     } catch (err) {
       console.error('Erro ao salvar rota:', err);
     } finally {
@@ -660,6 +672,11 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                       <span className="ml-1">• {rotas.find(r => r.id === osDetails.rota_id)?.nome || 'Sem rota'}</span>
                     )}
                   </span>
+                  {cidadeKm && (osDetails.tipo_os === 'LP' || osDetails.tipo_os === 'OW') && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">
+                      {cidadeKm.distancia_km_ida_volta} km i/v • R${cidadeKm.receita_por_os.toFixed(2)}
+                    </span>
+                  )}
                   <button
                     onClick={() => {
                       setEditCidade(osDetails.cliente_cidade || '');
