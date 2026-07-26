@@ -1548,16 +1548,29 @@ export function Configuracoes() {
                         type="text"
                         value={novaCidade}
                         onChange={(e) => setNovaCidade(e.target.value)}
-                        onKeyDown={(e) => {
+                        onKeyDown={async (e) => {
                           if (e.key === 'Enter' && novaCidade.trim()) {
                             e.preventDefault();
-                            const cidadeNormalizada = novaCidade.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            const cidadeTrimmed = novaCidade.trim();
+                            const cidadeNormalizada = cidadeTrimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                             const cidadesNormalizadas = formRota.cidades.map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-                            if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
-                              setFormRota({...formRota, cidades: [...formRota.cidades, novaCidade.trim()]});
-                              setNovaCidade('');
-                            } else {
-                              alert('Cidade já adicionada (mesmo com grafia diferente)!');
+                            if (cidadesNormalizadas.includes(cidadeNormalizada)) {
+                              alert('Cidade já adicionada nesta rota!');
+                              return;
+                            }
+                            const rotaDuplicada = rotas.find(r => r.id !== editingId && r.unidade_id === formRota.unidade_id && r.cidades?.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === cidadeNormalizada));
+                            if (rotaDuplicada) {
+                              const novasCidadesOutra = rotaDuplicada.cidades.filter(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') !== cidadeNormalizada);
+                              await supabase.from('rotas').update({ cidades: novasCidadesOutra }).eq('id', rotaDuplicada.id);
+                              setRotas(prev => prev.map(r => r.id === rotaDuplicada.id ? { ...r, cidades: novasCidadesOutra } : r));
+                              alert(`Cidade movida da ${rotaDuplicada.nome} para esta rota.`);
+                            }
+                            const novasCidades = [...formRota.cidades, cidadeTrimmed];
+                            setFormRota({...formRota, cidades: novasCidades});
+                            setNovaCidade('');
+                            if (editingId) {
+                              await supabase.from('rotas').update({ cidades: novasCidades }).eq('id', editingId);
+                              setRotas(prev => prev.map(r => r.id === editingId ? { ...r, cidades: novasCidades } : r));
                             }
                           }
                         }}
@@ -1566,15 +1579,28 @@ export function Configuracoes() {
                       />
                       <button
                         type="button"
-                        onClick={() => {
+                        onClick={async () => {
                           if (novaCidade.trim()) {
-                            const cidadeNormalizada = novaCidade.trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+                            const cidadeTrimmed = novaCidade.trim();
+                            const cidadeNormalizada = cidadeTrimmed.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
                             const cidadesNormalizadas = formRota.cidades.map(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''));
-                            if (!cidadesNormalizadas.includes(cidadeNormalizada)) {
-                              setFormRota({...formRota, cidades: [...formRota.cidades, novaCidade.trim()]});
-                              setNovaCidade('');
-                            } else {
-                              alert('Cidade já adicionada (mesmo com grafia diferente)!');
+                            if (cidadesNormalizadas.includes(cidadeNormalizada)) {
+                              alert('Cidade já adicionada nesta rota!');
+                              return;
+                            }
+                            const rotaDuplicada = rotas.find(r => r.id !== editingId && r.unidade_id === formRota.unidade_id && r.cidades?.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') === cidadeNormalizada));
+                            if (rotaDuplicada) {
+                              const novasCidadesOutra = rotaDuplicada.cidades.filter(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '') !== cidadeNormalizada);
+                              await supabase.from('rotas').update({ cidades: novasCidadesOutra }).eq('id', rotaDuplicada.id);
+                              setRotas(prev => prev.map(r => r.id === rotaDuplicada.id ? { ...r, cidades: novasCidadesOutra } : r));
+                              alert(`Cidade movida da ${rotaDuplicada.nome} para esta rota.`);
+                            }
+                            const novasCidades = [...formRota.cidades, cidadeTrimmed];
+                            setFormRota({...formRota, cidades: novasCidades});
+                            setNovaCidade('');
+                            if (editingId) {
+                              await supabase.from('rotas').update({ cidades: novasCidades }).eq('id', editingId);
+                              setRotas(prev => prev.map(r => r.id === editingId ? { ...r, cidades: novasCidades } : r));
                             }
                           }
                         }}
@@ -1604,11 +1630,13 @@ export function Configuracoes() {
                             </div>
                             <button
                               type="button"
-                              onClick={() => {
-                                setFormRota({
-                                  ...formRota,
-                                  cidades: formRota.cidades.filter((_, i) => i !== index)
-                                });
+                              onClick={async () => {
+                                const novasCidades = formRota.cidades.filter((_, i) => i !== index);
+                                setFormRota({ ...formRota, cidades: novasCidades });
+                                if (editingId) {
+                                  await supabase.from('rotas').update({ cidades: novasCidades }).eq('id', editingId);
+                                  setRotas(prev => prev.map(r => r.id === editingId ? { ...r, cidades: novasCidades } : r));
+                                }
                               }}
                               className="p-1 hover:bg-red-500/20 rounded transition-colors shrink-0"
                             >

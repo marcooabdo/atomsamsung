@@ -3853,7 +3853,7 @@ Não haverá cobrança ao cliente.`
                             const cidadeNorm = normalizeCidadeLocal(os.cliente_cidade);
                             const rotaAtual = cidadeNorm ? rotasUnidade.find(r => r.cidades?.some(c => normalizeCidadeLocal(c) === cidadeNorm)) : null;
                             if (rotaAtual) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${rotaAtual.cor || '#666'}25`, color: rotaAtual.cor || '#999' }}>{rotaAtual.nome}</span>;
-                            if (os.cliente_cidade && os.tipo_atendimento === 'IH') return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">Sem rota</span>;
+                            if (os.cliente_cidade) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">Sem rota</span>;
                             return null;
                           })()}
                         </p>

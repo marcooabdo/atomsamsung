@@ -740,7 +740,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                       <span className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1" style={{ backgroundColor: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.35)' }}>
                         <AlertTriangle className="w-3 h-3 inline" />
                         {osDetails.cliente_cidade || 'Sem cidade'}
-                        {osDetails.tipo_atendimento === 'IH' && <span className="ml-1">• Sem rota</span>}
+                        <span className="ml-1">• Sem rota</span>
                       </span>
                     );
                   })()}
