@@ -1499,7 +1499,7 @@ export function Kanban() {
   const performUniversalSearch = (os: any, term: string): { matches: boolean; source: 'visible' | 'hidden' } => {
     if (!term) return { matches: true, source: 'visible' };
 
-    const searchLower = term.toLowerCase();
+    const searchLower = term.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
     // Busca em campos visíveis do card
     const visibleFields = [
@@ -1528,7 +1528,7 @@ export function Kanban() {
     ];
 
     const matchesVisible = visibleFields.some(field =>
-      field && field.toString().toLowerCase().includes(searchLower)
+      field && field.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(searchLower)
     );
 
     if (matchesVisible) {
@@ -1596,7 +1596,7 @@ export function Kanban() {
           member.aparelho_nserie,
           member.defeito_relatado
         ];
-        return memberFields.some(f => f && f.toString().toLowerCase().includes(searchLower));
+        return memberFields.some(f => f && f.toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(searchLower));
       });
       if (matchesGroupMember) {
         return { matches: true, source: 'hidden' };

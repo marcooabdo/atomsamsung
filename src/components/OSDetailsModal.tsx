@@ -448,12 +448,14 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     const receita = Math.round(kmIdaVolta * TARIFA * 100) / 100;
     const cidade = osDetails.cliente_cidade.trim();
 
-    const { data: existing } = await supabase
+    const { data: allKm } = await supabase
       .from('rotas_cidades_km')
-      .select('id')
-      .eq('unidade_id', osDetails.unidade_id)
-      .ilike('cidade', cidade)
-      .maybeSingle();
+      .select('id, cidade')
+      .eq('unidade_id', osDetails.unidade_id);
+
+    const normKmC = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const cidadeNormKm = normKmC(cidade);
+    const existing = allKm?.find(row => normKmC(row.cidade) === cidadeNormKm) || null;
 
     if (existing) {
       await supabase

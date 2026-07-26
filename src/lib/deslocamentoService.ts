@@ -155,12 +155,8 @@ export async function calcularESalvarKmCidade(
   cidadeDestino: string,
   estadoDestino: string
 ): Promise<{ distancia_km_ida_volta: number; receita_por_os: number } | null> {
-  const { data: existing } = await supabase
-    .from('rotas_cidades_km')
-    .select('distancia_km_ida_volta, receita_por_os')
-    .eq('unidade_id', unidadeId)
-    .ilike('cidade', cidadeDestino.trim())
-    .maybeSingle();
+  const cidadeTrim = cidadeDestino.trim();
+  const existing = await findCidadeKm(unidadeId, cidadeTrim);
 
   if (existing) return existing;
 
@@ -174,7 +170,7 @@ export async function calcularESalvarKmCidade(
 
   const result = await calcularDistanciaViaProxy(
     unidade.cidade, unidade.estado || '',
-    cidadeDestino.trim(), estadoDestino || ''
+    cidadeTrim, estadoDestino || ''
   );
 
   if (result.erro || result.distancia_km === 0) return null;
@@ -186,7 +182,7 @@ export async function calcularESalvarKmCidade(
     .from('rotas_cidades_km')
     .insert({
       unidade_id: unidadeId,
-      cidade: cidadeDestino.trim(),
+      cidade: cidadeTrim,
       estado: estadoDestino || null,
       distancia_km: result.distancia_km,
       distancia_km_ida_volta: idaVolta,
@@ -202,13 +198,25 @@ export async function getKmCidade(
   unidadeId: string,
   cidade: string
 ): Promise<{ distancia_km_ida_volta: number; receita_por_os: number } | null> {
+  return findCidadeKm(unidadeId, cidade.trim());
+}
+
+async function findCidadeKm(
+  unidadeId: string,
+  cidade: string
+): Promise<{ distancia_km_ida_volta: number; receita_por_os: number } | null> {
   const { data } = await supabase
     .from('rotas_cidades_km')
-    .select('distancia_km_ida_volta, receita_por_os')
-    .eq('unidade_id', unidadeId)
-    .ilike('cidade', cidade.trim())
-    .maybeSingle();
-  return data;
+    .select('distancia_km_ida_volta, receita_por_os, cidade')
+    .eq('unidade_id', unidadeId);
+
+  if (!data || data.length === 0) return null;
+
+  const normalize = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const cidadeNorm = normalize(cidade);
+
+  const match = data.find(row => normalize(row.cidade) === cidadeNorm);
+  return match ? { distancia_km_ida_volta: match.distancia_km_ida_volta, receita_por_os: match.receita_por_os } : null;
 }
 
 export { TARIFA_POR_KM };

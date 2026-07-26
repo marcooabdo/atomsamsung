@@ -2924,12 +2924,14 @@ Não haverá cobrança ao cliente.`
     const receita = Math.round(kmIdaVolta * TARIFA * 100) / 100;
     const cidade = kmCidadeRef.trim();
 
-    const { data: existing } = await supabase
+    const { data: allKm } = await supabase
       .from('rotas_cidades_km')
-      .select('id')
-      .eq('unidade_id', os.unidade_id)
-      .ilike('cidade', cidade)
-      .maybeSingle();
+      .select('id, cidade')
+      .eq('unidade_id', os.unidade_id);
+
+    const normKm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    const cidadeNormKm = normKm(cidade);
+    const existing = allKm?.find(row => normKm(row.cidade) === cidadeNormKm) || null;
 
     if (existing) {
       await supabase
