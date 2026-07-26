@@ -2409,7 +2409,7 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     .eq('tipo_os', 'LP')
     .eq('tipo_atendimento', 'IH')
     .neq('coluna_kanban', 'os_fechada')
-    .or('arquivada.is.null,arquivada.eq.false');
+    .eq('arquivada', false);
 
   if (unidadeId) {
     osQuery = osQuery.eq('unidade_id', unidadeId);
