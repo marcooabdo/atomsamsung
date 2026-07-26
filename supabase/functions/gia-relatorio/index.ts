@@ -2504,6 +2504,8 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   type ColData = Record<string, CityData>;
   const mappedByUnit: Record<string, Record<string, ColData>> = {};
   const unmappedByUnit: Record<string, Record<string, number>> = {};
+  const unitCityByUnit: Record<string, number> = {};
+  const totalOSByUnit: Record<string, number> = {};
 
   for (const os of osList) {
     if (!os.unidade_id) continue;
@@ -2511,10 +2513,13 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     const cidade = os.cliente_cidade?.trim() || 'Sem cidade';
     const key = `${uid}|${cidade.toLowerCase()}`;
 
-    // Skip unit's own city (R$ 0, not shown)
-    if (cidadesUnidadeSet.has(key)) continue;
+    totalOSByUnit[uid] = (totalOSByUnit[uid] || 0) + 1;
 
-    // City must be in an active route AND have KM > 0 to count
+    if (cidadesUnidadeSet.has(key)) {
+      unitCityByUnit[uid] = (unitCityByUnit[uid] || 0) + 1;
+      continue;
+    }
+
     const isInRoute = cidadesEmRotaSet.has(key);
     const hasKm = kmDefinedSet.has(key);
 
@@ -2534,12 +2539,14 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   let totalGeralOS = 0;
   let totalGeralReceita = 0;
 
-  const allUnitIds = [...new Set([...Object.keys(mappedByUnit), ...Object.keys(unmappedByUnit)])].sort((a, b) => (unidadeMap[a] || '').localeCompare(unidadeMap[b] || ''));
+  const allUnitIds = [...new Set([...Object.keys(mappedByUnit), ...Object.keys(unmappedByUnit), ...Object.keys(totalOSByUnit)])].sort((a, b) => (unidadeMap[a] || '').localeCompare(unidadeMap[b] || ''));
 
   for (const uid of allUnitIds) {
     const colunas = mappedByUnit[uid] || {};
     const unmapped = unmappedByUnit[uid] || {};
     const nomeUnidade = unidadeMap[uid] || 'Unidade';
+    const unitTotalOS = totalOSByUnit[uid] || 0;
+    const unitCityOS = unitCityByUnit[uid] || 0;
 
     const colTotals: { col: string; os: number; receita: number; cidades: ColData }[] = [];
     for (const [col, cidadesData] of Object.entries(colunas)) {
@@ -2553,14 +2560,12 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
     });
 
-    const unitOS = colTotals.reduce((s, c) => s + c.os, 0);
     const unitReceita = colTotals.reduce((s, c) => s + c.receita, 0);
-    totalGeralOS += unitOS;
+    totalGeralOS += unitTotalOS;
     totalGeralReceita += unitReceita;
 
     const lines: string[] = [];
-    for (const { col, os: colOS, receita: colReceita, cidades: cidadesData } of colTotals) {
-      // Filter out cities with R$ 0 (unit's own city)
+    for (const { col, cidades: cidadesData } of colTotals) {
       const cidadesFiltered = Object.entries(cidadesData).filter(([, data]) => data.receita > 0);
       const actualOS = cidadesFiltered.reduce((s, [, d]) => s + d.count, 0);
       const actualReceita = cidadesFiltered.reduce((s, [, d]) => s + d.count * d.receita, 0);
@@ -2582,6 +2587,7 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
 
     const unmappedEntries = Object.entries(unmapped).sort((a, b) => b[1] - a[1]);
     const totalUnmapped = unmappedEntries.reduce((s, [, n]) => s + n, 0);
+    const totalSemReceita = totalUnmapped + unitCityOS;
     const hora = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", hour: '2-digit', minute: '2-digit' });
 
     const msgParts = [
@@ -2591,14 +2597,20 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       `🕐 ${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} às ${hora}`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `📊 *${unitOS}* OS com KM • 💵 *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
+      `📊 *${unitTotalOS}* OS IH LP • 💵 *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
       ``,
       ...lines,
     ];
 
-    if (unmappedEntries.length > 0) {
-      const unmappedList = unmappedEntries.map(([cidade, qty]) => `${qty}x ${cidade}`).join(', ');
-      msgParts.push(`⚠️ *${totalUnmapped} OS sem KM:* ${unmappedList}`);
+    if (totalSemReceita > 0) {
+      msgParts.push(`⚠️ *${totalSemReceita} OS sem receita de KM:*`);
+      if (unitCityOS > 0) {
+        const cidadeSede = nomeUnidade.replace(/Smart Center Samsung\s*/i, '');
+        msgParts.push(`      _${unitCityOS}x ${cidadeSede} (cidade-sede)_`);
+      }
+      for (const [cidade, qty] of unmappedEntries) {
+        msgParts.push(`      _${qty}x ${cidade} (sem rota)_`);
+      }
       msgParts.push('');
     }
 
@@ -2612,14 +2624,14 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     `💰 *DINHEIRO NA MESA — Consolidado*`,
     now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" }),
     ``,
-    `📊 ${totalGeralOS} OS mapeadas • *R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
+    `📊 ${totalGeralOS} OS IH LP • *R$ ${totalGeralReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
     ``,
     ...allUnitIds.map(uid => {
       const colunas = mappedByUnit[uid] || {};
       const nomeU = unidadeMap[uid] || 'Unidade';
-      const osCount = Object.values(colunas).reduce((s, c) => s + Object.values(c).reduce((ss, d) => ss + d.count, 0), 0);
+      const osTotal = totalOSByUnit[uid] || 0;
       const receita = Object.values(colunas).reduce((s, c) => s + Object.values(c).reduce((ss, d) => ss + d.count * d.receita, 0), 0);
-      return `🏢 *${nomeU}*: ${osCount} OS • R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+      return `🏢 *${nomeU}*: ${osTotal} OS • R$ ${receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
     }),
     ``,
     `_GIA • Global Intelligence Assistance_`,
