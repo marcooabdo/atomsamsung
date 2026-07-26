@@ -2508,12 +2508,19 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   const unmappedByUnit: Record<string, Record<string, number>> = {};
   const unitCityByUnit: Record<string, number> = {};
   const totalOSByUnit: Record<string, number> = {};
+  const cidadeDisplayMap: Record<string, string> = {};
 
   for (const os of osList) {
     if (!os.unidade_id) continue;
     const uid = os.unidade_id;
-    const cidade = os.cliente_cidade?.trim() || 'Sem cidade';
-    const key = `${uid}|${normCity(cidade)}`;
+    const cidadeRaw = os.cliente_cidade?.trim() || 'Sem cidade';
+    const cidadeKey = normCity(cidadeRaw);
+    const key = `${uid}|${cidadeKey}`;
+
+    // Use accented version as display label (prefer the one with accents)
+    if (!cidadeDisplayMap[cidadeKey] || cidadeRaw.normalize('NFD').length > cidadeDisplayMap[cidadeKey].normalize('NFD').length) {
+      cidadeDisplayMap[cidadeKey] = cidadeRaw;
+    }
 
     totalOSByUnit[uid] = (totalOSByUnit[uid] || 0) + 1;
 
@@ -2529,11 +2536,11 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       const col = os.coluna_kanban || 'os_nova';
       if (!mappedByUnit[uid]) mappedByUnit[uid] = {};
       if (!mappedByUnit[uid][col]) mappedByUnit[uid][col] = {};
-      if (!mappedByUnit[uid][col][cidade]) mappedByUnit[uid][col][cidade] = { count: 0, receita: receitaMap[key] || 0 };
-      mappedByUnit[uid][col][cidade].count++;
+      if (!mappedByUnit[uid][col][cidadeKey]) mappedByUnit[uid][col][cidadeKey] = { count: 0, receita: receitaMap[key] || 0 };
+      mappedByUnit[uid][col][cidadeKey].count++;
     } else {
       if (!unmappedByUnit[uid]) unmappedByUnit[uid] = {};
-      unmappedByUnit[uid][cidade] = (unmappedByUnit[uid][cidade] || 0) + 1;
+      unmappedByUnit[uid][cidadeKey] = (unmappedByUnit[uid][cidadeKey] || 0) + 1;
     }
   }
 
@@ -2578,8 +2585,8 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       lines.push(`${emoji} *${label}*`);
       lines.push(`      ${actualOS} OS — *R$ ${actualReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`);
       const cidadesSorted = cidadesFiltered.sort((a, b) => (b[1].count * b[1].receita) - (a[1].count * a[1].receita));
-      const cidadeLines = cidadesSorted.map(([cidade, data]) =>
-        `${data.count}x ${cidade} (R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`
+      const cidadeLines = cidadesSorted.map(([cidadeKey, data]) =>
+        `${data.count}x ${cidadeDisplayMap[cidadeKey] || cidadeKey} (R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`
       );
       for (const cl of cidadeLines) {
         lines.push(`      _${cl}_`);
@@ -2610,8 +2617,8 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
         const cidadeSede = nomeUnidade.replace(/Smart Center Samsung\s*/i, '');
         msgParts.push(`      _${unitCityOS}x ${cidadeSede} (cidade-sede)_`);
       }
-      for (const [cidade, qty] of unmappedEntries) {
-        msgParts.push(`      _${qty}x ${cidade} (sem rota)_`);
+      for (const [cidadeKey, qty] of unmappedEntries) {
+        msgParts.push(`      _${qty}x ${cidadeDisplayMap[cidadeKey] || cidadeKey} (sem rota)_`);
       }
       msgParts.push('');
     }
