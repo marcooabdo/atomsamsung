@@ -1148,14 +1148,23 @@ export function Kanban() {
         }
       }
 
-      const { error, data } = await supabase
-        .from('os')
-        .update({
+      const updatePayload: Record<string, any> = {
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
           bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
-        })
+        };
+
+      const rotaDestino = rotas.find(r => r.coluna_kanban === targetColumn);
+      if (rotaDestino) {
+        updatePayload.rota_id = rotaDestino.id;
+      } else if (draggedCard.rota_id && !['rota_azul','rota_verde','rota_amarela','rota_laranja','rota_rosa','rota_preta','rota_vermelha','em_rota_ih'].includes(targetColumn)) {
+        updatePayload.rota_id = null;
+      }
+
+      const { error, data } = await supabase
+        .from('os')
+        .update(updatePayload)
         .eq('id', draggedCard.id)
         .select();
 
@@ -1283,14 +1292,22 @@ export function Kanban() {
         }
       }
 
-      const { error } = await supabase
-        .from('os')
-        .update({
+      const updatePayload2: Record<string, any> = {
           coluna_kanban: targetColumn,
           sequencia_coluna: novaSequencia,
           bloqueio_movimentacao_automatica: true,
           updated_at: new Date().toISOString()
-        })
+        };
+      const rotaDest2 = rotas.find(r => r.coluna_kanban === targetColumn);
+      if (rotaDest2) {
+        updatePayload2.rota_id = rotaDest2.id;
+      } else if (draggedCard.rota_id && !['rota_azul','rota_verde','rota_amarela','rota_laranja','rota_rosa','rota_preta','rota_vermelha','em_rota_ih'].includes(targetColumn)) {
+        updatePayload2.rota_id = null;
+      }
+
+      const { error } = await supabase
+        .from('os')
+        .update(updatePayload2)
         .eq('id', draggedCard.id);
 
       if (error) throw error;
@@ -1300,7 +1317,7 @@ export function Kanban() {
         await criarAgendamentoParaRota(draggedCard);
       }
 
-      const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia };
+      const updatedCard = { ...draggedCard, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: updatePayload2.rota_id !== undefined ? updatePayload2.rota_id : draggedCard.rota_id };
 
       setOsData(prevData => {
         const newData = { ...prevData };
@@ -1333,16 +1350,20 @@ export function Kanban() {
     setRoutePickerOS(null);
 
     try {
+      const rpUpdatePayload: Record<string, any> = { coluna_kanban: targetColumn, bloqueio_movimentacao_automatica: true, updated_at: new Date().toISOString() };
+      const rotaDest = rotas.find(r => r.coluna_kanban === targetColumn);
+      if (rotaDest) rpUpdatePayload.rota_id = rotaDest.id;
+
       const { error } = await supabase
         .from('os')
-        .update({ coluna_kanban: targetColumn, bloqueio_movimentacao_automatica: true, updated_at: new Date().toISOString() })
+        .update(rpUpdatePayload)
         .eq('id', osId);
       if (error) throw error;
 
       setOsData(prevData => {
         const newData = { ...prevData };
         newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
-        const card = { ...routePickerOS!, coluna_kanban: targetColumn };
+        const card = { ...routePickerOS!, coluna_kanban: targetColumn, rota_id: rpUpdatePayload.rota_id || routePickerOS!.rota_id };
         newData[targetColumn] = [...(newData[targetColumn] || []), card];
         return newData;
       });

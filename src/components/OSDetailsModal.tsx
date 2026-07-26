@@ -116,7 +116,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [selectedRotaColumn, setSelectedRotaColumn] = useState('');
   const [savingRota, setSavingRota] = useState(false);
   const [cidadeKm, setCidadeKm] = useState<{ distancia_km_ida_volta: number; receita_por_os: number } | null>(null);
-  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cidades: string[] }>>([]);
+  const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cor: string; cidades: string[] }>>([]);
   const [showKmModal, setShowKmModal] = useState(false);
   const [kmInput, setKmInput] = useState('');
 
@@ -351,7 +351,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   async function loadRotas(unidadeId: string) {
     const { data } = await supabase
       .from('rotas')
-      .select('id, nome, coluna_kanban, cidades')
+      .select('id, nome, coluna_kanban, cor, cidades')
       .eq('unidade_id', unidadeId)
       .eq('ativa', true);
     if (data) setRotas(data);
@@ -718,13 +718,19 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
                 {/* Cidade + Rota inline editor */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
-                  <span className="text-xs px-2 py-1 rounded-full font-medium" style={{ backgroundColor: `${textSecondary}15`, color: textSecondary }}>
-                    <Route className="w-3 h-3 inline mr-1" />
-                    {osDetails.cliente_cidade || 'Sem cidade'}
-                    {rotas.find(r => r.id === osDetails.rota_id) && (
-                      <span className="ml-1">• {rotas.find(r => r.id === osDetails.rota_id)?.nome || 'Sem rota'}</span>
-                    )}
-                  </span>
+                  {(() => {
+                    const rotaByCol = rotas.find(r => r.coluna_kanban === osDetails.coluna_kanban);
+                    const rotaById = rotas.find(r => r.id === osDetails.rota_id);
+                    const rotaAtual = rotaByCol || rotaById;
+                    return (
+                      <span className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1" style={{ backgroundColor: rotaAtual ? `${rotaAtual.cor}20` : `${textSecondary}15`, color: rotaAtual ? rotaAtual.cor : textSecondary }}>
+                        {rotaAtual && <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: rotaAtual.cor }} />}
+                        <Route className="w-3 h-3 inline" />
+                        {osDetails.cliente_cidade || 'Sem cidade'}
+                        {rotaAtual && <span className="ml-1">• {rotaAtual.nome}</span>}
+                      </span>
+                    );
+                  })()}
                   {cidadeKm && osDetails.tipo_atendimento === 'IH' && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium cursor-pointer" onClick={() => { setKmInput(String(cidadeKm.distancia_km_ida_volta)); setShowKmModal(true); }}>
                       {cidadeKm.distancia_km_ida_volta} km i/v • R${cidadeKm.receita_por_os.toFixed(2)}
@@ -741,8 +747,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                   <button
                     onClick={() => {
                       setEditCidade(osDetails.cliente_cidade || '');
-                      const rotaAtual = rotas.find(r => r.id === osDetails.rota_id);
-                      setSelectedRotaColumn(rotaAtual?.coluna_kanban || osDetails.coluna_kanban || '');
+                      setSelectedRotaColumn(osDetails.coluna_kanban || '');
                       setShowRotaEditor(true);
                     }}
                     className="text-xs flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
