@@ -334,6 +334,36 @@ Deno.serve(async (req: Request) => {
     // Para controle_lp_prazo e relatorio_km, enviar uma mensagem separada por unidade
     if (tipo === "controle_lp_prazo" || tipo === "relatorio_km") {
       try {
+        // For relatorio_km, first send visual images per unit
+        if (tipo === "relatorio_km") {
+          try {
+            const imgResponse = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio-image`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${supabaseKey}`,
+              },
+              body: JSON.stringify({ tipo: "dinheiro_na_mesa" }),
+            });
+
+            if (imgResponse.ok) {
+              const imgData = await imgResponse.json();
+              if (imgData.images && imgData.images.length > 0) {
+                for (let i = 0; i < imgData.images.length; i++) {
+                  const img = imgData.images[i];
+                  await sendWhatsAppImage(targetGroup, img.url, "");
+                  if (i < imgData.images.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                  }
+                }
+                await new Promise(resolve => setTimeout(resolve, 2000));
+              }
+            }
+          } catch (imgErr) {
+            console.error("Erro ao enviar imagens dinheiro_na_mesa:", imgErr.message);
+          }
+        }
+
         const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
           method: "POST",
           headers: {

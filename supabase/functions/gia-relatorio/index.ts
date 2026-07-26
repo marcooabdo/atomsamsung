@@ -2436,6 +2436,21 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     if (r.distancia_km_ida_volta && r.distancia_km_ida_volta > 0) kmDefinedSet.add(key);
   }
 
+  // Build set of cities actually in active routes per unit
+  const { data: rotasData } = await supabase.from('rotas').select('unidade_id, cidades').eq('ativa', true);
+  const cidadesEmRotaSet = new Set<string>();
+  for (const rota of rotasData || []) {
+    for (const cidade of (rota.cidades || [])) {
+      cidadesEmRotaSet.add(`${rota.unidade_id}|${cidade.trim().toLowerCase()}`);
+    }
+  }
+
+  // Build unit city set (these get excluded entirely, R$ 0)
+  const cidadesUnidadeSet = new Set<string>();
+  for (const u of unidades || []) {
+    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${u.cidade.toLowerCase()}`);
+  }
+
   // Pipeline order for IH (matching Kanban board)
   const PIPELINE_ORDER = [
     'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao', 'orcamento_aprovado',
@@ -2496,7 +2511,14 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     const cidade = os.cliente_cidade?.trim() || 'Sem cidade';
     const key = `${uid}|${cidade.toLowerCase()}`;
 
-    if (kmDefinedSet.has(key)) {
+    // Skip unit's own city (R$ 0, not shown)
+    if (cidadesUnidadeSet.has(key)) continue;
+
+    // City must be in an active route AND have KM > 0 to count
+    const isInRoute = cidadesEmRotaSet.has(key);
+    const hasKm = kmDefinedSet.has(key);
+
+    if (isInRoute && hasKm) {
       const col = os.coluna_kanban || 'os_nova';
       if (!mappedByUnit[uid]) mappedByUnit[uid] = {};
       if (!mappedByUnit[uid][col]) mappedByUnit[uid][col] = {};
@@ -2538,11 +2560,17 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
 
     const lines: string[] = [];
     for (const { col, os: colOS, receita: colReceita, cidades: cidadesData } of colTotals) {
+      // Filter out cities with R$ 0 (unit's own city)
+      const cidadesFiltered = Object.entries(cidadesData).filter(([, data]) => data.receita > 0);
+      const actualOS = cidadesFiltered.reduce((s, [, d]) => s + d.count, 0);
+      const actualReceita = cidadesFiltered.reduce((s, [, d]) => s + d.count * d.receita, 0);
+      if (actualOS === 0) continue;
+      
       const emoji = colunaEmojis[col] || '▪️';
       const label = colunaLabels[col] || col;
       lines.push(`${emoji} *${label}*`);
-      lines.push(`      ${colOS} OS — *R$ ${colReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`);
-      const cidadesSorted = Object.entries(cidadesData).sort((a, b) => (b[1].count * b[1].receita) - (a[1].count * a[1].receita));
+      lines.push(`      ${actualOS} OS — *R$ ${actualReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`);
+      const cidadesSorted = cidadesFiltered.sort((a, b) => (b[1].count * b[1].receita) - (a[1].count * a[1].receita));
       const cidadeLines = cidadesSorted.map(([cidade, data]) =>
         `${data.count}x ${cidade} (R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`
       );

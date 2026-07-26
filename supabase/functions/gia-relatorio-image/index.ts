@@ -778,6 +778,213 @@ async function handleAberturaFechamentoImage(supabase: ReturnType<typeof createC
   };
 }
 
+// ==================== DINHEIRO NA MESA IMAGE ====================
+
+async function handleDinheiroNaMesaImage(supabase: ReturnType<typeof createClient>) {
+  const PIPELINE_ORDER = [
+    'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao', 'orcamento_aprovado',
+    'aguardando_peca', 'peca_em_transito',
+    'rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja',
+    'em_rota_ih', 'em_reparo_ih', 'instalacao_inicial', 'service_handling', 'return_handling',
+    'trade_up', 'saw', 'controle_qualidade', 'qa_bt', 'reparo_concluido', 'aguardando_fechamento',
+    'orcamentos_rejeitados',
+  ];
+  const COLUNA_LABELS: Record<string, string> = {
+    'os_nova': 'OS Nova', 'diagnostico': 'Diagnóstico/Triagem',
+    'negociacao_em_andamento': 'Enviar Orçamento', 'aguardando_aprovacao': 'Aguardando Aprovação',
+    'orcamento_aprovado': 'Orçamento Aprovado', 'aguardando_peca': 'Aguardando Peça',
+    'peca_em_transito': 'Peça em Trânsito',
+    'rota_preta': 'Rota Preta', 'rota_vermelha': 'Rota Vermelha', 'rota_azul': 'Rota Azul',
+    'rota_verde': 'Rota Verde', 'rota_rosa': 'Rota Rosa', 'rota_amarela': 'Rota Amarela', 'rota_laranja': 'Rota Laranja',
+    'em_rota_ih': 'Agendados (FTF)', 'em_reparo_ih': 'Reparo Progresso IH',
+    'instalacao_inicial': 'Instalação Inicial', 'service_handling': 'Service Handling',
+    'return_handling': 'Return Handling', 'trade_up': 'Trade Up', 'saw': 'SAW',
+    'controle_qualidade': 'Controle Qualidade', 'qa_bt': 'Q&A / BT',
+    'reparo_concluido': 'Reparo Concluído', 'aguardando_fechamento': 'Aguard. Fechamento',
+    'orcamentos_rejeitados': 'Orç. Rejeitados',
+  };
+  const COLUNA_COLORS: Record<string, string> = {
+    'os_nova': '#0EA5E9', 'diagnostico': '#06B6D4', 'negociacao_em_andamento': '#F59E0B',
+    'aguardando_aprovacao': '#F97316', 'orcamento_aprovado': '#10B981', 'aguardando_peca': '#8B5CF6',
+    'peca_em_transito': '#3B82F6', 'rota_preta': '#6B7280', 'rota_vermelha': '#EF4444',
+    'rota_azul': '#3B82F6', 'rota_verde': '#10B981', 'rota_rosa': '#EC4899',
+    'rota_amarela': '#EAB308', 'rota_laranja': '#F97316',
+    'em_rota_ih': '#10B981', 'em_reparo_ih': '#06B6D4', 'instalacao_inicial': '#7C3AED',
+    'service_handling': '#DB2777', 'return_handling': '#D97706', 'trade_up': '#0891B2',
+    'saw': '#14B8A6', 'controle_qualidade': '#2563EB', 'qa_bt': '#7C3AED',
+    'reparo_concluido': '#10B981', 'aguardando_fechamento': '#F59E0B', 'orcamentos_rejeitados': '#EF4444',
+  };
+
+  // Fetch data
+  const { data: unidades } = await supabase.from('unidades').select('id, nome, cidade').like('nome', '%Samsung%');
+  const targetUnits = (unidades || []).filter((u: any) => 
+    u.nome.includes('Feira de Santana') || u.nome.includes('Montes Claros') || u.nome.includes('Juiz de Fora')
+  );
+
+  const { data: osList } = await supabase
+    .from('os')
+    .select('id, coluna_kanban, cliente_cidade, unidade_id, tipo_os, tipo_atendimento')
+    .in('tipo_os', ['LP', 'OW'])
+    .eq('tipo_atendimento', 'IH')
+    .neq('coluna_kanban', 'os_fechada')
+    .eq('arquivada', false);
+
+  const { data: kmRef } = await supabase.from('rotas_cidades_km').select('unidade_id, cidade, distancia_km_ida_volta, receita_por_os');
+  const receitaMap: Record<string, number> = {};
+  const kmDefinedSet = new Set<string>();
+  for (const r of kmRef || []) {
+    const key = `${r.unidade_id}|${(r.cidade || '').toLowerCase()}`;
+    receitaMap[key] = r.receita_por_os || 0;
+    if (r.distancia_km_ida_volta && Number(r.distancia_km_ida_volta) > 0) kmDefinedSet.add(key);
+  }
+
+  const { data: rotasData } = await supabase.from('rotas').select('unidade_id, cidades').eq('ativa', true);
+  const cidadesEmRotaSet = new Set<string>();
+  for (const rota of rotasData || []) {
+    for (const cidade of (rota.cidades || [])) {
+      cidadesEmRotaSet.add(`${rota.unidade_id}|${cidade.trim().toLowerCase()}`);
+    }
+  }
+
+  const cidadesUnidadeSet = new Set<string>();
+  for (const u of targetUnits) {
+    if (u.cidade) cidadesUnidadeSet.add(`${u.id}|${u.cidade.toLowerCase()}`);
+  }
+
+  const now = new Date();
+  const hora = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", hour: '2-digit', minute: '2-digit' });
+  const dataStr = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+
+  const images: Array<{ url: string; sigla: string; unidade: string }> = [];
+
+  for (const unit of targetUnits) {
+    const unitOS = (osList || []).filter((os: any) => os.unidade_id === unit.id);
+    
+    // Classify OS
+    const colTotals: Record<string, { os: number; receita: number }> = {};
+    let errorCount = 0;
+
+    for (const os of unitOS) {
+      const cidade = (os.cliente_cidade || '').trim();
+      if (!cidade) { errorCount++; continue; }
+      const key = `${unit.id}|${cidade.toLowerCase()}`;
+      if (cidadesUnidadeSet.has(key)) continue;
+      
+      const isInRoute = cidadesEmRotaSet.has(key);
+      const hasKm = kmDefinedSet.has(key);
+
+      if (isInRoute && hasKm) {
+        const col = os.coluna_kanban || 'os_nova';
+        if (!colTotals[col]) colTotals[col] = { os: 0, receita: 0 };
+        colTotals[col].os++;
+        colTotals[col].receita += receitaMap[key] || 0;
+      } else {
+        errorCount++;
+      }
+    }
+
+    // Sort by pipeline order
+    const sortedCols = PIPELINE_ORDER.filter(col => colTotals[col] && colTotals[col].os > 0);
+    const totalOS = sortedCols.reduce((s, col) => s + colTotals[col].os, 0);
+    const totalReceita = sortedCols.reduce((s, col) => s + colTotals[col].receita, 0);
+
+    // Generate SVG image
+    const rowHeight = 38;
+    const headerHeight = 100;
+    const footerHeight = 90;
+    const padding = 24;
+    const tableTop = headerHeight + 10;
+    const tableHeaderH = 34;
+    const imgWidth = 560;
+    const imgHeight = tableTop + tableHeaderH + (sortedCols.length * rowHeight) + footerHeight + padding;
+
+    const unitShortName = unit.nome.replace('Smart Center Samsung ', '');
+
+    let rows = '';
+    for (let i = 0; i < sortedCols.length; i++) {
+      const col = sortedCols[i];
+      const d = colTotals[col];
+      const y = tableTop + tableHeaderH + (i * rowHeight);
+      const bgColor = i % 2 === 0 ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.06)';
+      const dotColor = COLUNA_COLORS[col] || '#94a3b8';
+      const label = COLUNA_LABELS[col] || col;
+      rows += `
+        <rect x="20" y="${y}" width="${imgWidth - 40}" height="${rowHeight}" rx="4" fill="${bgColor}"/>
+        <circle cx="36" cy="${y + rowHeight / 2}" r="5" fill="${dotColor}"/>
+        <text x="50" y="${y + rowHeight / 2 + 5}" font-family="Arial, sans-serif" font-size="13" fill="#e2e8f0">${escapeXml(label)}</text>
+        <text x="${imgWidth - 130}" y="${y + rowHeight / 2 + 5}" font-family="Arial, sans-serif" font-size="13" fill="#94a3b8" text-anchor="end">${d.os} OS</text>
+        <text x="${imgWidth - 35}" y="${y + rowHeight / 2 + 5}" font-family="Arial, sans-serif" font-size="13" fill="#10b981" text-anchor="end" font-weight="600">R$ ${d.receita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</text>
+      `;
+    }
+
+    const totalY = tableTop + tableHeaderH + (sortedCols.length * rowHeight) + 15;
+
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${imgWidth}" height="${imgHeight}" viewBox="0 0 ${imgWidth} ${imgHeight}">
+      <defs>
+        <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" style="stop-color:#0f172a"/>
+          <stop offset="100%" style="stop-color:#1e293b"/>
+        </linearGradient>
+        <linearGradient id="headerGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" style="stop-color:#10b981;stop-opacity:0.2"/>
+          <stop offset="100%" style="stop-color:#0ea5e9;stop-opacity:0.1"/>
+        </linearGradient>
+      </defs>
+      <rect width="${imgWidth}" height="${imgHeight}" fill="url(#bg)" rx="12"/>
+      <rect x="0" y="0" width="${imgWidth}" height="${headerHeight}" fill="url(#headerGrad)" rx="12"/>
+      <rect x="0" y="70" width="${imgWidth}" height="30" fill="url(#headerGrad)"/>
+      
+      <text x="${imgWidth / 2}" y="35" font-family="Arial, sans-serif" font-size="18" fill="#f1f5f9" text-anchor="middle" font-weight="700">💰 DINHEIRO NA MESA</text>
+      <text x="${imgWidth / 2}" y="58" font-family="Arial, sans-serif" font-size="14" fill="#94a3b8" text-anchor="middle">${escapeXml(unitShortName)}</text>
+      <text x="${imgWidth / 2}" y="80" font-family="Arial, sans-serif" font-size="11" fill="#64748b" text-anchor="middle">${dataStr} às ${hora}</text>
+      <text x="${imgWidth / 2}" y="96" font-family="Arial, sans-serif" font-size="12" fill="#cbd5e1" text-anchor="middle">${totalOS} OS calculadas</text>
+      
+      <!-- Table header -->
+      <rect x="20" y="${tableTop}" width="${imgWidth - 40}" height="${tableHeaderH}" rx="6" fill="rgba(16,185,129,0.1)"/>
+      <text x="50" y="${tableTop + 22}" font-family="Arial, sans-serif" font-size="11" fill="#64748b" font-weight="600">COLUNA</text>
+      <text x="${imgWidth - 130}" y="${tableTop + 22}" font-family="Arial, sans-serif" font-size="11" fill="#64748b" font-weight="600" text-anchor="end">QTD</text>
+      <text x="${imgWidth - 35}" y="${tableTop + 22}" font-family="Arial, sans-serif" font-size="11" fill="#64748b" font-weight="600" text-anchor="end">RECEITA</text>
+      
+      ${rows}
+      
+      <!-- Total -->
+      <rect x="20" y="${totalY}" width="${imgWidth - 40}" height="40" rx="8" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+      <text x="36" y="${totalY + 26}" font-family="Arial, sans-serif" font-size="14" fill="#f1f5f9" font-weight="700">TOTAL</text>
+      <text x="${imgWidth - 130}" y="${totalY + 26}" font-family="Arial, sans-serif" font-size="14" fill="#f1f5f9" font-weight="700" text-anchor="end">${totalOS} OS</text>
+      <text x="${imgWidth - 35}" y="${totalY + 26}" font-family="Arial, sans-serif" font-size="14" fill="#10b981" font-weight="700" text-anchor="end">R$ ${totalReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}</text>
+      
+      <!-- Error footer -->
+      <text x="${imgWidth / 2}" y="${totalY + 65}" font-family="Arial, sans-serif" font-size="11" fill="#f59e0b" text-anchor="middle">${errorCount > 0 ? `⚠️ ${errorCount} OS sem cálculo (erro de rota/KM)` : '✅ Todas as OS calculadas'}</text>
+      <text x="${imgWidth / 2}" y="${totalY + 82}" font-family="Arial, sans-serif" font-size="10" fill="#475569" text-anchor="middle">GIA • Relatório Automático</text>
+    </svg>`;
+
+    // Convert SVG to PNG
+    const pngBuffer = await svgToPng(svg);
+
+    // Upload to storage
+    const fileName = `dinheiro-na-mesa-${unitShortName.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}.png`;
+    const storagePath = `relatorios/dinheiro-na-mesa/${fileName}`;
+    const { error: uploadError } = await supabase.storage
+      .from('os-anexos')
+      .upload(storagePath, pngBuffer, { contentType: 'image/png', upsert: true });
+
+    if (uploadError) {
+      console.error(`Upload error for ${unitShortName}:`, uploadError.message);
+      continue;
+    }
+
+    const { data: urlData } = supabase.storage.from('os-anexos').getPublicUrl(storagePath);
+    images.push({ url: urlData.publicUrl, sigla: unitShortName, unidade: unit.nome });
+  }
+
+  return {
+    success: true,
+    images,
+    horario: `${dataStr} ${hora}`,
+    total_unidades: images.length,
+  };
+}
+
 // ==================== MAIN HANDLER ====================
 
 Deno.serve(async (req: Request) => {
@@ -806,6 +1013,13 @@ Deno.serve(async (req: Request) => {
 
     if (tipo === "abertura_fechamento") {
       const result = await handleAberturaFechamentoImage(supabase);
+      return new Response(JSON.stringify(result), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (tipo === "dinheiro_na_mesa") {
+      const result = await handleDinheiroNaMesaImage(supabase);
       return new Response(JSON.stringify(result), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
