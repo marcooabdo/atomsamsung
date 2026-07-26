@@ -2436,18 +2436,53 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     if (r.distancia_km_ida_volta && r.distancia_km_ida_volta > 0) kmDefinedSet.add(key);
   }
 
+  // Pipeline order for IH (matching Kanban board)
+  const PIPELINE_ORDER = [
+    'os_nova', 'diagnostico', 'negociacao_em_andamento', 'aguardando_aprovacao', 'orcamento_aprovado',
+    'aguardando_peca', 'peca_em_transito',
+    'rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja',
+    'em_rota_ih', 'em_reparo_ih', 'instalacao_inicial', 'service_handling', 'return_handling',
+    'trade_up', 'saw', 'controle_qualidade', 'qa_bt', 'reparo_concluido', 'aguardando_fechamento',
+    'orcamentos_rejeitados',
+  ];
+
   const colunaLabels: Record<string, string> = {
-    'os_nova': 'OS Nova', 'aguardando_peca': 'Aguard. Peça', 'peca_em_transito': 'Peça Trânsito',
-    'em_rota_ih': 'Em Rota IH', 'em_reparo_ih': 'Em Reparo IH', 'aguardando_fechamento': 'Aguard. Fechamento',
-    'aguardando_aprovacao': 'Aguard. Aprovação', 'return_handling': 'Return Handling', 'service_handling': 'Service Handling',
-    'saw': 'SAW', 'qa_bt': 'QA/BT', 'rota_preta': 'Rota Preta', 'rota_vermelha': 'Rota Vermelha',
-    'rota_azul': 'Rota Azul', 'rota_verde': 'Rota Verde', 'rota_rosa': 'Rota Rosa',
-    'rota_amarela': 'Rota Amarela', 'rota_laranja': 'Rota Laranja',
+    'os_nova': 'OS Nova',
+    'diagnostico': 'Diagnóstico/Triagem',
+    'negociacao_em_andamento': 'Enviar Orçamento',
+    'aguardando_aprovacao': 'Aguardando Aprovação',
+    'orcamento_aprovado': 'Orçamento Aprovado',
+    'aguardando_peca': 'Aguardando Peça',
+    'peca_em_transito': 'Peça em Trânsito',
+    'rota_preta': 'Rota Preta',
+    'rota_vermelha': 'Rota Vermelha',
+    'rota_azul': 'Rota Azul',
+    'rota_verde': 'Rota Verde',
+    'rota_rosa': 'Rota Rosa',
+    'rota_amarela': 'Rota Amarela',
+    'rota_laranja': 'Rota Laranja',
+    'em_rota_ih': 'Agendados (FTF)',
+    'em_reparo_ih': 'Reparo em Progresso IH',
+    'instalacao_inicial': 'Instalação Inicial',
+    'service_handling': 'Service Handling',
+    'return_handling': 'Return Handling',
+    'trade_up': 'Trade Up',
+    'saw': 'SAW',
+    'controle_qualidade': 'Controle de Qualidade',
+    'qa_bt': 'Q&A / BT',
+    'reparo_concluido': 'Reparo Concluído',
+    'aguardando_fechamento': 'Aguardando Fechamento',
+    'orcamentos_rejeitados': 'Orçamentos Rejeitados',
   };
   const colunaEmojis: Record<string, string> = {
-    'os_nova': '🆕', 'aguardando_peca': '⏳', 'peca_em_transito': '🚚', 'em_rota_ih': '🛣️',
-    'em_reparo_ih': '🔧', 'aguardando_fechamento': '📋', 'aguardando_aprovacao': '✋',
-    'return_handling': '↩️', 'service_handling': '⚙️', 'saw': '📦', 'qa_bt': '🔍',
+    'os_nova': '🆕', 'diagnostico': '🔬', 'negociacao_em_andamento': '💬', 'aguardando_aprovacao': '✋',
+    'orcamento_aprovado': '✅', 'aguardando_peca': '⏳', 'peca_em_transito': '🚚',
+    'rota_preta': '⚫', 'rota_vermelha': '🔴', 'rota_azul': '🔵', 'rota_verde': '🟢',
+    'rota_rosa': '🩷', 'rota_amarela': '🟡', 'rota_laranja': '🟠',
+    'em_rota_ih': '🛣️', 'em_reparo_ih': '🔧', 'instalacao_inicial': '🏗️',
+    'service_handling': '⚙️', 'return_handling': '↩️', 'trade_up': '🔄',
+    'saw': '📦', 'controle_qualidade': '🔍', 'qa_bt': '🧪',
+    'reparo_concluido': '✔️', 'aguardando_fechamento': '📋', 'orcamentos_rejeitados': '❌',
   };
 
   type CityData = { count: number; receita: number };
@@ -2490,7 +2525,11 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
       for (const c of Object.values(cidadesData)) { colOS += c.count; colReceita += c.count * c.receita; }
       colTotals.push({ col, os: colOS, receita: colReceita, cidades: cidadesData });
     }
-    colTotals.sort((a, b) => b.receita - a.receita);
+    colTotals.sort((a, b) => {
+      const ia = PIPELINE_ORDER.indexOf(a.col);
+      const ib = PIPELINE_ORDER.indexOf(b.col);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
 
     const unitOS = colTotals.reduce((s, c) => s + c.os, 0);
     const unitReceita = colTotals.reduce((s, c) => s + c.receita, 0);
@@ -2501,11 +2540,13 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     for (const { col, os: colOS, receita: colReceita, cidades: cidadesData } of colTotals) {
       const emoji = colunaEmojis[col] || '▪️';
       const label = colunaLabels[col] || col;
-      lines.push(`${emoji} *${label}* — ${colOS} OS • R$ ${colReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
+      lines.push(`${emoji} *${label}*`);
+      lines.push(`      ${colOS} OS — *R$ ${colReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`);
       const cidadesSorted = Object.entries(cidadesData).sort((a, b) => (b[1].count * b[1].receita) - (a[1].count * a[1].receita));
-      for (const [cidade, data] of cidadesSorted) {
-        lines.push(`    ${data.count}x ${cidade} → R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`);
-      }
+      const cidadeLines = cidadesSorted.map(([cidade, data]) =>
+        `${data.count}x ${cidade} (R$ ${(data.count * data.receita).toLocaleString("pt-BR", { minimumFractionDigits: 2 })})`
+      );
+      lines.push(`      _${cidadeLines.join(' • ')}_`);
       lines.push('');
     }
 
@@ -2514,25 +2555,26 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
     const hora = now.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", hour: '2-digit', minute: '2-digit' });
 
     const msgParts = [
-      `💰 *DINHEIRO NA MESA — ${nomeUnidade}*`,
-      `${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} ${hora}`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `💰 *DINHEIRO NA MESA*`,
+      `📍 *${nomeUnidade}*`,
+      `🕐 ${now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} às ${hora}`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
       ``,
-      `📊 ${unitOS} OS mapeadas • *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
+      `📊 *${unitOS}* OS com KM • 💵 *R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
       ``,
       ...lines,
-      `━━━━━━━━━━━━━━━━━━━━━`,
-      `💰 *Total: R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`,
     ];
 
     if (unmappedEntries.length > 0) {
+      const unmappedList = unmappedEntries.map(([cidade, qty]) => `${qty}x ${cidade}`).join(', ');
+      msgParts.push(`⚠️ *${totalUnmapped} OS sem KM:* ${unmappedList}`);
       msgParts.push('');
-      msgParts.push(`⚠️ *${totalUnmapped} OS sem KM definido:*`);
-      for (const [cidade, qty] of unmappedEntries) {
-        msgParts.push(`    ${qty}x ${cidade}`);
-      }
     }
-    msgParts.push('');
-    msgParts.push(`_GIA • Global Intelligence Assistance_`);
+
+    msgParts.push(`━━━━━━━━━━━━━━━━━━━━━━`);
+    msgParts.push(`💰 *TOTAL: R$ ${unitReceita.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}*`);
+    msgParts.push(`_GIA • Relatório Automático_`);
     mensagensPorUnidade.push(msgParts.join("\n"));
   }
 
