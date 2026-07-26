@@ -1,4 +1,4 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route, AlertTriangle } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
@@ -101,6 +101,11 @@ const ROTA_COLORS: Record<string, string> = {
   'Rota 5': 'bg-emerald-100 text-emerald-700 border-emerald-300',
   'Rota 6': 'bg-cyan-100 text-cyan-700 border-cyan-300',
   'Rota 7': 'bg-purple-100 text-purple-700 border-purple-300'
+};
+
+const normCidade = (c: string | null | undefined): string => {
+  if (!c) return '';
+  return c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 };
 
 export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
@@ -719,15 +724,23 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 {/* Cidade + Rota inline editor */}
                 <div className="flex items-center gap-2 mb-3 flex-wrap">
                   {(() => {
-                    const rotaByCol = rotas.find(r => r.coluna_kanban === osDetails.coluna_kanban);
-                    const rotaById = rotas.find(r => r.id === osDetails.rota_id);
-                    const rotaAtual = rotaByCol || rotaById;
+                    const cidadeN = normCidade(osDetails.cliente_cidade);
+                    const rotaAtual = cidadeN ? rotas.find(r => r.cidades?.some(c => normCidade(c) === cidadeN)) : null;
+                    if (rotaAtual) {
+                      return (
+                        <span className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1" style={{ backgroundColor: `${rotaAtual.cor}20`, color: rotaAtual.cor }}>
+                          <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: rotaAtual.cor }} />
+                          <Route className="w-3 h-3 inline" />
+                          {osDetails.cliente_cidade || 'Sem cidade'}
+                          <span className="ml-1">• {rotaAtual.nome}</span>
+                        </span>
+                      );
+                    }
                     return (
-                      <span className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1" style={{ backgroundColor: rotaAtual ? `${rotaAtual.cor}20` : `${textSecondary}15`, color: rotaAtual ? rotaAtual.cor : textSecondary }}>
-                        {rotaAtual && <span className="w-2.5 h-2.5 rounded-full inline-block" style={{ backgroundColor: rotaAtual.cor }} />}
-                        <Route className="w-3 h-3 inline" />
+                      <span className="text-xs px-2 py-1 rounded-full font-medium flex items-center gap-1" style={{ backgroundColor: 'rgba(251,191,36,0.12)', color: '#FBBF24', border: '1px solid rgba(251,191,36,0.35)' }}>
+                        <AlertTriangle className="w-3 h-3 inline" />
                         {osDetails.cliente_cidade || 'Sem cidade'}
-                        {rotaAtual && <span className="ml-1">• {rotaAtual.nome}</span>}
+                        {osDetails.tipo_atendimento === 'IH' && <span className="ml-1">• Sem rota</span>}
                       </span>
                     );
                   })()}

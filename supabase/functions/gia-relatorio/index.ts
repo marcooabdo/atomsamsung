@@ -736,23 +736,22 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
         cidadesComRotaPorUnidade[rota.unidade_id] = new Set();
       }
       for (const cidade of rota.cidades) {
-        cidadesComRotaPorUnidade[rota.unidade_id].add(cidade.toLowerCase().trim());
+        cidadesComRotaPorUnidade[rota.unidade_id].add(cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim());
       }
     }
   }
 
-  // Fetch all active OS that are not closed/archived and not already in a route column
+  // Fetch all active IH OS that are not closed/archived and not already in a route column
   let allOSRaw: any[] = [];
   let from = 0;
   const pageSize = 1000;
   while (true) {
     let q = supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, coluna_kanban, rota_id, unidade_id, tipo_atendimento")
+      .select("id, numero_os_samsung, numero_os_interna, cliente_nome, cliente_cidade, coluna_kanban, unidade_id, tipo_atendimento")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
       .not("coluna_kanban", "in", `(${colunasComRota.join(",")})`)
-      .is("rota_id", null)
       .eq("tipo_atendimento", "IH")
       .range(from, from + pageSize - 1);
     if (unidadeId) q = q.eq("unidade_id", unidadeId);
@@ -764,12 +763,13 @@ async function gerarAgendamentosIH(supabase: ReturnType<typeof createClient>, un
     from += pageSize;
   }
 
-  // Filter out OS whose city already has a route color in the same unit
+  // Filter: keep only OS whose city does NOT have a route in the same unit
   const allOS = allOSRaw.filter((os) => {
     if (!os.cliente_cidade || !os.unidade_id) return true;
     const cidadesSet = cidadesComRotaPorUnidade[os.unidade_id];
     if (!cidadesSet) return true;
-    return !cidadesSet.has(os.cliente_cidade.toLowerCase().trim());
+    const cidadeNorm = os.cliente_cidade.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    return !cidadesSet.has(cidadeNorm);
   });
 
   // Columns to include in the report (only non-route pipeline columns)

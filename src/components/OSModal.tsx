@@ -200,7 +200,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [osVinculadas, setOsVinculadas] = useState<any[]>([]);
 
   // Route validation states
-  const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string }>>([]);
+  const [rotasUnidade, setRotasUnidade] = useState<Array<{ id: string; nome: string; cidades: string[]; coluna_kanban: string; cor: string | null }>>([]);
   const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
   const [mostrarEditarRotaCidade, setMostrarEditarRotaCidade] = useState(false);
   const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
@@ -508,7 +508,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     try {
       const { data } = await supabase
         .from('rotas')
-        .select('id, nome, cidades, coluna_kanban')
+        .select('id, nome, cidades, coluna_kanban, cor')
         .eq('unidade_id', unidadeIdParam)
         .eq('ativa', true);
       if (data) setRotasUnidade(data);
@@ -3848,8 +3848,10 @@ Não haverá cobrança ao cliente.`
                         </p>
                         <p className="text-sm text-gray-300">{normalizarCidade(os.cliente_cidade) || '-'}
                           {(() => {
-                            const rotaAtual = rotasUnidade.find(r => r.id === os.rota_id);
+                            const cidadeNorm = normalizeCidadeLocal(os.cliente_cidade);
+                            const rotaAtual = cidadeNorm ? rotasUnidade.find(r => r.cidades?.some(c => normalizeCidadeLocal(c) === cidadeNorm)) : null;
                             if (rotaAtual) return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded" style={{ backgroundColor: `${rotaAtual.cor || '#666'}25`, color: rotaAtual.cor || '#999' }}>{rotaAtual.nome}</span>;
+                            if (os.cliente_cidade && os.tipo_atendimento === 'IH') return <span className="ml-1.5 text-xs px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400">Sem rota</span>;
                             return null;
                           })()}
                         </p>
