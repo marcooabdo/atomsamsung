@@ -117,6 +117,8 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [savingRota, setSavingRota] = useState(false);
   const [cidadeKm, setCidadeKm] = useState<{ distancia_km_ida_volta: number; receita_por_os: number } | null>(null);
   const [rotas, setRotas] = useState<Array<{ id: string; nome: string; coluna_kanban: string; cidades: string[] }>>([]);
+  const [showKmModal, setShowKmModal] = useState(false);
+  const [kmInput, setKmInput] = useState('');
 
   const themeAccent = themeInfo.accent;
   const modalBg = isDark ? themeInfo.bg : '#ffffff';
@@ -132,7 +134,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   }, [osId]);
 
   useEffect(() => {
-    if (osDetails?.cliente_cidade && osDetails?.unidade_id && (osDetails?.tipo_os === 'LP' || osDetails?.tipo_os === 'OW')) {
+    if (osDetails?.cliente_cidade && osDetails?.unidade_id && osDetails?.tipo_atendimento === 'IH') {
       getKmCidade(osDetails.unidade_id, osDetails.cliente_cidade).then(setCidadeKm);
     }
   }, [osDetails?.cliente_cidade, osDetails?.unidade_id]);
@@ -417,13 +419,64 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       await loadRotas(osDetails.unidade_id);
 
       if (cidadeCorrigida && osDetails.unidade_id) {
-        calcularESalvarKmCidade(osDetails.unidade_id, cidadeCorrigida, osDetails.cliente_estado || '');
+        const kmResult = await calcularESalvarKmCidade(osDetails.unidade_id, cidadeCorrigida, osDetails.cliente_estado || '');
+        if (kmResult) {
+          setCidadeKm(kmResult);
+        } else {
+          setKmInput('');
+          setShowKmModal(true);
+        }
       }
     } catch (err) {
       console.error('Erro ao salvar rota:', err);
     } finally {
       setSavingRota(false);
     }
+  }
+
+  async function handleSaveKmManual() {
+    if (!osDetails?.unidade_id || !osDetails?.cliente_cidade) return;
+    const kmIdaVolta = parseFloat(kmInput.replace(',', '.'));
+    if (isNaN(kmIdaVolta) || kmIdaVolta <= 0) return;
+
+    const TARIFA = 1.38;
+    const receita = Math.round(kmIdaVolta * TARIFA * 100) / 100;
+    const cidade = osDetails.cliente_cidade.trim();
+
+    const { data: existing } = await supabase
+      .from('rotas_cidades_km')
+      .select('id')
+      .eq('unidade_id', osDetails.unidade_id)
+      .ilike('cidade', cidade)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('rotas_cidades_km')
+        .update({
+          distancia_km: Math.round(kmIdaVolta / 2 * 10) / 10,
+          distancia_km_ida_volta: kmIdaVolta,
+          receita_por_os: receita,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('rotas_cidades_km')
+        .insert({
+          unidade_id: osDetails.unidade_id,
+          cidade,
+          estado: osDetails.cliente_estado || null,
+          distancia_km: Math.round(kmIdaVolta / 2 * 10) / 10,
+          distancia_km_ida_volta: kmIdaVolta,
+          receita_por_os: receita,
+          calculado_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+    }
+
+    setCidadeKm({ distancia_km_ida_volta: kmIdaVolta, receita_por_os: receita });
+    setShowKmModal(false);
   }
 
   function handleOpenMaps(type: 'google' | 'waze') {
@@ -672,10 +725,18 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                       <span className="ml-1">• {rotas.find(r => r.id === osDetails.rota_id)?.nome || 'Sem rota'}</span>
                     )}
                   </span>
-                  {cidadeKm && (osDetails.tipo_os === 'LP' || osDetails.tipo_os === 'OW') && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium">
+                  {cidadeKm && osDetails.tipo_atendimento === 'IH' && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-medium cursor-pointer" onClick={() => { setKmInput(String(cidadeKm.distancia_km_ida_volta)); setShowKmModal(true); }}>
                       {cidadeKm.distancia_km_ida_volta} km i/v • R${cidadeKm.receita_por_os.toFixed(2)}
                     </span>
+                  )}
+                  {!cidadeKm && osDetails.tipo_atendimento === 'IH' && osDetails.cliente_cidade && (
+                    <button
+                      onClick={() => { setKmInput(''); setShowKmModal(true); }}
+                      className="text-xs px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-medium hover:bg-amber-500/20 transition-colors"
+                    >
+                      + Adicionar KM
+                    </button>
                   )}
                   <button
                     onClick={() => {
@@ -1064,6 +1125,46 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
           unidade_id: osDetails.unidade_id,
         }}
       />
+
+      {showKmModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1e1e2e] border border-white/10 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold text-lg mb-2">Distância KM (ida e volta)</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Cidade: <span className="text-white font-medium">{osDetails.cliente_cidade}</span>
+            </p>
+            <input
+              type="text"
+              value={kmInput}
+              onChange={(e) => setKmInput(e.target.value)}
+              placeholder="Ex: 320"
+              className="w-full px-4 py-3 bg-[#2a2a3e] border border-white/10 rounded-lg text-white text-lg focus:outline-none focus:border-blue-500 mb-2"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveKmManual(); }}
+            />
+            {kmInput && !isNaN(parseFloat(kmInput.replace(',', '.'))) && parseFloat(kmInput.replace(',', '.')) > 0 && (
+              <p className="text-sm text-emerald-400 mb-4">
+                Receita: R$ {(parseFloat(kmInput.replace(',', '.')) * 1.38).toFixed(2)}
+              </p>
+            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowKmModal(false)}
+                className="flex-1 px-4 py-2.5 border border-white/10 rounded-lg text-gray-300 hover:bg-white/5 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveKmManual}
+                disabled={!kmInput || isNaN(parseFloat(kmInput.replace(',', '.'))) || parseFloat(kmInput.replace(',', '.')) <= 0}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

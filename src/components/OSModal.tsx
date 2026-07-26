@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { calcularESalvarKmCidade } from '../lib/deslocamentoService';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
 
@@ -203,6 +204,9 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [mostrarSelecionarRotaObrigatoria, setMostrarSelecionarRotaObrigatoria] = useState(false);
   const [mostrarEditarRotaCidade, setMostrarEditarRotaCidade] = useState(false);
   const [colunaDestinoAposSelecionarRota, setColunaDestinoAposSelecionarRota] = useState<{ id: string; label: string } | null>(null);
+  const [showKmModal, setShowKmModal] = useState(false);
+  const [kmInput, setKmInput] = useState('');
+  const [kmCidadeRef, setKmCidadeRef] = useState('');
 
   // Estados para WhatsApp Chat
   const [showWhatsAppChat, setShowWhatsAppChat] = useState(false);
@@ -2894,10 +2898,63 @@ Não haverá cobrança ao cliente.`
 
         await moverOS(targetCol.id, extraUpdates);
       }
+
+      const cidadeFinal = (cidadeCorrigida?.trim() || os.cliente_cidade || '').trim();
+      if (cidadeFinal && os.unidade_id && os.tipo_atendimento === 'IH') {
+        const kmResult = await calcularESalvarKmCidade(os.unidade_id, cidadeFinal, os.cliente_estado || '');
+        if (!kmResult) {
+          setKmCidadeRef(cidadeFinal);
+          setKmInput('');
+          setShowKmModal(true);
+        }
+      }
     } catch (error: any) {
       alert(`Erro ao definir rota: ${error.message}`);
     }
   };
+
+  async function handleSaveKmManualOSModal() {
+    if (!os?.unidade_id || !kmCidadeRef) return;
+    const kmIdaVolta = parseFloat(kmInput.replace(',', '.'));
+    if (isNaN(kmIdaVolta) || kmIdaVolta <= 0) return;
+
+    const TARIFA = 1.38;
+    const receita = Math.round(kmIdaVolta * TARIFA * 100) / 100;
+    const cidade = kmCidadeRef.trim();
+
+    const { data: existing } = await supabase
+      .from('rotas_cidades_km')
+      .select('id')
+      .eq('unidade_id', os.unidade_id)
+      .ilike('cidade', cidade)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from('rotas_cidades_km')
+        .update({
+          distancia_km: Math.round(kmIdaVolta / 2 * 10) / 10,
+          distancia_km_ida_volta: kmIdaVolta,
+          receita_por_os: receita,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existing.id);
+    } else {
+      await supabase
+        .from('rotas_cidades_km')
+        .insert({
+          unidade_id: os.unidade_id,
+          cidade,
+          estado: os.cliente_estado || null,
+          distancia_km: Math.round(kmIdaVolta / 2 * 10) / 10,
+          distancia_km_ida_volta: kmIdaVolta,
+          receita_por_os: receita,
+          calculado_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+    }
+    setShowKmModal(false);
+  }
 
   const handleConfirmCityEdit = async (cidadeEditada: string) => {
     if (!os) return;
@@ -6117,6 +6174,46 @@ Não haverá cobrança ao cliente.`
             onReload?.();
           }}
         />
+      )}
+
+      {showKmModal && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-[#1e1e2e] border border-white/10 rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <h3 className="text-white font-semibold text-lg mb-2">Distância KM (ida e volta)</h3>
+            <p className="text-sm text-gray-400 mb-4">
+              Cidade: <span className="text-white font-medium">{kmCidadeRef}</span>
+            </p>
+            <input
+              type="text"
+              value={kmInput}
+              onChange={(e) => setKmInput(e.target.value)}
+              placeholder="Ex: 320"
+              className="w-full px-4 py-3 bg-[#2a2a3e] border border-white/10 rounded-lg text-white text-lg focus:outline-none focus:border-blue-500 mb-2"
+              autoFocus
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSaveKmManualOSModal(); }}
+            />
+            {kmInput && !isNaN(parseFloat(kmInput.replace(',', '.'))) && parseFloat(kmInput.replace(',', '.')) > 0 && (
+              <p className="text-sm text-emerald-400 mb-4">
+                Receita: R$ {(parseFloat(kmInput.replace(',', '.')) * 1.38).toFixed(2)}
+              </p>
+            )}
+            <div className="flex gap-3 mt-4">
+              <button
+                onClick={() => setShowKmModal(false)}
+                className="flex-1 px-4 py-2.5 border border-white/10 rounded-lg text-gray-300 hover:bg-white/5 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleSaveKmManualOSModal}
+                disabled={!kmInput || isNaN(parseFloat(kmInput.replace(',', '.'))) || parseFloat(kmInput.replace(',', '.')) <= 0}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white font-medium transition-colors"
+              >
+                Salvar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
