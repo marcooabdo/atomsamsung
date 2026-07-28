@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { FileText, Clock, Save, Eye, ToggleLeft, ToggleRight, X, Loader2, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { FileText, Clock, Save, ToggleLeft, ToggleRight, X, Loader2, Plus, Trash2, Calendar, Send, ChevronDown, ChevronUp, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 
 interface RelatorioConfig {
@@ -8,183 +8,58 @@ interface RelatorioConfig {
   nome: string;
   emoji: string;
   horario: string;
+  horarios: string[];
+  dias_semana: number[];
   ativo: boolean;
   template_formato: string;
+  grupo_destino: string | null;
   created_at: string;
   updated_at: string;
 }
 
-const DEFAULT_TEMPLATES: Record<string, string> = {
-  pulso_operacional: `🔴 *PULSO OPERACIONAL*
-━━━━━━━━━━━━━━━━━━━━━
-
-⚠️ *OS PARADAS HÁ MAIS DE 2 HORAS:*
-
-{lista_os_paradas}
-
-📊 *RESUMO POR COLUNA:*
-{resumo_colunas}
-
-🔔 Total de OS paradas: {total_paradas}
-⏰ Relatório gerado: {horario}`,
-
-  estoque_dia: `📦 *ESTOQUE DO DIA*
-━━━━━━━━━━━━━━━━━━━━━
-
-📊 *SITUAÇÃO GERAL:*
-• Total de peças em estoque: {total_pecas}
-• Peças disponíveis: {disponiveis}
-• Peças vinculadas: {vinculadas}
-• Peças em trânsito: {em_transito}
-
-📋 *REQUISIÇÕES PENDENTES:*
-{requisicoes_pendentes}
-
-🔔 Alertas:
-{alertas_estoque}
-
-⏰ Relatório gerado: {horario}`,
-
-  resumo_final: `🏁 *RESUMO FINAL DO DIA*
-━━━━━━━━━━━━━━━━━━━━━
-
-📊 *MOVIMENTAÇÃO DO DIA:*
-• OS abertas hoje: {abertas_hoje}
-• OS fechadas hoje: {fechadas_hoje}
-• OS em andamento: {em_andamento}
-
-💰 *FINANCEIRO:*
-• Faturamento do dia: R$ {faturamento}
-• Pagamentos recebidos: {pagamentos}
-
-👥 *DESEMPENHO TÉCNICOS:*
-{desempenho_tecnicos}
-
-⏰ Relatório gerado: {horario}`,
-
-  agendamentos_ih: `🚨📋 *RELATÓRIO ROTAS*
-━━━━━━━━━━━━━━━━━━━━━
-
-📅 {data}
-⏰ {horario}
-
-⚠️ *{total} OS sem rota definida*
-
-{detalhes_unidades}
-
-━━━━━━━━━━━━━━━━━━━━━
-🤖 _GIA • Global Intelligence Assistance_`,
-
-  compliance_erros: `⚠️ *COMPLIANCE E ERROS*
-━━━━━━━━━━━━━━━━━━━━━
-
-🚨 *ALERTAS CRÍTICOS:*
-{alertas_criticos}
-
-📋 *PENDÊNCIAS:*
-{pendencias}
-
-📊 *INDICADORES:*
-• SLA médio: {sla_medio}
-• OS fora do prazo: {fora_prazo}
-• Erros de processo: {erros}
-
-⏰ Relatório gerado: {horario}`,
-
-  limite_credito_gspn: `💳 *LIMITE DE CRÉDITO GSPN*
-━━━━━━━━━━━━━━━━━━━━━
-
-💰 *SITUAÇÃO ATUAL:*
-• Limite total: R$ {limite_total}
-• Utilizado: R$ {utilizado}
-• Disponível: R$ {disponivel}
-• % utilizado: {percentual}%
-
-📋 *PEÇAS PENDENTES DE CRÉDITO:*
-{pecas_pendentes}
-
-⚠️ *ALERTAS:*
-{alertas_credito}
-
-⏰ Relatório gerado: {horario}`,
-
-  mapa_rotas: `🗺️ *RELATÓRIO AGENDA*
-━━━━━━━━━━━━━━━━━━━━━
-
-📋 *ROTAS DO DIA:*
-{rotas}
-
-📊 *RESUMO:*
-• Total de visitas: {total_visitas}
-• Km estimado: {km_total}
-• Técnicos em rota: {tecnicos_rota}
-
-⏰ Relatório gerado: {horario}`,
-
-  nucleo_pecas: `🔧 *NÚCLEO DE PEÇAS*
-━━━━━━━━━━━━━━━━━━━━━
-
-📦 *MOVIMENTAÇÃO:*
-• Entradas hoje: {entradas}
-• Saídas hoje: {saidas}
-• Devoluções pendentes: {devolucoes}
-
-📋 *REQUISIÇÕES:*
-{requisicoes}
-
-⚠️ *ALERTAS DE ESTOQUE:*
-{alertas}
-
-⏰ Relatório gerado: {horario}`,
-
-  abertura_fechamento: `📊 *ABERTURA E FECHAMENTO*
-━━━━━━━━━━━━━━━━━━━━━
-
-📈 *ABERTURA:*
-• OS abertas hoje: {abertas_hoje}
-• Por tipo: LP={lp} | OW={ow}
-• IH={ih} | CI={ci}
-
-📉 *FECHAMENTO:*
-• OS fechadas hoje: {fechadas_hoje}
-• Tempo médio: {tempo_medio}
-
-📊 *SALDO:*
-• Backlog atual: {backlog}
-• Variação: {variacao}
-
-⏰ Relatório gerado: {horario}`,
+const DIAS_SEMANA_LABELS: Record<number, string> = {
+  0: 'Dom',
+  1: 'Seg',
+  2: 'Ter',
+  3: 'Qua',
+  4: 'Qui',
+  5: 'Sex',
+  6: 'Sáb',
 };
 
-function renderTemplatePreview(template: string): string {
-  if (!template) return '';
-  let html = template.replace(/\*(.*?)\*/g, '<strong>$1</strong>');
-  html = html.replace(/\n/g, '<br>');
-  return html;
-}
+const DIAS_SEMANA_FULL: Record<number, string> = {
+  0: 'Domingo',
+  1: 'Segunda',
+  2: 'Terça',
+  3: 'Quarta',
+  4: 'Quinta',
+  5: 'Sexta',
+  6: 'Sábado',
+};
 
 export function ConfiguracoesRelatorios() {
   const [relatorios, setRelatorios] = useState<RelatorioConfig[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editForm, setEditForm] = useState<Partial<RelatorioConfig>>({});
-  const [saving, setSaving] = useState(false);
-  const [savingHorario, setSavingHorario] = useState<string | null>(null);
-  const [showPreview, setShowPreview] = useState(false);
+  const [saving, setSaving] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [newHorarioInput, setNewHorarioInput] = useState<Record<string, string>>({});
 
   const fetchRelatorios = useCallback(async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('gia_relatorios_config' as any)
       .select('*')
-      .order('horario');
+      .order('nome');
 
     if (error) {
       console.error('Erro ao buscar relatórios:', error);
     } else {
-      setRelatorios(data || []);
+      setRelatorios((data || []).map((r: any) => ({
+        ...r,
+        horarios: r.horarios || [],
+        dias_semana: r.dias_semana || [1, 2, 3, 4, 5],
+      })));
     }
     setLoading(false);
   }, []);
@@ -193,73 +68,15 @@ export function ConfiguracoesRelatorios() {
     fetchRelatorios();
   }, [fetchRelatorios]);
 
-  const getEffectiveTemplate = (relatorio: RelatorioConfig): string => {
-    return relatorio.template_formato || DEFAULT_TEMPLATES[relatorio.tipo] || '';
-  };
-
-  const handleEdit = (relatorio: RelatorioConfig) => {
-    setEditingId(relatorio.id);
-    setEditForm({
-      template_formato: getEffectiveTemplate(relatorio),
-      horario: relatorio.horario,
-    });
-    setShowPreview(false);
-  };
-
-  const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditForm({});
-    setShowPreview(false);
-  };
-
-  const handleSave = async (id: string) => {
-    setSaving(true);
-    const { error } = await supabase
-      .from('gia_relatorios_config' as any)
-      .update({
-        template_formato: editForm.template_formato,
-        horario: editForm.horario,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Erro ao salvar:', error);
-    } else {
-      setSuccessMessage('Relatório atualizado com sucesso!');
-      setTimeout(() => setSuccessMessage(null), 3000);
-      setEditingId(null);
-      setEditForm({});
-      fetchRelatorios();
-    }
-    setSaving(false);
-  };
-
-  const handleHorarioChange = async (relatorio: RelatorioConfig, newHorario: string) => {
-    setSavingHorario(relatorio.id);
-    const { error } = await supabase
-      .from('gia_relatorios_config' as any)
-      .update({
-        horario: newHorario,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', relatorio.id);
-
-    if (!error) {
-      setRelatorios(prev =>
-        prev.map(r => r.id === relatorio.id ? { ...r, horario: newHorario } : r)
-      );
-    }
-    setSavingHorario(null);
+  const showSuccess = (msg: string) => {
+    setSuccessMessage(msg);
+    setTimeout(() => setSuccessMessage(null), 3000);
   };
 
   const handleToggleAtivo = async (relatorio: RelatorioConfig) => {
     const { error } = await supabase
       .from('gia_relatorios_config' as any)
-      .update({
-        ativo: !relatorio.ativo,
-        updated_at: new Date().toISOString(),
-      })
+      .update({ ativo: !relatorio.ativo, updated_at: new Date().toISOString() })
       .eq('id', relatorio.id);
 
     if (!error) {
@@ -267,6 +84,76 @@ export function ConfiguracoesRelatorios() {
         prev.map(r => r.id === relatorio.id ? { ...r, ativo: !r.ativo } : r)
       );
     }
+  };
+
+  const handleAddHorario = async (relatorio: RelatorioConfig) => {
+    const newTime = newHorarioInput[relatorio.id];
+    if (!newTime) return;
+    if (relatorio.horarios.includes(newTime)) return;
+
+    const updatedHorarios = [...relatorio.horarios, newTime].sort();
+    setSaving(relatorio.id);
+
+    const { error } = await supabase
+      .from('gia_relatorios_config' as any)
+      .update({ horarios: updatedHorarios, updated_at: new Date().toISOString() })
+      .eq('id', relatorio.id);
+
+    if (!error) {
+      setRelatorios(prev =>
+        prev.map(r => r.id === relatorio.id ? { ...r, horarios: updatedHorarios } : r)
+      );
+      setNewHorarioInput(prev => ({ ...prev, [relatorio.id]: '' }));
+      showSuccess('Horário adicionado!');
+    }
+    setSaving(null);
+  };
+
+  const handleRemoveHorario = async (relatorio: RelatorioConfig, horario: string) => {
+    const updatedHorarios = relatorio.horarios.filter(h => h !== horario);
+    setSaving(relatorio.id);
+
+    const { error } = await supabase
+      .from('gia_relatorios_config' as any)
+      .update({ horarios: updatedHorarios, updated_at: new Date().toISOString() })
+      .eq('id', relatorio.id);
+
+    if (!error) {
+      setRelatorios(prev =>
+        prev.map(r => r.id === relatorio.id ? { ...r, horarios: updatedHorarios } : r)
+      );
+      showSuccess('Horário removido!');
+    }
+    setSaving(null);
+  };
+
+  const handleToggleDia = async (relatorio: RelatorioConfig, dia: number) => {
+    const current = relatorio.dias_semana;
+    const updatedDias = current.includes(dia)
+      ? current.filter(d => d !== dia)
+      : [...current, dia].sort((a, b) => a - b);
+
+    setSaving(relatorio.id);
+
+    const { error } = await supabase
+      .from('gia_relatorios_config' as any)
+      .update({ dias_semana: updatedDias, updated_at: new Date().toISOString() })
+      .eq('id', relatorio.id);
+
+    if (!error) {
+      setRelatorios(prev =>
+        prev.map(r => r.id === relatorio.id ? { ...r, dias_semana: updatedDias } : r)
+      );
+    }
+    setSaving(null);
+  };
+
+  const getDiasLabel = (dias: number[]) => {
+    if (dias.length === 7) return 'Todos os dias';
+    if (dias.length === 0) return 'Nenhum dia';
+    if (JSON.stringify(dias) === JSON.stringify([1, 2, 3, 4, 5])) return 'Seg a Sex';
+    if (JSON.stringify(dias) === JSON.stringify([1, 2, 3, 4, 5, 6])) return 'Seg a Sáb';
+    return dias.map(d => DIAS_SEMANA_LABELS[d]).join(', ');
   };
 
   if (loading) {
@@ -281,58 +168,68 @@ export function ConfiguracoesRelatorios() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-3">
         <h2 className="tech-heading text-2xl flex items-center gap-3">
-          <FileText className="w-7 h-7 text-[#00D4FF]" />
-          Configurações de Relatórios GIA
+          <Send className="w-7 h-7 text-[#39FF14]" />
+          Central de Relatórios
         </h2>
-        <span className="text-sm text-gray-400">
-          {relatorios.filter(r => r.ativo).length} ativos de {relatorios.length} relatórios
-        </span>
+        <div className="flex items-center gap-4">
+          <span className="text-sm text-gray-400 flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-[#39FF14] animate-pulse" />
+            {relatorios.filter(r => r.ativo).length} ativos
+          </span>
+          <span className="text-sm text-gray-500">
+            {relatorios.length} relatórios configurados
+          </span>
+        </div>
       </div>
 
       {/* Info Banner */}
-      <div className="bg-[#00D4FF]/5 border border-[#00D4FF]/20 rounded-lg px-4 py-3 flex items-start gap-3">
-        <Info className="w-5 h-5 text-[#00D4FF] mt-0.5 flex-shrink-0" />
+      <div className="bg-[#39FF14]/5 border border-[#39FF14]/20 rounded-xl px-5 py-4 flex items-start gap-3">
+        <Info className="w-5 h-5 text-[#39FF14] mt-0.5 flex-shrink-0" />
         <div className="text-sm text-gray-300">
-          <p>Edite os horários diretamente e clique no template para personalizar o formato de cada relatório.</p>
-          <p className="text-gray-500 text-xs mt-1">Variáveis entre {'{chaves}'} são substituídas automaticamente pela GIA com dados em tempo real.</p>
+          <p className="font-medium text-white mb-1">Relatórios enviados pela GIA no WhatsApp</p>
+          <p className="text-gray-400">
+            Gerencie os horários e dias da semana de cada relatório. Clique em um relatório para expandir e editar os detalhes.
+          </p>
         </div>
       </div>
 
       {/* Success Message */}
       {successMessage && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3 text-green-400 text-sm">
+        <div className="bg-green-500/10 border border-green-500/30 rounded-lg px-4 py-3 text-green-400 text-sm animate-in fade-in duration-200">
           {successMessage}
         </div>
       )}
 
-      {/* Reports Table */}
+      {/* Reports List */}
       <div className="space-y-3">
         {relatorios.map((relatorio) => {
-          const template = getEffectiveTemplate(relatorio);
           const isExpanded = expandedId === relatorio.id;
-          const isEditing = editingId === relatorio.id;
+          const isSaving = saving === relatorio.id;
 
           return (
             <div
               key={relatorio.id}
-              className={`premium-card rounded-xl border transition-all duration-200 ${
+              className={`rounded-xl border transition-all duration-200 overflow-hidden ${
                 relatorio.ativo
-                  ? 'border-[#00D4FF]/15 hover:border-[#00D4FF]/30'
-                  : 'border-gray-700/40 opacity-50'
+                  ? 'bg-gray-900/60 border-gray-700/60 hover:border-[#39FF14]/30'
+                  : 'bg-gray-900/30 border-gray-800/40 opacity-60'
               }`}
             >
               {/* Main Row */}
-              <div className="flex items-center gap-4 px-5 py-4">
+              <div
+                className="flex items-center gap-4 px-5 py-4 cursor-pointer"
+                onClick={() => setExpandedId(isExpanded ? null : relatorio.id)}
+              >
                 {/* Toggle */}
                 <button
-                  onClick={() => handleToggleAtivo(relatorio)}
+                  onClick={(e) => { e.stopPropagation(); handleToggleAtivo(relatorio); }}
                   className="flex-shrink-0 transition-transform hover:scale-110"
                   title={relatorio.ativo ? 'Desativar' : 'Ativar'}
                 >
                   {relatorio.ativo ? (
-                    <ToggleRight className="w-7 h-7 text-[#00D4FF]" />
+                    <ToggleRight className="w-7 h-7 text-[#39FF14]" />
                   ) : (
                     <ToggleLeft className="w-7 h-7 text-gray-500" />
                   )}
@@ -347,142 +244,130 @@ export function ConfiguracoesRelatorios() {
                   </div>
                 </div>
 
-                {/* Horario - directly editable */}
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <Clock className="w-4 h-4 text-gray-400" />
-                  <input
-                    type="time"
-                    value={relatorio.horario}
-                    onChange={(e) => handleHorarioChange(relatorio, e.target.value)}
-                    className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white w-[110px] focus:border-[#00D4FF] focus:ring-1 focus:ring-[#00D4FF] outline-none transition-all cursor-pointer"
-                  />
-                  {savingHorario === relatorio.id && (
-                    <Loader2 className="w-4 h-4 text-[#00D4FF] animate-spin" />
+                {/* Schedule summary */}
+                <div className="hidden sm:flex items-center gap-3 flex-shrink-0">
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <Clock className="w-3.5 h-3.5" />
+                    <span className="font-mono">
+                      {relatorio.horarios.length > 0
+                        ? relatorio.horarios.length === 1
+                          ? relatorio.horarios[0]
+                          : `${relatorio.horarios.length}x/dia`
+                        : '—'
+                      }
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-400">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>{getDiasLabel(relatorio.dias_semana)}</span>
+                  </div>
+                </div>
+
+                {/* Expand/Collapse */}
+                <div className="flex-shrink-0">
+                  {isExpanded ? (
+                    <ChevronUp className="w-5 h-5 text-gray-400" />
+                  ) : (
+                    <ChevronDown className="w-5 h-5 text-gray-400" />
                   )}
                 </div>
-
-                {/* Expand/Collapse Template */}
-                <button
-                  onClick={() => {
-                    if (isEditing) return;
-                    setExpandedId(isExpanded ? null : relatorio.id);
-                  }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg border transition-all flex-shrink-0 bg-gray-800 border-gray-600 hover:border-[#00D4FF]/50 text-gray-300 hover:text-white"
-                  title="Ver/Editar template"
-                >
-                  <FileText className="w-3.5 h-3.5" />
-                  Template
-                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-                </button>
               </div>
 
-              {/* Expanded Template View */}
-              {isExpanded && !isEditing && (
-                <div className="border-t border-gray-700/50 px-5 py-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs text-gray-400 uppercase tracking-wider font-medium">
-                      Template Atual
-                      {!relatorio.template_formato && (
-                        <span className="ml-2 text-yellow-500/80">(padrão do sistema)</span>
-                      )}
-                    </span>
-                    <button
-                      onClick={() => handleEdit(relatorio)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs rounded-lg bg-[#00D4FF]/10 border border-[#00D4FF]/30 text-[#00D4FF] hover:bg-[#00D4FF]/20 transition-all"
-                    >
-                      <FileText className="w-3.5 h-3.5" />
-                      Editar Template
-                    </button>
-                  </div>
-                  <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg p-4 max-h-[300px] overflow-auto">
-                    <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono leading-relaxed">
-                      {template || '(Nenhum template definido)'}
-                    </pre>
-                  </div>
-                </div>
-              )}
-
-              {/* Editing Template */}
-              {isEditing && (
-                <div className="border-t border-gray-700/50 px-5 py-4 space-y-4">
-                  {/* Template Editor */}
+              {/* Expanded Details */}
+              {isExpanded && (
+                <div className="border-t border-gray-700/50 px-5 py-5 space-y-5">
+                  {/* Horarios Section */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-300 flex items-center gap-2">
-                        <FileText className="w-4 h-4" />
-                        Editando Template
-                      </label>
-                      <button
-                        onClick={() => setShowPreview(!showPreview)}
-                        className="flex items-center gap-1.5 text-xs text-[#00D4FF] hover:text-[#00D4FF]/80 transition-colors"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
-                        {showPreview ? 'Ocultar Preview' : 'Ver Preview'}
-                      </button>
+                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-3">
+                      <Clock className="w-4 h-4 text-[#39FF14]" />
+                      Horários de Envio
+                    </label>
+
+                    <div className="flex flex-wrap gap-2 mb-3">
+                      {relatorio.horarios.length === 0 && (
+                        <span className="text-sm text-gray-500 italic">Nenhum horário definido</span>
+                      )}
+                      {relatorio.horarios.map(horario => (
+                        <div
+                          key={horario}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-800 border border-gray-600 text-sm text-white font-mono group"
+                        >
+                          <Clock className="w-3.5 h-3.5 text-gray-400" />
+                          {horario}
+                          <button
+                            onClick={() => handleRemoveHorario(relatorio, horario)}
+                            className="ml-1 p-0.5 rounded text-gray-500 hover:text-red-400 hover:bg-red-400/10 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Remover horário"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
 
-                    <div className={`grid gap-4 ${showPreview ? 'grid-cols-1 lg:grid-cols-2' : 'grid-cols-1'}`}>
-                      <textarea
-                        value={editForm.template_formato || ''}
-                        onChange={(e) =>
-                          setEditForm(prev => ({ ...prev, template_formato: e.target.value }))
-                        }
-                        rows={18}
-                        placeholder="Digite o template do relatório..."
-                        className="w-full px-4 py-3 rounded-lg bg-gray-900 border border-gray-600 text-white font-mono text-sm focus:border-[#00D4FF] focus:ring-1 focus:ring-[#00D4FF] outline-none transition-all resize-y leading-relaxed"
+                    {/* Add new horario */}
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="time"
+                        value={newHorarioInput[relatorio.id] || ''}
+                        onChange={(e) => setNewHorarioInput(prev => ({ ...prev, [relatorio.id]: e.target.value }))}
+                        className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white w-[130px] focus:border-[#39FF14] focus:ring-1 focus:ring-[#39FF14] outline-none transition-all"
                       />
+                      <button
+                        onClick={() => handleAddHorario(relatorio)}
+                        disabled={!newHorarioInput[relatorio.id] || isSaving}
+                        className="flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg bg-[#39FF14]/10 border border-[#39FF14]/30 text-[#39FF14] hover:bg-[#39FF14]/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </button>
+                      {isSaving && <Loader2 className="w-4 h-4 text-[#39FF14] animate-spin" />}
+                    </div>
+                  </div>
 
-                      {showPreview && (
-                        <div className="bg-gray-900/80 border border-gray-700 rounded-lg p-4 overflow-auto max-h-[440px]">
-                          <div className="flex items-center gap-2 text-xs text-gray-500 mb-3 pb-2 border-b border-gray-700">
-                            <Eye className="w-3.5 h-3.5" />
-                            PREVIEW (WhatsApp)
-                          </div>
-                          <div
-                            className="text-sm text-gray-200 leading-relaxed whitespace-pre-wrap"
-                            dangerouslySetInnerHTML={{
-                              __html: renderTemplatePreview(editForm.template_formato || ''),
-                            }}
-                          />
-                        </div>
-                      )}
+                  {/* Dias da Semana Section */}
+                  <div>
+                    <label className="text-sm font-medium text-gray-300 flex items-center gap-2 mb-3">
+                      <Calendar className="w-4 h-4 text-[#39FF14]" />
+                      Dias da Semana
+                    </label>
+
+                    <div className="flex flex-wrap gap-2">
+                      {[1, 2, 3, 4, 5, 6, 0].map(dia => {
+                        const isActive = relatorio.dias_semana.includes(dia);
+                        return (
+                          <button
+                            key={dia}
+                            onClick={() => handleToggleDia(relatorio, dia)}
+                            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all border ${
+                              isActive
+                                ? 'bg-[#39FF14]/15 border-[#39FF14]/40 text-[#39FF14]'
+                                : 'bg-gray-800/50 border-gray-700 text-gray-500 hover:border-gray-500 hover:text-gray-300'
+                            }`}
+                            title={DIAS_SEMANA_FULL[dia]}
+                          >
+                            {DIAS_SEMANA_LABELS[dia]}
+                          </button>
+                        );
+                      })}
                     </div>
 
                     <p className="text-xs text-gray-500 mt-2">
-                      Use <code className="bg-gray-800 px-1 rounded">*texto*</code> para negrito.
-                      Variáveis <code className="bg-gray-800 px-1 rounded">{'{variavel}'}</code> são preenchidas pela GIA.
+                      O relatório será enviado apenas nos dias selecionados nos horários definidos acima.
                     </p>
                   </div>
 
-                  {/* Horario in edit mode */}
-                  <div className="flex items-center gap-3">
-                    <Clock className="w-4 h-4 text-gray-400" />
-                    <label className="text-sm text-gray-300">Horário:</label>
-                    <input
-                      type="time"
-                      value={editForm.horario || ''}
-                      onChange={(e) => setEditForm(prev => ({ ...prev, horario: e.target.value }))}
-                      className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-1.5 text-sm text-white focus:border-[#00D4FF] focus:ring-1 focus:ring-[#00D4FF] outline-none transition-all"
-                    />
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-3 pt-2 border-t border-gray-700/50">
-                    <button
-                      onClick={() => handleSave(relatorio.id)}
-                      disabled={saving}
-                      className="flex items-center gap-2 px-5 py-2 bg-[#00D4FF] hover:bg-[#00D4FF]/90 text-gray-900 font-semibold rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                      Salvar
-                    </button>
-                    <button
-                      onClick={handleCancelEdit}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-all"
-                    >
-                      <X className="w-4 h-4" />
-                      Cancelar
-                    </button>
+                  {/* Info footer */}
+                  <div className="flex items-center justify-between pt-3 border-t border-gray-700/50">
+                    <div className="text-xs text-gray-500">
+                      Última atualização: {new Date(relatorio.updated_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}
+                    </div>
+                    {relatorio.grupo_destino && (
+                      <div className="text-xs text-gray-500 flex items-center gap-1.5">
+                        <Send className="w-3 h-3" />
+                        Grupo configurado
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -497,7 +382,7 @@ export function ConfiguracoesRelatorios() {
           <FileText className="w-12 h-12 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400 text-lg">Nenhum relatório configurado</p>
           <p className="text-gray-500 text-sm mt-1">
-            Os templates de relatórios GIA aparecerão aqui.
+            Os relatórios da GIA aparecerão aqui conforme forem sendo criados.
           </p>
         </div>
       )}

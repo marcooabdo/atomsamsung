@@ -894,7 +894,7 @@ export function Configuracoes() {
     { id: 'nf' as Tab, label: 'Nota Fiscal', icon: Receipt, color: '#f59e0b', isAccent: false },
     { id: 'regras_fechamento' as Tab, label: 'Regras Fechamento', icon: ShieldCheck, color: '#FF0064', isAccent: false, onlyFor: ['master', 'diretoria', 'gerente'] },
     { id: 'atom_core' as Tab, label: 'Atom Core', icon: Settings, color: '#00D4FF', isAccent: true, onlyFor: ['master', 'diretoria'] },
-    { id: 'relatorios' as Tab, label: 'Relatórios GIA', icon: BarChart3, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria'] }
+    { id: 'relatorios' as Tab, label: 'Central Relatórios', icon: BarChart3, color: '#39FF14', isAccent: false, onlyFor: ['master', 'diretoria'] }
   ];
 
   const tabs = allTabs.filter(tab => {
