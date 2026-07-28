@@ -2657,6 +2657,204 @@ async function gerarRelatorioKM(supabase: ReturnType<typeof createClient>, unida
   };
 }
 
+async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
+  const now = new Date();
+
+  // Fetch unidades
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  const unidadeShort: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeShort[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeShort[u.id] = "JDF";
+      else if (nome.includes("feira de santana") || nome.includes("feira")) unidadeShort[u.id] = "FSA";
+      else unidadeShort[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
+  }
+
+  // Fetch usuarios for attendant names
+  const { data: usuarios } = await supabase.from("usuarios").select("id, nome");
+  const usuarioMap: Record<string, string> = {};
+  if (usuarios) {
+    for (const u of usuarios) {
+      usuarioMap[u.id] = u.nome || "Sem nome";
+    }
+  }
+
+  // Fetch pipeline column names
+  const { data: colunas } = await supabase.from("atom_connect_pipeline_colunas").select("id, nome");
+  const colunaMap: Record<string, string> = {};
+  if (colunas) {
+    for (const c of colunas) {
+      colunaMap[c.id] = c.nome;
+    }
+  }
+
+  // Fetch active conversations (not finalized, not internal, not in finalizado_nps)
+  const { data: conversas, error } = await supabase
+    .from("atom_connect_conversas")
+    .select("id, unidade_id, cliente_nome, cliente_telefone, coluna_pipeline, atendente_id, ultima_resposta_cliente_at, ultima_resposta_operador_at")
+    .is("resultado_conversa", null)
+    .eq("is_interno", false)
+    .neq("coluna_pipeline", "finalizado_nps");
+
+  if (error) throw new Error(`Erro ao buscar conversas: ${error.message}`);
+
+  // Filter conversations waiting > 1 hour without response
+  const ONE_HOUR_MS = 60 * 60 * 1000;
+  const pendentes: {
+    unidade_id: string;
+    cliente_nome: string | null;
+    cliente_telefone: string;
+    coluna_pipeline: string;
+    atendente_id: string | null;
+    waiting_minutes: number;
+  }[] = [];
+
+  for (const c of conversas || []) {
+    if (!c.ultima_resposta_cliente_at) continue;
+    const clienteAt = new Date(c.ultima_resposta_cliente_at).getTime();
+    const operadorAt = c.ultima_resposta_operador_at ? new Date(c.ultima_resposta_operador_at).getTime() : 0;
+
+    // Client message is newer than operator's last response
+    if (clienteAt > operadorAt) {
+      const elapsed = now.getTime() - clienteAt;
+      if (elapsed >= ONE_HOUR_MS) {
+        pendentes.push({
+          unidade_id: c.unidade_id,
+          cliente_nome: c.cliente_nome,
+          cliente_telefone: c.cliente_telefone,
+          coluna_pipeline: c.coluna_pipeline,
+          atendente_id: c.atendente_id,
+          waiting_minutes: Math.floor(elapsed / 60000),
+        });
+      }
+    }
+  }
+
+  // Sort by waiting time descending
+  pendentes.sort((a, b) => b.waiting_minutes - a.waiting_minutes);
+
+  // Group by unidade
+  const porUnidade: Record<string, typeof pendentes> = {};
+  for (const p of pendentes) {
+    const uid = p.unidade_id || "sem_unidade";
+    if (!porUnidade[uid]) porUnidade[uid] = [];
+    porUnidade[uid].push(p);
+  }
+
+  // Get response metrics per unit
+  const metricsPerUnit: Record<string, { avg_first: number; avg_between: number; per_attendant: { atendente_id: string; avg_first: number; avg_between: number }[] }> = {};
+
+  const unitIds = unidades ? unidades.map(u => u.id) : [];
+  for (const unitId of unitIds) {
+    try {
+      const { data: metrics } = await supabase.rpc("get_atom_connect_response_metrics", { p_unidade_id: unitId });
+      if (metrics) {
+        metricsPerUnit[unitId] = {
+          avg_first: metrics.avg_first_response_seconds || 0,
+          avg_between: metrics.avg_between_response_seconds || 0,
+          per_attendant: (metrics.per_attendant || []).map((pa: any) => ({
+            atendente_id: pa.atendente_id,
+            avg_first: pa.avg_first_response_seconds || 0,
+            avg_between: pa.avg_between_response_seconds || 0,
+          })),
+        };
+      }
+    } catch (_) { /* skip */ }
+  }
+
+  // Format duration
+  function fmtDuration(minutes: number): string {
+    if (minutes < 60) return `${minutes}min`;
+    const h = Math.floor(minutes / 60);
+    const m = minutes % 60;
+    if (h < 24) return m > 0 ? `${h}h${m}min` : `${h}h`;
+    const d = Math.floor(h / 24);
+    const rh = h % 24;
+    return rh > 0 ? `${d}d ${rh}h` : `${d}d`;
+  }
+
+  function fmtSeconds(seconds: number): string {
+    if (seconds <= 0) return "—";
+    return fmtDuration(Math.round(seconds / 60));
+  }
+
+  // Build message
+  const hora = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+  const lines: string[] = [];
+
+  lines.push(`⚠️ *SLA ATOM CONNECT — ${hora}*`);
+  lines.push(`📊 *${pendentes.length} conversas* aguardando resposta há mais de 1 hora`);
+  lines.push("");
+
+  if (pendentes.length === 0) {
+    lines.push("✅ Nenhuma conversa pendente no momento. SLA em dia!");
+  } else {
+    const sortedUnits = Object.entries(porUnidade).sort((a, b) => b[1].length - a[1].length);
+
+    for (const [uid, lista] of sortedUnits) {
+      const sigla = unidadeShort[uid] || "???";
+      lines.push(`━━━━━━━━━━━━━━━━━━`);
+      lines.push(`🏢 *${unidadeMap[uid] || sigla}* — ${lista.length} pendente${lista.length > 1 ? "s" : ""}`);
+      lines.push("");
+
+      for (const p of lista) {
+        const nome = p.cliente_nome || "Sem nome";
+        const tel = p.cliente_telefone.replace(/^55/, "").replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+        const coluna = colunaMap[p.coluna_pipeline] || p.coluna_pipeline;
+        const atendente = p.atendente_id ? (usuarioMap[p.atendente_id] || "—") : "❌ Sem atendente";
+        const tempo = fmtDuration(p.waiting_minutes);
+
+        lines.push(`👤 *${nome}*`);
+        lines.push(`📱 ${tel}`);
+        lines.push(`⏱️ Aguardando: *${tempo}*`);
+        lines.push(`📂 ${coluna} • ${atendente}`);
+        lines.push("");
+      }
+    }
+  }
+
+  // Metrics section
+  lines.push(`━━━━━━━━━━━━━━━━━━`);
+  lines.push(`📈 *MÉTRICAS DE TEMPO DE RESPOSTA*`);
+  lines.push("");
+
+  for (const uid of unitIds) {
+    const m = metricsPerUnit[uid];
+    if (!m) continue;
+    const sigla = unidadeShort[uid] || "???";
+    lines.push(`🏢 *${unidadeMap[uid] || sigla}*`);
+    lines.push(`   ⚡ 1º Contato: *${fmtSeconds(m.avg_first)}*`);
+    lines.push(`   🔄 Entre Respostas: *${fmtSeconds(m.avg_between)}*`);
+
+    if (m.per_attendant.length > 0) {
+      const sorted = [...m.per_attendant].sort((a, b) => a.avg_first - b.avg_first);
+      for (const pa of sorted) {
+        const nome = usuarioMap[pa.atendente_id] || "—";
+        const firstName = nome.split(" ")[0];
+        lines.push(`      • ${firstName}: 1º ${fmtSeconds(pa.avg_first)} | Entre ${fmtSeconds(pa.avg_between)}`);
+      }
+    }
+    lines.push("");
+  }
+
+  lines.push(`🤖 _GIA • Atom Connect SLA_`);
+
+  const resumoTexto = lines.join("\n");
+
+  return {
+    titulo: "SLA Atom Connect",
+    subtitulo: `${pendentes.length} conversas aguardando >1h`,
+    gerado_em: now.toISOString(),
+    total_pendentes: pendentes.length,
+    resumo_texto: resumoTexto,
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -2706,9 +2904,12 @@ Deno.serve(async (req: Request) => {
       case "relatorio_km":
         resultado = await gerarRelatorioKM(supabase, unidade_id);
         break;
+      case "sla_atom_connect":
+        resultado = await gerarSLAAtomConnect(supabase);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

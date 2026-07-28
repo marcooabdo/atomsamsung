@@ -2167,7 +2167,7 @@ export function Configuracoes() {
                   <div className="space-y-3">
                     {/* Search and unit filter */}
                     <div className="flex flex-col sm:flex-row gap-3">
-                      <div className="relative flex-1">
+                      <div className="relative flex-1 min-w-0">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
                         <input
                           type="text"
@@ -2181,7 +2181,7 @@ export function Configuracoes() {
                         <select
                           value={selectedUnidadeServico}
                           onChange={(e) => setSelectedUnidadeServico(e.target.value)}
-                          className="neon-input min-w-[180px]"
+                          className="neon-input w-[200px] shrink-0"
                         >
                           <option value="">Todas as Unidades</option>
                           {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
