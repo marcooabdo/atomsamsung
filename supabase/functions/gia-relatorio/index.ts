@@ -3027,7 +3027,7 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
 
     lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
     lines.push(`💡 _OS OW sem serviço pode ser LP — verificar e converter se necessário._`);
-    lines.push(`🤖 _GIA • Validação OW_`);
+    lines.push(`🤖 _GIA • Global Intelligence Assistance_`);
 
     mensagens.push(lines.join("\n"));
   }
