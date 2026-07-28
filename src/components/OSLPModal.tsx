@@ -6858,41 +6858,29 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       {/* WhatsApp Chat Panel */}
       <AnimatePresence>
         {showWhatsAppChat && whatsAppConversa && os && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[70]"
-              onClick={() => {
-                setShowWhatsAppChat(false);
-                setWhatsAppConversa(null);
-              }}
-            />
-            <motion.div
-              initial={{ x: '100%', opacity: 0.8 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: '100%', opacity: 0.8 }}
-              transition={{ type: 'spring', damping: 28, stiffness: 300, mass: 0.8 }}
-              className="fixed top-0 right-0 bottom-0 z-[71] flex flex-col w-full sm:w-[480px] md:w-[560px] lg:w-[640px] shadow-2xl"
-              style={{ background: '#0A0A16' }}
-            >
-              <div className="h-full flex overflow-hidden w-full">
-                <AtomConnectChat
-                  conversa={whatsAppConversa}
-                  onClose={() => {
-                    setShowWhatsAppChat(false);
-                    setWhatsAppConversa(null);
-                  }}
-                  onUpdate={() => {}}
-                  accentColor="#25D366"
-                  unidadeId={os.unidade_id}
-                  fillParent
-                />
-              </div>
-            </motion.div>
-          </>
+          <motion.div
+            initial={{ x: '100%', opacity: 0.8 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '100%', opacity: 0.8 }}
+            transition={{ type: 'spring', damping: 28, stiffness: 300, mass: 0.8 }}
+            className="fixed top-4 right-4 bottom-4 z-[200] flex flex-col w-[90vw] sm:w-[440px] md:w-[520px] lg:w-[600px] rounded-2xl shadow-2xl overflow-hidden border border-[#25D366]/30"
+            style={{ background: '#0A0A16' }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="h-full flex overflow-hidden w-full">
+              <AtomConnectChat
+                conversa={whatsAppConversa}
+                onClose={() => {
+                  setShowWhatsAppChat(false);
+                  setWhatsAppConversa(null);
+                }}
+                onUpdate={() => {}}
+                accentColor="#25D366"
+                unidadeId={os.unidade_id}
+                fillParent
+              />
+            </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
