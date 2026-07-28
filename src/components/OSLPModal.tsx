@@ -1634,7 +1634,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           os_id: novaOS.id,
           usuario_id: usuario?.id,
           comentario: `OS ${tipoOS} criada por ${usuario?.nome}`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         }
       ];
 
@@ -1645,7 +1646,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: novaOS.id,
             usuario_id: usuario?.id,
             comentario: `Serviço adicionado: ${servico.descricao} - Qtd: ${servico.quantidade} - R$ ${servico.valor_unitario.toFixed(2)}`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
         });
       }
@@ -1657,7 +1659,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: novaOS.id,
             usuario_id: usuario?.id,
             comentario: `Peça adicionada: ${peca.descricao} (${peca.codigo}) - R$ ${peca.valor.toFixed(2)}`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
         });
       }
@@ -1669,7 +1672,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: novaOS.id,
             usuario_id: usuario?.id,
             comentario: `Anexo adicionado: ${anexo.nome}`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
         });
       }
@@ -1681,7 +1685,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: novaOS.id,
             usuario_id: usuario?.id,
             comentario: `Pagamento registrado: ${pag.forma_pagamento} - R$ ${pag.valor.toFixed(2)}`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
         });
       }
@@ -1701,7 +1706,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: novaOS.id,
             usuario_id: usuario?.id,
             comentario: `Peça requisitada por ${usuario?.nome}: ${req.descricao} (${req.codigo})`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
         });
       }
@@ -1779,14 +1785,16 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `OS movida para "Aguardando Peça" - requisição criada por ${usuario?.nome}`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         });
       } else {
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Peça requisitada por ${usuario?.nome}: ${peca.descricao} (${peca.codigo || peca.pn})`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         });
       }
 
@@ -1833,7 +1841,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `✚ Requisição adicionada: ${dadosRequisicaoManual.descricao} (${dadosRequisicaoManual.codigo}) - Qtd: ${dadosRequisicaoManual.quantidade}${valorNumerico ? ` - Valor: R$ ${valorNumerico.toFixed(2)}` : ''}`,
-        is_system: true
+        is_system: true,
+          origem: 'sistema'
       });
 
       setNovaPecaCodigo('');
@@ -1895,7 +1904,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Nova requisição criada para peça ${peca.descricao} (${peca.codigo || peca.pn}). Motivo: ${motivo}`,
-        is_system: true
+        is_system: true,
+          origem: 'sistema'
       });
 
       showAlert({ message: 'Nova requisição criada com sucesso!', type: 'success' });
@@ -1936,7 +1946,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Requisição cancelada por ${usuario?.nome}: ${requisicaoParaCancelar.descricao}\nMotivo: ${motivoCancelamento}`,
-        is_system: true
+        is_system: true,
+          origem: 'sistema'
       });
 
       if (commentError) {
@@ -1979,7 +1990,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `GI postada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})`,
-        is_system: true
+        is_system: true,
+          origem: 'sistema'
       });
 
       // Log no histórico da peça
@@ -2057,14 +2069,16 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao} (Lote - IDs: ${idsNumericos})\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         });
       } else {
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao}\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         });
       }
 
@@ -2133,7 +2147,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: osId,
             usuario_id: usuario?.id,
             comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca}) - Lote IDs: ${idsNumericos}\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeças voltaram para DISPONÍVEL no estoque.`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
 
         for (const pecaId of pecasSelecionadas) {
@@ -2177,7 +2192,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             os_id: osId,
             usuario_id: usuario?.id,
             comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca})\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeça voltou para DISPONÍVEL no estoque.`,
-            is_system: true
+            is_system: true,
+          origem: 'sistema'
           });
 
         if (requisicaoCancelarGI.peca_estoque_id) {
@@ -2359,13 +2375,15 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `OS convertida de LP para OW por ${usuario?.nome}`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         },
         {
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Motivo da conversão: ${motivoConversao}`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         }
       ];
 
@@ -2375,7 +2393,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `IMPORTANTE: ${requisicoesCount} requisição(ões) de peças foram mantidas`,
-          is_system: true
+          is_system: true,
+          origem: 'sistema'
         });
       }
 
@@ -5758,36 +5777,43 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                           }
                         }}
                       />
-                      Mostrar logs do sistema
+                      Mostrar comentários do GSPN (Samsung)
                     </label>
                   </div>
 
                   <div className="space-y-3">
                     {comentarios
-                      .filter(c => mostrarComentariosSistema || !c.is_system)
-                      .map((comentario) => (
-                        <div
-                          key={comentario.id}
-                          className={`premium-card p-4 ${
-                            comentario.is_system ? 'border-l-4 border-l-blue-500' : ''
-                          }`}
-                        >
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex items-center gap-2">
-                              <User className="w-4 h-4 text-gray-500" />
-                              <span className="text-sm text-gray-400">
-                                {comentario.is_system ? 'Sistema' : 'Usuário'}
+                      .filter(c => {
+                        if (!c.is_system) return true;
+                        if ((c as any).origem === 'gspn') return mostrarComentariosSistema;
+                        return false;
+                      })
+                      .map((comentario) => {
+                        const isGspn = (comentario as any).origem === 'gspn';
+                        return (
+                          <div
+                            key={comentario.id}
+                            className={`premium-card p-4 ${
+                              isGspn ? 'border-l-4 border-l-blue-500' : ''
+                            }`}
+                          >
+                            <div className="flex items-start justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <User className="w-4 h-4 text-gray-500" />
+                                <span className="text-sm text-gray-400">
+                                  {isGspn ? 'GSPN' : (comentario.usuario?.nome || 'Usuário')}
+                                </span>
+                              </div>
+                              <span className="text-xs text-gray-600">
+                                {new Date(comentario.created_at).toLocaleString('pt-BR')}
                               </span>
                             </div>
-                            <span className="text-xs text-gray-600">
-                              {new Date(comentario.created_at).toLocaleString('pt-BR')}
-                            </span>
+                            <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                              {comentario.comentario}
+                            </p>
                           </div>
-                          <p className="text-sm text-gray-300 whitespace-pre-wrap">
-                            {comentario.comentario}
-                          </p>
-                        </div>
-                      ))}
+                        );
+                      })}
                   </div>
                 </div>
               )}

@@ -90,7 +90,8 @@ const COLUNAS_KANBAN = [
 ];
 
 type OS = Database['public']['Tables']['os']['Row'];
-type OSComentario = Database['public']['Tables']['os_comentarios']['Row'] & {
+type OSComentario = Omit<Database['public']['Tables']['os_comentarios']['Row'], 'origem'> & {
+  origem?: string | null;
   usuario?: { nome: string } | null;
 };
 type OSAnexo = Database['public']['Tables']['os_anexos']['Row'];
@@ -1114,7 +1115,8 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `💰 Valor GSPN definido para ${peca.descricao}: R$ ${valorGSPN.toFixed(2)} → Valor Final: R$ ${valorTotal.toFixed(2)}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       // Remove do estado de edição
@@ -1230,7 +1232,8 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `🗑️ Peça manual removida: ${peca.descricao}${peca.codigo ? ` (${peca.codigo})` : ''}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       await loadPecas();
@@ -1317,7 +1320,8 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Peca adicionada manualmente: ${novaPecaDescricaoOW} (${novaPecaCodigoOW}) - Qtd: ${quantidade} - Valor Base: R$ ${valorGSPNNum.toFixed(2)} - Valor Final: R$ ${valorTotal.toFixed(2)}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       setNovaPecaCodigoOW('');
@@ -1393,7 +1397,8 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Anexo adicionado: ${nomeExibicao}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       setPendingUploadFile(null);
@@ -1676,7 +1681,8 @@ Não haverá cobrança ao cliente.`
           os_id: os.id,
           usuario_id: usuario.id,
           comentario: comentarioTexto,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
 
       alert(novoStatus ? 'Cortesia aplicada com sucesso!' : 'Cortesia removida com sucesso!');
@@ -2077,7 +2083,8 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `OS movida para "Aguardando Peça" - requisição criada por ${usuario?.nome}`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       } else {
         // Log de nova requisição
@@ -2085,7 +2092,8 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Nova requisição de peça adicionada: ${peca.descricao}`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       }
 
@@ -2196,7 +2204,8 @@ Não haverá cobrança ao cliente.`
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Nova requisição criada após reprovação anterior por ${usuario?.nome}: ${peca.descricao} (${peca.codigo || peca.pn})\nMotivo da nova requisição: ${motivo}\nReprovação anterior: ${requisicaoReprovada.motivo_reprovacao}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       // Aguarda um breve momento para garantir que o banco processou tudo
@@ -2253,7 +2262,8 @@ Não haverá cobrança ao cliente.`
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Análise técnica concluída por ${usuario?.nome}. OS enviada para precificação.`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       await supabase
@@ -2306,7 +2316,8 @@ Não haverá cobrança ao cliente.`
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `GI postada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       // Log no histórico da peça
@@ -2360,7 +2371,8 @@ Não haverá cobrança ao cliente.`
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Checklist padrão criado por ${usuario?.nome}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       alert('Checklist criado com sucesso!');
@@ -2389,7 +2401,8 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `${usuario?.nome} ${concluido ? 'concluiu' : 'desmarcou'} item do checklist: "${item.item}"`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       }
     } catch (error) {
@@ -2445,7 +2458,8 @@ Não haverá cobrança ao cliente.`
         os_id: osId,
         usuario_id: usuario?.id,
         comentario: `Requisição cancelada por ${usuario?.nome}: ${requisicao.descricao} (${requisicao.codigo_peca})\nMotivo: ${motivo}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       // Aguarda um pouco antes de recarregar
@@ -2502,14 +2516,16 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao} (Lote - IDs: ${idsNumericos})\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       } else {
         await supabase.from('os_comentarios').insert({
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Devolução solicitada por ${usuario?.nome} - Peça: ${requisicaoSelecionada.descricao}\nTipo: ${tipoLabel}\nMotivo: ${motivo}\n\nAguardando aprovação do estoque.`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       }
 
@@ -2572,7 +2588,8 @@ Não haverá cobrança ao cliente.`
             os_id: osId,
             usuario_id: usuario?.id,
             comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca}) - Lote IDs: ${idsNumericos}\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeças voltaram para DISPONÍVEL no estoque.`,
-            is_system: true
+            is_system: true,
+        origem: 'sistema'
           });
 
         for (const pecaId of pecasSelecionadas) {
@@ -2615,7 +2632,8 @@ Não haverá cobrança ao cliente.`
             os_id: osId,
             usuario_id: usuario?.id,
             comentario: `Despacho cancelado por ${usuario?.nome}: ${requisicaoCancelarGI.descricao} (${requisicaoCancelarGI.codigo_peca})\nRequisição ID: ${requisicaoCancelarGI.id.slice(0, 8)}\nMotivo: ${motivo}\nPeça voltou para DISPONÍVEL no estoque.`,
-            is_system: true
+            is_system: true,
+        origem: 'sistema'
           });
 
         if (requisicaoCancelarGI.peca_estoque_id) {
@@ -2671,13 +2689,15 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `OS convertida de OW para LP por ${usuario?.nome}`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         },
         {
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `Motivo da conversão: ${motivoConversao}`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         }
       ];
 
@@ -2686,7 +2706,8 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: 'IMPORTANTE: Esta OS possuía cotação que foi mantida no histórico',
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       }
 
@@ -2696,7 +2717,8 @@ Não haverá cobrança ao cliente.`
           os_id: osId,
           usuario_id: usuario?.id,
           comentario: `IMPORTANTE: ${giPostadaCount} peça(s) com GI postada foram mantidas no histórico`,
-          is_system: true
+          is_system: true,
+        origem: 'sistema'
         });
       }
 
@@ -2736,7 +2758,8 @@ Não haverá cobrança ao cliente.`
         os_id: os.id,
         usuario_id: usuario?.id,
         comentario: `**DIAGNOSTICO TECNICO (editado manualmente):**\n\n${texto}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       setOS({ ...os, diagnostico_tecnico: texto });
@@ -2765,7 +2788,8 @@ Não haverá cobrança ao cliente.`
         os_id: os.id,
         usuario_id: usuario?.id,
         comentario: `**REPARO EFETUADO (editado manualmente):**\n\n${texto}`,
-        is_system: true
+        is_system: true,
+        origem: 'sistema'
       });
 
       setOS({ ...os, reparo_efetuado: texto });
@@ -5345,7 +5369,8 @@ Não haverá cobrança ao cliente.`
                                     os_id: osId,
                                     usuario_id: usuario?.id,
                                     comentario: `Anexo removido: ${anexo.nome_arquivo}`,
-                                    is_system: true
+                                    is_system: true,
+        origem: 'sistema'
                                   });
                                   loadAnexos();
                                   loadComentarios();
@@ -5424,36 +5449,47 @@ Não haverá cobrança ao cliente.`
                   className="w-4 h-4"
                 />
                 <label htmlFor="mostrarSistema" className="text-xs text-gray-400">
-                  Mostrar logs do sistema
+                  Mostrar comentários do GSPN (Samsung)
                 </label>
               </div>
 
               <div className="space-y-3">
-                {comentarios.filter(c => mostrarComentariosSistema || !c.is_system).length === 0 ? (
+                {comentarios.filter(c => {
+                  if (!c.is_system) return true;
+                  if (c.origem === 'gspn') return mostrarComentariosSistema;
+                  return false;
+                }).length === 0 ? (
                   <p className="text-center text-gray-500 py-8">Nenhum comentário ainda</p>
                 ) : (
                   comentarios
-                    .filter(c => mostrarComentariosSistema || !c.is_system)
-                    .map((comentario) => (
-                      <div
-                        key={comentario.id}
-                        className={`premium-card p-4 ${comentario.is_system ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : ''}`}
-                      >
-                        {comentario.is_system ? (
-                          <p className="text-xs text-blue-400 font-bold mb-1">
-                            🤖 SISTEMA {comentario.usuario?.nome && `- ${comentario.usuario.nome}`}
+                    .filter(c => {
+                      if (!c.is_system) return true;
+                      if (c.origem === 'gspn') return mostrarComentariosSistema;
+                      return false;
+                    })
+                    .map((comentario) => {
+                      const isGspn = comentario.origem === 'gspn';
+                      return (
+                        <div
+                          key={comentario.id}
+                          className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : ''}`}
+                        >
+                          {isGspn ? (
+                            <p className="text-xs text-blue-400 font-bold mb-1">
+                              🤖 GSPN {comentario.usuario?.nome && `- ${comentario.usuario.nome}`}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-gray-400 font-bold mb-1">
+                              👤 {comentario.usuario?.nome || 'Usuário'}
+                            </p>
+                          )}
+                          <p className="text-sm text-gray-300">{comentario.comentario}</p>
+                          <p className="text-xs text-gray-500 mt-2">
+                            {new Date(comentario.created_at).toLocaleString('pt-BR')}
                           </p>
-                        ) : (
-                          <p className="text-xs text-gray-400 font-bold mb-1">
-                            👤 {comentario.usuario?.nome || 'Usuário'}
-                          </p>
-                        )}
-                        <p className="text-sm text-gray-300">{comentario.comentario}</p>
-                        <p className="text-xs text-gray-500 mt-2">
-                          {new Date(comentario.created_at).toLocaleString('pt-BR')}
-                        </p>
-                      </div>
-                    ))
+                        </div>
+                      );
+                    })
                 )}
               </div>
             </div>

@@ -24,6 +24,10 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
   const [ramal, setRamal] = useState(usuario?.ramal || '');
   const [cargo, setCargo] = useState(usuario?.cargo || '');
   const [bio, setBio] = useState(usuario?.bio || '');
+  const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState<boolean>(
+    (usuario as any)?.mostrar_comentarios_sistema ?? true
+  );
+  const [savingPreferencias, setSavingPreferencias] = useState(false);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
@@ -48,6 +52,7 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           ramal: ramal.trim() || null,
           cargo: cargo.trim() || null,
           bio: bio.trim() || null,
+          mostrar_comentarios_sistema: mostrarComentariosSistema,
           updated_at: new Date().toISOString()
         })
         .eq('id', usuario.id);
@@ -61,7 +66,8 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
           ramal: ramal.trim() || null,
           cargo: cargo.trim() || null,
           bio: bio.trim() || null,
-        });
+          mostrar_comentarios_sistema: mostrarComentariosSistema,
+        } as any);
       }
       setProfileMsg({ type: 'success', text: 'Perfil atualizado!' });
     } catch (err: any) {
@@ -270,6 +276,45 @@ export function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                   maxLength={200}
                 />
                 <p className="text-right text-[10px] mt-1" style={{ color: 'var(--text-secondary)' }}>{bio.length}/200</p>
+              </div>
+
+              <div className="pt-2 border-t" style={{ borderColor: 'var(--border-primary)' }}>
+                <label className="flex items-center justify-between cursor-pointer py-1">
+                  <div>
+                    <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>Mostrar comentários do GSPN</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>Exibe comentários automáticos da Samsung na aba de comentários da OS</p>
+                  </div>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={mostrarComentariosSistema}
+                    disabled={savingPreferencias}
+                    onClick={async () => {
+                      const newVal = !mostrarComentariosSistema;
+                      setMostrarComentariosSistema(newVal);
+                      setSavingPreferencias(true);
+                      try {
+                        const { error } = await supabase
+                          .from('usuarios')
+                          .update({ mostrar_comentarios_sistema: newVal, updated_at: new Date().toISOString() })
+                          .eq('id', usuario.id);
+                        if (error) throw error;
+                        if (updateUsuario) updateUsuario({ ...usuario, mostrar_comentarios_sistema: newVal } as any);
+                      } catch {
+                        setMostrarComentariosSistema(!newVal);
+                      } finally {
+                        setSavingPreferencias(false);
+                      }
+                    }}
+                    className="relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50"
+                    style={{ background: mostrarComentariosSistema ? 'var(--text-accent)' : 'rgba(255,255,255,0.15)' }}
+                  >
+                    <span
+                      className="inline-block h-4 w-4 transform rounded-full bg-white transition-transform"
+                      style={{ transform: mostrarComentariosSistema ? 'translateX(24px)' : 'translateX(4px)' }}
+                    />
+                  </button>
+                </label>
               </div>
 
               {profileMsg && (
