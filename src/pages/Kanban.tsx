@@ -1376,9 +1376,10 @@ export function Kanban() {
   const handleMandatoryRouteSelect = async (rotaColumn: string, cidadeCorrigidaParam?: string) => {
     if (!mandatoryRoutePickerOS || !pendingMandatoryMove) return;
 
-    const osId = mandatoryRoutePickerOS.id;
-    const prevColumn = mandatoryRoutePickerOS.coluna_kanban;
-    const cidadeOS = cidadeCorrigidaParam && cidadeCorrigidaParam.trim() !== '' ? cidadeCorrigidaParam.trim() : mandatoryRoutePickerOS.cliente_cidade;
+    const currentOS = mandatoryRoutePickerOS;
+    const osId = currentOS.id;
+    const prevColumn = currentOS.coluna_kanban;
+    const cidadeOS = cidadeCorrigidaParam && cidadeCorrigidaParam.trim() !== '' ? cidadeCorrigidaParam.trim() : currentOS.cliente_cidade;
 
     const rotaColorMap: Record<string, { nome: string; cor: string }> = {
       'rota_preta': { nome: 'Rota Preta', cor: '#1a1a1a' },
@@ -1393,7 +1394,7 @@ export function Kanban() {
     let rotaSelecionada = rotas.find(r => r.coluna_kanban === rotaColumn);
     let rotaIdReal = rotaSelecionada?.id || null;
 
-    const unidadeParaRota = mandatoryRoutePickerOS.unidade_id || selectedUnidade || usuario?.unidade_id;
+    const unidadeParaRota = currentOS.unidade_id || selectedUnidade || usuario?.unidade_id;
 
     setMandatoryRoutePickerOS(null);
     setPendingMandatoryMove(null);
@@ -1441,7 +1442,7 @@ export function Kanban() {
       }
       // Normalizar e corrigir nome da cidade
       const cidadeAtual = cidadeOS;
-      let cidadeCorrigida = cidadeAtual || mandatoryRoutePickerOS.cliente_cidade;
+      let cidadeCorrigida = cidadeAtual || currentOS.cliente_cidade;
 
       if (rotaSelecionada && cidadeAtual) {
         const cidadeNormalizada = normalizeCidade(cidadeAtual);
@@ -1464,7 +1465,7 @@ export function Kanban() {
 
       if (error) throw error;
 
-      const updatedCard = { ...mandatoryRoutePickerOS, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida };
+      const updatedCard = { ...currentOS, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida };
 
       setOsData(prevData => {
         const newData = { ...prevData };

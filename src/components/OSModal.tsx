@@ -2905,12 +2905,12 @@ Não haverá cobrança ao cliente.`
       setMostrarSelecionarRotaObrigatoria(false);
 
       if (isEditOnly) {
-        const extraUpdates: Record<string, any> = { rota_id: rotaIdReal, coluna_kanban: rotaColumn };
+        const extraUpdates: Record<string, any> = { rota_id: rotaIdReal };
         if (cidadeCorrigida && cidadeCorrigida.trim() !== '' && cidadeCorrigida !== os.cliente_cidade) {
           extraUpdates.cliente_cidade = cidadeCorrigida.trim();
         }
         await supabase.from('os').update(extraUpdates).eq('id', os.id);
-        setOS({ ...os, ...extraUpdates, rota_id: rotaIdReal, coluna_kanban: rotaColumn });
+        setOS({ ...os, ...extraUpdates, rota_id: rotaIdReal });
         setColunaDestinoAposSelecionarRota(null);
         if (onReload) onReload();
       } else if (colunaDestinoAposSelecionarRota) {

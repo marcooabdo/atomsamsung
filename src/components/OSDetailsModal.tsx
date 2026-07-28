@@ -411,7 +411,6 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
       const updateData: any = {
         rota_id: rotaId,
-        coluna_kanban: selectedRotaColumn,
         updated_at: new Date().toISOString(),
       };
       if (cidadeCorrigida && cidadeCorrigida !== osDetails.cliente_cidade) {
@@ -419,7 +418,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       }
 
       await supabase.from('os').update(updateData).eq('id', osDetails.id);
-      setOsDetails({ ...osDetails, ...updateData, coluna_kanban: selectedRotaColumn, rota_id: rotaId });
+      setOsDetails({ ...osDetails, ...updateData, rota_id: rotaId });
       setShowRotaEditor(false);
       await loadRotas(osDetails.unidade_id);
 
