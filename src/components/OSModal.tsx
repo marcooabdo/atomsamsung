@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight, CreditCard as Edit3, Plus, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { calcularESalvarKmCidade } from '../lib/deslocamentoService';
 import { normalizarCidade } from '../lib/cidadeNormalize';
@@ -225,8 +225,9 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [mostrarModalServico, setMostrarModalServico] = useState(false);
   const [buscaServico, setBuscaServico] = useState('');
   const [mostrarModalConvertTipo, setMostrarModalConvertTipo] = useState(false);
-  const [servicosSalvos, setServicosSalvos] = useState(false);
-  const [salvandoServicos, setSalvandoServicos] = useState(false);
+  const [editandoServicoId, setEditandoServicoId] = useState<string | null>(null);
+  const [editServicoValor, setEditServicoValor] = useState('');
+  const [editServicoQtd, setEditServicoQtd] = useState(1);
 
   // Estados para adicionar peça manualmente (OW)
   const [novaPecaCodigoOW, setNovaPecaCodigoOW] = useState('');
@@ -772,7 +773,6 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
       setServicos(servicosFormatados);
     }
 
-    if (resetSaved) setServicosSalvos(false);
   };
 
   const loadServicosCadastrados = async () => {
@@ -792,19 +792,10 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     setServicosCadastrados(data || []);
   };
 
-  const handleSalvarServicos = async () => {
-    setSalvandoServicos(true);
-    try {
-      // Os valores são calculados automaticamente pelos triggers do banco
-      // Apenas recarregar a OS para pegar os valores atualizados
-      await loadOS();
-      onReload?.();
-      setServicosSalvos(true);
-    } catch (err: any) {
-      showAlert({ message: 'Erro ao salvar servicos: ' + err.message, type: 'error' });
-    } finally {
-      setSalvandoServicos(false);
-    }
+  const refreshAfterServicoChange = async () => {
+    await loadServicos(false);
+    await loadOS();
+    onReload?.();
   };
 
   const loadRequisicoes = async () => {
@@ -5017,152 +5008,130 @@ Não haverá cobrança ao cliente.`
                 </div>
               ) : (
                 <>
-                  <div className="flex items-center justify-between mb-4">
+                  <div className="mb-4">
                     <h3 className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">
                       Servicos ({servicos.length})
                     </h3>
-                    <button
-                      onClick={() => {
-                        loadServicosCadastrados();
-                        setMostrarModalServico(true);
-                      }}
-                      className="neon-button px-4 py-2 text-xs"
-                      style={{
-                        backgroundColor: 'rgba(var(--accent-rgb), 0.125)',
-                        borderColor: 'var(--text-accent)',
-                        color: 'var(--text-accent)'
-                      }}
-                    >
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-lg">+</span>
-                        ADICIONAR
-                      </span>
-                    </button>
                   </div>
 
                   <div className="space-y-3">
-                    {servicos.map((servico) => (
-                      <div key={servico.id} className="premium-card p-4" style={{ borderColor: 'rgba(var(--accent-rgb), 0.25)' }}>
-                        <div className="flex items-start gap-4">
-                          <div className="flex-1">
-                            <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
-                            <p className="text-xs text-gray-500">Cod: {servico.codigo_servico}</p>
-                          </div>
-                          <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={async () => {
-                                  if (servico.quantidade > 1) {
-                                    const table = servico._table || 'cotacoes_servicos';
+                    {servicos.map((servico) => {
+                      const isEditing = editandoServicoId === servico.id;
+                      const table = servico._table || 'cotacoes_servicos';
+                      return (
+                        <div key={servico.id} className="premium-card p-4" style={{ borderColor: isEditing ? 'var(--neon-green)' : 'rgba(var(--accent-rgb), 0.25)' }}>
+                          <div className="flex items-start gap-4">
+                            <div className="flex-1">
+                              <p className="text-sm font-bold text-[#00D4FF] mb-1">{servico.descricao || servico.codigo_servico}</p>
+                              <p className="text-xs text-gray-500">Cod: {servico.codigo_servico}</p>
+                            </div>
+                            {!isEditing ? (
+                              <div className="flex items-center gap-3">
+                                <div className="text-right">
+                                  <p className="text-xs text-gray-400">{servico.quantidade}x R$ {(servico.valor_unitario || 0).toFixed(2)}</p>
+                                  <p className="text-sm font-bold text-[#39FF14]">R$ {(servico.valor_total || 0).toFixed(2)}</p>
+                                </div>
+                                <button
+                                  onClick={() => {
+                                    setEditandoServicoId(servico.id);
+                                    setEditServicoValor(String(servico.valor_unitario || 0));
+                                    setEditServicoQtd(servico.quantidade || 1);
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-[#00D4FF]/15 hover:bg-[#00D4FF]/25 flex items-center justify-center transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit3 className="w-4 h-4 text-[#00D4FF]" />
+                                </button>
+                                <button
+                                  onClick={async () => {
+                                    if (confirm('Remover este servico?')) {
+                                      await supabase.from(table).delete().eq('id', servico.id);
+                                      await refreshAfterServicoChange();
+                                    }
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-red-500/15 hover:bg-red-500/25 flex items-center justify-center transition-colors"
+                                  title="Excluir"
+                                >
+                                  <Trash2 className="w-4 h-4 text-red-400" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    onClick={() => setEditServicoQtd(Math.max(1, editServicoQtd - 1))}
+                                    className="w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors text-sm"
+                                  >-</button>
+                                  <span className="text-sm font-bold text-white w-6 text-center">{editServicoQtd}</span>
+                                  <button
+                                    onClick={() => setEditServicoQtd(editServicoQtd + 1)}
+                                    className="w-7 h-7 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors text-sm"
+                                  >+</button>
+                                </div>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={editServicoValor}
+                                  onChange={(e) => setEditServicoValor(e.target.value)}
+                                  onPaste={(e) => {
+                                    e.preventDefault();
+                                    const pasted = e.clipboardData.getData('text');
+                                    setEditServicoValor(sanitizeGSPNValue(pasted));
+                                  }}
+                                  className="neon-input w-24 text-right text-sm py-1 px-2"
+                                  placeholder="0.00"
+                                />
+                                <button
+                                  onClick={async () => {
+                                    const novoValor = parseFloat(sanitizeGSPNValue(editServicoValor)) || 0;
                                     await supabase
                                       .from(table)
-                                      .update({ quantidade: servico.quantidade - 1, valor_total: servico.valor_unitario * (servico.quantidade - 1) })
+                                      .update({ valor_unitario: novoValor, quantidade: editServicoQtd, valor_total: novoValor * editServicoQtd })
                                       .eq('id', servico.id);
-                                    loadServicos(true);
-                                  }
-                                }}
-                                className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
-                              >
-                                -
-                              </button>
-                              <span className="text-sm font-bold text-white w-8 text-center">{servico.quantidade}</span>
-                              <button
-                                onClick={async () => {
-                                  const table = servico._table || 'cotacoes_servicos';
-                                  await supabase
-                                    .from(table)
-                                    .update({ quantidade: servico.quantidade + 1, valor_total: servico.valor_unitario * (servico.quantidade + 1) })
-                                    .eq('id', servico.id);
-                                  loadServicos(true);
-                                }}
-                                className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 flex items-center justify-center text-white font-bold transition-colors"
-                              >
-                                +
-                              </button>
-                            </div>
-                            <div className="text-right min-w-[100px]">
-                              <input
-                                type="text"
-                                inputMode="decimal"
-                                defaultValue={servico.valor_unitario}
-                                onPaste={(e) => {
-                                  e.preventDefault();
-                                  const pasted = e.clipboardData.getData('text');
-                                  e.currentTarget.value = sanitizeGSPNValue(pasted);
-                                }}
-                                onBlur={async (e) => {
-                                  const novoValor = parseFloat(sanitizeGSPNValue(e.target.value)) || 0;
-                                  const table = servico._table || 'cotacoes_servicos';
-                                  await supabase
-                                    .from(table)
-                                    .update({ valor_unitario: novoValor, valor_total: novoValor * servico.quantidade })
-                                    .eq('id', servico.id);
-                                  loadServicos(true);
-                                }}
-                                className="neon-input w-24 text-right text-sm py-1 px-2"
-                                placeholder="0.00"
-                              />
-                              <p className="text-xs text-gray-500 mt-1">
-                                Total: <span className="text-[#39FF14] font-bold">R$ {(servico.valor_total || 0).toFixed(2)}</span>
-                              </p>
-                            </div>
-                            <button
-                              onClick={async () => {
-                                if (confirm('Remover este servico?')) {
-                                  const table = servico._table || 'cotacoes_servicos';
-                                  await supabase.from(table).delete().eq('id', servico.id);
-                                  loadServicos(true);
-                                }
-                              }}
-                              className="w-8 h-8 rounded-lg bg-red-500/20 hover:bg-red-500/30 flex items-center justify-center transition-colors"
-                            >
-                              <X className="w-4 h-4 text-red-400" />
-                            </button>
+                                    setEditandoServicoId(null);
+                                    await refreshAfterServicoChange();
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-green-500/20 hover:bg-green-500/30 flex items-center justify-center transition-colors"
+                                  title="Confirmar"
+                                >
+                                  <Check className="w-4 h-4 text-green-400" />
+                                </button>
+                                <button
+                                  onClick={() => setEditandoServicoId(null)}
+                                  className="w-8 h-8 rounded-lg bg-gray-700/50 hover:bg-gray-700 flex items-center justify-center transition-colors"
+                                  title="Cancelar"
+                                >
+                                  <X className="w-4 h-4 text-gray-400" />
+                                </button>
+                              </div>
+                            )}
                           </div>
                         </div>
+                      );
+                    })}
+                  </div>
+
+                  {servicos.length > 0 && (
+                    <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
+                        <span className="text-2xl font-bold text-[#39FF14]">
+                          R$ {servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0).toFixed(2)}
+                        </span>
                       </div>
-                    ))}
-                  </div>
-
-                  <div className="premium-card p-4 bg-gradient-to-r from-[#00D4FF]/10 to-[#39FF14]/10" style={{ borderColor: 'var(--neon-green)' }}>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-bold text-[#00D4FF] uppercase tracking-wider">Total de Servicos:</span>
-                      <span className="text-2xl font-bold text-[#39FF14]">
-                        R$ {servicos.reduce((sum, s) => sum + (s.valor_total || 0), 0).toFixed(2)}
-                      </span>
                     </div>
-                  </div>
+                  )}
 
-                  <div className="flex justify-end mt-4">
-                    <button
-                      onClick={handleSalvarServicos}
-                      disabled={salvandoServicos}
-                      className="neon-button px-8 py-3 text-sm flex items-center gap-2 disabled:opacity-50"
-                      style={{
-                        backgroundColor: servicosSalvos ? 'rgba(var(--neon-green-rgb),0.25)' : 'rgba(var(--neon-green-rgb),0.1)',
-                        borderColor: 'var(--neon-green)',
-                        color: 'var(--neon-green)',
-                        boxShadow: servicosSalvos ? '0 0 30px rgba(var(--neon-green-rgb),0.5)' : '0 0 20px rgba(var(--neon-green-rgb),0.3)'
-                      }}
-                    >
-                      {salvandoServicos ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          SALVANDO...
-                        </>
-                      ) : servicosSalvos ? (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          ATUALIZAR PAGAMENTO NOVAMENTE
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle className="w-4 h-4" />
-                          SALVAR E ATUALIZAR PAGAMENTO
-                        </>
-                      )}
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => {
+                      loadServicosCadastrados();
+                      setMostrarModalServico(true);
+                    }}
+                    className="w-full py-3 rounded-xl border border-dashed border-[#00D4FF]/40 hover:border-[#00D4FF] hover:bg-[#00D4FF]/5 text-[#00D4FF] text-sm font-medium flex items-center justify-center gap-2 transition-all"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Adicionar Servico
+                  </button>
                 </>
               )}
             </div>
@@ -5826,7 +5795,7 @@ Não haverá cobrança ao cliente.`
                                   return;
                                 }
                               }
-                              await loadServicos(true);
+                              await refreshAfterServicoChange();
                               setBuscaServico('');
                               setMostrarModalServico(false);
                             } catch (err) {
