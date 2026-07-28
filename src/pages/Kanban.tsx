@@ -457,43 +457,53 @@ export function Kanban() {
     setBuscarOSResult(null);
 
     try {
-      const { data: unidadeData } = await supabase
-        .from('unidades')
-        .select('nome, samsung_asccode, samsung_token')
-        .eq('id', selectedUnidade)
-        .single();
-
-      if (!unidadeData) {
-        setBuscarOSResult({ status: 'error', message: 'Unidade não encontrada.' });
-        return;
-      }
-
-      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        setBuscarOSResult({ status: 'error', message: 'Esta unidade não possui configuração Samsung (ASC Code ou Token não configurados).' });
-        return;
-      }
-
-      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os/por-os', {
+      const response = await fetch('https://bot-post-products.groupglobal.com.br/api/gspn/busca-manual', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ascCode: unidadeData.samsung_asccode,
-          tokenApi: unidadeData.samsung_token,
-          filial: unidadeData.nome.toLowerCase(),
           unidade_id: selectedUnidade,
           numero_os: buscarOSNumero.trim()
         }),
       });
 
-      const result = await response.json();
+      if (response.status === 200) {
+        const result = await response.json();
+        if (result.success && result.os_id) {
+          await loadKanbanData();
 
-      if (result.status === 'success') {
-        setBuscarOSResult({ status: 'success', message: result.message || 'Processamento realizado com sucesso. A OS será importada em breve.' });
+          const { data: osData } = await supabase
+            .from('os')
+            .select('id, tipo_os, tipo_orcamento')
+            .eq('id', result.os_id)
+            .maybeSingle();
+
+          if (osData) {
+            setShowBuscarOSModal(false);
+            setBuscarOSNumero('');
+            setBuscarOSResult(null);
+            setSelectedOSId(osData.id);
+            setSelectedOSTipo(osData.tipo_os as 'LP' | 'OW' | 'NA');
+            setSelectedOSTipoOrcamento(osData.tipo_orcamento || null);
+            setSelectedOSInitialTab(undefined);
+          } else {
+            setBuscarOSResult({
+              status: 'success',
+              message: result.acao === 'criada'
+                ? 'OS criada com sucesso! Recarregando o Kanban...'
+                : 'OS atualizada com sucesso! Recarregando o Kanban...'
+            });
+          }
+        } else {
+          setBuscarOSResult({ status: 'error', message: result.message || 'Resposta inválida do servidor.' });
+        }
+      } else if (response.status === 404) {
+        const result = await response.json().catch(() => ({}));
+        setBuscarOSResult({ status: 'error', message: result.message || 'OS não encontrada na Samsung.' });
       } else {
-        setBuscarOSResult({ status: 'error', message: result.message || 'Erro desconhecido ao buscar OS.' });
+        setBuscarOSResult({ status: 'error', message: 'Erro ao buscar OS, tente novamente.' });
       }
     } catch (error) {
-      setBuscarOSResult({ status: 'error', message: error instanceof Error ? error.message : 'Erro desconhecido ao buscar OS.' });
+      setBuscarOSResult({ status: 'error', message: 'Erro ao buscar OS, tente novamente.' });
     } finally {
       setBuscarOSLoading(false);
     }
@@ -2926,14 +2936,9 @@ export function Kanban() {
                   )}
                   <div>
                     <p className="text-xs font-semibold mb-0.5" style={{ color: buscarOSResult.status === 'success' ? '#10b981' : '#ef4444' }}>
-                      {buscarOSResult.status === 'success' ? 'Solicitação enviada' : 'Erro'}
+                      {buscarOSResult.status === 'success' ? 'Sucesso' : 'Erro'}
                     </p>
                     <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>{buscarOSResult.message}</p>
-                    {buscarOSResult.status === 'success' && (
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-secondary)', opacity: 0.7 }}>
-                        O processamento ocorre de forma assincrona. A OS aparecera no Kanban em breve.
-                      </p>
-                    )}
                   </div>
                 </div>
               )}
