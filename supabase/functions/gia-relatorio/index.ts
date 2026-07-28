@@ -2860,6 +2860,189 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  const unidadeSigla: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeSigla[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeSigla[u.id] = "JDF";
+      else if (nome.includes("feira")) unidadeSigla[u.id] = "FSA";
+      else unidadeSigla[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
+  }
+
+  // Fetch all open OW OS (not closed, not archived)
+  let allOW: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    let q = supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, tipo_orcamento, valor_total, orcamento_aprovado, status_orcamento_link")
+      .eq("tipo_os", "OW")
+      .neq("coluna_kanban", "os_fechada")
+      .or("arquivada.is.null,arquivada.eq.false")
+      .range(from, from + pageSize - 1);
+    if (unidadeId) q = q.eq("unidade_id", unidadeId);
+    const { data, error } = await q;
+    if (error) throw new Error(`Erro ao buscar OS OW: ${error.message}`);
+    if (!data || data.length === 0) break;
+    allOW = allOW.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  if (allOW.length === 0) {
+    const msg = `✅ *VALIDAÇÃO OW — ${spDate} • ${spHour}*\n\nNenhuma OS OW aberta encontrada.\n\n🤖 _GIA • Validação OW_`;
+    return {
+      titulo: "Validação OW",
+      subtitulo: "Nenhuma OS OW aberta",
+      gerado_em: now.toISOString(),
+      mensagens_por_unidade: [msg],
+      resumo_texto: msg,
+    };
+  }
+
+  const osIds = allOW.map((o) => o.id);
+
+  // Check which OS have services in os_servicos
+  const osComServico = new Set<string>();
+  for (let i = 0; i < osIds.length; i += 200) {
+    const batch = osIds.slice(i, i + 200);
+    const { data: servicos } = await supabase
+      .from("os_servicos")
+      .select("os_id")
+      .in("os_id", batch);
+    if (servicos) {
+      for (const s of servicos) osComServico.add(s.os_id);
+    }
+  }
+
+  // Filter: OS OW without any service
+  const osSemServico = allOW.filter((os) => !osComServico.has(os.id));
+
+  if (osSemServico.length === 0) {
+    const msg = `✅ *VALIDAÇÃO OW — ${spDate} • ${spHour}*\n\nTodas as OS OW possuem serviço registrado! Nenhuma pendência.\n\n🤖 _GIA • Validação OW_`;
+    return {
+      titulo: "Validação OW",
+      subtitulo: "Todas OK",
+      gerado_em: now.toISOString(),
+      mensagens_por_unidade: [msg],
+      resumo_texto: msg,
+    };
+  }
+
+  // Get GSPN cost (valor_gspn) for each OS from os_pecas
+  const osIdsInvalid = osSemServico.map((o) => o.id);
+  const custoGSPNPorOS: Record<string, number> = {};
+  for (let i = 0; i < osIdsInvalid.length; i += 200) {
+    const batch = osIdsInvalid.slice(i, i + 200);
+    const { data: pecas } = await supabase
+      .from("os_pecas")
+      .select("os_id, valor_gspn")
+      .in("os_id", batch);
+    if (pecas) {
+      for (const p of pecas) {
+        const val = Number(p.valor_gspn) || 0;
+        custoGSPNPorOS[p.os_id] = (custoGSPNPorOS[p.os_id] || 0) + val;
+      }
+    }
+  }
+
+  // Group by unidade
+  const porUnidade: Record<string, typeof osSemServico> = {};
+  for (const os of osSemServico) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidade[uid]) porUnidade[uid] = [];
+    porUnidade[uid].push(os);
+  }
+
+  const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+
+  function getStatusOrcamento(os: any): string {
+    if (os.orcamento_aprovado === true) return "✅ Aprovado";
+    if (os.status_orcamento_link === "rejeitado") return "❌ Rejeitado";
+    return "⏳ Pendente";
+  }
+
+  // Build one message per unit (max 40 OS)
+  const mensagens: string[] = [];
+  const sortedUnits = Object.entries(porUnidade).sort((a, b) => b[1].length - a[1].length);
+
+  for (const [uid, lista] of sortedUnits) {
+    const sigla = unidadeSigla[uid] || "???";
+    const nomeLista = lista.slice(0, 40);
+    const lines: string[] = [];
+
+    lines.push(`⚠️ *VALIDAÇÃO OW — ${sigla}*`);
+    lines.push(`${spDate} • ${spHour}`);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(``);
+    lines.push(`📊 *${lista.length} OS OW sem serviço adicionado*`);
+    lines.push(``);
+
+    // Group by coluna_kanban for readability
+    const porColuna: Record<string, typeof lista> = {};
+    for (const os of nomeLista) {
+      const col = os.coluna_kanban || "sem_coluna";
+      if (!porColuna[col]) porColuna[col] = [];
+      porColuna[col].push(os);
+    }
+
+    for (const [col, osList] of Object.entries(porColuna)) {
+      const colLabel = getColunaLabel(col);
+      lines.push(`📌 *${colLabel}* (${osList.length})`);
+      lines.push(`┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
+
+      for (const os of osList) {
+        const osNum = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+        const valorTotal = Number(os.valor_total) || 0;
+        const custoGSPN = custoGSPNPorOS[os.id] || 0;
+        const lucro = valorTotal - custoGSPN;
+        const margemPct = valorTotal > 0 ? Math.round((lucro / valorTotal) * 100) : 0;
+        const statusOrc = getStatusOrcamento(os);
+
+        lines.push(`• *${osNum}* | ${statusOrc}`);
+        if (valorTotal > 0 || custoGSPN > 0) {
+          lines.push(`  ${fmt(valorTotal)} - ${fmt(custoGSPN)} = ${fmt(lucro)} (${margemPct}%)`);
+        } else {
+          lines.push(`  Sem valores cadastrados`);
+        }
+      }
+      lines.push(``);
+    }
+
+    if (lista.length > 40) {
+      lines.push(`_...e mais ${lista.length - 40} OS_`);
+      lines.push(``);
+    }
+
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`💡 _OS OW sem serviço pode ser LP — verificar e converter se necessário._`);
+    lines.push(`🤖 _GIA • Validação OW_`);
+
+    mensagens.push(lines.join("\n"));
+  }
+
+  return {
+    titulo: "Validação OW",
+    subtitulo: `${osSemServico.length} OS OW sem serviço`,
+    gerado_em: now.toISOString(),
+    horario_disparo: spHour,
+    total_os_sem_servico: osSemServico.length,
+    mensagens_por_unidade: mensagens,
+    resumo_texto: mensagens[0],
+  };
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 200, headers: corsHeaders });
@@ -2912,9 +3095,12 @@ Deno.serve(async (req: Request) => {
       case "sla_atom_connect":
         resultado = await gerarSLAAtomConnect(supabase);
         break;
+      case "validacao_ow":
+        resultado = await gerarValidacaoOW(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect, validacao_ow` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }
