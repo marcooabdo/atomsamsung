@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck, Settings, BarChart3 } from 'lucide-react';
+import { Building, Users, Wrench, DollarSign, CreditCard, Plus, CreditCard as Edit, Trash2, Save, X, MapPin, FileText, ChevronUp, ChevronDown, FileType, Receipt, Shield, ShieldCheck, Settings, BarChart3, Search } from 'lucide-react';
 import { ConfiguracoesPDFOS } from '../components/ConfiguracoesPDFOS';
 import { ConfiguracoesNF } from '../components/ConfiguracoesNF';
 import { ConfiguracoesPermissoes } from '../components/ConfiguracoesPermissoes';
@@ -143,6 +143,10 @@ export function Configuracoes() {
   const [selectedUnidadeRota, setSelectedUnidadeRota] = useState<string>(canSeeAllUnits ? '' : userUnitId);
   const [selectedUnidadeChecklist, setSelectedUnidadeChecklist] = useState<string>(canSeeAllUnits ? '' : userUnitId);
   const [selectedUnidadeRegras, setSelectedUnidadeRegras] = useState<string>(canSeeAllUnits ? '' : userUnitId);
+
+  const [searchUsuario, setSearchUsuario] = useState('');
+  const [searchServico, setSearchServico] = useState('');
+  const [selectedUnidadeServico, setSelectedUnidadeServico] = useState<string>(canSeeAllUnits ? '' : userUnitId);
 
   const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [showDeleteSuccessModal, setShowDeleteSuccessModal] = useState(false);
@@ -2079,13 +2083,30 @@ export function Configuracoes() {
 
                 {activeTab === 'usuarios' && (
                   <div className="space-y-3">
-                    {usuarios.length === 0 ? (
+                    {/* Search bar */}
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                      <input
+                        type="text"
+                        value={searchUsuario}
+                        onChange={(e) => setSearchUsuario(e.target.value)}
+                        placeholder="Pesquisar usuário por nome, email ou tipo..."
+                        className="neon-input pl-9 w-full"
+                      />
+                    </div>
+                    {(() => {
+                      const filteredUsuarios = usuarios.filter(u => {
+                        if (!searchUsuario.trim()) return true;
+                        const term = searchUsuario.toLowerCase();
+                        return u.nome.toLowerCase().includes(term) || u.email.toLowerCase().includes(term) || u.tipo.toLowerCase().includes(term);
+                      });
+                      return filteredUsuarios.length === 0 ? (
                       <div className="text-center py-12">
                         <Users className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-500 text-sm">Nenhum usuário cadastrado</p>
+                        <p className="text-gray-500 text-sm">{searchUsuario ? 'Nenhum usuário encontrado' : 'Nenhum usuário cadastrado'}</p>
                       </div>
                     ) : (
-                      usuarios.map((usuario) => (
+                      filteredUsuarios.map((usuario) => (
                         <div key={usuario.id} className="premium-card p-4 hover-lift">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -2137,19 +2158,50 @@ export function Configuracoes() {
                           </div>
                         </div>
                       ))
-                    )}
+                    );
+                    })()}
                   </div>
                 )}
 
                 {activeTab === 'servicos' && (
                   <div className="space-y-3">
-                    {servicos.length === 0 ? (
+                    {/* Search and unit filter */}
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+                        <input
+                          type="text"
+                          value={searchServico}
+                          onChange={(e) => setSearchServico(e.target.value)}
+                          placeholder="Pesquisar serviço por nome, descrição ou linha..."
+                          className="neon-input pl-9 w-full"
+                        />
+                      </div>
+                      {canSeeAllUnits && (
+                        <select
+                          value={selectedUnidadeServico}
+                          onChange={(e) => setSelectedUnidadeServico(e.target.value)}
+                          className="neon-input min-w-[180px]"
+                        >
+                          <option value="">Todas as Unidades</option>
+                          {unidades.map(u => <option key={u.id} value={u.id}>{u.nome}</option>)}
+                        </select>
+                      )}
+                    </div>
+                    {(() => {
+                      const filteredServicos = servicos.filter(s => {
+                        if (selectedUnidadeServico && s.unidade_id !== selectedUnidadeServico) return false;
+                        if (!searchServico.trim()) return true;
+                        const term = searchServico.toLowerCase();
+                        return s.nome.toLowerCase().includes(term) || (s.descricao || '').toLowerCase().includes(term) || (s.linha || '').toLowerCase().includes(term);
+                      });
+                      return filteredServicos.length === 0 ? (
                       <div className="text-center py-12">
                         <Wrench className="w-12 h-12 text-gray-600 mx-auto mb-3" />
-                        <p className="text-gray-500 text-sm">Nenhum serviço cadastrado</p>
+                        <p className="text-gray-500 text-sm">{searchServico || selectedUnidadeServico ? 'Nenhum serviço encontrado' : 'Nenhum serviço cadastrado'}</p>
                       </div>
                     ) : (
-                      servicos.map((servico) => (
+                      filteredServicos.map((servico) => (
                         <div key={servico.id} className="premium-card p-4 hover-lift">
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
@@ -2192,7 +2244,8 @@ export function Configuracoes() {
                           </div>
                         </div>
                       ))
-                    )}
+                    );
+                    })()}
                   </div>
                 )}
 
