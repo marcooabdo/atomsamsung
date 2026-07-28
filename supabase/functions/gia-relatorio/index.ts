@@ -2860,6 +2860,189 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
   };
 }
 
+const PIPELINE_ORDER = [
+  "os_nova",
+  "diagnostico",
+  "negociacao_em_andamento",
+  "aguardando_aprovacao",
+  "orcamento_aprovado",
+  "aguardando_peca",
+  "peca_em_transito",
+  "em_reparo_ci",
+  "rota_preta",
+  "rota_vermelha",
+  "rota_azul",
+  "rota_verde",
+  "rota_rosa",
+  "rota_amarela",
+  "rota_laranja",
+  "em_rota_ih",
+  "em_reparo_ih",
+  "instalacao_inicial",
+  "service_handling",
+  "return_handling",
+  "trade_up",
+  "saw",
+  "controle_qualidade",
+  "qa_bt",
+  "reparo_concluido",
+  "aguardando_fechamento",
+  "orcamentos_rejeitados",
+  "os_fechada",
+];
+
+const COLUNAS_EXCLUIDAS_2H = [
+  "return_handling",
+  "instalacao_inicial",
+  "trade_up",
+  "service_handling",
+  "os_fechada",
+  "aguardando_peca",
+  "peca_em_transito",
+];
+
+async function gerarRelatorio2Horas(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
+  const now = new Date();
+  const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  const spHour = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  const unidadeSigla: Record<string, string> = {};
+  if (unidades) {
+    for (const u of unidades) {
+      unidadeMap[u.id] = u.nome;
+      const nome = (u.nome || "").toLowerCase();
+      if (nome.includes("montes claros")) unidadeSigla[u.id] = "MOC";
+      else if (nome.includes("juiz de fora")) unidadeSigla[u.id] = "JDF";
+      else if (nome.includes("feira")) unidadeSigla[u.id] = "FSA";
+      else unidadeSigla[u.id] = u.nome?.slice(0, 3)?.toUpperCase() || "???";
+    }
+  }
+
+  // 2 hours ago
+  const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
+
+  // Fetch all OS that have been in their current column for more than 2 hours
+  let allOS: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    let q = supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, coluna_kanban_desde, unidade_id")
+      .lt("coluna_kanban_desde", twoHoursAgo)
+      .not("coluna_kanban", "is", null)
+      .or("arquivada.is.null,arquivada.eq.false")
+      .range(from, from + pageSize - 1);
+    if (unidadeId) q = q.eq("unidade_id", unidadeId);
+    const { data, error } = await q;
+    if (error) throw new Error(`Erro ao buscar OS: ${error.message}`);
+    if (!data || data.length === 0) break;
+    allOS = allOS.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  // Filter out excluded columns
+  const filtered = allOS.filter((os) => !COLUNAS_EXCLUIDAS_2H.includes(os.coluna_kanban));
+
+  if (filtered.length === 0) {
+    const msg = `✅ *RELATÓRIO 2 HORAS — ${spDate} • ${spHour}*\n\nNenhuma OS com mais de 2 horas na etapa! Tudo fluindo.\n\n🤖 _GIA • Relatório 2 Horas_`;
+    return {
+      titulo: "Relatório 2 Horas",
+      subtitulo: "Nenhuma OS parada",
+      gerado_em: now.toISOString(),
+      mensagens_por_unidade: [msg],
+      resumo_texto: msg,
+    };
+  }
+
+  // Group by unidade
+  const porUnidade: Record<string, typeof filtered> = {};
+  for (const os of filtered) {
+    const uid = os.unidade_id || "sem_unidade";
+    if (!porUnidade[uid]) porUnidade[uid] = [];
+    porUnidade[uid].push(os);
+  }
+
+  const mensagens: string[] = [];
+  const sortedUnits = Object.entries(porUnidade).sort((a, b) => b[1].length - a[1].length);
+
+  for (const [uid, lista] of sortedUnits) {
+    const sigla = unidadeSigla[uid] || "???";
+
+    // Group by coluna_kanban and sort by pipeline order
+    const porColuna: Record<string, typeof lista> = {};
+    for (const os of lista) {
+      const col = os.coluna_kanban || "sem_coluna";
+      if (!porColuna[col]) porColuna[col] = [];
+      porColuna[col].push(os);
+    }
+
+    const sortedColunas = Object.entries(porColuna).sort((a, b) => {
+      const idxA = PIPELINE_ORDER.indexOf(a[0]);
+      const idxB = PIPELINE_ORDER.indexOf(b[0]);
+      return (idxA === -1 ? 999 : idxA) - (idxB === -1 ? 999 : idxB);
+    });
+
+    const lines: string[] = [];
+    lines.push(`⏱️ *RELATÓRIO 2 HORAS — ${sigla}*`);
+    lines.push(`${spDate} • ${spHour}`);
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(``);
+    lines.push(`📊 *${lista.length} OS com mais de 2h na etapa*`);
+    lines.push(``);
+
+    let osCount = 0;
+    for (const [col, osList] of sortedColunas) {
+      if (osCount >= 40) break;
+      const colLabel = getColunaLabel(col);
+      lines.push(`📌 *${colLabel}* (${osList.length})`);
+      lines.push(`┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄`);
+
+      // Sort by longest time first
+      const sorted = osList.sort((a: any, b: any) => {
+        const tA = new Date(a.coluna_kanban_desde).getTime();
+        const tB = new Date(b.coluna_kanban_desde).getTime();
+        return tA - tB; // oldest first = longest time
+      });
+
+      for (const os of sorted) {
+        if (osCount >= 40) break;
+        const osNum = os.numero_os_samsung || os.numero_os_interna || os.id.slice(0, 8);
+        const desde = new Date(os.coluna_kanban_desde);
+        const diffMinutes = Math.floor((now.getTime() - desde.getTime()) / 60000);
+        const tempoStr = formatDuration(diffMinutes);
+        lines.push(`• *${osNum}* — ${tempoStr}`);
+        osCount++;
+      }
+      lines.push(``);
+    }
+
+    if (lista.length > 40) {
+      lines.push(`_...e mais ${lista.length - 40} OS_`);
+      lines.push(``);
+    }
+
+    lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
+    lines.push(`💡 _OS paradas >2h precisam de ação imediata._`);
+    lines.push(`🤖 _GIA • Relatório 2 Horas_`);
+
+    mensagens.push(lines.join("\n"));
+  }
+
+  return {
+    titulo: "Relatório 2 Horas",
+    subtitulo: `${filtered.length} OS paradas >2h`,
+    gerado_em: now.toISOString(),
+    horario_disparo: spHour,
+    total_os_paradas: filtered.length,
+    mensagens_por_unidade: mensagens,
+    resumo_texto: mensagens[0],
+  };
+}
+
 async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -3098,9 +3281,12 @@ Deno.serve(async (req: Request) => {
       case "validacao_ow":
         resultado = await gerarValidacaoOW(supabase, unidade_id);
         break;
+      case "relatorio_2h":
+        resultado = await gerarRelatorio2Horas(supabase, unidade_id);
+        break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect, validacao_ow` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect, validacao_ow, relatorio_2h` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

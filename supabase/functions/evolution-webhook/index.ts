@@ -1001,6 +1001,7 @@ async function processMessage(
 const GIA_REPORT_KEYWORDS: Array<{ keywords: string[]; tipo: string }> = [
   { keywords: ["sla", "sla connect", "sla atom", "sem resposta", "pendentes connect"], tipo: "sla_atom_connect" },
   { keywords: ["validacao ow", "validação ow", "relatorio ow", "relatório ow", "ow sem servico", "ow sem serviço"], tipo: "validacao_ow" },
+  { keywords: ["relatorio 2 horas", "relatório 2 horas", "2 horas", "2h parada", "relatorio 2h", "relatório 2h"], tipo: "relatorio_2h" },
   { keywords: ["km", "quilom", "dinheiro na mesa", "receita km", "deslocamento"], tipo: "relatorio_km" },
   { keywords: ["controle lp", "relatório lp", "relatorio lp", " lp", "prazo lp"], tipo: "controle_lp_prazo" },
   { keywords: ["pulso", "operacional", "cockpit"], tipo: "pulso_operacional" },
