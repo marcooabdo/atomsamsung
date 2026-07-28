@@ -3027,7 +3027,7 @@ async function gerarRelatorio2Horas(supabase: ReturnType<typeof createClient>, u
 
     lines.push(`━━━━━━━━━━━━━━━━━━━━━`);
     lines.push(`💡 _OS paradas >2h precisam de ação imediata._`);
-    lines.push(`🤖 _GIA • Relatório 2 Horas_`);
+    lines.push(`🤖 _GIA • Global Intelligence Assistance_`);
 
     mensagens.push(lines.join("\n"));
   }
