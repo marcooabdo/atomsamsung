@@ -230,6 +230,8 @@ export function Kanban() {
   const [pendingFecharOSDrop, setPendingFecharOSDrop] = useState<{ card: OS; position: number | undefined } | null>(null);
   const [groupCountMap, setGroupCountMap] = useState<Record<string, number>>({});
   const [groupMembersMap, setGroupMembersMap] = useState<Record<string, any[]>>({});
+  const [refreshingOSId, setRefreshingOSId] = useState<string | null>(null);
+  const [refreshWarning, setRefreshWarning] = useState<string | null>(null);
 
   const debouncedSearchTerm = useDebounce(searchTerm, 300);
   const debouncedTipoOSFilters = useDebounce(tipoOSFilters, 200);
@@ -1738,21 +1740,45 @@ export function Kanban() {
     Object.values(osData).flat().map(os => os.tipo_atendimento).filter(Boolean)
   )).sort() as string[], [osData]);
 
-  const handleCardClick = useCallback((os: OS) => {
+  const refreshOSFromSamsung = useCallback(async (osId: string): Promise<void> => {
+    setRefreshingOSId(osId);
+    setRefreshWarning(null);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${osId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!response.ok && response.status !== 404) {
+        setRefreshWarning('Não foi possível atualizar os dados da Samsung agora.');
+      }
+    } catch {
+      setRefreshWarning('Não foi possível atualizar os dados da Samsung agora.');
+    } finally {
+      setRefreshingOSId(null);
+    }
+  }, []);
+
+  const handleCardClick = useCallback(async (os: OS) => {
+    await refreshOSFromSamsung(os.id);
     setSelectedOSId(os.id);
     setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
     setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
     setSelectedOSInitialTab(undefined);
-  }, []);
+  }, [refreshOSFromSamsung]);
 
-  const handleOpenComments = useCallback((os: OS) => {
+  const handleOpenComments = useCallback(async (os: OS) => {
+    await refreshOSFromSamsung(os.id);
     setSelectedOSId(os.id);
     setSelectedOSTipo(os.tipo_os as 'LP' | 'OW' | 'NA');
     setSelectedOSTipoOrcamento(os.tipo_orcamento || null);
     setSelectedOSInitialTab('comentarios');
     // Mark as read locally immediately
     setCommentReadMap(prev => ({ ...prev, [os.id]: new Date().toISOString() }));
-  }, []);
+  }, [refreshOSFromSamsung]);
 
   const handleCardAnalise = useCallback((os: OS) => {
     setSelectedOSForAnalise({
@@ -2671,6 +2697,31 @@ export function Kanban() {
           </div>
         </div>
       </div>
+
+      {refreshingOSId && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)' }}>
+          <div className="flex flex-col items-center gap-4">
+            <div className="futuristic-loader" />
+            <p className="text-sm font-semibold tracking-wide" style={{ color: '#00D4FF' }}>
+              Atualizando dados da Samsung...
+            </p>
+          </div>
+        </div>
+      )}
+
+      {refreshWarning && !refreshingOSId && (
+        <div className="fixed bottom-6 right-6 z-[9998] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl" style={{
+          background: 'rgba(30,30,40,0.98)',
+          border: '1px solid rgba(255,191,0,0.3)',
+          animation: 'slideIn 0.3s ease-out',
+        }}>
+          <AlertCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#FFBF00' }} />
+          <p className="text-xs" style={{ color: 'rgba(255,255,255,0.8)' }}>{refreshWarning}</p>
+          <button onClick={() => setRefreshWarning(null)} className="ml-2 p-1 rounded" style={{ color: 'rgba(255,255,255,0.4)' }}>
+            <X className="w-3 h-3" />
+          </button>
+        </div>
+      )}
 
       {selectedOSId && (selectedOSTipo === 'OW' || selectedOSTipo === 'NA' || selectedOSTipoOrcamento === 'samsung_contigo' || selectedOSTipoOrcamento === 'acessorios') && selectedOSTipo !== 'LP' && (
         <OSModal
