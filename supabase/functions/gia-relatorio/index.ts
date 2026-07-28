@@ -2841,7 +2841,7 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
       }
     }
 
-    lines.push(`🤖 _GIA • SLA Connect_`);
+    lines.push(`🤖 _GIA • Global Intelligence Assistance_`);
     mensagens.push(lines.join("\n"));
   }
 
