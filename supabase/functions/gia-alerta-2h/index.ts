@@ -108,6 +108,18 @@ Deno.serve(async (req: Request) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     const now = new Date();
+
+    // Only send alerts between 08:00 and 19:00 BRT (Mon-Fri)
+    const brHour = parseInt(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo", hour: "2-digit", hour12: false }));
+    const brDay = parseInt(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo", weekday: "narrow" }).length > 0
+      ? new Date(now.toLocaleString("en-US", { timeZone: "America/Sao_Paulo" })).getDay().toString()
+      : "0");
+    if (brHour < 8 || brHour >= 19 || brDay === 0 || brDay === 6) {
+      return new Response(
+        JSON.stringify({ success: true, alertas_enviados: 0, message: "Fora do horário de alertas (08-19h BRT, seg-sex)" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
     const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000).toISOString();
 
     // Fetch unidades for sigla mapping
