@@ -278,7 +278,7 @@ export function RouteSelectionModal({
               color: '#EF4444',
             }}
           >
-            Cancelar Movimentacao
+            Cancelar
           </button>
         </div>
       </div>

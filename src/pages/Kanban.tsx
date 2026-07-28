@@ -1378,7 +1378,6 @@ export function Kanban() {
 
     const osId = mandatoryRoutePickerOS.id;
     const prevColumn = mandatoryRoutePickerOS.coluna_kanban;
-    const { targetColumn, position: finalPosition } = pendingMandatoryMove;
     const cidadeOS = cidadeCorrigidaParam && cidadeCorrigidaParam.trim() !== '' ? cidadeCorrigidaParam.trim() : mandatoryRoutePickerOS.cliente_cidade;
 
     const rotaColorMap: Record<string, { nome: string; cor: string }> = {
@@ -1440,30 +1439,12 @@ export function Kanban() {
           ));
         }
       }
-      let novaSequencia: number = 0;
-      const cardsDestino = filteredData[targetColumn] || [];
-
-      if (finalPosition === undefined || finalPosition >= cardsDestino.length) {
-        const ultimoCard = cardsDestino[cardsDestino.length - 1];
-        novaSequencia = ultimoCard ? (ultimoCard.sequencia_coluna ?? 0) + 1 : 0;
-      } else if (finalPosition === 0) {
-        const primeiroCard = cardsDestino[0];
-        novaSequencia = primeiroCard ? (primeiroCard.sequencia_coluna ?? 0) - 1 : 0;
-      } else {
-        const cardAntes = cardsDestino[finalPosition - 1];
-        const cardDepois = cardsDestino[finalPosition];
-        const seqAntes = cardAntes?.sequencia_coluna ?? 0;
-        const seqDepois = cardDepois?.sequencia_coluna ?? 0;
-        novaSequencia = Math.floor((seqAntes + seqDepois) / 2);
-      }
-
       // Normalizar e corrigir nome da cidade
       const cidadeAtual = cidadeOS;
       let cidadeCorrigida = cidadeAtual || mandatoryRoutePickerOS.cliente_cidade;
 
       if (rotaSelecionada && cidadeAtual) {
         const cidadeNormalizada = normalizeCidade(cidadeAtual);
-        // Buscar a cidade correta na lista de cidades da rota (com capitalização e acentos corretos)
         const cidadeCorrectaNaLista = rotaSelecionada.cidades.find(
           c => normalizeCidade(c) === cidadeNormalizada
         );
@@ -1475,25 +1456,19 @@ export function Kanban() {
       const { error } = await supabase
         .from('os')
         .update({
-          coluna_kanban: targetColumn,
-          sequencia_coluna: novaSequencia,
           rota_id: rotaIdReal,
           cliente_cidade: cidadeCorrigida,
-          bloqueio_movimentacao_automatica: false,
           updated_at: new Date().toISOString()
         })
         .eq('id', osId);
 
       if (error) throw error;
 
-      const updatedCard = { ...mandatoryRoutePickerOS, coluna_kanban: targetColumn, sequencia_coluna: novaSequencia, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida };
+      const updatedCard = { ...mandatoryRoutePickerOS, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida };
 
       setOsData(prevData => {
         const newData = { ...prevData };
-        newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
-        const newCards = [...(newData[targetColumn] || []), updatedCard];
-        newCards.sort((a, b) => (a.sequencia_coluna ?? 0) - (b.sequencia_coluna ?? 0));
-        newData[targetColumn] = newCards;
+        newData[prevColumn] = (newData[prevColumn] || []).map(os => os.id === osId ? updatedCard : os);
         return newData;
       });
 
