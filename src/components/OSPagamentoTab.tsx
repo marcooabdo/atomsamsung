@@ -71,23 +71,7 @@ export function OSPagamentoTab({ osId, os, onUpdate }: OSPagamentoTabProps) {
 
       if (error) throw error;
 
-      let additionalUserIds = new Set<string>();
-      if (os.unidade_id) {
-        const { data: junctionData } = await supabase
-          .from('usuario_unidades')
-          .select('usuario_id')
-          .eq('unidade_id', os.unidade_id);
-        if (junctionData) {
-          junctionData.forEach(j => additionalUserIds.add(j.usuario_id));
-        }
-      }
-
-      const filtrados = (data || []).filter(u => {
-        if (!os.unidade_id) return true;
-        return u.unidade_id === os.unidade_id || !u.unidade_id || additionalUserIds.has(u.id);
-      });
-
-      setUsuariosUnidade(filtrados);
+      setUsuariosUnidade(data || []);
     } catch (error) {
     }
   };
