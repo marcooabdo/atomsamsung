@@ -2693,13 +2693,12 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
     }
   }
 
-  // Fetch active conversations (not finalized, not internal, not in finalizado_nps)
+  // Fetch active conversations (not finalized, not internal)
   const { data: conversas, error } = await supabase
     .from("atom_connect_conversas")
     .select("id, unidade_id, cliente_nome, cliente_telefone, coluna_pipeline, atendente_id, ultima_resposta_cliente_at, ultima_resposta_operador_at")
     .is("resultado_conversa", null)
-    .eq("is_interno", false)
-    .neq("coluna_pipeline", "finalizado_nps");
+    .eq("is_interno", false);
 
   if (error) throw new Error(`Erro ao buscar conversas: ${error.message}`);
 
@@ -2719,7 +2718,6 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
     const clienteAt = new Date(c.ultima_resposta_cliente_at).getTime();
     const operadorAt = c.ultima_resposta_operador_at ? new Date(c.ultima_resposta_operador_at).getTime() : 0;
 
-    // Client message is newer than operator's last response
     if (clienteAt > operadorAt) {
       const elapsed = now.getTime() - clienteAt;
       if (elapsed >= ONE_HOUR_MS) {
@@ -2746,28 +2744,7 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
     porUnidade[uid].push(p);
   }
 
-  // Get response metrics per unit
-  const metricsPerUnit: Record<string, { avg_first: number; avg_between: number; per_attendant: { atendente_id: string; avg_first: number; avg_between: number }[] }> = {};
-
-  const unitIds = unidades ? unidades.map(u => u.id) : [];
-  for (const unitId of unitIds) {
-    try {
-      const { data: metrics } = await supabase.rpc("get_atom_connect_response_metrics", { p_unidade_id: unitId });
-      if (metrics) {
-        metricsPerUnit[unitId] = {
-          avg_first: metrics.avg_first_response_seconds || 0,
-          avg_between: metrics.avg_between_response_seconds || 0,
-          per_attendant: (metrics.per_attendant || []).map((pa: any) => ({
-            atendente_id: pa.atendente_id,
-            avg_first: pa.avg_first_response_seconds || 0,
-            avg_between: pa.avg_between_response_seconds || 0,
-          })),
-        };
-      }
-    } catch (_) { /* skip */ }
-  }
-
-  // Format duration
+  // Format duration helpers
   function fmtDuration(minutes: number): string {
     if (minutes < 60) return `${minutes}min`;
     const h = Math.floor(minutes / 60);
@@ -2783,75 +2760,103 @@ async function gerarSLAAtomConnect(supabase: ReturnType<typeof createClient>) {
     return fmtDuration(Math.round(seconds / 60));
   }
 
-  // Build message
   const hora = now.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
-  const lines: string[] = [];
 
-  lines.push(`⚠️ *SLA ATOM CONNECT — ${hora}*`);
-  lines.push(`📊 *${pendentes.length} conversas* aguardando resposta há mais de 1 hora`);
-  lines.push("");
+  // Build one message per unit
+  const mensagens: string[] = [];
+  const unitIds = unidades ? unidades.map(u => u.id) : [];
 
-  if (pendentes.length === 0) {
-    lines.push("✅ Nenhuma conversa pendente no momento. SLA em dia!");
-  } else {
-    const sortedUnits = Object.entries(porUnidade).sort((a, b) => b[1].length - a[1].length);
+  for (const uid of unitIds) {
+    const lista = porUnidade[uid] || [];
+    // Get metrics for this unit
+    let metrics: { avg_first: number; avg_between: number; per_attendant: { atendente_id: string; avg_first: number; avg_between: number }[] } | null = null;
+    try {
+      const { data: m } = await supabase.rpc("get_atom_connect_response_metrics", { p_unidade_id: uid });
+      if (m) {
+        metrics = {
+          avg_first: m.avg_first_response_seconds || 0,
+          avg_between: m.avg_between_response_seconds || 0,
+          per_attendant: (m.per_attendant || []).map((pa: any) => ({
+            atendente_id: pa.atendente_id,
+            avg_first: pa.avg_first_response_seconds || 0,
+            avg_between: pa.avg_between_response_seconds || 0,
+          })),
+        };
+      }
+    } catch (_) { /* skip */ }
 
-    for (const [uid, lista] of sortedUnits) {
-      const sigla = unidadeShort[uid] || "???";
-      lines.push(`━━━━━━━━━━━━━━━━━━`);
-      lines.push(`🏢 *${unidadeMap[uid] || sigla}* — ${lista.length} pendente${lista.length > 1 ? "s" : ""}`);
+    // Skip units with no pending and no metrics
+    if (lista.length === 0 && (!metrics || (metrics.avg_first === 0 && metrics.avg_between === 0))) continue;
+
+    const lines: string[] = [];
+    const nomeUnidade = unidadeMap[uid] || unidadeShort[uid] || "???";
+
+    lines.push(`⚠️ *SLA ATOM CONNECT — ${nomeUnidade}*`);
+    lines.push(`🕐 ${hora}`);
+    lines.push("");
+
+    // Metrics first
+    if (metrics) {
+      lines.push(`📈 *INDICADORES DE TEMPO*`);
+      lines.push(`⚡ Tempo Médio 1º Contato: *${fmtSeconds(metrics.avg_first)}*`);
+      lines.push(`🔄 Tempo Médio Entre Respostas: *${fmtSeconds(metrics.avg_between)}*`);
       lines.push("");
 
-      for (const p of lista) {
-        const nome = p.cliente_nome || "Sem nome";
-        const tel = p.cliente_telefone.replace(/^55/, "").replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
-        const coluna = colunaMap[p.coluna_pipeline] || p.coluna_pipeline;
-        const atendente = p.atendente_id ? (usuarioMap[p.atendente_id] || "—") : "❌ Sem atendente";
-        const tempo = fmtDuration(p.waiting_minutes);
-
-        lines.push(`👤 *${nome}*`);
-        lines.push(`📱 ${tel}`);
-        lines.push(`⏱️ Aguardando: *${tempo}*`);
-        lines.push(`📂 ${coluna} • ${atendente}`);
+      if (metrics.per_attendant.length > 0) {
+        lines.push(`👥 *Por Atendente:*`);
+        const sorted = [...metrics.per_attendant].sort((a, b) => a.avg_first - b.avg_first);
+        for (const pa of sorted) {
+          const nome = usuarioMap[pa.atendente_id] || "—";
+          const firstName = nome.split(" ")[0];
+          lines.push(`  • ${firstName}: 1º ${fmtSeconds(pa.avg_first)} | Entre ${fmtSeconds(pa.avg_between)}`);
+        }
         lines.push("");
       }
     }
-  }
 
-  // Metrics section
-  lines.push(`━━━━━━━━━━━━━━━━━━`);
-  lines.push(`📈 *MÉTRICAS DE TEMPO DE RESPOSTA*`);
-  lines.push("");
+    // Total pending
+    lines.push(`━━━━━━━━━━━━━━━━━━`);
+    lines.push(`📊 *${lista.length} conversas* aguardando >1h`);
+    lines.push("");
 
-  for (const uid of unitIds) {
-    const m = metricsPerUnit[uid];
-    if (!m) continue;
-    const sigla = unidadeShort[uid] || "???";
-    lines.push(`🏢 *${unidadeMap[uid] || sigla}*`);
-    lines.push(`   ⚡ 1º Contato: *${fmtSeconds(m.avg_first)}*`);
-    lines.push(`   🔄 Entre Respostas: *${fmtSeconds(m.avg_between)}*`);
+    if (lista.length === 0) {
+      lines.push("✅ Nenhuma conversa pendente!");
+    } else {
+      // Show max 20
+      const top20 = lista.slice(0, 20);
+      for (const p of top20) {
+        const nome = p.cliente_nome || "Sem nome";
+        const tel = p.cliente_telefone.replace(/^55/, "").replace(/(\d{2})(\d{5})(\d{4})/, "($1) $2-$3");
+        const atendente = p.atendente_id ? (usuarioMap[p.atendente_id]?.split(" ")[0] || "—") : "❌ Sem atendente";
+        const tempo = fmtDuration(p.waiting_minutes);
 
-    if (m.per_attendant.length > 0) {
-      const sorted = [...m.per_attendant].sort((a, b) => a.avg_first - b.avg_first);
-      for (const pa of sorted) {
-        const nome = usuarioMap[pa.atendente_id] || "—";
-        const firstName = nome.split(" ")[0];
-        lines.push(`      • ${firstName}: 1º ${fmtSeconds(pa.avg_first)} | Entre ${fmtSeconds(pa.avg_between)}`);
+        lines.push(`👤 *${nome}* • ${atendente}`);
+        lines.push(`📱 ${tel} • ⏱️ *${tempo}*`);
+        lines.push("");
+      }
+
+      if (lista.length > 20) {
+        lines.push(`_...e mais ${lista.length - 20} contatos_`);
+        lines.push("");
       }
     }
-    lines.push("");
+
+    lines.push(`🤖 _GIA • SLA Connect_`);
+    mensagens.push(lines.join("\n"));
   }
 
-  lines.push(`🤖 _GIA • Atom Connect SLA_`);
-
-  const resumoTexto = lines.join("\n");
+  // If no messages at all (all units empty), send a single "all clear" message
+  if (mensagens.length === 0) {
+    mensagens.push(`✅ *SLA ATOM CONNECT — ${hora}*\n\nTodas as unidades estão com SLA em dia! Nenhuma conversa pendente há mais de 1 hora.\n\n🤖 _GIA • SLA Connect_`);
+  }
 
   return {
     titulo: "SLA Atom Connect",
     subtitulo: `${pendentes.length} conversas aguardando >1h`,
     gerado_em: now.toISOString(),
     total_pendentes: pendentes.length,
-    resumo_texto: resumoTexto,
+    mensagens_por_unidade: mensagens,
+    resumo_texto: mensagens[0],
   };
 }
 
