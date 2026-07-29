@@ -2569,42 +2569,85 @@ export function Configuracoes() {
                           : 'Selecione uma unidade para visualizar e configurar suas rotas.'
                         }
                       </p>
-                      {selectedUnidadeRota && rotas.filter(r => r.unidade_id === selectedUnidadeRota).length > 0 && (
-                        <button
-                          onClick={async () => {
-                            const rotasUnidade = rotas.filter(r => r.unidade_id === selectedUnidadeRota);
-                            const { data: kmData } = await supabase
-                              .from('rotas_cidades_km')
-                              .select('cidade, distancia_km_ida_volta')
-                              .eq('unidade_id', selectedUnidadeRota);
-                            const kmMap: Record<string, number> = {};
-                            (kmData || []).forEach((k: any) => { kmMap[k.cidade?.toLowerCase()] = k.distancia_km_ida_volta || 0; });
-                            const wb = XLSX.utils.book_new();
-                            rotasUnidade.forEach(rota => {
-                              if (!rota.cidades || rota.cidades.length === 0) return;
-                              const rows = rota.cidades.map(cidade => ({
-                                'Cor da Rota': rota.nome,
-                                'Cidade': cidade,
-                                'KM Ida + Volta': kmMap[cidade.toLowerCase()] || 0,
-                              }));
-                              const ws = XLSX.utils.json_to_sheet(rows);
+                      <div className="flex items-center gap-3 mt-3">
+                        {selectedUnidadeRota && rotas.filter(r => r.unidade_id === selectedUnidadeRota).length > 0 && (
+                          <button
+                            onClick={async () => {
+                              const rotasUnidade = rotas.filter(r => r.unidade_id === selectedUnidadeRota);
+                              const { data: kmData } = await supabase
+                                .from('rotas_cidades_km')
+                                .select('cidade, distancia_km_ida_volta')
+                                .eq('unidade_id', selectedUnidadeRota);
+                              const kmMap: Record<string, number> = {};
+                              (kmData || []).forEach((k: any) => { kmMap[k.cidade?.toLowerCase()] = k.distancia_km_ida_volta || 0; });
+                              const wb = XLSX.utils.book_new();
+                              const allRows: any[] = [];
+                              rotasUnidade.forEach(rota => {
+                                if (!rota.cidades || rota.cidades.length === 0) return;
+                                rota.cidades.forEach(cidade => {
+                                  allRows.push({
+                                    'Rota': rota.nome,
+                                    'Cidade': cidade,
+                                    'KM Ida + Volta': kmMap[cidade.toLowerCase()] || 0,
+                                  });
+                                });
+                              });
+                              if (allRows.length === 0) { alert('Nenhuma rota com cidades para exportar.'); return; }
+                              const ws = XLSX.utils.json_to_sheet(allRows);
                               ws['!cols'] = [{ wch: 18 }, { wch: 25 }, { wch: 16 }];
-                              const sheetName = rota.nome.replace(/[\\/*?[\]]/g, '').substring(0, 31);
-                              XLSX.utils.book_append_sheet(wb, ws, sheetName);
-                            });
-                            if (wb.SheetNames.length === 0) {
-                              alert('Nenhuma rota com cidades para exportar.');
-                              return;
-                            }
-                            const nomeUnidade = unidades.find(u => u.id === selectedUnidadeRota)?.nome || 'Unidade';
-                            XLSX.writeFile(wb, `Rotas_${nomeUnidade}.xlsx`);
-                          }}
-                          className="mt-3 flex items-center gap-2 px-4 py-2 rounded-lg bg-[#10b981]/10 border border-[#10b981]/40 text-[#10b981] text-sm font-medium hover:bg-[#10b981]/20 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                          Exportar Excel
-                        </button>
-                      )}
+                              const nomeUnidade = unidades.find(u => u.id === selectedUnidadeRota)?.nome || 'Unidade';
+                              XLSX.utils.book_append_sheet(wb, ws, nomeUnidade.substring(0, 31));
+                              XLSX.writeFile(wb, `Rotas_${nomeUnidade}.xlsx`);
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#10b981]/10 border border-[#10b981]/40 text-[#10b981] text-sm font-medium hover:bg-[#10b981]/20 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Exportar Excel
+                          </button>
+                        )}
+                        {!selectedUnidadeRota && rotas.length > 0 && (
+                          <button
+                            onClick={async () => {
+                              const { data: kmData } = await supabase
+                                .from('rotas_cidades_km')
+                                .select('cidade, distancia_km_ida_volta, unidade_id');
+                              const kmMap: Record<string, Record<string, number>> = {};
+                              (kmData || []).forEach((k: any) => {
+                                if (!kmMap[k.unidade_id]) kmMap[k.unidade_id] = {};
+                                kmMap[k.unidade_id][k.cidade?.toLowerCase()] = k.distancia_km_ida_volta || 0;
+                              });
+                              const wb = XLSX.utils.book_new();
+                              unidades.forEach(unidade => {
+                                const rotasUnidade = rotas.filter(r => r.unidade_id === unidade.id);
+                                if (rotasUnidade.length === 0) return;
+                                const unitKm = kmMap[unidade.id] || {};
+                                const allRows: any[] = [];
+                                rotasUnidade.forEach(rota => {
+                                  if (!rota.cidades || rota.cidades.length === 0) return;
+                                  rota.cidades.forEach(cidade => {
+                                    allRows.push({
+                                      'Rota': rota.nome,
+                                      'Cidade': cidade,
+                                      'KM Ida + Volta': unitKm[cidade.toLowerCase()] || 0,
+                                    });
+                                  });
+                                });
+                                if (allRows.length === 0) return;
+                                const ws = XLSX.utils.json_to_sheet(allRows);
+                                ws['!cols'] = [{ wch: 18 }, { wch: 25 }, { wch: 16 }];
+                                const sheetName = unidade.nome.replace(/[\\/*?[\]]/g, '').substring(0, 31);
+                                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                              });
+                              if (wb.SheetNames.length === 0) { alert('Nenhuma rota com cidades para exportar.'); return; }
+                              XLSX.writeFile(wb, 'Rotas_Todas_Unidades.xlsx');
+                            }}
+                            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#10b981]/10 border border-[#10b981]/40 text-[#10b981] text-sm font-medium hover:bg-[#10b981]/20 transition-colors"
+                          >
+                            <Download className="w-4 h-4" />
+                            Exportar Todas Unidades
+                          </button>
+                        )}
+                      </div>
                     </div>
 
                     {!selectedUnidadeRota ? (
