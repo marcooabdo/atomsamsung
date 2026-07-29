@@ -3043,6 +3043,97 @@ async function gerarRelatorio2Horas(supabase: ReturnType<typeof createClient>, u
   };
 }
 
+async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
+  const { data: unidades } = await supabase.from("unidades").select("id, nome");
+  const unidadeMap: Record<string, string> = {};
+  for (const u of unidades || []) {
+    unidadeMap[u.id] = u.nome;
+  }
+
+  function getSigla(nome: string): string {
+    const lower = nome.toLowerCase();
+    if (lower.includes("montes claros")) return "MOC";
+    if (lower.includes("juiz de fora")) return "JDF";
+    if (lower.includes("feira de santana")) return "FSA";
+    return nome.substring(0, 3).toUpperCase();
+  }
+
+  const targetUnits = (unidades || []).filter(u => {
+    const lower = u.nome.toLowerCase();
+    return lower.includes("montes claros") || lower.includes("feira de santana") || lower.includes("juiz de fora");
+  });
+
+  let allOS: any[] = [];
+  let from = 0;
+  const pageSize = 1000;
+  while (true) {
+    const { data } = await supabase
+      .from("os")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, arquivada")
+      .neq("coluna_kanban", "os_fechada")
+      .or("arquivada.is.null,arquivada.eq.false")
+      .in("tipo_os", ["OW", "OOW"])
+      .range(from, from + pageSize - 1);
+    if (!data || data.length === 0) break;
+    allOS = allOS.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  const mensagens: string[] = [];
+  const agora = new Date();
+  const horaStr = agora.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+
+  for (const unit of targetUnits) {
+    const sigla = getSigla(unit.nome);
+    const osUnit = allOS.filter(os => os.unidade_id === unit.id);
+
+    if (osUnit.length === 0) continue;
+
+    const byColuna: Record<string, any[]> = {};
+    for (const os of osUnit) {
+      const col = os.coluna_kanban || "sem_coluna";
+      if (!byColuna[col]) byColuna[col] = [];
+      byColuna[col].push(os);
+    }
+
+    const sortedColunas = Object.keys(byColuna).sort((a, b) => byColuna[b].length - byColuna[a].length);
+
+    let msg = `📋 *RELATÓRIO OW SIMPLES — ${sigla}*\n`;
+    msg += `📅 ${agora.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })} às ${horaStr}\n`;
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n\n`;
+
+    for (const col of sortedColunas) {
+      const osList = byColuna[col];
+      const label = getColunaLabel(col);
+      msg += `📌 *${label}* (${osList.length})\n`;
+      for (const os of osList) {
+        const numero = os.numero_os_samsung || os.numero_os_interna || "—";
+        msg += `  • ${numero}\n`;
+      }
+      msg += `\n`;
+    }
+
+    msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
+    msg += `🔢 *Total: ${osUnit.length} OS OW abertas*\n`;
+    msg += `📍 Unidade: ${unit.nome}`;
+
+    mensagens.push(msg);
+  }
+
+  if (mensagens.length === 0) {
+    return {
+      resumo_texto: "✅ Nenhuma OS OW aberta nas unidades monitoradas.",
+      mensagens_por_unidade: [],
+    };
+  }
+
+  return {
+    resumo_texto: mensagens.join("\n\n"),
+    mensagens_por_unidade: mensagens,
+  };
+}
+
 async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unidadeId?: string) {
   const now = new Date();
   const spDate = now.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -3289,12 +3380,15 @@ Deno.serve(async (req: Request) => {
       case "validacao_ow":
         resultado = await gerarValidacaoOW(supabase, unidade_id);
         break;
+      case "ow_simples":
+        resultado = await gerarOWSimples(supabase);
+        break;
       case "relatorio_2h":
         resultado = await gerarRelatorio2Horas(supabase, unidade_id);
         break;
       default:
         return new Response(
-          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect, validacao_ow, relatorio_2h` }),
+          JSON.stringify({ error: `Tipo de relatorio desconhecido: ${tipo}. Tipos disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, relatorio_km, sla_atom_connect, validacao_ow, ow_simples, relatorio_2h` }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
     }

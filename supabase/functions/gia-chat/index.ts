@@ -312,6 +312,7 @@ REGRAS CRITICAS:
     const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     const REPORT_TRIGGERS: { keywords: string[]; tipo: string }[] = [
+      { keywords: ["ow simples", "relatorio ow simples", "relatorio de ow simples"], tipo: "ow_simples" },
       { keywords: ["sla atom connect", "sla atendimento", "sla connect", "conversas sem resposta", "pendentes atom connect"], tipo: "sla_atom_connect" },
       { keywords: ["controle lp", "relatorio lp", "relatorio de lp", " lp"], tipo: "controle_lp_prazo" },
       { keywords: ["pulso operacional", "pulso"], tipo: "pulso_operacional" },
@@ -336,7 +337,8 @@ REGRAS CRITICAS:
       msgLower.includes("relatorio") || msgLower.includes("controle") || 
       msgLower.includes("report") || msgLower.includes("pulso") || 
       msgLower.includes("nucleo") || msgLower.includes("limite") ||
-      msgLower.includes("sla") || msgLower.includes("atom connect")
+      msgLower.includes("sla") || msgLower.includes("atom connect") ||
+      msgLower.includes("ow simples")
     );
 
     let detectedReportTipo: string | null = null;

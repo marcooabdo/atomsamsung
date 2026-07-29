@@ -332,7 +332,7 @@ Deno.serve(async (req: Request) => {
     const targetGroup = group_jid || config.grupo_destino || DEFAULT_GROUP;
 
     // Para controle_lp_prazo, relatorio_km, sla_atom_connect e validacao_ow, enviar uma mensagem separada por unidade
-    if (tipo === "controle_lp_prazo" || tipo === "relatorio_km" || tipo === "sla_atom_connect" || tipo === "validacao_ow" || tipo === "relatorio_2h") {
+    if (tipo === "controle_lp_prazo" || tipo === "relatorio_km" || tipo === "sla_atom_connect" || tipo === "validacao_ow" || tipo === "relatorio_2h" || tipo === "ow_simples") {
       try {
         // For relatorio_km, first send visual images per unit
         if (tipo === "relatorio_km") {
