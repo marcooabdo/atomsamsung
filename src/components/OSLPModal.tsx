@@ -120,6 +120,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
   const [abaAtiva, setAbaAtiva] = useState<AbaAtiva>((initialTab as AbaAtiva) || 'dados');
   const [loading, setLoading] = useState(currentMode === 'view');
   const [mostrarComentariosSistema, setMostrarComentariosSistema] = useState(true);
+  const [mostrarLogsDoSistema, setMostrarLogsDoSistema] = useState(false);
   const [mostrarModalConversao, setMostrarModalConversao] = useState(false);
   const [motivoConversao, setMotivoConversao] = useState('');
   const [showVincularModalLP, setShowVincularModalLP] = useState(false);
@@ -1342,13 +1343,13 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     const [osComentariosResult, cotacaoComentariosResult] = await Promise.all([
       supabase
         .from('os_comentarios')
-        .select('*')
+        .select('*, usuario:usuarios(nome)')
         .eq('os_id', currentOsId)
         .order('created_at', { ascending: false }),
       osData?.cotacao_id
         ? supabase
             .from('cotacao_comentarios')
-            .select('*')
+            .select('*, usuario:usuarios(nome)')
             .eq('cotacao_id', osData.cotacao_id)
             .order('created_at', { ascending: false })
         : Promise.resolve({ data: [], error: null })
@@ -5761,24 +5762,36 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         <Send className="w-4 h-4" />
                       </button>
                     </div>
-                    <label className="flex items-center gap-2 mt-2 text-xs text-gray-400">
-                      <input
-                        type="checkbox"
-                        checked={mostrarComentariosSistema}
-                        onChange={(e) => {
-                          const val = e.target.checked;
-                          setMostrarComentariosSistema(val);
-                          if (usuario?.id) {
-                            supabase
-                              .from('usuarios')
-                              .update({ mostrar_comentarios_sistema: val })
-                              .eq('id', usuario.id)
-                              .then();
-                          }
-                        }}
-                      />
-                      Mostrar comentários do GSPN (Samsung)
-                    </label>
+                    <div className="flex flex-wrap items-center gap-4 mt-2">
+                      <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mostrarLogsDoSistema}
+                          onChange={(e) => setMostrarLogsDoSistema(e.target.checked)}
+                          className="w-4 h-4"
+                        />
+                        Mostrar logs do sistema
+                      </label>
+                      <label className="flex items-center gap-2 text-xs text-gray-400 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={mostrarComentariosSistema}
+                          onChange={(e) => {
+                            const val = e.target.checked;
+                            setMostrarComentariosSistema(val);
+                            if (usuario?.id) {
+                              supabase
+                                .from('usuarios')
+                                .update({ mostrar_comentarios_sistema: val })
+                                .eq('id', usuario.id)
+                                .then();
+                            }
+                          }}
+                          className="w-4 h-4"
+                        />
+                        Mostrar comentários do GSPN (Samsung)
+                      </label>
+                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -5786,34 +5799,70 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                       .filter(c => {
                         if (!c.is_system) return true;
                         if ((c as any).origem === 'gspn') return mostrarComentariosSistema;
-                        return false;
+                        return mostrarLogsDoSistema;
+                      }).length === 0 ? (
+                        <p className="text-center text-gray-500 py-8">Nenhum comentário ainda</p>
+                      ) : (
+                      comentarios
+                      .filter(c => {
+                        if (!c.is_system) return true;
+                        if ((c as any).origem === 'gspn') return mostrarComentariosSistema;
+                        return mostrarLogsDoSistema;
                       })
                       .map((comentario) => {
                         const isGspn = (comentario as any).origem === 'gspn';
+                        const isSystemLog = comentario.is_system && !isGspn;
+                        const autorGspn = (comentario as any).autor_gspn;
+                        const dataGspn = (comentario as any).data_gspn;
                         return (
                           <div
                             key={comentario.id}
-                            className={`premium-card p-4 ${
-                              isGspn ? 'border-l-4 border-l-blue-500' : ''
-                            }`}
+                            className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : isSystemLog ? 'border-l-4 border-gray-600/50 bg-gray-800/30 opacity-70' : ''}`}
                           >
-                            <div className="flex items-start justify-between mb-2">
-                              <div className="flex items-center gap-2">
-                                <User className="w-4 h-4 text-gray-500" />
-                                <span className="text-sm text-gray-400">
-                                  {isGspn ? 'GSPN' : (comentario.usuario?.nome || 'Usuário')}
-                                </span>
-                              </div>
-                              <span className="text-xs text-gray-600">
-                                {new Date(comentario.created_at).toLocaleString('pt-BR')}
-                              </span>
-                            </div>
-                            <p className="text-sm text-gray-300 whitespace-pre-wrap">
-                              {comentario.comentario}
-                            </p>
+                            {isGspn ? (
+                              <>
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className="text-xs text-blue-400 font-bold">
+                                    GSPN {autorGspn ? `- ${autorGspn}` : ''}
+                                  </p>
+                                  <span className="text-xs text-gray-500">
+                                    {dataGspn
+                                      ? new Date(dataGspn).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                      : new Date(comentario.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                    }
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300">{comentario.comentario}</p>
+                              </>
+                            ) : isSystemLog ? (
+                              <>
+                                <p className="text-xs text-gray-500 italic">{comentario.comentario}</p>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {new Date(comentario.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <div className="flex items-start justify-between mb-2">
+                                  <div className="flex items-center gap-2">
+                                    <User className="w-4 h-4 text-gray-500" />
+                                    <span className="text-sm text-gray-400">
+                                      {comentario.usuario?.nome || 'Usuário'}
+                                    </span>
+                                  </div>
+                                  <span className="text-xs text-gray-600">
+                                    {new Date(comentario.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                  </span>
+                                </div>
+                                <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                                  {comentario.comentario}
+                                </p>
+                              </>
+                            )}
                           </div>
                         );
-                      })}
+                      })
+                    )}
                   </div>
                 </div>
               )}
