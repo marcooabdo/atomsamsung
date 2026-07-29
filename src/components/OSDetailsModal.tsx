@@ -184,7 +184,10 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     setCurrentJob(data);
   }
 
+  const REFRESH_GSPN_ATIVO = false;
+
   async function syncGSPN() {
+    if (!REFRESH_GSPN_ATIVO) return;
     if (!osDetails?.numero_os_samsung) {
       alert('Esta OS não possui número Samsung para sincronizar');
       return;
@@ -545,7 +548,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
               {osDetails.numero_os_samsung && (
                 <button
                   onClick={syncGSPN}
-                  disabled={syncingGSPN || currentJob?.is_running}
+                  disabled={!REFRESH_GSPN_ATIVO || syncingGSPN || currentJob?.is_running}
                   className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />

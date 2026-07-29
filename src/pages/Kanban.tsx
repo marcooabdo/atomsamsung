@@ -1716,7 +1716,10 @@ export function Kanban() {
     Object.values(osData).flat().map(os => os.tipo_atendimento).filter(Boolean)
   )).sort() as string[], [osData]);
 
+  const REFRESH_GSPN_ATIVO = false;
+
   const refreshOSFromSamsung = useCallback(async (osId: string): Promise<void> => {
+    if (!REFRESH_GSPN_ATIVO) return;
     setRefreshingOSId(osId);
     setRefreshWarning(null);
     try {

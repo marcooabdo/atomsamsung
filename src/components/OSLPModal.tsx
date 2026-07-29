@@ -543,7 +543,10 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     window.open(`/os/print?osId=${os.id}`, '_blank');
   };
 
+  const REFRESH_GSPN_ATIVO = false;
+
   const syncGSPN = async () => {
+    if (!REFRESH_GSPN_ATIVO) return;
     if (!os?.numero_os_samsung) {
       showAlert({ message: 'Esta OS não possui número Samsung para sincronizar', type: 'warning' });
       return;
@@ -2555,7 +2558,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
             {currentMode === 'view' && os?.numero_os_samsung && (
               <button
                 onClick={syncGSPN}
-                disabled={syncingGSPN || currentJob?.is_running}
+                disabled={!REFRESH_GSPN_ATIVO || syncingGSPN || currentJob?.is_running}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)',
