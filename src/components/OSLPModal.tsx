@@ -5755,6 +5755,11 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         if ((c as any).origem === 'gspn') return mostrarComentariosSistema;
                         return mostrarLogsDoSistema;
                       })
+                      .sort((a, b) => {
+                        const dateA = ((a as any).origem === 'gspn' && (a as any).data_gspn) ? new Date((a as any).data_gspn).getTime() : new Date(a.created_at).getTime();
+                        const dateB = ((b as any).origem === 'gspn' && (b as any).data_gspn) ? new Date((b as any).data_gspn).getTime() : new Date(b.created_at).getTime();
+                        return dateB - dateA;
+                      })
                       .map((comentario) => {
                         const isGspn = (comentario as any).origem === 'gspn';
                         const isSystemLog = comentario.is_system && !isGspn;
@@ -5765,7 +5770,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         return (
                           <div
                             key={comentario.id}
-                            className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : isSystemLog ? 'border-l-4 border-gray-600/50 bg-gray-800/30 opacity-70' : ''}`}
+                            className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : isSystemLog ? 'border-l-4 border-gray-600/50 bg-gray-800/30 opacity-70' : 'border-l-4 border-emerald-500/50 bg-emerald-500/5'}`}
                           >
                             {isGspn ? (
                               <>
@@ -5798,19 +5803,12 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                               </>
                             ) : (
                               <>
-                                <div className="flex items-start justify-between mb-2">
-                                  <div className="flex items-center gap-2">
-                                    <User className="w-4 h-4 text-gray-500" />
-                                    <span className="text-sm text-gray-400">
-                                      {comentario.usuario?.nome || 'Usuário'}
-                                    </span>
-                                  </div>
-                                  <span className="text-xs text-gray-600">
-                                    {new Date(comentario.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                                  </span>
-                                </div>
-                                <p className="text-sm text-gray-300 whitespace-pre-wrap">
-                                  {comentario.comentario}
+                                <p className="text-xs text-emerald-400 font-bold mb-1">
+                                  {comentario.usuario?.nome || 'Usuário'}
+                                </p>
+                                <p className="text-sm text-gray-300 whitespace-pre-wrap">{comentario.comentario}</p>
+                                <p className="text-xs text-gray-500 mt-2">
+                                  {new Date(comentario.created_at).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </p>
                               </>
                             )}

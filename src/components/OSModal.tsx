@@ -5390,6 +5390,11 @@ Não haverá cobrança ao cliente.`
                       if (c.origem === 'gspn') return mostrarComentariosSistema;
                       return mostrarLogsDoSistema;
                     })
+                    .sort((a, b) => {
+                      const dateA = (a.origem === 'gspn' && (a as any).data_gspn) ? new Date((a as any).data_gspn).getTime() : new Date(a.created_at).getTime();
+                      const dateB = (b.origem === 'gspn' && (b as any).data_gspn) ? new Date((b as any).data_gspn).getTime() : new Date(b.created_at).getTime();
+                      return dateB - dateA;
+                    })
                     .map((comentario) => {
                       const isGspn = comentario.origem === 'gspn';
                       const isSystemLog = comentario.is_system && !isGspn;
@@ -5400,7 +5405,7 @@ Não haverá cobrança ao cliente.`
                       return (
                         <div
                           key={comentario.id}
-                          className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : isSystemLog ? 'border-l-4 border-gray-600/50 bg-gray-800/30 opacity-70' : ''}`}
+                          className={`premium-card p-4 ${isGspn ? 'border-l-4 border-blue-500/50 bg-blue-500/5' : isSystemLog ? 'border-l-4 border-gray-600/50 bg-gray-800/30 opacity-70' : 'border-l-4 border-emerald-500/50 bg-emerald-500/5'}`}
                         >
                           {isGspn ? (
                             <>
@@ -5433,7 +5438,7 @@ Não haverá cobrança ao cliente.`
                             </>
                           ) : (
                             <>
-                              <p className="text-xs text-gray-400 font-bold mb-1">
+                              <p className="text-xs text-emerald-400 font-bold mb-1">
                                 {comentario.usuario?.nome || 'Usuário'}
                               </p>
                               <p className="text-sm text-gray-300">{comentario.comentario}</p>
