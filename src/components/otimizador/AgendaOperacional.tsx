@@ -73,7 +73,7 @@ export default function AgendaOperacional() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [agendamentos, setAgendamentos] = useState<AgendamentoOS[]>([]);
   const [tecnicos, setTecnicos] = useState<{ id: string; nome: string }[]>([]);
-  const [rotas, setRotas] = useState<{ id: string; nome: string; cor: string }[]>([]);
+  const [rotas, setRotas] = useState<{ id: string; nome: string; cor: string; cidades: string[] | null }[]>([]);
   const [loadingData, setLoadingData] = useState(true);
   const [showFilters, setShowFilters] = useState(false);
   const [filtros, setFiltros] = useState<Filtros>({ tecnico_id: null, rota_id: null, status: null });
@@ -101,7 +101,7 @@ export default function AgendaOperacional() {
   const loadRotas = async () => {
     const { data } = await supabase
       .from('rotas')
-      .select('id, nome, cor')
+      .select('id, nome, cor, cidades')
       .eq('unidade_id', selectedUnidade)
       .eq('ativa', true)
       .order('nome');
@@ -197,6 +197,27 @@ export default function AgendaOperacional() {
     if (os.data_agendamento < hoje && os.coluna_kanban === 'agendada')
       return { label: 'Perdida', color: '#EF4444', icon: XCircle };
     return { label: 'Pendente', color: '#F59E0B', icon: AlertTriangle };
+  };
+
+  const cidadeCorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const rota of rotas) {
+      if (rota.cidades) {
+        for (const cidade of rota.cidades) {
+          map[cidade.toLowerCase()] = rota.cor;
+        }
+      }
+    }
+    return map;
+  }, [rotas]);
+
+  const resolveColor = (ag: AgendamentoOS): string => {
+    if (ag.rota?.cor) return ag.rota.cor;
+    if (ag.cliente_cidade) {
+      const cor = cidadeCorMap[ag.cliente_cidade.toLowerCase()];
+      if (cor) return cor;
+    }
+    return '#64748B';
   };
 
   const filtrosAtivos = filtros.tecnico_id || filtros.rota_id || filtros.status;
@@ -358,6 +379,7 @@ export default function AgendaOperacional() {
           agendamentos={agendamentos}
           onSelectOS={setSelectedOSId}
           getStatusInfo={getStatusInfo}
+          resolveColor={resolveColor}
         />
       )}
 
@@ -398,7 +420,7 @@ export default function AgendaOperacional() {
                         <div key={ag.id}
                           onClick={e => { e.stopPropagation(); setSelectedOSId(ag.id); }}
                           className="px-1 py-0.5 rounded text-[10px] cursor-pointer hover:opacity-80"
-                          style={{ backgroundColor: `${ag.rota?.cor || '#3B82F6'}30`, borderLeft: `2px solid ${ag.rota?.cor || '#3B82F6'}` }}
+                          style={{ backgroundColor: `${resolveColor(ag)}30`, borderLeft: `2px solid ${resolveColor(ag)}` }}
                           title={`${ag.numero_os_samsung || ag.numero_os_interna} - ${ag.tecnico?.nome || ''}`}>
                           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.numero_os_interna}</span>
                         </div>
@@ -442,16 +464,12 @@ export default function AgendaOperacional() {
                         return (
                           <div key={ag.id} onClick={() => setSelectedOSId(ag.id)}
                             className="rounded-lg p-3 cursor-pointer transition-all group"
-                            style={{ backgroundColor: 'var(--bg-card)', border: `1px solid var(--border-primary)`, borderLeftWidth: '3px', borderLeftColor: ag.rota?.cor || 'var(--border-primary)' }}>
+                            style={{ backgroundColor: 'var(--bg-card)', border: `1px solid var(--border-primary)`, borderLeftWidth: '3px', borderLeftColor: resolveColor(ag) }}>
                             <div className="flex items-center justify-between mb-1.5">
                               <div className="flex items-center gap-2">
                                 <FileText className="w-3.5 h-3.5" style={{ color: '#3B82F6' }} />
                                 <span className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{ag.numero_os_samsung || ag.numero_os_interna}</span>
-                                {ag.rota && (
-                                  <span className="px-1.5 py-0.5 rounded text-[10px] font-medium" style={{ backgroundColor: `${ag.rota.cor}20`, color: ag.rota.cor, border: `1px solid ${ag.rota.cor}40` }}>
-                                    {ag.rota.nome}
-                                  </span>
-                                )}
+
                               </div>
                               <div className="flex items-center gap-1.5">
                                 <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1" style={{ backgroundColor: `${st.color}15`, color: st.color, border: `1px solid ${st.color}30` }}>
@@ -510,9 +528,10 @@ interface WeeklyViewProps {
   agendamentos: AgendamentoOS[];
   onSelectOS: (id: string) => void;
   getStatusInfo: (os: AgendamentoOS) => { label: string; color: string; icon: any };
+  resolveColor: (ag: AgendamentoOS) => string;
 }
 
-function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo }: WeeklyViewProps) {
+function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo, resolveColor }: WeeklyViewProps) {
   const weekColumns = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
   const weekColumnsFull = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
@@ -529,8 +548,18 @@ function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo }: Weekl
         map[ag.data_agendamento].push(ag);
       }
     });
+    for (const key of Object.keys(map)) {
+      map[key].sort((a, b) => {
+        const colorA = resolveColor(a);
+        const colorB = resolveColor(b);
+        if (colorA === colorB) return 0;
+        if (colorA === '#64748B') return 1;
+        if (colorB === '#64748B') return -1;
+        return colorA.localeCompare(colorB);
+      });
+    }
     return map;
-  }, [agendamentos, reorderedDays]);
+  }, [agendamentos, reorderedDays, resolveColor]);
 
   const todayStr = formatDateLocal(new Date());
 
@@ -577,7 +606,7 @@ function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo }: Weekl
           return (
             <div
               key={colIdx}
-              className="p-2 space-y-2 overflow-y-auto"
+              className="p-1.5 space-y-1 overflow-y-auto"
               style={{
                 backgroundColor: isCurrentDay ? '#3B82F605' : 'transparent',
                 borderRight: colIdx < 6 ? '1px solid var(--border-primary)' : undefined,
@@ -590,7 +619,7 @@ function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo }: Weekl
                 </div>
               )}
               {dayAgendamentos.map(ag => (
-                <WeeklyCard key={ag.id} ag={ag} onSelectOS={onSelectOS} getStatusInfo={getStatusInfo} />
+                <WeeklyCard key={ag.id} ag={ag} onSelectOS={onSelectOS} getStatusInfo={getStatusInfo} resolveColor={resolveColor} />
               ))}
             </div>
           );
@@ -608,84 +637,52 @@ interface WeeklyCardProps {
   ag: AgendamentoOS;
   onSelectOS: (id: string) => void;
   getStatusInfo: (os: AgendamentoOS) => { label: string; color: string; icon: any };
+  resolveColor: (ag: AgendamentoOS) => string;
 }
 
-function WeeklyCard({ ag, onSelectOS, getStatusInfo }: WeeklyCardProps) {
-  const routeColor = ag.rota?.cor || '#64748B';
+function WeeklyCard({ ag, onSelectOS, getStatusInfo, resolveColor }: WeeklyCardProps) {
+  const routeColor = resolveColor(ag);
   const isDarkRoute = routeColor.toLowerCase() === '#1a1a1a' || routeColor.toLowerCase() === '#000000';
   const st = getStatusInfo(ag);
 
   return (
     <div
       onClick={() => onSelectOS(ag.id)}
-      className="rounded-lg p-2.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
+      className="rounded-lg px-2 py-1.5 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-lg"
       style={{
-        backgroundColor: `${routeColor}12`,
-        border: `1px solid ${routeColor}35`,
-        borderLeftWidth: 4,
-        borderLeftColor: routeColor,
+        backgroundColor: `${routeColor}15`,
+        borderLeft: `3px solid ${routeColor}`,
       }}
     >
-      {/* OS number */}
-      <div className="flex items-center justify-between mb-1.5">
-        <span className="font-bold text-xs truncate" style={{ color: 'var(--text-primary)' }}>
+      <div className="flex items-center justify-between">
+        <span className="font-bold text-[11px] truncate" style={{ color: 'var(--text-primary)' }}>
           {ag.numero_os_samsung || ag.numero_os_interna}
         </span>
-        {ag.rota && (
-          <span
-            className="w-2.5 h-2.5 rounded-full flex-shrink-0"
-            style={{ backgroundColor: routeColor, boxShadow: `0 0 6px ${routeColor}60` }}
-            title={ag.rota.nome}
-          />
+        {ag.tipo_os && (
+          <span className="px-1 rounded text-[9px] font-bold" style={{
+            backgroundColor: ag.tipo_os === 'LP' ? '#10B98120' : '#F9731620',
+            color: ag.tipo_os === 'LP' ? '#10B981' : '#F97316',
+          }}>{ag.tipo_os}</span>
         )}
       </div>
 
-      {/* Technician */}
       {ag.tecnico && (
-        <div className="flex items-center gap-1 mb-1">
-          <User className="w-3 h-3 flex-shrink-0" style={{ color: isDarkRoute ? '#94A3B8' : routeColor }} />
-          <span className="text-[11px] font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+        <div className="flex items-center gap-1 mt-0.5">
+          <User className="w-2.5 h-2.5 flex-shrink-0" style={{ color: isDarkRoute ? '#94A3B8' : routeColor }} />
+          <span className="text-[10px] font-medium truncate" style={{ color: 'var(--text-secondary)' }}>
             {ag.tecnico.nome.split(' ').slice(0, 2).join(' ')}
           </span>
         </div>
       )}
 
-      {/* City */}
       {ag.cliente_cidade && (
-        <div className="flex items-center gap-1 mb-1">
-          <MapPin className="w-3 h-3 flex-shrink-0" style={{ color: isDarkRoute ? '#94A3B8' : routeColor }} />
-          <span className="text-[11px] truncate" style={{ color: 'var(--text-secondary)' }}>
+        <div className="flex items-center gap-1 mt-0.5">
+          <MapPin className="w-2.5 h-2.5 flex-shrink-0" style={{ color: isDarkRoute ? '#94A3B8' : routeColor }} />
+          <span className="text-[10px] truncate" style={{ color: 'var(--text-tertiary)' }}>
             {ag.cliente_cidade}
           </span>
         </div>
       )}
-
-      {/* Period & Route badge */}
-      <div className="flex items-center gap-1 flex-wrap mt-1.5">
-        {ag.periodo_agendamento && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={{
-            backgroundColor: ag.periodo_agendamento === 'manha' ? '#F59E0B15' : '#8B5CF615',
-            color: ag.periodo_agendamento === 'manha' ? '#F59E0B' : '#8B5CF6',
-            border: `1px solid ${ag.periodo_agendamento === 'manha' ? '#F59E0B30' : '#8B5CF630'}`,
-          }}>
-            {ag.periodo_agendamento === 'manha' ? 'AM' : 'PM'}
-          </span>
-        )}
-        {ag.tipo_os && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-medium" style={{
-            backgroundColor: ag.tipo_os === 'LP' ? '#10B98115' : '#F9731615',
-            color: ag.tipo_os === 'LP' ? '#10B981' : '#F97316',
-            border: `1px solid ${ag.tipo_os === 'LP' ? '#10B98130' : '#F9731630'}`,
-          }}>{ag.tipo_os}</span>
-        )}
-        {ag.rota && (
-          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold truncate" style={{
-            backgroundColor: `${routeColor}20`,
-            color: isDarkRoute ? '#E2E8F0' : routeColor,
-            border: `1px solid ${routeColor}40`,
-          }}>{ag.rota.nome.replace('Rota ', '')}</span>
-        )}
-      </div>
     </div>
   );
 }
