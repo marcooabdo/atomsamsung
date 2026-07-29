@@ -5,7 +5,12 @@ export function encodeStoragePath(path: string): string {
 }
 
 export function getStoragePublicUrl(pathFromDb: string): string {
-  const encodedPath = encodeStoragePath(pathFromDb);
+  if (pathFromDb.includes('://')) return pathFromDb;
+  let resolvedPath = pathFromDb;
+  if (!resolvedPath.startsWith('os-anexos/') && !resolvedPath.startsWith('pagamentos/') && !resolvedPath.startsWith('chat/') && !resolvedPath.startsWith('cotacoes-anexos/') && !resolvedPath.startsWith('profile-photos/') && !resolvedPath.startsWith('vendas-avaliacoes/') && !resolvedPath.startsWith('etiquetas-imagens/')) {
+    resolvedPath = `os-anexos/${resolvedPath}`;
+  }
+  const encodedPath = encodeStoragePath(resolvedPath);
   return `${supabaseUrl}/storage/v1/object/public/${encodedPath}`;
 }
 

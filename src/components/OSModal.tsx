@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight, CreditCard as Edit3, Plus, Check } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getStoragePublicUrl } from '../lib/storageUtils';
 import { calcularESalvarKmCidade } from '../lib/deslocamentoService';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
@@ -5216,7 +5217,7 @@ Não haverá cobrança ao cliente.`
                           onClick={() => setAnexoPreview(anexo)}
                         >
                           {isImage && anexo.url ? (
-                            <img src={anexo.url} alt={anexo.nome_arquivo} className="w-full h-full object-cover" />
+                            <img src={getStoragePublicUrl(anexo.url)} alt={anexo.nome_arquivo} className="w-full h-full object-cover" />
                           ) : isPDF ? (
                             <FileDown className="w-6 h-6 text-red-400" />
                           ) : (

@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, User, Package, FileText, MessageSquare, Paperclip, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Loader2, MoveHorizontal, ChevronDown, Calendar, CheckCircle, XCircle, DollarSign, Wrench, Save, Upload, CreditCard, Search, Plus, Percent, Tag, Receipt, FileDown, Eye, EyeOff, Phone, Layers, Link2, ChevronRight, Pencil } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { getStoragePublicUrl } from '../lib/storageUtils';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
 import { getKmCidade, calcularESalvarKmCidade } from '../lib/deslocamentoService';
@@ -2258,7 +2259,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         return;
       }
 
-      window.open(anexo.url, '_blank');
+      const fullUrl = getStoragePublicUrl(anexo.url);
+      window.open(fullUrl, '_blank');
     } catch (error) {
       alert('Erro ao abrir anexo');
     }
