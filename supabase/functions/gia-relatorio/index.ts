@@ -3096,7 +3096,7 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
 
   const osIds = allOW.map((o) => o.id);
 
-  // Check which OS have services in os_servicos
+  // Check which OS have services in os_servicos OR cotacoes_servicos
   const osComServico = new Set<string>();
   for (let i = 0; i < osIds.length; i += 200) {
     const batch = osIds.slice(i, i + 200);
@@ -3106,6 +3106,14 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
       .in("os_id", batch);
     if (servicos) {
       for (const s of servicos) osComServico.add(s.os_id);
+    }
+    const { data: cotacoesServicos } = await supabase
+      .from("cotacoes_servicos")
+      .select("os_id")
+      .not("os_id", "is", null)
+      .in("os_id", batch);
+    if (cotacoesServicos) {
+      for (const s of cotacoesServicos) osComServico.add(s.os_id);
     }
   }
 
