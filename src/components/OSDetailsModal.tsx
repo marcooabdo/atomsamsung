@@ -190,53 +190,24 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       return;
     }
 
-    if (currentJob?.is_running) {
-      alert('Já existe uma sincronização em andamento para esta OS');
-      return;
-    }
-
     setSyncingGSPN(true);
     try {
-      const { data: unidadeData } = await supabase
-        .from('unidades')
-        .select('nome, samsung_asccode, samsung_token')
-        .eq('id', osDetails.unidade_id)
-        .single();
-
-      if (!unidadeData) {
-        alert('Unidade não encontrada');
-        return;
-      }
-
-      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        alert('Unidade sem configuração Samsung (ASC Code ou Token não configurados)');
-        return;
-      }
-
-      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os/one', {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${osId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ascCode: unidadeData.samsung_asccode,
-          tokenApi: unidadeData.samsung_token,
-          filial: unidadeData.nome.toLowerCase(),
-          unidade_id: osDetails.unidade_id,
-          numero_os: osDetails.numero_os_samsung
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
-      const result = await response.json();
-
-      if (response.ok && result.status === 'success') {
+      if (response.ok) {
         await loadOSDetails();
-        await loadCurrentJob();
       } else {
-        alert(`Erro na sincronização: ${result.message || 'Erro desconhecido'}`);
+        alert('Não foi possível atualizar os dados da Samsung agora.');
       }
-    } catch (error) {
-      alert(`Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`);
+    } catch {
+      alert('Não foi possível atualizar os dados da Samsung agora.');
     } finally {
       setSyncingGSPN(false);
     }

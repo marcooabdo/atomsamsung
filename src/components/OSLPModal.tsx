@@ -548,84 +548,28 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
       return;
     }
 
-    if (currentJob?.is_running) {
-      showAlert({ message: 'Já existe uma sincronização em andamento para esta OS', type: 'info' });
-      return;
-    }
-
     setSyncingGSPN(true);
-
     try {
-      const { data: unidadeData } = await supabase
-        .from('unidades')
-        .select('nome, samsung_asccode, samsung_token')
-        .eq('id', os.unidade_id)
-        .single();
-
-      if (!unidadeData) {
-        showAlert({ message: 'Unidade não encontrada', type: 'error' });
-        setSyncingGSPN(false);
-        return;
-      }
-
-      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        showAlert({ message: 'Unidade sem configuração Samsung (ASC Code ou Token não configurados)', type: 'warning' });
-        setSyncingGSPN(false);
-        return;
-      }
-
-      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os/one', {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30000);
+      const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${currentOsId}`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ascCode: unidadeData.samsung_asccode,
-          tokenApi: unidadeData.samsung_token,
-          filial: unidadeData.nome.toLowerCase(),
-          unidade_id: os.unidade_id,
-          numero_os: os.numero_os_samsung
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
       });
+      clearTimeout(timeout);
 
-      if (!response.ok) {
-        const result = await response.json();
-        showAlert({ message: `Erro ao iniciar sincronização: ${result.message || 'Erro desconhecido'}`, type: 'error' });
-        setSyncingGSPN(false);
+      if (response.ok) {
+        await loadOS();
+        await loadComentarios();
+        if (onReload) onReload();
+        showAlert({ message: 'Dados da Samsung atualizados com sucesso', type: 'success' });
       } else {
-        setSyncingGSPN(false);
-
-        let attempts = 0;
-        const maxAttempts = 10;
-
-        const checkJob = async () => {
-          attempts++;
-
-          const { data: job, error } = await supabase
-            .from('jobs')
-            .select('*')
-            .eq('os_id', currentOsId)
-            .eq('modulo', 'pipeline_operacional')
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-
-          if (error) {
-          }
-
-
-          if (job) {
-            setCurrentJob(job);
-          } else if (attempts < maxAttempts) {
-            setTimeout(checkJob, 2000);
-          } else {
-          }
-        };
-
-        setTimeout(checkJob, 2000);
+        showAlert({ message: 'Não foi possível atualizar os dados da Samsung agora.', type: 'warning' });
       }
-    } catch (error) {
-      showAlert({ message: `Erro ao sincronizar: ${error instanceof Error ? error.message : 'Erro desconhecido'}`, type: 'error' });
+    } catch {
+      showAlert({ message: 'Não foi possível atualizar os dados da Samsung agora.', type: 'warning' });
+    } finally {
       setSyncingGSPN(false);
     }
   };
@@ -5814,6 +5758,8 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                         const isSystemLog = comentario.is_system && !isGspn;
                         const autorGspn = (comentario as any).autor_gspn;
                         const dataGspn = (comentario as any).data_gspn;
+                        const statusGspn = (comentario as any).status_gspn;
+                        const motivoGspn = (comentario as any).motivo_gspn;
                         return (
                           <div
                             key={comentario.id}
@@ -5823,7 +5769,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                               <>
                                 <div className="flex items-center justify-between mb-1">
                                   <p className="text-xs text-blue-400 font-bold">
-                                    GSPN {autorGspn ? `- ${autorGspn}` : ''}
+                                    {autorGspn || 'GSPN'}
                                   </p>
                                   <span className="text-xs text-gray-500">
                                     {dataGspn
@@ -5832,6 +5778,13 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
                                     }
                                   </span>
                                 </div>
+                                {(statusGspn || motivoGspn) && (
+                                  <p className="text-xs text-gray-400 mb-1">
+                                    {statusGspn && <span>Status: <span className="text-gray-300">{statusGspn}</span></span>}
+                                    {statusGspn && motivoGspn && <span> | </span>}
+                                    {motivoGspn && <span>Motivo: <span className="text-gray-300">{motivoGspn}</span></span>}
+                                  </p>
+                                )}
                                 <p className="text-sm text-gray-300">{comentario.comentario}</p>
                               </>
                             ) : isSystemLog ? (
