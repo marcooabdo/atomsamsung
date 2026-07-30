@@ -543,7 +543,7 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
     window.open(`/os/print?osId=${os.id}`, '_blank');
   };
 
-  const REFRESH_GSPN_ATIVO = false;
+  const REFRESH_GSPN_ATIVO = true;
 
   const syncGSPN = async () => {
     if (!REFRESH_GSPN_ATIVO) return;

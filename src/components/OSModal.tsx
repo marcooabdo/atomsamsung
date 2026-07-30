@@ -1478,7 +1478,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
     setCurrentJob(data);
   };
 
-  const REFRESH_GSPN_ATIVO = false;
+  const REFRESH_GSPN_ATIVO = true;
 
   const syncGSPN = async () => {
     if (!REFRESH_GSPN_ATIVO) return;

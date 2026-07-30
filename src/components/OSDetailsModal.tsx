@@ -184,7 +184,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     setCurrentJob(data);
   }
 
-  const REFRESH_GSPN_ATIVO = false;
+  const REFRESH_GSPN_ATIVO = true;
 
   async function syncGSPN() {
     if (!REFRESH_GSPN_ATIVO) return;
