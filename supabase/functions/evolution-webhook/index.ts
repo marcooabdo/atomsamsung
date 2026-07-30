@@ -1053,7 +1053,6 @@ async function handleGIAReportRequest(
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
     const payload: any = {
-      group_jid: groupJid,
       instance_name: _instancia.instance_name || "Marco",
     };
 
