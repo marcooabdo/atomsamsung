@@ -1660,9 +1660,18 @@ export function Kanban() {
       });
       clearTimeout(timeout);
       if (!response.ok && response.status !== 404) {
-        setRefreshWarning('Não foi possível atualizar os dados da Samsung agora.');
+        let errorMsg = 'Não foi possível atualizar os dados da Samsung agora.';
+        try {
+          const body = await response.json();
+          if (body?.erros?.length) {
+            console.error('[GSPN Refresh] Erros detalhados:', body.erros);
+            errorMsg = body.erros[0];
+          }
+        } catch {}
+        setRefreshWarning(errorMsg);
       }
-    } catch {
+    } catch (err) {
+      console.error('[GSPN Refresh] Falha na requisição:', err);
       setRefreshWarning('Não foi possível atualizar os dados da Samsung agora.');
     } finally {
       setRefreshingOSId(null);

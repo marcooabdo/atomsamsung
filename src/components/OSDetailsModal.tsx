@@ -207,9 +207,18 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
       if (response.ok) {
         await loadOSDetails();
       } else {
-        alert('Não foi possível atualizar os dados da Samsung agora.');
+        let errorMsg = 'Não foi possível atualizar os dados da Samsung agora.';
+        try {
+          const body = await response.json();
+          if (body?.erros?.length) {
+            console.error('[GSPN Refresh] Erros detalhados:', body.erros);
+            errorMsg = body.erros[0];
+          }
+        } catch {}
+        alert(errorMsg);
       }
-    } catch {
+    } catch (err) {
+      console.error('[GSPN Refresh] Falha na requisição:', err);
       alert('Não foi possível atualizar os dados da Samsung agora.');
     } finally {
       setSyncingGSPN(false);

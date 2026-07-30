@@ -569,9 +569,18 @@ export function OSLPModal({ osId, onClose, onReload, onMoveOS, mode = 'view', ti
         if (onReload) onReload();
         showAlert({ message: 'Dados da Samsung atualizados com sucesso', type: 'success' });
       } else {
-        showAlert({ message: 'Não foi possível atualizar os dados da Samsung agora.', type: 'warning' });
+        let errorMsg = 'Não foi possível atualizar os dados da Samsung agora.';
+        try {
+          const body = await response.json();
+          if (body?.erros?.length) {
+            console.error('[GSPN Refresh] Erros detalhados:', body.erros);
+            errorMsg = body.erros[0];
+          }
+        } catch {}
+        showAlert({ message: errorMsg, type: 'warning' });
       }
-    } catch {
+    } catch (err) {
+      console.error('[GSPN Refresh] Falha na requisição:', err);
       showAlert({ message: 'Não foi possível atualizar os dados da Samsung agora.', type: 'warning' });
     } finally {
       setSyncingGSPN(false);
