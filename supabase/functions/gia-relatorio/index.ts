@@ -3069,7 +3069,7 @@ async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
   while (true) {
     const { data } = await supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, arquivada")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, arquivada, grupo_os_id, created_at")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
       .in("tipo_os", ["OW", "OOW"])
@@ -3079,6 +3079,24 @@ async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
     if (data.length < pageSize) break;
     from += pageSize;
   }
+
+  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in each group.
+  const grupoMapSimples: Record<string, any[]> = {};
+  for (const os of allOS) {
+    if (os.grupo_os_id) {
+      if (!grupoMapSimples[os.grupo_os_id]) grupoMapSimples[os.grupo_os_id] = [];
+      grupoMapSimples[os.grupo_os_id].push(os);
+    }
+  }
+  const vinculadaIdsSimples = new Set<string>();
+  for (const members of Object.values(grupoMapSimples)) {
+    if (members.length <= 1) continue;
+    members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    for (let i = 1; i < members.length; i++) {
+      vinculadaIdsSimples.add(members[i].id);
+    }
+  }
+  allOS = allOS.filter((os) => !vinculadaIdsSimples.has(os.id));
 
   const mensagens: string[] = [];
   const agora = new Date();
@@ -3160,7 +3178,7 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
   while (true) {
     let q = supabase
       .from("os")
-      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, tipo_orcamento, valor_total, orcamento_aprovado, status_orcamento_link")
+      .select("id, numero_os_samsung, numero_os_interna, coluna_kanban, unidade_id, tipo_os, tipo_orcamento, valor_total, orcamento_aprovado, status_orcamento_link, grupo_os_id, created_at")
       .eq("tipo_os", "OW")
       .neq("coluna_kanban", "os_fechada")
       .or("arquivada.is.null,arquivada.eq.false")
@@ -3173,6 +3191,24 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
     if (data.length < pageSize) break;
     from += pageSize;
   }
+
+  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in each group.
+  const grupoMap: Record<string, any[]> = {};
+  for (const os of allOW) {
+    if (os.grupo_os_id) {
+      if (!grupoMap[os.grupo_os_id]) grupoMap[os.grupo_os_id] = [];
+      grupoMap[os.grupo_os_id].push(os);
+    }
+  }
+  const vinculadaIds = new Set<string>();
+  for (const members of Object.values(grupoMap)) {
+    if (members.length <= 1) continue;
+    members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    for (let i = 1; i < members.length; i++) {
+      vinculadaIds.add(members[i].id);
+    }
+  }
+  allOW = allOW.filter((os) => !vinculadaIds.has(os.id));
 
   if (allOW.length === 0) {
     const msg = `✅ *VALIDAÇÃO OW — ${spDate} • ${spHour}*\n\nNenhuma OS OW aberta encontrada.\n\n🤖 _GIA • Validação OW_`;
