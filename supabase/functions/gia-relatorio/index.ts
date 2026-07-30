@@ -3080,20 +3080,32 @@ async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
     from += pageSize;
   }
 
-  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in each group.
-  const grupoMapSimples: Record<string, any[]> = {};
-  for (const os of allOS) {
-    if (os.grupo_os_id) {
-      if (!grupoMapSimples[os.grupo_os_id]) grupoMapSimples[os.grupo_os_id] = [];
-      grupoMapSimples[os.grupo_os_id].push(os);
-    }
-  }
+  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in the FULL group.
+  // We need to fetch all group members (including non-OW types like LP) to determine the true principal.
+  const grupoIds = [...new Set(allOS.filter(os => os.grupo_os_id).map(os => os.grupo_os_id))];
   const vinculadaIdsSimples = new Set<string>();
-  for (const members of Object.values(grupoMapSimples)) {
-    if (members.length <= 1) continue;
-    members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    for (let i = 1; i < members.length; i++) {
-      vinculadaIdsSimples.add(members[i].id);
+  if (grupoIds.length > 0) {
+    let allGroupMembers: any[] = [];
+    for (let i = 0; i < grupoIds.length; i += 50) {
+      const batch = grupoIds.slice(i, i + 50);
+      const { data: members } = await supabase
+        .from("os")
+        .select("id, grupo_os_id, created_at")
+        .in("grupo_os_id", batch);
+      if (members) allGroupMembers = allGroupMembers.concat(members);
+    }
+    const grupoMapSimples: Record<string, any[]> = {};
+    for (const m of allGroupMembers) {
+      if (!grupoMapSimples[m.grupo_os_id]) grupoMapSimples[m.grupo_os_id] = [];
+      grupoMapSimples[m.grupo_os_id].push(m);
+    }
+    for (const members of Object.values(grupoMapSimples)) {
+      if (members.length <= 1) continue;
+      members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      const principalId = members[0].id;
+      for (let i = 1; i < members.length; i++) {
+        vinculadaIdsSimples.add(members[i].id);
+      }
     }
   }
   allOS = allOS.filter((os) => !vinculadaIdsSimples.has(os.id));
@@ -3192,20 +3204,31 @@ async function gerarValidacaoOW(supabase: ReturnType<typeof createClient>, unida
     from += pageSize;
   }
 
-  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in each group.
-  const grupoMap: Record<string, any[]> = {};
-  for (const os of allOW) {
-    if (os.grupo_os_id) {
-      if (!grupoMap[os.grupo_os_id]) grupoMap[os.grupo_os_id] = [];
-      grupoMap[os.grupo_os_id].push(os);
-    }
-  }
+  // Exclude vinculadas (non-principal OS in a group). Principal = most recent created_at in the FULL group.
+  // We need to fetch all group members (including non-OW types like LP) to determine the true principal.
+  const grupoIdsOW = [...new Set(allOW.filter(os => os.grupo_os_id).map(os => os.grupo_os_id))];
   const vinculadaIds = new Set<string>();
-  for (const members of Object.values(grupoMap)) {
-    if (members.length <= 1) continue;
-    members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    for (let i = 1; i < members.length; i++) {
-      vinculadaIds.add(members[i].id);
+  if (grupoIdsOW.length > 0) {
+    let allGroupMembersOW: any[] = [];
+    for (let i = 0; i < grupoIdsOW.length; i += 50) {
+      const batch = grupoIdsOW.slice(i, i + 50);
+      const { data: members } = await supabase
+        .from("os")
+        .select("id, grupo_os_id, created_at")
+        .in("grupo_os_id", batch);
+      if (members) allGroupMembersOW = allGroupMembersOW.concat(members);
+    }
+    const grupoMap: Record<string, any[]> = {};
+    for (const m of allGroupMembersOW) {
+      if (!grupoMap[m.grupo_os_id]) grupoMap[m.grupo_os_id] = [];
+      grupoMap[m.grupo_os_id].push(m);
+    }
+    for (const members of Object.values(grupoMap)) {
+      if (members.length <= 1) continue;
+      members.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      for (let i = 1; i < members.length; i++) {
+        vinculadaIds.add(members[i].id);
+      }
     }
   }
   allOW = allOW.filter((os) => !vinculadaIds.has(os.id));
