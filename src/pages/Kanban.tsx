@@ -1652,7 +1652,7 @@ export function Kanban() {
     setRefreshWarning(null);
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 30000);
+      const timeout = setTimeout(() => controller.abort(), 120000);
       const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${osId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
