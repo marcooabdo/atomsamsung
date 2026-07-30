@@ -139,7 +139,6 @@ export function Kanban() {
   const [criarOSOW, setCriarOSOW] = useState(false);
   const [criarOSSCACC, setCriarOSSCACC] = useState(false);
   const [mostrarInfoFinanceira, setMostrarInfoFinanceira] = useState(true);
-  const [syncingSamsung, setSyncingSamsung] = useState(false);
   const [showAnaliseModal, setShowAnaliseModal] = useState(false);
   const [selectedOSForAnalise, setSelectedOSForAnalise] = useState<{ id: string; numero: string } | null>(null);
   const [showIniciarReparoModal, setShowIniciarReparoModal] = useState(false);
@@ -381,76 +380,6 @@ export function Kanban() {
     setTecnicos(data || []);
   };
 
-  const syncSamsungGSPN = async () => {
-    if (!selectedUnidade) {
-      setInfoModalData({
-        title: 'Sincronização Samsung',
-        message: 'Selecione uma unidade para atualizar.'
-      });
-      setShowInfoModal(true);
-      return;
-    }
-
-    setSyncingSamsung(true);
-    try {
-      const { data: unidadeData } = await supabase
-        .from('unidades')
-        .select('nome, samsung_asccode, samsung_token')
-        .eq('id', selectedUnidade)
-        .single();
-
-      if (!unidadeData) {
-        setInfoModalData({
-          title: 'Sincronização Samsung',
-          message: 'Unidade não encontrada.'
-        });
-        setShowInfoModal(true);
-        return;
-      }
-
-      if (!unidadeData.samsung_asccode || !unidadeData.samsung_token) {
-        setInfoModalData({
-          title: 'Configuração Incompleta',
-          message: 'Esta unidade não possui configuração Samsung (ASC Code ou Token não configurados).'
-        });
-        setShowInfoModal(true);
-        return;
-      }
-
-      const response = await fetch('https://atom-n8n.2vhnbz.easypanel.host/webhook/atualizar-os', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ascCode: unidadeData.samsung_asccode,
-          tokenApi: unidadeData.samsung_token,
-          filial: unidadeData.nome.toLowerCase(),
-          unidade_id: selectedUnidade
-        }),
-      });
-
-      const result = await response.json();
-
-      if (response.ok && result.status === 'success') {
-        await loadKanbanData();
-      } else {
-        setErrorModalData({
-          title: 'Erro na Sincronização',
-          message: result.message || 'Erro desconhecido ao sincronizar com Samsung.'
-        });
-        setShowErrorModal(true);
-      }
-    } catch (error) {
-      setErrorModalData({
-        title: 'Erro ao Sincronizar',
-        message: error instanceof Error ? error.message : 'Erro desconhecido ao sincronizar.'
-      });
-      setShowErrorModal(true);
-    } finally {
-      setSyncingSamsung(false);
-    }
-  };
 
   const buscarOSPorNumero = async () => {
     if (!selectedUnidade || !buscarOSNumero.trim()) return;
@@ -2396,26 +2325,6 @@ export function Kanban() {
                 </div>
               )}
             </div>
-
-            <button
-              onClick={syncSamsungGSPN}
-              disabled={syncingSamsung || !selectedUnidade}
-              className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg font-bold transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: 'linear-gradient(135deg, rgba(var(--accent-rgb),0.2) 0%, rgba(var(--accent-rgb),0.05) 100%)',
-                border: '1px solid var(--text-accent)',
-                color: 'var(--text-accent)',
-                boxShadow: '0 0 10px rgba(var(--accent-rgb),0.2)'
-              }}
-              title={
-                !selectedUnidade
-                  ? 'Selecione uma unidade para sincronizar'
-                  : 'Sincronizar novas OS da Samsung'
-              }
-            >
-              <RefreshCw className={`w-3.5 h-3.5 ${syncingSamsung ? 'animate-spin' : ''}`} />
-              {syncingSamsung ? 'SINCRONIZANDO...' : 'SYNC NOVAS OS'}
-            </button>
 
             <button
               onClick={() => {
