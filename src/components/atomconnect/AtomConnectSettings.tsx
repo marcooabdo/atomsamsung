@@ -43,8 +43,8 @@ interface PipelineColuna {
   conversas_count?: number;
 }
 
-const EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || '';
-const EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || '';
+const DEFAULT_EVOLUTION_URL = import.meta.env.VITE_EVOLUTION_URL || 'https://atom-evolution-api.2vhnbz.easypanel.host';
+const DEFAULT_EVOLUTION_API_KEY = import.meta.env.VITE_EVOLUTION_API_KEY || 'Novasenha2026';
 
 export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const { unidadeAtual, unidades } = useAuth();
@@ -66,8 +66,8 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const [newInstance, setNewInstance] = useState({
     nome: '',
-    api_url: EVOLUTION_URL,
-    api_key: EVOLUTION_API_KEY,
+    api_url: DEFAULT_EVOLUTION_URL,
+    api_key: DEFAULT_EVOLUTION_API_KEY,
     instance_name: '',
     unidade_id: effectiveUnidadeId || ''
   });
@@ -507,7 +507,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
     setCreateError(null);
 
     try {
-      const evolutionResult = await createEvolutionInstance(newInstance.instance_name);
+      const instanceApiUrl = newInstance.api_url || DEFAULT_EVOLUTION_URL;
+      const instanceApiKey = newInstance.api_key || DEFAULT_EVOLUTION_API_KEY;
+      const evolutionResult = await createEvolutionInstance(newInstance.instance_name, instanceApiUrl, instanceApiKey);
 
       if (evolutionResult.error) {
         throw new Error(evolutionResult.error);
@@ -518,8 +520,8 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
         .insert({
           unidade_id: newInstance.unidade_id,
           nome: newInstance.nome,
-          api_url: newInstance.api_url || EVOLUTION_URL,
-          api_key: newInstance.api_key || EVOLUTION_API_KEY,
+          api_url: instanceApiUrl,
+          api_key: instanceApiKey,
           instance_name: newInstance.instance_name,
           status: 'disconnected'
         })
@@ -529,7 +531,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       if (error) throw error;
 
       setShowNewInstance(false);
-      setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
+      setNewInstance({ nome: '', api_url: DEFAULT_EVOLUTION_URL, api_key: DEFAULT_EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
       loadInstancias();
 
       if (instanciaData) {
@@ -542,8 +544,8 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
           .insert({
             unidade_id: unidadeAtual,
             nome: newInstance.nome,
-            api_url: newInstance.api_url || EVOLUTION_URL,
-            api_key: newInstance.api_key || EVOLUTION_API_KEY,
+            api_url: instanceApiUrl,
+            api_key: instanceApiKey,
             instance_name: newInstance.instance_name,
             status: 'disconnected'
           })
@@ -551,7 +553,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
           .single();
 
         setShowNewInstance(false);
-        setNewInstance({ nome: '', api_url: EVOLUTION_URL, api_key: EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
+        setNewInstance({ nome: '', api_url: DEFAULT_EVOLUTION_URL, api_key: DEFAULT_EVOLUTION_API_KEY, instance_name: '', unidade_id: unidadeAtual || '' });
         loadInstancias();
 
         if (instanciaData) {
@@ -743,66 +745,72 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
 
   const webhookUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/evolution-webhook`;
 
-  const createEvolutionInstance = async (instanceName: string) => {
+  const createEvolutionInstance = async (instanceName: string, apiUrl: string, apiKey: string) => {
+    if (!apiUrl) throw new Error('URL da Evolution API não configurada');
+    if (!apiKey) throw new Error('API Key da Evolution não configurada');
+
+    const baseUrl = apiUrl.replace(/\/$/, '');
+
+    const response = await fetch(`${baseUrl}/instance/create`, {
+      method: 'POST',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        instanceName,
+        qrcode: true,
+        integration: 'WHATSAPP-BAILEYS',
+        webhook: {
+          url: webhookUrl,
+          byEvents: false,
+          base64: false,
+          events: [
+            'messages.upsert',
+            'messages.update',
+            'connection.update',
+            'qrcode.updated',
+            'groups.upsert',
+            'groups.update'
+          ]
+        }
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Erro ao criar instância: ${response.status} - ${errorText}`);
+    }
+
+    const data = await response.json();
+
     try {
-      const response = await fetch(`${EVOLUTION_URL}/instance/create`, {
+      await fetch(`${baseUrl}/webhook/set/${instanceName}`, {
         method: 'POST',
         headers: {
-          'apikey': EVOLUTION_API_KEY,
+          'apikey': apiKey,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          instanceName,
-          qrcode: true,
-          integration: 'WHATSAPP-BAILEYS',
-          webhook: {
-            url: webhookUrl,
-            byEvents: false,
-            base64: false,
-            events: [
-              'messages.upsert',
-              'messages.update',
-              'connection.update',
-              'qrcode.updated',
-              'groups.upsert',
-              'groups.update'
-            ]
-          }
+          enabled: true,
+          url: webhookUrl,
+          webhookByEvents: false,
+          webhookBase64: false,
+          events: [
+            'MESSAGES_UPSERT',
+            'MESSAGES_UPDATE',
+            'CONNECTION_UPDATE',
+            'QRCODE_UPDATED',
+            'GROUPS_UPSERT',
+            'GROUPS_UPDATE'
+          ]
         })
       });
-
-      const data = await response.json();
-
-      try {
-        await fetch(`${EVOLUTION_URL}/webhook/set/${instanceName}`, {
-          method: 'POST',
-          headers: {
-            'apikey': EVOLUTION_API_KEY,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            enabled: true,
-            url: webhookUrl,
-            webhookByEvents: false,
-            webhookBase64: false,
-            events: [
-              'MESSAGES_UPSERT',
-              'MESSAGES_UPDATE',
-              'CONNECTION_UPDATE',
-              'QRCODE_UPDATED',
-              'GROUPS_UPSERT',
-              'GROUPS_UPDATE'
-            ]
-          })
-        });
-      } catch (e) {
-        // ignored
-      }
-
-      return data;
-    } catch (error) {
-      throw error;
+    } catch (e) {
+      // webhook config is best-effort
     }
+
+    return data;
   };
 
   const configureWebhook = async (instancia: Instancia) => {
@@ -1704,13 +1712,13 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                   <p className="text-xs text-gray-500 mt-1">A instancia sera vinculada a esta unidade</p>
                 </div>
 
-                {EVOLUTION_URL && (
+                {DEFAULT_EVOLUTION_URL && (
                   <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
                     <div className="flex items-center gap-2 text-sm text-green-400">
                       <CheckCircle2 className="w-4 h-4" />
                       API Evolution configurada
                     </div>
-                    <p className="text-xs text-gray-400 mt-1 truncate">{EVOLUTION_URL}</p>
+                    <p className="text-xs text-gray-400 mt-1 truncate">{DEFAULT_EVOLUTION_URL}</p>
                   </div>
                 )}
               </div>
