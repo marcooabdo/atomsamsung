@@ -55,7 +55,7 @@ interface Notification {
 }
 
 export default function AtomConnect() {
-  const { usuario, unidadeAtual, unidades } = useAuth();
+  const { usuario, unidadeAtual, unidades, unidadesAdicionais } = useAuth();
   const { theme } = useTheme();
   const [searchParams, setSearchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState<TabType>('kanban');
@@ -72,8 +72,10 @@ export default function AtomConnect() {
   const [showUnidadeFilter, setShowUnidadeFilter] = useState(false);
   const [deepSearchIds, setDeepSearchIds] = useState<string[]>([]);
 
-  const canFilterUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
-  const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(canFilterUnits ? null : (unidadeAtual || null));
+  const isMasterDiretoria = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
+  const hasAdditionalUnits = unidadesAdicionais && unidadesAdicionais.length > 0;
+  const canFilterUnits = isMasterDiretoria || hasAdditionalUnits;
+  const [selectedUnidadeFilter, setSelectedUnidadeFilter] = useState<string | null>(isMasterDiretoria ? null : (unidadeAtual || null));
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const lastNotifiedRef = useRef<Record<string, number>>({});
   const selectedConversaRef = useRef<Conversa | null>(null);
@@ -430,7 +432,7 @@ export default function AtomConnect() {
                     <span className="text-sm font-bold tracking-wide">
                       {selectedUnidadeFilter && unidades
                         ? unidades.find(u => u.id === selectedUnidadeFilter)?.nome || 'FILTRO DE UNIDADES'
-                        : 'TODAS AS UNIDADES'}
+                        : isMasterDiretoria ? 'TODAS AS UNIDADES' : 'MINHAS UNIDADES'}
                     </span>
                     <ChevronDown className="w-4 h-4" />
                   </button>
@@ -448,20 +450,24 @@ export default function AtomConnect() {
                           boxShadow: '0 0 30px rgba(var(--accent-rgb), 0.2)'
                         }}
                       >
-                        <button
-                          onClick={() => {
-                            setSelectedUnidadeFilter(null);
-                            setShowUnidadeFilter(false);
-                          }}
-                          className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.08] transition-colors ${
-                            !selectedUnidadeFilter ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
-                          }`}
-                        >
-                          <Building2 className="w-5 h-5" />
-                          <span className="text-sm font-bold">TODAS AS UNIDADES</span>
-                        </button>
-                        {unidades && unidades.length > 0 ? (
-                          unidades.map(unidade => (
+                        {isMasterDiretoria && (
+                          <button
+                            onClick={() => {
+                              setSelectedUnidadeFilter(null);
+                              setShowUnidadeFilter(false);
+                            }}
+                            className={`w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-white/[0.08] transition-colors ${
+                              !selectedUnidadeFilter ? 'bg-cyan-500/20 text-cyan-300 border-l-4 border-cyan-400' : 'text-white/70'
+                            }`}
+                          >
+                            <Building2 className="w-5 h-5" />
+                            <span className="text-sm font-bold">TODAS AS UNIDADES</span>
+                          </button>
+                        )}
+                        {(hasAdditionalUnits && !isMasterDiretoria
+                          ? unidades.filter(u => u.id === unidadeAtual || unidadesAdicionais.includes(u.id))
+                          : unidades
+                        ).map(unidade => (
                             <button
                               key={unidade.id}
                               onClick={() => {
@@ -476,11 +482,7 @@ export default function AtomConnect() {
                               <span className="text-sm font-medium">{unidade.nome}</span>
                             </button>
                           ))
-                        ) : (
-                          <div className="px-4 py-3.5 text-white/50 text-sm text-center">
-                            Nenhuma unidade disponivel
-                          </div>
-                        )}
+                        }
                       </motion.div>
                     )}
                   </AnimatePresence>
