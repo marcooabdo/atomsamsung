@@ -3110,6 +3110,29 @@ async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
   }
   allOS = allOS.filter((os) => !vinculadaIdsSimples.has(os.id));
 
+  // Exclude OS that already have services (os_servicos OR cotacoes_servicos)
+  const allOSIds = allOS.map(o => o.id);
+  const osComServico = new Set<string>();
+  for (let i = 0; i < allOSIds.length; i += 200) {
+    const batch = allOSIds.slice(i, i + 200);
+    const { data: servicos } = await supabase
+      .from("os_servicos")
+      .select("os_id")
+      .in("os_id", batch);
+    if (servicos) {
+      for (const s of servicos) osComServico.add(s.os_id);
+    }
+    const { data: cotacoesServicos } = await supabase
+      .from("cotacoes_servicos")
+      .select("os_id")
+      .not("os_id", "is", null)
+      .in("os_id", batch);
+    if (cotacoesServicos) {
+      for (const s of cotacoesServicos) osComServico.add(s.os_id);
+    }
+  }
+  allOS = allOS.filter((os) => !osComServico.has(os.id));
+
   const mensagens: string[] = [];
   const agora = new Date();
   const horaStr = agora.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
@@ -3145,7 +3168,7 @@ async function gerarOWSimples(supabase: ReturnType<typeof createClient>) {
     }
 
     msg += `━━━━━━━━━━━━━━━━━━━━━━\n`;
-    msg += `🔢 *Total: ${osUnit.length} OS OW abertas*\n`;
+    msg += `🔢 *Total: ${osUnit.length} OS OW sem serviço*\n`;
     msg += `📍 Unidade: ${unit.nome}`;
 
     mensagens.push(msg);

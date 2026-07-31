@@ -287,7 +287,7 @@ EXEMPLOS PRATICOS:
 
 ACOES DE RELATORIO WHATSAPP:
 Quando o usuario pedir para enviar um relatorio no WhatsApp/grupo, o sistema intercepta e executa AUTOMATICAMENTE. Voce recebera um "[SYSTEM ACTION RESULT: ...]" informando se foi enviado com sucesso ou se deu erro. Apenas confirme ao usuario de forma natural.
-Relatorios disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo.
+Relatorios disponiveis: pulso_operacional, abertura_fechamento, mapa_rotas, nucleo_pecas, estoque_dia, limite_credito_gspn, compliance_erros, agendamentos_ih, resumo_final, controle_lp_prazo, validacao_ow, ow_simples, sla_atom_connect, relatorio_km, relatorio_2h.
 
 REGRAS CRITICAS:
 1. SEMPRE inclua 2-4 cards quando responder com dados
@@ -312,6 +312,7 @@ REGRAS CRITICAS:
     const msgLower = message.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     
     const REPORT_TRIGGERS: { keywords: string[]; tipo: string }[] = [
+      { keywords: ["validacao ow", "validacao de ow", "relatorio de ow", "relatorio ow", "relatorio das ow", "os ow"], tipo: "validacao_ow" },
       { keywords: ["ow simples", "relatorio ow simples", "relatorio de ow simples"], tipo: "ow_simples" },
       { keywords: ["sla atom connect", "sla atendimento", "sla connect", "conversas sem resposta", "pendentes atom connect"], tipo: "sla_atom_connect" },
       { keywords: ["controle lp", "relatorio lp", "relatorio de lp", " lp"], tipo: "controle_lp_prazo" },
@@ -324,13 +325,18 @@ REGRAS CRITICAS:
       { keywords: ["compliance", "erros compliance"], tipo: "compliance_erros" },
       { keywords: ["agenda", "agendamento", "agendamentos ih"], tipo: "agendamentos_ih" },
       { keywords: ["resumo final", "resumo do dia"], tipo: "resumo_final" },
+      { keywords: ["relatorio 2h", "2 horas", "2h"], tipo: "relatorio_2h" },
+      { keywords: ["relatorio km", "quilometragem", "km rodado"], tipo: "relatorio_km" },
     ];
 
     const hasActionVerb = (
       msgLower.includes("enviar") || msgLower.includes("envia") || 
+      msgLower.includes("envie") ||
       msgLower.includes("manda") || msgLower.includes("mandar") || 
+      msgLower.includes("mande") ||
       msgLower.includes("dispara") || msgLower.includes("disparar") ||
-      msgLower.includes("gera") || msgLower.includes("gerar")
+      msgLower.includes("gera") || msgLower.includes("gerar") ||
+      msgLower.includes("gere")
     );
 
     const hasReportWord = (
