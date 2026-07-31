@@ -987,6 +987,38 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
 
   console.log(`[Compliance] OS com peças mapeadas: ${pecasPerOS.size}`);
 
+  // Exclude OS that have services matching TAXA DE VISITA, INSTALAÇÃO, or COLETA
+  const osExcluidasPorServico: Set<string> = new Set();
+  for (let i = 0; i < osIds.length; i += 200) {
+    const batch = osIds.slice(i, i + 200);
+    const { data: servOS } = await supabase
+      .from("os_servicos")
+      .select("os_id, descricao")
+      .in("os_id", batch);
+    if (servOS) {
+      for (const s of servOS) {
+        const desc = (s.descricao || "").toUpperCase();
+        if (desc.includes("TAXA DE VISITA") || desc.includes("INSTALACAO") || desc.includes("INSTALAÇÃO") || desc.includes("COLETA")) {
+          osExcluidasPorServico.add(s.os_id);
+        }
+      }
+    }
+    const { data: servCot } = await supabase
+      .from("cotacoes_servicos")
+      .select("os_id, descricao")
+      .in("os_id", batch)
+      .not("os_id", "is", null);
+    if (servCot) {
+      for (const s of servCot) {
+        const desc = (s.descricao || "").toUpperCase();
+        if (desc.includes("TAXA DE VISITA") || desc.includes("INSTALACAO") || desc.includes("INSTALAÇÃO") || desc.includes("COLETA")) {
+          osExcluidasPorServico.add(s.os_id);
+        }
+      }
+    }
+  }
+  console.log(`[Compliance] OS excluídas por serviço (visita/instalação/coleta): ${osExcluidasPorServico.size}`);
+
   // Check for problems - matching Cockpit logic exactly
   const hasCodigo = (p: { pn: string | null; codigo: string | null }) =>
     (p.pn && p.pn.trim() !== "") || (p.codigo && p.codigo.trim() !== "");
@@ -999,6 +1031,8 @@ async function gerarComplianceErros(supabase: ReturnType<typeof createClient>, u
   let totalSemValor = 0;
 
   for (const os of osDataList) {
+    if (osExcluidasPorServico.has(os.id)) continue;
+
     const pecas = pecasPerOS.get(os.id);
 
     // Check: OS has no peças at all (skip for early-stage columns)
