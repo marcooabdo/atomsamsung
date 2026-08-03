@@ -1370,22 +1370,42 @@ async function sendGroupImageViaStorage(supabase: any, imageUrl: string, caption
   const cfg = await getEvolutionConfig(supabase);
 
   // Download image from Google Static Maps
+  console.log(`[GIA Route] Downloading map from: ${imageUrl.substring(0, 120)}...`);
   const imgResp = await fetch(imageUrl);
-  if (!imgResp.ok) throw new Error(`Failed to download map image: ${imgResp.status}`);
+  if (!imgResp.ok) {
+    const errBody = await imgResp.text();
+    console.error(`[GIA Route] Map download FAILED: status=${imgResp.status} body=${errBody.substring(0, 200)}`);
+    throw new Error(`Failed to download map image: ${imgResp.status}`);
+  }
   const imgBuffer = new Uint8Array(await imgResp.arrayBuffer());
-  console.log(`[GIA Route] Map downloaded: ${imgBuffer.length} bytes`);
+  console.log(`[GIA Route] Map downloaded OK: ${imgBuffer.length} bytes`);
 
-  // Convert to base64 and send directly via Evolution API (most reliable)
-  const base64 = btoa(String.fromCharCode(...imgBuffer));
+  if (imgBuffer.length < 1000) {
+    console.error(`[GIA Route] Image too small (${imgBuffer.length} bytes), likely an error response`);
+    throw new Error("Image too small - likely API error");
+  }
+
+  // Convert to base64 using chunked approach (spread operator crashes on large arrays)
+  let binary = "";
+  const chunkSize = 8192;
+  for (let i = 0; i < imgBuffer.length; i += chunkSize) {
+    const chunk = imgBuffer.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+  const base64 = btoa(binary);
   const mediaBase64 = `data:image/png;base64,${base64}`;
+  console.log(`[GIA Route] Base64 encoded: ${base64.length} chars`);
+
+  const payload = JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: mediaBase64, caption, fileName: "rota.png" });
+  console.log(`[GIA Route] Sending media payload: ${payload.length} bytes`);
 
   const resp = await fetch(`${cfg.api_url}/message/sendMedia/${cfg.instance_name}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: cfg.api_key },
-    body: JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: mediaBase64, caption, fileName: "rota.png" }),
+    body: payload,
   });
   const body = await resp.text();
-  console.log(`[GIA Route] sendMedia status=${resp.status} body=${body.substring(0, 300)}`);
+  console.log(`[GIA Route] sendMedia response: status=${resp.status} body=${body.substring(0, 400)}`);
   if (!resp.ok) throw new Error(`sendMedia failed: ${resp.status} - ${body}`);
 }
 
@@ -1859,8 +1879,9 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
 
     try {
       await sendGroupImageViaStorage(supabase, mapUrl, caption.trim());
-    } catch (imgErr) {
-      console.error("[GIA Route] Error sending map:", imgErr);
+    } catch (imgErr: any) {
+      console.error("[GIA Route] Error sending map:", imgErr?.message || imgErr);
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Não consegui enviar a imagem do mapa. Erro: ${imgErr?.message || "desconhecido"}`);
     }
 
     // Small delay so image arrives first
