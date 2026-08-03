@@ -69,8 +69,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
   const { isDark } = useTheme();
   const effectiveUnidadeId = unidadeId || unidadeAtual;
   const [colunas, setColunas] = useState<PipelineColuna[]>([]);
-  const [draggedConversa, setDraggedConversa] = useState<Conversa | null>(null);
-  const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+
   const [pendingFinalizeConversa, setPendingFinalizeConversa] = useState<Conversa | null>(null);
   const [filterAtendente, setFilterAtendente] = useState<'all' | 'mine' | 'unassigned'>('all');
   const [filterVendedor, setFilterVendedor] = useState<string>('all');
@@ -266,44 +265,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
     }));
   };
 
-  const handleDragStart = (e: React.DragEvent, conversa: Conversa) => {
-    setDraggedConversa(conversa);
-    e.dataTransfer.effectAllowed = 'move';
-  };
 
-  const handleDragOver = (e: React.DragEvent, colunaId: string) => {
-    e.preventDefault();
-    setDragOverColumn(colunaId);
-  };
-
-  const handleDragLeave = () => {
-    setDragOverColumn(null);
-  };
-
-  const handleDrop = async (e: React.DragEvent, colunaId: string) => {
-    e.preventDefault();
-    setDragOverColumn(null);
-
-    if (!draggedConversa || draggedConversa.coluna_pipeline === colunaId) {
-      setDraggedConversa(null);
-      return;
-    }
-
-    const targetColuna = colunas.find(c => c.id === colunaId);
-    if (targetColuna?.is_final) {
-      setPendingFinalizeConversa(draggedConversa);
-      setDraggedConversa(null);
-      return;
-    }
-
-    await supabase
-      .from('atom_connect_conversas')
-      .update({ coluna_pipeline: colunaId })
-      .eq('id', draggedConversa.id);
-
-    setDraggedConversa(null);
-    onUpdateConversa();
-  };
 
   const handleKanbanFinalize = async (data: ClosureData) => {
     if (!pendingFinalizeConversa) return;
@@ -501,7 +463,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
           {colunas.map((coluna, idx) => {
             const Icon = ICON_MAP[coluna.icone] || MessageSquare;
             const columnConversas = getConversasByColuna(coluna.id);
-            const isDropTarget = dragOverColumn === coluna.id;
+            const isDropTarget = false;
             const isCollapsed = collapsedColumns.has(coluna.id);
             const oldestAge = getOldestConversaAge(columnConversas);
             const unreadTotal = getUnreadCount(columnConversas);
@@ -517,9 +479,8 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                   }`}
                   style={{ background: isDropTarget ? `${coluna.cor}08` : 'transparent' }}
                   onClick={() => toggleColumnCollapse(coluna.id)}
-                  onDragOver={(e) => handleDragOver(e, coluna.id)}
-                  onDragLeave={handleDragLeave}
-                  onDrop={(e) => handleDrop(e, coluna.id)}
+
+
                 >
                   <div className="flex flex-col items-center gap-3 py-3 border-b border-white/[0.04]">
                     <div
@@ -595,9 +556,8 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                 style={{
                   background: isDropTarget ? `${coluna.cor}08` : 'transparent',
                 }}
-                onDragOver={(e) => handleDragOver(e, coluna.id)}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, coluna.id)}
+
+
               >
                 {/* Column Header */}
                 <div className="flex-shrink-0 px-3 py-2.5 border-b border-white/[0.04]">
@@ -693,8 +653,7 @@ export function AtomConnectKanban({ conversas, searchTerm, deepSearchIds = [], o
                           initial={{ opacity: 0, y: 10 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, scale: 0.95 }}
-                          draggable
-                          onDragStart={(e: any) => handleDragStart(e, conversa)}
+
                           onClick={() => onSelectConversa(conversa)}
                           className={`p-2.5 rounded-lg cursor-pointer transition-all duration-150 group ${
                             slaBreached
