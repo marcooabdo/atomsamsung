@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Calendar, Clock, User, MapPin, ChevronLeft, ChevronRight, Filter, CheckCircle, XCircle, AlertTriangle, FileText, LayoutGrid, Columns2 as Columns } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
@@ -211,14 +211,14 @@ export default function AgendaOperacional() {
     return map;
   }, [rotas]);
 
-  const resolveColor = (ag: AgendamentoOS): string => {
-    if (ag.rota?.cor) return ag.rota.cor;
+  const resolveColor = useCallback((ag: AgendamentoOS): string => {
     if (ag.cliente_cidade) {
       const cor = cidadeCorMap[ag.cliente_cidade.toLowerCase()];
       if (cor) return cor;
     }
+    if (ag.rota?.cor) return ag.rota.cor;
     return '#64748B';
-  };
+  }, [cidadeCorMap]);
 
   const filtrosAtivos = filtros.tecnico_id || filtros.rota_id || filtros.status;
 
