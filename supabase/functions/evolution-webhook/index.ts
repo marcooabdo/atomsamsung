@@ -341,7 +341,12 @@ Deno.serve(async (req: Request) => {
       // GIA report request detection - ONLY in groups
       if (isGroup && !fromMe) {
         const textContent = msg.conversation || msg.extendedTextMessage?.text || "";
-        if (textContent && isGIAReportRequest(textContent)) {
+        if (textContent && isGIARouteCommand(textContent)) {
+          const webhookInstanceName = typeof instance === "string"
+            ? instance
+            : instance?.instanceName || instance?.name || body.instanceName || "Marco";
+          handleGIARouteCommand(supabase, textContent, rawRemoteJid, webhookInstanceName);
+        } else if (textContent && isGIAReportRequest(textContent)) {
           const webhookInstanceName = typeof instance === "string"
             ? instance
             : instance?.instanceName || instance?.name || body.instanceName || "Marco";
@@ -1288,4 +1293,324 @@ async function processRatingResponse(
     .from("atom_connect_conversas")
     .update(updateData)
     .eq("id", conversa.id);
+}
+
+// ====== GIA ROUTE COMMAND HANDLING ======
+
+function isGIARouteCommand(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  if (!lower.includes("gia") && !lower.includes("monta")) return false;
+  return (lower.includes("monta") || lower.includes("montar")) && lower.includes("rota") && (lower.includes("tecnico") || lower.includes("técnico") || lower.includes("para"));
+}
+
+const ROUTE_CMD_PATTERNS = [
+  /monta(?:r)?\s+(?:a\s+)?rota\s+(.+?)\s+(?:para|pro|pra)\s+(?:o\s+)?t[eé]cnico\s+(.+?)\s+(?:da|de)\s+(?:unidade\s+)?(.+?)\s+a\s+partir\s+(?:do\s+)?dia\s+(.+)/i,
+  /monta(?:r)?\s+(?:a\s+)?rota\s+(.+?)\s+(?:para|pro|pra)\s+(?:o\s+)?t[eé]cnico\s+(.+?)\s+(?:da|de)\s+(?:unidade\s+)?(.+)/i,
+];
+
+function parseRouteCmdDate(input?: string): string {
+  if (!input) {
+    const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    return tomorrow.toISOString().split("T")[0];
+  }
+  const clean = input.trim().replace(/^de\s+/i, "").replace(/^do\s+/i, "");
+  const slashMatch = clean.match(/^(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?$/);
+  if (slashMatch) {
+    const day = slashMatch[1].padStart(2, "0");
+    const month = slashMatch[2].padStart(2, "0");
+    const year = slashMatch[3]
+      ? (slashMatch[3].length === 2 ? `20${slashMatch[3]}` : slashMatch[3])
+      : new Date().getFullYear().toString();
+    return `${year}-${month}-${day}`;
+  }
+  const dayOnly = clean.match(/^(\d{1,2})$/);
+  if (dayOnly) {
+    const now = new Date();
+    const day = dayOnly[1].padStart(2, "0");
+    const month = (now.getMonth() + 1).toString().padStart(2, "0");
+    return `${now.getFullYear()}-${month}-${day}`;
+  }
+  return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+}
+
+async function handleGIARouteCommand(supabase: any, text: string, groupJid: string, instanceName: string) {
+  try {
+    let rotaNome = "", tecnicoNome = "", unidadeNome = "", dataStr: string | undefined;
+
+    for (const pattern of ROUTE_CMD_PATTERNS) {
+      const match = text.match(pattern);
+      if (match) {
+        rotaNome = match[1].trim();
+        tecnicoNome = match[2].trim();
+        unidadeNome = match[3].trim();
+        dataStr = match[4]?.trim();
+        break;
+      }
+    }
+
+    if (!rotaNome || !tecnicoNome || !unidadeNome) {
+      console.log("[GIA Route] Could not parse command:", text);
+      return;
+    }
+
+    console.log(`[GIA Route] rota=${rotaNome}, tecnico=${tecnicoNome}, unidade=${unidadeNome}, data=${dataStr || "amanhã"}`);
+
+    // Resolve unidade
+    const { data: unidades } = await supabase
+      .from("unidades")
+      .select("id, nome")
+      .ilike("nome", `%${unidadeNome}%`);
+
+    if (!unidades || unidades.length === 0) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Unidade "${unidadeNome}" não encontrada.`);
+      return;
+    }
+    const unidade = unidades[0];
+
+    // Resolve tecnico
+    const { data: tecnicos } = await supabase
+      .from("usuarios")
+      .select("id, nome")
+      .eq("unidade_id", unidade.id)
+      .eq("ativo", true)
+      .ilike("nome", `%${tecnicoNome}%`);
+
+    if (!tecnicos || tecnicos.length === 0) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Técnico "${tecnicoNome}" não encontrado na unidade ${unidade.nome}.`);
+      return;
+    }
+    const tecnico = tecnicos[0];
+
+    // Resolve rota
+    const { data: rotas } = await supabase
+      .from("rotas")
+      .select("id, nome, coluna_kanban, cor")
+      .eq("unidade_id", unidade.id)
+      .eq("ativa", true)
+      .ilike("nome", `%${rotaNome}%`);
+
+    if (!rotas || rotas.length === 0) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Rota "${rotaNome}" não encontrada na unidade ${unidade.nome}.`);
+      return;
+    }
+    const rota = rotas[0];
+
+    if (!rota.coluna_kanban) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Rota "${rota.nome}" não tem coluna kanban associada.`);
+      return;
+    }
+
+    // Get OS in this route column
+    const { data: osList } = await supabase
+      .from("os")
+      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cidade, endereco_completo, tipo_reparo, lat, lng")
+      .eq("unidade_id", unidade.id)
+      .eq("coluna_kanban", rota.coluna_kanban);
+
+    if (!osList || osList.length === 0) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Nenhuma OS encontrada na ${rota.nome} da unidade ${unidade.nome}.`);
+      return;
+    }
+
+    // Check tipo_reparo
+    const osSemTipo = osList.filter((os: any) => !os.tipo_reparo || os.tipo_reparo.trim() === "");
+    if (osSemTipo.length > 0) {
+      const lista = osSemTipo.slice(0, 5).map((os: any) => {
+        const ref = os.numero_os_samsung || os.numero_os_interna || os.id.substring(0, 8);
+        return `  - ${ref} (${os.cliente_nome})`;
+      }).join("\n");
+      await sendGroupMessage(supabase, instanceName, groupJid,
+        `⚠️ Não posso montar a rota. As seguintes OS estão sem Tipo de Reparo:\n\n${lista}${osSemTipo.length > 5 ? `\n  ... e mais ${osSemTipo.length - 5}` : ""}\n\nPreencha o tipo de reparo e peça novamente.`
+      );
+      return;
+    }
+
+    // Get repair time config
+    const { data: tempos } = await supabase
+      .from("gia_tempos_reparo")
+      .select("tipo_reparo, tempo_minutos")
+      .eq("unidade_id", unidade.id)
+      .eq("ativo", true);
+
+    const tempoMap = new Map((tempos || []).map((t: any) => [t.tipo_reparo.toLowerCase(), t.tempo_minutos]));
+
+    const osSemTempo = osList.filter((os: any) => {
+      const tipo = os.tipo_reparo?.toLowerCase();
+      return tipo && !tempoMap.has(tipo);
+    });
+
+    if (osSemTempo.length > 0) {
+      const tiposFaltantes = [...new Set(osSemTempo.map((os: any) => os.tipo_reparo))];
+      await sendGroupMessage(supabase, instanceName, groupJid,
+        `⚠️ Não posso montar a rota. Os seguintes tipos de reparo não têm tempo cadastrado:\n\n${tiposFaltantes.map((t: string) => `  - ${t}`).join("\n")}\n\nCadastre em Otimizador > Config > Tempos de Reparo.`
+      );
+      return;
+    }
+
+    // Build the plan
+    const dataInicio = parseRouteCmdDate(dataStr);
+    const MAX_MIN_DIA = 8 * 60;
+
+    const paradas = osList.map((os: any, idx: number) => ({
+      os_id: os.id,
+      numero_samsung: os.numero_os_samsung,
+      numero_interno: os.numero_os_interna || os.id.substring(0, 8),
+      cliente_nome: os.cliente_nome,
+      cliente_telefone: os.cliente_telefone,
+      cidade: os.cidade,
+      endereco: os.endereco_completo,
+      tipo_reparo: os.tipo_reparo,
+      tempo_estimado_min: tempoMap.get(os.tipo_reparo.toLowerCase()) || 60,
+      dia: 1,
+      ordem: idx + 1,
+    }));
+
+    // Distribute across days
+    let diaAtual = 1;
+    let tempoAcumulado = 0;
+    for (const parada of paradas) {
+      const tempoParada = parada.tempo_estimado_min + 15;
+      if (tempoAcumulado + tempoParada > MAX_MIN_DIA && tempoAcumulado > 0) {
+        diaAtual++;
+        tempoAcumulado = 0;
+      }
+      parada.dia = diaAtual;
+      tempoAcumulado += tempoParada;
+    }
+
+    for (let dia = 1; dia <= diaAtual; dia++) {
+      const pd = paradas.filter((p: any) => p.dia === dia);
+      pd.forEach((p: any, idx: number) => { p.ordem = idx + 1; });
+    }
+
+    const totalTempo = paradas.reduce((sum: number, p: any) => sum + p.tempo_estimado_min, 0);
+    const diasTotais = Math.max(...paradas.map((p: any) => p.dia));
+
+    // Compute data_fim
+    const dataInicioDate = new Date(dataInicio + "T12:00:00");
+    const dataFimDate = new Date(dataInicioDate);
+    dataFimDate.setDate(dataFimDate.getDate() + diasTotais - 1);
+
+    // Save the plan
+    const { data: planoData, error: planoError } = await supabase
+      .from("gia_planos_rota")
+      .insert({
+        unidade_id: unidade.id,
+        rota_id: rota.id,
+        tecnico_id: tecnico.id,
+        nome_rota: rota.nome,
+        nome_tecnico: tecnico.nome,
+        data_inicio: dataInicio,
+        data_fim: dataFimDate.toISOString().split("T")[0],
+        status: "planejado",
+        total_os: paradas.length,
+        total_tempo_estimado_min: totalTempo,
+      })
+      .select("id")
+      .single();
+
+    if (planoError || !planoData) {
+      console.error("[GIA Route] Error saving plan:", planoError);
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Erro ao salvar o plano. Tente novamente.`);
+      return;
+    }
+
+    // Save paradas
+    const paradasInsert = paradas.map((p: any) => {
+      const dataPrevista = new Date(dataInicioDate);
+      dataPrevista.setDate(dataPrevista.getDate() + p.dia - 1);
+      return {
+        plano_id: planoData.id,
+        os_id: p.os_id,
+        dia: p.dia,
+        data_prevista: dataPrevista.toISOString().split("T")[0],
+        ordem: p.ordem,
+        tipo_reparo: p.tipo_reparo,
+        tempo_estimado_min: p.tempo_estimado_min,
+        status: "pendente",
+        os_numero_samsung: p.numero_samsung,
+        os_numero_interno: p.numero_interno,
+        cliente_nome: p.cliente_nome,
+        cliente_telefone: p.cliente_telefone,
+        cidade: p.cidade,
+        endereco: p.endereco,
+        pecas_json: [],
+      };
+    });
+
+    await supabase.from("gia_plano_paradas").insert(paradasInsert);
+
+    // Build summary message
+    const horas = Math.floor(totalTempo / 60);
+    const minutos = totalTempo % 60;
+    const dataFormatada = dataInicioDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+
+    let msg = `✅ *Rota montada: ${rota.nome}*\n`;
+    msg += `👤 Técnico: ${tecnico.nome}\n`;
+    msg += `📅 Início: ${dataFormatada}\n`;
+    msg += `📊 Total: ${paradas.length} OS em ${diasTotais} dia(s)\n`;
+    msg += `⏱️ Tempo estimado: ${horas}h${minutos > 0 ? `${minutos}min` : ""}\n\n`;
+
+    for (let dia = 1; dia <= Math.min(diasTotais, 3); dia++) {
+      const pd = paradas.filter((p: any) => p.dia === dia);
+      const dataDia = new Date(dataInicioDate);
+      dataDia.setDate(dataDia.getDate() + dia - 1);
+      const dataDiaStr = dataDia.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+      msg += `*Dia ${dia} (${dataDiaStr}):* ${pd.length} OS\n`;
+      for (const p of pd.slice(0, 8)) {
+        const ref = p.numero_samsung || p.numero_interno;
+        msg += `  ${p.ordem}. ${ref} - ${p.cliente_nome} (${p.cidade || "?"}) | ${p.tipo_reparo} ${p.tempo_estimado_min}min\n`;
+      }
+      if (pd.length > 8) {
+        msg += `  ... +${pd.length - 8} OS\n`;
+      }
+      msg += "\n";
+    }
+    if (diasTotais > 3) {
+      msg += `... +${diasTotais - 3} dias restantes\n\n`;
+    }
+    msg += `🔗 Acompanhe no ATOM > Otimizador > GIA Rotas`;
+
+    await sendGroupMessage(supabase, instanceName, groupJid, msg);
+  } catch (err) {
+    console.error("[GIA Route] Error:", err);
+  }
+}
+
+async function sendGroupMessage(supabase: any, instanceName: string, groupJid: string, text: string) {
+  try {
+    const { data: instancia } = await supabase
+      .from("atom_connect_instancias")
+      .select("api_url, api_key, instance_name")
+      .eq("instance_name", instanceName)
+      .maybeSingle();
+
+    if (!instancia) {
+      // Fallback: get first instancia
+      const { data: fallback } = await supabase
+        .from("atom_connect_instancias")
+        .select("api_url, api_key, instance_name")
+        .limit(1)
+        .maybeSingle();
+
+      if (!fallback) {
+        console.error("[GIA Route] No WhatsApp instance found");
+        return;
+      }
+      await fetch(`${fallback.api_url}/message/sendText/${fallback.instance_name}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: fallback.api_key },
+        body: JSON.stringify({ number: groupJid, text }),
+      });
+      return;
+    }
+
+    await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+      body: JSON.stringify({ number: groupJid, text }),
+    });
+  } catch (err) {
+    console.error("[GIA Route] Error sending message:", err);
+  }
 }
