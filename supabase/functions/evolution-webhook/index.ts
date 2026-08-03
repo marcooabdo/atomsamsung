@@ -370,6 +370,15 @@ Deno.serve(async (req: Request) => {
       let targetInstancia = instancia;
 
       if (!targetInstancia) {
+        // For group messages, do NOT fallback to another instance
+        // as this would create the group in the wrong unit
+        if (isGroup) {
+          return new Response(JSON.stringify({ skip: "group_no_matching_instance" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+
         const { data: fallbackInstancia } = await supabase
           .from("atom_connect_instancias")
           .select("id, unidade_id, api_url, api_key, instance_name")
