@@ -1901,10 +1901,20 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     }
 
     try {
-      await sendGroupImageViaStorage(supabase, mapUrl, mapUrlFallback, caption.trim());
+      // Send map link as text with the legend caption
+      const mapLink = buildGeoapifyMapUrl(baseLat, baseLng, paradasCoords);
+      let mapMsg = `🗺️ *MAPA DA ROTA: ${rota.nome}*\n`;
+      mapMsg += `👤 ${tecnico.nome} | 📅 ${dataFormatada}\n\n`;
+      mapMsg += `📍 *Legenda:*\n`;
+      mapMsg += `🟢 *B* = Base (${unidade.nome})\n`;
+      for (const p of paradas) {
+        const ref = p.numero_samsung || p.numero_interno;
+        mapMsg += `🔴 *${p.ordem}* = ${ref} — ${p.cliente_nome} (${p.cidade})\n`;
+      }
+      mapMsg += `\n🔗 ${mapLink}`;
+      await sendGroupMessage(supabase, instanceName, groupJid, mapMsg);
     } catch (imgErr: any) {
-      console.error("[GIA Route] Error sending map:", imgErr?.message || imgErr);
-      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Não consegui enviar a imagem do mapa. Erro: ${imgErr?.message || "desconhecido"}`);
+      console.error("[GIA Route] Error sending map link:", imgErr?.message || imgErr);
     }
 
     // Small delay so image arrives first
