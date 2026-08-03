@@ -189,7 +189,7 @@ export default function GIARotasPanel() {
           <Route className="w-16 h-16 text-gray-600 mx-auto mb-4" />
           <p className="text-gray-400 text-lg">Nenhum plano de rota criado ainda.</p>
           <p className="text-gray-500 text-sm mt-2">
-            Peça para a GIA montar uma rota: "GIA, monta a rota [nome] de [unidade] para o técnico [nome]"
+            Peça para a GIA montar uma rota: "GIA monta a rota [nome] para o técnico [nome] da unidade [nome] a partir do dia [data]"
           </p>
         </div>
       ) : (

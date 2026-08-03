@@ -4,20 +4,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { AgendamentoChecklistSection } from './AgendamentoChecklistSection';
 
-const TIPOS_REPARO_IH = [
-  'Troca de placa',
-  'Troca de painel',
-  'Troca de Open Cell',
-  'Troca de compressor',
-  'Troca de cesto',
-  'Troca de serpentina',
-  'Troca de peça (simples)',
-  'Coleta/Entrega',
-  'Coleta',
-  'Visita Técnica',
-  'Instalação Inicial'
-];
-
 interface OSAgendamentoTabProps {
   osId: string;
   unidadeId: string;
@@ -67,6 +53,9 @@ export function OSAgendamentoTab({
   const [novoTipoReparo, setNovoTipoReparo] = useState('');
   const [mostrarNovoTipo, setMostrarNovoTipo] = useState(false);
   const [tiposCustom, setTiposCustom] = useState<string[]>([]);
+  const [tipoReparoLocal, setTipoReparoLocal] = useState(tipoReparo || '');
+  const [salvandoTipoReparo, setSalvandoTipoReparo] = useState(false);
+  const [tipoReparoSalvo, setTipoReparoSalvo] = useState(false);
 
 
 
@@ -195,11 +184,7 @@ export function OSAgendamentoTab({
         return;
       }
 
-      if (tipoAtendimento === 'IH' && !formData.tipo_reparo) {
-        setErro('Tipo de Reparo e obrigatorio para atendimentos IH');
-        setSalvando(false);
-        return;
-      }
+
 
       // Check if there's an existing visit without check-in that we can update
       const visitaSemCheckin = todosAgendamentos.find(a => !a.checkin_realizado && a.status !== 'cancelado');
@@ -211,7 +196,6 @@ export function OSAgendamentoTab({
         tecnico_agendado_id: formData.tecnico_agendado_id,
         confirmado_com_cliente: formData.confirmado_com_cliente,
         periodo_agendamento: formData.periodo_agendamento || null,
-        tipo_reparo: tipoAtendimento === 'IH' ? (formData.tipo_reparo || null) : null,
         updated_at: new Date().toISOString()
       };
 
@@ -376,8 +360,106 @@ export function OSAgendamentoTab({
     }
   };
 
+  const handleSalvarTipoReparo = async () => {
+    if (!tipoReparoLocal) return;
+    setSalvandoTipoReparo(true);
+    try {
+      const { error } = await supabase
+        .from('os')
+        .update({ tipo_reparo: tipoReparoLocal, updated_at: new Date().toISOString() })
+        .eq('id', osId);
+      if (error) throw error;
+      setTipoReparoSalvo(true);
+      setTimeout(() => setTipoReparoSalvo(false), 3000);
+    } catch {
+      setErro('Erro ao salvar tipo de reparo');
+    } finally {
+      setSalvandoTipoReparo(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
+      {/* TIPO DE REPARO - Seção independente */}
+      <div className="bg-gray-800/40 border border-gray-700/50 rounded-xl p-4">
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Wrench className="w-4 h-4 text-cyan-400" />
+            Tipo de Reparo
+          </h4>
+          {tipoReparoSalvo && (
+            <span className="text-xs text-green-400 font-medium">Salvo!</span>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="flex-1">
+            {mostrarNovoTipo ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={novoTipoReparo}
+                  onChange={(e) => setNovoTipoReparo(e.target.value)}
+                  placeholder="Digite o novo tipo..."
+                  className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
+                />
+                <button
+                  onClick={() => {
+                    if (novoTipoReparo.trim()) {
+                      setTiposCustom(prev => [...prev, novoTipoReparo.trim()]);
+                      setTipoReparoLocal(novoTipoReparo.trim());
+                      setNovoTipoReparo('');
+                      setMostrarNovoTipo(false);
+                    }
+                  }}
+                  className="px-3 py-2 bg-cyan-600 hover:bg-cyan-700 rounded-lg text-white text-sm"
+                >
+                  OK
+                </button>
+                <button
+                  onClick={() => { setMostrarNovoTipo(false); setNovoTipoReparo(''); }}
+                  className="px-3 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg text-white text-sm"
+                >
+                  X
+                </button>
+              </div>
+            ) : (
+              <select
+                value={tipoReparoLocal}
+                onChange={(e) => setTipoReparoLocal(e.target.value)}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-sm focus:outline-none focus:border-cyan-500"
+              >
+                <option value="">Selecione o tipo de reparo</option>
+                {[
+                  'Troca de painel', 'Troca de placa', 'Troca de compressor',
+                  'Troca de Open Cell', 'Troca de peça (simples)', 'Troca de peca (simples)',
+                  'Troca de serpentina', 'Instalação Inicial', 'Visita Técnica',
+                  'Coleta', 'Coleta/Entrega', 'Borracha',
+                  ...tiposCustom
+                ].map(tipo => (
+                  <option key={tipo} value={tipo}>{tipo}</option>
+                ))}
+              </select>
+            )}
+          </div>
+          {!mostrarNovoTipo && (
+            <button
+              onClick={() => setMostrarNovoTipo(true)}
+              className="p-2 text-gray-400 hover:text-cyan-400 transition-colors"
+              title="Adicionar novo tipo"
+            >
+              <Plus className="w-4 h-4" />
+            </button>
+          )}
+          <button
+            onClick={handleSalvarTipoReparo}
+            disabled={!tipoReparoLocal || salvandoTipoReparo}
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-white text-sm font-medium transition-colors"
+          >
+            {salvandoTipoReparo ? 'Salvando...' : 'Salvar'}
+          </button>
+        </div>
+      </div>
+
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-semibold text-[#00D4FF] mb-2">
@@ -425,82 +507,6 @@ export function OSAgendamentoTab({
             </button>
           </div>
         </div>
-
-        {tipoAtendimento === 'IH' && (
-          <div>
-            <label className="block text-sm font-semibold text-[#00D4FF] mb-2">
-              <Wrench className="w-4 h-4 inline mr-2" />
-              Tipo de Reparo *
-            </label>
-            <select
-              value={formData.tipo_reparo}
-              onChange={(e) => setFormData({ ...formData, tipo_reparo: e.target.value })}
-              className="neon-input w-full"
-            >
-              <option value="">Selecione o tipo de reparo</option>
-              {[...TIPOS_REPARO_IH, ...tiposCustom].map((tipo) => (
-                <option key={tipo} value={tipo}>
-                  {tipo}
-                </option>
-              ))}
-            </select>
-
-            {!mostrarNovoTipo ? (
-              <button
-                type="button"
-                onClick={() => setMostrarNovoTipo(true)}
-                className="mt-2 flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all duration-200"
-                style={{ color: '#FFA500', background: 'rgba(255,165,0,0.08)', border: '1px solid rgba(255,165,0,0.25)' }}
-                onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,165,0,0.15)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,165,0,0.08)'; }}
-              >
-                <Plus className="w-3.5 h-3.5" />
-                ADICIONAR NOVO TIPO
-              </button>
-            ) : (
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  type="text"
-                  value={novoTipoReparo}
-                  onChange={(e) => setNovoTipoReparo(e.target.value)}
-                  placeholder="Nome do novo tipo..."
-                  className="neon-input flex-1 text-sm"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && novoTipoReparo.trim()) {
-                      setTiposCustom(prev => [...prev, novoTipoReparo.trim()]);
-                      setFormData({ ...formData, tipo_reparo: novoTipoReparo.trim() });
-                      setNovoTipoReparo('');
-                      setMostrarNovoTipo(false);
-                    }
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (novoTipoReparo.trim()) {
-                      setTiposCustom(prev => [...prev, novoTipoReparo.trim()]);
-                      setFormData({ ...formData, tipo_reparo: novoTipoReparo.trim() });
-                      setNovoTipoReparo('');
-                      setMostrarNovoTipo(false);
-                    }
-                  }}
-                  className="p-2 rounded-lg transition-all duration-200"
-                  style={{ color: '#39FF14', background: 'rgba(57,255,20,0.10)', border: '1px solid rgba(57,255,20,0.3)' }}
-                >
-                  <CheckCircle className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { setMostrarNovoTipo(false); setNovoTipoReparo(''); }}
-                  className="p-2 rounded-lg transition-all duration-200"
-                  style={{ color: '#EF4444', background: 'rgba(239,68,68,0.10)', border: '1px solid rgba(239,68,68,0.3)' }}
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
         <div>
           <label className="block text-sm font-semibold text-[#00D4FF] mb-2">

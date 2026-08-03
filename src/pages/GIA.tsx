@@ -508,7 +508,7 @@ export function GIA() {
                     'Analise o faturamento do mês',
                     'Quais pecas estao em falta?',
                     'Produtividade da equipe',
-                    'Monta a rota rosa de Montes Claros para o técnico Erick',
+                    'Monta a rota rosa para o técnico Erick da unidade Montes Claros a partir do dia 10/08',
                   ].map((suggestion) => (
                     <motion.button
                       key={suggestion}
