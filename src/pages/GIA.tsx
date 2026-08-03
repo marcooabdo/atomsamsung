@@ -5,6 +5,8 @@ import { GIAConversation, type GIAMessage, type GIACardData } from '../component
 import { GIAInputController } from '../components/gia/GIAInputController';
 import { createMockAIStream } from '../components/gia/mockAIStream';
 import type { CardData } from '../components/gia/giaScript';
+import { isRouteCommand, handleRouteCommand, confirmAndSaveRoute, type RouteCommandResult } from '../components/gia/giaRouteHandler';
+import type { GIARotaPlan } from '../lib/giaRouteService';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { speakGia, stopGiaSpeaking } from '../lib/elevenLabsTTS';
@@ -206,6 +208,8 @@ export function GIA() {
     }, 800);
   }, []);
 
+  const pendingPlanRef = useRef<GIARotaPlan | null>(null);
+
   const sendMessageAPI = useCallback(async (text: string) => {
     if (!usuario) return;
     setIsProcessing(true);
@@ -219,6 +223,66 @@ export function GIA() {
     };
     setMessages(prev => [...prev, userMessage]);
     setAiState('thinking');
+
+    // Handle route plan confirmation
+    if (pendingPlanRef.current && (text.toLowerCase().includes('sim') || text.toLowerCase().includes('seguir') || text.toLowerCase().includes('confirma'))) {
+      const plan = pendingPlanRef.current;
+      pendingPlanRef.current = null;
+      const response = await confirmAndSaveRoute(plan, usuario.id);
+      setAiState('speaking');
+      await streamResponse(response);
+      const aiMsg: GIAMessage = { id: `ai-${Date.now()}`, role: 'assistant', content: response, timestamp: Date.now() };
+      setMessages(prev => [...prev, aiMsg]);
+      setAiState('idle');
+      setIsProcessing(false);
+      return;
+    }
+    if (pendingPlanRef.current && (text.toLowerCase().includes('não') || text.toLowerCase().includes('nao') || text.toLowerCase().includes('cancel'))) {
+      pendingPlanRef.current = null;
+      const response = 'OK, rota cancelada. Peça novamente quando quiser.';
+      setAiState('speaking');
+      await streamResponse(response);
+      const aiMsg: GIAMessage = { id: `ai-${Date.now()}`, role: 'assistant', content: response, timestamp: Date.now() };
+      setMessages(prev => [...prev, aiMsg]);
+      setAiState('idle');
+      setIsProcessing(false);
+      return;
+    }
+
+    // Handle route commands locally
+    if (isRouteCommand(text)) {
+      try {
+        const result = await handleRouteCommand(text);
+        if (result.handled) {
+          let response = '';
+          if (result.needsConfirmation && result.plan) {
+            pendingPlanRef.current = result.plan;
+            response = result.confirmationMessage || '';
+          } else if (result.plan && result.response) {
+            const savedResponse = await confirmAndSaveRoute(result.plan, usuario.id);
+            response = savedResponse;
+          } else {
+            response = result.response || 'Comando processado.';
+          }
+          setAiState('speaking');
+          await streamResponse(response);
+          const aiMsg: GIAMessage = { id: `ai-${Date.now()}`, role: 'assistant', content: response, timestamp: Date.now() };
+          setMessages(prev => [...prev, aiMsg]);
+          setAiState('idle');
+          setIsProcessing(false);
+          return;
+        }
+      } catch (err) {
+        const errResponse = `Erro ao processar comando de rota: ${err instanceof Error ? err.message : 'erro desconhecido'}`;
+        setAiState('speaking');
+        await streamResponse(errResponse);
+        const aiMsg: GIAMessage = { id: `ai-${Date.now()}`, role: 'assistant', content: errResponse, timestamp: Date.now() };
+        setMessages(prev => [...prev, aiMsg]);
+        setAiState('idle');
+        setIsProcessing(false);
+        return;
+      }
+    }
 
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -444,6 +508,7 @@ export function GIA() {
                     'Analise o faturamento do mês',
                     'Quais pecas estao em falta?',
                     'Produtividade da equipe',
+                    'Monta a rota rosa de Montes Claros para o técnico Erick',
                   ].map((suggestion) => (
                     <motion.button
                       key={suggestion}

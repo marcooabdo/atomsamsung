@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Cog, Save, Clock, MapPin, Bell, Eye, Settings, AlertTriangle } from 'lucide-react';
+import { Cog, Save, Clock, MapPin, Bell, Eye, Settings, AlertTriangle, Timer } from 'lucide-react';
 import { useOtimizador } from '../../contexts/OtimizadorContext';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfiguracaoPrioridades from './ConfiguracaoPrioridades';
+import ConfiguracaoTemposReparo from './ConfiguracaoTemposReparo';
 
 interface ConfigOtimizador {
   tempo_medio_ih: number;
@@ -33,7 +34,7 @@ export default function ConfiguracaoOtimizador() {
   });
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
-  const [activeTab, setActiveTab] = useState<'geral' | 'prioridades'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'prioridades' | 'tempos_reparo'>('geral');
 
   useEffect(() => {
     if (selectedUnidade) {
@@ -129,7 +130,18 @@ export default function ConfiguracaoOtimizador() {
           }`}
         >
           <Settings className="w-5 h-5" />
-          <span className="font-medium">Configurações Gerais</span>
+          <span className="font-medium">Gerais</span>
+        </button>
+        <button
+          onClick={() => setActiveTab('tempos_reparo')}
+          className={`flex items-center gap-2 px-4 py-3 rounded-lg transition-all flex-1 ${
+            activeTab === 'tempos_reparo'
+              ? 'bg-gradient-to-r from-cyan-700 to-teal-600 text-white'
+              : 'text-gray-400 hover:bg-gray-700/50'
+          }`}
+        >
+          <Timer className="w-5 h-5" />
+          <span className="font-medium">Tempos de Reparo</span>
         </button>
         <button
           onClick={() => setActiveTab('prioridades')}
@@ -140,11 +152,13 @@ export default function ConfiguracaoOtimizador() {
           }`}
         >
           <AlertTriangle className="w-5 h-5" />
-          <span className="font-medium">Regras de Prioridade</span>
+          <span className="font-medium">Prioridades</span>
         </button>
       </div>
 
-      {activeTab === 'geral' ? (
+      {activeTab === 'tempos_reparo' ? (
+        <ConfiguracaoTemposReparo />
+      ) : activeTab === 'geral' ? (
         <>
           {!canEdit && (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4">

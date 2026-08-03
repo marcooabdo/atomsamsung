@@ -14,7 +14,8 @@ export type OtimizadorTab =
   | 'analytics'
   | 'config'
   | 'despacho'
-  | 'historico';
+  | 'historico'
+  | 'gia_rotas';
 
 interface Unidade {
   id: string;
