@@ -1337,6 +1337,179 @@ function parseRouteCmdDate(input?: string): string {
   return new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 }
 
+// ===== GIA Route: Evolution API helpers (uses system_secrets, same as gia-send-relatorio) =====
+const ROUTE_GROUP_JID = "120363427351181397@g.us";
+const GOOGLE_MAPS_KEY = Deno.env.get("GOOGLE_MAPS_API_KEY") || "";
+
+async function getEvolutionConfig(supabase: any): Promise<{ api_url: string; api_key: string; instance_name: string }> {
+  const { data: secrets } = await supabase
+    .from("system_secrets")
+    .select("key, value")
+    .in("key", ["EVOLUTION_API_URL", "EVOLUTION_API_KEY", "EVOLUTION_INSTANCE_NAME"]);
+
+  const m: Record<string, string> = {};
+  for (const s of secrets || []) m[s.key] = s.value;
+
+  if (!m.EVOLUTION_API_URL || !m.EVOLUTION_API_KEY || !m.EVOLUTION_INSTANCE_NAME) {
+    throw new Error("Evolution API config missing in system_secrets");
+  }
+  return { api_url: m.EVOLUTION_API_URL, api_key: m.EVOLUTION_API_KEY, instance_name: m.EVOLUTION_INSTANCE_NAME };
+}
+
+async function sendGroupMessage(supabase: any, _instanceName: string, _groupJid: string, text: string) {
+  const cfg = await getEvolutionConfig(supabase);
+  const resp = await fetch(`${cfg.api_url}/message/sendText/${cfg.instance_name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: cfg.api_key },
+    body: JSON.stringify({ number: ROUTE_GROUP_JID, text }),
+  });
+  const body = await resp.text();
+  console.log(`[GIA Route] sendText to ${ROUTE_GROUP_JID} status=${resp.status} body=${body.substring(0, 200)}`);
+  if (!resp.ok) throw new Error(`sendText failed: ${resp.status} - ${body}`);
+}
+
+async function sendGroupImage(supabase: any, imageUrl: string, caption: string) {
+  const cfg = await getEvolutionConfig(supabase);
+  const resp = await fetch(`${cfg.api_url}/message/sendMedia/${cfg.instance_name}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", apikey: cfg.api_key },
+    body: JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: imageUrl, caption }),
+  });
+  const body = await resp.text();
+  console.log(`[GIA Route] sendMedia to ${ROUTE_GROUP_JID} status=${resp.status} body=${body.substring(0, 200)}`);
+  if (!resp.ok) throw new Error(`sendMedia failed: ${resp.status} - ${body}`);
+}
+
+// ===== Geocoding =====
+async function geocodeAddress(address: string): Promise<{ lat: number; lng: number } | null> {
+  if (!GOOGLE_MAPS_KEY) return null;
+  const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${GOOGLE_MAPS_KEY}&region=br&language=pt-BR`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.status === "OK" && data.results?.[0]?.geometry?.location) {
+      const loc = data.results[0].geometry.location;
+      return { lat: loc.lat, lng: loc.lng };
+    }
+    console.log(`[GIA Route] Geocode failed for "${address}": ${data.status}`);
+    return null;
+  } catch (e) {
+    console.error("[GIA Route] Geocode error:", e);
+    return null;
+  }
+}
+
+// ===== Route optimization (nearest neighbor with smart direction) =====
+function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+interface OSWithCoords {
+  os_id: string;
+  numero_samsung: string | null;
+  numero_interno: string;
+  cliente_nome: string;
+  cliente_telefone: string;
+  cidade: string;
+  endereco: string;
+  tipo_reparo: string;
+  tempo_estimado_min: number;
+  lat: number;
+  lng: number;
+  created_at: string;
+  distFromBase: number;
+}
+
+function optimizeRouteOrder(osItems: OSWithCoords[], baseLat: number, baseLng: number): OSWithCoords[] {
+  if (osItems.length <= 1) return osItems;
+
+  // Calculate distance from base for each
+  for (const os of osItems) {
+    os.distFromBase = haversineKm(baseLat, baseLng, os.lat, os.lng);
+  }
+
+  // Determine direction: check which half has older OS
+  const sorted = [...osItems].sort((a, b) => a.distFromBase - b.distFromBase);
+  const mid = Math.ceil(sorted.length / 2);
+  const closeHalf = sorted.slice(0, mid);
+  const farHalf = sorted.slice(mid);
+
+  const avgAgeClose = closeHalf.reduce((sum, os) => sum + new Date().getTime() - new Date(os.created_at).getTime(), 0) / closeHalf.length;
+  const avgAgeFar = farHalf.length > 0
+    ? farHalf.reduce((sum, os) => sum + new Date().getTime() - new Date(os.created_at).getTime(), 0) / farHalf.length
+    : 0;
+
+  // If far OS are older on average, start from furthest (reverse nearest neighbor)
+  const startFar = avgAgeFar > avgAgeClose;
+  console.log(`[GIA Route] Direction: ${startFar ? "far first" : "close first"} (avgAge close=${Math.round(avgAgeClose / 86400000)}d, far=${Math.round(avgAgeFar / 86400000)}d)`);
+
+  // Nearest neighbor algorithm
+  const result: OSWithCoords[] = [];
+  const remaining = new Set(osItems.map((_, i) => i));
+
+  // Pick starting point
+  let currentLat: number, currentLng: number;
+  if (startFar) {
+    // Start from the furthest OS from base
+    let maxDist = -1, startIdx = 0;
+    for (const i of remaining) {
+      if (osItems[i].distFromBase > maxDist) { maxDist = osItems[i].distFromBase; startIdx = i; }
+    }
+    remaining.delete(startIdx);
+    result.push(osItems[startIdx]);
+    currentLat = osItems[startIdx].lat;
+    currentLng = osItems[startIdx].lng;
+  } else {
+    // Start from the closest to base
+    let minDist = Infinity, startIdx = 0;
+    for (const i of remaining) {
+      if (osItems[i].distFromBase < minDist) { minDist = osItems[i].distFromBase; startIdx = i; }
+    }
+    remaining.delete(startIdx);
+    result.push(osItems[startIdx]);
+    currentLat = osItems[startIdx].lat;
+    currentLng = osItems[startIdx].lng;
+  }
+
+  // Visit nearest unvisited
+  while (remaining.size > 0) {
+    let nearestIdx = -1, nearestDist = Infinity;
+    for (const i of remaining) {
+      const d = haversineKm(currentLat, currentLng, osItems[i].lat, osItems[i].lng);
+      if (d < nearestDist) { nearestDist = d; nearestIdx = i; }
+    }
+    remaining.delete(nearestIdx);
+    result.push(osItems[nearestIdx]);
+    currentLat = osItems[nearestIdx].lat;
+    currentLng = osItems[nearestIdx].lng;
+  }
+
+  return result;
+}
+
+// ===== Static Map URL generator =====
+function buildStaticMapUrl(baseLat: number, baseLng: number, paradas: { lat: number; lng: number; ordem: number }[]): string {
+  const markers: string[] = [];
+  // Base marker (green)
+  markers.push(`markers=color:green|label:B|${baseLat},${baseLng}`);
+  // Stop markers (red, numbered)
+  for (const p of paradas) {
+    const label = p.ordem <= 9 ? String(p.ordem) : "X";
+    markers.push(`markers=color:red|label:${label}|${p.lat},${p.lng}`);
+  }
+  // Path connecting base -> stops in order
+  const pathPoints = [`${baseLat},${baseLng}`, ...paradas.map(p => `${p.lat},${p.lng}`)];
+  const path = `path=color:0x4285F4FF|weight:4|${pathPoints.join("|")}`;
+
+  const url = `https://maps.googleapis.com/maps/api/staticmap?size=600x400&maptype=roadmap&${markers.join("&")}&${path}&key=${GOOGLE_MAPS_KEY}`;
+  return url;
+}
+
+// ===== Main route handler =====
 async function handleGIARouteCommand(supabase: any, text: string, groupJid: string, instanceName: string) {
   console.log(`[GIA Route] Processing command: "${text}" from group ${groupJid} via instance ${instanceName}`);
   try {
@@ -1360,10 +1533,10 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
 
     console.log(`[GIA Route] rota=${rotaNome}, tecnico=${tecnicoNome}, unidade=${unidadeNome}, data=${dataStr || "amanhã"}`);
 
-    // Resolve unidade
+    // Resolve unidade (with coordinates)
     const { data: unidades } = await supabase
       .from("unidades")
-      .select("id, nome")
+      .select("id, nome, latitude, longitude")
       .ilike("nome", `%${unidadeNome}%`);
 
     if (!unidades || unidades.length === 0) {
@@ -1371,6 +1544,8 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       return;
     }
     const unidade = unidades[0];
+    const baseLat = parseFloat(unidade.latitude) || -12.2664;
+    const baseLng = parseFloat(unidade.longitude) || -38.9663;
 
     // Resolve tecnico
     const { data: tecnicos } = await supabase
@@ -1408,7 +1583,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     // Get OS in this route column
     const { data: osList } = await supabase
       .from("os")
-      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cliente_cidade, cliente_endereco, tipo_reparo, lat, lng")
+      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cliente_cidade, cliente_endereco, tipo_reparo, lat, lng, created_at")
       .eq("unidade_id", unidade.id)
       .eq("coluna_kanban", rota.coluna_kanban);
 
@@ -1417,16 +1592,58 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       return;
     }
 
-    // Check tipo_reparo
+    // --- BLOCK: Check endereco/cidade ---
+    const osSemEndereco = osList.filter((os: any) => !os.cliente_endereco?.trim() || !os.cliente_cidade?.trim());
+    if (osSemEndereco.length > 0) {
+      const lista = osSemEndereco.slice(0, 8).map((os: any) => {
+        const ref = os.numero_os_samsung || os.numero_os_interna || os.id.substring(0, 8);
+        const falta = !os.cliente_endereco?.trim() ? "endereço" : "cidade";
+        return `  - ${ref} (${os.cliente_nome}) - falta ${falta}`;
+      }).join("\n");
+      await sendGroupMessage(supabase, instanceName, groupJid,
+        `⚠️ Não posso montar a rota. As seguintes OS estão sem endereço/cidade:\n\n${lista}${osSemEndereco.length > 8 ? `\n  ... e mais ${osSemEndereco.length - 8}` : ""}\n\nPreencha o endereço completo e peça novamente.`
+      );
+      return;
+    }
+
+    // --- BLOCK: Check tipo_reparo ---
     const osSemTipo = osList.filter((os: any) => !os.tipo_reparo || os.tipo_reparo.trim() === "");
     if (osSemTipo.length > 0) {
-      const lista = osSemTipo.slice(0, 5).map((os: any) => {
+      const lista = osSemTipo.slice(0, 8).map((os: any) => {
         const ref = os.numero_os_samsung || os.numero_os_interna || os.id.substring(0, 8);
         return `  - ${ref} (${os.cliente_nome})`;
       }).join("\n");
       await sendGroupMessage(supabase, instanceName, groupJid,
-        `⚠️ Não posso montar a rota. As seguintes OS estão sem Tipo de Reparo:\n\n${lista}${osSemTipo.length > 5 ? `\n  ... e mais ${osSemTipo.length - 5}` : ""}\n\nPreencha o tipo de reparo e peça novamente.`
+        `⚠️ Não posso montar a rota. As seguintes OS estão sem Tipo de Reparo:\n\n${lista}${osSemTipo.length > 8 ? `\n  ... e mais ${osSemTipo.length - 8}` : ""}\n\nPreencha o tipo de reparo e peça novamente.`
       );
+      return;
+    }
+
+    // --- GEOCODE OS without coordinates ---
+    for (const os of osList) {
+      if (os.lat && os.lng) continue;
+      const fullAddress = `${os.cliente_endereco}, ${os.cliente_cidade}, Brasil`;
+      const coords = await geocodeAddress(fullAddress);
+      if (coords) {
+        os.lat = coords.lat;
+        os.lng = coords.lng;
+        // Save to DB for cache
+        await supabase.from("os").update({ lat: coords.lat, lng: coords.lng }).eq("id", os.id);
+        console.log(`[GIA Route] Geocoded OS ${os.numero_os_interna}: ${coords.lat},${coords.lng}`);
+      } else {
+        console.log(`[GIA Route] Could not geocode OS ${os.numero_os_interna}: "${fullAddress}"`);
+      }
+    }
+
+    // Filter out OS that still have no coords (should be rare)
+    const osWithCoords = osList.filter((os: any) => os.lat && os.lng);
+    const osWithoutCoords = osList.filter((os: any) => !os.lat || !os.lng);
+    if (osWithoutCoords.length > 0) {
+      const refs = osWithoutCoords.map((os: any) => os.numero_os_samsung || os.numero_os_interna).join(", ");
+      console.log(`[GIA Route] ${osWithoutCoords.length} OS without coords (skipped): ${refs}`);
+    }
+    if (osWithCoords.length === 0) {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Não consegui localizar nenhuma OS no mapa. Verifique os endereços.`);
       return;
     }
 
@@ -1439,31 +1656,8 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
 
     const tempoMap = new Map((tempos || []).map((t: any) => [t.tipo_reparo.toLowerCase(), t.tempo_minutos]));
 
-    const osSemTempo = osList.filter((os: any) => {
-      const tipo = os.tipo_reparo?.toLowerCase();
-      return tipo && !tempoMap.has(tipo);
-    });
-
-    if (osSemTempo.length > 0) {
-      const tiposFaltantes = [...new Set(osSemTempo.map((os: any) => os.tipo_reparo))];
-      await sendGroupMessage(supabase, instanceName, groupJid,
-        `⚠️ Os seguintes tipos de reparo não têm tempo cadastrado (usando 60min como padrão):\n\n${tiposFaltantes.map((t: string) => `  - ${t}`).join("\n")}\n\nCadastre em Otimizador > Config > Tempos de Reparo para maior precisão.`
-      );
-    }
-
-    // Build the plan
-    const dataInicio = parseRouteCmdDate(dataStr);
-
-    // Calculate available work minutes from technician config
-    const horaInicioStr = tecnico.horario_inicio_expediente || "08:00";
-    const horaFimStr = tecnico.horario_fim_expediente || "17:00";
-    const tempoAlmoco = tecnico.duracao_almoco_minutos || 60;
-    const [hI, mI] = horaInicioStr.split(":").map(Number);
-    const [hF, mF] = horaFimStr.split(":").map(Number);
-    const totalMinutosDia = (hF * 60 + mF) - (hI * 60 + mI);
-    const MAX_MIN_DIA = totalMinutosDia - tempoAlmoco;
-
-    const paradas = osList.map((os: any, idx: number) => ({
+    // Build OS items with all data
+    const osItems: OSWithCoords[] = osWithCoords.map((os: any) => ({
       os_id: os.id,
       numero_samsung: os.numero_os_samsung,
       numero_interno: os.numero_os_interna || os.id.substring(0, 8),
@@ -1473,15 +1667,42 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       endereco: os.cliente_endereco,
       tipo_reparo: os.tipo_reparo,
       tempo_estimado_min: tempoMap.get(os.tipo_reparo.toLowerCase()) || 60,
+      lat: parseFloat(os.lat),
+      lng: parseFloat(os.lng),
+      created_at: os.created_at,
+      distFromBase: 0,
+    }));
+
+    // --- OPTIMIZE: nearest neighbor with smart direction ---
+    const optimized = optimizeRouteOrder(osItems, baseLat, baseLng);
+
+    // Calculate total route distance
+    let totalKm = haversineKm(baseLat, baseLng, optimized[0].lat, optimized[0].lng);
+    for (let i = 1; i < optimized.length; i++) {
+      totalKm += haversineKm(optimized[i - 1].lat, optimized[i - 1].lng, optimized[i].lat, optimized[i].lng);
+    }
+    totalKm = Math.round(totalKm * 10) / 10;
+
+    // Build the plan with time distribution
+    const dataInicio = parseRouteCmdDate(dataStr);
+    const horaInicioStr = tecnico.horario_inicio_expediente || "08:00";
+    const horaFimStr = tecnico.horario_fim_expediente || "17:00";
+    const tempoAlmoco = tecnico.duracao_almoco_minutos || 60;
+    const [hI, mI] = horaInicioStr.split(":").map(Number);
+    const [hF, mF] = horaFimStr.split(":").map(Number);
+    const MAX_MIN_DIA = (hF * 60 + mF) - (hI * 60 + mI) - tempoAlmoco;
+
+    // Assign days
+    const paradas = optimized.map((os, idx) => ({
+      ...os,
       dia: 1,
       ordem: idx + 1,
     }));
 
-    // Distribute across days
     let diaAtual = 1;
     let tempoAcumulado = 0;
     for (const parada of paradas) {
-      const tempoParada = parada.tempo_estimado_min + 15;
+      const tempoParada = parada.tempo_estimado_min + 15; // +15 min transit between stops
       if (tempoAcumulado + tempoParada > MAX_MIN_DIA && tempoAcumulado > 0) {
         diaAtual++;
         tempoAcumulado = 0;
@@ -1490,15 +1711,18 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       tempoAcumulado += tempoParada;
     }
 
+    // Re-number within each day
     for (let dia = 1; dia <= diaAtual; dia++) {
-      const pd = paradas.filter((p: any) => p.dia === dia);
-      pd.forEach((p: any, idx: number) => { p.ordem = idx + 1; });
+      let ordem = 1;
+      for (const p of paradas) {
+        if (p.dia === dia) { p.ordem = ordem++; }
+      }
     }
 
-    const totalTempo = paradas.reduce((sum: number, p: any) => sum + p.tempo_estimado_min, 0);
-    const diasTotais = Math.max(...paradas.map((p: any) => p.dia));
+    const totalTempo = paradas.reduce((sum, p) => sum + p.tempo_estimado_min, 0);
+    const diasTotais = Math.max(...paradas.map(p => p.dia));
 
-    // Compute data_fim
+    // Dates
     const dataInicioDate = new Date(dataInicio + "T12:00:00");
     const dataFimDate = new Date(dataInicioDate);
     dataFimDate.setDate(dataFimDate.getDate() + diasTotais - 1);
@@ -1528,7 +1752,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     }
 
     // Save paradas
-    const paradasInsert = paradas.map((p: any) => {
+    const paradasInsert = paradas.map((p) => {
       const dataPrevista = new Date(dataInicioDate);
       dataPrevista.setDate(dataPrevista.getDate() + p.dia - 1);
       return {
@@ -1552,35 +1776,61 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
 
     await supabase.from("gia_plano_paradas").insert(paradasInsert);
 
-    // Build summary message
+    // --- SEND MAP IMAGE ---
+    const mapUrl = buildStaticMapUrl(baseLat, baseLng, paradas.map(p => ({ lat: p.lat, lng: p.lng, ordem: p.ordem })));
     const horas = Math.floor(totalTempo / 60);
     const minutos = totalTempo % 60;
     const dataFormatada = dataInicioDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
+    const caption = `🗺️ *${rota.nome}* | ${tecnico.nome}\n📅 ${dataFormatada} | ${paradas.length} OS | ${diasTotais} dia(s)\n📏 ~${totalKm} km | ⏱️ ${horas}h${minutos > 0 ? `${minutos}min` : ""}`;
+
+    try {
+      await sendGroupImage(supabase, mapUrl, caption);
+    } catch (imgErr) {
+      console.error("[GIA Route] Error sending map image:", imgErr);
+    }
+
+    // --- SEND DETAIL MESSAGE ---
     let msg = `✅ *Rota montada: ${rota.nome}*\n`;
     msg += `👤 Técnico: ${tecnico.nome}\n`;
     msg += `📅 Início: ${dataFormatada}\n`;
     msg += `📊 Total: ${paradas.length} OS em ${diasTotais} dia(s)\n`;
+    msg += `📏 Distância total: ~${totalKm} km\n`;
     msg += `⏱️ Tempo estimado: ${horas}h${minutos > 0 ? `${minutos}min` : ""}\n\n`;
 
-    for (let dia = 1; dia <= Math.min(diasTotais, 3); dia++) {
-      const pd = paradas.filter((p: any) => p.dia === dia);
+    msg += `*📍 Legenda do Mapa:*\n`;
+    msg += `  🟢 B = Base (${unidade.nome})\n`;
+    for (const p of paradas.slice(0, 15)) {
+      const ref = p.numero_samsung || p.numero_interno;
+      msg += `  📌 ${p.ordem}. ${ref} - ${p.cliente_nome} (${p.cidade})\n`;
+    }
+    if (paradas.length > 15) msg += `  ... +${paradas.length - 15} paradas\n`;
+    msg += "\n";
+
+    for (let dia = 1; dia <= Math.min(diasTotais, 5); dia++) {
+      const pd = paradas.filter(p => p.dia === dia);
       const dataDia = new Date(dataInicioDate);
       dataDia.setDate(dataDia.getDate() + dia - 1);
-      const dataDiaStr = dataDia.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
-      msg += `*Dia ${dia} (${dataDiaStr}):* ${pd.length} OS\n`;
-      for (const p of pd.slice(0, 8)) {
+      const dataDiaStr = dataDia.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
+      const tempodia = pd.reduce((s, p) => s + p.tempo_estimado_min, 0);
+      msg += `*Dia ${dia} (${dataDiaStr}):* ${pd.length} OS | ~${Math.round(tempodia / 60)}h\n`;
+      for (const p of pd.slice(0, 10)) {
         const ref = p.numero_samsung || p.numero_interno;
-        msg += `  ${p.ordem}. ${ref} - ${p.cliente_nome} (${p.cidade || "?"}) | ${p.tipo_reparo} ${p.tempo_estimado_min}min\n`;
+        msg += `  ${p.ordem}. ${ref} - ${p.cliente_nome} (${p.cidade}) | ${p.tipo_reparo} ${p.tempo_estimado_min}min\n`;
       }
-      if (pd.length > 8) {
-        msg += `  ... +${pd.length - 8} OS\n`;
+      if (pd.length > 10) msg += `  ... +${pd.length - 10} OS\n`;
+      msg += "\n";
+    }
+    if (diasTotais > 5) msg += `... +${diasTotais - 5} dias restantes\n\n`;
+
+    if (osWithoutCoords.length > 0) {
+      msg += `⚠️ ${osWithoutCoords.length} OS não geolocalizadas (endereço impreciso):\n`;
+      for (const os of osWithoutCoords.slice(0, 5)) {
+        msg += `  - ${os.numero_os_samsung || os.numero_os_interna} (${os.cliente_nome})\n`;
       }
       msg += "\n";
     }
-    if (diasTotais > 3) {
-      msg += `... +${diasTotais - 3} dias restantes\n\n`;
-    }
+
     msg += `🔗 Acompanhe no ATOM > Otimizador > GIA Rotas`;
 
     await sendGroupMessage(supabase, instanceName, groupJid, msg);
@@ -1591,37 +1841,5 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     } catch (sendErr) {
       console.error("[GIA Route] Error sending error message:", sendErr);
     }
-  }
-}
-
-async function sendGroupMessage(supabase: any, _instanceName: string, _groupJid: string, text: string) {
-  try {
-    // Always use atom_core_settings config (same as GIA reports)
-    const { data: settings } = await supabase
-      .from("atom_core_settings")
-      .select("chave, valor")
-      .in("chave", ["evolution_api_url", "evolution_api_key", "evolution_instance_name", "whatsapp_group_jid"]);
-
-    const cfg: Record<string, string> = {};
-    for (const s of settings || []) cfg[s.chave] = s.valor;
-
-    const apiUrl = cfg.evolution_api_url;
-    const apiKey = cfg.evolution_api_key;
-    const instance = cfg.evolution_instance_name;
-    const groupJid = cfg.whatsapp_group_jid;
-
-    if (!apiUrl || !apiKey || !instance || !groupJid) {
-      console.error("[GIA Route] Missing atom_core_settings for Evolution API", cfg);
-      return;
-    }
-
-    const resp = await fetch(`${apiUrl}/message/sendText/${instance}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", apikey: apiKey },
-      body: JSON.stringify({ number: groupJid, text }),
-    });
-    console.log(`[GIA Route] Message sent to ${groupJid}, status: ${resp.status}`);
-  } catch (err) {
-    console.error("[GIA Route] Error sending message:", err);
   }
 }
