@@ -266,7 +266,21 @@ export async function validateAndPlanRoute(
     ordem: idx + 1,
   }));
 
-  const MAX_MINUTOS_DIA = 8 * 60;
+  // Fetch technician work hours
+  const { data: tecData } = await supabase
+    .from('usuarios')
+    .select('horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos')
+    .eq('id', tecnico_id)
+    .maybeSingle();
+
+  const horaInicioStr = tecData?.horario_inicio_expediente || '08:00';
+  const horaFimStr = tecData?.horario_fim_expediente || '17:00';
+  const tempoAlmoco = tecData?.duracao_almoco_minutos || 60;
+  const [hI, mI] = horaInicioStr.split(':').map(Number);
+  const [hF, mF] = horaFimStr.split(':').map(Number);
+  const totalMinutosDia = (hF * 60 + mF) - (hI * 60 + mI);
+  const MAX_MINUTOS_DIA = totalMinutosDia - tempoAlmoco;
+
   let diaAtual = 1;
   let tempoAcumuladoDia = 0;
   for (const parada of paradas) {

@@ -36,6 +36,7 @@ export default function GestaoEquipe() {
   const [searchTerm, setSearchTerm] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editHabilidades, setEditHabilidades] = useState<string[]>([]);
+  const [editHorarios, setEditHorarios] = useState({ inicio: '', fim: '', almoco_inicio: '', almoco_min: 60 });
   const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -117,11 +118,18 @@ export default function GestaoEquipe() {
   const startEdit = (tec: TecnicoStats) => {
     setEditingId(tec.id);
     setEditHabilidades([...tec.habilidades]);
+    setEditHorarios({
+      inicio: tec.horario_inicio_expediente?.substring(0, 5) || '08:00',
+      fim: tec.horario_fim_expediente?.substring(0, 5) || '17:00',
+      almoco_inicio: tec.horario_almoco_inicio?.substring(0, 5) || '12:00',
+      almoco_min: tec.duracao_almoco_minutos || 60,
+    });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditHabilidades([]);
+    setEditHorarios({ inicio: '', fim: '', almoco_inicio: '', almoco_min: 60 });
   };
 
   const toggleSkill = (skill: string) => {
@@ -135,11 +143,24 @@ export default function GestaoEquipe() {
     try {
       await supabase
         .from('usuarios')
-        .update({ habilidades: editHabilidades })
+        .update({
+          habilidades: editHabilidades,
+          horario_inicio_expediente: editHorarios.inicio,
+          horario_fim_expediente: editHorarios.fim,
+          horario_almoco_inicio: editHorarios.almoco_inicio,
+          duracao_almoco_minutos: editHorarios.almoco_min,
+        })
         .eq('id', tecId);
 
       setTecnicos(prev =>
-        prev.map(t => t.id === tecId ? { ...t, habilidades: editHabilidades } : t)
+        prev.map(t => t.id === tecId ? {
+          ...t,
+          habilidades: editHabilidades,
+          horario_inicio_expediente: editHorarios.inicio,
+          horario_fim_expediente: editHorarios.fim,
+          horario_almoco_inicio: editHorarios.almoco_inicio,
+          duracao_almoco_minutos: editHorarios.almoco_min,
+        } : t)
       );
       setEditingId(null);
     } finally {
@@ -250,7 +271,7 @@ export default function GestaoEquipe() {
                       border: `1px solid ${editingId === tec.id ? '#EF444430' : '#3B82F630'}`,
                     }}
                   >
-                    {editingId === tec.id ? <><X className="w-3 h-3" />Cancelar</> : <><Edit2 className="w-3 h-3" />Skills</>}
+                    {editingId === tec.id ? <><X className="w-3 h-3" />Cancelar</> : <><Edit2 className="w-3 h-3" />Editar</>}
                   </button>
                 </div>
 
@@ -281,6 +302,52 @@ export default function GestaoEquipe() {
 
                 {editingId === tec.id ? (
                   <div className="mt-3 rounded-lg p-4" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-primary)' }}>
+                    <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
+                      Horario de Trabalho
+                    </p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--text-tertiary)' }}>Inicio</label>
+                        <input
+                          type="time"
+                          value={editHorarios.inicio}
+                          onChange={(e) => setEditHorarios(prev => ({ ...prev, inicio: e.target.value }))}
+                          className="w-full px-2 py-1.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--text-tertiary)' }}>Fim</label>
+                        <input
+                          type="time"
+                          value={editHorarios.fim}
+                          onChange={(e) => setEditHorarios(prev => ({ ...prev, fim: e.target.value }))}
+                          className="w-full px-2 py-1.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--text-tertiary)' }}>Almoco</label>
+                        <input
+                          type="time"
+                          value={editHorarios.almoco_inicio}
+                          onChange={(e) => setEditHorarios(prev => ({ ...prev, almoco_inicio: e.target.value }))}
+                          className="w-full px-2 py-1.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-xs mb-1 block" style={{ color: 'var(--text-tertiary)' }}>Duracao (min)</label>
+                        <input
+                          type="number"
+                          value={editHorarios.almoco_min}
+                          onChange={(e) => setEditHorarios(prev => ({ ...prev, almoco_min: parseInt(e.target.value) || 60 }))}
+                          className="w-full px-2 py-1.5 rounded-lg text-xs"
+                          style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-primary)' }}
+                        />
+                      </div>
+                    </div>
+
                     <p className="text-xs font-semibold mb-3" style={{ color: 'var(--text-secondary)' }}>
                       Linhas de Produto atendidas (Samsung)
                     </p>

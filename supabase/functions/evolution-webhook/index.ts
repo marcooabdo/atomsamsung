@@ -345,7 +345,11 @@ Deno.serve(async (req: Request) => {
           const webhookInstanceName = typeof instance === "string"
             ? instance
             : instance?.instanceName || instance?.name || body.instanceName || "Marco";
-          handleGIARouteCommand(supabase, textContent, rawRemoteJid, webhookInstanceName);
+          await handleGIARouteCommand(supabase, textContent, rawRemoteJid, webhookInstanceName);
+          return new Response(JSON.stringify({ ok: true, action: "gia_route_command" }), {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
         } else if (textContent && isGIAReportRequest(textContent)) {
           const webhookInstanceName = typeof instance === "string"
             ? instance
@@ -1334,6 +1338,7 @@ function parseRouteCmdDate(input?: string): string {
 }
 
 async function handleGIARouteCommand(supabase: any, text: string, groupJid: string, instanceName: string) {
+  console.log(`[GIA Route] Processing command: "${text}" from group ${groupJid} via instance ${instanceName}`);
   try {
     let rotaNome = "", tecnicoNome = "", unidadeNome = "", dataStr: string | undefined;
 
@@ -1370,7 +1375,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     // Resolve tecnico
     const { data: tecnicos } = await supabase
       .from("usuarios")
-      .select("id, nome")
+      .select("id, nome, horario_inicio_expediente, horario_fim_expediente, duracao_almoco_minutos")
       .eq("unidade_id", unidade.id)
       .eq("ativo", true)
       .ilike("nome", `%${tecnicoNome}%`);
@@ -1403,7 +1408,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     // Get OS in this route column
     const { data: osList } = await supabase
       .from("os")
-      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cidade, endereco_completo, tipo_reparo, lat, lng")
+      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cliente_cidade, endereco_completo, tipo_reparo, lat, lng")
       .eq("unidade_id", unidade.id)
       .eq("coluna_kanban", rota.coluna_kanban);
 
@@ -1442,14 +1447,21 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     if (osSemTempo.length > 0) {
       const tiposFaltantes = [...new Set(osSemTempo.map((os: any) => os.tipo_reparo))];
       await sendGroupMessage(supabase, instanceName, groupJid,
-        `⚠️ Não posso montar a rota. Os seguintes tipos de reparo não têm tempo cadastrado:\n\n${tiposFaltantes.map((t: string) => `  - ${t}`).join("\n")}\n\nCadastre em Otimizador > Config > Tempos de Reparo.`
+        `⚠️ Os seguintes tipos de reparo não têm tempo cadastrado (usando 60min como padrão):\n\n${tiposFaltantes.map((t: string) => `  - ${t}`).join("\n")}\n\nCadastre em Otimizador > Config > Tempos de Reparo para maior precisão.`
       );
-      return;
     }
 
     // Build the plan
     const dataInicio = parseRouteCmdDate(dataStr);
-    const MAX_MIN_DIA = 8 * 60;
+
+    // Calculate available work minutes from technician config
+    const horaInicioStr = tecnico.horario_inicio_expediente || "08:00";
+    const horaFimStr = tecnico.horario_fim_expediente || "17:00";
+    const tempoAlmoco = tecnico.duracao_almoco_minutos || 60;
+    const [hI, mI] = horaInicioStr.split(":").map(Number);
+    const [hF, mF] = horaFimStr.split(":").map(Number);
+    const totalMinutosDia = (hF * 60 + mF) - (hI * 60 + mI);
+    const MAX_MIN_DIA = totalMinutosDia - tempoAlmoco;
 
     const paradas = osList.map((os: any, idx: number) => ({
       os_id: os.id,
@@ -1457,7 +1469,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       numero_interno: os.numero_os_interna || os.id.substring(0, 8),
       cliente_nome: os.cliente_nome,
       cliente_telefone: os.cliente_telefone,
-      cidade: os.cidade,
+      cidade: os.cliente_cidade,
       endereco: os.endereco_completo,
       tipo_reparo: os.tipo_reparo,
       tempo_estimado_min: tempoMap.get(os.tipo_reparo.toLowerCase()) || 60,
@@ -1574,6 +1586,11 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     await sendGroupMessage(supabase, instanceName, groupJid, msg);
   } catch (err) {
     console.error("[GIA Route] Error:", err);
+    try {
+      await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Erro ao processar comando de rota. Tente novamente.`);
+    } catch (sendErr) {
+      console.error("[GIA Route] Error sending error message:", sendErr);
+    }
   }
 }
 
@@ -1614,3 +1631,4 @@ async function sendGroupMessage(supabase: any, instanceName: string, groupJid: s
     console.error("[GIA Route] Error sending message:", err);
   }
 }
+// GIA Route v2
