@@ -1366,47 +1366,68 @@ async function sendGroupMessage(supabase: any, _instanceName: string, _groupJid:
   if (!resp.ok) throw new Error(`sendText failed: ${resp.status} - ${body}`);
 }
 
-async function sendGroupImageViaStorage(supabase: any, imageUrl: string, caption: string) {
+async function sendGroupImageViaStorage(supabase: any, imageUrl: string, fallbackUrl: string, caption: string) {
   const cfg = await getEvolutionConfig(supabase);
 
-  // Download image from Google Static Maps
-  console.log(`[GIA Route] Downloading map from: ${imageUrl.substring(0, 120)}...`);
+  // Try downloading the primary image (Google Static Maps)
+  console.log(`[GIA Route] Attempting Google Static Maps...`);
+  let imgBuffer: Uint8Array | null = null;
+
   const imgResp = await fetch(imageUrl);
-  if (!imgResp.ok) {
-    const errBody = await imgResp.text();
-    console.error(`[GIA Route] Map download FAILED: status=${imgResp.status} body=${errBody.substring(0, 200)}`);
-    throw new Error(`Failed to download map image: ${imgResp.status}`);
+  if (imgResp.ok) {
+    imgBuffer = new Uint8Array(await imgResp.arrayBuffer());
+    if (imgBuffer.length < 1000) imgBuffer = null;
   }
-  const imgBuffer = new Uint8Array(await imgResp.arrayBuffer());
-  console.log(`[GIA Route] Map downloaded OK: ${imgBuffer.length} bytes`);
+  console.log(`[GIA Route] Google response: ${imgResp.status}, size: ${imgBuffer?.length || 0}`);
 
-  if (imgBuffer.length < 1000) {
-    console.error(`[GIA Route] Image too small (${imgBuffer.length} bytes), likely an error response`);
-    throw new Error("Image too small - likely API error");
+  // If Google failed, try Geoapify fallback
+  if (!imgBuffer && fallbackUrl) {
+    console.log(`[GIA Route] Google failed, trying Geoapify fallback...`);
+    const fbResp = await fetch(fallbackUrl);
+    if (fbResp.ok) {
+      imgBuffer = new Uint8Array(await fbResp.arrayBuffer());
+      if (imgBuffer.length < 1000) imgBuffer = null;
+    }
+    console.log(`[GIA Route] Geoapify response: ${fbResp.status}, size: ${imgBuffer?.length || 0}`);
   }
 
-  // Convert to base64 using chunked approach (spread operator crashes on large arrays)
-  let binary = "";
-  const chunkSize = 8192;
-  for (let i = 0; i < imgBuffer.length; i += chunkSize) {
-    const chunk = imgBuffer.subarray(i, i + chunkSize);
-    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  if (!imgBuffer) {
+    throw new Error("Could not download map image from any source");
   }
-  const base64 = btoa(binary);
-  const mediaBase64 = `data:image/png;base64,${base64}`;
-  console.log(`[GIA Route] Base64 encoded: ${base64.length} chars`);
 
-  const payload = JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: mediaBase64, caption, fileName: "rota.png" });
-  console.log(`[GIA Route] Sending media payload: ${payload.length} bytes`);
+  // Convert to base64 and send
+  const base64 = uint8ToBase64(imgBuffer);
+  console.log(`[GIA Route] Sending image: ${base64.length} chars base64`);
 
   const resp = await fetch(`${cfg.api_url}/message/sendMedia/${cfg.instance_name}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: cfg.api_key },
-    body: payload,
+    body: JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: `data:image/png;base64,${base64}`, caption, fileName: "rota.png" }),
   });
   const body = await resp.text();
-  console.log(`[GIA Route] sendMedia response: status=${resp.status} body=${body.substring(0, 400)}`);
+  console.log(`[GIA Route] sendMedia: status=${resp.status} body=${body.substring(0, 300)}`);
   if (!resp.ok) throw new Error(`sendMedia failed: ${resp.status} - ${body}`);
+}
+
+function uint8ToBase64(buffer: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 8192;
+  for (let i = 0; i < buffer.length; i += chunkSize) {
+    const chunk = buffer.subarray(i, i + chunkSize);
+    binary += String.fromCharCode.apply(null, chunk as unknown as number[]);
+  }
+  return btoa(binary);
+}
+
+// Alternative map using Geoapify (free, no key required for low volume)
+function buildGeoapifyMapUrl(baseLat: number, baseLng: number, paradas: { lat: number; lng: number; ordem: number }[]): string {
+  const markers: string[] = [];
+  markers.push(`lonlat:${baseLng},${baseLat};type:awesome;color:%2322c55e;icon:home;iconsize:large;whitecircle:no`);
+  for (const p of paradas) {
+    markers.push(`lonlat:${p.lng},${p.lat};type:awesome;color:%23ef4444;text:${p.ordem};iconsize:large;whitecircle:no`);
+  }
+  const markerStr = markers.join("|");
+  return `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=640&height=480&marker=${encodeURIComponent(markerStr)}&apiKey=0ebe89ad20ef4e07834abe4e9d41860e`;
 }
 
 // ===== Geocoding =====
@@ -1865,7 +1886,9 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     await supabase.from("gia_plano_paradas").insert(paradasInsert);
 
     // --- SEND MAP IMAGE ---
-    const mapUrl = buildStaticMapUrl(baseLat, baseLng, paradas.map(p => ({ lat: p.lat, lng: p.lng, ordem: p.ordem })));
+    const paradasCoords = paradas.map(p => ({ lat: p.lat, lng: p.lng, ordem: p.ordem }));
+    const mapUrl = buildStaticMapUrl(baseLat, baseLng, paradasCoords);
+    const mapUrlFallback = buildGeoapifyMapUrl(baseLat, baseLng, paradasCoords);
     const dataFormatada = dataInicioDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
     // Caption includes the legend (shown below map in WhatsApp)
@@ -1878,7 +1901,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     }
 
     try {
-      await sendGroupImageViaStorage(supabase, mapUrl, caption.trim());
+      await sendGroupImageViaStorage(supabase, mapUrl, mapUrlFallback, caption.trim());
     } catch (imgErr: any) {
       console.error("[GIA Route] Error sending map:", imgErr?.message || imgErr);
       await sendGroupMessage(supabase, instanceName, groupJid, `⚠️ Não consegui enviar a imagem do mapa. Erro: ${imgErr?.message || "desconhecido"}`);
