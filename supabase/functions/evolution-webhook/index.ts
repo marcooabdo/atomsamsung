@@ -1408,7 +1408,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     // Get OS in this route column
     const { data: osList } = await supabase
       .from("os")
-      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cliente_cidade, endereco_completo, tipo_reparo, lat, lng")
+      .select("id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, cliente_cidade, cliente_endereco, tipo_reparo, lat, lng")
       .eq("unidade_id", unidade.id)
       .eq("coluna_kanban", rota.coluna_kanban);
 
@@ -1470,7 +1470,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
       cliente_nome: os.cliente_nome,
       cliente_telefone: os.cliente_telefone,
       cidade: os.cliente_cidade,
-      endereco: os.endereco_completo,
+      endereco: os.cliente_endereco,
       tipo_reparo: os.tipo_reparo,
       tempo_estimado_min: tempoMap.get(os.tipo_reparo.toLowerCase()) || 60,
       dia: 1,
@@ -1594,41 +1594,34 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
   }
 }
 
-async function sendGroupMessage(supabase: any, instanceName: string, groupJid: string, text: string) {
+async function sendGroupMessage(supabase: any, _instanceName: string, _groupJid: string, text: string) {
   try {
-    const { data: instancia } = await supabase
-      .from("atom_connect_instancias")
-      .select("api_url, api_key, instance_name")
-      .eq("instance_name", instanceName)
-      .maybeSingle();
+    // Always use atom_core_settings config (same as GIA reports)
+    const { data: settings } = await supabase
+      .from("atom_core_settings")
+      .select("chave, valor")
+      .in("chave", ["evolution_api_url", "evolution_api_key", "evolution_instance_name", "whatsapp_group_jid"]);
 
-    if (!instancia) {
-      // Fallback: get first instancia
-      const { data: fallback } = await supabase
-        .from("atom_connect_instancias")
-        .select("api_url, api_key, instance_name")
-        .limit(1)
-        .maybeSingle();
+    const cfg: Record<string, string> = {};
+    for (const s of settings || []) cfg[s.chave] = s.valor;
 
-      if (!fallback) {
-        console.error("[GIA Route] No WhatsApp instance found");
-        return;
-      }
-      await fetch(`${fallback.api_url}/message/sendText/${fallback.instance_name}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", apikey: fallback.api_key },
-        body: JSON.stringify({ number: groupJid, text }),
-      });
+    const apiUrl = cfg.evolution_api_url;
+    const apiKey = cfg.evolution_api_key;
+    const instance = cfg.evolution_instance_name;
+    const groupJid = cfg.whatsapp_group_jid;
+
+    if (!apiUrl || !apiKey || !instance || !groupJid) {
+      console.error("[GIA Route] Missing atom_core_settings for Evolution API", cfg);
       return;
     }
 
-    await fetch(`${instancia.api_url}/message/sendText/${instancia.instance_name}`, {
+    const resp = await fetch(`${apiUrl}/message/sendText/${instance}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json", apikey: instancia.api_key },
+      headers: { "Content-Type": "application/json", apikey: apiKey },
       body: JSON.stringify({ number: groupJid, text }),
     });
+    console.log(`[GIA Route] Message sent to ${groupJid}, status: ${resp.status}`);
   } catch (err) {
     console.error("[GIA Route] Error sending message:", err);
   }
 }
-// GIA Route v2
