@@ -1368,34 +1368,24 @@ async function sendGroupMessage(supabase: any, _instanceName: string, _groupJid:
 
 async function sendGroupImageViaStorage(supabase: any, imageUrl: string, caption: string) {
   const cfg = await getEvolutionConfig(supabase);
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
 
   // Download image from Google Static Maps
   const imgResp = await fetch(imageUrl);
   if (!imgResp.ok) throw new Error(`Failed to download map image: ${imgResp.status}`);
   const imgBuffer = new Uint8Array(await imgResp.arrayBuffer());
+  console.log(`[GIA Route] Map downloaded: ${imgBuffer.length} bytes`);
 
-  // Upload to Supabase Storage
-  const fileName = `route-map-${Date.now()}.png`;
-  const { error: uploadErr } = await supabase.storage
-    .from("os-anexos")
-    .upload(`route-maps/${fileName}`, imgBuffer, { contentType: "image/png", upsert: true });
-  if (uploadErr) {
-    console.error("[GIA Route] Storage upload error:", uploadErr);
-    throw new Error(`Storage upload failed: ${uploadErr.message}`);
-  }
+  // Convert to base64 and send directly via Evolution API (most reliable)
+  const base64 = btoa(String.fromCharCode(...imgBuffer));
+  const mediaBase64 = `data:image/png;base64,${base64}`;
 
-  const publicUrl = `${supabaseUrl}/storage/v1/object/public/os-anexos/route-maps/${fileName}`;
-  console.log(`[GIA Route] Map uploaded: ${publicUrl}`);
-
-  // Send via Evolution API
   const resp = await fetch(`${cfg.api_url}/message/sendMedia/${cfg.instance_name}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", apikey: cfg.api_key },
-    body: JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: publicUrl, caption }),
+    body: JSON.stringify({ number: ROUTE_GROUP_JID, mediatype: "image", media: mediaBase64, caption, fileName: "rota.png" }),
   });
   const body = await resp.text();
-  console.log(`[GIA Route] sendMedia status=${resp.status}`);
+  console.log(`[GIA Route] sendMedia status=${resp.status} body=${body.substring(0, 300)}`);
   if (!resp.ok) throw new Error(`sendMedia failed: ${resp.status} - ${body}`);
 }
 
@@ -1573,8 +1563,7 @@ async function buildFullItinerary(
   let dayEstrada = 0;
   let dayOS = 0;
   let hadLunch = false;
-  const ALMOCO_START = 11 * 60 + 30; // 11:30
-  const ALMOCO_END = 13 * 60; // 13:00
+  const ALMOCO_HORA = 12 * 60; // 12:00 fixed lunch time
 
   function pushDay() {
     const dayDate = new Date(dataInicioDate);
@@ -1589,12 +1578,63 @@ async function buildFullItinerary(
     currentMin = horaInicio;
   }
 
-  function maybeInsertLunch() {
+  function insertLunch() {
     if (hadLunch) return;
-    if (currentMin >= ALMOCO_START) {
-      hadLunch = true;
-      dayEvents.push({ time: fmtHM(currentMin), endTime: fmtHM(currentMin + almocoMin), icon: "🍽️", text: `Almoço (${fmtDuracao(almocoMin)})` });
-      currentMin += almocoMin;
+    hadLunch = true;
+    const lunchStart = currentMin;
+    dayEvents.push({ time: fmtHM(lunchStart), endTime: fmtHM(lunchStart + almocoMin), icon: "🍽️", text: `Almoço (${fmtDuracao(almocoMin)})` });
+    currentMin += almocoMin;
+  }
+
+  // Adds a driving segment, splitting it at 12:00 for lunch if needed
+  function addDriveWithLunch(durationMin: number, distanceKm: number, label: string) {
+    if (durationMin <= 0 || distanceKm <= 2) return;
+
+    const driveStart = currentMin;
+    const driveEnd = driveStart + durationMin;
+
+    // Check if drive crosses lunch time (12:00) and we haven't had lunch yet
+    if (!hadLunch && driveStart < ALMOCO_HORA && driveEnd > ALMOCO_HORA) {
+      // Split: drive until 12:00, then lunch, then continue
+      const minBeforeLunch = ALMOCO_HORA - driveStart;
+      const minAfterLunch = durationMin - minBeforeLunch;
+      const kmPerMin = distanceKm / durationMin;
+      const kmBefore = Math.round(kmPerMin * minBeforeLunch * 10) / 10;
+      const kmAfter = Math.round(kmPerMin * minAfterLunch * 10) / 10;
+
+      // First half of drive
+      dayEvents.push({
+        time: fmtHM(driveStart), endTime: fmtHM(ALMOCO_HORA), icon: "🚗",
+        text: `${label} (${kmBefore}km, ${fmtDuracao(minBeforeLunch)})`,
+      });
+      currentMin = ALMOCO_HORA;
+      dayKm += kmBefore;
+      dayEstrada += minBeforeLunch;
+
+      // Lunch at 12:00
+      insertLunch();
+
+      // Second half of drive
+      const resumeAt = currentMin;
+      dayEvents.push({
+        time: fmtHM(resumeAt), endTime: fmtHM(resumeAt + minAfterLunch), icon: "🚗",
+        text: `${label} — continuação (${kmAfter}km, ${fmtDuracao(minAfterLunch)})`,
+      });
+      currentMin = resumeAt + minAfterLunch;
+      dayKm += kmAfter;
+      dayEstrada += minAfterLunch;
+    } else {
+      // No split needed — check if lunch should come before
+      if (!hadLunch && driveStart >= ALMOCO_HORA) insertLunch();
+
+      const actualStart = currentMin;
+      dayEvents.push({
+        time: fmtHM(actualStart), endTime: fmtHM(actualStart + durationMin), icon: "🚗",
+        text: `${label} (${distanceKm}km, ${fmtDuracao(durationMin)})`,
+      });
+      currentMin = actualStart + durationMin;
+      dayKm += distanceKm;
+      dayEstrada += durationMin;
     }
   }
 
@@ -1603,41 +1643,23 @@ async function buildFullItinerary(
 
   for (let i = 0; i < paradas.length; i++) {
     const p = paradas[i];
-    const legToStop = legs[i]; // base/prev -> this stop
-
-    // Check if we need lunch before driving
-    maybeInsertLunch();
+    const legToStop = legs[i];
 
     // Check if this leg + service fits today
     const totalNeeded = legToStop.durationMin + p.tempo_estimado_min;
-    if (currentMin + totalNeeded > horaFim && dayOS > 0) {
-      // Need to check if we even have room for the drive
-      // End day, hotel
+    if (currentMin + totalNeeded + (!hadLunch ? almocoMin : 0) > horaFim && dayOS > 0) {
       const lastCity = i > 0 ? paradas[i - 1].cidade : baseCidade;
       dayEvents.push({ time: fmtHM(currentMin), icon: "🏨", text: `Pernoite em ${lastCity}` });
       pushDay();
       dayEvents.push({ time: fmtHM(currentMin), icon: "🌅", text: `Início do dia em ${lastCity}` });
     }
 
-    // Drive to stop
-    const driveStart = currentMin;
-    const driveEnd = currentMin + legToStop.durationMin;
+    // Drive to stop (with lunch split if crossing 12:00)
+    const origin = i === 0 ? baseCidade : paradas[i - 1].cidade;
+    addDriveWithLunch(legToStop.durationMin, legToStop.distanceKm, `Deslocamento: ${origin} → ${p.cidade}`);
 
-    if (legToStop.durationMin > 0 && legToStop.distanceKm > 2) {
-      const origin = i === 0 ? baseCidade : paradas[i - 1].cidade;
-      dayEvents.push({
-        time: fmtHM(driveStart),
-        endTime: fmtHM(driveEnd),
-        icon: "🚗",
-        text: `Deslocamento: ${origin} → ${p.cidade} (${legToStop.distanceKm}km, ${fmtDuracao(legToStop.durationMin)})`,
-      });
-    }
-    currentMin = driveEnd;
-    dayKm += legToStop.distanceKm;
-    dayEstrada += legToStop.durationMin;
-
-    // Insert lunch if we crossed the lunch window during driving
-    maybeInsertLunch();
+    // If we arrived after 12:00 and haven't had lunch, insert it now
+    if (!hadLunch && currentMin >= ALMOCO_HORA) insertLunch();
 
     // Check-in
     const ref = p.numero_samsung || p.numero_interno;
@@ -1655,30 +1677,22 @@ async function buildFullItinerary(
 
   // Return leg (last stop -> base)
   const returnLeg = legs[legs.length - 1];
-  maybeInsertLunch();
 
   if (returnLeg.distanceKm > 2) {
     const lastStopCity = paradas[paradas.length - 1].cidade;
 
     // Check if return fits today
-    if (currentMin + returnLeg.durationMin > horaFim + 60 && dayOS > 0) {
+    if (currentMin + returnLeg.durationMin + (!hadLunch ? almocoMin : 0) > horaFim + 60 && dayOS > 0) {
       dayEvents.push({ time: fmtHM(currentMin), icon: "🏨", text: `Pernoite em ${lastStopCity}` });
       pushDay();
       dayEvents.push({ time: fmtHM(currentMin), icon: "🌅", text: `Início do dia em ${lastStopCity}` });
     }
 
-    dayEvents.push({
-      time: fmtHM(currentMin),
-      endTime: fmtHM(currentMin + returnLeg.durationMin),
-      icon: "🚗",
-      text: `Retorno: ${lastStopCity} → ${baseCidade} (${returnLeg.distanceKm}km, ${fmtDuracao(returnLeg.durationMin)})`,
-    });
-    currentMin += returnLeg.durationMin;
-    dayKm += returnLeg.distanceKm;
-    dayEstrada += returnLeg.durationMin;
-
-    maybeInsertLunch();
+    addDriveWithLunch(returnLeg.durationMin, returnLeg.distanceKm, `Retorno: ${lastStopCity} → ${baseCidade}`);
   }
+
+  // Final lunch check (if somehow never had it)
+  if (!hadLunch && currentMin >= ALMOCO_HORA) insertLunch();
 
   dayEvents.push({ time: fmtHM(currentMin), icon: "🏁", text: `Chegada na Base - ${baseCidade}` });
   pushDay();
@@ -1834,10 +1848,17 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     const mapUrl = buildStaticMapUrl(baseLat, baseLng, paradas.map(p => ({ lat: p.lat, lng: p.lng, ordem: p.ordem })));
     const dataFormatada = dataInicioDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
-    const caption = `🗺️ *ROTEIRO: ${rota.nome}*\n👤 ${tecnico.nome}\n📅 ${dataFormatada} | ${paradas.length} OS | ${diasTotais} dia(s)\n📏 ${totalKm}km | 🚗 ${fmtDuracao(totalEstrada)} na estrada`;
+    // Caption includes the legend (shown below map in WhatsApp)
+    let caption = `🗺️ *ROTEIRO: ${rota.nome}*\n👤 ${tecnico.nome}\n📅 ${dataFormatada} | ${paradas.length} OS | ${diasTotais} dia(s)\n📏 ${totalKm}km | 🚗 ${fmtDuracao(totalEstrada)} na estrada\n\n`;
+    caption += `📍 *Legenda:*\n`;
+    caption += `🟢 *B* = Base (${unidade.nome})\n`;
+    for (const p of paradas) {
+      const ref = p.numero_samsung || p.numero_interno;
+      caption += `🔴 *${p.ordem}* = ${ref} — ${p.cliente_nome} (${p.cidade})\n`;
+    }
 
     try {
-      await sendGroupImageViaStorage(supabase, mapUrl, caption);
+      await sendGroupImageViaStorage(supabase, mapUrl, caption.trim());
     } catch (imgErr) {
       console.error("[GIA Route] Error sending map:", imgErr);
     }
@@ -1845,7 +1866,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     // Small delay so image arrives first
     await new Promise(r => setTimeout(r, 2000));
 
-    // --- BUILD ITINERARY MESSAGE ---
+    // --- BUILD ITINERARY MESSAGE (no legend here, it's in the image) ---
     let msg = `📋 *ROTEIRO DE VIAGEM — ${rota.nome}*\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n`;
     msg += `👤 Técnico: *${tecnico.nome}*\n`;
@@ -1853,15 +1874,6 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     msg += `📊 ${paradas.length} OS | ${diasTotais} dia(s) | ${totalKm}km total\n`;
     msg += `🚗 ${fmtDuracao(totalEstrada)} na estrada | 🔧 ${fmtDuracao(totalTempo)} em atendimentos\n`;
     msg += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
-
-    // Legend
-    msg += `*📍 PONTOS NO MAPA:*\n`;
-    msg += `  🟢 *B* = Base (${unidade.nome})\n`;
-    for (const p of paradas) {
-      const ref = p.numero_samsung || p.numero_interno;
-      msg += `  🔴 *${p.ordem}* = ${ref} — ${p.cliente_nome} (${p.cidade})\n`;
-    }
-    msg += `\n`;
 
     for (const day of days) {
       const dayDateStr = day.date.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit", year: "numeric" });
