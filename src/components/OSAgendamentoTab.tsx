@@ -57,6 +57,10 @@ export function OSAgendamentoTab({
   const [salvandoTipoReparo, setSalvandoTipoReparo] = useState(false);
   const [tipoReparoSalvo, setTipoReparoSalvo] = useState(false);
 
+  useEffect(() => {
+    setTipoReparoLocal(tipoReparo || '');
+  }, [tipoReparo]);
+
 
 
   useEffect(() => {
@@ -371,6 +375,7 @@ export function OSAgendamentoTab({
       if (error) throw error;
       setTipoReparoSalvo(true);
       setTimeout(() => setTipoReparoSalvo(false), 3000);
+      onSave();
     } catch {
       setErro('Erro ao salvar tipo de reparo');
     } finally {
