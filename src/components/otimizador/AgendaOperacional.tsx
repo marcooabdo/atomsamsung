@@ -535,10 +535,7 @@ function WeeklyView({ weekDays, agendamentos, onSelectOS, getStatusInfo, resolve
   const weekColumns = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab', 'Dom'];
   const weekColumnsFull = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
 
-  const reorderedDays = useMemo(() => {
-    const sunday = weekDays[0];
-    return [...weekDays.slice(1), sunday];
-  }, [weekDays]);
+  const reorderedDays = useMemo(() => weekDays, [weekDays]);
 
   const agByDay = useMemo(() => {
     const map: Record<string, AgendamentoOS[]> = {};
