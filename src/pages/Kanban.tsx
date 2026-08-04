@@ -681,7 +681,8 @@ export function Kanban() {
     const movedCard = sourceCards.find(c => c.id === osId);
     if (!movedCard) return;
 
-    if (!movedCard.rota_id && movedCard.tipo_atendimento === 'IH') {
+    const colunasExigemRota = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
+    if (!movedCard.rota_id && movedCard.tipo_atendimento === 'IH' && colunasExigemRota.includes(toColumn)) {
       setMandatoryRoutePickerOS(movedCard);
       setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
       return;
@@ -899,9 +900,10 @@ export function Kanban() {
 
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
 
-    // Verificar se a OS IH tem rota definida antes de qualquer movimentação
+    // Verificar se a OS IH tem rota definida antes de mover para colunas que exigem rota
+    const colunasExigemRota = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
     if (!isSameColumn) {
-      if (!draggedCard.rota_id && draggedCard.tipo_atendimento === 'IH') {
+      if (!draggedCard.rota_id && draggedCard.tipo_atendimento === 'IH' && colunasExigemRota.includes(targetColumn)) {
         setMandatoryRoutePickerOS(draggedCard);
         setPendingMandatoryMove({ targetColumn, position: finalPosition });
         setDraggedCard(null);
@@ -1732,8 +1734,9 @@ export function Kanban() {
       return;
     }
 
-    // Validar rota: se a OS IH não tem rota definida, exibir modal obrigatório
-    if (!os.rota_id && os.tipo_atendimento === 'IH') {
+    // Validar rota: se a OS IH não tem rota definida e vai para coluna de rota
+    const colunasExigemRotaMove = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
+    if (!os.rota_id && os.tipo_atendimento === 'IH' && colunasExigemRotaMove.includes(targetColumn)) {
       setMandatoryRoutePickerOS(os);
       setPendingMandatoryMove({ targetColumn, position: undefined });
       return;
