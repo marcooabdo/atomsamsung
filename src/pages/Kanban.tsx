@@ -675,17 +675,22 @@ export function Kanban() {
     }
   };
 
-  const handleModalMoveOS = (osId: string, fromColumn: string, toColumn: string) => {
+  const handleModalMoveOS = async (osId: string, fromColumn: string, toColumn: string) => {
     // Find the OS card to check rota
     const sourceCards = osData[fromColumn] || [];
-    const movedCard = sourceCards.find(c => c.id === osId);
+    let movedCard = sourceCards.find(c => c.id === osId);
     if (!movedCard) return;
 
-    const colunasExigemRota = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
-    if (!movedCard.rota_id && movedCard.tipo_atendimento === 'IH' && colunasExigemRota.includes(toColumn)) {
-      setMandatoryRoutePickerOS(movedCard);
-      setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
-      return;
+    if (!movedCard.rota_id && movedCard.tipo_atendimento === 'IH') {
+      // Double-check from DB in case local state is stale
+      const { data: freshOS } = await supabase.from('os').select('rota_id').eq('id', osId).maybeSingle();
+      if (freshOS?.rota_id) {
+        movedCard = { ...movedCard, rota_id: freshOS.rota_id };
+      } else {
+        setMandatoryRoutePickerOS(movedCard);
+        setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
+        return;
+      }
     }
 
     setOsData(prevData => {
@@ -900,14 +905,19 @@ export function Kanban() {
 
     const rotasColumns = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja'];
 
-    // Verificar se a OS IH tem rota definida antes de mover para colunas que exigem rota
-    const colunasExigemRota = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
+    // Verificar se a OS IH tem rota definida antes de qualquer movimentação
     if (!isSameColumn) {
-      if (!draggedCard.rota_id && draggedCard.tipo_atendimento === 'IH' && colunasExigemRota.includes(targetColumn)) {
-        setMandatoryRoutePickerOS(draggedCard);
-        setPendingMandatoryMove({ targetColumn, position: finalPosition });
-        setDraggedCard(null);
-        return;
+      if (!draggedCard.rota_id && draggedCard.tipo_atendimento === 'IH') {
+        // Double-check from DB in case local state is stale
+        const { data: freshOS } = await supabase.from('os').select('rota_id').eq('id', draggedCard.id).maybeSingle();
+        if (freshOS?.rota_id) {
+          // rota_id exists in DB but not in local state - proceed with move
+        } else {
+          setMandatoryRoutePickerOS(draggedCard);
+          setPendingMandatoryMove({ targetColumn, position: finalPosition });
+          setDraggedCard(null);
+          return;
+        }
       }
     }
 
@@ -1309,6 +1319,7 @@ export function Kanban() {
     const currentOS = mandatoryRoutePickerOS;
     const osId = currentOS.id;
     const prevColumn = currentOS.coluna_kanban;
+    const { targetColumn: pendingTargetColumn, position: pendingPosition } = pendingMandatoryMove;
     const cidadeOS = cidadeCorrigidaParam && cidadeCorrigidaParam.trim() !== '' ? cidadeCorrigidaParam.trim() : currentOS.cliente_cidade;
 
     const rotaColorMap: Record<string, { nome: string; cor: string }> = {
@@ -1395,13 +1406,27 @@ export function Kanban() {
 
       if (error) throw error;
 
-      const updatedCard = { ...currentOS, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida };
+      const updatedCard = { ...currentOS, rota_id: rotaIdReal, cliente_cidade: cidadeCorrigida, coluna_kanban: pendingTargetColumn };
 
+      // Move the card from origin to the pending target column
       setOsData(prevData => {
         const newData = { ...prevData };
-        newData[prevColumn] = (newData[prevColumn] || []).map(os => os.id === osId ? updatedCard : os);
+        newData[prevColumn] = (newData[prevColumn] || []).filter(os => os.id !== osId);
+        const targetCards = [...(newData[pendingTargetColumn] || [])];
+        if (pendingPosition !== undefined && pendingPosition >= 0) {
+          targetCards.splice(pendingPosition, 0, updatedCard);
+        } else {
+          targetCards.push(updatedCard);
+        }
+        newData[pendingTargetColumn] = targetCards;
         return newData;
       });
+
+      // Also update the column in the database
+      await supabase
+        .from('os')
+        .update({ coluna_kanban: pendingTargetColumn })
+        .eq('id', osId);
 
     } catch (err: any) {
       setErrorModalData({
@@ -1734,12 +1759,17 @@ export function Kanban() {
       return;
     }
 
-    // Validar rota: se a OS IH não tem rota definida e vai para coluna de rota
-    const colunasExigemRotaMove = ['rota_preta', 'rota_vermelha', 'rota_azul', 'rota_verde', 'rota_rosa', 'rota_amarela', 'rota_laranja', 'em_rota_ih'];
-    if (!os.rota_id && os.tipo_atendimento === 'IH' && colunasExigemRotaMove.includes(targetColumn)) {
-      setMandatoryRoutePickerOS(os);
-      setPendingMandatoryMove({ targetColumn, position: undefined });
-      return;
+    // Validar rota: se a OS IH não tem rota definida, exibir modal obrigatório
+    if (!os.rota_id && os.tipo_atendimento === 'IH') {
+      // Double-check from DB in case local state is stale
+      const { data: freshOS } = await supabase.from('os').select('rota_id').eq('id', os.id).maybeSingle();
+      if (freshOS?.rota_id) {
+        // rota_id exists in DB but not in local state - proceed with move
+      } else {
+        setMandatoryRoutePickerOS(os);
+        setPendingMandatoryMove({ targetColumn, position: undefined });
+        return;
+      }
     }
 
     try {
