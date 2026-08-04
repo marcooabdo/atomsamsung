@@ -1419,15 +1419,16 @@ function uint8ToBase64(buffer: Uint8Array): string {
   return btoa(binary);
 }
 
-// Alternative map using Geoapify (free, no key required for low volume)
-function buildGeoapifyMapUrl(baseLat: number, baseLng: number, paradas: { lat: number; lng: number; ordem: number }[]): string {
-  const markers: string[] = [];
-  markers.push(`lonlat:${baseLng},${baseLat};type:awesome;color:%2322c55e;icon:home;iconsize:large;whitecircle:no`);
-  for (const p of paradas) {
-    markers.push(`lonlat:${p.lng},${p.lat};type:awesome;color:%23ef4444;text:${p.ordem};iconsize:large;whitecircle:no`);
+// Google Maps directions link (no API key needed, opens in browser)
+function buildGoogleMapsLink(baseLat: number, baseLng: number, paradas: { lat: number; lng: number; ordem: number }[]): string {
+  const waypoints = paradas.map(p => `${p.lat},${p.lng}`);
+  const origin = `${baseLat},${baseLng}`;
+  const destination = waypoints[waypoints.length - 1] || origin;
+  const middle = waypoints.slice(0, -1).join("/");
+  if (middle) {
+    return `https://www.google.com/maps/dir/${origin}/${middle}/${destination}`;
   }
-  const markerStr = markers.join("|");
-  return `https://maps.geoapify.com/v1/staticmap?style=osm-bright&width=640&height=480&marker=${encodeURIComponent(markerStr)}&apiKey=0ebe89ad20ef4e07834abe4e9d41860e`;
+  return `https://www.google.com/maps/dir/${origin}/${destination}`;
 }
 
 // ===== Geocoding =====
@@ -1887,8 +1888,6 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
 
     // --- SEND MAP IMAGE ---
     const paradasCoords = paradas.map(p => ({ lat: p.lat, lng: p.lng, ordem: p.ordem }));
-    const mapUrl = buildStaticMapUrl(baseLat, baseLng, paradasCoords);
-    const mapUrlFallback = buildGeoapifyMapUrl(baseLat, baseLng, paradasCoords);
     const dataFormatada = dataInicioDate.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
 
     // Caption includes the legend (shown below map in WhatsApp)
@@ -1901,8 +1900,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
     }
 
     try {
-      // Send map link as text with the legend caption
-      const mapLink = buildGeoapifyMapUrl(baseLat, baseLng, paradasCoords);
+      const mapLink = buildGoogleMapsLink(baseLat, baseLng, paradasCoords);
       let mapMsg = `🗺️ *MAPA DA ROTA: ${rota.nome}*\n`;
       mapMsg += `👤 ${tecnico.nome} | 📅 ${dataFormatada}\n\n`;
       mapMsg += `📍 *Legenda:*\n`;
@@ -1911,7 +1909,7 @@ async function handleGIARouteCommand(supabase: any, text: string, groupJid: stri
         const ref = p.numero_samsung || p.numero_interno;
         mapMsg += `🔴 *${p.ordem}* = ${ref} — ${p.cliente_nome} (${p.cidade})\n`;
       }
-      mapMsg += `\n🔗 ${mapLink}`;
+      mapMsg += `\n🔗 *Abrir rota no Google Maps:*\n${mapLink}`;
       await sendGroupMessage(supabase, instanceName, groupJid, mapMsg);
     } catch (imgErr: any) {
       console.error("[GIA Route] Error sending map link:", imgErr?.message || imgErr);
