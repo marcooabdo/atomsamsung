@@ -82,7 +82,7 @@ export function GSPNSyncHistory({ syncHistory, loading }: GSPNSyncHistoryProps) 
                 Mudanças: {record.mudancas.join(', ')}
               </p>
             )}
-            {record.status === 'concluido' && record.novos_anexos && record.novos_anexos > 0 && (
+            {record.status === 'concluido' && record.novos_anexos != null && record.novos_anexos > 0 && (
               <p className="text-[11px] text-emerald-400/80 mt-0.5">
                 +{record.novos_anexos} anexo{record.novos_anexos > 1 ? 's' : ''}
               </p>
@@ -98,3 +98,6 @@ export function GSPNSyncHistory({ syncHistory, loading }: GSPNSyncHistoryProps) 
     </div>
   );
 }
+
+
+export { GSPNSyncHistory }
