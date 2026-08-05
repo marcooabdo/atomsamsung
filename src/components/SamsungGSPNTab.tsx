@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import { Download, CheckCircle, AlertCircle, Clock, RefreshCw, Save, Edit, Smartphone, Settings } from 'lucide-react';
+import { Download, CheckCircle, AlertCircle, Clock, RefreshCw, Save, CreditCard as Edit, Smartphone, Settings, AlertTriangle } from 'lucide-react';
+import { GSPNErrosHistorico } from './GSPNErrosHistorico';
+import { useGSPNErros } from '../hooks/useGSPNErros';
 
 interface SamsungConfig {
   id: string;
@@ -34,6 +36,7 @@ export function SamsungGSPNTab() {
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const { erros: gspnErros, loading: errosLoading, hasMore: errosHasMore, fetchMore: errosFetchMore } = useGSPNErros();
 
   const [formData, setFormData] = useState({
     asc_code: '',
@@ -594,6 +597,25 @@ export function SamsungGSPNTab() {
           </div>
         </div>
       )}
+
+      {/* Histórico de Erros GSPN */}
+      <div className="mt-8 p-6 rounded-xl border border-red-500/20 bg-red-500/5">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-8 h-8 rounded-lg bg-red-500/20 flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4 text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-sm font-semibold text-white">Erros GSPN</h3>
+            <p className="text-xs text-gray-500">Histórico de erros de todos os processos (crons, refresh, busca manual)</p>
+          </div>
+        </div>
+        <GSPNErrosHistorico
+          erros={gspnErros}
+          loading={errosLoading}
+          hasMore={errosHasMore}
+          onLoadMore={errosFetchMore}
+        />
+      </div>
     </div>
   );
 }

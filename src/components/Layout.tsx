@@ -7,6 +7,8 @@ import { supabase } from '../lib/supabase';
 import { ProfilePhotoUpload } from './ProfilePhotoUpload';
 import { ProfileModal } from './ProfileModal';
 import { ChatNotificationToast } from './ChatNotificationToast';
+import { GSPNErroToast } from './GSPNErroToast';
+import { useGSPNErros } from '../hooks/useGSPNErros';
 import {
   LayoutDashboard,
   Layers,
@@ -70,6 +72,7 @@ export function Layout({ children }: LayoutProps) {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [tooltipTop, setTooltipTop] = useState(0);
   const hideTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { novoErro, dismissErro } = useGSPNErros();
 
   const menuItems = useMemo(() => {
     if (permissionsLoading) return allMenuItems;
@@ -455,6 +458,7 @@ export function Layout({ children }: LayoutProps) {
 
       <ProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
       <ChatNotificationToast />
+      <GSPNErroToast erro={novoErro} onDismiss={dismissErro} />
     </div>
   );
 }
