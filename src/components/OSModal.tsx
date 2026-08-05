@@ -1,11 +1,14 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight, CreditCard as Edit3, Plus, Check } from 'lucide-react';
+import { X, User, Package, FileText, MessageSquare, Paperclip, DollarSign, Wrench, Send, Trash2, CheckSquare, AlertCircle, AlertTriangle, Clock, QrCode, RefreshCw, Calendar, Microscope, MoveHorizontal, ChevronDown, Download, FileDown, XCircle, CheckCircle, Save, Receipt, Phone, Loader2, Star, Pencil, ShieldCheck, Layers, Link2, ChevronRight, CreditCard as Edit3, Plus, Check, History } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 import { calcularESalvarKmCidade } from '../lib/deslocamentoService';
 import { normalizarCidade } from '../lib/cidadeNormalize';
 import { VincularOSModal } from './VincularOSModal';
+import { useGSPNSync } from '../hooks/useGSPNSync';
+import { GSPNSyncIndicator } from './GSPNSyncIndicator';
+import { GSPNSyncHistory } from './GSPNSyncHistory';
 
 function sanitizeGSPNValue(raw: string): string {
   let cleaned = raw.replace(/[^\d.,]/g, '');
@@ -195,6 +198,7 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
   const [mostrarConfirmacaoMover, setMostrarConfirmacaoMover] = useState(false);
   const [colunaDestino, setColunaDestino] = useState<{ id: string; label: string } | null>(null);
   const [syncingGSPN, setSyncingGSPN] = useState(false);
+  const [showSyncHistory, setShowSyncHistory] = useState(false);
   const [currentJob, setCurrentJob] = useState<any>(null);
   const [mostrarSucessoMover, setMostrarSucessoMover] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -1480,46 +1484,23 @@ export function OSModal({ osId: propOsId, onClose, onReload, onMoveOS, mode = 'v
 
   const REFRESH_GSPN_ATIVO = true;
 
+  const hasSamsungOS = !!os?.numero_os_samsung;
+  const gspnSync = useGSPNSync({
+    osId: hasSamsungOS ? osId : null,
+    autoRefreshOnOpen: true,
+    onSyncComplete: () => { loadOS(); loadComentarios(); if (onReload) onReload(); },
+  });
+
+  // Keep legacy syncingGSPN in sync for button state
+  useEffect(() => { setSyncingGSPN(gspnSync.isSyncing); }, [gspnSync.isSyncing]);
+
   const syncGSPN = async () => {
     if (!REFRESH_GSPN_ATIVO) return;
     if (!os?.numero_os_samsung) {
       showAlert({ message: 'Esta OS não possui número Samsung para sincronizar', type: 'warning' });
       return;
     }
-
-    setSyncingGSPN(true);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${osId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        await loadOS();
-        await loadComentarios();
-        if (onReload) onReload();
-        showAlert({ message: 'Dados da Samsung atualizados com sucesso', type: 'success' });
-      } else {
-        let errorMsg = 'Não foi possível atualizar os dados da Samsung agora.';
-        try {
-          const body = await response.json();
-          if (body?.erros?.length) {
-            console.error('[GSPN Refresh] Erros detalhados:', body.erros);
-            errorMsg = body.erros[0];
-          }
-        } catch {}
-        showAlert({ message: errorMsg, type: 'warning' });
-      }
-    } catch (err) {
-      console.error('[GSPN Refresh] Falha na requisição:', err);
-      showAlert({ message: 'Não foi possível atualizar os dados da Samsung agora.', type: 'warning' });
-    } finally {
-      setSyncingGSPN(false);
-    }
+    gspnSync.triggerSync();
   };
 
   const salvarNumeroSamsung = async () => {
@@ -3182,21 +3163,31 @@ Não haverá cobrança ao cliente.`
             </button>
 
             {os?.numero_os_samsung && (
-              <button
-                onClick={syncGSPN}
-                disabled={!REFRESH_GSPN_ATIVO || syncingGSPN || currentJob?.is_running}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)',
-                  border: '1px solid #8B5CF6',
-                  color: '#8B5CF6',
-                  boxShadow: '0 0 10px rgba(139,92,246,0.2)'
-                }}
-                title="Sincronizar dados com Samsung GSPN"
-              >
-                <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
-                SYNC GSPN
-              </button>
+              <>
+                <button
+                  onClick={syncGSPN}
+                  disabled={!REFRESH_GSPN_ATIVO || syncingGSPN || currentJob?.is_running}
+                  className="flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(139,92,246,0.05) 100%)',
+                    border: '1px solid #8B5CF6',
+                    color: '#8B5CF6',
+                    boxShadow: '0 0 10px rgba(139,92,246,0.2)'
+                  }}
+                  title="Sincronizar dados com Samsung GSPN"
+                >
+                  <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
+                  SYNC GSPN
+                </button>
+                <button
+                  onClick={() => { setShowSyncHistory(!showSyncHistory); if (!showSyncHistory) gspnSync.loadHistory(); }}
+                  className="p-2 rounded-lg transition-colors hover:bg-white/10"
+                  style={{ color: '#8B5CF6' }}
+                  title="Histórico de sincronização"
+                >
+                  <History className="w-4 h-4" />
+                </button>
+              </>
             )}
               </>
             )}
@@ -3209,6 +3200,23 @@ Não haverá cobrança ao cliente.`
             </button>
           </div>
         </div>
+
+        {/* GSPN Sync Indicator */}
+        {hasSamsungOS && (gspnSync.isSyncing || gspnSync.syncError || gspnSync.mudancas) && (
+          <div className="px-6 pt-3">
+            <GSPNSyncIndicator isSyncing={gspnSync.isSyncing} syncError={gspnSync.syncError} mudancas={gspnSync.mudancas} />
+          </div>
+        )}
+
+        {/* GSPN Sync History */}
+        {showSyncHistory && (
+          <div className="px-6 pt-3">
+            <div className="p-4 rounded-lg border" style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.08)' }}>
+              <h4 className="text-sm font-semibold mb-3 text-white">Histórico de Sincronização</h4>
+              <GSPNSyncHistory syncHistory={gspnSync.syncHistory} />
+            </div>
+          </div>
+        )}
 
         {currentJob && (
           <div className="px-6 pt-4 pb-4">

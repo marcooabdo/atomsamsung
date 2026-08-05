@@ -687,9 +687,21 @@ export function Kanban() {
       if (freshOS?.rota_id) {
         movedCard = { ...movedCard, rota_id: freshOS.rota_id };
       } else {
-        setMandatoryRoutePickerOS(movedCard);
-        setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
-        return;
+        // Try to auto-assign route by city match
+        const cidadeNorm = (movedCard.cliente_cidade || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const unidadeOS = movedCard.unidade_id || selectedUnidade || usuario?.unidade_id;
+        const rotaMatch = rotas.find(r => 
+          r.cidades.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() === cidadeNorm)
+        );
+        if (rotaMatch) {
+          // Auto-assign the route
+          await supabase.from('os').update({ rota_id: rotaMatch.id }).eq('id', osId);
+          movedCard = { ...movedCard, rota_id: rotaMatch.id };
+        } else {
+          setMandatoryRoutePickerOS(movedCard);
+          setPendingMandatoryMove({ targetColumn: toColumn, position: undefined });
+          return;
+        }
       }
     }
 
@@ -911,12 +923,21 @@ export function Kanban() {
         // Double-check from DB in case local state is stale
         const { data: freshOS } = await supabase.from('os').select('rota_id').eq('id', draggedCard.id).maybeSingle();
         if (freshOS?.rota_id) {
-          // rota_id exists in DB but not in local state - proceed with move
+          // rota_id exists in DB - proceed with move
         } else {
-          setMandatoryRoutePickerOS(draggedCard);
-          setPendingMandatoryMove({ targetColumn, position: finalPosition });
-          setDraggedCard(null);
-          return;
+          // Try to auto-assign route by city match
+          const cidadeNorm = (draggedCard.cliente_cidade || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+          const rotaMatch = rotas.find(r => 
+            r.cidades.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() === cidadeNorm)
+          );
+          if (rotaMatch) {
+            await supabase.from('os').update({ rota_id: rotaMatch.id }).eq('id', draggedCard.id);
+          } else {
+            setMandatoryRoutePickerOS(draggedCard);
+            setPendingMandatoryMove({ targetColumn, position: finalPosition });
+            setDraggedCard(null);
+            return;
+          }
         }
       }
     }
@@ -1766,9 +1787,18 @@ export function Kanban() {
       if (freshOS?.rota_id) {
         // rota_id exists in DB but not in local state - proceed with move
       } else {
-        setMandatoryRoutePickerOS(os);
-        setPendingMandatoryMove({ targetColumn, position: undefined });
-        return;
+        // Try to auto-assign route by city match
+        const cidadeNorm = (os.cliente_cidade || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        const rotaMatch = rotas.find(r => 
+          r.cidades.some(c => c.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim() === cidadeNorm)
+        );
+        if (rotaMatch) {
+          await supabase.from('os').update({ rota_id: rotaMatch.id }).eq('id', os.id);
+        } else {
+          setMandatoryRoutePickerOS(os);
+          setPendingMandatoryMove({ targetColumn, position: undefined });
+          return;
+        }
       }
     }
 

@@ -1,8 +1,11 @@
-import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route, AlertTriangle } from 'lucide-react';
+import { X, MapPin, Phone, Mail, Package, DollarSign, Calendar, Clock, ExternalLink, FileText, RefreshCw, Activity, CheckCircle, XCircle, MessageCircle, Pencil, Route, AlertTriangle, History } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { supabase, formatTipoAtendimento } from '../lib/supabase';
 import { AnexoPreviewModal } from './AnexoPreviewModal';
 import { WhatsAppSendModal } from './WhatsAppSendModal';
+import { useGSPNSync } from '../hooks/useGSPNSync';
+import { GSPNSyncIndicator } from './GSPNSyncIndicator';
+import { GSPNSyncHistory } from './GSPNSyncHistory';
 import { calcularESalvarKmCidade, getKmCidade } from '../lib/deslocamentoService';
 import { getStoragePublicUrl } from '../lib/storageUtils';
 import { useTheme } from '../contexts/ThemeContext';
@@ -113,7 +116,7 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
   const [osDetails, setOsDetails] = useState<OSDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [anexoPreview, setAnexoPreview] = useState<any>(null);
-  const [syncingGSPN, setSyncingGSPN] = useState(false);
+  const [showSyncHistory, setShowSyncHistory] = useState(false);
   const [currentJob, setCurrentJob] = useState<Job | null>(null);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [showRotaEditor, setShowRotaEditor] = useState(false);
@@ -184,46 +187,12 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
     setCurrentJob(data);
   }
 
-  const REFRESH_GSPN_ATIVO = true;
-
-  async function syncGSPN() {
-    if (!REFRESH_GSPN_ATIVO) return;
-    if (!osDetails?.numero_os_samsung) {
-      alert('Esta OS não possui número Samsung para sincronizar');
-      return;
-    }
-
-    setSyncingGSPN(true);
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 120000);
-      const response = await fetch(`https://bot-post-products.groupglobal.com.br/api/gspn/refresh/${osId}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (response.ok) {
-        await loadOSDetails();
-      } else {
-        let errorMsg = 'Não foi possível atualizar os dados da Samsung agora.';
-        try {
-          const body = await response.json();
-          if (body?.erros?.length) {
-            console.error('[GSPN Refresh] Erros detalhados:', body.erros);
-            errorMsg = body.erros[0];
-          }
-        } catch {}
-        alert(errorMsg);
-      }
-    } catch (err) {
-      console.error('[GSPN Refresh] Falha na requisição:', err);
-      alert('Não foi possível atualizar os dados da Samsung agora.');
-    } finally {
-      setSyncingGSPN(false);
-    }
-  }
+  const hasSamsungOS = !!osDetails?.numero_os_samsung;
+  const { isSyncing: syncingGSPN, syncError, mudancas, triggerSync, syncHistory, loadHistory } = useGSPNSync({
+    osId: hasSamsungOS ? osId : null,
+    autoRefreshOnOpen: true,
+    onSyncComplete: () => { loadOSDetails(); },
+  });
 
   async function loadOSDetails() {
     setLoading(true);
@@ -555,14 +524,24 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
                 </button>
               )}
               {osDetails.numero_os_samsung && (
-                <button
-                  onClick={syncGSPN}
-                  disabled={!REFRESH_GSPN_ATIVO || syncingGSPN || currentJob?.is_running}
-                  className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
-                  {syncingGSPN || currentJob?.is_running ? 'Sincronizando...' : 'Atualizar GSPN'}
-                </button>
+                <>
+                  <button
+                    onClick={triggerSync}
+                    disabled={syncingGSPN || currentJob?.is_running}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <RefreshCw className={`w-4 h-4 ${syncingGSPN || currentJob?.is_running ? 'animate-spin' : ''}`} />
+                    {syncingGSPN || currentJob?.is_running ? 'Sincronizando...' : 'Atualizar GSPN'}
+                  </button>
+                  <button
+                    onClick={() => { setShowSyncHistory(!showSyncHistory); if (!showSyncHistory) loadHistory(); }}
+                    className="flex items-center gap-2 px-3 py-2 rounded-lg transition-colors hover:bg-white/10"
+                    style={{ color: textSecondary }}
+                    title="Histórico de sincronização"
+                  >
+                    <History className="w-4 h-4" />
+                  </button>
+                </>
               )}
             </div>
           </div>
@@ -576,6 +555,23 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
             <X className="w-6 h-6" />
           </button>
         </div>
+
+        {/* GSPN Sync Indicator */}
+        {hasSamsungOS && (syncingGSPN || syncError || mudancas) && (
+          <div className="px-6 pt-3">
+            <GSPNSyncIndicator isSyncing={syncingGSPN} syncError={syncError} mudancas={mudancas} />
+          </div>
+        )}
+
+        {/* GSPN Sync History */}
+        {showSyncHistory && (
+          <div className="px-6 pt-3">
+            <div className="p-4 rounded-lg border" style={{ background: cardBg, borderColor: borderColor }}>
+              <h4 className="text-sm font-semibold mb-3" style={{ color: textPrimary }}>Histórico de Sincronização</h4>
+              <GSPNSyncHistory syncHistory={syncHistory} />
+            </div>
+          </div>
+        )}
 
         {currentJob && (
           <div className="px-6 pt-4">
