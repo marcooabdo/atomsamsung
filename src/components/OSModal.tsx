@@ -3203,14 +3203,14 @@ Não haverá cobrança ao cliente.`
 
         {/* GSPN Sync Indicator */}
         {hasSamsungOS && (gspnSync.isSyncing || gspnSync.syncError || gspnSync.mudancas) && (
-          <div className="px-6 pt-3">
+          <div className="px-6 pt-3 pb-3">
             <GSPNSyncIndicator isSyncing={gspnSync.isSyncing} syncError={gspnSync.syncError} mudancas={gspnSync.mudancas} />
           </div>
         )}
 
         {/* GSPN Sync History */}
         {showSyncHistory && (
-          <div className="px-6 pt-3">
+          <div className="px-6 pt-3 pb-4">
             <div className="p-4 rounded-lg border" style={{ background: 'rgba(0,0,0,0.2)', borderColor: 'rgba(255,255,255,0.08)' }}>
               <h4 className="text-sm font-semibold mb-3 text-white">Histórico de Sincronização</h4>
               <GSPNSyncHistory syncHistory={gspnSync.syncHistory} />

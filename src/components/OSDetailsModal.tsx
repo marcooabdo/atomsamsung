@@ -558,14 +558,14 @@ export default function OSDetailsModal({ osId, onClose }: OSDetailsModalProps) {
 
         {/* GSPN Sync Indicator */}
         {hasSamsungOS && (syncingGSPN || syncError || mudancas) && (
-          <div className="px-6 pt-3">
+          <div className="px-6 pt-3 pb-3">
             <GSPNSyncIndicator isSyncing={syncingGSPN} syncError={syncError} mudancas={mudancas} />
           </div>
         )}
 
         {/* GSPN Sync History */}
         {showSyncHistory && (
-          <div className="px-6 pt-3">
+          <div className="px-6 pt-3 pb-4">
             <div className="p-4 rounded-lg border" style={{ background: cardBg, borderColor: borderColor }}>
               <h4 className="text-sm font-semibold mb-3" style={{ color: textPrimary }}>Histórico de Sincronização</h4>
               <GSPNSyncHistory syncHistory={syncHistory} />

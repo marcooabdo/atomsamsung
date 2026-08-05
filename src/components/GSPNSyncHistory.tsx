@@ -47,7 +47,7 @@ export function GSPNSyncHistory({ syncHistory, loading }: GSPNSyncHistoryProps) 
   }
 
   return (
-    <div className="space-y-2 max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
+    <div className="space-y-3 max-h-64 overflow-y-auto" style={{ scrollbarWidth: 'thin' }}>
       {syncHistory.map(record => (
         <div
           key={record.id}
@@ -98,6 +98,3 @@ export function GSPNSyncHistory({ syncHistory, loading }: GSPNSyncHistoryProps) 
     </div>
   );
 }
-
-
-export { GSPNSyncHistory }
