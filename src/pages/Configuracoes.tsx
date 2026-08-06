@@ -1997,22 +1997,88 @@ export function Configuracoes() {
                     </button>
                   )}
                   {activeTab === 'servicos' && (
-                    <button
-                      onClick={() => handleOpenModal()}
-                      className="neon-button flex items-center gap-2 px-4 py-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Adicionar Serviço
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const filteredServicos = servicos.filter(s => {
+                            if (selectedUnidadeServico && s.unidade_id !== selectedUnidadeServico) return false;
+                            if (!searchServico.trim()) return true;
+                            const term = searchServico.toLowerCase();
+                            return s.nome.toLowerCase().includes(term) || (s.descricao || '').toLowerCase().includes(term) || (s.linha || '').toLowerCase().includes(term);
+                          });
+                          if (filteredServicos.length === 0) { alert('Nenhum serviço para exportar.'); return; }
+                          const rows = filteredServicos.map(s => ({
+                            'Nome': s.nome,
+                            'Descrição': s.descricao || '',
+                            'Linha do Produto': s.linha || '',
+                            'Valor Base (R$)': s.valor_base,
+                            'Unidade': s.unidade_id ? (unidades.find(u => u.id === s.unidade_id)?.nome || '') : 'Global',
+                            'Status': s.ativo ? 'Ativo' : 'Inativo',
+                            'Criado em': s.created_at ? new Date(s.created_at).toLocaleDateString('pt-BR') : '',
+                          }));
+                          const wb = XLSX.utils.book_new();
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          ws['!cols'] = [{ wch: 30 }, { wch: 40 }, { wch: 25 }, { wch: 14 }, { wch: 28 }, { wch: 10 }, { wch: 12 }];
+                          XLSX.utils.book_append_sheet(wb, ws, 'Serviços');
+                          const unidadeNome = selectedUnidadeServico ? unidades.find(u => u.id === selectedUnidadeServico)?.nome || 'Unidade' : 'Todas';
+                          XLSX.writeFile(wb, `Servicos_${unidadeNome.replace(/\s+/g, '_')}.xlsx`);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#00D4FF]/30 text-[#00D4FF] hover:bg-[#00D4FF]/10 transition-colors text-sm"
+                      >
+                        <Download className="w-4 h-4" />
+                        Exportar
+                      </button>
+                      <button
+                        onClick={() => handleOpenModal()}
+                        className="neon-button flex items-center gap-2 px-4 py-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Adicionar Serviço
+                      </button>
+                    </div>
                   )}
                   {activeTab === 'markup' && (
-                    <button
-                      onClick={() => handleOpenModal()}
-                      className="neon-button flex items-center gap-2 px-4 py-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      Adicionar Markup
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          const filteredMarkups = markups.filter(m => {
+                            if (selectedUnidadeMarkup === '') return true;
+                            return m.unidade_id === selectedUnidadeMarkup;
+                          });
+                          if (filteredMarkups.length === 0) { alert('Nenhuma regra de markup para exportar.'); return; }
+                          const rows = filteredMarkups.map(m => ({
+                            'Nome': m.nome,
+                            'Tipo Orçamento': m.tipo_orcamento === 'normal' ? 'Normal' : m.tipo_orcamento === 'acessorios' ? 'Acessórios' : 'Samsung Contigo',
+                            'Valor Mínimo (R$)': m.valor_minimo !== null ? m.valor_minimo : 0,
+                            'Valor Máximo (R$)': m.valor_maximo !== null ? m.valor_maximo : '∞ (sem limite)',
+                            'Tipo Markup': m.tipo === 'percentual' ? 'Percentual' : m.tipo === 'multiplicador' ? 'Multiplicador' : 'Valor Fixo',
+                            'Valor Markup': m.tipo === 'percentual' ? `${m.valor}%` : m.tipo === 'multiplicador' ? `×${m.valor}` : `R$ ${m.valor.toFixed(2)}`,
+                            'Valor Numérico': m.valor,
+                            'Descrição': m.descricao || '',
+                            'Unidade': m.unidade_id ? (unidades.find(u => u.id === m.unidade_id)?.nome || '') : 'Global',
+                            'Status': m.ativo ? 'Ativo' : 'Inativo',
+                            'Criado em': m.created_at ? new Date(m.created_at).toLocaleDateString('pt-BR') : '',
+                          }));
+                          const wb = XLSX.utils.book_new();
+                          const ws = XLSX.utils.json_to_sheet(rows);
+                          ws['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 35 }, { wch: 28 }, { wch: 10 }, { wch: 12 }];
+                          XLSX.utils.book_append_sheet(wb, ws, 'Markup');
+                          const unidadeNome = selectedUnidadeMarkup ? unidades.find(u => u.id === selectedUnidadeMarkup)?.nome || 'Unidade' : 'Todas';
+                          XLSX.writeFile(wb, `Markup_${unidadeNome.replace(/\s+/g, '_')}.xlsx`);
+                        }}
+                        className="flex items-center gap-2 px-3 py-2 rounded-lg border border-[#00D4FF]/30 text-[#00D4FF] hover:bg-[#00D4FF]/10 transition-colors text-sm"
+                      >
+                        <Download className="w-4 h-4" />
+                        Exportar
+                      </button>
+                      <button
+                        onClick={() => handleOpenModal()}
+                        className="neon-button flex items-center gap-2 px-4 py-2"
+                      >
+                        <Plus className="w-4 h-4" />
+                        Adicionar Markup
+                      </button>
+                    </div>
                   )}
                   {activeTab === 'rotas' && selectedUnidadeRota && (
                     <button
