@@ -358,20 +358,45 @@ REGRAS CRITICAS:
       }
     }
 
+    // Detect unit filter from message (siglas: MOC, FSA, JDF, SBC)
+    const UNIT_ALIASES: { keywords: string[]; unidade_id: string; nome: string }[] = [
+      { keywords: ["moc", "montes claros"], unidade_id: "234822a3-f706-47f5-97af-bc7732417660", nome: "Montes Claros" },
+      { keywords: ["fsa", "feira de santana", "feira"], unidade_id: "1b9ff2d1-474e-4783-aa39-80c89a6a48cf", nome: "Feira de Santana" },
+      { keywords: ["jdf", "juiz de fora", "juiz"], unidade_id: "4ba3e16b-5627-480e-b2b2-f6599a211d41", nome: "Juiz de Fora" },
+      { keywords: ["sbc", "sao bernardo", "bernardo"], unidade_id: "96fb83dd-3ea2-478e-a5f1-bbb58da99592", nome: "São Bernardo do Campo" },
+    ];
+
+    let detectedUnidadeId: string | null = null;
+    let detectedUnidadeNome: string | null = null;
+
+    for (const unit of UNIT_ALIASES) {
+      if (unit.keywords.some(kw => msgLower.includes(kw))) {
+        detectedUnidadeId = unit.unidade_id;
+        detectedUnidadeNome = unit.nome;
+        break;
+      }
+    }
+
     if (detectedReportTipo) {
       try {
+        const sendPayload: Record<string, string> = { tipo: detectedReportTipo };
+        if (detectedUnidadeId) {
+          sendPayload.unidade_id = detectedUnidadeId;
+        }
+
         const sendResponse = await fetch(`${supabaseUrl}/functions/v1/gia-send-relatorio`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${supabaseServiceKey}`,
           },
-          body: JSON.stringify({ tipo: detectedReportTipo }),
+          body: JSON.stringify(sendPayload),
         });
 
         const sendResult = await sendResponse.json();
+        const unitSuffix = detectedUnidadeNome ? ` (filtrado: ${detectedUnidadeNome})` : " (todas as unidades)";
         const actionResult = sendResponse.ok
-          ? `RELATORIO "${detectedReportTipo}" ENVIADO COM SUCESSO no grupo WhatsApp.`
+          ? `RELATORIO "${detectedReportTipo}" ENVIADO COM SUCESSO no grupo WhatsApp${unitSuffix}.`
           : `ERRO ao enviar relatorio "${detectedReportTipo}": ${sendResult.error || "falha desconhecida"}`;
 
         chatMessages[chatMessages.length - 1] = {

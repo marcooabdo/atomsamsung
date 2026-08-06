@@ -137,7 +137,7 @@ IMPORTANTE: Gere APENAS o texto da mensagem, sem markdown extra, sem explicaçõ
   return result.choices[0]?.message?.content || "Bom dia, equipe! Vamos com tudo hoje! 🚀\n\nGIA • Diretoria Group Global";
 }
 
-async function generateReport(tipo: string): Promise<string> {
+async function generateReport(tipo: string, unidade_id?: string): Promise<string> {
   // Motivacional usa OpenAI diretamente (não existe em gia-relatorio)
   if (tipo === "motivacional_operacional") {
     return await generateMotivacionalOperacional();
@@ -147,13 +147,16 @@ async function generateReport(tipo: string): Promise<string> {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+  const payload: Record<string, string> = { tipo };
+  if (unidade_id) payload.unidade_id = unidade_id;
+
   const response = await fetch(`${supabaseUrl}/functions/v1/gia-relatorio`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       "Authorization": `Bearer ${supabaseServiceKey}`,
     },
-    body: JSON.stringify({ tipo }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -264,7 +267,7 @@ Deno.serve(async (req: Request) => {
 
   try {
     const body = await req.json();
-    const { tipo, group_jid, todos } = body;
+    const { tipo, group_jid, todos, unidade_id } = body;
 
     // Se "todos" flag, enviar todos os relatórios ativos
     if (todos) {
@@ -426,7 +429,7 @@ Deno.serve(async (req: Request) => {
         
         // Enviar também um texto resumo breve após as imagens
         await new Promise(resolve => setTimeout(resolve, 2000));
-        const message = await generateReport(tipo);
+        const message = await generateReport(tipo, unidade_id);
         await sendWhatsAppGroup(targetGroup, message);
         
         await supabase.from("gia_relatorio_logs").insert({
@@ -485,7 +488,7 @@ Deno.serve(async (req: Request) => {
     }
 
     // Gerar o relatório (texto)
-    const message = await generateReport(tipo);
+    const message = await generateReport(tipo, unidade_id);
 
     // Enviar para o grupo correto usando instância Marco (ATOM CORE)
     await sendWhatsAppGroup(targetGroup, message);
