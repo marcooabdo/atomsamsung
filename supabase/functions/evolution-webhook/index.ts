@@ -1052,6 +1052,23 @@ function detectReportType(text: string): string | null {
   return null;
 }
 
+const UNIT_ALIASES_REPORT: { keywords: string[]; unidade_id: string; nome: string }[] = [
+  { keywords: ["moc", "montes claros"], unidade_id: "234822a3-f706-47f5-97af-bc7732417660", nome: "Montes Claros" },
+  { keywords: ["fsa", "feira de santana", "feira"], unidade_id: "1b9ff2d1-474e-4783-aa39-80c89a6a48cf", nome: "Feira de Santana" },
+  { keywords: ["jdf", "juiz de fora", "juiz"], unidade_id: "4ba3e16b-5627-480e-b2b2-f6599a211d41", nome: "Juiz de Fora" },
+  { keywords: ["sbc", "sao bernardo", "bernardo"], unidade_id: "96fb83dd-3ea2-478e-a5f1-bbb58da99592", nome: "São Bernardo do Campo" },
+];
+
+function detectUnitFromText(text: string): string | null {
+  const lower = text.toLowerCase();
+  for (const unit of UNIT_ALIASES_REPORT) {
+    if (unit.keywords.some(kw => lower.includes(kw))) {
+      return unit.unidade_id;
+    }
+  }
+  return null;
+}
+
 async function handleGIAReportRequest(
   _supabase: any,
   text: string,
@@ -1065,7 +1082,8 @@ async function handleGIAReportRequest(
       return;
     }
 
-    console.log(`[GIA Report] Detected type=${tipo}, group=${groupJid}`);
+    const detectedUnidadeId = detectUnitFromText(text);
+    console.log(`[GIA Report] Detected type=${tipo}, group=${groupJid}, unidade=${detectedUnidadeId || "todas"}`);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -1078,6 +1096,9 @@ async function handleGIAReportRequest(
       payload.todos = true;
     } else {
       payload.tipo = tipo;
+      if (detectedUnidadeId) {
+        payload.unidade_id = detectedUnidadeId;
+      }
     }
 
     // Fire and forget - don't block the webhook response
