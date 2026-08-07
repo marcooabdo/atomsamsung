@@ -321,13 +321,13 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   useEffect(() => {
+    setOsData(null);
+    setSuggestedOS(null);
     loadMensagens();
     loadColunas();
     loadAtendentes();
     loadInstancia();
-    if (conversa.os_id) {
-      loadOSData();
-    }
+    loadOSData();
     markAsRead();
     setClienteFoto(conversa.cliente_foto_url);
     setEditClienteNome(conversa.cliente_nome || '');
@@ -1328,30 +1328,44 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     setSearchingOS(true);
     const numericTerm = term.replace(/\D/g, '');
 
+    const buildOrFilter = (t: string, nt: string) => {
+      if (nt && nt.length >= 2) {
+        return `numero_os_interna.ilike.%${t}%,numero_os_samsung.ilike.%${t}%,numero_os_samsung.ilike.%${nt}%,cliente_nome.ilike.%${t}%,cliente_telefone.ilike.%${nt}%,cliente_telefone_2.ilike.%${nt}%,cliente_cpf_cnpj.ilike.%${nt}%`;
+      }
+      return `numero_os_interna.ilike.%${t}%,numero_os_samsung.ilike.%${t}%,cliente_nome.ilike.%${t}%,cliente_telefone.ilike.%${t}%,cliente_cpf_cnpj.ilike.%${t}%`;
+    };
+
     try {
-      let query = supabase
-        .from('os')
-        .select(osSelectFields);
-
       const targetUnidadeId = getTargetUnidade();
+      const orFilter = buildOrFilter(term, numericTerm);
+
       if (targetUnidadeId) {
-        query = query.eq('unidade_id', targetUnidadeId);
+        const { data, error } = await supabase
+          .from('os')
+          .select(osSelectFields)
+          .eq('unidade_id', targetUnidadeId)
+          .or(orFilter)
+          .order('created_at', { ascending: false })
+          .limit(30);
+
+        if (!error && data && data.length > 0) {
+          setOsSearchResults(data);
+          setSearchingOS(false);
+          return;
+        }
       }
 
-      if (numericTerm && numericTerm.length >= 2) {
-        query = query.or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,numero_os_samsung.ilike.%${numericTerm}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${numericTerm}%,cliente_telefone_2.ilike.%${numericTerm}%,cliente_cpf_cnpj.ilike.%${numericTerm}%`);
-      } else {
-        query = query.or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`);
-      }
-
-      const { data, error } = await query
+      const { data: allData, error: allError } = await supabase
+        .from('os')
+        .select(osSelectFields)
+        .or(orFilter)
         .order('created_at', { ascending: false })
         .limit(30);
 
-      if (error) {
-        console.error('[AtomConnect] searchOS error:', error);
+      if (allError) {
+        console.error('[AtomConnect] searchOS error:', allError);
       }
-      setOsSearchResults(data || []);
+      setOsSearchResults(allData || []);
     } catch (e) {
       console.error('[AtomConnect] searchOS exception:', e);
       setOsSearchResults([]);
@@ -2478,15 +2492,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     )}
                     <div className="flex gap-2 pt-2">
                       <button
-                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] transition-colors"
-                        style={{ backgroundColor: `${accentColor}20`, color: accentColor }}
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        Ver OS
-                      </button>
-                      <button
                         onClick={desvincularOS}
-                        className="px-2 py-1.5 rounded text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
+                        className="flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded text-[10px] bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors"
                       >
                         <X className="w-3 h-3" />
                       </button>
