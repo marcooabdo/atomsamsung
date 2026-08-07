@@ -67,7 +67,7 @@ interface OS {
   numero_os_samsung: string | null;
   cliente_nome: string | null;
   cliente_telefone: string | null;
-  defeito_reclamado: string | null;
+  defeito_relatado: string | null;
   status_kanban: string | null;
   coluna_kanban: string | null;
 }
@@ -618,7 +618,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           if (targetUnit) {
             const { data: matched } = await supabase
               .from('os')
-              .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
+              .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban')
               .eq('unidade_id', targetUnit)
               .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
               .not('coluna_kanban', 'in', '("finalizado","arquivado")')
@@ -634,7 +634,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
     const { data } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban')
       .eq('id', conversa.os_id)
       .maybeSingle();
     if (data) setOsData(data);
@@ -1316,7 +1316,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [loadingAllOS, setLoadingAllOS] = useState(false);
   const [osLoadError, setOsLoadError] = useState<string | null>(null);
 
-  const osSelectFields = 'id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban';
+  const osSelectFields = 'id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban';
 
   const getTargetUnidade = () => conversa.unidade_id || unidadeId || unidadeAtual;
 
@@ -2472,9 +2472,9 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         <span className="text-xs font-medium text-orange-400">{osData.numero_os_samsung}</span>
                       </div>
                     )}
-                    {osData.defeito_reclamado && (
+                    {osData.defeito_relatado && (
                       <div className="pt-2" style={{ borderTop: `1px solid ${borderColor}` }}>
-                        <p className="text-[10px] line-clamp-2" style={{ color: textSecondary }}>{osData.defeito_reclamado}</p>
+                        <p className="text-[10px] line-clamp-2" style={{ color: textSecondary }}>{osData.defeito_relatado}</p>
                       </div>
                     )}
                     <div className="flex gap-2 pt-2">
@@ -2506,8 +2506,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                             <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
                               OS #{suggestedOS.numero_os_samsung || suggestedOS.numero_os_interna}
                             </p>
-                            {suggestedOS.defeito_reclamado && (
-                              <p className="text-[10px] text-gray-400 truncate">{suggestedOS.defeito_reclamado}</p>
+                            {suggestedOS.defeito_relatado && (
+                              <p className="text-[10px] text-gray-400 truncate">{suggestedOS.defeito_relatado}</p>
                             )}
                           </div>
                           <button
@@ -2937,8 +2937,8 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                               )}
                             </div>
                             <div className="flex items-center gap-2 mt-0.5">
-                              {os.defeito_reclamado && (
-                                <span className="text-[10px] text-white/30 truncate">{os.defeito_reclamado}</span>
+                              {os.defeito_relatado && (
+                                <span className="text-[10px] text-white/30 truncate">{os.defeito_relatado}</span>
                               )}
                               {os.cliente_telefone && (
                                 <span className="text-[10px] text-white/20 flex-shrink-0">
