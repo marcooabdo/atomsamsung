@@ -1314,10 +1314,14 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
 
   const [allUnitOS, setAllUnitOS] = useState<OS[]>([]);
   const [loadingAllOS, setLoadingAllOS] = useState(false);
+  const [osLoadError, setOsLoadError] = useState<string | null>(null);
+
+  const osSelectFields = 'id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban';
+
+  const getTargetUnidade = () => conversa.unidade_id || unidadeId || unidadeAtual;
 
   const searchOS = useCallback(async (term: string) => {
-    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
-    if (!targetUnidadeId || !term || term.length < 1) {
+    if (!term || term.length < 1) {
       setOsSearchResults([]);
       return;
     }
@@ -1328,8 +1332,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     try {
       let query = supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
-        .eq('unidade_id', targetUnidadeId);
+        .select(osSelectFields);
+
+      const targetUnidadeId = getTargetUnidade();
+      if (targetUnidadeId) {
+        query = query.eq('unidade_id', targetUnidadeId);
+      }
 
       if (numericTerm && numericTerm.length >= 2) {
         query = query.or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,numero_os_samsung.ilike.%${numericTerm}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${numericTerm}%,cliente_telefone_2.ilike.%${numericTerm}%,cliente_cpf_cnpj.ilike.%${numericTerm}%`);
@@ -1341,10 +1349,12 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
         .order('created_at', { ascending: false })
         .limit(30);
 
-      if (!error && data) {
-        setOsSearchResults(data);
+      if (error) {
+        console.error('[AtomConnect] searchOS error:', error);
       }
-    } catch {
+      setOsSearchResults(data || []);
+    } catch (e) {
+      console.error('[AtomConnect] searchOS exception:', e);
       setOsSearchResults([]);
     } finally {
       setSearchingOS(false);
@@ -1352,22 +1362,32 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   }, [conversa.unidade_id, unidadeId, unidadeAtual]);
 
   const loadAllUnitOS = useCallback(async () => {
-    const targetUnidadeId = conversa.unidade_id || unidadeId || unidadeAtual;
-    if (!targetUnidadeId) return;
-
     setLoadingAllOS(true);
+    setOsLoadError(null);
     try {
-      const { data } = await supabase
+      let query = supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
-        .eq('unidade_id', targetUnidadeId)
+        .select(osSelectFields);
+
+      const targetUnidadeId = getTargetUnidade();
+      if (targetUnidadeId) {
+        query = query.eq('unidade_id', targetUnidadeId);
+      }
+
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(500);
 
-      if (data) {
-        setAllUnitOS(data);
+      if (error) {
+        console.error('[AtomConnect] loadAllUnitOS error:', error);
+        setOsLoadError(error.message);
+        setAllUnitOS([]);
+      } else {
+        setAllUnitOS(data || []);
       }
-    } catch {
+    } catch (e: any) {
+      console.error('[AtomConnect] loadAllUnitOS exception:', e);
+      setOsLoadError(e?.message || 'Erro ao carregar OS');
       setAllUnitOS([]);
     } finally {
       setLoadingAllOS(false);
@@ -2868,7 +2888,16 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                     return (
                       <div className="flex flex-col items-center justify-center h-full text-gray-500">
                         <FileText className="w-10 h-10 mb-2 opacity-30" />
-                        <p className="text-xs">Nenhuma OS nesta unidade</p>
+                        <p className="text-xs">{osLoadError ? `Erro: ${osLoadError}` : 'Nenhuma OS nesta unidade'}</p>
+                        {osLoadError && (
+                          <button
+                            onClick={loadAllUnitOS}
+                            className="mt-2 text-[10px] px-2 py-1 rounded bg-white/5 hover:bg-white/10 transition-colors"
+                            style={{ color: accentColor }}
+                          >
+                            Tentar novamente
+                          </button>
+                        )}
                       </div>
                     );
                   }
