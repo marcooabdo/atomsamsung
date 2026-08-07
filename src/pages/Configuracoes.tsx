@@ -77,6 +77,7 @@ interface Markup {
   tipo_orcamento: 'normal' | 'acessorios' | 'samsung_contigo';
   ativo: boolean;
   created_at: string;
+  preco_minimo_venda: number | null;
 }
 
 interface TaxaMaquina {
@@ -193,7 +194,7 @@ export function Configuracoes() {
   const [formUsuario, setFormUsuario] = useState({ nome: '', email: '', tipo: 'tecnico' as const, unidade_id: '', senha: '', ativo: true, numero_tecnico: '' });
   const [unidadesAdicionais, setUnidadesAdicionais] = useState<string[]>([]);
   const [formServico, setFormServico] = useState({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: '', ativo: true });
-  const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true });
+  const [formMarkup, setFormMarkup] = useState({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual' as const, valor: '0', descricao: '', unidade_id: '', tipo_orcamento: 'normal' as const, ativo: true, preco_minimo_venda: '' });
   const [formRota, setFormRota] = useState({ nome: '', cor: '#3b82f6', cidades: [] as string[], unidade_id: '', ativa: true });
   const [cidadesKM, setCidadesKM] = useState<Record<string, string>>({});
   const [formChecklist, setFormChecklist] = useState({ nome: '', descricao: '', tipo_servico: 'geral' as const, tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM' as const, unidade_id: '', itens: [] as ChecklistItem[], ativo: true });
@@ -330,7 +331,7 @@ export function Configuracoes() {
           break;
         case 'markup':
           const markup = markups.find(m => m.id === id);
-          if (markup) setFormMarkup({ nome: markup.nome, valor_minimo: markup.valor_minimo?.toString() || '', valor_maximo: markup.valor_maximo?.toString() || '', tipo: markup.tipo, valor: markup.valor.toString(), descricao: markup.descricao || '', unidade_id: markup.unidade_id || '', tipo_orcamento: markup.tipo_orcamento || 'normal', ativo: markup.ativo });
+          if (markup) setFormMarkup({ nome: markup.nome, valor_minimo: markup.valor_minimo?.toString() || '', valor_maximo: markup.valor_maximo?.toString() || '', tipo: markup.tipo, valor: markup.valor.toString(), descricao: markup.descricao || '', unidade_id: markup.unidade_id || '', tipo_orcamento: markup.tipo_orcamento || 'normal', ativo: markup.ativo, preco_minimo_venda: markup.preco_minimo_venda?.toString() || '' });
           break;
         case 'rotas':
           const rota = rotas.find(r => r.id === id);
@@ -377,7 +378,7 @@ export function Configuracoes() {
       setUnidadesAdicionais([]);
       const defaultUnitForForm = canSeeAllUnits ? '' : userUnitId;
       setFormServico({ nome: '', descricao: '', valor_base: '0', linha: '', unidade_id: defaultUnitForForm, ativo: true });
-      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: defaultUnitForForm, tipo_orcamento: 'normal', ativo: true });
+      setFormMarkup({ nome: '', valor_minimo: '', valor_maximo: '', tipo: 'percentual', valor: '0', descricao: '', unidade_id: defaultUnitForForm, tipo_orcamento: 'normal', ativo: true, preco_minimo_venda: '' });
       setFormRota({ nome: '', cor: '#3b82f6', cidades: [], unidade_id: selectedUnidadeRota || defaultUnitForForm, ativa: true });
       setCidadesKM({});
       setFormChecklist({ nome: '', descricao: '', tipo_servico: 'geral', tipo_os: ['LP', 'OW', 'NA'], tipos_atendimento: ['CI', 'IH', 'II', 'RH', 'SH', 'PS'], tipo_checklist: 'ADM', unidade_id: selectedUnidadeChecklist || defaultUnitForForm, itens: [], ativo: true });
@@ -583,7 +584,8 @@ export function Configuracoes() {
             descricao: formMarkup.descricao || null,
             unidade_id: markupUnidadeId,
             tipo_orcamento: formMarkup.tipo_orcamento || 'normal',
-            ativo: formMarkup.ativo
+            ativo: formMarkup.ativo,
+            preco_minimo_venda: formMarkup.preco_minimo_venda ? parseFloat(formMarkup.preco_minimo_venda) : null
           };
           if (editingId) {
             const { error } = await supabase.from('markup_regras').update(markupData).eq('id', editingId);
@@ -1443,6 +1445,11 @@ export function Configuracoes() {
                     </p>
                   </div>
                   <div>
+                    <label className="block text-xs text-gray-400 uppercase mb-2">Trava — Preço Mínimo de Venda (R$)</label>
+                    <input type="number" step="0.01" value={formMarkup.preco_minimo_venda} onChange={(e) => setFormMarkup({...formMarkup, preco_minimo_venda: e.target.value})} placeholder="Ex: 300 (opcional)" className="neon-input" />
+                    <p className="text-xs text-gray-500 mt-1">Se o cálculo resultar em menos que esse valor, cobra esse mínimo</p>
+                  </div>
+                  <div>
                     <label className="block text-xs text-gray-400 uppercase mb-2">Descrição</label>
                     <textarea value={formMarkup.descricao} onChange={(e) => setFormMarkup({...formMarkup, descricao: e.target.value})} rows={2} placeholder="Descrição opcional da regra" className="neon-input" />
                   </div>
@@ -2049,11 +2056,12 @@ export function Configuracoes() {
                           const rows = filteredMarkups.map(m => ({
                             'Nome': m.nome,
                             'Tipo Orçamento': m.tipo_orcamento === 'normal' ? 'Normal' : m.tipo_orcamento === 'acessorios' ? 'Acessórios' : 'Samsung Contigo',
-                            'Valor Mínimo (R$)': m.valor_minimo !== null ? m.valor_minimo : 0,
-                            'Valor Máximo (R$)': m.valor_maximo !== null ? m.valor_maximo : '∞ (sem limite)',
+                            'Custo Mínimo (R$)': m.valor_minimo !== null ? m.valor_minimo : 0,
+                            'Custo Máximo (R$)': m.valor_maximo !== null ? m.valor_maximo : '∞ (sem limite)',
                             'Tipo Markup': m.tipo === 'percentual' ? 'Percentual' : m.tipo === 'multiplicador' ? 'Multiplicador' : 'Valor Fixo',
-                            'Valor Markup': m.tipo === 'percentual' ? `${m.valor}%` : m.tipo === 'multiplicador' ? `×${m.valor}` : `R$ ${m.valor.toFixed(2)}`,
+                            'Fator/Valor': m.tipo === 'percentual' ? `${m.valor}%` : m.tipo === 'multiplicador' ? `×${m.valor}` : `+R$ ${m.valor.toFixed(2)}`,
                             'Valor Numérico': m.valor,
+                            'Trava - Preço Mín. Venda (R$)': m.preco_minimo_venda || '',
                             'Descrição': m.descricao || '',
                             'Unidade': m.unidade_id ? (unidades.find(u => u.id === m.unidade_id)?.nome || '') : 'Global',
                             'Status': m.ativo ? 'Ativo' : 'Inativo',
@@ -2061,7 +2069,7 @@ export function Configuracoes() {
                           }));
                           const wb = XLSX.utils.book_new();
                           const ws = XLSX.utils.json_to_sheet(rows);
-                          ws['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 35 }, { wch: 28 }, { wch: 10 }, { wch: 12 }];
+                          ws['!cols'] = [{ wch: 25 }, { wch: 18 }, { wch: 16 }, { wch: 20 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 28 }, { wch: 35 }, { wch: 28 }, { wch: 10 }, { wch: 12 }];
                           XLSX.utils.book_append_sheet(wb, ws, 'Markup');
                           const unidadeNome = selectedUnidadeMarkup ? unidades.find(u => u.id === selectedUnidadeMarkup)?.nome || 'Unidade' : 'Todas';
                           XLSX.writeFile(wb, `Markup_${unidadeNome.replace(/\s+/g, '_')}.xlsx`);
@@ -2405,7 +2413,7 @@ export function Configuracoes() {
                               {markup.descricao && (
                                 <p className="text-sm text-gray-400 mb-2">{markup.descricao}</p>
                               )}
-                              <div className="grid grid-cols-3 gap-3 text-sm mb-3">
+                              <div className="grid grid-cols-4 gap-3 text-sm mb-3">
                                 <div>
                                   <span className="text-gray-500 text-xs">De:</span>
                                   <p className="text-gray-300 font-semibold">
@@ -2426,11 +2434,20 @@ export function Configuracoes() {
                                     {markup.tipo === 'valor_fixo' && `+R$ ${markup.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`}
                                   </p>
                                 </div>
+                                <div>
+                                  <span className="text-gray-500 text-xs">Trava (Mín. Venda):</span>
+                                  <p className={`font-bold ${markup.preco_minimo_venda ? 'text-[#FF6B35]' : 'text-gray-600'}`}>
+                                    {markup.preco_minimo_venda
+                                      ? `R$ ${markup.preco_minimo_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`
+                                      : '—'}
+                                  </p>
+                                </div>
                               </div>
                               <div className="text-xs text-gray-500">
                                 {markup.tipo === 'percentual' && `Adiciona ${markup.valor}% ao valor base`}
                                 {markup.tipo === 'multiplicador' && `Multiplica valor base por ${markup.valor}`}
                                 {markup.tipo === 'valor_fixo' && `Adiciona R$ ${markup.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })} ao valor base`}
+                                {markup.preco_minimo_venda && ` · Se resultado < R$ ${markup.preco_minimo_venda.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}, cobra o mínimo`}
                               </div>
                             </div>
                             <div className="flex items-center gap-2 ml-4">
