@@ -150,6 +150,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [osSearchTerm, setOsSearchTerm] = useState('');
   const [osSearchResults, setOsSearchResults] = useState<OS[]>([]);
   const [searchingOS, setSearchingOS] = useState(false);
+  const [suggestedOS, setSuggestedOS] = useState<OS | null>(null);
   const [clienteFoto, setClienteFoto] = useState<string | null>(conversa.cliente_foto_url);
   const [usersCache, setUsersCache] = useState<Record<string, string>>({});
   const [instancia, setInstancia] = useState<Instancia | null>(null);
@@ -608,13 +609,36 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   };
 
   const loadOSData = async () => {
-    if (!conversa.os_id) return;
+    if (!conversa.os_id) {
+      // Auto-suggest: search for OS matching this phone number
+      if (conversa.cliente_telefone && !conversa.is_group) {
+        const phoneSuffix = conversa.cliente_telefone.replace(/\D/g, '').slice(-8);
+        if (phoneSuffix.length >= 8) {
+          const targetUnit = conversa.unidade_id || unidadeId || unidadeAtual;
+          if (targetUnit) {
+            const { data: matched } = await supabase
+              .from('os')
+              .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
+              .eq('unidade_id', targetUnit)
+              .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
+              .not('coluna_kanban', 'in', '("finalizado","arquivado")')
+              .order('created_at', { ascending: false })
+              .limit(1);
+            if (matched && matched.length > 0) {
+              setSuggestedOS(matched[0]);
+            }
+          }
+        }
+      }
+      return;
+    }
     const { data } = await supabase
       .from('os')
       .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_reclamado, status_kanban, coluna_kanban')
       .eq('id', conversa.os_id)
       .maybeSingle();
     if (data) setOsData(data);
+    setSuggestedOS(null);
   };
 
   const markAsRead = async () => {
@@ -1382,6 +1406,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
       .eq('id', conversa.id);
 
     setOsData(os);
+    setSuggestedOS(null);
     setShowVincularOS(false);
     setOsSearchTerm('');
     setOsSearchResults([]);
@@ -2450,6 +2475,31 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                   </div>
                 ) : (
                   <div className="space-y-2">
+                    {suggestedOS && (
+                      <div className="rounded-lg border border-cyan-500/30 bg-cyan-500/5 p-2.5 space-y-2">
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                          <span className="text-[10px] font-medium text-cyan-400">OS encontrada para este telefone</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: textPrimary }}>
+                              OS #{suggestedOS.numero_os_samsung || suggestedOS.numero_os_interna}
+                            </p>
+                            {suggestedOS.defeito_reclamado && (
+                              <p className="text-[10px] text-gray-400 truncate">{suggestedOS.defeito_reclamado}</p>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => vincularOS(suggestedOS)}
+                            className="flex-shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-md text-[10px] font-medium bg-cyan-500/20 text-cyan-400 hover:bg-cyan-500/30 transition-colors"
+                          >
+                            <Link2 className="w-3 h-3" />
+                            Vincular
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <button
                       onClick={() => setShowVincularOS(true)}
                       className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs hover:bg-black/5 transition-colors border border-dashed"
@@ -2835,27 +2885,39 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
                         <button
                           key={os.id}
                           onClick={() => vincularOS(os)}
-                          className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-white/5 transition-colors text-left group"
+                          className="w-full flex items-start gap-2.5 px-3 py-2.5 rounded-lg hover:bg-white/5 transition-colors text-left group"
                         >
-                          <FileText className="w-4 h-4 text-gray-600 group-hover:text-cyan-400 flex-shrink-0 transition-colors" />
-                          <div className="flex items-center gap-2 flex-1 min-w-0">
-                            <span className="text-[11px] font-semibold text-cyan-400 flex-shrink-0">
-                              #{os.numero_os_samsung || os.numero_os_interna || '---'}
-                            </span>
-                            <span className="text-[11px] text-white/70 truncate">
-                              {os.cliente_nome || 'Sem nome'}
-                            </span>
-                            {os.numero_os_samsung && os.numero_os_interna && (
-                              <span className="text-[9px] px-1 py-0.5 rounded bg-orange-500/15 text-orange-400/80 flex-shrink-0">
-                                SAM
+                          <FileText className="w-4 h-4 text-gray-600 group-hover:text-cyan-400 flex-shrink-0 transition-colors mt-0.5" />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="text-[11px] font-semibold text-cyan-400 flex-shrink-0">
+                                #{os.numero_os_samsung || os.numero_os_interna || '---'}
                               </span>
-                            )}
+                              <span className="text-[11px] text-white/70 truncate">
+                                {os.cliente_nome || 'Sem nome'}
+                              </span>
+                              {os.numero_os_samsung && os.numero_os_interna && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-orange-500/15 text-orange-400/80 flex-shrink-0">
+                                  SAM
+                                </span>
+                              )}
+                              {os.coluna_kanban && (
+                                <span className="text-[9px] px-1 py-0.5 rounded bg-white/5 text-white/30 flex-shrink-0">
+                                  {os.coluna_kanban.replace(/_/g, ' ')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              {os.defeito_reclamado && (
+                                <span className="text-[10px] text-white/30 truncate">{os.defeito_reclamado}</span>
+                              )}
+                              {os.cliente_telefone && (
+                                <span className="text-[10px] text-white/20 flex-shrink-0">
+                                  {os.cliente_telefone}
+                                </span>
+                              )}
+                            </div>
                           </div>
-                          {os.cliente_telefone && (
-                            <span className="text-[10px] text-white/25 flex-shrink-0 hidden group-hover:block">
-                              {os.cliente_telefone}
-                            </span>
-                          )}
                         </button>
                       ))}
                     </>

@@ -770,6 +770,26 @@ async function processMessage(
       insertData.cliente_foto_url = groupPhotoUrl;
     }
 
+    // Auto-link OS by phone number (only for individual conversations, not groups)
+    if (!groupInfo.isGroup && phoneNumber) {
+      try {
+        const phoneSuffix = phoneNumber.replace(/\D/g, "").slice(-8);
+        if (phoneSuffix.length >= 8) {
+          const { data: matchedOS } = await supabase
+            .from("os")
+            .select("id")
+            .eq("unidade_id", instancia.unidade_id)
+            .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
+            .not("coluna_kanban", "in", '("finalizado","arquivado")')
+            .order("created_at", { ascending: false })
+            .limit(1);
+          if (matchedOS && matchedOS.length > 0) {
+            insertData.os_id = matchedOS[0].id;
+          }
+        }
+      } catch {}
+    }
+
     const { data: newConversa, error: insertError } = await supabase
       .from("atom_connect_conversas")
       .insert(insertData)
