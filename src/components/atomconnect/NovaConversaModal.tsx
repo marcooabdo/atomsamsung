@@ -14,7 +14,7 @@ interface OS {
   cliente_nome: string | null;
   cliente_telefone: string | null;
   defeito_relatado: string | null;
-  status_kanban: string | null;
+  coluna_kanban: string | null;
 }
 
 interface Unidade {
@@ -196,7 +196,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
 
     const { data: osMatch } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, coluna_kanban')
       .eq('unidade_id', selectedUnidadeId)
       .or(`cliente_telefone.eq.${formattedPhone},cliente_telefone.eq.${phoneWithoutDDI},cliente_telefone.ilike.%${phoneWithoutDDI}%`)
       .order('created_at', { ascending: false })
@@ -261,7 +261,7 @@ export function NovaConversaModal({ accentColor, onClose, onConversaCriada }: Pr
     try {
       const { data, error } = await supabase
         .from('os')
-        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban')
+        .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, coluna_kanban')
         .eq('unidade_id', selectedUnidadeId)
         .or(`numero_os_interna.ilike.%${term}%,numero_os_samsung.ilike.%${term}%,cliente_nome.ilike.%${term}%,cliente_telefone.ilike.%${term}%,cliente_cpf_cnpj.ilike.%${term}%`)
         .order('created_at', { ascending: false })

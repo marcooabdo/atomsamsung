@@ -68,7 +68,6 @@ interface OS {
   cliente_nome: string | null;
   cliente_telefone: string | null;
   defeito_relatado: string | null;
-  status_kanban: string | null;
   coluna_kanban: string | null;
 }
 
@@ -618,7 +617,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
           if (targetUnit) {
             const { data: matched } = await supabase
               .from('os')
-              .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban')
+              .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, coluna_kanban')
               .eq('unidade_id', targetUnit)
               .or(`cliente_telefone.ilike.%${phoneSuffix},cliente_telefone_2.ilike.%${phoneSuffix}`)
               .not('coluna_kanban', 'in', '("finalizado","arquivado")')
@@ -634,7 +633,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
     }
     const { data } = await supabase
       .from('os')
-      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban')
+      .select('id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, coluna_kanban')
       .eq('id', conversa.os_id)
       .maybeSingle();
     if (data) setOsData(data);
@@ -1316,7 +1315,7 @@ export function AtomConnectChat({ conversa, onClose, onUpdate, accentColor, unid
   const [loadingAllOS, setLoadingAllOS] = useState(false);
   const [osLoadError, setOsLoadError] = useState<string | null>(null);
 
-  const osSelectFields = 'id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, status_kanban, coluna_kanban';
+  const osSelectFields = 'id, numero_os_interna, numero_os_samsung, cliente_nome, cliente_telefone, defeito_relatado, coluna_kanban';
 
   const getTargetUnidade = () => conversa.unidade_id || unidadeId || unidadeAtual;
 
