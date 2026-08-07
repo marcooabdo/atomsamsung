@@ -1,4 +1,4 @@
-import { MapPin, Clock, Package, Phone, Navigation, CheckCircle, AlertCircle } from 'lucide-react';
+import { MapPin, Clock, Package, Phone, Navigation, CheckCircle, AlertCircle, Wrench, AlertTriangle, RotateCcw } from 'lucide-react';
 import { getStatusColor, getStatusLabel } from './CustomMarker';
 import { normalizarCidade } from '../../lib/cidadeNormalize';
 
@@ -51,6 +51,28 @@ export function OSListCard({ agendamento, isSelected, onClick, showDistance, dis
           </div>
         )}
       </div>
+
+      {agendamento.resultado_visita && (
+        <div className={`flex items-center gap-1.5 mb-3 px-2.5 py-1.5 rounded-md text-xs font-bold border ${
+          agendamento.resultado_visita === 'reparo_sucesso'
+            ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+            : agendamento.resultado_visita === 'peca_defeito'
+            ? 'bg-red-500/15 text-red-400 border-red-500/30'
+            : agendamento.resultado_visita === 'improdutiva_revisita'
+            ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+            : 'bg-gray-500/15 text-gray-400 border-gray-500/30'
+        }`}>
+          {agendamento.resultado_visita === 'reparo_sucesso' ? (
+            <><Wrench className="w-3.5 h-3.5" /> Reparo com Sucesso</>
+          ) : agendamento.resultado_visita === 'peca_defeito' ? (
+            <><AlertTriangle className="w-3.5 h-3.5" /> Peça com Defeito</>
+          ) : agendamento.resultado_visita === 'improdutiva_revisita' ? (
+            <><RotateCcw className="w-3.5 h-3.5" /> Improdutiva / Revisita</>
+          ) : (
+            agendamento.resultado_visita
+          )}
+        </div>
+      )}
 
       <div className="space-y-2">
         <div className="flex items-start justify-between">

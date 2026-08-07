@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, Calendar, MapPin, User, Clock } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, MapPin, User, Clock, Wrench, AlertTriangle, RotateCcw } from 'lucide-react';
 import type { Database } from '../../lib/database.types';
 
 type Agendamento = Database['public']['Tables']['agendamentos']['Row'] & {
@@ -214,6 +214,27 @@ export function AgendamentoCalendario({ agendamentos, onAgendamentoClick }: Agen
                       <p className="text-xs text-gray-400 truncate">
                         {agendamento.tecnico.nome}
                       </p>
+                      {agendamento.resultado_visita && (
+                        <div className={`flex items-center gap-1 mt-1 text-[10px] font-bold ${
+                          agendamento.resultado_visita === 'reparo_sucesso'
+                            ? 'text-emerald-400'
+                            : agendamento.resultado_visita === 'peca_defeito'
+                            ? 'text-red-400'
+                            : agendamento.resultado_visita === 'improdutiva_revisita'
+                            ? 'text-amber-400'
+                            : 'text-gray-400'
+                        }`}>
+                          {agendamento.resultado_visita === 'reparo_sucesso' ? (
+                            <><Wrench className="w-3 h-3" /> Sucesso</>
+                          ) : agendamento.resultado_visita === 'peca_defeito' ? (
+                            <><AlertTriangle className="w-3 h-3" /> Peça Defeito</>
+                          ) : agendamento.resultado_visita === 'improdutiva_revisita' ? (
+                            <><RotateCcw className="w-3 h-3" /> Revisita</>
+                          ) : (
+                            agendamento.resultado_visita
+                          )}
+                        </div>
+                      )}
                     </button>
                   ))}
 
@@ -327,6 +348,19 @@ export function AgendamentoCalendario({ agendamentos, onAgendamentoClick }: Agen
                       <p className="text-white font-semibold truncate text-xs">
                         {agendamento.os.cliente_nome}
                       </p>
+                      {agendamento.resultado_visita && (
+                        <span className={`text-[9px] font-bold ${
+                          agendamento.resultado_visita === 'reparo_sucesso' ? 'text-emerald-400' :
+                          agendamento.resultado_visita === 'peca_defeito' ? 'text-red-400' :
+                          agendamento.resultado_visita === 'improdutiva_revisita' ? 'text-amber-400' :
+                          'text-gray-400'
+                        }`}>
+                          {agendamento.resultado_visita === 'reparo_sucesso' ? 'Sucesso' :
+                           agendamento.resultado_visita === 'peca_defeito' ? 'Peça Defeito' :
+                           agendamento.resultado_visita === 'improdutiva_revisita' ? 'Revisita' :
+                           agendamento.resultado_visita}
+                        </span>
+                      )}
                     </button>
                   ))}
 
