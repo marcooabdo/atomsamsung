@@ -623,12 +623,14 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                          data?.phoneNumber ||
                          null;
 
+      const updateData: Record<string, any> = { status: newStatus };
+      if (phoneNumber) {
+        updateData.phone_number = phoneNumber;
+      }
+
       await supabase
         .from('atom_connect_instancias')
-        .update({
-          status: newStatus,
-          phone_number: phoneNumber
-        })
+        .update(updateData)
         .eq('id', instancia.id);
 
       loadInstancias();
@@ -700,13 +702,14 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                              data?.phoneNumber ||
                              null;
 
+          const pollUpdate: Record<string, any> = { status: 'connected', qr_code: null };
+          if (phoneNumber) {
+            pollUpdate.phone_number = phoneNumber;
+          }
+
           await supabase
             .from('atom_connect_instancias')
-            .update({
-              status: 'connected',
-              phone_number: phoneNumber,
-              qr_code: null
-            })
+            .update(pollUpdate)
             .eq('id', instancia.id);
 
           if (qrPollingRef.current) {
