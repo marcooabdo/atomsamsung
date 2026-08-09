@@ -23,6 +23,7 @@ interface Instancia {
   status: 'connected' | 'disconnected' | 'connecting';
   qr_code: string | null;
   phone_number: string | null;
+  phone_number_id: string | null;
   created_at: string;
 }
 
@@ -61,7 +62,7 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const [qrCodeModal, setQrCodeModal] = useState<{ instancia: Instancia; qrCode: string } | null>(null);
   const qrPollingRef = useRef<NodeJS.Timeout | null>(null);
   const [editingInstance, setEditingInstance] = useState<Instancia | null>(null);
-  const [editForm, setEditForm] = useState({ nome: '', observacao: '' });
+  const [editForm, setEditForm] = useState({ nome: '', observacao: '', phone_number: '', phone_number_id: '' });
   const [savingEdit, setSavingEdit] = useState(false);
 
   const [newInstance, setNewInstance] = useState({
@@ -450,7 +451,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
   const openEditModal = (instancia: Instancia) => {
     setEditForm({
       nome: instancia.nome,
-      observacao: instancia.observacao || ''
+      observacao: instancia.observacao || '',
+      phone_number: instancia.phone_number || '',
+      phone_number_id: instancia.phone_number_id || ''
     });
     setEditingInstance(instancia);
   };
@@ -472,7 +475,9 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
       .from('atom_connect_instancias')
       .update({
         nome: editForm.nome.trim(),
-        observacao: editForm.observacao.trim() || null
+        observacao: editForm.observacao.trim() || null,
+        phone_number: editForm.phone_number.trim() || null,
+        phone_number_id: editForm.phone_number_id.trim() || null
       })
       .eq('id', editingInstance.id);
 
@@ -1093,6 +1098,11 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                               <span className="text-sm text-green-400 font-medium">
                                 {instancia.phone_number}
                               </span>
+                              {instancia.phone_number_id && (
+                                <span className="text-xs text-gray-500">
+                                  ID: {instancia.phone_number_id}
+                                </span>
+                              )}
                             </div>
                           )}
                           {instancia.status === 'disconnected' && (
@@ -1947,6 +1957,30 @@ export function AtomConnectSettings({ accentColor, unidadeId }: Props) {
                     value={editForm.nome}
                     onChange={(e) => setEditForm(prev => ({ ...prev, nome: e.target.value }))}
                     placeholder="Ex: WhatsApp Comercial"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Numero de Telefone
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.phone_number}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, phone_number: e.target.value }))}
+                    placeholder="Ex: 5538999216700"
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Phone Number ID (WhatsApp Business API)
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.phone_number_id}
+                    onChange={(e) => setEditForm(prev => ({ ...prev, phone_number_id: e.target.value }))}
+                    placeholder="Ex: 1286267577901515"
                     className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder-gray-500 focus:outline-none focus:border-white/20"
                   />
                 </div>
