@@ -3,7 +3,8 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { UnitFilter } from '../components/UnitFilter';
 import { OSModal } from '../components/OSModal';
-import { Archive, Search, RotateCcw, Loader2, FileX, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Archive, Search, RotateCcw, Loader2, FileX, ChevronLeft, ChevronRight, Download } from 'lucide-react';
+import { exportOSFechadasExcel } from '../lib/exportOSFechadas';
 
 type OS = {
   id: string;
@@ -24,7 +25,7 @@ type OS = {
 const PAGE_SIZE = 50;
 
 export function OSArquivadas() {
-  const { usuario } = useAuth();
+  const { usuario, allUserUnits } = useAuth();
   const [os, setOs] = useState<OS[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,6 +35,7 @@ export function OSArquivadas() {
   const [page, setPage] = useState(0);
   const [total, setTotal] = useState(0);
   const [restaurando, setRestaurando] = useState<string | null>(null);
+  const [exportingArquivadas, setExportingArquivadas] = useState(false);
 
   const canSeeAllUnits = (usuario?.tipo === 'master' || usuario?.tipo === 'diretoria') && !usuario?.unidade_id;
 
@@ -176,6 +178,38 @@ export function OSArquivadas() {
             style={{ color: 'var(--text-primary)' }}
           />
         </div>
+        <button
+          onClick={async () => {
+            if (exportingArquivadas) return;
+            setExportingArquivadas(true);
+            try {
+              const count = await exportOSFechadasExcel({
+                unidadeId: selectedUnidade || undefined,
+                allUserUnits: allUserUnits?.length > 0 ? allUserUnits : undefined,
+                arquivadas: true,
+              });
+              if (count === 0) alert('Nenhuma OS arquivada encontrada.');
+            } catch (err) {
+              console.error(err);
+              alert('Erro ao exportar. Tente novamente.');
+            }
+            setExportingArquivadas(false);
+          }}
+          disabled={exportingArquivadas}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-[1.02]"
+          style={{
+            background: exportingArquivadas ? 'var(--bg-tertiary)' : 'linear-gradient(135deg, #10B981, #059669)',
+            color: '#fff',
+            opacity: exportingArquivadas ? 0.6 : 1,
+          }}
+        >
+          {exportingArquivadas ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Download className="w-4 h-4" />
+          )}
+          Download Excel
+        </button>
       </div>
 
       <div

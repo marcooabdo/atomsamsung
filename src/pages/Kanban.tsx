@@ -18,6 +18,7 @@ import { VirtualizedColumn } from '../components/kanban/VirtualizedColumn';
 import { Search, AlertCircle, Activity, Zap, Clock, Plus, MapPin, CheckCircle, RefreshCw, Filter, ChevronDown, Download, X, Settings } from 'lucide-react';
 import type { Database } from '../lib/database.types';
 import { geocodeAddress } from '../lib/geocoding';
+import { exportOSFechadasExcel } from '../lib/exportOSFechadas';
 
 type OS = Database['public']['Tables']['os']['Row'];
 
@@ -206,6 +207,7 @@ export function Kanban() {
     } catch { return []; }
   });
   const [showExportModal, setShowExportModal] = useState(false);
+  const [exportingFechadas, setExportingFechadas] = useState(false);
   const [searchMatchSource, setSearchMatchSource] = useState<Record<string, 'hidden' | 'visible'>>({});
   const [routePickerOS, setRoutePickerOS] = useState<OS | null>(null);
   const [showConfirmMove, setShowConfirmMove] = useState(false);
@@ -2515,6 +2517,36 @@ export function Kanban() {
                               title="Valor total das pecas em transito"
                             >
                               R$ {valorTotalPecaEmTransito.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                            </button>
+                          )}
+                          {coluna.id === 'os_fechada' && (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (exportingFechadas) return;
+                                setExportingFechadas(true);
+                                try {
+                                  const count = await exportOSFechadasExcel({
+                                    unidadeId: selectedUnidade || undefined,
+                                    allUserUnits: allUserUnits.length > 0 ? allUserUnits : undefined,
+                                  });
+                                  if (count === 0) alert('Nenhuma OS fechada encontrada.');
+                                } catch (err) {
+                                  console.error(err);
+                                  alert('Erro ao exportar. Tente novamente.');
+                                }
+                                setExportingFechadas(false);
+                              }}
+                              className="p-1 rounded-lg transition-all hover:scale-110"
+                              style={{
+                                background: exportingFechadas ? '#6B728020' : '#10B98115',
+                                border: `1px solid ${exportingFechadas ? '#6B728040' : '#10B98135'}`,
+                                color: exportingFechadas ? '#6B7280' : '#10B981'
+                              }}
+                              title="Download Excel - OS Fechadas"
+                              disabled={exportingFechadas}
+                            >
+                              <Download className={`w-3 h-3 ${exportingFechadas ? 'animate-pulse' : ''}`} />
                             </button>
                           )}
                           <div className="relative" data-sort-dropdown>
